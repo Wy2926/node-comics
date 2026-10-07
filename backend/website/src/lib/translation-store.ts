@@ -49,6 +49,9 @@ export interface RecordData {
   input?: Blob;
   result?: Blob;
 }
+export function recordOrder(a: Pick<RecordMeta, 'created' | 'id'>, b: Pick<RecordMeta, 'created' | 'id'>) {
+  return b.created - a.created || a.id.localeCompare(b.id);
+}
 const BUDGET = 256 * 1024 * 1024;
 const MAX_RECORDS = 200;
 let opening: Promise<IDBDatabase> | undefined;
@@ -105,7 +108,7 @@ export async function listRecords(scopes: string[]) {
       ),
     ),
   );
-  return (rows.flat() as RecordMeta[]).sort((a, b) => b.created - a.created);
+  return (rows.flat() as RecordMeta[]).sort(recordOrder);
 }
 export async function readImages(id: string): Promise<RecordData | undefined> {
   return result(

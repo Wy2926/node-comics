@@ -9,7 +9,8 @@ import {commerce as uk} from './extra/uk';
 import {commerce as tr} from './extra/tr';
 import {commerce as vi} from './extra/vi';
 import {commerce as id} from './extra/id';
-const copies = {'fr':fr,'es':es,'pt-BR':ptBR,'de':de,'it':it,'ru':ru,'pl':pl,'uk':uk,'tr':tr,'vi':vi,'id':id};
+import {commerce as ar} from './extra/ar';
+const copies = {'fr':fr,'es':es,'pt-BR':ptBR,'de':de,'it':it,'ru':ru,'pl':pl,'uk':uk,'tr':tr,'vi':vi,'id':id,'ar':ar};
 export const commerceCopy = (locale:string) => copies[locale as keyof typeof copies];
 export function formatCopy(template:string,values:Record<string,string|number>) {
   return template.replace(/\{(\w+)\}/g,(token,key)=>String(values[key]??token));

@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Tryby rozszerzeń",
               "Zwykłe tłumaczenie",
-              "Zwykłe tłumaczenie w rozszerzeniu; przerysowywanie AI tylko w internetowym obszarze roboczym przy odpowiednich uprawnieniach"
+              "Standardowe tłumaczenie w rozszerzeniu"
             ],
             [
               "Koszty",

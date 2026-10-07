@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Apri una storia che hai il diritto di leggere. Traduci quando vuoi e tieni l’originale a portata di mano.",
     "ctaButton": "Inizia il tuo viaggio di lettura",
     "pricingTitle": "Leggi gratuitamente. Scegli il tuo piano di traduzione.",
-    "pricingDescription": "Confronta i piani Gratuito e Lite: pagine gratuite ogni giorno, fino a 1.200 nuove richieste in ogni finestra mobile di un’ora e fatturazione mensile o annuale. Lite non include il ridisegno con IA. I nuovi account idonei hanno una prova di 7 giorni.",
+    "pricingDescription": "Confronta i piani Gratuito e Lite: pagine gratuite ogni giorno, fino a 1.200 nuove richieste in ogni finestra mobile di un’ora e fatturazione mensile o annuale. I nuovi account idonei hanno una prova di 7 giorni.",
     "freePlan": "Gratuito",
     "freePlanDescription": "Per una piccola lettura ogni giorno",
     "free": "gratuito",
@@ -92,7 +92,7 @@ export default {
       "Accesso ai risultati esistenti validi",
       "Fino a 10 nuove immagini di traduzione ogni 60 secondi consecutivi"
     ],
-    "freeNote": "Il ridisegno con IA nel piano Gratuito richiede un bonus promozionale valido. Il limite giornaliero si azzera secondo il fuso Asia/Shanghai e le pagine inutilizzate non si accumulano.",
+    "freeNote": "Il limite giornaliero si azzera secondo il fuso Asia/Shanghai e le pagine inutilizzate non si accumulano.",
     "quotaNote": "Ogni versione di un’immagine generata correttamente nella modalità e nella lingua scelte conta come una pagina. Le richieste duplicate e il riutilizzo di risultati validi non vengono addebitati due volte. Una nuova traduzione richiesta esplicitamente usa i diritti attuali. I totali illimitati restano soggetti ai limiti di frequenza, immagine e capacità del servizio; non è garantita una velocità di completamento.",
     "downloadTitle": "Installa l'estensione del tuo traduttore manga",
     "downloadDescription": "Ottieni NodeLane Comics per Chrome, Edge o Firefox. Apri Chrome Web Store, Edge Add-ons o Firefox Add-ons, oppure scarica il pacchetto per il tuo browser.",
@@ -198,7 +198,7 @@ export default {
     {
       "title": "Traduzione classica nell’estensione",
       "paragraphs": [
-        "L’estensione offre traduzione classica: rilevamento del testo, riconoscimento OCR, traduzione, rimozione e reinserimento del testo. Puoi tornare all’originale o confrontare le due immagini affiancate. Il ridisegno con IA è stato rimosso dall’estensione.",
+        "L’estensione offre traduzione classica: rilevamento del testo, riconoscimento OCR, traduzione, rimozione e reinserimento del testo. Puoi tornare all’originale o confrontare le due immagini affiancate.",
         "Il riconoscimento e la traduzione possono omettere parole o interpretare male nomi, effetti sonori e contesto. Controlla anche la disposizione del testo. Confronta più pagine rappresentative con gli originali; una formulazione scorrevole non garantisce precisione."
       ]
     },
@@ -206,14 +206,14 @@ export default {
       "title": "Servizio ufficiale NodeLane",
       "paragraphs": [
         "Accedi al tuo account NodeLane per usare il servizio ufficiale. Le immagini selezionate vengono elaborate a distanza secondo i diritti e i limiti mostrati nell’account. I risultati validi possono essere riutilizzati secondo le regole di conservazione.",
-        "La tariffa gratuita include 30 pagine classiche al giorno. Lite non ha un limite totale giornaliero o mensile, con un massimo di 1.200 nuove pagine per finestra mobile di un’ora e nessun ridisegno con IA incluso. Si applicano ancora limiti di frequenza, immagine e capacità del servizio a breve termine."
+        "La tariffa gratuita include 30 pagine classiche al giorno. Lite non ha un limite totale giornaliero o mensile, con un massimo di 1.200 nuove pagine per finestra mobile di un’ora. Si applicano ancora limiti di frequenza, immagine e capacità del servizio a breve termine."
       ]
     },
     {
       "title": "Lo spazio web di traduzione delle immagini",
       "paragraphs": [
-        "Il sito accetta JPG, PNG e WebP, con una prova per ospiti o la quota del tuo account. Il ridisegno con IA resta disponibile lì solo quando i tuoi diritti lo consentono; non è presente nell’estensione attuale.",
-        "In questo spazio web, il ridisegno può modificare linee, personaggi o sfondi. Confronta sempre con l’originale. Ogni modalità e lingua ha risultati distinti e si applicano le regole di accesso e fatturazione mostrate."
+        "Il sito accetta JPG, PNG e WebP, con una prova per ospiti o la quota del tuo account.",
+        "Confronta sempre con l’originale. Ogni lingua di destinazione ha risultati distinti, soggetti alle regole di accesso e fatturazione mostrate."
       ]
     },
     {
@@ -345,7 +345,7 @@ export default {
     {
       "title": "Traduzione e conservazione",
       "paragraphs": [
-        "L’estensione attuale offre soltanto traduzione classica. Il ridisegno con IA descritto qui riguarda lo spazio web di traduzione delle immagini, secondo i diritti disponibili. La traduzione classica utilizza il riconoscimento, la traduzione del testo, la pulizia e la composizione. Il ridisegno con IA invia le immagini della pagina a un modello di immagine. Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti; Il ridisegno con IA mantiene i risultati completi. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database.",
+        "L’estensione attuale offre soltanto traduzione classica. La traduzione classica utilizza il riconoscimento, la traduzione del testo, la pulizia e la composizione. Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database.",
         "I risultati vengono riutilizzati solo all'interno dello stesso account quando contenuto, modalità, lingua e configurazione effettiva coincidono e rimane una richiesta valida. Gli originali e i risultati non vengono condivisi tra gli utenti. Il browser combina le sovrapposizioni con la propria immagine originale; il server non conserva copie originali permanenti."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Fornitori di servizi e trasferimenti",
             "paragraphs": [
-              "L’estensione attuale offre soltanto traduzione classica. Il ridisegno con IA descritto qui riguarda lo spazio web di traduzione delle immagini, secondo i diritti disponibili. L'elaborazione classica può comportare il rilevamento/OCR, modelli di testo, riparazione dello sfondo locale e composizione. I fornitori di testo elaborano il testo riconosciuto necessario per la traduzione; i fornitori di ridisegno elaborano l'immagine e la lingua della pagina. I provider effettivi sono configurati sul server per l'attività.",
+              "L’estensione attuale offre soltanto traduzione classica. L'elaborazione classica può comportare il rilevamento/OCR, modelli di testo, riparazione dello sfondo locale e composizione. I fornitori di testo elaborano il testo riconosciuto necessario per la traduzione. I provider effettivi sono configurati sul server per l'attività.",
               "Le immagini di traduzione utilizzano file privati sul server centrale; il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database. I servizi di identità, infrastruttura, traduzione e pagamento elaborano i dati secondo necessità, in base alle politiche applicabili. L'elaborazione potrebbe avvenire al di fuori della tua regione. Non vendiamo informazioni personali né utilizziamo i fumetti inviati per il targeting degli annunci. Non promettiamo che tutti i fornitori non conservino nulla o non utilizzino mai i dati per la formazione; questo dipende dal fornitore e dal contratto. Non inviare contenuti sensibili non autorizzati o non idonei."
             ]
           },
           {
             "title": "Conservazione e cancellazione",
             "paragraphs": [
-              "Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti; Il ridisegno con IA mantiene i risultati completi. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database.",
+              "Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database.",
               "I risultati vengono riutilizzati solo all'interno dello stesso account quando contenuto, modalità, lingua e configurazione effettiva coincidono e rimane una richiesta valida. Gli originali e i risultati non vengono condivisi tra gli utenti. Il browser combina le sovrapposizioni con la propria immagine originale; il server non conserva copie originali permanenti. L'eliminazione di un record di traduzione revoca immediatamente l'accesso al server di quella richiesta. Altre richieste valide nel tuo account rimangono utilizzabili; il file dei risultati viene rimosso dopo la revoca dell'ultima richiesta valida. Le copie scaricate o memorizzate nella cache potrebbero rimanere sul tuo dispositivo finché non le cancelli.",
               "Per richieste di eliminazione di account o più ampie, contattaci per la verifica dell'identità e dell'ambito. Potrebbe essere necessario conservare i registri di transazioni, controlli o sicurezza per obblighi di servizio, controversie o requisiti applicabili. Non è prevista alcuna scadenza unica per la cancellazione di tutti i record; la risposta spiegherà il risultato e i vincoli."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Diritti sui contenuti e risultati dell'intelligenza artificiale",
             "paragraphs": [
               "Devi avere il diritto di accedere, caricare, tradurre ed elaborare i contenuti selezionati e rispettare i requisiti del sito di origine e del titolare dei diritti. L'estensione non concede alcun diritto d'autore o autorizzazione automatica per pubblicare immagini tradotte. Non ignorare paywall, requisiti di accesso o DRM. Non garantiamo la legalità o la completezza del contenuto originale. Le richieste di copyright dovrebbero identificare l'opera, i diritti, il problema e le informazioni di contatto.",
-              "L’IA può omettere, tradurre male o posizionare in modo errato il testo. Nello spazio web di traduzione delle immagini, il ridisegno con IA può anche modificare le illustrazioni quando questa modalità è disponibile secondo i tuoi diritti. I risultati aiutano la lettura e non sostituiscono gli originali o una verifica professionale. Le illustrazioni originali del sito sono generate con IA; i confronti linguistici sono esempi registrati di traduzione classica. Non garantiscono precisione o velocità per ogni immagine. Puoi confrontare gli originali e inviare feedback."
+              "L’IA può omettere, tradurre male o posizionare in modo errato il testo. I risultati aiutano la lettura e non sostituiscono gli originali o una verifica professionale. Le illustrazioni originali del sito sono generate con IA; i confronti linguistici sono esempi registrati di traduzione classica. Non garantiscono precisione o velocità per ogni immagine. Puoi confrontare gli originali e inviare feedback."
             ]
           },
           {
             "title": "Vantaggi e abbonamenti",
             "paragraphs": [
-              "I piani Gratuito e Lite, gli abbonamenti PLUS esistenti, le prove e i bonus seguono le proprie scadenze e regole sulle pagine, indicate nell’account. Lite accetta fino a 1.200 nuove pagine in ogni finestra mobile di un’ora e non include il ridisegno con IA. L’assenza di un limite totale giornaliero o mensile non elimina i limiti di frequenza, immagine o capacità del servizio.",
+              "I piani Gratuito e Lite, gli abbonamenti PLUS esistenti, le prove e i bonus seguono le proprie scadenze e regole sulle pagine, indicate nell’account. Lite accetta fino a 1.200 nuove pagine in ogni finestra mobile di un’ora. L’assenza di un limite totale giornaliero o mensile non elimina i limiti di frequenza, immagine o capacità del servizio.",
               "Gli abbonamenti offrono fatturazione mensile o annuale. Prezzi, prove e limiti di pagine seguono l'offerta selezionata, che si rinnova automaticamente con quell'intervallo. Le variazioni di prezzo si applicano ai nuovi abbonamenti; gli abbonamenti esistenti mantengono il prezzo originale e la versione dei vantaggi. Annulla prima del rinnovo."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Prova e fatturazione",
             "paragraphs": [
               "Gli abbonamenti offrono fatturazione mensile o annuale. Prezzi, prove e limiti di pagine seguono l'offerta selezionata, che si rinnova automaticamente con quell'intervallo. Le variazioni di prezzo si applicano ai nuovi abbonamenti; gli abbonamenti esistenti mantengono il prezzo originale e la versione dei vantaggi. Annulla prima del rinnovo.",
-              "Le pagine di ridisegno vengono assegnate ogni mese, anche con i piani annuali, e quelle inutilizzate non si accumulano. Gli account idonei possono iniziare la prova indicata per il proprio piano, che richiede una carta. Abbonarsi di nuovo o scegliere un altro piano non ripristina l’idoneità alla prova."
+              "Gli account idonei possono iniziare la prova indicata per il proprio piano, che richiede una carta. Abbonarsi di nuovo o scegliere un altro piano non ripristina l’idoneità alla prova."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "La traduzione dei manga è gratuita e cosa include Lite?",
-        "answer": "Leggere gli originali locali è gratuito e non richiede un account. La traduzione ufficiale richiede l’accesso; il piano Gratuito include 30 pagine classiche al giorno. Lite costa 5,99 USD al mese o 59,99 USD all’anno, senza limite totale giornaliero o mensile per la traduzione classica e con fino a 1.200 nuove pagine in ogni finestra mobile di un’ora. Si applicano limiti di frequenza e capacità. Il ridisegno con IA non è incluso. I nuovi account idonei hanno una prova di 7 giorni con carta. PLUS non è disponibile per nuovi acquisti; gli abbonamenti esistenti mantengono i vantaggi indicati. Imposte e importo finale sono mostrati al pagamento.",
+        "answer": "Leggere gli originali locali è gratuito e non richiede un account. La traduzione ufficiale richiede l’accesso; il piano Gratuito include 30 pagine classiche al giorno. Lite costa 5,99 USD al mese o 59,99 USD all’anno, senza limite totale giornaliero o mensile per la traduzione classica e con fino a 1.200 nuove pagine in ogni finestra mobile di un’ora. Si applicano limiti di frequenza e capacità. I nuovi account idonei hanno una prova di 7 giorni con carta. PLUS non è disponibile per nuovi acquisti; gli abbonamenti esistenti mantengono i vantaggi indicati. Imposte e importo finale sono mostrati al pagamento.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Quale traduzione offre l’estensione e quale servizio posso scegliere?",
-        "answer": "L’estensione attuale offre soltanto traduzione classica, con confronto e ritorno all’originale. Usa il servizio ufficiale con il tuo account o collega il tuo manga-translator-ui senza quota ufficiale. Il ridisegno con IA resta una funzione dello spazio web di traduzione delle immagini, quando i tuoi diritti lo consentono.",
+        "answer": "L’estensione attuale offre soltanto traduzione classica, con confronto e ritorno all’originale. Usa il servizio ufficiale con il tuo account o collega il tuo manga-translator-ui senza quota ufficiale.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Le immagini vengono caricate o conservate?",
-        "answer": "Quando usi la traduzione ufficiale, si applicano le seguenti regole di conservazione. La traduzione invia le immagini della pagina selezionata al backend e ai relativi fornitori. Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti; Il ridisegno con IA mantiene i risultati completi. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database. L'eliminazione di un record di traduzione revoca immediatamente l'accesso al server di quella richiesta. Altre richieste valide nel tuo account rimangono utilizzabili; il file dei risultati viene rimosso dopo la revoca dell'ultima richiesta valida. Le copie scaricate o memorizzate nella cache potrebbero rimanere sul tuo dispositivo finché non le cancelli. I cookie di origine, i token di accesso e la cronologia di navigazione non vengono caricati. L’estensione attuale offre soltanto traduzione classica. Il ridisegno con IA descritto qui riguarda lo spazio web di traduzione delle immagini, secondo i diritti disponibili. Con MTU, le immagini vengono inviate direttamente al servizio selezionato; elaborazione e conservazione dipendono dalla sua configurazione.",
+        "answer": "Quando usi la traduzione ufficiale, si applicano le seguenti regole di conservazione. La traduzione invia le immagini della pagina selezionata al backend e ai relativi fornitori. Gli originali sono file temporanei sul server centrale e sui nodi di calcolo, eliminati dopo che un'attività viene completata, fallisce o viene annullata. La traduzione classica mantiene i file sovrapposti. I risultati rimangono privati ​​finché il tuo account ha una richiesta valida. Il testo riconosciuto, le traduzioni e i metadati necessari vengono archiviati nel database. L'eliminazione di un record di traduzione revoca immediatamente l'accesso al server di quella richiesta. Altre richieste valide nel tuo account rimangono utilizzabili; il file dei risultati viene rimosso dopo la revoca dell'ultima richiesta valida. Le copie scaricate o memorizzate nella cache potrebbero rimanere sul tuo dispositivo finché non le cancelli. I cookie di origine, i token di accesso e la cronologia di navigazione non vengono caricati. L’estensione attuale offre soltanto traduzione classica. Con MTU, le immagini vengono inviate direttamente al servizio selezionato; elaborazione e conservazione dipendono dalla sua configurazione.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Le traduzioni fallite utilizzano pagine?",
-        "answer": "Per le attività ufficiali del tuo account, le pagine possono essere riservate prima dell’elaborazione e conteggiate dopo una consegna riuscita. Un errore esplicito libera la riserva, così come un risultato classico confermato senza testo o con riconoscimento parziale e l’originale conservato. Se il risultato di un ridisegno con IA resta sconosciuto nello spazio web, quando questa modalità è disponibile secondo i tuoi diritti, viene prima verificato e le pagine possono restare temporaneamente riservate. MTU non consuma la quota ufficiale di NodeLane. La prova per ospiti segue separatamente le regole delle richieste accettate mostrate nello spazio web, dove anche gli errori possono contare.",
+        "answer": "Per le attività ufficiali del tuo account, le pagine possono essere riservate prima dell’elaborazione e conteggiate dopo una consegna riuscita. Un errore esplicito libera la riserva, così come un risultato classico confermato senza testo o con riconoscimento parziale e l’originale conservato. MTU non consuma la quota ufficiale di NodeLane. La prova per ospiti segue separatamente le regole delle richieste accettate mostrate nello spazio web, dove anche gli errori possono contare.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Come funzionano i limiti di traduzione Lite?",
-        "answer": "Lo stesso account condivide un limite di 100 nuove immagini da tradurre in ogni finestra mobile di 60 secondi e di 1.200 in ogni finestra mobile di 3.600 secondi, tra tutti i dispositivi, modalità e lingue. Il piano Gratuito ne consente 10 in ogni finestra mobile di 60 secondi. Ripetere la stessa richiesta o riutilizzare risultati validi non conta di nuovo. Le attività accettate contano anche se falliscono, vengono annullate o non contengono testo. Le richieste rifiutate e le transazioni di database annullate liberano il posto prenotato nella quota oraria. I nuovi tentativi seguono le effettive regole di ammissione delle nuove attività. Questi limiti non garantiscono una velocità di completamento. Lite non include il ridisegno con IA.",
+        "answer": "Lo stesso account condivide un limite di 100 nuove immagini da tradurre in ogni finestra mobile di 60 secondi e di 1.200 in ogni finestra mobile di 3.600 secondi, tra tutti i dispositivi, modalità e lingue. Il piano Gratuito ne consente 10 in ogni finestra mobile di 60 secondi. Ripetere la stessa richiesta o riutilizzare risultati validi non conta di nuovo. Le attività accettate contano anche se falliscono, vengono annullate o non contengono testo. Le richieste rifiutate e le transazioni di database annullate liberano il posto prenotato nella quota oraria. I nuovi tentativi seguono le effettive regole di ammissione delle nuove attività. Questi limiti non garantiscono una velocità di completamento.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Gratuito",
     "常规翻译": "Traduzione classica",
     "不限累计页数": "Pagine totali illimitate",
-    "AI 重绘可用额度": "Pagine di ridisegno con IA disponibili",
     "页": " pagine",
     " 页可用": " pagine disponibili",
     "你的阅读权益": "I tuoi benefici nella lettura",

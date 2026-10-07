@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Uzatma modları",
               "Normal çeviri",
-              "Uzantıda normal çeviri; AI yeniden çizim yalnızca web çalışma alanında uygun haklarla"
+              "Uzantıda standart çeviri"
             ],
             [
               "Maliyetler",

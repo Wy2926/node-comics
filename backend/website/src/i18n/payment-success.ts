@@ -9,6 +9,7 @@ import {paymentSuccess as uk} from './extra/uk';
 import {paymentSuccess as tr} from './extra/tr';
 import {paymentSuccess as vi} from './extra/vi';
 import {paymentSuccess as id} from './extra/id';
+import {paymentSuccess as ar} from './extra/ar';
 import type {Locale} from './types';
 
 interface Copy {title:string;description:string;heading:string;body:string;hint:string;home:string;footer:string}
@@ -23,7 +24,7 @@ export const paymentSuccess:Record<Locale,Copy> = {
   'uk':uk,
   'tr':tr,
   'vi':vi,
-  'id':id,
+  'id':id,'ar':ar,
 
   'zh-CN': {title:'支付成功',description:'已完成 订阅流程，回到插件继续阅读。',heading:'回到故事里，继续精彩。',body:'感谢你选择 NodeLane Comics。现在可以切回插件，继续你的漫画旅程。',hint:'会员权益会自动同步。若暂未更新，请在插件「我的账户」中点击刷新。',home:'返回官网',footer:'你可以放心关闭此页面。'},
   'zh-TW': {title:'支付成功',description:'已完成 訂閱流程，回到擴充功能繼續閱讀。',heading:'回到故事裡，繼續精彩。',body:'感謝你選擇 NodeLane Comics。現在可以切回擴充功能，繼續你的漫畫旅程。',hint:'會員權益會自動同步。若尚未更新，請在擴充功能「我的帳戶」中點擊重新整理。',home:'返回官網',footer:'你可以放心關閉此頁面。'},

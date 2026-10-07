@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Zostaw tłumaczenie NodeLane Comics. Zachowaj swoją uwagę na następną stronę.",
     "ctaButton": "Rozpocznij swoją podróż czytelniczą",
     "pricingTitle": "Czytaj za darmo. Wybierz swój plan tłumaczeń.",
-    "pricingDescription": "Porównaj plan bezpłatny i Lite: bezpłatne strony każdego dnia, do 1 200 nowych żądań w ruchomym oknie godzinnym oraz płatność miesięczna lub roczna. Lite nie obejmuje przerysowania przez AI. Nowe konta spełniające warunki otrzymują 7-dniowy okres próbny.",
+    "pricingDescription": "Porównaj plan bezpłatny i Lite: bezpłatne strony każdego dnia, do 1 200 nowych żądań w ruchomym oknie godzinnym oraz płatność miesięczna lub roczna. Nowe konta spełniające warunki otrzymują 7-dniowy okres próbny.",
     "freePlan": "Bezpłatny",
     "freePlanDescription": "Do codziennej lektury",
     "free": "bezpłatny",
@@ -92,7 +92,7 @@ export default {
       "Dostęp do aktualnych, aktualnych wyników",
       "Do 10 nowych obrazów tłumaczeniowych na przewijanie 60 sekund"
     ],
-    "freeNote": "Przerysowanie przez AI w planie bezpłatnym wymaga aktywnego limitu promocyjnego. Limit dzienny jest odnawiany według strefy Asia/Shanghai, a niewykorzystane strony nie są przenoszone.",
+    "freeNote": "Limit dzienny jest odnawiany według strefy Asia/Shanghai, a niewykorzystane strony nie są przenoszone.",
     "quotaNote": "Jedna pomyślnie utworzona wersja obrazu w wybranym trybie i języku liczy się jako jedna strona. Powtórzone żądania i ponowne użycie ważnych wyników nie są rozliczane podwójnie. Wyraźne zlecenie nowego tłumaczenia wykorzystuje aktualne uprawnienia. Nawet bez łącznego limitu obowiązują krótkoterminowe ograniczenia częstotliwości żądań, obrazów i dostępnej mocy usługi; szybkość wykonania nie jest gwarantowana.",
     "downloadTitle": "Zainstaluj rozszerzenie tłumacza mangi",
     "downloadDescription": "Pobierz NodeLane Comics dla Chrome, Edge lub Firefox. Otwórz Chrome Web Store, Edge Add-ons lub Firefox Add-ons albo pobierz pakiet dla swojej przeglądarki.",
@@ -192,14 +192,14 @@ export default {
   ],
   "minutes": 5,
   "title": "Zwykłe tłumaczenie mangi: oficjalny kanał czy własny MTU?",
-  "description": "Jak działa zwykłe tłumaczenie w rozszerzeniu, czym różnią się oficjalny kanał i manga-translator-ui oraz gdzie dostępne jest przerysowywanie AI.",
+  "description": "Jak działa zwykłe tłumaczenie w rozszerzeniu i czym różnią się oficjalny kanał i manga-translator-ui.",
   "category": "Wskazówki dotyczące tłumaczeń",
   "sections": [
     {
       "title": "Jak działa zwykłe tłumaczenie",
       "paragraphs": [
         "Rozszerzenie wykrywa tekst, rozpoznaje go przez OCR, tłumaczy, odtwarza tło w obszarze tekstu i umieszcza wynik na stronie. Oryginał pozostaje dostępny do porównania.",
-        "Bieżące rozszerzenie korzysta wyłącznie ze zwykłego tłumaczenia. Przerysowywanie AI pozostaje w internetowym obszarze roboczym obrazów przy odpowiednich uprawnieniach konta; jego obecność na stronie nie oznacza obsługi w czytniku."
+        "Bieżące rozszerzenie korzysta wyłącznie ze zwykłego tłumaczenia."
       ]
     },
     {
@@ -315,7 +315,7 @@ export default {
       "title": "Najpierw rozwiąż pierwotne zadanie",
       "paragraphs": [
         "Oficjalne zadania są zapisywane na serwerze: zamknięcie strony lub krótka utrata połączenia nie oznacza anulowania. Po przywróceniu połączenia poczekaj na stan pierwotnego zadania. Jeśli używasz MTU, sprawdź wykonanie w samej usłudze.",
-        "Jeśli wynik jest jeszcze nieznany, najpierw sprawdź stan zadania zamiast tworzyć kolejne wersje. W internetowym obszarze roboczym przerysowywanie AI może tymczasowo rezerwować limit do sprawdzenia wyniku; rozszerzenie korzysta ze zwykłego tłumaczenia."
+        "Jeśli wynik jest jeszcze nieznany, najpierw sprawdź stan zadania zamiast tworzyć kolejne wersje."
       ]
     },
     {
@@ -345,7 +345,7 @@ export default {
     {
       "title": "Tłumaczenie i przechowywanie",
       "paragraphs": [
-        "Rozszerzenie używa zwykłego tłumaczenia. Przerysowywanie AI jest dostępne w internetowym obszarze roboczym przy odpowiednich uprawnieniach konta. Tłumaczenie klasyczne wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Funkcja Redraw wysyła obrazy stron do modelu obrazu. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek; Przerysowanie AI pozwala zachować pełne wyniki. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+        "Rozszerzenie używa zwykłego tłumaczenia. Tłumaczenie klasyczne wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
         "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Usługodawcy i transfery",
             "paragraphs": [
-              "Rozszerzenie używa zwykłego tłumaczenia. Przerysowywanie AI jest dostępne w internetowym obszarze roboczym przy odpowiednich uprawnieniach konta. Klasyczne przetwarzanie może obejmować wykrywanie/OCR, modele tekstowe, lokalną naprawę tła i skład. Dostawcy tekstu przetwarzają rozpoznany tekst potrzebny do tłumaczenia; dostawcy usług reraw przetwarzają obraz i język strony. Rzeczywiści dostawcy są skonfigurowani na serwerze dla tego zadania.",
+              "Rozszerzenie używa zwykłego tłumaczenia. Klasyczne przetwarzanie może obejmować wykrywanie/OCR, modele tekstowe, lokalną naprawę tła i skład. Dostawcy tekstu przetwarzają rozpoznany tekst potrzebny do tłumaczenia. Rzeczywiści dostawcy są skonfigurowani na serwerze dla tego zadania.",
               "Obrazy tłumaczeń korzystają z prywatnych plików na serwerze centralnym; rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usługi związane z tożsamością, infrastrukturą, tłumaczeniami i płatnościami przetwarzają dane w razie potrzeby, zgodnie z obowiązującymi politykami. Przetwarzanie może odbywać się poza Twoim regionem. Nie sprzedajemy danych osobowych ani nie wykorzystujemy przesłanych komiksów do kierowania reklam. Nie obiecujemy, że wszyscy dostawcy niczego nie zachowają ani nigdy nie wykorzystają danych do celów szkoleniowych; zależy to od dostawcy i umowy. Nie przesyłaj nieautoryzowanych lub nieodpowiednich treści wrażliwych."
             ]
           },
           {
             "title": "Przechowywanie i usuwanie",
             "paragraphs": [
-              "Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek; Przerysowanie AI pozwala zachować pełne wyniki. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+              "Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
               "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz.",
               "W przypadku żądań usunięcia konta lub szerszych wniosków skontaktuj się z nami w celu weryfikacji tożsamości i zakresu. Rejestry transakcji, audytów lub bezpieczeństwa mogą wymagać przechowywania ze względu na zobowiązania serwisowe, spory lub obowiązujące wymagania. Nie ma określonego terminu usunięcia wszystkich zapisów; odpowiedź wyjaśni wynik i ograniczenia."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Prawa do treści i wyniki AI",
             "paragraphs": [
               "Musisz mieć prawo dostępu, przesyłania, tłumaczenia i przetwarzania wybranych treści oraz przestrzegać wymagań dotyczących witryny źródłowej i posiadacza praw. Rozszerzenie nie przyznaje żadnych praw autorskich ani automatycznych uprawnień do publikowania przetłumaczonych obrazów. Nie omijaj zapór płatniczych, wymagań dotyczących logowania ani DRM. Nie gwarantujemy legalności ani kompletności treści źródłowych. Zapytania dotyczące praw autorskich powinny określać dzieło, prawa, wydanie i dane kontaktowe.",
-              "AI może pominąć, błędnie przetłumaczyć lub umieścić tekst. Przerysowywanie AI w internetowym obszarze roboczym, gdy jest dostępne dla konta, może też zmienić rysunek. Wyniki pomagają czytać i nie zastępują oryginału ani profesjonalnej weryfikacji. Oryginalne ilustracje strony są wygenerowane przez AI; porównania języków pokazują zapisane przykłady zwykłego tłumaczenia. Nie gwarantują dokładności, szybkości ani wyniku dla każdego obrazu. Porównuj z oryginałem i przesyłaj uwagi."
+              "AI może pominąć, błędnie przetłumaczyć lub umieścić tekst. Wyniki pomagają czytać i nie zastępują oryginału ani profesjonalnej weryfikacji. Oryginalne ilustracje strony są wygenerowane przez AI; porównania języków pokazują zapisane przykłady zwykłego tłumaczenia. Nie gwarantują dokładności, szybkości ani wyniku dla każdego obrazu. Porównuj z oryginałem i przesyłaj uwagi."
             ]
           },
           {
             "title": "Korzyści i subskrypcje",
             "paragraphs": [
-              "Bezpłatne, Lite, istniejące PLUS, korzyści próbne i bonusowe podlegają odpowiednim zasadom wygaśnięcia i stronie pokazanym na Twoim koncie. Lite akceptuje do 1200 nowych stron na godzinę i nie obejmuje ponownego rysowania AI. Żaden dzienny lub miesięczny całkowity limit nie usuwa krótkoterminowych limitów stawek, obrazu lub wydajności usług.",
+              "Plan bezpłatny, Lite, istniejące subskrypcje PLUS, okresy próbne i bonusy podlegają terminom i zasadom widocznym na koncie. Lite przyjmuje do 1 200 nowych stron w każdym ruchomym oknie godzinnym. Brak dziennego lub miesięcznego limitu łącznej liczby stron nie znosi ograniczeń częstotliwości żądań, rozmiaru obrazów ani przepustowości usługi.",
               "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Wersja próbna i rozliczenia",
             "paragraphs": [
               "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem.",
-              "Strony przerysowywania stają się dostępne co miesiąc bez konieczności przerzucania, także w przypadku planów rocznych. Kwalifikujące się konta mogą rozpocząć okres próbny wymagany przy użyciu karty, pokazany w ich planie. Ponowna subskrypcja lub wybranie innego planu nie resetuje uprawnień do okresu próbnego."
+              "Konta spełniające warunki mogą rozpocząć okres próbny wskazany dla wybranego planu. Wymagane jest podanie karty. Ponowna subskrypcja ani zmiana planu nie odnawia prawa do okresu próbnego."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Czy tłumaczenie mangi jest bezpłatne i co obejmuje Lite?",
-        "answer": "Czytanie lokalnych oryginałów jest bezpłatne i nie wymaga konta. Oficjalne tłumaczenie wymaga zalogowania się; Bezpłatnie obejmuje 30 klasycznych stron dziennie. Lite kosztuje 5,99 USD miesięcznie lub 59,99 USD rocznie, bez dziennego lub miesięcznego klasycznego całkowitego limitu i do 1200 nowych stron na godzinę. Obowiązują limity szybkości i pojemności. Przerysowanie AI nie jest uwzględnione. Kwalifikujące się konta po raz pierwszy otrzymują 7-dniowy okres próbny wspierany kartą. PLUS jest zamknięty na nowe zakupy; istniejące subskrypcje zachowują wyświetlane korzyści. Podatki i ostateczne kwoty są wyświetlane przy kasie.",
+        "answer": "Czytanie lokalnych oryginałów jest bezpłatne i nie wymaga konta. Oficjalne tłumaczenie wymaga zalogowania się; Bezpłatnie obejmuje 30 klasycznych stron dziennie. Lite kosztuje 5,99 USD miesięcznie lub 59,99 USD rocznie, bez dziennego lub miesięcznego klasycznego całkowitego limitu i do 1200 nowych stron na godzinę. Obowiązują limity szybkości i pojemności. Kwalifikujące się konta po raz pierwszy otrzymują 7-dniowy okres próbny wspierany kartą. PLUS jest zamknięty na nowe zakupy; istniejące subskrypcje zachowują wyświetlane korzyści. Podatki i ostateczne kwoty są wyświetlane przy kasie.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Jakie tłumaczenie i kanały są dostępne w rozszerzeniu?",
-        "answer": "Bieżące rozszerzenie używa zwykłego tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał NodeLane lub własny manga-translator-ui. Przerysowywanie AI jest dostępne tylko w internetowym obszarze roboczym przy odpowiednich uprawnieniach. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest wyłączone.",
+        "answer": "Bieżące rozszerzenie używa zwykłego tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał NodeLane lub własny manga-translator-ui. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest wyłączone.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Czy obrazy są przesyłane lub zachowywane?",
-        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa zwykłego tłumaczenia. Przerysowywanie AI jest dostępne w internetowym obszarze roboczym przy odpowiednich uprawnieniach konta. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek; Przerysowanie AI pozwala zachować pełne wyniki. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
+        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa zwykłego tłumaczenia. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Czy nieudane tłumaczenia korzystają ze stron?",
-        "answer": "W oficjalnym tłumaczeniu na koncie strony mogą być najpierw zarezerwowane, a rozliczane po pomyślnym dostarczeniu. Jawna porażka zwalnia rezerwację, podobnie jak zwykły wynik bez tekstu lub z częściowym rozpoznaniem i zachowanym tekstem oryginalnym. Nieznany wynik przerysowywania AI dotyczy tylko trybu dostępnego dla konta w internetowym obszarze roboczym: najpierw sprawdzany jest stan zadania, a rezerwacja może tymczasowo pozostać. MTU nie zużywa oficjalnego limitu NodeLane. Anonimowe próby mają odrębne zasady liczenia nowych zgłoszeń w obszarze roboczym; nieudane próby również są liczone.",
+        "answer": "W oficjalnym tłumaczeniu na koncie strony mogą być najpierw zarezerwowane, a rozliczane po pomyślnym dostarczeniu. Jawna porażka zwalnia rezerwację, podobnie jak zwykły wynik bez tekstu lub z częściowym rozpoznaniem i zachowanym tekstem oryginalnym. MTU nie zużywa oficjalnego limitu NodeLane. Anonimowe próby mają odrębne zasady liczenia nowych zgłoszeń w obszarze roboczym; nieudane próby również są liczone.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Jak działają limity tłumaczenia Lite?",
-        "answer": "Jedno konto ma wspólny limit 100 nowych obrazów tłumaczeń na 60 sekund i 1200 na 3600 sekund na różnych urządzeniach, w trybach i językach. Za darmo pozwala na 10 na 60 sekund. Powtórzenie tego samego żądania i ponowne wykorzystanie prawidłowych wyników nie są liczone ponownie. Zaakceptowane zadania nadal się liczą, jeśli zawiodą, zostaną anulowane lub nie będą zawierać żadnego tekstu. Odrzucone żądania lub wycofane transakcje bazy danych zwalniają zarezerwowany przedział godzinowy. Ponowne próby są zgodne z rzeczywistymi zasadami przyjmowania nowych zadań. Limity te nie gwarantują szybkości zakończenia. Lite wyklucza przerysowanie AI.",
+        "answer": "Jedno konto ma wspólny limit 100 nowych obrazów tłumaczeń na 60 sekund i 1200 na 3600 sekund na różnych urządzeniach, w trybach i językach. Za darmo pozwala na 10 na 60 sekund. Powtórzenie tego samego żądania i ponowne wykorzystanie prawidłowych wyników nie są liczone ponownie. Zaakceptowane zadania nadal się liczą, jeśli zawiodą, zostaną anulowane lub nie będą zawierać żadnego tekstu. Odrzucone żądania lub wycofane transakcje bazy danych zwalniają zarezerwowany przedział godzinowy. Ponowne próby są zgodne z rzeczywistymi zasadami przyjmowania nowych zadań. Limity te nie gwarantują szybkości zakończenia.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Bezpłatny",
     "常规翻译": "Tłumaczenie standardowe",
     "不限累计页数": "Nieograniczona liczba stron",
-    "AI 重绘可用额度": "Dostępne strony przerysowywania AI",
     "页": " strony",
     " 页可用": " dostępne strony",
     "你的阅读权益": "Twoje korzyści z czytania",

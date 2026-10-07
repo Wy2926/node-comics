@@ -64,7 +64,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
         raise ValueError('OIDC origin must be a bare HTTPS origin')
     reserved = {'admin', 'v1', 'internal', 'health', 'docs', 'redoc', 'api', 'openapi', 'account', 'auth',
                 'features', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
-                'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'webhooks', 'billing', 'payment',
+                'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'ar', 'webhooks', 'billing', 'payment',
                 'uninstall', 'drive-connect', 'translate'}
     if kind == 'admin' and (not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/', admin_path)
                             or admin_path.strip('/').lower() in reserved):

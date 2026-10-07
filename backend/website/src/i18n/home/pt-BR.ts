@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Tente novamente",
     "caption": "Resultados de tradução padrão registrados"
   },
-  "eyebrow": "SUAS HISTÓRIAS. SEU RITMO.",
-  "title": [
-    "Leia e traduza mangá.",
-    "Direto no navegador."
-  ],
-  "description": "Leia e traduza no Chrome, Edge e Firefox: arquivos locais, EPUB, Google Drive, bibliotecas OPDS e sites compatíveis. Descubra mangás, compare os originais e prepare sua leitura offline.",
+  "eyebrow": "EXTENSÃO PARA TRADUZIR MANGÁS",
+  "title": ["Traduza seu mangá.","Continue a leitura."],
+  "description": "Uma extensão de tradução de mangás para Chrome, Edge e Firefox no computador. Traduza imagens com o serviço em nuvem da NodeLane e compare com o original enquanto lê.",
   "install": "Obtenha a extensão",
-  "seeReader": "Explore o leitor",
+  "seeReader": "Veja a tradução em ação",
   "readerPath": "Leia quadrinhos com a extensão",
-  "readerAccess": "Leia seus originais locais gratuitamente e sem conta. O serviço oficial usa a cota da sua conta; seu próprio MTU não precisa de conta NodeLane nem cota oficial.",
+  "readerAccess": "Instalação gratuita. A tradução em nuvem exige uma conta e segue os limites dos planos gratuitos ou pagos.",
   "webAccess": "Experimente como convidado ou faça login para usar a cota da sua conta. A área de tradução de imagens mostra os usos disponíveis.",
   "desktop": "Feito para ler no computador",
   "popupAlt": "NodeLane Comics pop-up da barra de ferramentas com o inglês selecionado e o botão Traduzir guia atual.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Três passos para sua próxima história em quadrinhos.",
+  "stepsTitle": "Três passos para ler e traduzir.",
   "stepsIntro": "Instale a extensão, adicione uma história em quadrinhos e leia no seu próprio ritmo.",
-  "steps": [
-    [
-      "Instalar a extensão",
-      "Escolha a loja oficial ou o pacote correspondente ao seu navegador. Confira as restrições de acesso a sites no navegador."
-    ],
-    [
-      "Abrir uma história",
-      "Importe um arquivo, escolha um arquivo do Drive, conecte uma biblioteca OPDS ou adicione um mangá de um site compatível."
-    ],
-    [
-      "Ler e traduzir quando precisar",
-      "Mantenha o original, escolha o serviço oficial ou seu MTU e salve capítulos para leitura offline."
-    ]
-  ],
+  "steps": [["Instale a extensão","Acesse a loja oficial do Chrome, Edge ou Firefox."],["Abra seu mangá","Importe um quadrinho local ou abra um site de mangás compatível."],["Escolha um idioma","Traduza as imagens com o serviço escolhido e mantenha o original ao lado."]],
   "compareEyebrow": "VEJA MAIS DE PERTO",
   "compareTitle": "Verifique a tradução. Mantenha o original.",
   "compareBody": "Alterne entre o original em japonês e os resultados de tradução registrados. No leitor, as versões original e traduzida estão sempre ao alcance.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Veja a captura de tela completa",
   "close": "Fechar captura de tela",
   "galleryName": "Explorar capturas de tela da extensão",
-  "screenshotNote": "Capturas de tela reais compartilhadas com a visão geral do projeto, mostradas em inglês. Abra qualquer captura de tela para ver o original completo. Os recursos podem variar de acordo com a versão; a arte em quadrinhos pertence aos seus respectivos proprietários.",
+  "screenshotNote": "Captura real do produto: interface em inglês, original e tradução para chinês. Os resultados variam. As ilustrações pertencem aos respectivos titulares.",
   "sourcesEyebrow": "DOS SEUS ARQUIVOS OU DA WEB",
   "sourcesTitle": "Traga uma história em quadrinhos que você possa acessar.",
   "sources": [
@@ -153,12 +137,12 @@ const copy: HomeCopy = {
     ]
   ],
   "controlNote": "Mangás novos abrem com os originais. A tradução automática fica desativada por padrão; escolha um idioma e um serviço quando quiser traduzir.",
-  "privacyTitle": "Saiba o que acontece com suas páginas.",
-  "privacyBody": "A tradução oficial envia as imagens selecionadas ao servidor; os originais são removidos quando a tarefa termina, falha ou é cancelada. Os resultados privados da conta são mantidos enquanto houver solicitações válidas. Os resultados de convidados ficam no servidor por 24 horas após o término da tarefa; esse limite não afeta traduções salvas localmente. Ao conectar um serviço de tradução local, esse serviço determina o processamento e a retenção das imagens.",
+  "privacyTitle": "Leia de graça. Escolha seu plano de tradução.",
+  "privacyBody": "O NodeLane Comics oferece uma extensão gratuita e tradução em nuvem vinculada à sua conta. Há limites de solicitações e capacidade do serviço. Confira a disponibilidade, os benefícios e as condições de cobrança antes de assinar.",
   "privacy": "Política de privacidade",
-  "pricing": "Planos e cotas",
-  "ctaTitle": "Pronto para sua próxima página?",
-  "ctaBody": "Obtenha a extensão, abra uma história em quadrinhos e fique à vontade."
+  "pricing": "Comparar Free e Lite",
+  "ctaTitle": "Entenda sua próxima página.",
+  "ctaBody": "Instale o NodeLane Comics no Chrome, Edge ou Firefox para computador."
 };
 
 export default copy;

@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Lesen Sie Ihre erste übersetzte Seite",
         "paragraphs": [
-          "Importiere einen lokalen Manga oder öffne eine unterstützte Quelle im Leser. Wähle eine Sprache und klassische Übersetzung mit deinem ausgewählten MTU-Kanal. Die aktuelle Erweiterung bietet nur diese Übersetzung; KI-Neuzeichnen im Web-Arbeitsbereich ist eine separate Funktion.",
+          "Importiere einen lokalen Manga oder öffne eine unterstützte Quelle im Leser. Wähle eine Sprache und klassische Übersetzung mit deinem ausgewählten MTU-Kanal.",
           "Die aktuelle Seite hat Vorrang, danach folgt ein begrenzter Bereich benachbarter Bilder. Bilder werden im selben MTU-Kanal einzeln verarbeitet. Vergleiche Original und Übersetzung ohne Positionsverlust; Leser und Seitenübersetzung verwenden denselben ausgewählten Dienst.",
           "Wenn eine Seite fehlschlägt, beheben Sie das gemeldete Problem, bevor Sie es manuell erneut versuchen. Das Schließen einer Seite oder der Verlust der Verbindung beweist nicht, dass MTU die Berechnung gestoppt hat. Vermeiden Sie wiederholte Übermittlungen, solange der Dienst möglicherweise noch ausgelastet ist."
         ],
@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Erweiterungsmodi",
               "Derzeit nur klassische Übersetzung",
-              "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab."
+              "Standardübersetzung in der Erweiterung"
             ],
             [
               "Kosten",

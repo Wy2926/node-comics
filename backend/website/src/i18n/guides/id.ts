@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Mode ekstensi",
               "Terjemahan biasa",
-              "Terjemahan biasa di ekstensi; gambar ulang AI hanya di ruang kerja web sesuai hak akses"
+              "Terjemahan standar di ekstensi"
             ],
             [
               "Biaya",

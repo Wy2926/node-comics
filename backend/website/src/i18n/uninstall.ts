@@ -9,6 +9,7 @@ import {uninstall as uk} from './extra/uk';
 import {uninstall as tr} from './extra/tr';
 import {uninstall as vi} from './extra/vi';
 import {uninstall as id} from './extra/id';
+import {uninstall as ar} from './extra/ar';
 import type {Locale} from './types';
 
 import type {Reason} from './uninstall-reasons';
@@ -29,7 +30,7 @@ export const uninstallCopy: Record<Locale, UninstallCopy> = {
   'uk':uk,
   'tr':tr,
   'vi':vi,
-  'id':id,
+  'id':id,'ar':ar,
 
   'zh-CN': {
     title: '感谢你试用 NodeLane 漫译', description: '愿意告诉我们卸载的原因吗？反馈完全自愿，无需登录，也可以直接关闭此页。',

@@ -312,7 +312,7 @@ WIDGET = """window.turnstile=(()=>{
 class FixtureWebsite(website.WebsiteFiles):
     async def get_response(self, path, scope):
         response=await super().get_response(path,scope)
-        if 'text/html' in response.headers.get('content-type','') and 'translate' in path.split('/'):
+        if 'text/html' in response.headers.get('content-type','') and 'translate' in path.replace('\\', '/').split('/'):
             html=Path(response.path).read_text(encoding='utf-8').replace('<head>','<head><script>'+WIDGET+'</script>')
             digest=base64.b64encode(sha256(WIDGET.encode()).digest()).decode()
             headers=dict(response.headers)

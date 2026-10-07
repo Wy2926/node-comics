@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { request, TranslationError, watch } from '../src/lib/translation-api';
-import { localSnapshotState } from '../src/lib/translation-store';
+import { localSnapshotState, recordOrder } from '../src/lib/translation-store';
+
+test('batch rows keep the same order when timestamps tie or a record is updated', () => {
+  const rows = [{ id: 'b', created: 1 }, { id: 'a', created: 1 }, { id: 'c', created: 2 }];
+  assert.deepEqual(rows.sort(recordOrder).map(row => row.id), ['c', 'a', 'b']);
+  assert.deepEqual([rows[1], rows[2], rows[0]].sort(recordOrder).map(row => row.id), ['c', 'a', 'b']);
+});
 
 test('a completed server task is receiving until its full image is saved locally', () => {
   assert.equal(

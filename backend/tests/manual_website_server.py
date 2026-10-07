@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+import asyncio
 from app import website
 
 ORIGIN = 'http://127.0.0.1:4322'
@@ -41,6 +42,20 @@ def config():
     return {'mode':'oidc','dev_auth':False,'issuer':ORIGIN+'/test-identity','client_id':'website-fixture',
         'audience':ORIGIN+'/api','authorization_endpoint':ORIGIN+'/test-identity/auth',
         'token_endpoint':ORIGIN+'/test-identity/token','scopes':'openid profile offline_access'}
+
+
+@app.get('/v1/billing/catalog')
+async def catalog():
+    # Loopback acceptance data only. Never calls a billing provider.
+    await asyncio.sleep(min(15, max(0, state.get('catalog_delay_ms', 0) / 1000)))
+    month = {'id':'lite-month','plan_id':'lite','plan_revision_id':'fixture-lite',
+        'name':'Lite','currency':'usd','unit_amount':599,'interval':'month',
+        'hourly_image_limit':1200,'monthly_redraw_pages':0,'trial_days':7,
+        'trial_redraw_pages':0,'channels':[{'provider':'stripe','binding_id':'fixture',
+            'trial_days':7,'trial_redraw_pages':0}]}
+    offers = [month, {**month, 'id':'lite-year', 'interval':'year', 'unit_amount':5999}]
+    return JSONResponse({'offers':state.get('catalog_offers', offers)},
+        status_code=state.get('catalog_status', 200))
 
 
 @app.get('/test-identity/auth')

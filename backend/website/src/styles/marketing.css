@@ -1,0 +1,81 @@
+/* Website-only theme. Shared reader / Drive design tokens remain unchanged. */
+body[data-site-theme='midnight'] {
+  color-scheme: dark;
+  --canvas: #080f19;
+  --surface: #0d1724;
+  --surface-soft: #142235;
+  --ink: #f3f6fc;
+  --muted: #a7b4c7;
+  --line: #29374a;
+  --accent: #91c3ff;
+  --accent-on: #08182a;
+  --accent-hover: #b5d7ff;
+  --accent-soft: #172e48;
+  --success: #8ce0bb;
+  --danger: #ffa5a9;
+  --danger-soft: #3a202b;
+  --comic-stroke: var(--line);
+  --comic-border: 1px solid var(--line);
+  --comic-input-border: 1px solid #61728a;
+  --comic-control-radius: 999px;
+  --comic-card-radius: 14px;
+  --comic-panel-radius: 18px;
+  --comic-tab-radius: 8px;
+  --comic-tab-paper: var(--surface-soft);
+  --comic-tab-selected-bottom: var(--accent);
+  --comic-control-selected-bg: var(--accent-soft);
+  --comic-control-selected-ink: var(--ink);
+  --comic-control-disabled-bg: #1a2738;
+  --comic-control-disabled-ink: #9caabd;
+  --comic-control-disabled-border: var(--line);
+  --comic-warning-paper: #342e20;
+  --comic-focus-ring: 2px solid #b5d7ff;
+  --comic-shadow-small: none;
+  --comic-shadow: none;
+  --comic-shadow-hover: none;
+  --comic-shadow-active: none;
+  --comic-shadow-disabled: none;
+  --comic-control-hover-translate: 0, 0;
+  --comic-control-active-translate: 0, 0;
+  --comic-dot-pattern: none;
+  background: var(--canvas);
+  color: var(--ink);
+}
+body[data-site-theme='midnight'] ::selection { background: #33577f; color: #fff; }
+body[data-site-theme='midnight'] .container { width: min(1320px, calc(100% - 120px)); }
+body[data-site-theme='midnight'] .site-header { background: var(--canvas); border-bottom: 0; }
+body[data-site-theme='midnight'] .header-inner { min-height: 106px; }
+body[data-site-theme='midnight'] .header-inner .brand img { width: 230px; }
+body[data-site-theme='midnight'] .header-tools { gap: 14px; }
+body[data-site-theme='midnight'] :is(.language-menu summary, .account-link) { border-color: transparent; background: transparent; }
+body[data-site-theme='midnight'] .header-actions .account-link { width: auto; padding-inline: 10px; }
+body[data-site-theme='midnight'] .language-menu nav { box-shadow: 0 12px 32px #0006; }
+.header-download { white-space: nowrap; }
+body[data-site-theme='midnight'] .button:not(.secondary, .light, .home-install) { --control-bg: #1475dd; --control-ink: #fff; --control-hover-bg: #246ac1; }
+body[data-page='/'] .header-download { display: none; }
+body[data-site-theme='midnight'] .site-footer { background: var(--canvas); border-top: 1px solid var(--line); }
+body[data-site-theme='midnight'] .footer-bottom { line-height: 1.7; }
+body[data-site-theme='midnight'] .directory-track img[src$='toolpilot-logo-black.svg'] { background: #f3f6fc; padding: 7px; border-radius: 5px; }
+body[data-site-theme='midnight'] :is(.feature-card, .store-card, .login-passport, .feature-ribbon, table) { background: var(--surface); }
+body[data-site-theme='midnight'] .page-intro h1 { font-family: Georgia, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif; font-weight: 400; }
+.ui-icon { display: inline-block; flex: none; width: 20px; height: 20px; background: currentColor; mask: var(--ui-icon) center / contain no-repeat; }
+.icon-check { --ui-icon: url('/icons/check.svg'); color: var(--accent); }
+.icon-arrow { --ui-icon: url('/icons/arrow-right.svg'); }
+@media (max-width: 1100px) {
+  body[data-site-theme='midnight'] .container { width: calc(100% - 64px); }
+  body[data-site-theme='midnight'] .header-inner .brand img { width: 190px; }
+}
+@media (max-width: 760px) {
+  body[data-site-theme='midnight'] .container { width: calc(100% - 36px); }
+  body[data-site-theme='midnight'] .header-inner { min-height: 78px; }
+  body[data-site-theme='midnight'] .header-inner .brand img { width: 160px; }
+  .header-download { display: none; }
+}
+@media (max-width: 480px) {
+  body[data-site-theme='midnight'] .header-inner { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 14px; }
+  body[data-site-theme='midnight'] .header-tools { display: flex; margin-left: auto; gap: 4px; }
+  body[data-site-theme='midnight'] .language-menu summary { padding-inline: 6px; }
+  body[data-site-theme='midnight'] .language-menu summary > span { display: none; }
+  body[data-site-theme='midnight'] .language-menu nav { left: auto; right: 0; }
+  body[data-site-theme='midnight'] .mobile-nav nav { top: 100%; }
+}

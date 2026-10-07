@@ -73,7 +73,7 @@ class ReleaseTests(unittest.TestCase):
         source = self.root / 'build'
         source.mkdir()
         (source / 'index.html').write_text('<h1>Public home</h1>', encoding='utf-8')
-        for locale in ('', 'en', 'ja', 'ko', 'zh-tw'):
+        for locale in ('', 'en', 'ja', 'ko', 'zh-tw', 'ar'):
             page = source / locale / 'translate' / 'index.html'
             page.parent.mkdir(parents=True)
             page.write_text('<h1>Translation</h1>', encoding='utf-8')
@@ -81,7 +81,7 @@ class ReleaseTests(unittest.TestCase):
         home = config.split('location = / {', 1)[1].split('\n}', 1)[0]
         self.assertNotIn('challenges.cloudflare.com', home)
         self.assertNotIn('blob:', home)
-        for locale in ('', 'en/', 'ja/', 'ko/', 'zh-tw/'):
+        for locale in ('', 'en/', 'ja/', 'ko/', 'zh-tw/', 'ar/'):
             page = config.split(f'location = /{locale}translate/ {{', 1)[1].split('\n}', 1)[0]
             self.assertIn('no-store', page)
             self.assertIn('noindex', page)
@@ -93,7 +93,7 @@ class ReleaseTests(unittest.TestCase):
         source = self.root / 'build'
         source.mkdir()
         (source / 'index.html').write_text('<h1>Home</h1>', encoding='utf-8')
-        for locale in ('zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'):
+        for locale in ('zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'ar'):
             error = source / locale / '404' / 'index.html'
             error.parent.mkdir(parents=True)
             error.write_text('<h1>Not found</h1>', encoding='utf-8')

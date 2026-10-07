@@ -2,11 +2,11 @@ import type { HomeCopy } from './types';
 
 const copy: HomeCopy = {
   comparison: { title: 'One page. Many languages.', group: 'Translation examples', labels: ['Japanese original', 'Chinese', 'English', 'Korean'], loading: 'Loading image…', error: 'The image could not be loaded.', retry: 'Try again', caption: 'Recorded standard-translation results' },
-  eyebrow: "YOUR BOOKS. YOUR SOURCES. YOUR PACE.",
-  title: ["Read your comics.","Translate as you go."],
-  description: "Read comics and EPUBs in Chrome, Edge or Firefox. Open local files, Google Drive, OPDS libraries and supported sites; translate images with the official service or your own manga-translator-ui.",
-  install: 'Get the extension', seeReader: 'Explore the reader',
-  readerPath: "Your comics and libraries in one reader", readerAccess: "Read originals without a NodeLane account. Official translation uses your account allowance; your own MTU service needs no NodeLane sign-in. Source access rules still apply.",
+  eyebrow: "MANGA TRANSLATOR EXTENSION",
+  title: ["Translate manga.","Keep reading."],
+  description: "A manga translator extension for desktop Chrome, Edge and Firefox. Translate comic images with NodeLane’s cloud service and compare with the original while you read.",
+  install: 'Get the extension', seeReader: "See translation in action",
+  readerPath: "Your comics and libraries in one reader", readerAccess: "Free to install. Cloud translation requires an account, with limits for free and paid plans.",
   webAccess: 'Try as a guest, or sign in to use your account allowance. The image workspace shows your available uses.',
   desktop: 'Made for desktop reading', popupAlt: 'NodeLane Comics toolbar popup with English selected and the Translate current tab button.',
   platformHeading: 'Your desktop browser, supported', guestEyebrow: 'ONLINE IMAGE TRANSLATION',
@@ -20,12 +20,8 @@ const copy: HomeCopy = {
       { title: 'Start reading and translating', description: 'An English introduction to the reader, original pages and translation.', language: 'English video' },
     ],
   },
-  stepsTitle: 'Three steps to your next comic.', stepsIntro: "Install the extension, open a book or connect a source, and choose how you want to read.",
-  steps: [
-    ['Install the extension', "Choose the store or download package for your desktop browser, then pin the extension to the toolbar."],
-    ["Open a comic or library", "Import a local comic or EPUB, connect Google Drive or OPDS, or choose a title from a supported website."],
-    ["Read and translate as needed", "Start with the original. Choose your translation service and target language, compare images, and continue from your saved position."],
-  ],
+  stepsTitle: "From installation to translation in three steps.", stepsIntro: "Install the extension, open a book or connect a source, and choose how you want to read.",
+  steps: [["Install the extension","Get it from the official store for Chrome, Edge or Firefox."],["Open your manga","Read a local comic or open a supported manga website."],["Choose a language","Translate images with your selected service and keep the original alongside."]],
   compareEyebrow: 'TAKE A CLOSER LOOK', compareTitle: 'Check the translation. Keep the original.',
   compareBody: "Compare a Japanese original with recorded standard-translation results. In the reader, switch views or read the original and translation side by side while keeping your place.",
   compareNote: 'A real standard-translation sample on an original AI illustration. Results vary by artwork, text and language.',
@@ -36,7 +32,7 @@ const copy: HomeCopy = {
   galleryBodies: ["Import and manage your comics, then continue from the saved position.", "Browse AniList charts, synopses, ratings and alternate titles; title and synopsis translations are available.", "Search supported websites by title or alternate title, or translate the title before choosing a source.", "Cache selected languages and chapters, track storage, pause, resume and retry missing pages.", "Browse chapters and language options, with page counts, cache status and reading progress.", "Compare original and standard-translated images side by side, or switch back without losing your place."],
   galleryAlt: ['English comic library interface and reading progress.', 'English comic discovery charts and title details.', 'English comic title search, website selection, and search results.', 'English offline caching tasks, chapter progress, and storage use.', 'English reader with the multilingual chapter directory expanded.', 'English reader with the original and Chinese translation side by side.'],
   enlarge: 'View full screenshot', close: 'Close screenshot', galleryName: 'Explore extension screenshots',
-  screenshotNote: 'Real screenshots shared with the project overview, shown in English. Open any screenshot to view the full original. Features may differ by version; comic artwork belongs to its respective owners.',
+  screenshotNote: "Real product screenshot: English interface, original and Chinese translation. Results vary. Comic artwork belongs to its respective owners.",
   sourcesEyebrow: "LOCAL FILES, CLOUD LIBRARIES AND WEBSITES", sourcesTitle: "Open the books you already have access to.",
   sources: [
     [
@@ -66,10 +62,10 @@ const copy: HomeCopy = {
     ["Your manga-translator-ui service", "Connect your own MTU with its service address and credentials. No NodeLane account or official allowance is needed; processing and any API costs depend on your setup."],
   ],
   controlNote: "New comics open as originals. The extension uses standard translation for comic images; choose a channel when you need it.",
-  privacyTitle: 'Know what happens to your pages.',
-  privacyBody: 'Official translation sends selected images to the server; originals are removed after the task completes, fails or is cancelled. Private account results are retained while valid requests remain; guest server results are kept for 24 hours after the task ends, and translations saved locally are unaffected by that limit. When you connect a local translation service, that service determines image processing and retention.',
-  privacy: 'Privacy policy', pricing: 'Plans & allowances',
-  ctaTitle: 'Ready for your next page?', ctaBody: "Open a book, connect your library, and make the next page yours.",
+  privacyTitle: "Read for free. Choose your translation plan.",
+  privacyBody: "NodeLane Comics offers a free extension and account-based cloud translation. Rate and service-capacity limits apply. Check current availability, full benefits and billing terms before subscribing.",
+  privacy: 'Privacy policy', pricing: "Compare Free and Lite",
+  ctaTitle: "Make sense of your next page.", ctaBody: "Install NodeLane Comics for desktop Chrome, Edge or Firefox.",
 };
 
 export default copy;

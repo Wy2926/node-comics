@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Tekrar dene",
     "caption": "Kaydedilmiş standart çeviri sonuçları"
   },
-  "eyebrow": "SENİN HİKÂYELERİN. SENİN TEMPOUN.",
-  "title": [
-    "Manga oku ve çevir.",
-    "Doğrudan tarayıcında."
-  ],
-  "description": "Chrome, Edge ve Firefox’ta manga okuyun ve çevirin. Yerel çizgi romanlar ve EPUB, Google Drive, OPDS kitaplıkları veya desteklenen siteleri açın. Sayfaları ve görünür alanları çevirirken orijinal elinizin altında kalsın.",
+  "eyebrow": "MANGA ÇEVİRİ TARAYICI UZANTISI",
+  "title": ["Manganızı çevirin.","Okumaya devam edin."],
+  "description": "Masaüstü Chrome, Edge ve Firefox için manga çeviri uzantısı. NodeLane bulut hizmetiyle manga görsellerini çevirin ve okurken orijinalleriyle karşılaştırın.",
   "install": "Uzantıyı edin",
-  "seeReader": "Okuyucuyu keşfet",
+  "seeReader": "Çeviriyi görün",
   "readerPath": "Uzantı ile çizgi romanları okuyun",
-  "readerAccess": "Yerel orijinalleri ücretsiz ve hesapsız okuyun. Resmî çeviri hesap kotasını kullanır; kendi manga-translator-ui hizmetiniz NodeLane hesabı veya resmî kota gerektirmez.",
+  "readerAccess": "Kurulum ücretsizdir. Bulut çevirisi hesap gerektirir; ücretsiz ve ücretli planların kullanım sınırları geçerlidir.",
   "webAccess": "Misafir olarak deneyin veya hesap kullanım hakkınizi kullanmak için oturum açın. Görüntü çalışma alanı mevcut kullanımlarınızı gösterir.",
   "desktop": "Masaüstünde okumak için tasarlandı",
   "popupAlt": "NodeLane Comics İngilizce'nin seçili olduğu ve Geçerli sekmeyi çevir düğmesinin bulunduğu araç çubuğu açılır penceresi.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Üç adımda sıradaki çizgi romanına ulaş.",
+  "stepsTitle": "Üç adımda okuyun ve çevirin.",
   "stepsIntro": "Uzantıyı yükleyin, bir çizgi roman ekleyin ve kendi hızınızda okuyun.",
-  "steps": [
-    [
-      "Uzantıyı kurun",
-      "Resmi mağazadan yükleyin veya tarayıcınıza uygun paketi indirin."
-    ],
-    [
-      "Kaynağınızı açın",
-      "Yerel dosya içe aktarın, Google Drive’dan çizgi roman seçin, OPDS bağlayın veya desteklenen bir site ekleyin."
-    ],
-    [
-      "Okuyun ve çevirin",
-      "Yeni çizgi romanlar orijinal olarak açılır. Resmî kanal veya MTU seçin ve ihtiyaç duyduğunuzda çeviriyi açın."
-    ]
-  ],
+  "steps": [["Uzantıyı yükleyin","Chrome, Edge veya Firefox’un resmi mağazasından edinin."],["Manganızı açın","Yerel bir çizgi romanı içe aktarın veya desteklenen bir manga sitesini açın."],["Dil seçin","Seçtiğiniz hizmetle görselleri çevirin ve orijinali yanınızda tutun."]],
   "compareEyebrow": "DAHA YAKINDAN BAK",
   "compareTitle": "Çeviriyi kontrol et. Orijinali koru.",
   "compareBody": "Japonca orijinal ile kaydedilmiş çeviri sonuçları arasında geçiş yapın. Okuyucunun orijinal ve tercüme edilmiş görünümleri ulaşılabilir durumda kalır.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Tam ekran görüntüsünü aç",
   "close": "Ekran görüntüsünü kapat",
   "galleryName": "Uzantı ekran görüntülerini keşfedin",
-  "screenshotNote": "İngilizce olarak gösterilen, projeye genel bakışla paylaşılan gerçek ekran görüntüleri. Orijinalin tamamını görüntülemek için herhangi bir ekran görüntüsünü açın. Özellikler sürüme göre farklılık gösterebilir; çizgi roman görselleri ilgili sahiplerine aittir.",
+  "screenshotNote": "Gerçek ürün ekranı: İngilizce arayüz, orijinal ve Çince çeviri. Sonuçlar değişebilir. Çizimlerin hakları ilgili hak sahiplerine aittir.",
   "sourcesEyebrow": "DOSYALARINDAN VEYA WEB'DEN",
   "sourcesTitle": "Dosyalarınız, kitaplıklarınız ve desteklenen siteler.",
   "sources": [
@@ -152,13 +136,13 @@ const copy: HomeCopy = {
       "NodeLane hesabı ve resmî kota kullanmadan MTU hizmetinizi bağlayın. Birden fazla profil kaydedebilirsiniz; aynı anda seçilen tek kanal kullanılır."
     ]
   ],
-  "controlNote": "Yeni çizgi roman orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır. Açıldığında geçerli ve yakındaki görseller sınırlı bir pencerede işlenir. AI yeniden çizim yalnızca web görsel çalışma alanında, uygun hesap haklarıyla kullanılabilir.",
-  "privacyTitle": "Sayfalarının nasıl işlendiğini bil.",
-  "privacyBody": "Resmi çeviri, seçilen görselleri sunucuya gönderir; orijinaller görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra kaldırılır. Geçerli istekler devam ettiği sürece özel hesap sonuçları korunur; Konuk sunucu sonuçları, görev sona erdikten sonra 24 saat süreyle saklanır ve yerel olarak kaydedilen çeviriler bu sınırdan etkilenmez. Yerel bir çeviri hizmetine bağlandığınızda görüntü işlemeyi ve saklamayı bu hizmet belirler.",
+  "controlNote": "Yeni çizgi roman orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır. Açıldığında geçerli ve yakındaki görseller sınırlı bir pencerede işlenir.",
+  "privacyTitle": "Ücretsiz okuyun. Çeviri planınızı seçin.",
+  "privacyBody": "NodeLane Comics, ücretsiz bir uzantı ve hesaba bağlı bulut çevirisi sunar. İstek sıklığı ve hizmet kapasitesi sınırları geçerlidir. Abone olmadan önce güncel kullanılabilirliği, özellikleri ve faturalandırma koşullarını inceleyin.",
   "privacy": "Gizlilik politikası",
-  "pricing": "Planlar ve kullanım hakları",
-  "ctaTitle": "Sıradaki sayfaya hazır mısın?",
-  "ctaBody": "Uzantıyı edinin, bir çizgi roman açın ve kendinizi rahat ettirin."
+  "pricing": "Free ve Lite’ı karşılaştırın",
+  "ctaTitle": "Bir sonraki sayfanızı anlayın.",
+  "ctaBody": "Masaüstü Chrome, Edge veya Firefox için NodeLane Comics’i yükleyin."
 };
 
 export default copy;

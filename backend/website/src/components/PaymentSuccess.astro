@@ -10,13 +10,14 @@ import {absolute} from '../data/site';
 import '../styles/global.css';
 import '../styles/controls.css';
 import '../styles/header.css';
+import '../styles/rtl.css';
 interface Props {locale:Locale}
 const {locale}=Astro.props;
 const t=paymentSuccess[locale];
 const brand=dictionaries[locale].ui.brandName;
 ---
 <!doctype html>
-<html lang={locale}>
+<html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -6,7 +6,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4321';
 const out=path.resolve('artifacts/website-pricing');
 await mkdir(out,{recursive:true});
-const locales=['','zh-tw/','en/','ja/','ko/','fr/','es/','pt-br/','de/','it/','ru/','pl/','uk/','tr/','vi/','id/'];
+const locales=['','zh-tw/','en/','ja/','ko/','fr/','es/','pt-br/','de/','it/','ru/','pl/','uk/','tr/','vi/','id/','ar/'];
 const month={id:'lite-month',plan_id:'lite',plan_revision_id:'lite-v1',name:'Lite',currency:'usd',unit_amount:599,interval:'month',monthly_redraw_pages:0,hourly_image_limit:1200,trial_days:7,trial_redraw_pages:0,channels:[{provider:'stripe',binding_id:'fixture',trial_days:7,trial_redraw_pages:0}]};
 const year={...month,id:'lite-year',interval:'year',unit_amount:5999};
 let offers=[month,year],status=200,release=null,onCatalogRequest=null;
@@ -46,11 +46,10 @@ const published=async(target,state)=>{
  await target.locator(`.billing-availability[data-state="${state}"]`).waitFor();
  const block=target.locator('.published-lite-pricing');
  assert(await block.isVisible(),'published Lite pricing is visible');
- const prices=block.locator('.published-price-grid .published-price');
- assert.equal(await prices.count(),2,'monthly and yearly prices remain visible together');
- for(const [index,expected] of ['US$5.99','US$59.99'].entries()){
-  assert((await prices.nth(index).innerText()).replace(/\s/g,'').includes(expected),`published price ${expected}`);
- }
+ const locale=await target.locator('html').getAttribute('lang');
+ const interval=await block.getAttribute('data-billing-interval');
+ const expected='US$'+new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(interval==='year'?59.99:5.99);
+ assert.equal(await block.locator('.price-value').innerText(),expected,'actual charge for the selected cadence');
  await comparison(target,1200);
  assert(await target.locator('.billing-availability button').isDisabled(),'unavailable purchase action is disabled');
  assert.equal(await target.locator('a[href*="price="]').count(),0,'no synthetic checkout link');
@@ -123,5 +122,5 @@ try {
  done();release=null;onCatalogRequest=null;await live();
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
  assert.deepEqual(errors,[]);
- console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected six-feature comparison including plan-specific models, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: seventeen locales with and without JavaScript, eight widths, connected six-feature comparison including plan-specific models, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

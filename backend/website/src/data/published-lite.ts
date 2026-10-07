@@ -5,5 +5,4 @@ export const publishedLite = {
   yearlyAmount: '59.99',
   hourlyImageLimit: 1200,
   trialDays: 7,
-  trialRedrawPages: 0,
 } as const;

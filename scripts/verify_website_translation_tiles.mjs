@@ -23,14 +23,14 @@ async function records(page){return page.evaluate(async()=>{
   try{return await new Promise((resolve,reject)=>{const request=db.transaction('records').objectStore('records').getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
   finally{db.close();}
 });}
-async function ready(page){await page.getByRole('button',{name:'添加图片',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('.image-dropzone button')?.disabled);}
+async function ready(page){await page.locator('.image-dropzone button').waitFor();await page.waitForFunction(()=>!document.querySelector('.image-dropzone button')?.disabled);}
 async function add(page,name){await ready(page);await page.locator('.image-dropzone input[type="file"]').setInputFiles(path.join(sources,name+'-source.png'));await page.locator('.record-copy strong').filter({hasText:name+'-source.png'}).waitFor();}
 async function start(page,name){await add(page,name);await page.getByRole('button',{name:'开始翻译',exact:true}).click();}
-async function waitState(page,wanted){await page.waitForFunction(value=>document.querySelector('.translation-status')?.getAttribute('data-state')===value,wanted,{timeout:60000});}
+async function waitState(page,wanted){await page.waitForFunction(value=>document.querySelector('.translation-records li')?.getAttribute('data-state')===value,wanted,{timeout:60000});}
 async function oneRecord(page){const rows=await records(page);assert.equal(rows.length,1);return rows[0];}
-async function visibleImage(page,width,height){await page.waitForFunction(size=>{const image=document.querySelector('.translation-canvas img');return image?.complete&&image.naturalWidth===size[0]&&image.naturalHeight===size[1];},[width,height]);}
 async function downloadAndCompare(page,row,label){
-  const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'下载完整译图',exact:true}).click()]);
+  const item=page.locator('.translation-records li').filter({has:page.getByText(row.name,{exact:true})});
+  const [download]=await Promise.all([page.waitForEvent('download'),item.getByRole('button',{name:'下载完整译图',exact:true}).click()]);
   const downloaded=path.join(out,label+path.extname(download.suggestedFilename()));await download.saveAs(downloaded);
   const expected=path.join(out,label+'-expected.png'),response=await fetch(origin+'/__expected/'+row.requestId);assert(response.ok);await writeFile(expected,Buffer.from(await response.arrayBuffer()));
   const result=JSON.parse(execFileSync(python,['-c',String.raw`
@@ -66,9 +66,10 @@ try{
     assert.equal(row.resultFormat,'overlay-tiles-v1');assert.equal(row.snapshot.result.representation,'overlay-tiles-v1');
     assert.equal(before.admitted_requests[row.requestId].result_format,'overlay-tiles-v1');
     assert.deepEqual([row.width,row.height],[100000,64]);
-    await visibleImage(page,100000,64);const image=await downloadAndCompare(page,row,'wide');assert.equal(image.format,'PNG');
+    assert.equal(await page.locator('.translation-workbench img, .translation-canvas').count(),0);
+    const image=await downloadAndCompare(page,row,'wide');assert.equal(image.format,'PNG');
     check('100000x64 classic negotiates tiles and downloads an exact full PNG across the 2048px lettering boundary');
-    await page.reload();await ready(page);await waitState(page,'succeeded');await visibleImage(page,100000,64);
+    await page.reload();await ready(page);await waitState(page,'succeeded');
     const restored=await oneRecord(page);assert.equal(restored.requestId,row.requestId);
     await downloadAndCompare(page,restored,'wide-history');const after=await state();
     assert.equal(after.create_calls,before.create_calls);assert.equal(after.result_calls,before.result_calls);assert.equal(after.get_calls,before.get_calls);
@@ -83,17 +84,9 @@ try{
     await control({tiles_enabled:false,max_dimension:16000});await page.reload();await ready(page);await waitState(page,'succeeded');
     const row=await oneRecord(page),after=await state();assert.equal(row.requestId,paused.requestId);assert.equal(row.resultFormat,'overlay-tiles-v1');
     assert.equal(after.create_calls,1);assert.equal(after.get_calls,before.get_calls+1);assert.equal(after.result_calls,2);
-    await visibleImage(page,64,100000);await downloadAndCompare(page,row,'long');
-    await page.locator('.translation-canvas').evaluate(canvas=>{const image=canvas.querySelector('img');canvas.scrollTop=4096*image.getBoundingClientRect().width/64-canvas.clientHeight/2;});
+    await downloadAndCompare(page,row,'long');
     await page.screenshot({path:path.join(out,'long-cross-tile.png')});
     check('64x100000 result-download interruption resumes the same UUID despite missing tiles capability and a smaller limit; all 4096px seam pixels match');
-    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'重新翻译',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelectorAll('.translation-records li').length===2);
-    await waitState(page,'succeeded');
-    const renewed=(await records(page)).find(value=>value.id!==row.id);assert(renewed);assert.notEqual(renewed.requestId,row.requestId);
-    const renewedState=await state();assert.deepEqual(renewedState.admitted_requests[renewed.requestId],{regenerate_of:row.requestId});
-    assert.equal(renewed.resultFormat,'overlay-tiles-v1');assert.equal(renewed.snapshot.result.representation,'overlay-tiles-v1');
-    check('Translate again sends only regenerate_of and inherits the frozen tile result format');
   });
 
   await scenario('lost-acceptance',{fail_create_response_once:true},async page=>{
@@ -124,7 +117,7 @@ try{
     await start(page,'ordinary');await waitState(page,'succeeded');
     const row=(await records(page)).find(value=>value.name==='ordinary-source.png'),after=await state();assert(row);
     assert.equal(row.resultFormat,undefined);assert.equal(row.snapshot.result.representation,'overlay-v1');assert.equal(after.admitted_requests[row.requestId].result_format,undefined);
-    await visibleImage(page,640,900);await downloadAndCompare(page,row,'ordinary');
+    await downloadAndCompare(page,row,'ordinary');
     await page.screenshot({path:path.join(out,'ordinary-screen.png')});
     check('ordinary classic images still succeed with overlay-v1 when the capabilities representation field is absent');
   });
@@ -149,17 +142,18 @@ try{
     check('missing frozen input stops recovery without rebuilding bytes or changing the existing request identity');
   });
 
-  await scenario('redraw',{},async page=>{
-    await page.locator('.translation-identity').getByRole('button',{name:'登录',exact:true}).click();
-    await page.locator('.translation-identity').getByText('Demo Reader',{exact:true}).waitFor();
-    await ready(page);await page.locator('.translation-settings select').nth(1).selectOption('redraw');
-    await start(page,'long');await waitState(page,'failed');assert.equal((await state()).create_calls,0);
-    await start(page,'ordinary');await waitState(page,'succeeded');
-    const row=(await records(page)).find(value=>value.name==='ordinary-source.png'),after=await state();assert(row);
-    assert.equal(after.admitted_requests[row.requestId].mode,'redraw');assert.equal(after.admitted_requests[row.requestId].result_format,undefined);assert.equal(row.resultFormat,undefined);
-    assert.equal(row.snapshot.result.representation,'full-image-v1');await downloadAndCompare(page,row,'redraw');
-    await page.screenshot({path:path.join(out,'redraw.png')});
-    check('redraw never requests tiles: a long input is rejected locally and an ordinary redraw still succeeds');
+  await scenario('batch',{},async page=>{
+    await page.locator('.image-dropzone input[type="file"]').setInputFiles(['ordinary','wide'].map(name=>path.join(sources,name+'-source.png')));
+    await page.waitForFunction(()=>document.querySelectorAll('.translation-records li').length===2);
+    await page.getByRole('button',{name:'开始翻译',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.translation-records li[data-state="succeeded"]').length===2,undefined,{timeout:60000});
+    assert.equal(await page.locator('.translation-workbench img, .translation-canvas, input[type="range"]').count(),0);
+    const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'打包下载已完成（ZIP）',exact:true}).click()]);
+    const archive=path.join(out,'translations.zip');await download.saveAs(archive);
+    const summary=JSON.parse(execFileSync(python,['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))',archive],{encoding:'utf8'}));
+    assert.equal(summary.length,2);assert(summary.every(name=>/\.(png|webp|jpg)$/.test(name)));
+    assert.equal((await state()).create_calls,2);
+    check('batch uploads two images, completes two distinct tasks and downloads one valid ZIP without previews');
   });
   assert.deepEqual(errors,[]);
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,scenarios,liveProvider:false,syntheticApi:true},null,2));

@@ -1,17 +1,19 @@
 # 官网素材来源
 
+## 产品素材
+
 | 素材 | 来源与使用规范 |
 | --- | --- |
-| [`../../docs/images/`](../../docs/images/) / [`../../docs/images/en/`](../../docs/images/en/) | 与中文、英文项目 README 共用的六张真实截图：首页直接引用原图，以构建生成的 WebP 预览；简中、繁中页面展示中文截图，其余页面展示英文截图。界面内漫画归各自权利人，不能作为原创素材重新授权 |
+| [`../../docs/images/`](../../docs/images/) / [`../../docs/images/en/`](../../docs/images/en/) | 与中文、英文项目 README 共用的真实截图：首页选用翻译对照截图，以构建生成的响应式 WebP 预览；简中、繁中页面展示中文界面，其余页面展示英文界面。界面内漫画归各自权利人，不能作为原创素材重新授权 |
 | `journey-original.webp` / `reading-corner.webp` | 原创 AI 插画，gpt-image-2、high；提示词见 [hero.txt](assets/prompts/hero.txt)、[reading.txt](assets/prompts/reading.txt) |
 | `journey-translated.webp` / `journey-en.webp` / `journey-ko.webp` | 用户提供并确认为常规翻译实测产物的中／英／韩对照图 |
 | `public/social-cover.webp` | 阅读角插画的 1200 × 630 分享图 |
-| Logo / favicon | 复用插件品牌资源，命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
+| Logo / favicon | 复用插件品牌资源，深色布局使用插件原始 `logo-horizontal-en-dark.webp` / `logo-horizontal-zh-dark.webp` 的本地副本；命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
 | [GitHubMark.astro](src/components/GitHubMark.astro) | GitHub 官方 [Octicons mark-github-16](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/mark-github-16.svg)，固定版本 `90af1f14984832de34e94b2d530043fbcf85eb7f`；保留原始轮廓，仅使用 `currentColor` 和 20px 显示尺寸。上游 SVG SHA-256：`7421820090b50ac79d7c2bf7c951a433d7098a8a9c474809207bdd45f62d9d46`；[MIT 许可](public/licenses/octicons.txt)随静态产物分发 |
 
-首页六张截图对应书架、发现、跨语言搜索、离线中心、阅读目录和翻译对照。预览保持完整画面，只加载当前选中图片；打开查看时再加载完整 PNG 原图，不重画 UI 或修改截图文字。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
+首页展示一张真实翻译对照截图。预览保持完整画面，按屏幕尺寸选择 WebP；首页点击后打开完整 PNG 原图，不重画 UI 或修改截图文字。英文界面截图中的译文为中文，图注明确说明，不冒充英／西／德翻译实测。生成插画不重新授予第三方开源许可，系统字体只作栅格化使用。
 
-首屏书架预览和中英文教程封面同样使用上述真实产品截图，以 640 像素宽 WebP 输出。教程封面用于介绍相关产品操作，不冒充视频截帧；视频链接统一维护在 `src/data/site.ts`，点击后进入 NodeLane YouTube 频道的已发布视频。官网不嵌入播放器或加载远程视频缩略图。
+保留的教程素材同样来自上述真实产品截图，不冒充视频截帧；视频链接统一维护在 `src/data/site.ts`。官网不嵌入播放器或加载远程视频缩略图，首页不再展开教程卡片。
 
 漫画星芒、隐私盾牌和播放标识由 [ComicSymbol.astro](src/components/ComicSymbol.astro) 绘制为静态 SVG，线条与颜色复用官网令牌中的漫画图标调色板；无外部素材、字体、运行脚本或网络请求。语言菜单的国旗由 [LanguageFlag.astro](src/components/LanguageFlag.astro) 复用插件已有的 [flag-icons 7.5.0](https://github.com/lipis/flag-icons/tree/v7.5.0/flags/4x3) 原始 SVG，复制至官网自身素材目录；保留原始轮廓，以内联 data URL 显示，不产生外部或额外图片请求。[MIT 许可](public/licenses/flag-icons.txt)随官网静态产物分发，图标只作装饰，语言名称保留为文本。
 
@@ -44,8 +46,19 @@
 | [public/social-cover.webp](public/social-cover.webp) | `6c6dba9712a00be1312673373e26f8a289a6d14cc6a1dc26277e72c11dc8c322` |
 | [src/assets/logo-zh.webp](src/assets/logo-zh.webp) | `3bab8e6227e9a68de9d2cc2f34a1cb0d60ad1de15e937294e87d602ece0add7a` |
 | [src/assets/logo-en.webp](src/assets/logo-en.webp) | `abac28ef1514504dfcfee05374a85d230987809ce906cd08d864f19d79801023` |
+| [src/assets/logo-en-dark.webp](src/assets/logo-en-dark.webp) | `8839d406415ea21d39a6cf90f34b257a11cd73a978c46df7bda45afe6ffb4143` |
+| [src/assets/logo-zh-dark.webp](src/assets/logo-zh-dark.webp) | `13f4247055ce0ffe62e8e71d3839b7a945b8decc97b08ea1493b51877aa165a4` |
 | [public/icon-128.png](public/icon-128.png) | `a83fe892bb1599baaba3c8c11f2a19ce10cff2560956c3072cde57f20f52da53` |
 | [public/favicon.ico](public/favicon.ico) | `6ec5ace09c14e6a3865397956490a92488059b8ac07fee995907670b529017c2` |
+
+## 控件图标
+
+勾选与箭头使用 GitHub 官方 Octicons，固定版本 `90af1f14984832de34e94b2d530043fbcf85eb7f`，保留原始路径，以 CSS mask 随文本着色。[MIT 许可](public/licenses/octicons.txt)随静态产物分发。
+
+| 本地素材 | 原始来源 | SHA-256 |
+| --- | --- | --- |
+| [check.svg](public/icons/check.svg) | [check-16.svg](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/check-16.svg) | `290b457841652beccbc8478a4dec5c41021cc1aa081224f968393cbedeca1e83` |
+| [arrow-right.svg](public/icons/arrow-right.svg) | [arrow-right-16.svg](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/arrow-right-16.svg) | `9c996093e7605103d462a873f18d2e6de9ad66b03c212a4eaf0ac720ceebe4f5` |
 
 ## 浏览器商店标识
 

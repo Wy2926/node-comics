@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Öffne eine Geschichte, die du lesen darfst. Übersetze bei Bedarf und behalte das Original griffbereit.",
     "ctaButton": "Beginnen Sie Ihre Lesereise",
     "pricingTitle": "Kostenlos lesen. Wählen Sie Ihren Übersetzungsplan.",
-    "pricingDescription": "Vergleichen Sie den kostenlosen Tarif und Lite: kostenlose Seiten pro Tag, bis zu 1.200 neue Anfragen in jedem gleitenden Stundenfenster sowie monatliche oder jährliche Abrechnung. Lite enthält keine KI-Neuzeichnung. Berechtigte Erstnutzer erhalten eine 7-tägige Testphase.",
+    "pricingDescription": "Vergleichen Sie den kostenlosen Tarif und Lite: kostenlose Seiten pro Tag, bis zu 1.200 neue Anfragen in jedem gleitenden Stundenfenster sowie monatliche oder jährliche Abrechnung. Berechtigte Erstnutzer erhalten eine 7-tägige Testphase.",
     "freePlan": "Kostenlos",
     "freePlanDescription": "Für eine kleine Lektüre jeden Tag",
     "free": "kostenlos",
@@ -92,7 +92,7 @@ export default {
       "Zugriff auf Ihre gültigen vorhandenen Ergebnisse",
       "Bis zu 10 neue Übersetzungsbilder pro rollierende 60 Sekunden"
     ],
-    "freeNote": "KI-Neuzeichnung im kostenlosen Tarif erfordert ein gültiges Aktionskontingent. Das tägliche Seitenkontingent wird nach der Zeitzone Asia/Shanghai zurückgesetzt und nicht übertragen.",
+    "freeNote": "Das tägliche Seitenkontingent wird nach der Zeitzone Asia/Shanghai zurückgesetzt und nicht übertragen.",
     "quotaNote": "Eine erfolgreich erstellte Bildversion in einem gewählten Modus und einer gewählten Sprache zählt als eine Seite. Doppelte Anfragen und die Wiederverwendung gültiger Ergebnisse werden nicht doppelt berechnet. Eine ausdrücklich angeforderte Neuübersetzung verwendet die aktuell verfügbaren Leistungen. Auch ohne Gesamtseitenlimit gelten kurzfristige Anfrage-, Bild- und Kapazitätsgrenzen. Eine bestimmte Fertigstellungsgeschwindigkeit wird nicht garantiert.",
     "downloadTitle": "Installieren Sie Ihre Manga-Übersetzer-Erweiterung",
     "downloadDescription": "Hole dir NodeLane Comics für Chrome, Edge oder Firefox. Öffne Chrome Web Store, Edge Add-ons oder Firefox Add-ons oder lade das passende Browserpaket herunter.",
@@ -198,7 +198,7 @@ export default {
     {
       "title": "Klassische Übersetzung in der Erweiterung",
       "paragraphs": [
-        "Die Erweiterung bietet klassische Übersetzung: Texterkennung, OCR, Übersetzung, Entfernen und erneutes Einsetzen des Textes. Du kannst zum Original zurückkehren oder beide Bilder nebeneinander vergleichen. KI-Neuzeichnen wurde aus der Erweiterung entfernt.",
+        "Die Erweiterung bietet klassische Übersetzung: Texterkennung, OCR, Übersetzung, Entfernen und erneutes Einsetzen des Textes. Du kannst zum Original zurückkehren oder beide Bilder nebeneinander vergleichen.",
         "Erkennung und Übersetzung können Wörter auslassen oder Namen, Geräusche und Zusammenhänge falsch verstehen. Prüfe auch die Textplatzierung. Vergleiche mehrere typische Seiten mit den Originalen; flüssige Formulierungen garantieren keine Genauigkeit."
       ]
     },
@@ -206,14 +206,14 @@ export default {
       "title": "Offizieller NodeLane-Dienst",
       "paragraphs": [
         "Melde dich bei NodeLane an, um den offiziellen Dienst zu nutzen. Ausgewählte Bilder werden auf dem Server entsprechend den in deinem Konto angezeigten Leistungen und Grenzen verarbeitet. Gültige Ergebnisse können gemäß den Aufbewahrungsregeln wiederverwendet werden.",
-        "Kostenlos beinhaltet 30 klassische Seiten pro Tag. Lite hat keine tägliche oder monatliche Gesamtobergrenze, mit bis zu 1.200 neuen Seiten pro rollierender Stunde und ohne inbegriffene KI-Neuzeichnung. Es gelten weiterhin kurzfristige Tarif-, Image- und Leistungskapazitätsgrenzen."
+        "Kostenlos beinhaltet 30 klassische Seiten pro Tag. Lite hat keine tägliche oder monatliche Gesamtobergrenze, mit bis zu 1.200 neuen Seiten pro rollierender Stunde. Es gelten weiterhin kurzfristige Tarif-, Image- und Leistungskapazitätsgrenzen."
       ]
     },
     {
       "title": "Der Web-Arbeitsbereich zur Bildübersetzung",
       "paragraphs": [
-        "Die Website nimmt JPG, PNG und WebP an, mit Gasttest oder deinem Kontokontingent. KI-Neuzeichnen ist dort weiterhin verfügbar, wenn deine Berechtigungen es erlauben; die aktuelle Erweiterung bietet diese Funktion nicht.",
-        "Im Web-Arbeitsbereich kann das Neuzeichnen Linien, Figuren oder Hintergründe verändern. Vergleiche immer mit dem Original. Modi und Sprachen haben getrennte Ergebnisse; die angezeigten Zugriffs- und Abrechnungsregeln gelten weiterhin."
+        "Die Website nimmt JPG, PNG und WebP an, mit Gasttest oder deinem Kontokontingent.",
+        "Vergleiche den übersetzten Text mit dem Original. Die Ergebnisse werden nach Sprache gespeichert; es gelten die angezeigten Zugriffs-, Aufbewahrungs- und Abrechnungsregeln."
       ]
     },
     {
@@ -345,7 +345,7 @@ export default {
     {
       "title": "Übersetzung und Aufbewahrung",
       "paragraphs": [
-        "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Bei der klassischen Übersetzung kommen Erkennung, Textübersetzung, Bereinigung und Satz zum Einsatz. Redraw sendet Seitenbilder an ein Bildmodell. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
+        "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Bei der klassischen Übersetzung kommen Erkennung, Textübersetzung, Bereinigung und Satz zum Einsatz. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
         "Ergebnisse werden nur dann innerhalb desselben Kontos wiederverwendet, wenn Inhalt, Modus, Sprache und effektive Konfiguration übereinstimmen und eine gültige Anfrage verbleibt. Originale und Ergebnisse werden nicht zwischen Benutzern geteilt. Der Browser kombiniert Overlays mit seinem eigenen Originalbild; Der Server speichert keine dauerhaften Originalkopien."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Dienstleister und Transfers",
             "paragraphs": [
-              "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Die klassische Verarbeitung kann Erkennung/OCR, Textmodelle, lokale Hintergrundreparatur und Schriftsatz umfassen. Textanbieter verarbeiten den erkannten Text, der für die Übersetzung benötigt wird; Redraw-Anbieter verarbeiten das Seitenbild und die Sprache. Für die Aufgabe werden auf dem Server tatsächliche Anbieter konfiguriert.",
+              "Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Die klassische Verarbeitung kann Erkennung/OCR, Textmodelle, lokale Hintergrundreparatur und Schriftsatz umfassen. Textanbieter verarbeiten den erkannten Text, der für die Übersetzung benötigt wird. Für die Aufgabe werden auf dem Server tatsächliche Anbieter konfiguriert.",
               "Für Übersetzungsbilder werden private Dateien auf dem zentralen Server verwendet. Erkannter Text, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Identitäts-, Infrastruktur-, Übersetzungs- und Zahlungsdienste verarbeiten Daten nach Bedarf gemäß ihren geltenden Richtlinien. Die Verarbeitung kann außerhalb Ihrer Region erfolgen. Wir verkaufen keine personenbezogenen Daten und verwenden die eingereichten Comics nicht für zielgerichtete Werbung. Wir versprechen nicht, dass alle Anbieter keine Daten speichern oder niemals für Schulungen verwenden. Dies hängt vom Anbieter und der Vereinbarung ab. Übermitteln Sie keine unautorisierten oder ungeeigneten sensiblen Inhalte."
             ]
           },
           {
             "title": "Aufbewahrung und Löschung",
             "paragraphs": [
-              "Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
+              "Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
               "Ergebnisse werden nur dann innerhalb desselben Kontos wiederverwendet, wenn Inhalt, Modus, Sprache und effektive Konfiguration übereinstimmen und eine gültige Anfrage verbleibt. Originale und Ergebnisse werden nicht zwischen Benutzern geteilt. Der Browser kombiniert Overlays mit seinem eigenen Originalbild; Der Server speichert keine dauerhaften Originalkopien. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen.",
               "Für Konto- oder umfassendere Löschungsanfragen kontaktieren Sie uns zur Identitäts- und Umfangsüberprüfung. Transaktions-, Audit- oder Sicherheitsaufzeichnungen müssen möglicherweise für Serviceverpflichtungen, Streitigkeiten oder geltende Anforderungen aufbewahrt werden. Es wird keine einheitliche Löschfrist für alle Aufzeichnungen versprochen; In der Antwort werden das Ergebnis und die Einschränkungen erläutert."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Inhaltsrechte und KI-Ergebnisse",
             "paragraphs": [
               "Sie müssen das Recht haben, auf ausgewählte Inhalte zuzugreifen, diese hochzuladen, zu übersetzen und zu verarbeiten und die Anforderungen der Quellseite und der Rechteinhaber einzuhalten. Die Erweiterung gewährt kein Urheberrecht oder eine automatische Erlaubnis zur Veröffentlichung übersetzter Bilder. Umgehen Sie keine Paywalls, Anmeldeanforderungen oder DRM. Wir übernehmen keine Gewähr für die Rechtmäßigkeit oder Vollständigkeit des Quellinhalts. Urheberrechtsanfragen sollten das Werk, die Rechte, das Problem und die Kontaktinformationen angeben.",
-              "KI kann Text auslassen, falsch übersetzen oder falsch platzieren. Im Web-Arbeitsbereich zur Bildübersetzung kann KI-Neuzeichnen auch das Bildmaterial verändern, wenn dieser Modus gemäß Ihren Berechtigungen verfügbar ist. Die Ergebnisse helfen beim Lesen und ersetzen weder Originale noch eine fachliche Prüfung. Die Originalillustrationen der Website sind KI-generiert; die Sprachvergleiche zeigen aufgezeichnete Beispiele klassischer Übersetzung. Sie garantieren weder Genauigkeit noch Geschwindigkeit für jedes Bild. Sie können Originale vergleichen und Feedback senden."
+              "KI kann Text auslassen, falsch übersetzen oder falsch platzieren. Die Ergebnisse helfen beim Lesen und ersetzen weder Originale noch eine fachliche Prüfung. Die Originalillustrationen der Website sind KI-generiert; die Sprachvergleiche zeigen aufgezeichnete Beispiele klassischer Übersetzung. Sie garantieren weder Genauigkeit noch Geschwindigkeit für jedes Bild. Sie können Originale vergleichen und Feedback senden."
             ]
           },
           {
             "title": "Vorteile und Abonnements",
             "paragraphs": [
-              "Kostenlose, Lite, bestehende PLUS, Test- und Bonusvorteile unterliegen den jeweiligen Ablauf- und Seitenregeln, die in Ihrem Konto angezeigt werden. Lite akzeptiert bis zu 1.200 neue Seiten pro fortlaufender Stunde und schließt die KI-Neuzeichnung aus. Keine tägliche oder monatliche Gesamtobergrenze hebt kurzfristige Tarif-, Image- oder Servicekapazitätsbeschränkungen nicht auf.",
+              "Kostenlose, Lite, bestehende PLUS, Test- und Bonusvorteile unterliegen den jeweiligen Ablauf- und Seitenregeln, die in Ihrem Konto angezeigt werden. Lite akzeptiert bis zu 1.200 neue Seiten pro fortlaufender Stunde. Keine tägliche oder monatliche Gesamtobergrenze hebt kurzfristige Tarif-, Image- oder Servicekapazitätsbeschränkungen nicht auf.",
               "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Testversion und Abrechnung",
             "paragraphs": [
               "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen.",
-              "Neugestaltete Seiten sind monatlich ohne Verlängerung verfügbar, auch bei Jahresplänen. Berechtigte Konten können die für ihren Plan angezeigte kartenpflichtige Testversion starten. Durch ein erneutes Abonnieren oder Auswählen eines anderen Plans wird die Testberechtigung nicht zurückgesetzt."
+              "Berechtigte Konten können die für ihren Plan angezeigte kartenpflichtige Testversion starten. Durch ein erneutes Abonnieren oder Auswählen eines anderen Plans wird die Testberechtigung nicht zurückgesetzt."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Ist die Manga-Übersetzung kostenlos und was beinhaltet Lite?",
-        "answer": "Das Lesen lokaler Originale ist kostenlos und erfordert kein Konto. Für die offizielle Übersetzung ist eine Anmeldung erforderlich. Kostenlos beinhaltet 30 klassische Seiten pro Tag. Lite kostet 5,99 US-Dollar monatlich oder 59,99 US-Dollar jährlich, ohne tägliche oder monatliche klassische Gesamtobergrenze und bis zu 1.200 neue Seiten pro fortlaufender Stunde. Es gelten Tarif- und Kapazitätsgrenzen. KI-Neuzeichnung ist nicht enthalten. Berechtigte Erstkonten erhalten eine 7-tägige, kartengestützte Testversion. PLUS ist für Neukäufe geschlossen; Bestehende Abonnements behalten ihre angezeigten Vorteile. Steuern und Endbeträge werden an der Kasse angezeigt.",
+        "answer": "Das Lesen lokaler Originale ist kostenlos und erfordert kein Konto. Für die offizielle Übersetzung ist eine Anmeldung erforderlich. Kostenlos beinhaltet 30 klassische Seiten pro Tag. Lite kostet 5,99 US-Dollar monatlich oder 59,99 US-Dollar jährlich, ohne tägliche oder monatliche klassische Gesamtobergrenze und bis zu 1.200 neue Seiten pro fortlaufender Stunde. Es gelten Tarif- und Kapazitätsgrenzen. Berechtigte Erstkonten erhalten eine 7-tägige, kartengestützte Testversion. PLUS ist für Neukäufe geschlossen; Bestehende Abonnements behalten ihre angezeigten Vorteile. Steuern und Endbeträge werden an der Kasse angezeigt.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Welche Übersetzung bietet die Erweiterung und welchen Dienst kann ich wählen?",
-        "answer": "Die aktuelle Erweiterung bietet nur klassische Übersetzung mit Vergleich und Rückkehr zum Original. Nutze den offiziellen Dienst mit deinem Konto oder verbinde dein eigenes manga-translator-ui ohne offizielles Kontingent. KI-Neuzeichnen bleibt eine Funktion des Web-Arbeitsbereichs zur Bildübersetzung, wenn deine Berechtigungen es erlauben.",
+        "answer": "Die aktuelle Erweiterung bietet nur klassische Übersetzung mit Vergleich und Rückkehr zum Original. Nutze den offiziellen Dienst mit deinem Konto oder verbinde dein eigenes manga-translator-ui ohne offizielles Kontingent.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Werden Bilder hochgeladen oder gespeichert?",
-        "answer": "Bei Nutzung der offiziellen Übersetzung gelten die folgenden Aufbewahrungsregeln. Die Übersetzung sendet ausgewählte Seitenbilder an das Backend und relevante Anbieter. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten; Bei der KI-Neuzeichnung bleiben die vollständigen Ergebnisse erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen. Quellcookies, Anmeldetokens und Browserverlauf werden nicht hochgeladen. Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Das hier beschriebene KI-Neuzeichnen gehört zum Web-Arbeitsbereich zur Bildübersetzung und hängt von den verfügbaren Berechtigungen ab. Bei MTU werden Bilder direkt an den ausgewählten Dienst gesendet; Verarbeitung und Aufbewahrung hängen von dessen Konfiguration ab.",
+        "answer": "Bei Nutzung der offiziellen Übersetzung gelten die folgenden Aufbewahrungsregeln. Die Übersetzung sendet ausgewählte Seitenbilder an das Backend und relevante Anbieter. Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der klassischen Übersetzung bleiben Overlay-Dateien erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen. Quellcookies, Anmeldetokens und Browserverlauf werden nicht hochgeladen. Die aktuelle Erweiterung bietet ausschließlich klassische Übersetzung. Bei MTU werden Bilder direkt an den ausgewählten Dienst gesendet; Verarbeitung und Aufbewahrung hängen von dessen Konfiguration ab.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Benutzen fehlgeschlagene Übersetzungen Seiten?",
-        "answer": "Bei offiziellen Aufgaben Ihres Kontos können Seiten vor der Verarbeitung reserviert und nach erfolgreicher Bereitstellung abgerechnet werden. Ein ausdrücklicher Fehler gibt die Reservierung frei, ebenso ein bestätigtes klassisches Ergebnis ohne Text oder mit nur teilweiser Erkennung und beibehaltenem Original. Ist das Ergebnis eines KI-Neuzeichnens im Web-Arbeitsbereich unbekannt und dieser Modus gemäß Ihren Berechtigungen verfügbar, wird es zuerst geprüft; die Seiten können vorübergehend reserviert bleiben. MTU verbraucht kein offizielles NodeLane-Kontingent. Für den Gasttest gelten separat die im Web-Arbeitsbereich angezeigten Regeln für angenommene Anfragen, bei denen auch Fehler zählen können.",
+        "answer": "Bei offiziellen Aufgaben Ihres Kontos können Seiten vor der Verarbeitung reserviert und nach erfolgreicher Bereitstellung abgerechnet werden. Ein ausdrücklicher Fehler gibt die Reservierung frei, ebenso ein bestätigtes klassisches Ergebnis ohne Text oder mit nur teilweiser Erkennung und beibehaltenem Original. MTU verbraucht kein offizielles NodeLane-Kontingent. Für den Gasttest gelten separat die im Web-Arbeitsbereich angezeigten Regeln für angenommene Anfragen, bei denen auch Fehler zählen können.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Wie funktionieren die Lite-Übersetzungslimits?",
-        "answer": "Ein Konto verfügt über ein Limit von 100 neuen Übersetzungsbildern pro laufenden 60 Sekunden und 1.200 pro laufenden 3.600 Sekunden für alle Geräte, Modi und Sprachen. Kostenlos erlaubt 10 pro rollenden 60 Sekunden. Das erneute Abspielen derselben Anfrage und die Wiederverwendung gültiger Ergebnisse werden nicht erneut gezählt. Angenommene Aufgaben zählen weiterhin, wenn sie fehlschlagen, abgebrochen werden oder keinen Text enthalten. Abgelehnte Anfragen oder zurückgesetzte Datenbanktransaktionen geben den reservierten stündlichen Slot frei. Wiederholungsversuche folgen den tatsächlichen Zulassungsregeln für neue Aufgaben. Diese Grenzwerte garantieren keine Abschlussgeschwindigkeit. Lite schließt AI-Neuzeichnung aus.",
+        "answer": "Ein Konto verfügt über ein Limit von 100 neuen Übersetzungsbildern pro laufenden 60 Sekunden und 1.200 pro laufenden 3.600 Sekunden für alle Geräte, Modi und Sprachen. Kostenlos erlaubt 10 pro rollenden 60 Sekunden. Das erneute Abspielen derselben Anfrage und die Wiederverwendung gültiger Ergebnisse werden nicht erneut gezählt. Angenommene Aufgaben zählen weiterhin, wenn sie fehlschlagen, abgebrochen werden oder keinen Text enthalten. Abgelehnte Anfragen oder zurückgesetzte Datenbanktransaktionen geben den reservierten stündlichen Slot frei. Wiederholungsversuche folgen den tatsächlichen Zulassungsregeln für neue Aufgaben. Diese Grenzwerte garantieren keine Abschlussgeschwindigkeit.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Kostenlos",
     "常规翻译": "Standardübersetzung",
     "不限累计页数": "Unbegrenzte Gesamtseitenanzahl",
-    "AI 重绘可用额度": "Verfügbare KI-Neuzeichnungsseiten",
     "页": " Seiten",
     " 页可用": " Seiten verfügbar",
     "你的阅读权益": "Ihre Lesevorteile",

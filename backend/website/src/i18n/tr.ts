@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Çeviriyi NodeLane Comics'a bırakın. Dikkatinizi bir sonraki sayfaya saklayın.",
     "ctaButton": "Okuma yolculuğunuza başlayın",
     "pricingTitle": "Ücretsiz okuyun. Çeviri planınızı seçin.",
-    "pricingDescription": "Ücretsiz ve Lite manga çevirisi planlarını karşılaştırın: günlük ücretsiz sayfalar, kayan bir saatlik dönemde 1.200 yeni istek ve aylık ya da yıllık ödeme. Lite, yapay zekâ ile yeniden çizimi içermez. Koşulları sağlayan ilk kez kullanıcılar 7 gün deneyebilir.",
+    "pricingDescription": "Ücretsiz ve Lite manga çevirisi planlarını karşılaştırın: günlük ücretsiz sayfalar, kayan bir saatlik dönemde 1.200 yeni istek ve aylık ya da yıllık ödeme. Koşulları sağlayan ilk kez kullanıcılar 7 gün deneyebilir.",
     "freePlan": "Ücretsiz",
     "freePlanDescription": "Her gün biraz okumak için",
     "free": "ücretsiz",
@@ -92,7 +92,7 @@ export default {
       "Geçerli mevcut sonuçlarınıza erişim",
       "Her kayan 60 saniyelik dönemde en fazla 10 yeni çeviri görseli"
     ],
-    "freeNote": "Ücretsiz planda yapay zekâ ile yeniden çizim için geçerli promosyon kullanım hakkı gerekir. Günlük sayfalar Asia/Shanghai saat dilimine göre sıfırlanır; kullanılmayanlar devretmez.",
+    "freeNote": "Günlük sayfalar Asia/Shanghai saat dilimine göre sıfırlanır; kullanılmayanlar devretmez.",
     "quotaNote": "Bir görüntünün seçilen mod ve dilde başarıyla oluşturulmuş bir versiyonu bir sayfa olarak sayılır. Tekrarlanan istekler ve geçerli sonuçların yeniden kullanımı için iki kez ücret alınmaz. Açıkça yeni bir çeviri, mevcut yetkiyi kullanır. Sınırsız toplamlar, kısa vadeli oran, görüntü ve hizmet kapasitesi sınırlarına tabi olmaya devam eder; tamamlanma hızı garanti edilmez.",
     "downloadTitle": "Manga çevirmen uzantınızı yükleyin",
     "downloadDescription": "Chrome, Edge veya Firefox için NodeLane Comics edinin. Chrome Web Store, Edge Add-ons veya Firefox Add-ons mağazasını açın ya da tarayıcınıza uygun paketi indirin.",
@@ -192,14 +192,14 @@ export default {
   ],
   "minutes": 5,
   "title": "Normal manga çevirisi: resmî kanal mı, kendi MTU’nuz mu?",
-  "description": "Uzantıda normal çevirinin işleyişi, resmî kanal ve manga-translator-ui arasındaki farklar ve AI yeniden çizimin nerede kullanılabildiği.",
+  "description": "Uzantıda normal çevirinin işleyişi ve resmî kanal ile manga-translator-ui arasındaki farklar.",
   "category": "Çeviri ipuçları",
   "sections": [
     {
       "title": "Normal çeviri nasıl çalışır?",
       "paragraphs": [
         "Uzantı metni bulur, OCR ile tanır, çevirir, metin alanındaki arka planı onarır ve sonucu sayfaya yerleştirir. Orijinal karşılaştırma için erişilebilir kalır.",
-        "Güncel uzantı yalnızca normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web görsel çalışma alanında kalır; web sitesinde bulunması okuyucuda desteklendiği anlamına gelmez."
+        "Güncel uzantı yalnızca normal çeviri kullanır."
       ]
     },
     {
@@ -315,7 +315,7 @@ export default {
       "title": "Önce asıl görevi çözün",
       "paragraphs": [
         "Resmî görevler sunucuda saklanır: sayfayı kapatmak veya kısa bağlantı kaybı iptal anlamına gelmez. Bağlantı dönünce ilk görevin durumunu bekleyin. MTU seçildiyse işlemi doğrudan hizmette kontrol edin.",
-        "Sonuç bilinmiyorsa tekrar sürümler oluşturmak yerine önce görev durumunu kontrol edin. Web çalışma alanındaki AI yeniden çizim, sonuç doğrulanana kadar kotayı geçici olarak ayırabilir; uzantı normal çeviri kullanır."
+        "Sonuç bilinmiyorsa tekrar sürümler oluşturmak yerine önce görev durumunu kontrol edin."
       ]
     },
     {
@@ -345,7 +345,7 @@ export default {
     {
       "title": "Çeviri ve saklama",
       "paragraphs": [
-        "Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Standart çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Yeniden Çizim, sayfa görüntülerini bir görüntü modeline gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+        "Uzantı normal çeviri kullanır. Standart çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
         "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Servis sağlayıcılar ve transferler",
             "paragraphs": [
-              "Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Klasik işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler; yeniden çizim sağlayıcıları sayfa görüntüsünü ve dilini işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
+              "Uzantı normal çeviri kullanır. Klasik işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
               "Çeviri görselleri merkezi sunucudaki özel dosyaları kullanır; tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Kimlik, altyapı, çeviri ve ödeme hizmetleri, verileri gerektiği şekilde geçerli politikaları kapsamında işler. İşleme bölgenizin dışında gerçekleşebilir. Reklam hedefleme için kişisel bilgileri satmıyoruz veya gönderilen çizgi romanları kullanmıyoruz. Tüm sağlayıcıların hiçbir şeyi saklamayacağını veya verileri eğitim için asla kullanmayacağını garanti etmiyoruz; bu sağlayıcıya ve anlaşmaya bağlıdır. Yetkisiz veya uygun olmayan hassas içerik göndermeyin."
             ]
           },
           {
             "title": "Saklama ve silme",
             "paragraphs": [
-              "Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+              "Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
               "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir.",
               "Hesap silme veya daha geniş kapsamlı silme talepleri için kimlik ve kapsam doğrulaması amacıyla bizimle iletişime geçin. İşlem, denetim veya güvenlik kayıtlarının hizmet yükümlülükleri, anlaşmazlıklar veya geçerli gereksinimler nedeniyle saklanması gerekebilir. Tüm kayıtlar için tek bir silme tarihi sözü verilmemektedir; yanıt, sonucu ve kısıtlamaları açıklayacaktır."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "İçerik hakları ve yapay zeka sonuçları",
             "paragraphs": [
               "Seçilen içeriğe erişme, yükleme, tercüme etme ve işleme hakkına sahip olmanız ve kaynak site ve hak sahibinin gerekliliklerini takip etmeniz gerekir. Uzantı, çevrilmiş görüntüleri yayınlamak için hiçbir telif hakkı veya otomatik izin vermez. Ödeme duvarlarını, oturum açma gerekliliklerini veya DRM'yi atlamayın. Kaynak içeriğinin yasallığını veya eksiksizliğini garanti etmiyoruz. Telif hakkı sorgularında eser, haklar, sorun ve iletişim bilgileri belirtilmelidir.",
-              "Yapay zekâ metni atlayabilir, yanlış çevirebilir veya yanlış yerleştirebilir. Hesabınız için kullanılabilen web çalışma alanındaki AI yeniden çizim, görseli de değiştirebilir. Sonuçlar okumaya yardımcı olur; orijinalin veya uzman incelemesinin yerini almaz. Sitenin özgün illüstrasyonları yapay zekâ ile üretilmiştir; dil karşılaştırmaları kaydedilmiş normal çeviri örneklerini gösterir. Her görsel için doğruluk, hız veya sonuç garantisi vermez. Orijinalle karşılaştırın ve geri bildirim gönderin."
+              "Yapay zekâ metni atlayabilir, yanlış çevirebilir veya yanlış yerleştirebilir. Sonuçlar okumaya yardımcı olur; orijinalin veya uzman incelemesinin yerini almaz. Sitenin özgün illüstrasyonları yapay zekâ ile üretilmiştir; dil karşılaştırmaları kaydedilmiş normal çeviri örneklerini gösterir. Her görsel için doğruluk, hız veya sonuç garantisi vermez. Orijinalle karşılaştırın ve geri bildirim gönderin."
             ]
           },
           {
             "title": "Avantajlar ve abonelikler",
             "paragraphs": [
-              "Ücretsiz, Lite, mevcut PLUS, deneme ve bonus avantajları, hesabınızda gösterilen ilgili son kullanma tarihi ve sayfa kurallarına tabidir. Lite, her kayan bir saatlik dönemde 1.200'e kadar yeni sayfayı kabul eder ve yapay zekâ ile yeniden çizimi hariç tutar. Günlük veya aylık toplam üst sınırın olmaması, kısa süreli istek hızı, resim veya hizmet kapasitesi sınırlarını ortadan kaldırmaz.",
+              "Ücretsiz, Lite, mevcut PLUS, deneme ve bonus avantajları, hesabınızda gösterilen ilgili son kullanma tarihi ve sayfa kurallarına tabidir. Lite, her kayan bir saatlik dönemde 1.200'e kadar yeni sayfayı kabul eder. Günlük veya aylık toplam üst sınırın olmaması, kısa süreli istek hızı, resim veya hizmet kapasitesi sınırlarını ortadan kaldırmaz.",
               "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Deneme ve faturalandırma",
             "paragraphs": [
               "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin.",
-              "Yeniden çizim sayfaları yıllık planlar dahil her ay açılır; kullanılmayanlar sonraki aya devretmez. Koşulları sağlayan hesaplar, planlarında gösterilen ve kart gerektiren denemeyi başlatabilir. Yeniden abone olmak veya başka bir plan seçmek deneme hakkını sıfırlamaz."
+              "Koşulları sağlayan hesaplar, planlarında gösterilen ve kart gerektiren denemeyi başlatabilir. Yeniden abone olmak veya başka bir plan seçmek deneme hakkını sıfırlamaz."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Manga çevirisi ücretsiz mi ve Lite neler içeriyor?",
-        "answer": "Yerel orijinalleri okumak ücretsizdir ve hesap gerektirmez. Resmi çeviri oturum açmayı gerektirir; Ücretsiz, günde 30 standart çeviri sayfası içerir. Lite'nin maliyeti aylık 5,99 ABD Doları veya yıllık 59,99 ABD Dolarıdır; günlük veya aylık standart çeviri toplamı üst sınır yoktur ve her kayan bir saatlik dönemde 1.200'e kadar yeni sayfa bulunur. Oran ve kapasite sınırları geçerlidir. yapay zekâ ile yeniden çizim dahil değildir. İlk kez uygun hesaplara 7 günlük kart destekli deneme süresi sunulur. PLUS yeni alımlara kapalı; mevcut abonelikler görüntülenen avantajları korur. Vergiler ve nihai tutarlar ödeme sırasında gösterilir.",
+        "answer": "Yerel orijinalleri okumak ücretsizdir ve hesap gerektirmez. Resmi çeviri oturum açmayı gerektirir; Ücretsiz, günde 30 standart çeviri sayfası içerir. Lite'nin maliyeti aylık 5,99 ABD Doları veya yıllık 59,99 ABD Dolarıdır; günlük veya aylık standart çeviri toplamı üst sınır yoktur ve her kayan bir saatlik dönemde 1.200'e kadar yeni sayfa bulunur. Oran ve kapasite sınırları geçerlidir. İlk kez uygun hesaplara 7 günlük kart destekli deneme süresi sunulur. PLUS yeni alımlara kapalı; mevcut abonelikler görüntülenen avantajları korur. Vergiler ve nihai tutarlar ödeme sırasında gösterilir.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Uzantıda hangi çeviri ve kanallar kullanılabilir?",
-        "answer": "Güncel uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. NodeLane resmî kanalını veya kendi manga-translator-ui hizmetinizi seçin. AI yeniden çizim yalnızca web çalışma alanında uygun haklarla kullanılabilir. Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri kapalıdır.",
+        "answer": "Güncel uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. NodeLane resmî kanalını veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri kapalıdır.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Resimler yükleniyor mu yoksa saklanıyor mu?",
-        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı normal çeviri kullanır. AI yeniden çizim, uygun hesap haklarıyla web çalışma alanında kullanılabilir. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur; yapay zekâ ile yeniden çizim tam sonuçları korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
+        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı normal çeviri kullanır. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Başarısız olan çeviriler sayfa kullanıyor mu?",
-        "answer": "Hesapla yapılan resmî çeviride sayfalar önce ayrılabilir ve başarılı teslimden sonra kotadan düşülür. Açık bir hata ayrılan kotayı serbest bırakır; metin bulunmayan veya kısmi tanımada orijinal metnin korunduğu normal sonuçlar için de aynı kural geçerlidir. Sonucu bilinmeyen AI yeniden çizim yalnızca web çalışma alanında hesabınıza sunulan modla ilgilidir: önce görev durumu doğrulanır ve ayrılan kota geçici olarak tutulabilir. MTU, NodeLane resmî kotasını kullanmaz. Anonim denemelerde çalışma alanının yeni istek sayımı kuralları ayrıca geçerlidir; başarısız denemeler de sayılır.",
+        "answer": "Hesapla yapılan resmî çeviride sayfalar önce ayrılabilir ve başarılı teslimden sonra kotadan düşülür. Açık bir hata ayrılan kotayı serbest bırakır; metin bulunmayan veya kısmi tanımada orijinal metnin korunduğu normal sonuçlar için de aynı kural geçerlidir. MTU, NodeLane resmî kotasını kullanmaz. Anonim denemelerde çalışma alanının yeni istek sayımı kuralları ayrıca geçerlidir; başarısız denemeler de sayılır.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Lite çeviri sınırları nasıl çalışır?",
-        "answer": "Bir hesabın tüm cihazları, modları ve dilleri, her kayan 60 saniyelik dönemde 100 ve her kayan 3.600 saniyelik dönemde 1.200 yeni çeviri görseli sınırını paylaşır. Ücretsiz planda kayan 60 saniyelik dönemde 10 görsele izin verilir. Aynı isteğin tekrar gönderilmesi ve geçerli sonuçların yeniden kullanılması tekrar sayılmaz. Kabul edilen görevler başarısız olsa, iptal edilse veya metin içermese de sayılır. Reddedilen istekler veya geri alınan veritabanı işlemleri, ayrılan saatlik yeri serbest bırakır. Yeniden denemeler yeni görev kabul kurallarına tabidir. Bu sınırlar tamamlanma hızını garanti etmez. Lite, yapay zekâ ile yeniden çizimi içermez.",
+        "answer": "Bir hesabın tüm cihazları, modları ve dilleri, her kayan 60 saniyelik dönemde 100 ve her kayan 3.600 saniyelik dönemde 1.200 yeni çeviri görseli sınırını paylaşır. Ücretsiz planda kayan 60 saniyelik dönemde 10 görsele izin verilir. Aynı isteğin tekrar gönderilmesi ve geçerli sonuçların yeniden kullanılması tekrar sayılmaz. Kabul edilen görevler başarısız olsa, iptal edilse veya metin içermese de sayılır. Reddedilen istekler veya geri alınan veritabanı işlemleri, ayrılan saatlik yeri serbest bırakır. Yeniden denemeler yeni görev kabul kurallarına tabidir. Bu sınırlar tamamlanma hızını garanti etmez.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Ücretsiz",
     "常规翻译": "Standart çeviri",
     "不限累计页数": "Sınırsız toplam sayfa",
-    "AI 重绘可用额度": "Kullanılabilir yapay zekâ ile yeniden çizim sayfaları",
     "页": " sayfa",
     " 页可用": " sayfa kullanılabilir",
     "你的阅读权益": "Okuma kullanım haklarınız",

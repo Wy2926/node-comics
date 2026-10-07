@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@astrojs/react": "6.0.6",
+    "@zip.js/zip.js": "2.15.0",
     "astro": "7.3.3",
     "oidc-client-ts": "3.5.0",
     "react": "19.2.0",

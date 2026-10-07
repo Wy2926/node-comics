@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Réessayez",
     "caption": "Résultats de traduction standard enregistrés"
   },
-  "eyebrow": "VOS HISTOIRES. VOTRE RYTHME.",
-  "title": [
-    "Lisez et traduisez des mangas.",
-    "Dans votre navigateur."
-  ],
-  "description": "Lisez et traduisez dans Chrome, Edge et Firefox : fichiers locaux, EPUB, Google Drive, bibliothèques OPDS et sites compatibles. Découvrez des mangas, comparez les originaux et préparez votre lecture hors ligne.",
+  "eyebrow": "EXTENSION DE TRADUCTION DE MANGAS",
+  "title": ["Traduisez vos mangas.","Poursuivez la lecture."],
+  "description": "Une extension de traduction de mangas pour Chrome, Edge et Firefox sur ordinateur. Traduisez les images avec le service cloud NodeLane et comparez-les à l’original pendant votre lecture.",
   "install": "Obtenez l'extension",
-  "seeReader": "Découvrez le lecteur",
+  "seeReader": "Voir la traduction en action",
   "readerPath": "Lire des bandes dessinées avec l'extension",
-  "readerAccess": "Lisez gratuitement vos originaux locaux sans compte. Le service officiel utilise votre quota de compte ; votre propre MTU n’exige ni compte NodeLane ni quota officiel.",
+  "readerAccess": "Installation gratuite. La traduction cloud nécessite un compte et respecte les limites des offres gratuites ou payantes.",
   "webAccess": "Essayez en tant qu’invité ou connectez-vous pour utiliser le quota de votre compte. L’espace de traduction d’images affiche le nombre d’utilisations disponibles.",
   "desktop": "Pensé pour la lecture sur ordinateur",
   "popupAlt": "Fenêtre contextuelle de la barre d'outils NodeLane Comics avec l'anglais sélectionné et le bouton de l'onglet Traduire actuel.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Trois étapes vers votre prochaine bande dessinée.",
+  "stepsTitle": "Trois étapes pour lire et traduire.",
   "stepsIntro": "Installez l'extension, ajoutez une bande dessinée et lisez à votre rythme.",
-  "steps": [
-    [
-      "Installer l’extension",
-      "Choisissez la boutique officielle ou le paquet adapté à votre navigateur. Vérifiez les restrictions d’accès aux sites dans votre navigateur."
-    ],
-    [
-      "Ouvrir une histoire",
-      "Importez un fichier, choisissez un fichier Drive, connectez une bibliothèque OPDS ou ajoutez un manga depuis un site compatible."
-    ],
-    [
-      "Lire et traduire au besoin",
-      "Gardez l’original, choisissez le service officiel ou votre MTU et mettez les chapitres en cache pour les lire hors ligne."
-    ]
-  ],
+  "steps": [["Installez l’extension","Choisissez la boutique officielle de Chrome, Edge ou Firefox."],["Ouvrez votre manga","Importez une bande dessinée locale ou ouvrez un site de mangas compatible."],["Choisissez une langue","Traduisez les images avec le service choisi et gardez l’original à côté."]],
   "compareEyebrow": "REGARDEZ DE PLUS PRÈS",
   "compareTitle": "Vérifiez la traduction. Gardez l'original.",
   "compareBody": "Passez de l’original japonais aux traductions enregistrées. Dans le lecteur, les vues originale et traduite restent toujours accessibles.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Voir la capture d'écran complète",
   "close": "Fermer la capture d'écran",
   "galleryName": "Explorer les captures d'écran de l'extension",
-  "screenshotNote": "Captures d'écran réelles partagées avec l'aperçu du projet, affichées en anglais. Ouvrez n'importe quelle capture d'écran pour afficher l'original complet. Les fonctionnalités peuvent différer selon la version ; les illustrations de bandes dessinées appartiennent à leurs propriétaires respectifs.",
+  "screenshotNote": "Capture réelle du produit : interface en anglais, original et traduction chinoise. Les résultats varient. Les illustrations appartiennent à leurs ayants droit respectifs.",
   "sourcesEyebrow": "À PARTIR DE VOS FICHIERS OU DU WEB",
   "sourcesTitle": "Apportez une bande dessinée à laquelle vous pouvez accéder.",
   "sources": [
@@ -153,12 +137,12 @@ const copy: HomeCopy = {
     ]
   ],
   "controlNote": "Les nouveaux mangas s’ouvrent sur les originaux. La traduction automatique est désactivée par défaut ; choisissez une langue et le service souhaité au moment de traduire.",
-  "privacyTitle": "Sachez ce qui arrive à vos pages.",
-  "privacyBody": "La traduction officielle envoie les images sélectionnées au serveur ; les originaux sont supprimés une fois la tâche terminée, échouée ou annulée. Les résultats privés du compte sont conservés tant qu’il reste des demandes valides. Les résultats des invités restent sur le serveur pendant 24 heures après la fin de la tâche ; cette limite n’affecte pas les traductions enregistrées localement. Si vous connectez un service de traduction local, le traitement et la conservation des images dépendent de ce service.",
+  "privacyTitle": "Lisez gratuitement. Choisissez votre offre de traduction.",
+  "privacyBody": "NodeLane Comics propose une extension gratuite et un service de traduction cloud lié à votre compte. Des limites de fréquence et de capacité s’appliquent. Consultez la disponibilité, les avantages et les conditions de facturation avant de vous abonner.",
   "privacy": "Politique de confidentialité",
-  "pricing": "Offres et quotas",
-  "ctaTitle": "Prêt pour votre prochaine page ?",
-  "ctaBody": "Obtenez l'extension, ouvrez une bande dessinée et installez-vous confortablement."
+  "pricing": "Comparer Free et Lite",
+  "ctaTitle": "Comprenez votre prochaine page.",
+  "ctaBody": "Installez NodeLane Comics sur Chrome, Edge ou Firefox pour ordinateur."
 };
 
 export default copy;

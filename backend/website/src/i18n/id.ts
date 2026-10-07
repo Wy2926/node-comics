@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Serahkan terjemahannya ke NodeLane Comics. Simpan perhatian Anda untuk halaman berikutnya.",
     "ctaButton": "Mulailah perjalanan membaca Anda",
     "pricingTitle": "Baca secara gratis. Pilih paket terjemahan Anda.",
-    "pricingDescription": "Bandingkan paket Gratis dan Lite: halaman gratis harian, 1.200 permintaan baru dalam setiap periode bergulir 60 menit, serta pembayaran bulanan atau tahunan. Lite tidak mencakup gambar ulang AI. Akun baru yang memenuhi syarat mendapat uji coba 7 hari.",
+    "pricingDescription": "Bandingkan paket Gratis dan Lite: halaman gratis harian, 1.200 permintaan baru dalam setiap periode bergulir 60 menit, serta pembayaran bulanan atau tahunan. Akun baru yang memenuhi syarat mendapat uji coba 7 hari.",
     "freePlan": "Gratis",
     "freePlanDescription": "Untuk sedikit membaca setiap hari",
     "free": "gratis",
@@ -92,7 +92,7 @@ export default {
       "Akses ke hasil yang sudah ada dan masih berlaku",
       "Hingga 10 gambar terjemahan baru dalam setiap periode bergulir 60 detik"
     ],
-    "freeNote": "Gambar ulang AI pada paket Gratis memerlukan kuota promosi yang masih berlaku. Kuota harian diatur ulang menurut zona waktu Asia/Shanghai dan sisanya tidak diakumulasi.",
+    "freeNote": "Kuota harian diatur ulang menurut zona waktu Asia/Shanghai dan sisanya tidak diakumulasi.",
     "quotaNote": "Satu versi gambar yang berhasil dibuat dalam mode dan bahasa yang dipilih dihitung sebagai satu halaman. Permintaan duplikat dan penggunaan kembali hasil yang valid tidak dikenakan biaya dua kali. Terjemahan baru yang eksplisit menggunakan hak saat ini. Jumlah total yang tidak terbatas tetap tunduk pada batasan tarif, gambar, dan kapasitas layanan jangka pendek; tidak ada kecepatan penyelesaian yang dijamin.",
     "downloadTitle": "Instal ekstensi penerjemah manga Anda",
     "downloadDescription": "Dapatkan NodeLane Comics untuk Chrome, Edge, atau Firefox. Buka Chrome Web Store, Edge Add-ons, atau Firefox Add-ons, atau unduh paket yang sesuai dengan browser Anda.",
@@ -192,14 +192,14 @@ export default {
   ],
   "minutes": 5,
   "title": "Terjemahan manga biasa: saluran resmi atau MTU sendiri?",
-  "description": "Cara kerja terjemahan biasa di ekstensi, perbedaan saluran resmi dan manga-translator-ui, serta tempat tersedianya gambar ulang AI.",
+  "description": "Cara kerja terjemahan biasa di ekstensi serta perbedaan saluran resmi dan manga-translator-ui.",
   "category": "Kiat terjemahan",
   "sections": [
     {
       "title": "Cara kerja terjemahan biasa",
       "paragraphs": [
         "Ekstensi menemukan teks, mengenalinya dengan OCR, menerjemahkan, memulihkan latar di area teks, dan menempatkan hasil pada halaman. Gambar asli tetap tersedia untuk dibandingkan.",
-        "Ekstensi saat ini hanya menggunakan terjemahan biasa. Gambar ulang AI tetap tersedia di ruang kerja gambar web sesuai hak akses akun; tersedianya di situs tidak berarti didukung oleh pembaca."
+        "Ekstensi saat ini hanya menggunakan terjemahan biasa."
       ]
     },
     {
@@ -315,7 +315,7 @@ export default {
       "title": "Selesaikan tugas awal terlebih dahulu",
       "paragraphs": [
         "Tugas resmi disimpan di server: menutup halaman atau kehilangan koneksi sebentar tidak berarti pembatalan. Setelah terhubung kembali, tunggu status tugas awal. Jika MTU dipilih, periksa prosesnya di layanan tersebut.",
-        "Jika hasil belum diketahui, periksa status tugas terlebih dahulu tanpa membuat versi berulang. Di ruang kerja web, gambar ulang AI dapat mencadangkan kuota sementara sampai hasil diverifikasi; ekstensi memakai terjemahan biasa."
+        "Jika hasil belum diketahui, periksa status tugas terlebih dahulu tanpa membuat versi berulang."
       ]
     },
     {
@@ -345,7 +345,7 @@ export default {
     {
       "title": "Terjemahan dan retensi",
       "paragraphs": [
-        "Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Terjemahan standar menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Redraw mengirimkan gambar halaman ke model gambar. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+        "Ekstensi memakai terjemahan biasa. Terjemahan standar menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
         "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Penyedia layanan dan transfer",
             "paragraphs": [
-              "Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Pemrosesan standar mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan; penyedia gambar ulang memproses gambar halaman dan bahasa. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
+              "Ekstensi memakai terjemahan biasa. Pemrosesan standar mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
               "Gambar terjemahan menggunakan file pribadi di server pusat; teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Layanan identitas, infrastruktur, penerjemahan, dan pembayaran memproses data sesuai kebutuhan, berdasarkan kebijakan yang berlaku. Pemrosesan mungkin terjadi di luar wilayah Anda. Kami tidak menjual informasi pribadi atau menggunakan komik yang dikirimkan untuk penargetan iklan. Kami tidak berjanji semua penyedia tidak menyimpan apa pun atau tidak pernah menggunakan data untuk pelatihan; ini tergantung pada penyedia dan perjanjian. Jangan mengirimkan konten sensitif yang tidak sah atau tidak sesuai."
             ]
           },
           {
             "title": "Retensi dan penghapusan",
             "paragraphs": [
-              "Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+              "Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
               "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya.",
               "Untuk permintaan penghapusan akun atau yang lebih luas, hubungi kami untuk verifikasi identitas dan cakupan. Catatan transaksi, audit, atau keamanan mungkin memerlukan penyimpanan untuk kewajiban layanan, perselisihan, atau persyaratan yang berlaku. Tidak ada tenggat waktu penghapusan yang dijanjikan untuk semua catatan; tanggapannya akan menjelaskan hasil dan kendalanya."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Hak konten dan hasil AI",
             "paragraphs": [
               "Anda harus memiliki hak untuk mengakses, mengunggah, menerjemahkan, dan memproses konten yang dipilih serta mengikuti persyaratan situs sumber dan pemegang hak. Ekstensi ini tidak memberikan hak cipta atau izin otomatis untuk mempublikasikan gambar terjemahan. Jangan mengabaikan paywall, persyaratan login, atau DRM. Kami tidak menjamin legalitas atau kelengkapan konten sumber. Penyelidikan hak cipta harus mengidentifikasi karya, hak, masalah, dan informasi kontak.",
-              "AI dapat melewatkan, salah menerjemahkan, atau salah menempatkan teks. Gambar ulang AI di ruang kerja web, jika tersedia untuk akun Anda, juga dapat mengubah ilustrasi. Hasil membantu membaca dan tidak menggantikan gambar asli atau pemeriksaan profesional. Ilustrasi orisinal situs dibuat dengan AI; perbandingan bahasa menampilkan contoh terjemahan biasa yang direkam. Contoh tersebut tidak menjamin akurasi, kecepatan, atau hasil untuk setiap gambar. Bandingkan dengan aslinya dan kirim masukan."
+              "AI dapat melewatkan, salah menerjemahkan, atau salah menempatkan teks. Hasil membantu membaca dan tidak menggantikan gambar asli atau pemeriksaan profesional. Ilustrasi orisinal situs dibuat dengan AI; perbandingan bahasa menampilkan contoh terjemahan biasa yang direkam. Contoh tersebut tidak menjamin akurasi, kecepatan, atau hasil untuk setiap gambar. Bandingkan dengan aslinya dan kirim masukan."
             ]
           },
           {
             "title": "Manfaat dan langganan",
             "paragraphs": [
-              "Gratis, Lite, PLUS yang ada, manfaat uji coba dan bonus mengikuti aturan masa berlaku dan halaman masing-masing yang ditampilkan di akun Anda. Lite menerima hingga 1.200 halaman baru per jam bergulir dan tidak termasuk gambar ulang AI. Tidak adanya batasan total harian atau bulanan tidak menghapus batas laju permintaan, gambar, atau kapasitas layanan jangka pendek.",
+              "Gratis, Lite, PLUS yang ada, manfaat uji coba dan bonus mengikuti aturan masa berlaku dan halaman masing-masing yang ditampilkan di akun Anda. Lite menerima hingga 1.200 halaman baru per jam bergulir. Tidak adanya batasan total harian atau bulanan tidak menghapus batas laju permintaan, gambar, atau kapasitas layanan jangka pendek.",
               "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Uji coba dan penagihan",
             "paragraphs": [
               "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan.",
-              "Kuota gambar ulang tersedia setiap bulan, termasuk pada paket tahunan; sisanya tidak dibawa ke bulan berikutnya. Akun yang memenuhi syarat dapat memulai uji coba dengan kartu yang ditampilkan untuk paketnya. Berlangganan kembali atau memilih paket lain tidak mengatur ulang kelayakan uji coba."
+              "Akun yang memenuhi syarat dapat memulai uji coba dengan kartu yang ditampilkan untuk paketnya. Berlangganan kembali atau memilih paket lain tidak mengatur ulang kelayakan uji coba."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Apakah terjemahan manga gratis, dan apa saja yang termasuk dalam Lite?",
-        "answer": "Membaca dokumen asli lokal gratis dan tidak memerlukan akun. Terjemahan resmi memerlukan proses masuk; Gratis termasuk 30 halaman standar per hari. Lite berharga US$5,99 per bulan atau US$59,99 per tahun, tanpa batas total standar harian atau bulanan dan hingga 1.200 halaman baru per jam bergulir. Batas laju permintaan dan kapasitas berlaku. Gambar ulang AI tidak termasuk. Akun pertama kali yang memenuhi syarat mendapatkan uji coba yang didukung kartu selama 7 hari. PLUS ditutup untuk pembelian baru; langganan yang ada tetap mempertahankan manfaat yang ditampilkan. Pajak dan jumlah akhir ditampilkan saat checkout.",
+        "answer": "Membaca dokumen asli lokal gratis dan tidak memerlukan akun. Terjemahan resmi memerlukan proses masuk; Gratis termasuk 30 halaman standar per hari. Lite berharga US$5,99 per bulan atau US$59,99 per tahun, tanpa batas total standar harian atau bulanan dan hingga 1.200 halaman baru per jam bergulir. Batas laju permintaan dan kapasitas berlaku. Akun pertama kali yang memenuhi syarat mendapatkan uji coba yang didukung kartu selama 7 hari. PLUS ditutup untuk pembelian baru; langganan yang ada tetap mempertahankan manfaat yang ditampilkan. Pajak dan jumlah akhir ditampilkan saat checkout.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Terjemahan dan saluran apa yang tersedia di ekstensi?",
-        "answer": "Ekstensi saat ini memakai terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi NodeLane atau manga-translator-ui sendiri. Gambar ulang AI hanya tersedia di ruang kerja web sesuai hak akses. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif.",
+        "answer": "Ekstensi saat ini memakai terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi NodeLane atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Apakah gambar diunggah atau disimpan?",
-        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan biasa. Gambar ulang AI tersedia di ruang kerja web sesuai hak akses akun. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay; Gambar ulang AI mempertahankan hasil penuh. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
+        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan biasa. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Apakah terjemahan yang gagal menggunakan halaman?",
-        "answer": "Pada terjemahan resmi dengan akun, halaman dapat dicadangkan terlebih dahulu lalu dipotong dari kuota setelah hasil berhasil diberikan. Kegagalan yang jelas melepaskan cadangan, begitu pula hasil biasa tanpa teks atau pengenalan parsial yang mempertahankan teks asli. Hasil gambar ulang AI yang belum diketahui hanya berlaku untuk mode yang tersedia bagi akun Anda di ruang kerja web: status tugas diperiksa terlebih dahulu dan cadangan dapat ditahan sementara. MTU tidak memakai kuota resmi NodeLane. Percobaan anonim mengikuti aturan penghitungan permintaan baru yang terpisah di ruang kerja; percobaan yang gagal juga dihitung.",
+        "answer": "Pada terjemahan resmi dengan akun, halaman dapat dicadangkan terlebih dahulu lalu dipotong dari kuota setelah hasil berhasil diberikan. Kegagalan yang jelas melepaskan cadangan, begitu pula hasil biasa tanpa teks atau pengenalan parsial yang mempertahankan teks asli. MTU tidak memakai kuota resmi NodeLane. Percobaan anonim mengikuti aturan penghitungan permintaan baru yang terpisah di ruang kerja; percobaan yang gagal juga dihitung.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Bagaimana cara kerja batas terjemahan Lite?",
-        "answer": "Satu akun berbagi batas 100 gambar terjemahan baru dalam setiap periode bergulir 60 detik dan 1.200 gambar dalam setiap periode bergulir 3.600 detik untuk semua perangkat, mode, dan bahasa. Paket Gratis mengizinkan 10 gambar dalam setiap periode bergulir 60 detik. Pengiriman ulang permintaan yang sama dan penggunaan kembali hasil yang masih berlaku tidak dihitung lagi. Tugas yang sudah diterima tetap dihitung meskipun gagal, dibatalkan, atau tidak berisi teks. Permintaan yang ditolak atau transaksi basis data yang dibatalkan akan melepaskan slot kuota per jam yang dicadangkan. Percobaan ulang mengikuti aturan penerimaan tugas baru yang berlaku. Batas ini tidak menjamin kecepatan penyelesaian. Lite tidak mencakup gambar ulang AI.",
+        "answer": "Satu akun berbagi batas 100 gambar terjemahan baru dalam setiap periode bergulir 60 detik dan 1.200 gambar dalam setiap periode bergulir 3.600 detik untuk semua perangkat, mode, dan bahasa. Paket Gratis mengizinkan 10 gambar dalam setiap periode bergulir 60 detik. Pengiriman ulang permintaan yang sama dan penggunaan kembali hasil yang masih berlaku tidak dihitung lagi. Tugas yang sudah diterima tetap dihitung meskipun gagal, dibatalkan, atau tidak berisi teks. Permintaan yang ditolak atau transaksi basis data yang dibatalkan akan melepaskan slot kuota per jam yang dicadangkan. Percobaan ulang mengikuti aturan penerimaan tugas baru yang berlaku. Batas ini tidak menjamin kecepatan penyelesaian.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Gratis",
     "常规翻译": "Terjemahan standar",
     "不限累计页数": "Jumlah halaman tidak terbatas",
-    "AI 重绘可用额度": "Halaman gambar ulang AI yang tersedia",
     "页": " halaman",
     " 页可用": " halaman tersedia",
     "你的阅读权益": "Manfaat membaca Anda",

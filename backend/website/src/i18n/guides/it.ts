@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Leggi la tua prima pagina tradotta",
         "paragraphs": [
-          "Importa un manga locale o apri una fonte compatibile nel lettore. Scegli una lingua e la traduzione classica con il tuo canale MTU selezionato. L’estensione attuale offre soltanto questa traduzione; il ridisegno con IA dello spazio web è una funzione separata.",
+          "Importa un manga locale o apri una fonte compatibile nel lettore. Scegli una lingua e la traduzione classica con il tuo canale MTU selezionato.",
           "La pagina attuale ha la priorità, seguita da una finestra limitata di immagini vicine. Le immagini vengono elaborate una alla volta sullo stesso canale MTU. Confronta originale e traduzione senza perdere la posizione; lettore e traduzione nella pagina usano lo stesso servizio selezionato.",
           "Se una pagina fallisce, risolvi il problema segnalato prima di riprovare manualmente. Chiudere una pagina o perdere la connessione non dimostra che MTU abbia interrotto il calcolo. Evita invii ripetuti mentre il servizio potrebbe essere ancora occupato."
         ],
@@ -214,7 +214,7 @@ export const localTranslationGuides: Guide[] = [
             [
               "Modalità di estensione",
               "Attualmente solo traduzione classica",
-              "L’estensione attuale offre soltanto traduzione classica. Il ridisegno con IA descritto qui riguarda lo spazio web di traduzione delle immagini, secondo i diritti disponibili."
+              "Traduzione standard nell’estensione"
             ],
             [
               "Costi",

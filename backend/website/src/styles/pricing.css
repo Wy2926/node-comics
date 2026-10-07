@@ -1,0 +1,75 @@
+/* A single semantic table keeps benefit rows aligned across both plans. */
+.pricing-comparison { max-width: 1180px; margin: 0 auto 48px; }
+.pricing-comparison > .billing-cycle-picker { margin: 0 auto 24px; }
+.pricing-comparison .plan-comparison { width: 100%; table-layout: fixed; border-collapse: collapse; background: transparent; font-size: .9rem; line-height: 1.6; }
+.pricing-comparison .feature-column { width: 26%; }
+.pricing-comparison col:not(.feature-column) { width: 37%; }
+.pricing-comparison :is(th, td) { padding: 24px 28px; border: 0; border-bottom: 1px solid var(--line); text-align: start; vertical-align: middle; overflow-wrap: anywhere; hyphens: auto; font-weight: 400; }
+.pricing-comparison thead th { padding: 0; vertical-align: top; background: transparent; }
+.pricing-comparison thead .comparison-heading { padding: 34px 28px; }
+.pricing-comparison .comparison-heading > span { font-size: .76rem; color: var(--muted); }
+.pricing-comparison .comparison-heading h2 { margin-top: 16px; font-family: Georgia, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif; font-size: clamp(1.6rem, 2.5vw, 2.15rem); font-weight: 400; line-height: 1.3; text-wrap: balance; }
+.pricing-comparison .price-card { padding: 32px 28px; min-width: 0; }
+.pricing-comparison :is(.paid-column, tbody td:last-child, .paid-action) { background: #101e2f; }
+.pricing-comparison .paid-column { border-radius: 18px 18px 0 0; }
+.pricing-comparison .paid-action { border-radius: 0 0 18px 18px; }
+.pricing-comparison .membership-heading { min-height: 22px; margin-bottom: 16px; color: var(--accent); font-size: .75rem; line-height: 1.5; }
+.pricing-comparison .price-card h2 { font-size: 1.8rem; font-weight: 500; }
+.pricing-comparison .price-card > p:not(.price) { margin-top: 12px; min-height: 3.4em; color: var(--muted); font-size: .86rem; line-height: 1.7; }
+.pricing-comparison .price-card.paid > p:not(.price) { color: var(--accent); font-weight: 600; }
+.pricing-comparison .price-card .price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 28px 0 12px; color: var(--ink); font-size: clamp(2.3rem, 3.5vw, 3.4rem); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.05em; line-height: 1.1; }
+.pricing-comparison .price .price-value { font: inherit; color: inherit; letter-spacing: inherit; }
+.pricing-comparison .price .price-unit { color: var(--muted); font-size: .8rem; font-weight: 400; letter-spacing: 0; }
+.pricing-comparison :is(.billing-total, .monthly-equivalent, .published-pricing-label) { font-size: .75rem; line-height: 1.7; color: var(--muted); }
+.pricing-comparison .price-terms { min-height: 5.1em; font-size: .75rem; line-height: 1.7; }
+.pricing-comparison .monthly-equivalent { color: var(--ink); }
+.pricing-comparison .billing-offer { padding: 0; border: 0; background: transparent; }
+.pricing-comparison .billing-plan-picker { margin-top: 16px; }
+.pricing-comparison .billing-plan-card { padding: 10px 12px; font-size: .8rem; }
+.pricing-comparison tbody th { background: transparent; color: var(--muted); font-size: .85rem; }
+.pricing-comparison tbody td { color: var(--muted); }
+.pricing-comparison tbody strong { color: var(--ink); font-weight: 600; }
+.pricing-comparison tr[data-feature='classic'] strong { color: var(--accent); }
+.pricing-comparison .feature-value { display: flex; align-items: flex-start; gap: 12px; }
+.pricing-comparison .feature-value .ui-icon { width: 18px; height: 25px; color: var(--accent); }
+.pricing-comparison .pricing-actions td { padding: 30px 28px; vertical-align: top; border-bottom: 0; }
+.pricing-comparison .pricing-actions .button { width: 100%; margin: 0; justify-content: space-between; white-space: normal; overflow-wrap: anywhere; gap: 12px; }
+.pricing-comparison .pricing-actions :is(.trial-note, .billing-status) { margin: 16px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.8; }
+.pricing-comparison .pricing-actions .billing-status { color: var(--ink); }
+.pricing-comparison > .comparison-note { max-width: 840px; margin: 30px auto 0; color: var(--muted); font-size: .76rem; line-height: 1.8; text-align: center; }
+@media (max-width: 950px) {
+  .pricing-comparison :is(th, td) { padding: 20px 18px; }
+  .pricing-comparison thead th { padding: 0; }
+  .pricing-comparison thead .comparison-heading { padding: 30px 18px; }
+  .pricing-comparison .price-card { padding: 30px 18px; }
+  .pricing-comparison .pricing-actions td { padding: 24px 18px; }
+}
+@media (max-width: 580px) {
+  .pricing-comparison > .billing-cycle-picker { margin-bottom: 18px; }
+  .pricing-comparison .feature-column { width: 24%; }
+  .pricing-comparison col:not(.feature-column) { width: 38%; }
+  .pricing-comparison :is(th, td) { padding: 17px 12px; font-size: .75rem; line-height: 1.6; }
+  .pricing-comparison thead th { padding: 0; }
+  .pricing-comparison thead .comparison-heading { padding: 22px 12px; }
+  .pricing-comparison .comparison-heading > span { font-size: .62rem; }
+  .pricing-comparison .comparison-heading h2 { font-size: .96rem; }
+  .pricing-comparison .price-card { padding: 22px 12px; }
+  .pricing-comparison .membership-heading { font-size: .62rem; min-height: 36px; margin-bottom: 10px; }
+  .pricing-comparison .price-card h2 { min-height: 2.6em; font-size: 1.3rem; }
+  .pricing-comparison .price-card > p:not(.price) { display: none; }
+  .pricing-comparison .price-card .price { margin-top: 16px; min-height: 52px; align-content: start; gap: 5px; font-size: clamp(1.55rem, 6.8vw, 2rem); }
+  .pricing-comparison .price .price-unit { flex-basis: 100%; font-size: .66rem; }
+  .pricing-comparison :is(.billing-total, .monthly-equivalent, .published-pricing-label) { font-size: .65rem; }
+  .pricing-comparison .price-terms { min-height: 8.5em; font-size: .65rem; }
+  .pricing-comparison tbody th { font-size: .68rem; }
+  .pricing-comparison .feature-value { gap: 5px; text-wrap: balance; }
+  .pricing-comparison .feature-value .ui-icon { width: 12px; height: 19px; }
+  .pricing-comparison .pricing-actions td { padding: 22px 12px; }
+  .pricing-comparison .pricing-actions .button { font-size: .7rem; padding: 10px 8px; gap: 5px; }
+  .pricing-comparison .pricing-actions .button .ui-icon { display: none; }
+  .pricing-comparison .pricing-actions :is(.trial-note, .billing-status) { font-size: .65rem; }
+  .pricing-comparison > .comparison-note { font-size: .7rem; text-align: start; }
+}
+@media (max-width: 350px) {
+  .pricing-comparison .price-terms { min-height: 11.9em; }
+}

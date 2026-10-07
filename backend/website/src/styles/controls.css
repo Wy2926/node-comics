@@ -1,5 +1,5 @@
 /* Website controls share one vocabulary; page styles only arrange them. */
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close) {
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18,7 +18,7 @@
 .account-refresh,
 .account-signout, .account-upgrade > summary,
 .translation-records li > button,
-.translation-result-actions button.text-link,
+.record-actions button.text-link,
 .translation-verification-close {
   --control-bg: var(--surface);
   --control-ink: var(--ink);
@@ -61,7 +61,7 @@
 .account-refresh,
 .account-signout, .account-upgrade > summary,
 .translation-records li > button,
-.translation-result-actions :is(.button, button.text-link),
+.record-actions :is(.button, button.text-link),
 .translation-identity .button,
 .translation-alert .button,
 .image-dropzone[data-compact='true'] .button {
@@ -72,7 +72,7 @@
   --control-hover-shadow: var(--comic-shadow);
 }
 
-.translation-result-actions button.text-link {
+.record-actions button.text-link {
   --control-ink: var(--danger);
   --control-hover-bg: var(--danger-soft);
 }
@@ -105,29 +105,29 @@
   box-shadow: var(--comic-shadow-small);
 }
 
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
   background: var(--control-hover-bg);
   box-shadow: var(--control-hover-shadow);
 }
 
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
   box-shadow: var(--comic-shadow-active);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
   .billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
     transform: translate(var(--comic-control-hover-translate));
   }
-  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
   .billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
     transform: translate(var(--comic-control-active-translate));
   }
 }
 
-:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):focus-visible,
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):focus-visible,
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:focus-visible) {
   outline: var(--comic-focus-ring);
   outline-offset: var(--comic-focus-offset);
@@ -135,7 +135,7 @@
 
 .billing-cycle input:focus-visible { outline: none; }
 
-:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close):is(:disabled, [aria-disabled='true']),
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):is(:disabled, [aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card)[data-disabled='true'],
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled),
 .billing-cycle:disabled label:not(.price-card .billing-cycle-card) {
@@ -174,7 +174,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .translation-result-actions button.text-link, .translation-verification-close, .translation-settings select) { transition: none; }
+  :is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close, .translation-settings select) { transition: none; }
 }
 
 /* Folder tabs select a view; they do not use action-button motion or shadows. */
@@ -267,3 +267,17 @@
 @media (prefers-reduced-motion: reduce) {
   :is(.segmented button, .gallery-switches button, .translation-tabs button, .price-card .billing-cycle-card) { transition: none; }
 }
+
+/* Compact cadence control shared by static and hydrated pricing. */
+.billing-cycle-picker { display: grid; justify-items: center; gap: 10px; min-width: 0; }
+.billing-cycle-saving { min-height: 2.8em; max-width: 100%; margin: 0; color: var(--accent); font-size: .72rem; line-height: 1.4; text-align: center; }
+.billing-cycle-saving .annual-badge { display: inline-block; padding: 4px 10px; border: 1px solid #29486a; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: inherit; font-weight: 500; line-height: inherit; }
+.price-value { display: inline-block; white-space: nowrap; font: inherit; letter-spacing: inherit; }
+.price-value .price-currency { display: inline-block; margin-inline: .12em; color: var(--muted); font-size: max(.34em, .68rem); font-weight: 500; letter-spacing: 0; }
+.billing-cycle.billing-cycle-segmented { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 4px; padding: 4px; margin: 0; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.billing-cycle-segmented legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card { display: flex; align-items: center; justify-content: center; flex-direction: row; flex: 1; min-width: 0; min-height: 42px; padding: 8px 23px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); box-shadow: none; transform: none; }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card strong { font-size: .84rem; font-weight: 500; }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card[data-selected='true'] { background: var(--accent-soft); color: var(--ink); box-shadow: inset 0 0 0 1px #3989e8; }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card input { position: absolute; inset: auto; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card:has(input:focus-visible) { outline: var(--comic-focus-ring); outline-offset: 3px; }

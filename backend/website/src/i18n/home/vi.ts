@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Thử lại",
     "caption": "Ghi kết quả dịch chuẩn"
   },
-  "eyebrow": "CÂU CHUYỆN CỦA BẠN. NHỊP ĐỌC CỦA BẠN.",
-  "title": [
-    "Đọc và dịch manga.",
-    "Ngay trong trình duyệt."
-  ],
-  "description": "Đọc tệp truyện, Google Drive, OPDS và website được hỗ trợ trong Chrome, Edge, Firefox. Mở EPUB, dịch ảnh thông thường hoặc vùng chọn trên web và luôn so sánh được bản gốc.",
+  "eyebrow": "TIỆN ÍCH DỊCH MANGA CHO TRÌNH DUYỆT",
+  "title": ["Dịch manga.","Tiếp tục đọc."],
+  "description": "Tiện ích dịch manga cho Chrome, Edge và Firefox trên máy tính. Dịch hình ảnh truyện bằng dịch vụ đám mây NodeLane và đối chiếu với bản gốc khi đọc.",
   "install": "Cài tiện ích",
-  "seeReader": "Khám phá trình đọc",
+  "seeReader": "Xem giao diện dịch",
   "readerPath": "Đọc truyện tranh với phần mở rộng",
-  "readerAccess": "Đọc bản gốc cục bộ miễn phí, không cần tài khoản. Bản dịch chính thức sử dụng hạn mức tài khoản của bạn; bạn cũng có thể kết nối dịch vụ cục bộ của riêng bạn.",
+  "readerAccess": "Cài đặt miễn phí. Dịch đám mây cần tài khoản và tuân theo giới hạn của gói miễn phí hoặc trả phí.",
   "webAccess": "Hãy thử làm khách hoặc đăng nhập để sử dụng hạn mức tài khoản của bạn. Không gian làm việc hình ảnh hiển thị các mục đích sử dụng sẵn có của bạn.",
   "desktop": "Thiết kế để đọc trên máy tính",
   "popupAlt": "NodeLane Comics bật lên thanh công cụ với tiếng Anh được chọn và nút Dịch tab hiện tại.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Ba bước để đọc bộ truyện tiếp theo.",
+  "stepsTitle": "Ba bước để đọc và dịch.",
   "stepsIntro": "Cài đặt tiện ích mở rộng, thêm truyện tranh và đọc theo tốc độ của riêng bạn.",
-  "steps": [
-      [
-        "Cài tiện ích",
-        "Cài từ cửa hàng chính thức hoặc lấy gói phù hợp với trình duyệt."
-      ],
-      [
-        "Thêm truyện hoặc kết nối thư viện",
-        "Nhập truyện cục bộ, Drive, kết nối OPDS hoặc bắt đầu từ website được hỗ trợ."
-      ],
-      [
-        "Dịch khi cần",
-        "Chọn kênh NodeLane hoặc dịch vụ riêng và ngôn ngữ để so sánh bản gốc, bản dịch trong trình đọc hoặc website."
-      ]
-    ],
+  "steps": [["Cài tiện ích","Tải từ cửa hàng chính thức của Chrome, Edge hoặc Firefox."],["Mở manga","Nhập truyện trên máy hoặc mở trang manga được hỗ trợ."],["Chọn ngôn ngữ","Dịch hình ảnh bằng dịch vụ đã chọn và giữ bản gốc bên cạnh."]],
   "compareEyebrow": "XEM KỸ HƠN",
   "compareTitle": "Kiểm tra bản dịch. Giữ lại bản gốc.",
   "compareBody": "Chuyển đổi giữa bản gốc tiếng Nhật và kết quả dịch đã ghi nhận. Trong trình đọc, bạn có thể xem bản gốc và bản dịch trong tầm tay.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Xem toàn bộ ảnh chụp màn hình",
   "close": "Đóng ảnh chụp màn hình",
   "galleryName": "Khám phá ảnh chụp màn hình tiện ích mở rộng",
-  "screenshotNote": "Ảnh chụp màn hình thực được chia sẻ với tổng quan về dự án, hiển thị bằng tiếng Anh. Mở bất kỳ ảnh chụp màn hình nào để xem bản gốc đầy đủ. Các tính năng có thể khác nhau tùy theo phiên bản; tác phẩm nghệ thuật truyện tranh thuộc về chủ sở hữu tương ứng của nó.",
+  "screenshotNote": "Ảnh chụp sản phẩm thực tế: giao diện tiếng Anh, bản gốc và bản dịch tiếng Trung. Kết quả có thể khác nhau. Hình ảnh truyện thuộc về các chủ sở hữu quyền tương ứng.",
   "sourcesEyebrow": "Tệp·Drive·thư viện·website",
   "sourcesTitle": "Thêm bộ truyện bạn có quyền truy cập.",
   "sources": [
@@ -153,12 +137,12 @@ const copy: HomeCopy = {
       ]
     ],
   "controlNote": "Truyện mới mở ở bản gốc. Chọn kênh và ngôn ngữ rồi bật dịch thông thường; trình đọc và dịch trên web dùng chung kênh đang chọn.",
-  "privacyTitle": "Biết các trang truyện của bạn được xử lý thế nào.",
-  "privacyBody": "Bản dịch chính thức gửi hình ảnh đã chọn đến máy chủ; bản gốc sẽ bị xóa sau khi tác vụ hoàn thành, không thành công hoặc bị hủy. Kết quả tài khoản cá nhân được giữ lại trong khi các yêu cầu hợp lệ vẫn còn; Kết quả của máy chủ khách được lưu giữ trong 24 giờ sau khi nhiệm vụ kết thúc và các bản dịch được lưu cục bộ không bị ảnh hưởng bởi giới hạn đó. Khi bạn kết nối một dịch vụ dịch thuật cục bộ, dịch vụ đó sẽ xác định việc xử lý và lưu giữ hình ảnh.",
+  "privacyTitle": "Đọc miễn phí. Chọn gói dịch phù hợp.",
+  "privacyBody": "NodeLane Comics cung cấp tiện ích miễn phí và dịch đám mây theo tài khoản. Có giới hạn tần suất yêu cầu và năng lực dịch vụ. Hãy xem tình trạng cung cấp, quyền lợi và điều kiện thanh toán trước khi đăng ký.",
   "privacy": "Chính sách quyền riêng tư",
-  "pricing": "Gói và hạn mức",
-  "ctaTitle": "Sẵn sàng sang trang tiếp theo?",
-  "ctaBody": "Nhận tiện ích mở rộng, mở truyện tranh và thư giãn."
+  "pricing": "So sánh Free và Lite",
+  "ctaTitle": "Hiểu trang truyện tiếp theo.",
+  "ctaBody": "Cài NodeLane Comics cho Chrome, Edge hoặc Firefox trên máy tính."
 };
 
 export default copy;

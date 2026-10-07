@@ -1,0 +1,13 @@
+/* Keep Arabic connected and readable without mirroring artwork or brand marks. */
+html[dir='rtl'] body { font-family: Tahoma, Arial, sans-serif; }
+html[dir='rtl'] :is(h1, h2, h3, .eyebrow, .price, .home-price) { letter-spacing: normal; }
+html[dir='rtl'] :is(.home-hero h1, .home-service-heading h2, .comparison-heading h2) { font-family: Tahoma, Arial, sans-serif; line-height: 1.45; }
+html[dir='rtl'] .home-hero h1 span { font-style: normal; }
+html[dir='rtl'] :is(.price-value, .email, pre, code) { direction: ltr; unicode-bidi: isolate; }
+html[dir='rtl'] .price-value { display: inline-block; }
+html[dir='rtl'] .icon-arrow { transform: scaleX(-1); }
+html[dir='rtl'] .check-list li { padding-left: 0; padding-right: 28px; }
+html[dir='rtl'] .check-list li::before { left: auto; right: 0; }
+html[dir='rtl'] :is(.article-body, .guide-content) :is(ul, ol) { padding-left: 0; padding-right: 1.5em; }
+html[dir='rtl'] :is(th, .translation-file-name) { text-align: start; }
+html[dir='rtl'] .skip-link { left: auto; right: 16px; }

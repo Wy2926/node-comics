@@ -26,7 +26,7 @@ test('homepage locales provide complete text and matching gallery/translation en
   }
   for (const locale of locales) check(homeCopy[locale], homeCopy.en, locale);
 });
-test('sixteen independent dictionaries cover all public content and account messages',()=>{
+test('seventeen independent dictionaries cover all public content and account messages',()=>{
   const reference=dictionaries['zh-CN'];
   for(const locale of locales){
     const value=dictionaries[locale];
@@ -93,8 +93,8 @@ test('0.9.1 replaces the superseded 0.9.0 notes in every locale',()=>{
 });
 
 
-test('sixteen locales include workspace, feedback, payment, project and browser-language copy',()=>{
-  assert.equal(locales.length,16);
+test('seventeen locales include workspace, feedback, payment, project and browser-language copy',()=>{
+  assert.equal(locales.length,17);
   for(const table of [translationCopy,uninstallCopy,paymentSuccess,projectCopy,languageNoticeCopy]) {
     assert.deepEqual(Object.keys(table).sort(),[...locales].sort());
     for(const locale of locales) assert.deepEqual(Object.keys(table[locale]).sort(),Object.keys(table.en).sort(),locale);

@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {annualSavings,amount,selectedChannel,hasManagedSubscription,offerBenefits,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
+import {annualSavings,annualSavingsForAmounts,amount,billingCopy,billingBenefitCopy,selectedChannel,hasManagedSubscription,offerBenefits,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
 import {selectedInterval} from '../src/components/BillingCycle';
+import {offerForInterval} from '../src/lib/billing-cycle';
 import {comparisonCopy} from '../src/lib/pricing-comparison';
 import {locales} from '../src/i18n/locales';
 
@@ -9,7 +10,7 @@ test('all pricing locales distinguish ordinary and subscription translation mode
   for(const locale of locales){
     const copy=comparisonCopy(locale);
     assert.ok(copy.model.label.trim(),locale);
-    assert.match(copy.model.free,/GPT 6\.1 Luna/,locale);
+    assert.match(copy.model.free,/GPT 6 Luna/,locale);
     assert.match(copy.model.lite,/Gemini 3\.8 Flash/,locale);
     assert.doesNotMatch(copy.model.free,/Gemini/,locale);
     assert.doesNotMatch(copy.model.lite,/GPT/,locale);
@@ -33,6 +34,16 @@ test('channel selection never changes a pending checkout provider',()=>{
   assert.equal(selectedChannel(offer,'')?.provider,'stripe');
 });
 
+test('public pricing never substitutes another cadence or retains a mismatched price ID',()=>{
+  const month={id:'monthly',interval:'month'} as BillingOffer,year={id:'yearly',interval:'year'} as BillingOffer;
+  const alternative={id:'yearly-alt',interval:'year'} as BillingOffer;
+  assert.equal(offerForInterval([month],'year'),undefined);
+  assert.equal(offerForInterval([year],'month'),undefined);
+  assert.equal(offerForInterval([month,year],'year','monthly'),year);
+  assert.equal(offerForInterval([month,year,alternative],'year','yearly-alt'),alternative);
+  assert.equal(offerForInterval([],'year'),undefined);
+});
+
 test('expired and revoked terminal subscriptions allow another purchase',()=>{
   const now=Date.parse('2026-09-20T00:00:00Z');
   for(const status of ['active','trialing','paused','past_due','unpaid','incomplete','scheduled_cancel'])assert.equal(hasManagedSubscription(status,null,now),true);
@@ -46,8 +57,13 @@ test('expired and revoked terminal subscriptions allow another purchase',()=>{
 
 test('Stripe minor units render correctly in public and account prices',()=>{
   const offer:BillingOffer={id:'test',name:'Sample',plan_id:'plus',plan_revision_id:'plus-v1',currency:'usd',unit_amount:999,interval:'year',monthly_redraw_pages:300,trial_days:0,trial_redraw_pages:0,channels:[{provider:'stripe',binding_id:'stripe-fixture',trial_days:7,trial_redraw_pages:30},{provider:'creem',binding_id:'creem-fixture',trial_days:7,trial_redraw_pages:30}]};
-  for(const [currency,unit_amount,value] of [['usd',999,9.99],['jpy',500,500],['isk',500,5],['ugx',500,5]] as const)
+  for(const [currency,unit_amount,value] of [['usd',999,9.99],['jpy',500,500],['isk',500,5],['ugx',500,5],['ISK',500,5],['UGX',500,5]] as const)
     assert.equal(amount({...offer,currency,unit_amount},'en'),new Intl.NumberFormat('en',{style:'currency',currency}).format(value));
+});
+
+test('public annual discount uses the same comparison math as live offers',()=>{
+  assert.deepEqual(annualSavingsForAmounts(599,5999),{regular:7188,saved:1189,percent:16.5});
+  for(const [monthly,yearly] of [[0,5999],[599,7188],[599,7200],[599,-1]])assert.equal(annualSavingsForAmounts(monthly,yearly),null);
 });
 
 test('annual savings compare the same published benefits and currency',()=>{
@@ -63,13 +79,20 @@ test('annual savings compare the same published benefits and currency',()=>{
   assert.equal(amount({...year,unit_amount:year.unit_amount/12},'en'),'$8.33');
 });
 
-test('Lite benefits and annual renewal do not claim redraw pages',()=>{
+test('billing copy omits retired mode benefits for both Lite and legacy quotes',()=>{
   const lite={interval:'year' as const,hourly_image_limit:1200,monthly_redraw_pages:0};
   const plus={...lite,hourly_image_limit:null,monthly_redraw_pages:300};
-  for(const locale of ['zh-CN','zh-TW','en','ja','ko']){
-    assert.match(offerBenefits(lite,locale),/1,200/);
-    assert.doesNotMatch(trialCopy(7,0,locale),/0/);
-    assert.notEqual(renewalCopy(lite,locale),renewalCopy(plus,locale));
-    assert.match(offerBenefits(plus,locale),/300/);
+  const retiredCopy=/redraw|重绘|重繪|再描画|다시 그리|redessin|redibuj|redesenh|neuzeich|ridisegn|перерис|перемальов|przerys|çizim|vẽ lại|gambar ulang/i;
+  for(const locale of locales){
+    const copy=billingCopy(locale),benefits=billingBenefitCopy(locale);
+    assert.equal(offerBenefits(lite,locale),benefits.hourly(1200),locale);
+    assert.equal(offerBenefits(plus,locale),copy.classic,locale);
+    assert.equal(renewalCopy(lite,locale),renewalCopy(plus,locale),locale);
+    assert.equal(renewalCopy(lite,locale),copy.renew(true),locale);
+    assert.equal(trialCopy(7,locale),benefits.trial(7),locale);
+    assert.match(trialCopy(7,locale),/7/,locale);
+    assert.doesNotMatch([offerBenefits(lite,locale),offerBenefits(plus,locale),renewalCopy(plus,locale),trialCopy(7,locale),benefits.description,benefits.intro].join(' '),retiredCopy,locale);
+    for(const key of ['quota','trial'])assert.equal(key in copy,false,`${locale}: billing.${key}`);
+    for(const key of ['noRedraw','annual'])assert.equal(key in benefits,false,`${locale}: billingBenefits.${key}`);
   }
 });

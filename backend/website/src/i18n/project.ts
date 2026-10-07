@@ -9,6 +9,7 @@ import {project as uk} from './extra/uk';
 import {project as tr} from './extra/tr';
 import {project as vi} from './extra/vi';
 import {project as id} from './extra/id';
+import {project as ar} from './extra/ar';
 import type { Locale } from './types';
 
 interface ProjectCopy {
@@ -44,7 +45,7 @@ export const projectCopy: Record<Locale, ProjectCopy> = {
   'uk':uk,
   'tr':tr,
   'vi':vi,
-  'id':id,
+  'id':id,'ar':ar,
 
   'zh-CN': {
     identityTitle: '为漫画阅读与翻译而做的开源项目。',

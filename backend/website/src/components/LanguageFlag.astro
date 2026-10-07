@@ -21,9 +21,10 @@ interface Props { locale: Locale }
 const {locale} = Astro.props;
 const flags: Record<Locale, string> = {
   'zh-CN': china, 'zh-TW': taiwan, en: unitedStates, ja: japan, ko: southKorea,
-  'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id,
+  'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id, ar: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#75aff0" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>',
 };
-// Local flag-icons 7.5.0 artwork. MIT license: /licenses/flag-icons.txt.
+// Local flag-icons 7.5.0 artwork (MIT); Arabic uses a neutral inline globe.
+// License: /licenses/flag-icons.txt.
 // Data URLs keep each flag's internal SVG references isolated without image requests.
 const source = `data:image/svg+xml,${encodeURIComponent(flags[locale])}`;
 ---

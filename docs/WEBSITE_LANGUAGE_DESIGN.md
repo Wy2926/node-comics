@@ -1,6 +1,6 @@
 # 官网语言选择
 
-官网支持与插件界面一致的 16 种语言，语言由 URL 决定：简体中文使用根路径，其余语言使用 `zh-tw`、`en`、`ja`、`ko`、`fr`、`es`、`pt-br`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id` 前缀。各语言的正文、账户、图片翻译和政策独立维护，运行与验证见[官网 README](../backend/website/README.md)。
+官网支持 17 种语言，语言由 URL 决定：简体中文使用根路径，其余语言使用 `zh-tw`、`en`、`ja`、`ko`、`fr`、`es`、`pt-br`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`、`ar` 前缀。各语言的正文、账户、图片翻译和政策独立维护；阿拉伯语使用 RTL 排版，金额、代码及邮箱保持独立的从左向右方向。官网语言不改变插件支持范围，运行与验证见[官网 README](../backend/website/README.md)。
 
 ## 浏览器语言提示
 
@@ -12,7 +12,7 @@
 
 ## 路由与 SEO
 
-语言菜单保留可抓取链接并切换到同一内容。公开固定语言页输出自身 canonical、16 个互相对应的 hreflang 与简中 `x-default`，并进入 sitemap。HTML 不按浏览器语言、Cookie 或 IP 替换正文；提示在浏览器本地判断，不增加网络请求。
+语言菜单保留可抓取链接并切换到同一内容。公开固定语言页输出自身 canonical、17 个互相对应的 hreflang 与简中 `x-default`，并进入 sitemap。HTML 不按浏览器语言、Cookie 或 IP 替换正文；提示在浏览器本地判断，不增加网络请求。
 
 OIDC 回调仍为精确的 `/auth/callback/`；登录保存并恢复当前语言的账户或翻译路径。支付渠道继续使用固定同源返回入口，成功页不发放权益。账户、身份、支付、工作台及卸载页面维持 noindex/no-store，不进入 sitemap。
 

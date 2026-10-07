@@ -16,5 +16,6 @@ import uk from './uk';
 import tr from './tr';
 import vi from './vi';
 import id from './id';
+import ar from './ar';
 export type { HomeCopy } from './types';
-export const homeCopy: Record<Locale,HomeCopy> = {'zh-CN':zhCN, 'zh-TW':zhTW, 'en':en, 'ja':ja, 'ko':ko, 'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id};
+export const homeCopy: Record<Locale,HomeCopy> = {'zh-CN':zhCN, 'zh-TW':zhTW, 'en':en, 'ja':ja, 'ko':ko, 'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id, 'ar':ar};

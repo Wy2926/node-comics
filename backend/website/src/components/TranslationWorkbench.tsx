@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ImageDropzone from './ImageDropzone';
 import Turnstile from './Turnstile';
 import { translationError } from '../i18n/translation-error';
@@ -11,11 +11,11 @@ import {
   listRecords,
   localSnapshotState,
   readImages,
+  recordOrder,
   removeRecord,
   saveRecord,
   storageBytes,
   type RecordMeta,
-  type Mode,
   type Snapshot,
 } from '../lib/translation-store';
 import {
@@ -29,6 +29,7 @@ import {
   type Capabilities,
 } from '../lib/translation-api';
 import { pixels } from '../lib/translation-pixels';
+import { saveDownload, translationArchive, translationFilename } from '../lib/translation-download';
 import '../styles/translate.css';
 
 const active = new Set([
@@ -55,110 +56,15 @@ const delay = (ms: number, signal: AbortSignal) =>
     else signal.addEventListener('abort', cancel, { once: true });
   });
 
-function Preview({
-  record,
-  view,
-  zoom,
-  volatile,
-}: {
-  record?: RecordMeta;
-  view: string;
-  zoom: number;
-  volatile?: Blob;
-}) {
-  const [urls, setUrls] = useState<{ original: string; result?: string }>();
-  const viewport = useRef<HTMLDivElement>(null),
-    position = useRef({ top: 0, left: 0 });
-  useEffect(() => {
-    let gone = false;
-    const made: string[] = [];
-    if (record)
-      void readImages(record.id).then((data) => {
-        if (gone || !data) return;
-        const original = URL.createObjectURL(data.source),
-          translated = volatile ?? data.result,
-          result = translated ? URL.createObjectURL(translated) : undefined;
-        made.push(original, ...(result ? [result] : []));
-        setUrls({ original, result });
-      });
-    return () => {
-      gone = true;
-      made.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [record?.id, record?.bytes, volatile]);
-  function restore() {
-    const element = viewport.current;
-    if (element) {
-      element.scrollTop =
-        position.current.top *
-        Math.max(0, element.scrollHeight - element.clientHeight);
-      element.scrollLeft =
-        position.current.left *
-        Math.max(0, element.scrollWidth - element.clientWidth);
-    }
-  }
-  useLayoutEffect(restore, [view, urls, zoom]);
-  return (
-    <div
-      ref={viewport}
-      tabIndex={0}
-      onScroll={(event) => {
-        const element = event.currentTarget;
-        position.current = {
-          top:
-            element.scrollHeight > element.clientHeight
-              ? element.scrollTop /
-                (element.scrollHeight - element.clientHeight)
-              : position.current.top,
-          left:
-            element.scrollWidth > element.clientWidth
-              ? element.scrollLeft / (element.scrollWidth - element.clientWidth)
-              : position.current.left,
-        };
-      }}
-      className="translation-canvas"
-      data-compare={view === 'compare'}
-      aria-label={record?.name}
-      role="region"
-    >
-      {urls && (
-        <div className="translation-images" style={{ width: zoom + '%' }}>
-          {(view !== 'translated' || !urls.result) && (
-            <img
-              src={urls.original}
-              width={record?.width}
-              height={record?.height}
-              onLoad={restore}
-              alt={record?.name ?? ''}
-            />
-          )}
-          {view !== 'original' && urls.result && (
-            <img
-              src={urls.result}
-              width={record?.width}
-              height={record?.height}
-              onLoad={restore}
-              alt={record?.name ?? ''}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function TranslationWorkbench({ locale, copy: t }: { locale: Locale; copy: TranslationCopy }) {
   const [rows, setRows] = useState<RecordMeta[]>([]),
-    [selected, setSelected] = useState(''),
     [account, setAccount] = useState<Account>(),
     [guest, setGuest] = useState<Guest>(),
     [caps, setCaps] = useState<Capabilities>(),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [view, setView] = useState('translated'),
-    [zoom, setZoom] = useState(100),
-    [mode, setMode] = useState<Mode>('classic'),
+    [downloading, setDownloading] = useState(false),
     [language, setLanguage] = useState(
       locale === 'zh-CN' ? 'zh-Hans' : locale === 'zh-TW' ? 'zh-Hant' : locale === 'pt-BR' ? 'pt' : locale,
     ),
@@ -171,6 +77,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   >(undefined);
   const controller = useRef<AbortController | undefined>(undefined);
   const running = useRef(false);
+  const exporting = useRef(false);
   const resumeOnReturn = useRef(false);
   const runningIds = useRef<string[]>([]);
   const resumePending = useRef<() => void>(() => undefined);
@@ -179,16 +86,15 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   const scopes = useRef<string[]>([]);
   const [hasGuestHistory, setHasGuestHistory] = useState(false);
   const [usedBytes, setUsedBytes] = useState(0);
-  const current = rows.find((row) => row.id === selected) ?? rows[0];
   const isGuestScope = showGuest || !account;
   const languages =
     caps?.languages.filter((item) =>
-      caps.modes.find((item) => item.id === mode)?.languages.includes(item.id),
+      caps.modes.find((item) => item.id === 'classic')?.languages.includes(item.id),
     ) ?? [];
   useEffect(() => {
     if (caps && !languages.some((item) => item.id === language))
       setLanguage(languages[0]?.id ?? '');
-  }, [caps, mode]);
+  }, [caps]);
   async function refresh() {
     const [found, used] = await Promise.all([
       listRecords(scopes.current),
@@ -196,9 +102,6 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     ]);
     setRows(found);
     setUsedBytes(used);
-    setSelected((id) =>
-      found.some((row) => row.id === id) ? id : (found[0]?.id ?? ''),
-    );
   }
   function fail(error: unknown) {
     const code =
@@ -218,9 +121,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     meta.updated = Date.now();
     setUsedBytes(await saveRecord(meta, data));
     setRows((old) =>
-      [...old.filter((row) => row.id !== meta.id), { ...meta }].sort(
-        (a, b) => b.created - a.created,
-      ),
+      [...old.filter((row) => row.id !== meta.id), { ...meta }].sort(recordOrder),
     );
   }
   useEffect(() => {
@@ -316,7 +217,6 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   }
   async function changeHistory(value: boolean) {
     setShowGuest(value);
-    if (value) setMode('classic');
     scopes.current = [
       draftScope(),
       ...(value || !account ? ['guest:*'] : ['user:' + account.id]),
@@ -368,7 +268,6 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         abort.signal.throwIfAborted();
         const meta = { ...stored };
         currentMeta = meta;
-        setSelected(meta.id);
         let data = await readImages(meta.id);
         if (!data) throw Error('LOCAL_STORAGE_UNAVAILABLE');
         const useAccount = meta.scope.startsWith('user:')
@@ -391,7 +290,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         )
           throw Error('GUEST_SESSION_EXPIRED');
         if (!meta.requestId) {
-          meta.mode = useAccount ? mode : 'classic';
+          meta.mode = 'classic';
           meta.language = language;
         }
         const allowTiles = meta.requestId
@@ -481,6 +380,8 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
             throw error;
         }
         if (!snapshot) {
+          // Older local records remain readable, but cannot create retired modes.
+          if (meta.mode !== 'classic') throw new TranslationError('TRANSLATION_UNAVAILABLE');
           const token = useAccount
             ? ''
             : await challenge('guest_translate', abort.signal);
@@ -653,7 +554,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     }
   }
   async function again(meta: RecordMeta) {
-    if (!['failed', 'succeeded'].includes(meta.state)) return;
+    if (meta.mode !== 'classic' || meta.state !== 'failed') return;
     if (!meta.requestId) {
       await run([meta]);
       return;
@@ -670,10 +571,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           updated: Date.now(),
           state: 'submitting',
           requestId: crypto.randomUUID(),
-          intent:
-            meta.state === 'failed'
-              ? { retry_of: meta.requestId }
-              : { regenerate_of: meta.requestId },
+          intent: { retry_of: meta.requestId },
           snapshot: undefined,
           error: undefined,
         };
@@ -685,33 +583,30 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       fail(error);
     }
   }
-  async function download() {
-    if (!current) return;
+  async function readResult(meta: RecordMeta) {
+    const blob = volatile?.id === meta.id ? volatile.blob : (await readImages(meta.id))?.result;
+    if (!blob) throw Error('INPUT_MISSING');
+    return { blob, name: translationFilename(meta.name, meta.language, blob.type) };
+  }
+  async function download(records: RecordMeta[], archive = false) {
+    if (!records.length || exporting.current) return;
+    exporting.current = true;
+    setDownloading(true);
+    setError('');
     try {
-      const blob =
-        volatile?.id === current.id
-          ? volatile.blob
-          : (await readImages(current.id))?.result;
-      if (!blob) throw Error('NETWORK_ERROR');
-      const url = URL.createObjectURL(blob),
-        a = document.createElement('a');
-      a.href = url;
-      a.download =
-        current.name.replace(/\.[^.]+$/, '') +
-        '-' +
-        current.language +
-        (blob.type === 'image/webp'
-          ? '.webp'
-          : blob.type === 'image/jpeg'
-            ? '.jpg'
-            : '.png');
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      if (archive) saveDownload(await translationArchive(records, readResult), 'node-comics-translations.zip');
+      else {
+        const { blob, name } = await readResult(records[0]);
+        saveDownload(blob, name);
+      }
     } catch (error) {
       fail(error);
+    } finally {
+      exporting.current = false;
+      setDownloading(false);
     }
   }
-  const entitlement = caps?.entitlements?.modes[mode];
+  const entitlement = caps?.entitlements?.modes.classic;
   const displayed = rows.filter(
     (row) =>
       row.scope.startsWith('draft:') ||
@@ -719,22 +614,20 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         ? row.scope.startsWith('guest:')
         : row.scope === 'user:' + account?.id),
   );
+  const completed = displayed.filter((row) => row.state === 'succeeded' || row.id === volatile?.id);
   return (
-    <section className="translation-workbench container">
+    <section className="translation-workbench container" data-has-images={!!displayed.length}>
       <header className="translation-heading">
         <div className="translation-heading-copy">
-          <p className="translation-kicker"><span aria-hidden="true">✦</span> NODELANE / TRANSLATE</p>
           <h1>{t.title}</h1>
           <p>{t.intro}</p>
         </div>
         <div className="translation-identity">
-          <div className="translation-identity-copy">
-            <strong>{isGuestScope ? t.guest : account?.name}</strong>
-            <span>{isGuestScope ? t.remaining : t.account}</span>
-          </div>
+          <strong>{isGuestScope ? t.guest : account?.name || t.account}</strong>
           <div className="translation-quota" aria-live="polite">
+            <span>{isGuestScope ? t.remaining : t.account}</span>
             <b>{isGuestScope ? (guest?.remaining ?? '—') : entitlement?.unlimited ? '∞' : (entitlement?.quota?.available ?? '—')}</b>
-            <span>{isGuestScope ? `/ ${guest?.daily_limit ?? 5}` : entitlement?.unlimited ? t.unlimited : t[mode]}</span>
+            <span>{isGuestScope ? `/ ${guest?.daily_limit ?? 5}` : entitlement?.unlimited ? t.unlimited : t.classic}</span>
           </div>
           {!account && (
             <button
@@ -758,8 +651,14 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       {isGuestScope && guest && !guest.enabled && (
         <p className="translation-availability">{t.disabled}</p>
       )}
-      <div className="translation-toolbar">
-        <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">02</span>{t.settingsTitle}</h2>
+      <section className="translation-composer" aria-label={t.uploadTitle}>
+        <ImageDropzone
+          copy={t}
+          locale={locale}
+          compact={!!displayed.length}
+          disabled={busy || !ready}
+          onAdded={refresh}
+        />
         <div className="translation-settings">
         <label>
           {t.language}
@@ -773,25 +672,6 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                 {item.label}
               </option>
             ))}
-          </select>
-        </label>
-        <label>
-          {t.mode}
-          <select
-            value={mode}
-            disabled={busy || isGuestScope}
-            onChange={(event) => setMode(event.target.value as Mode)}
-          >
-            <option value="classic">{t.classic}</option>
-            <option
-              value="redraw"
-              disabled={
-                !caps?.modes.find((item) => item.id === 'redraw')?.enabled ||
-                !caps?.entitlements?.modes.redraw?.allowed
-              }
-            >
-              {t.redraw}
-            </option>
           </select>
         </label>
         <button
@@ -816,7 +696,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           }
         >
           {busy ? t.busy : t.start}
-          <span aria-hidden="true">→</span>
+          <span className="ui-icon icon-arrow" aria-hidden="true" />
         </button>
         {busy && (
           <button
@@ -827,7 +707,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           </button>
         )}
         </div>
-      </div>
+      </section>
       {check && (
         <div className="translation-verification-overlay">
           <div ref={verificationDialog} className="translation-verification"
@@ -847,28 +727,25 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           </div>
         </div>
       )}
-      <div className="translation-layout">
-        <aside className="translation-sidebar">
-          <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">01</span>{t.uploadTitle}</h2>
-          <ImageDropzone
-            copy={t}
-            locale={locale}
-            compact
-            disabled={busy || !ready}
-            onAdded={refresh}
-          />
-          <div className="translation-history-heading"><h3>{t.history}</h3><span>{displayed.length}</span></div>
+      <section className="translation-files" aria-label={t.files}>
+        <div className="translation-files-heading">
+          <h2>{t.files} <span className="translation-history-count">{displayed.length}</span></h2>
+          <button className="button secondary" disabled={downloading || !completed.length}
+            onClick={() => void download(completed, true)}>
+            {downloading ? t.busy : t.downloadAll}
+          </button>
+        </div>
           {account && hasGuestHistory && (
-            <div className="translation-tabs">
+            <div className="translation-tabs" role="group" aria-label={t.history}>
               <button
-                disabled={busy}
+                disabled={busy || downloading}
                 aria-pressed={!showGuest}
                 onClick={() => void changeHistory(false).catch(fail)}
               >
                 {t.myHistory}
               </button>
               <button
-                disabled={busy}
+                disabled={busy || downloading}
                 aria-pressed={showGuest}
                 onClick={() => void changeHistory(true).catch(fail)}
               >
@@ -876,161 +753,58 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
               </button>
             </div>
           )}
+          {!!displayed.length && (
+            <div className="translation-progress">
+              <span role="status">{t.succeeded} {completed.length} / {displayed.length}</span>
+              <progress max={displayed.length} value={completed.length} aria-label={t.succeeded} />
+            </div>
+          )}
           <ol className="translation-records">
             {displayed.map((row, index) => (
-              <li key={row.id}>
-                <button
-                  aria-current={current?.id === row.id ? 'true' : undefined}
-                  onClick={() => {
-                    setSelected(row.id);
-                    setZoom(100);
-                    setVolatile((value) =>
-                      value?.id === row.id ? value : undefined,
-                    );
-                  }}
-                >
+              <li key={row.id} data-state={row.state}>
                   <span className="record-number">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  <span className="record-copy">
-                    <strong>{row.name}</strong>
+                  <div className="record-copy">
+                    <strong title={row.name}>{row.name}</strong>
                     <small>
                       <span className="record-state" data-state={row.state}>{t[row.state as keyof typeof t] ?? t.paused}</span>
-                      <time dateTime={new Date(row.created).toISOString()}>{new Date(row.created).toLocaleDateString(locale)}</time>
+                      {row.state !== 'draft' && <span>{row.language}</span>}
+                      {row.snapshot?.result?.kind === 'no_text' && <span>{t.noText}</span>}
+                      {row.snapshot?.result?.kind === 'partial' && <span>{t.partial}</span>}
                     </small>
-                  </span>
-                </button>
+                    {row.error && <p className="translation-error">{translationError(row.error, t)}</p>}
+                  </div>
+                  <div className="record-actions">
+                    {(row.state === 'succeeded' || volatile?.id === row.id) && (
+                      <button className="button secondary" disabled={downloading} onClick={() => void download([row])}>{t.download}</button>
+                    )}
+                    {row.requestId && !['failed', 'succeeded'].includes(row.state) && (
+                      <button className="button secondary" disabled={busy} onClick={() => void run([row])}>{t.resume}</button>
+                    )}
+                    {row.mode === 'classic' && row.state === 'failed' && (
+                      <button className="button secondary" disabled={busy} onClick={() => void again(row)}>{t.retry}</button>
+                    )}
+                    <button className="text-link" disabled={busy || downloading} onClick={() => {
+                      if (confirm(t.confirmDelete)) void removeRecord(row.id).then(refresh).catch(fail);
+                    }}>{t.remove}</button>
+                  </div>
               </li>
             ))}
           </ol>
           {!displayed.length && <p className="translation-history-empty">{t.historyEmpty}</p>}
-          <div className="translation-storage">
-            <p><span>{t.storage}</span><strong>{(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB</strong></p>
-            <meter min={0} max={256 * 1024 * 1024} value={usedBytes} aria-label={t.storage} />
-          </div>
-        </aside>
-        <div className="translation-viewer">
-          <div className="translation-view-heading">
-            <h2 className="translation-panel-title"><span className="translation-step" aria-hidden="true">03</span>{t.previewTitle}</h2>
-            {current && <span className="translation-status" data-state={current.state} role="status"><i aria-hidden="true" />{t[current.state as keyof typeof t] ?? t.paused}</span>}
-          </div>
-          <div className="translation-view-toolbar">
-            <div className="translation-tabs">
-              {(['original', 'translated', 'compare'] as const).map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={view === value}
-                  onClick={() => setView(value)}
-                >
-                  {t[value]}
-                </button>
-              ))}
-            </div>
-            <label>
-              {t.fit}
-              <input
-                aria-label={t.fit}
-                type="range"
-                min="50"
-                max="200"
-                step="10"
-                value={zoom}
-                onChange={(event) => setZoom(Number(event.target.value))}
-              />
-              <output>{zoom}%</output>
-            </label>
-          </div>
-          {current ? (
-            <Preview
-              key={current.id}
-              record={current}
-              view={view}
-              zoom={zoom}
-              volatile={volatile?.id === current.id ? volatile.blob : undefined}
-            />
-          ) : (
-            <div className="translation-empty">
-              <svg className="translation-empty-art" aria-hidden="true" viewBox="0 0 224 142" fill="none">
-                <path d="m33 25 72-9 12 100-72 9z" fill="var(--accent-soft)" stroke="currentColor" strokeWidth="2.5" />
-                <path d="m118 17 73 9-12 100-73-9z" fill="var(--surface)" stroke="currentColor" strokeWidth="2.5" />
-                <path d="m44 36 24-3 4 33-24 3zm34-4 19-2 4 33-19 2zm-28 46 53-7 4 33-53 7z" stroke="currentColor" strokeWidth="2" />
-                <path d="m132 39 42 5-2 21-14-2-8 5 1-6-22-2z" fill="var(--accent-soft)" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                <path d="m126 82 18 2-3 23-18-2zm28 3 18 2-3 23-18-2z" stroke="currentColor" strokeWidth="2" />
-                <path d="M5 56h17m-8-8v16m187 4h17m-8-8v16M99 7l6-6m89 132 6 6" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
-                <path d="m93 76 17-14 17 14h-11v16h-12V76z" fill="var(--comic-warning-paper)" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-              </svg>
-              <strong>{t.empty}</strong>
-              <ol className="translation-empty-steps">
-                <li><span>1</span>{t.select}</li>
-                <li><span>2</span>{t.language}</li>
-                <li><span>3</span>{t.start}</li>
-              </ol>
-            </div>
-          )}
-          {current && (
-            <footer className="translation-result-actions">
-              <div>
-                <span className="translation-file-name" title={current.name}>{current.name}</span>
-                <strong>
-                  {current.width && `${current.width} × ${current.height}`}
-                </strong>
-                {current.snapshot?.result?.kind === 'no_text' && (
-                  <span>{t.noText}</span>
-                )}
-                {current.snapshot?.result?.kind === 'partial' && (
-                  <span>{t.partial}</span>
-                )}
-                {current.error && (
-                  <p className="translation-error">
-                    {translationError(current.error, t)}
-                  </p>
-                )}
-              </div>
-              <div>
-                {(current.state === 'succeeded' ||
-                  volatile?.id === current.id) && (
-                  <button className="button" onClick={() => void download()}>
-                    {t.download}
-                  </button>
-                )}
-                {current.requestId &&
-                  !['failed', 'succeeded'].includes(current.state) && (
-                    <button
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() => void run([current])}
-                    >
-                      {t.resume}
-                    </button>
-                  )}
-                {['failed', 'succeeded'].includes(current.state) && (
-                  <button
-                    className="button secondary"
-                    disabled={busy}
-                    onClick={() => void again(current)}
-                  >
-                    {current.state === 'failed' ? t.retry : t.regenerate}
-                  </button>
-                )}
-                <button
-                  className="text-link"
-                  disabled={busy}
-                  onClick={() => {
-                    if (confirm(t.confirmDelete))
-                      void removeRecord(current.id).then(refresh).catch(fail);
-                  }}
-                >
-                  {t.remove}
-                </button>
-              </div>
-            </footer>
-          )}
+      </section>
+      <details className="translation-notes translation-details">
+        <summary>{t.localTitle} · {t.serverTitle}</summary>
+        <div className="translation-notes-body">
+          <div><strong>{t.localTitle}</strong><p>{t.local}</p></div>
+          <div><strong>{t.serverTitle}</strong><p>{t.retention}</p></div>
         </div>
-      </div>
-      <div className="translation-notes">
-        <div><strong>{t.localTitle}</strong><p>{t.local}</p></div>
-        <div><strong>{t.serverTitle}</strong><p>{t.retention}</p></div>
-      </div>
+        <div className="translation-storage">
+          <p><span>{t.storage}</span><strong>{(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB</strong></p>
+          <meter min={0} max={256 * 1024 * 1024} value={usedBytes} aria-label={t.storage} />
+        </div>
+      </details>
     </section>
   );
 }

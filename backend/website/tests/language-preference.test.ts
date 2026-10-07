@@ -6,8 +6,10 @@ import {locales, localPath} from '../src/i18n/locales';
 test('browser languages use preference order and supported regional variants',()=>{
   for (const locale of locales) assert.equal(browserLocale([locale]),locale);
   for (const [tag,expected] of [['zh-Hant-CN','zh-TW'],['zh-Hans-HK','zh-CN'],['zh-HK','zh-TW'],['pt-PT','pt-BR'],['en-GB','en'],['id_ID','id']] as const) assert.equal(browserLocale([tag]),expected);
-  assert.equal(browserLocale(['ar','fr-CA','en']), 'fr');
-  assert.equal(browserLocale(['ar','xx']), undefined);
+  for (const tag of ['ar-SA','ar-EG','ar_AE']) assert.equal(browserLocale([tag]),'ar');
+  assert.equal(browserLocale(['ar','fr-CA','en']), 'ar');
+  assert.equal(browserLocale(['fa','fr-CA','en']), 'fr');
+  assert.equal(browserLocale(['fa','xx']), undefined);
 });
 test('suggestion respects manual choice, dismissal and in-progress private flows',()=>{
   assert.equal(languageSuggestion('/guides/local-comics/','zh-CN',['de-DE']), 'de');

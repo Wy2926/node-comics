@@ -4,9 +4,9 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4331';
-const out=path.resolve('artifacts/website-16/browser');
+const out=path.resolve('artifacts/website-locales/browser');
 await mkdir(out,{recursive:true});
-const languages=['zh-CN','zh-TW','en','ja','ko','fr','es','pt-BR','de','it','ru','pl','uk','tr','vi','id'];
+const languages=['zh-CN','zh-TW','en','ja','ko','fr','es','pt-BR','de','it','ru','pl','uk','tr','vi','id','ar'];
 const prefix=locale=>locale==='zh-CN'?'':locale.toLowerCase()+'/';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const failures=[];
@@ -26,10 +26,10 @@ try {
   for(const locale of languages){
     const value=await context(locale),page=await value.newPage();
     await page.goto(`${origin}/${prefix(locale)}`);
-    await page.locator('.translation-hero input[type=file]').waitFor({state:'attached'});
+    await page.locator('.home-screenshot img').waitFor({state:'attached'});
     assert.equal(await page.locator('html').getAttribute('lang'),locale);
     assert.equal(await page.locator('[data-language-notice]').isVisible(),false);
-    assert.equal(await page.locator('.language-menu a').count(),16);
+    assert.equal(await page.locator('.language-menu a').count(),languages.length);
     assert.equal(await page.locator('.language-flag').evaluateAll(items=>items.every(item=>item.complete&&item.naturalWidth>0)),true);
     await noOverflow(page);
     await page.setViewportSize({width:320,height:740});
@@ -68,7 +68,7 @@ try {
   assert.equal(await mobile.locator('[data-language-notice]').isVisible(),false,'dismissal lasts through this tab session');
   await mobile.locator('.language-menu summary').click();
   const menu=mobile.locator('.language-menu nav');
-  assert(await menu.evaluate(node=>node.scrollHeight>node.clientHeight),'sixteen-language menu must scroll');
+  assert(await menu.evaluate(node=>node.scrollHeight>node.clientHeight),'seventeen-language menu must scroll');
   await menu.locator('a[lang=id]').scrollIntoViewIfNeeded();
   await mobile.screenshot({path:path.join(out,'language-menu-mobile.png')});
   await menu.locator('a[lang=id]').click();
@@ -100,6 +100,6 @@ try {
   await blockedPage.waitForURL('**/fr/');
   await blocked.close();
   assert.deepEqual(failures,[]);
-  await writeFile(path.join(out,'verification.json'),JSON.stringify({languages:16,pages:64,desktop:true,mobile:true,suggestions:'click only',manualPreference:true,dismissal:true,privateFlows:true,storageUnavailable:true,pageErrors:failures},null,2));
-  console.log('Verified 16 languages, 64 public pages, scrollable mobile menu, click-only language suggestion, preferences/dismissal, private flows and unavailable storage.');
+  await writeFile(path.join(out,'verification.json'),JSON.stringify({languages:17,pages:68,desktop:true,mobile:true,suggestions:'click only',manualPreference:true,dismissal:true,privateFlows:true,storageUnavailable:true,pageErrors:failures},null,2));
+  console.log('Verified 17 languages, 68 public pages, scrollable mobile menu, click-only language suggestion, preferences/dismissal, private flows and unavailable storage.');
 } finally {await browser.close();}

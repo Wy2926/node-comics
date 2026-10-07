@@ -73,7 +73,7 @@ const stores=browserStores;
   {key==='about'&&<AboutProject locale={locale}/>}
   {key==='changelog'&&<section class="container content-section"><a class="text-link" style="display:block;margin-bottom:35px" href={href('/feed.xml')}>{t.rss} ↗</a><div class="timeline">{d.releases.map(release=><article class="release" id={`release-${release.id ?? release.date}`}><time datetime={release.date}>{release.date}</time><h2>{release.title}</h2><ul>{release.items.map(item=><li>{item}</li>)}</ul></article>)}</div></section>}
   {['account','auth'].includes(key)&&<section class="container"><div class="account-shell"><Account client:load callback={key==='auth'} locale={locale} copy={account??{}} accountHref={href('/account/')} /><noscript><p class="note">{t.noscript}</p></noscript></div></section>}
-  {['features','about','guides'].includes(key)&&!guide&&<section class="container cta-section"><div><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>{t.ctaTitle}</h2><p>{t.ctaDescription}</p></div><a class="button light" href={href('/download/')}>{t.ctaButton} ↗</a><span class="cta-star" aria-hidden="true">✦</span></section>}
+  {['features','about','guides'].includes(key)&&!guide&&<section class="container cta-section"><div><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>{t.ctaTitle}</h2><p>{t.ctaDescription}</p></div><a class="button light" data-install-extension href={href('/download/')}>{t.ctaButton} ↗</a><span class="cta-star" aria-hidden="true">✦</span></section>}
 </Base>
 <style>
   .prose { min-width: 0; font-size: 1rem; }

@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Coba lagi",
     "caption": "Hasil terjemahan standar dicatat"
   },
-  "eyebrow": "CERITAMU. RITMEMU.",
-  "title": [
-    "Baca dan terjemahkan manga.",
-    "Langsung di browser."
-  ],
-  "description": "Baca dan terjemahkan manga di Chrome, Edge, dan Firefox. Buka komik lokal dan EPUB, Google Drive, pustaka OPDS, atau situs yang didukung. Terjemahkan halaman dan area terlihat sambil tetap dapat melihat aslinya.",
+  "eyebrow": "EKSTENSI PENERJEMAH MANGA",
+  "title": ["Terjemahkan manga.","Lanjutkan membaca."],
+  "description": "Ekstensi penerjemah manga untuk Chrome, Edge, dan Firefox di komputer. Terjemahkan gambar komik dengan layanan cloud NodeLane dan bandingkan dengan aslinya sambil membaca.",
   "install": "Dapatkan ekstensi",
-  "seeReader": "Jelajahi pembaca",
+  "seeReader": "Lihat hasil terjemahan",
   "readerPath": "Baca komik dengan ekstensi",
-  "readerAccess": "Baca gambar asli lokal gratis tanpa akun. Terjemahan resmi memakai kuota akun; manga-translator-ui sendiri tidak memerlukan akun NodeLane atau kuota resmi.",
+  "readerAccess": "Gratis dipasang. Terjemahan cloud memerlukan akun dan mengikuti batas paket gratis atau berbayar.",
   "webAccess": "Coba sebagai tamu, atau masuk untuk menggunakan kuota akun Anda. Ruang kerja gambar menunjukkan penggunaan yang tersedia.",
   "desktop": "Dirancang untuk membaca di desktop",
   "popupAlt": "NodeLane Comics munculan toolbar dengan bahasa Inggris dipilih dan tombol Terjemahkan tab saat ini.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Tiga langkah menuju komik berikutnya.",
+  "stepsTitle": "Tiga langkah untuk membaca dan menerjemahkan.",
   "stepsIntro": "Instal ekstensi, tambahkan komik, dan baca sesuai keinginan Anda.",
-  "steps": [
-    [
-      "Pasang ekstensi",
-      "Pasang dari toko resmi atau unduh paket yang sesuai dengan browser Anda."
-    ],
-    [
-      "Buka sumber Anda",
-      "Impor file lokal, pilih komik di Google Drive, hubungkan OPDS, atau tambahkan situs yang didukung."
-    ],
-    [
-      "Baca dan terjemahkan",
-      "Komik baru dibuka sebagai gambar asli. Pilih saluran resmi atau MTU dan aktifkan terjemahan saat diperlukan."
-    ]
-  ],
+  "steps": [["Pasang ekstensi","Dapatkan dari toko resmi Chrome, Edge, atau Firefox."],["Buka manga","Impor komik lokal atau buka situs manga yang didukung."],["Pilih bahasa","Terjemahkan gambar dengan layanan pilihan Anda dan tampilkan aslinya di samping."]],
   "compareEyebrow": "LIHAT LEBIH DEKAT",
   "compareTitle": "Periksa terjemahannya. Pertahankan aslinya.",
   "compareBody": "Beralih antara hasil terjemahan asli Jepang dan rekaman. Di pembaca, pandangan asli dan terjemahan tetap berada dalam jangkauan.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Lihat tangkapan layar lengkap",
   "close": "Tutup tangkapan layar",
   "galleryName": "Jelajahi tangkapan layar ekstensi",
-  "screenshotNote": "Tangkapan layar nyata yang dibagikan dengan ikhtisar proyek, ditampilkan dalam bahasa Inggris. Buka tangkapan layar apa pun untuk melihat aslinya secara lengkap. Fitur mungkin berbeda menurut versi; karya seni komik milik pemiliknya masing-masing.",
+  "screenshotNote": "Tangkapan layar produk asli: antarmuka bahasa Inggris, gambar asli, dan terjemahan bahasa Tionghoa. Hasil dapat bervariasi. Hak atas ilustrasi dimiliki pemiliknya masing-masing.",
   "sourcesEyebrow": "DARI FILE ANDA ATAU WEB",
   "sourcesTitle": "File Anda, pustaka, dan situs yang didukung.",
   "sources": [
@@ -152,13 +136,13 @@ const copy: HomeCopy = {
       "Hubungkan layanan MTU sendiri tanpa akun NodeLane dan kuota resmi. Anda dapat menyimpan beberapa profil; hanya saluran yang dipilih digunakan pada satu waktu."
     ]
   ],
-  "controlNote": "Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default. Saat diaktifkan, gambar saat ini dan yang berdekatan diproses dalam jendela terbatas. Gambar ulang AI hanya tersedia di ruang kerja gambar web sesuai hak akses akun.",
-  "privacyTitle": "Ketahui cara halaman Anda diproses.",
-  "privacyBody": "Terjemahan resmi mengirimkan gambar yang dipilih ke server; dokumen asli dihapus setelah tugas selesai, gagal, atau dibatalkan. Hasil akun pribadi dipertahankan sementara permintaan yang valid tetap ada; Hasil server tamu disimpan selama 24 jam setelah tugas berakhir, dan terjemahan yang disimpan secara lokal tidak terpengaruh oleh batas tersebut. Saat Anda menghubungkan layanan terjemahan lokal, layanan tersebut menentukan pemrosesan dan retensi gambar.",
+  "controlNote": "Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default. Saat diaktifkan, gambar saat ini dan yang berdekatan diproses dalam jendela terbatas.",
+  "privacyTitle": "Baca gratis. Pilih paket terjemahan Anda.",
+  "privacyBody": "NodeLane Comics menyediakan ekstensi gratis dan terjemahan cloud berbasis akun. Batas permintaan dan kapasitas layanan berlaku. Periksa ketersediaan, manfaat, dan ketentuan penagihan sebelum berlangganan.",
   "privacy": "Kebijakan privasi",
-  "pricing": "Paket dan kuota",
-  "ctaTitle": "Siap membuka halaman berikutnya?",
-  "ctaBody": "Dapatkan ekstensinya, buka komiknya, dan buat diri Anda nyaman."
+  "pricing": "Bandingkan Free dan Lite",
+  "ctaTitle": "Pahami halaman Anda berikutnya.",
+  "ctaBody": "Pasang NodeLane Comics untuk Chrome, Edge, atau Firefox di komputer."
 };
 
 export default copy;

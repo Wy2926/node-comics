@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Erneut versuchen",
     "caption": "Aufgezeichnete Ergebnisse der Standardübersetzung"
   },
-  "eyebrow": "IHRE GESCHICHTEN. IHR TEMPO.",
-  "title": [
-    "Manga lesen und übersetzen.",
-    "Direkt in Ihrem Browser."
-  ],
-  "description": "Lies und übersetze in Chrome, Edge und Firefox: lokale Dateien, EPUB, Google Drive, OPDS-Bibliotheken und unterstützte Websites. Entdecke Mangas, vergleiche die Originale und bereite das Lesen ohne Internet vor.",
+  "eyebrow": "BROWSER-ERWEITERUNG FÜR MANGA-ÜBERSETZUNG",
+  "title": ["Manga übersetzen.","Einfach weiterlesen."],
+  "description": "Eine Manga-Übersetzer-Erweiterung für Chrome, Edge und Firefox am Computer. Übersetze Comicbilder mit dem Cloud-Dienst von NodeLane und vergleiche sie beim Lesen mit dem Original.",
   "install": "Erweiterung installieren",
-  "seeReader": "Leseansicht entdecken",
+  "seeReader": "Übersetzung ansehen",
   "readerPath": "Lesen Sie Comics mit der Erweiterung",
-  "readerAccess": "Lies lokale Originale kostenlos und ohne Konto. Der offizielle Dienst nutzt dein Kontokontingent; dein eigenes MTU benötigt weder ein NodeLane-Konto noch ein offizielles Kontingent.",
+  "readerAccess": "Kostenlos installieren. Cloud-Übersetzung erfordert ein Konto; es gelten die Limits des kostenlosen oder kostenpflichtigen Tarifs.",
   "webAccess": "Probieren Sie die Übersetzung als Gast aus oder melden Sie sich an, um Ihr Kontokontingent zu verwenden. Im Bildarbeitsbereich sehen Sie Ihr verbleibendes Kontingent.",
   "desktop": "Für die Lektüre auf dem Desktop konzipiert",
   "popupAlt": "NodeLane Comics-Symbolleistenfenster mit ausgewählter englischer Sprache und der Schaltfläche „Aktuellen Tab übersetzen“.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Drei Schritte zu Ihrem nächsten Comic.",
+  "stepsTitle": "In drei Schritten lesen und übersetzen.",
   "stepsIntro": "Installieren Sie die Erweiterung, fügen Sie einen Comic hinzu und lesen Sie in Ihrem eigenen Tempo.",
-  "steps": [
-    [
-      "Erweiterung installieren",
-      "Wähle den offiziellen Store oder das passende Paket für deinen Browser. Prüfe die Website-Zugriffseinschränkungen deines Browsers."
-    ],
-    [
-      "Eine Geschichte öffnen",
-      "Importiere eine Datei, wähle eine Drive-Datei, verbinde eine OPDS-Bibliothek oder füge einen Manga von einer unterstützten Website hinzu."
-    ],
-    [
-      "Lesen und bei Bedarf übersetzen",
-      "Behalte das Original, wähle den offiziellen Dienst oder dein MTU und speichere Kapitel für das Lesen ohne Internet."
-    ]
-  ],
+  "steps": [["Erweiterung installieren","Nutze den offiziellen Store für Chrome, Edge oder Firefox."],["Manga öffnen","Importiere einen lokalen Comic oder öffne eine unterstützte Manga-Website."],["Sprache auswählen","Übersetze Bilder mit dem gewählten Dienst und behalte das Original daneben."]],
   "compareEyebrow": "Schauen Sie genauer hin",
   "compareTitle": "Überprüfen Sie die Übersetzung. Behalten Sie das Original.",
   "compareBody": "Wechseln Sie zwischen einem japanischen Original und aufgezeichneten Übersetzungsergebnissen. Im Reader bleiben Original- und übersetzte Ansichten in Reichweite.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Vollständigen Screenshot ansehen",
   "close": "Screenshot schließen",
   "galleryName": "Entdecken Sie Screenshots der Erweiterung",
-  "screenshotNote": "Echte Screenshots, die mit der Projektübersicht geteilt werden und auf Englisch angezeigt werden. Öffnen Sie einen beliebigen Screenshot, um das vollständige Original anzuzeigen. Die Funktionen können je nach Version unterschiedlich sein. Comic-Kunstwerke gehören ihren jeweiligen Eigentümern.",
+  "screenshotNote": "Echter Produkt-Screenshot: englische Oberfläche, Original und chinesische Übersetzung. Ergebnisse können variieren. Die Bildrechte liegen bei den jeweiligen Rechteinhabern.",
   "sourcesEyebrow": "AUS IHREN DATEIEN ODER DEM WEB",
   "sourcesTitle": "Bringen Sie einen Comic mit, auf den Sie zugreifen können.",
   "sources": [
@@ -153,12 +137,12 @@ const copy: HomeCopy = {
     ]
   ],
   "controlNote": "Neue Mangas öffnen sich mit den Originalen. Automatische Übersetzung ist standardmäßig deaktiviert; wähle Sprache und Dienst, wenn du übersetzen möchtest.",
-  "privacyTitle": "Erfahren Sie, was mit Ihren Seiten passiert.",
-  "privacyBody": "Die offizielle Übersetzung sendet ausgewählte Bilder an den Server; Originale werden entfernt, nachdem die Aufgabe abgeschlossen ist, fehlschlägt oder abgebrochen wird. Die Ergebnisse privater Konten bleiben erhalten, solange gültige Anfragen bestehen bleiben. Die Ergebnisse des Gastservers werden nach Ende der Aufgabe 24 Stunden lang gespeichert und lokal gespeicherte Übersetzungen sind von dieser Beschränkung nicht betroffen. Wenn Sie einen lokalen Übersetzungsdienst verbinden, bestimmt dieser Dienst die Bildverarbeitung und -speicherung.",
+  "privacyTitle": "Kostenlos lesen. Den passenden Übersetzungstarif wählen.",
+  "privacyBody": "NodeLane Comics bietet eine kostenlose Erweiterung und kontobasierte Cloud-Übersetzung. Anfrage- und Kapazitätslimits gelten. Prüfe vor dem Abonnement die aktuelle Verfügbarkeit, Leistungen und Abrechnungsbedingungen.",
   "privacy": "Datenschutzrichtlinie",
-  "pricing": "Tarife und Kontingente",
-  "ctaTitle": "Bereit für Ihre nächste Seite?",
-  "ctaBody": "Holen Sie sich die Erweiterung, öffnen Sie einen Comic und machen Sie es sich bequem."
+  "pricing": "Free und Lite vergleichen",
+  "ctaTitle": "Verstehe deine nächste Seite.",
+  "ctaBody": "Installiere NodeLane Comics für Chrome, Edge oder Firefox am Computer."
 };
 
 export default copy;

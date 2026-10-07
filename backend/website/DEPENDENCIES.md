@@ -9,6 +9,7 @@
 | @types/node | 22.20.4 | MIT | [npm source](https://registry.npmjs.org/@types/node/-/node-22.20.4.tgz) | `sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA==` |
 | @types/react | 19.3.0 | MIT | [npm source](https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz) | `sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==` |
 | @types/react-dom | 19.3.0 | MIT | [npm source](https://registry.npmjs.org/@types/react-dom/-/react-dom-19.3.0.tgz) | `sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==` |
+| @zip.js/zip.js | 2.15.0 | BSD-3-Clause | [npm source](https://registry.npmjs.org/@zip.js/zip.js/-/zip.js-2.15.0.tgz) | `sha512-hYAuHAaWjt0axbofaDL5XUlmrQPsBDcK3f45ApZuh6N+8UGVk26GoGdtGDvcvzahsHytTQ6DtBVXwG9IcCMjjQ==` |
 | astro | 7.3.3 | MIT | [npm source](https://registry.npmjs.org/astro/-/astro-7.3.3.tgz) | `sha512-NF08hk3edFkVmr9avf9HW/rQyf6NrpbVDyYj2cVN3JfijDhfJYh1ivWVTY5PUd5+rRZn/Vtu4iaeyNlP0Iv6mg==` |
 | cheerio | 1.2.0 | MIT | [npm source](https://registry.npmjs.org/cheerio/-/cheerio-1.2.0.tgz) | `sha512-WDrybc/gKFpTYQutKIK6UvfcuxijIZfMfXaYm8NMsPQxSYvf+13fXUJ4rztGGbJcBQ/GF55gvrZ0Bc0bj/mqvg==` |
 | jwt-decode | 4.0.0 | MIT | [npm source](https://registry.npmjs.org/jwt-decode/-/jwt-decode-4.0.0.tgz) | `sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==` |

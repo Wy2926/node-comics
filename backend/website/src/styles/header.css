@@ -39,7 +39,7 @@
 .language-chevron { width: 14px; height: 14px; transform-box: border-box; transform-origin: 50% 50%; }
 .language-menu[open] .language-chevron { transform: rotate(180deg); }
 .language-menu nav {
-  position: absolute; top: calc(100% + 12px); right: 0; min-width: 175px; padding: 7px;
+  position: absolute; top: calc(100% + 12px); inset-inline-end: 0; min-width: 175px; padding: 7px;
   max-height: min(70vh, 560px); max-width: calc(100vw - 32px); overflow-y: auto; overscroll-behavior: contain;
   display: grid; gap: 3px; background: var(--surface); border: var(--comic-border);
   border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow);
@@ -80,6 +80,6 @@
   .header-inner .brand img { width: clamp(128px, 35vw, 158px); }
   .github-link { grid-column: 2; grid-row: 1; justify-self: end; }
   .site-header .language-menu { grid-column: 1; grid-row: 2; justify-self: start; }
-  .site-header .language-menu nav { left: 0; right: auto; }
+  .site-header .language-menu nav { inset-inline-start: 0; inset-inline-end: auto; }
   .mobile-nav { grid-column: 2; grid-row: 2; justify-self: end; }
 }

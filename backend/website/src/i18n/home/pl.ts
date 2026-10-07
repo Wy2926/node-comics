@@ -15,16 +15,13 @@ const copy: HomeCopy = {
     "retry": "Spróbuj ponownie",
     "caption": "Zarejestrowane wyniki tłumaczenia standardowego"
   },
-  "eyebrow": "TWOJE HISTORIE. TWOJE TEMPO.",
-  "title": [
-    "Czytaj i tłumacz mangę.",
-    "Bezpośrednio w Twojej przeglądarce."
-  ],
-  "description": "Czytaj i tłumacz mangę w Chrome, Edge i Firefox. Otwieraj lokalne komiksy i EPUB, Google Drive, biblioteki OPDS lub obsługiwane strony. Tłumacz strony i widoczne obszary, zachowując dostęp do oryginału.",
+  "eyebrow": "ROZSZERZENIE DO TŁUMACZENIA MANGI",
+  "title": ["Tłumacz mangę.","Czytaj dalej."],
+  "description": "Rozszerzenie do tłumaczenia mangi w Chrome, Edge i Firefox na komputerze. Tłumacz obrazy za pomocą usługi chmurowej NodeLane i porównuj je z oryginałem podczas czytania.",
   "install": "Zainstaluj rozszerzenie",
-  "seeReader": "Poznaj czytnik",
+  "seeReader": "Zobacz tłumaczenie w działaniu",
   "readerPath": "Czytaj komiksy z rozszerzeniem",
-  "readerAccess": "Czytaj lokalne oryginały bezpłatnie i bez konta. Oficjalne tłumaczenie korzysta z limitu konta; własny manga-translator-ui nie wymaga konta NodeLane ani oficjalnego limitu.",
+  "readerAccess": "Instalacja jest bezpłatna. Tłumaczenie w chmurze wymaga konta i podlega limitom planu bezpłatnego lub płatnego.",
   "webAccess": "Wypróbuj jako gość lub zaloguj się, aby wykorzystać limit konta. Obszar roboczy obrazów pokazuje dostępną liczbę tłumaczeń.",
   "desktop": "Stworzony do czytania na komputerze",
   "popupAlt": "Okno NodeLane Comics na pasku narzędzi z wybranym językiem angielskim i przyciskiem „Tłumacz bieżącą kartę”.",
@@ -64,22 +61,9 @@ const copy: HomeCopy = {
       }
     ]
   },
-  "stepsTitle": "Trzy kroki do następnego komiksu.",
+  "stepsTitle": "Trzy kroki do czytania i tłumaczenia.",
   "stepsIntro": "Zainstaluj rozszerzenie, dodaj komiks i czytaj we własnym tempie.",
-  "steps": [
-    [
-      "Zainstaluj rozszerzenie",
-      "Zainstaluj z oficjalnego sklepu albo pobierz pakiet dla swojej przeglądarki."
-    ],
-    [
-      "Otwórz swoje źródło",
-      "Importuj plik lokalny, wybierz komiks w Google Drive, połącz OPDS lub dodaj obsługiwaną stronę."
-    ],
-    [
-      "Czytaj i tłumacz",
-      "Nowe komiksy otwierają się w oryginale. Wybierz oficjalny kanał lub MTU i włącz tłumaczenie, gdy go potrzebujesz."
-    ]
-  ],
+  "steps": [["Zainstaluj rozszerzenie","Skorzystaj z oficjalnego sklepu Chrome, Edge lub Firefox."],["Otwórz mangę","Zaimportuj lokalny komiks lub otwórz obsługiwaną stronę z mangą."],["Wybierz język","Tłumacz obrazy wybraną usługą i zachowaj oryginał obok."]],
   "compareEyebrow": "PRZYJRZYJ SIĘ BLIŻEJ",
   "compareTitle": "Sprawdź tłumaczenie. Zachowaj oryginał.",
   "compareBody": "Przełączaj między oryginałem japońskim a nagranymi wynikami tłumaczeń. W czytniku widoki oryginalne i przetłumaczone pozostają w zasięgu ręki.",
@@ -115,7 +99,7 @@ const copy: HomeCopy = {
   "enlarge": "Zobacz pełny zrzut ekranu",
   "close": "Zamknij zrzut ekranu",
   "galleryName": "Przeglądaj zrzuty ekranu rozszerzeń",
-  "screenshotNote": "Prawdziwe zrzuty ekranu udostępnione w przeglądzie projektu, pokazane w języku angielskim. Otwórz dowolny zrzut ekranu, aby wyświetlić pełny oryginał. Funkcje mogą się różnić w zależności od wersji; grafika komiksowa należy do odpowiednich właścicieli.",
+  "screenshotNote": "Rzeczywisty zrzut produktu: interfejs angielski, oryginał i tłumaczenie chińskie. Wyniki mogą się różnić. Prawa do ilustracji należą do ich właścicieli.",
   "sourcesEyebrow": "Z TWOICH PLIKÓW LUB SIECI",
   "sourcesTitle": "Twoje pliki, biblioteki i obsługiwane strony.",
   "sources": [
@@ -152,13 +136,13 @@ const copy: HomeCopy = {
       "Połącz własny MTU bez konta NodeLane i oficjalnego limitu. Możesz zapisać wiele profili; jednocześnie używany jest wybrany kanał."
     ]
   ],
-  "controlNote": "Nowy komiks otwiera się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone. Po włączeniu przetwarzane są bieżące i pobliskie obrazy w ograniczonym oknie. Przerysowywanie AI jest dostępne tylko w internetowym obszarze roboczym przy odpowiednich uprawnieniach.",
-  "privacyTitle": "Dowiedz się, co dzieje się z Twoimi stronami.",
-  "privacyBody": "Oficjalne tłumaczenie wysyła wybrane obrazy na serwer; oryginały są usuwane po zakończeniu zadania, niepowodzeniu lub anulowaniu. Wyniki konta prywatnego są zachowywane tak długo, jak ważne wnioski pozostają ważne; Wyniki serwera gościa są przechowywane przez 24 godziny po zakończeniu zadania, a tłumaczenia zapisane lokalnie nie podlegają temu limitowi. Kiedy łączysz się z lokalną usługą tłumaczeniową, ta usługa określa przetwarzanie i przechowywanie obrazów.",
+  "controlNote": "Nowy komiks otwiera się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone. Po włączeniu przetwarzane są bieżące i pobliskie obrazy w ograniczonym oknie.",
+  "privacyTitle": "Czytaj za darmo. Wybierz plan tłumaczenia.",
+  "privacyBody": "NodeLane Comics oferuje bezpłatne rozszerzenie i tłumaczenie w chmurze powiązane z kontem. Obowiązują limity żądań i wydajności usługi. Przed subskrypcją sprawdź dostępność, korzyści i warunki rozliczeń.",
   "privacy": "Polityka prywatności",
-  "pricing": "Plany i limity",
-  "ctaTitle": "Gotowy na następną stronę?",
-  "ctaBody": "Pobierz rozszerzenie, otwórz komiks i usiądź wygodnie."
+  "pricing": "Porównaj Free i Lite",
+  "ctaTitle": "Zrozum swoją następną stronę.",
+  "ctaBody": "Zainstaluj NodeLane Comics w Chrome, Edge lub Firefox na komputerze."
 };
 
 export default copy;

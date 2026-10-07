@@ -2,10 +2,10 @@ import type { HomeCopy } from './types';
 
 const copy: HomeCopy = {
   comparison: { title: '同一頁，多種語言。', group: '翻譯效果對照', labels: ['日文原圖', '中文', '英文', '韓文'], loading: '正在載入圖片…', error: '圖片載入失敗。', retry: '重新載入', caption: '已記錄的一般翻譯實測效果' },
-    eyebrow: '你的故事，你的節奏', title: ["漫畫閱讀與翻譯，","在瀏覽器裡完成。"],
-    description: "把本機漫畫、Google Drive、OPDS 書庫與適配網站帶進 Chrome、Edge、Firefox。支援 EPUB 閱讀、常規圖片翻譯與網頁劃圖，隨時對照原圖。",
-    install: '取得擴充功能', seeReader: '看看閱讀器', desktop: '為桌面閱讀設計',
-    readerPath: '用擴充功能，連續閱讀漫畫', readerAccess: '免費閱讀本機原圖，無需帳戶。官方翻譯使用帳戶額度，也可連接自己的本機翻譯服務。',
+    eyebrow: "漫畫翻譯瀏覽器擴充功能", title: ["看懂漫畫，","繼續你的閱讀。"],
+    description: "適用於桌面 Chrome、Edge 和 Firefox 的漫畫翻譯擴充功能。使用 NodeLane 雲端服務翻譯漫畫圖片，在閱讀器中隨時對照原圖。",
+    install: '取得擴充功能', seeReader: "查看翻譯效果", desktop: '為桌面閱讀設計',
+    readerPath: '用擴充功能，連續閱讀漫畫', readerAccess: "擴充功能免費安裝。雲端翻譯須登入，免費額度與付費方案各有使用限制。",
     webAccess: '可匿名體驗，登入後使用帳戶額度。目前可用次數以圖片工作台顯示為準。',
     platformHeading: '支援你的桌面瀏覽器', guestEyebrow: '線上圖片翻譯',
     popupAlt: 'NodeLane Comics 擴充功能彈窗，已選擇英語，顯示翻譯目前分頁按鈕。', popupCaption: '下一章，從瀏覽器工具列開始。',
@@ -18,21 +18,8 @@ const copy: HomeCopy = {
         { title: '閱讀與翻譯入門', description: '用英文教學瞭解閱讀器，以及原圖與翻譯的使用方式。', language: '英文影片' },
       ],
     },
-    stepsTitle: '三步，開啟下一本。', stepsIntro: '安裝擴充功能，加入漫畫，按自己的節奏閱讀。',
-    steps: [
-      [
-        "安裝瀏覽器擴充功能",
-        "從 Chrome、Edge、Firefox 官方商店安裝，或取得對應瀏覽器安裝套件。"
-      ],
-      [
-        "加入漫畫或連接書庫",
-        "匯入本機或 Google Drive 漫畫、連接 OPDS，或從已適配網站開啟閱讀。"
-      ],
-      [
-        "需要時開啟翻譯",
-        "選擇官方或自架管道與目標語言，在閱讀器或原網站對照原圖與譯圖。"
-      ]
-    ],
+    stepsTitle: "三步，開始閱讀與翻譯。", stepsIntro: '安裝擴充功能，加入漫畫，按自己的節奏閱讀。',
+    steps: [["安裝擴充功能","從 Chrome、Edge 或 Firefox 官方商店安裝。"],["開啟漫畫","匯入本機漫畫，或開啟已適配的漫畫網站。"],["選擇翻譯語言","使用所選服務翻譯圖片，隨時對照原圖繼續閱讀。"]],
     compareEyebrow: '看清每一頁', compareTitle: '看懂譯文，也保留原圖。',
     compareBody: '切換查看日文原圖和已記錄的翻譯結果。在閱讀器裡，原圖與譯圖也隨時可選。',
     compareNote: '原創 AI 插畫上的一般翻譯實測範例。效果因畫面、文字和語言而異。', compareLink: '瞭解翻譯方式',
@@ -41,7 +28,7 @@ const copy: HomeCopy = {
     galleryBodies: ['匯入、搜尋和管理漫畫，從上次讀到的位置繼續。', '瀏覽榜單，查看作品簡介、評分和別名，發現下一本。', '按名稱或別名搜尋網站，也可先翻譯名稱，再選擇來源。', '查看章節快取進度與空間佔用，隨時暫停或繼續。', '展開章節目錄，查看語言、頁數、快取和閱讀狀態。', '並排查看原圖與譯圖，也可切回原圖繼續閱讀。'],
     galleryAlt: ['中文介面的漫畫書架與閱讀進度。', '中文介面的漫畫發現榜單與作品詳情。', '中文介面的漫畫名稱、網站選擇與搜尋結果。', '中文介面的離線快取任務、章節進度與空間佔用。', '中文閱讀器與展開的多語言章節目錄。', '中文閱讀器中的原圖與中文譯圖並排對照。'],
     enlarge: '查看完整截圖', close: '關閉截圖', galleryName: '瀏覽擴充功能截圖',
-    screenshotNote: '與專案介紹共用的真實截圖，以中文介面展示；點擊可查看完整原圖。功能可能因安裝版本而異，漫畫作品歸各自權利人所有。',
+    screenshotNote: "真實產品截圖：中文介面，原圖與中文譯圖並排顯示。翻譯效果因內容而異，漫畫作品歸各自權利人所有。",
     sourcesEyebrow: "檔案、雲端硬碟、書庫與網站", sourcesTitle: '帶上你能存取的漫畫。',
     sources: [
       [
@@ -77,8 +64,8 @@ const copy: HomeCopy = {
       ]
     ],
     controlNote: "新漫畫預設顯示原圖。選擇管道與目標語言，再開啟常規翻譯；閱讀器與網頁共用目前管道。",
-    privacyTitle: '瞭解漫畫圖片如何處理。', privacyBody: '官方翻譯將選取的圖片傳送到伺服器，原圖在任務完成、失敗或取消後清理。帳戶的私有結果在仍有有效請求時保留；訪客的伺服器結果自任務結束起保留 24 小時，本機已保存的譯圖不受此期限影響。連接本機翻譯服務時，圖片處理與保留由該服務決定。',
-    privacy: '隱私政策', pricing: '方案與額度', ctaTitle: '準備好翻開下一頁了嗎？', ctaBody: '取得擴充功能，開啟漫畫，找到舒服的閱讀節奏。',
+    privacyTitle: "免費閱讀，按需選擇翻譯方案。", privacyBody: "NodeLane Comics 提供免費擴充功能與按帳戶計量的雲端翻譯服務。方案受速率與服務容量限制；訂閱前可查看即時購買狀態、完整權益和帳單規則。",
+    privacy: '隱私政策', pricing: "比較 Free 與 Lite", ctaTitle: "從下一頁，讀懂更多。", ctaBody: "為桌面 Chrome、Edge 或 Firefox 安裝 NodeLane Comics。",
   };
 
 export default copy;

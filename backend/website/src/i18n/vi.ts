@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Để lại bản dịch cho NodeLane Comics. Lưu sự chú ý của bạn cho trang tiếp theo.",
     "ctaButton": "Bắt đầu hành trình đọc của bạn",
     "pricingTitle": "Đọc miễn phí. Chọn gói dịch của bạn.",
-    "pricingDescription": "So sánh gói Miễn phí và Lite: trang miễn phí hằng ngày, 1.200 yêu cầu mới trong mỗi khoảng 60 phút trượt và thanh toán theo tháng hoặc năm. Lite không bao gồm vẽ lại bằng AI. Tài khoản mới đủ điều kiện được dùng thử 7 ngày.",
+    "pricingDescription": "So sánh gói Miễn phí và Lite: trang miễn phí hằng ngày, 1.200 yêu cầu mới trong mỗi khoảng 60 phút trượt và thanh toán theo tháng hoặc năm. Tài khoản mới đủ điều kiện được dùng thử 7 ngày.",
     "freePlan": "Miễn phí",
     "freePlanDescription": "Để đọc một chút mỗi ngày",
     "free": "miễn phí",
@@ -219,7 +219,7 @@ export default {
     {
       "title": "Công cụ ảnh trên website",
       "paragraphs": [
-        "Website có dịch JPG, PNG, WebP, tải ảnh hoàn chỉnh và lịch sử cục bộ. Vẽ lại bằng AI chỉ dùng khi tài khoản thực tế đủ quyền; đây không phải chế độ tiện ích và không thêm sách vào kệ."
+        "Website hỗ trợ dịch JPG, PNG và WebP, tải ảnh dịch hoàn chỉnh và lưu lịch sử cục bộ. Công cụ ảnh này tách biệt với tiện ích và không thêm sách vào kệ."
       ]
     }
   ],
@@ -346,7 +346,7 @@ export default {
     {
       "title": "Dịch và lưu giữ",
       "paragraphs": [
-        "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả thông thường lưu lớp phủ. AI trong công cụ website khi đủ quyền lưu ảnh đầy đủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
+        "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
         "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn."
       ]
     },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Nhà cung cấp dịch vụ và chuyển giao",
             "paragraphs": [
-              "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Vẽ lại bằng AI trong công cụ website chỉ dùng khi đủ quyền và gửi ảnh cùng ngôn ngữ đích đến nhà cung cấp ảnh. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
+              "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
               "Hình ảnh dịch sử dụng file riêng tư trên máy chủ trung tâm; văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Các dịch vụ nhận dạng, cơ sở hạ tầng, dịch thuật và thanh toán xử lý dữ liệu khi cần thiết theo chính sách hiện hành của họ. Quá trình xử lý có thể diễn ra bên ngoài khu vực của bạn. Chúng tôi không bán thông tin cá nhân hoặc sử dụng truyện tranh đã gửi để nhắm mục tiêu quảng cáo. Chúng tôi không hứa rằng tất cả các nhà cung cấp sẽ không giữ lại gì hoặc không bao giờ sử dụng dữ liệu để đào tạo; điều này phụ thuộc vào nhà cung cấp và thỏa thuận. Không gửi nội dung nhạy cảm trái phép hoặc không phù hợp."
             ]
           },
           {
             "title": "Giữ lại và xóa",
             "paragraphs": [
-              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ; AI trong công cụ website khi khả dụng lưu kết quả hoàn chỉnh. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
+              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
               "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
               "Đối với các yêu cầu xóa tài khoản hoặc phạm vi rộng hơn, hãy liên hệ với chúng tôi để xác minh danh tính và phạm vi. Hồ sơ giao dịch, kiểm toán hoặc bảo mật có thể cần được lưu giữ để phục vụ các nghĩa vụ dịch vụ, tranh chấp hoặc các yêu cầu hiện hành. Không có thời hạn xóa duy nhất nào được hứa hẹn cho tất cả hồ sơ; câu trả lời sẽ giải thích kết quả và những hạn chế."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Quyền nội dung và kết quả AI",
             "paragraphs": [
               "Bạn phải có quyền truy cập, tải lên, dịch và xử lý nội dung đã chọn cũng như tuân theo các yêu cầu về trang nguồn và chủ bản quyền. Tiện ích mở rộng không cấp bản quyền hoặc quyền tự động xuất bản hình ảnh đã dịch. Không bỏ qua tường phí, yêu cầu đăng nhập hoặc DRM. Chúng tôi không đảm bảo tính hợp pháp hoặc đầy đủ của nội dung nguồn. Các yêu cầu về bản quyền phải xác định tác phẩm, quyền, vấn đề và thông tin liên hệ.",
-              "AI có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng; vẽ lại khi khả dụng trên website còn có thể thay đổi hình. Kết quả hỗ trợ đọc, không thay nguyên bản hay đánh giá chuyên môn. Minh họa gốc trên website được tạo bằng AI, còn so sánh dịch là mẫu đã ghi nhận. Không bảo đảm chính xác, tốc độ hay kết quả cho mọi ảnh; bạn có thể so sánh nguyên bản và gửi phản hồi."
+              "AI có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng. Kết quả hỗ trợ đọc, không thay nguyên bản hay đánh giá chuyên môn. Minh họa gốc trên website được tạo bằng AI, còn so sánh dịch là mẫu đã ghi nhận. Không bảo đảm chính xác, tốc độ hay kết quả cho mọi ảnh; bạn có thể so sánh nguyên bản và gửi phản hồi."
             ]
           },
           {
             "title": "Lợi ích và đăng ký",
             "paragraphs": [
-              "Các lợi ích miễn phí, Lite, PLUS, bản dùng thử và tiền thưởng hiện có tuân theo các quy tắc trang và hết hạn tương ứng được hiển thị trong tài khoản của bạn. Lite chấp nhận tới 1.200 trang mới mỗi giờ và không bao gồm việc vẽ lại bằng AI. Không có tổng giới hạn hàng ngày hoặc hàng tháng sẽ không loại bỏ các giới hạn về tốc độ, hình ảnh hoặc dung lượng dịch vụ ngắn hạn.",
+              "Gói Miễn phí, Lite, các gói PLUS hiện có, bản dùng thử và ưu đãi tuân theo thời hạn và quy tắc hiển thị trong tài khoản. Lite tiếp nhận tối đa 1.200 trang mới trong mỗi khoảng 60 phút trượt. Không giới hạn tổng số trang theo ngày hoặc tháng không có nghĩa là bỏ giới hạn tần suất yêu cầu, kích thước ảnh hoặc năng lực xử lý của dịch vụ.",
               "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Dùng thử và thanh toán",
             "paragraphs": [
               "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn.",
-              "Hạn mức vẽ lại được cấp hằng tháng, kể cả với gói năm; phần chưa dùng không được cộng dồn. Tài khoản đủ điều kiện có thể bắt đầu bản dùng thử yêu cầu thẻ được hiển thị cho gói của mình. Đăng ký lại hoặc đổi gói không đặt lại điều kiện dùng thử."
+              "Tài khoản đủ điều kiện có thể bắt đầu bản dùng thử yêu cầu thẻ được hiển thị cho gói của mình. Đăng ký lại hoặc đổi gói không đặt lại điều kiện dùng thử."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Bản dịch manga có miễn phí không và Lite bao gồm những gì?",
-        "answer": "Đọc bản gốc cục bộ là miễn phí và không cần tài khoản. Bản dịch chính thức yêu cầu đăng nhập; Miễn phí bao gồm 30 trang dịch thông thường mỗi ngày. Lite có giá 5,99 đô la Mỹ hàng tháng hoặc 59,99 đô la Mỹ hàng năm, không có tổng giới hạn thông thường hàng ngày hoặc hàng tháng và lên tới 1.200 trang mới mỗi giờ. Áp dụng giới hạn tốc độ và dung lượng. Việc vẽ lại bằng AI không được bao gồm. Những tài khoản lần đầu đủ điều kiện sẽ được dùng thử 7 ngày dựa trên thẻ. PLUS không nhận mua hàng mới; đăng ký hiện có giữ lợi ích được hiển thị của họ. Thuế và số tiền cuối cùng được hiển thị khi thanh toán.",
+        "answer": "Đọc bản gốc cục bộ là miễn phí và không cần tài khoản. Bản dịch chính thức yêu cầu đăng nhập; Miễn phí bao gồm 30 trang dịch thông thường mỗi ngày. Lite có giá 5,99 đô la Mỹ hàng tháng hoặc 59,99 đô la Mỹ hàng năm, không có tổng giới hạn thông thường hàng ngày hoặc hàng tháng và lên tới 1.200 trang mới mỗi giờ. Áp dụng giới hạn tốc độ và dung lượng. Những tài khoản lần đầu đủ điều kiện sẽ được dùng thử 7 ngày dựa trên thẻ. PLUS không nhận mua hàng mới; đăng ký hiện có giữ lợi ích được hiển thị của họ. Thuế và số tiền cuối cùng được hiển thị khi thanh toán.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
         "question": "Chọn dịch thông thường qua NodeLane hay MTU thế nào?",
-        "answer": "Tiện ích chỉ dùng dịch thông thường: nhận diện chữ, dịch, xóa chữ cục bộ và dàn chữ. Kênh NodeLane cần đăng nhập và hạn mức tài khoản; MTU dùng dịch vụ riêng nên không cần tài khoản NodeLane. Cả hai đều so sánh được bản gốc. Vẽ lại bằng AI chỉ có trong công cụ ảnh website khi tài khoản đủ quyền, không phải chế độ của tiện ích.",
+        "answer": "Tiện ích chỉ dùng dịch thông thường: nhận diện chữ, dịch, xóa chữ cục bộ và dàn chữ. Kênh NodeLane cần đăng nhập và hạn mức tài khoản; MTU dùng dịch vụ riêng nên không cần tài khoản NodeLane. Cả hai đều so sánh được bản gốc.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Hình ảnh có được tải lên hoặc giữ lại không?",
-        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ; AI trong công cụ website khi đủ quyền lưu kết quả đầy đủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
+        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Các bản dịch không thành công có sử dụng các trang không?",
-        "answer": "Tác vụ chính thức giữ hạn mức tạm thời rồi quyết toán khi cung cấp thành công. Lỗi rõ ràng, không có chữ hoặc nhận diện một phần giữ nguyên văn sẽ trả phần đã giữ. Lượt tiếp nhận và giới hạn ngắn hạn tính riêng. Kết quả AI chưa rõ trong công cụ website được xác minh trước, không tự tạo lại. MTU không dùng hạn mức NodeLane nhưng chi phí dịch vụ vẫn áp dụng.",
+        "answer": "Tác vụ chính thức giữ hạn mức tạm thời rồi quyết toán khi cung cấp thành công. Lỗi rõ ràng, không có chữ hoặc nhận diện một phần giữ nguyên văn sẽ trả phần đã giữ. Lượt tiếp nhận và giới hạn ngắn hạn tính riêng. MTU không dùng hạn mức NodeLane nhưng chi phí dịch vụ vẫn áp dụng.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "Giới hạn dịch thuật Lite hoạt động như thế nào?",
-        "answer": "Một tài khoản dùng chung giới hạn 100 ảnh dịch mới trong mỗi khoảng 60 giây trượt và 1.200 ảnh trong mỗi khoảng 3.600 giây trượt giữa mọi thiết bị, chế độ và ngôn ngữ. Gói Miễn phí cho phép 10 ảnh trong mỗi khoảng 60 giây trượt. Gửi lại cùng yêu cầu và dùng lại kết quả hợp lệ không bị tính thêm. Tác vụ đã tiếp nhận vẫn được tính nếu thất bại, bị hủy hoặc không có chữ. Yêu cầu bị từ chối hay giao dịch cơ sở dữ liệu bị hoàn tác sẽ trả lại suất đã giữ trong hạn mức theo giờ. Việc thử lại tuân theo quy tắc tiếp nhận tác vụ mới thực tế. Các giới hạn này không bảo đảm tốc độ hoàn thành. Lite không bao gồm vẽ lại bằng AI.",
+        "answer": "Một tài khoản dùng chung giới hạn 100 ảnh dịch mới trong mỗi khoảng 60 giây trượt và 1.200 ảnh trong mỗi khoảng 3.600 giây trượt giữa mọi thiết bị, chế độ và ngôn ngữ. Gói Miễn phí cho phép 10 ảnh trong mỗi khoảng 60 giây trượt. Gửi lại cùng yêu cầu và dùng lại kết quả hợp lệ không bị tính thêm. Tác vụ đã tiếp nhận vẫn được tính nếu thất bại, bị hủy hoặc không có chữ. Yêu cầu bị từ chối hay giao dịch cơ sở dữ liệu bị hoàn tác sẽ trả lại suất đã giữ trong hạn mức theo giờ. Việc thử lại tuân theo quy tắc tiếp nhận tác vụ mới thực tế. Các giới hạn này không bảo đảm tốc độ hoàn thành.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Miễn phí",
     "常规翻译": "Dịch thông thường",
     "不限累计页数": "Tổng số trang không giới hạn",
-    "AI 重绘可用额度": "Các trang vẽ lại bằng AI có sẵn",
     "页": " trang",
     " 页可用": " trang có sẵn",
     "你的阅读权益": "Quyền lợi đọc của bạn",

@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Open a comic, connect your library, and translate the images you want to understand.",
     "ctaButton": "Start your reading journey",
     "pricingTitle": "Read for free. Choose your translation plan.",
-    "pricingDescription": "Compare Free and Lite manga translation: daily free pages, 1,200 new requests per rolling hour, and monthly or annual billing. Lite excludes AI redraw. Eligible first-time accounts get a 7-day trial.",
+    "pricingDescription": "Compare Free and Lite manga translation: daily free pages, 1,200 new requests per rolling hour, and monthly or annual billing. Eligible first-time accounts get a 7-day trial.",
     "freePlan": "Free",
     "freePlanDescription": "For a little reading every day",
     "free": "free",
@@ -92,7 +92,7 @@ export default {
       "Access valid existing results",
       "Up to 10 new translation images per rolling 60 seconds"
     ],
-    "freeNote": "AI redraw in the website workspace requires a valid entitlement; the extension uses standard translation. Daily pages reset in Asia/Shanghai time and do not roll over.",
+    "freeNote": "The extension and website image workspace use standard translation. Daily pages reset in Asia/Shanghai time and do not roll over.",
     "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Unlimited totals remain subject to short-term rate, image and service-capacity limits; no completion speed is guaranteed.",
     "downloadTitle": "Install your manga translator extension",
     "downloadDescription": "Get NodeLane Comics for desktop Chrome, Edge or Firefox. Install from the available official store or download the package for your browser; features depend on the installed version.",
@@ -192,7 +192,7 @@ export default {
         ],
         "minutes": 5,
         "title": "Standard manga translation: choose an official or local service",
-        "description": "Understand standard image translation, choose NodeLane or manga-translator-ui, compare originals and keep website image-workspace modes separate.",
+        "description": "Understand standard image translation, choose NodeLane or manga-translator-ui, compare originals and use the separate website image workspace.",
         "category": "Translation tips",
         "sections": [
           {
@@ -219,7 +219,7 @@ export default {
           {
             "title": "Website image translation has its own controls",
             "paragraphs": [
-              "The website image workspace is separate from the extension. Guest trials use standard translation; signed-in accounts may see other modes according to current capabilities and entitlements. An available AI redraw can alter artwork details. Follow the actual workspace and account display; Lite does not include AI redraw."
+              "The separate website image workspace translates JPG, PNG and WebP with standard translation. Try as a guest or sign in to use your account allowance, download translated images and keep browser-local history. It does not create comic-library entries."
             ]
           }
         ],
@@ -345,7 +345,7 @@ export default {
           {
             "title": "Translation and retention",
             "paragraphs": [
-              "The extension offers standard image translation. Official translation sends selected images and task information to NodeLane; MTU sends them directly to your selected service, which may call external models. The website image workspace separately offers modes according to capabilities and account entitlements.",
+              "The extension offers standard image translation. Official translation sends selected images and task information to NodeLane; MTU sends them directly to your selected service, which may call external models.",
               "Official originals are temporary and are removed after completion, failure or cancellation. Private account results remain while valid requests exist; guest server results can be retrieved for 24 hours after a task ends. Local saved translations follow browser storage and cache availability. Retention at your MTU or its providers depends on that service."
             ]
           },
@@ -449,14 +449,14 @@ export default {
           {
             "title": "Service providers and transfers",
             "paragraphs": [
-              "Classic processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation; redraw providers process the page image and language. Actual providers are configured on the server for the task.",
+              "Classic processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation. Actual providers are configured on the server for the task.",
               "Translation images use private files on the central server; recognized text, translations and necessary metadata are stored in the database. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
             ]
           },
           {
             "title": "Retention and deletion",
             "paragraphs": [
-              "Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files; AI redraw keeps full results. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
+              "Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
               "Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
               "For account or broader deletion requests, contact us for identity and scope verification. Transaction, audit or security records may need retention for service obligations, disputes or applicable requirements. No single erasure deadline is promised for all records; the response will explain the outcome and constraints."
             ]
@@ -485,13 +485,13 @@ export default {
             "title": "Content rights and AI results",
             "paragraphs": [
               "You must have the right to access, upload, translate and process selected content and follow source-site and rights-holder requirements. The extension grants no copyright or automatic permission to publish translated images. Do not bypass paywalls, login requirements or DRM. We do not guarantee source content legality or completeness. Copyright inquiries should identify the work, rights, issue and contact information.",
-              "Machine translation may omit, mistranslate or misplace text. AI redraw, when available in the website workspace, may also alter artwork. Results assist reading and do not replace originals or professional review. Original website illustrations are AI-generated; language comparisons show recorded standard-translation samples, without guarantees of per-image accuracy or speed. Compare with the original and send feedback when needed."
+              "Machine translation may omit, mistranslate or misplace text. Results assist reading and do not replace originals or professional review. Original website illustrations are AI-generated; language comparisons show recorded standard-translation samples, without guarantees of per-image accuracy or speed. Compare with the original and send feedback when needed."
             ]
           },
           {
             "title": "Benefits and subscriptions",
             "paragraphs": [
-              "Free, Lite, existing PLUS, trial and bonus benefits follow their respective expiry and page rules shown in your account. Lite accepts up to 1,200 new pages per rolling hour and excludes AI redraw. No daily or monthly total cap does not remove short-term rate, image or service-capacity limits.",
+              "Free, Lite, existing PLUS, trial and bonus benefits follow their respective expiry and page rules shown in your account. Lite accepts up to 1,200 new pages per rolling hour. No daily or monthly total cap does not remove short-term rate, image or service-capacity limits.",
               "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
             ]
           },
@@ -512,7 +512,7 @@ export default {
             "title": "Trial and billing",
             "paragraphs": [
               "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
-              "Redraw pages become available monthly with no rollover, including on annual plans. Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility."
+              "Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility."
             ]
           },
           {
@@ -560,13 +560,13 @@ export default {
       {
         "id": "free-plan",
         "question": "Is manga translation free, and what does Lite include?",
-        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic pages per day. Lite costs US$5.99 monthly or US$59.99 yearly, with no daily or monthly classic total cap and up to 1,200 new pages per rolling hour. Rate and capacity limits apply. AI redraw is not included. Eligible first-time accounts get a 7-day card-backed trial. PLUS is closed to new purchases; existing subscriptions keep their displayed benefits. Taxes and final amounts are shown at checkout.",
+        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic pages per day. Lite costs US$5.99 monthly or US$59.99 yearly, with no daily or monthly classic total cap and up to 1,200 new pages per rolling hour. Rate and capacity limits apply. Eligible first-time accounts get a 7-day card-backed trial. PLUS is closed to new purchases; existing subscriptions keep their displayed benefits. Taxes and final amounts are shown at checkout.",
         "relatedPath": "/pricing/"
       },
       {
         "id": "translation-modes",
-        "question": "Which translation services and modes can I use?",
-        "answer": "The extension provides standard image translation with OCR, text translation, local background repair and typesetting. Choose the official channel or your manga-translator-ui; originals remain available for comparison. The website image workspace is separate: guest trials use standard translation, while signed-in modes depend on current capabilities and account entitlements. Lite does not include AI redraw.",
+        "question": "Which translation services can I use?",
+        "answer": "The extension provides standard image translation with OCR, text translation, local background repair and typesetting. Choose the official channel or your manga-translator-ui; originals remain available for comparison. The separate website image workspace also provides standard translation for JPG, PNG and WebP, with guest trials and account allowance.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -584,19 +584,19 @@ export default {
       {
         "id": "image-privacy",
         "question": "Are images uploaded or retained?",
-        "answer": "Using the official channel sends selected page images to NodeLane and relevant providers. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files; AI redraw keeps full results. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them. Source cookies, login tokens and browsing history are not uploaded. Your own MTU follows its configured service and provider retention rules.",
+        "answer": "Using the official channel sends selected page images to NodeLane and relevant providers. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Classic translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them. Source cookies, login tokens and browsing history are not uploaded. Your own MTU follows its configured service and provider retention rules.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Do failed translations use pages?",
-        "answer": "Official account tasks may reserve pages first and settle them on successful delivery. Explicit failure, no-text results or incomplete standard recognition with original text retained release the reservation. An unknown AI redraw result in the website workspace is checked first and may temporarily reserve pages. MTU uses no official allowance. Guest trials count accepted images, including failures, according to the workspace limits.",
+        "answer": "Official account tasks may reserve pages first and settle them on successful delivery. Explicit failure, no-text results or incomplete standard recognition with original text retained release the reservation. MTU uses no official allowance. Guest trials count accepted images, including failures, according to the workspace limits.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
         "id": "plus-limits",
         "question": "How do Lite translation limits work?",
-        "answer": "One account shares a limit of 100 new translation images per rolling 60 seconds and 1,200 per rolling 3,600 seconds across devices, modes and languages. Free allows 10 per rolling 60 seconds. Replaying the same request and reusing valid results are not counted again. Accepted tasks still count if they fail, are canceled or contain no text. Rejected requests or rolled-back database transactions release the reserved hourly slot. Retries follow the actual new-task admission rules. These limits do not guarantee completion speed. Lite excludes AI redraw.",
+        "answer": "One account shares a limit of 100 new translation images per rolling 60 seconds and 1,200 per rolling 3,600 seconds across devices, modes and languages. Free allows 10 per rolling 60 seconds. Replaying the same request and reusing valid results are not counted again. Accepted tasks still count if they fail, are canceled or contain no text. Rejected requests or rolled-back database transactions release the reserved hourly slot. Retries follow the actual new-task admission rules. These limits do not guarantee completion speed.",
         "relatedPath": "/pricing/"
       },
       {
@@ -826,7 +826,6 @@ export default {
     "普通账户": "Free",
     "常规翻译": "Classic translation",
     "不限累计页数": "Unlimited total pages",
-    "AI 重绘可用额度": "Available AI redraw pages",
     "页": " pages",
     " 页可用": " pages available",
     "你的阅读权益": "Your reading benefits",

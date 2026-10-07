@@ -1,6 +1,7 @@
 import type {Locale} from './types';
 interface Copy {message:string;switch:string;dismiss:string}
 export const languageNoticeCopy:Record<Locale,Copy> = {
+  ar:{message:'لغة متصفحك المفضلة هي {language}. هل تريد التبديل؟',switch:'تغيير اللغة',dismiss:'متابعة بهذه اللغة'},
   'zh-CN':{message:'浏览器的首选语言是 {language}，要切换吗？',switch:'切换语言',dismiss:'暂不切换'},
   'zh-TW':{message:'瀏覽器的偏好語言是 {language}，要切換嗎？',switch:'切換語言',dismiss:'暫不切換'},
   en:{message:'Your browser prefers {language}. Switch language?',switch:'Switch language',dismiss:'Keep this language'},
