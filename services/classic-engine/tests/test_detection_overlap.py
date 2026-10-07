@@ -13,12 +13,15 @@ PATCH = LOCK['source']['patches'][PATCH_PATH]
 
 
 def test_preparation_applies_only_the_pinned_edit(tmp_path):
-    target = tmp_path / PATCH_PATH
-    target.parent.mkdir(parents=True)
-    source = '# Upstream license retained\n' + PATCH['before'] + '# Packing and merging retained\n'
-    target.write_text(source, encoding='utf-8')
+    sources = {}
+    for relative, patch in LOCK['source']['patches'].items():
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        sources[relative] = '# Upstream license retained\n' + patch['before'] + '# Other source retained\n'
+        target.write_text(sources[relative], encoding='utf-8')
     apply_source_patches(tmp_path)
-    assert target.read_text(encoding='utf-8') == source.replace(PATCH['before'], PATCH['after'])
+    for relative, patch in LOCK['source']['patches'].items():
+        assert (tmp_path / relative).read_text(encoding='utf-8') == sources[relative].replace(patch['before'], patch['after'])
     # Do not silently double-patch an already prepared or drifted source tree.
     with pytest.raises(ValueError, match='target changed'):
         apply_source_patches(tmp_path)

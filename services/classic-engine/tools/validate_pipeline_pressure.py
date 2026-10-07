@@ -56,7 +56,7 @@ class FixtureRuntime:
         time.sleep(.005)
         return rgb.copy()
 
-    def render(self, original, cleaned, analysis, translated, language, alpha):
+    def render(self, original, cleaned, analysis, translated, language, alpha, *, mask_cache_bytes=None):
         image = Image.fromarray(cleaned)
         image.putpixel((10, 10), (1, 2, 3))
         return pack_result(image, original, alpha, self.version, analysis, translated)

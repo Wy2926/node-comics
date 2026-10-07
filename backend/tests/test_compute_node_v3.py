@@ -50,7 +50,7 @@ class FixtureRuntime:
     def inpaint(self, source, analysis):
         return source
 
-    def render(self, original, source, analysis, translated, language, alpha):
+    def render(self, original, source, analysis, translated, language, alpha, *, mask_cache_bytes=None):
         self.rendered += 1
         image = Image.open(BytesIO(source[0])).convert('RGB')
         stream = BytesIO()

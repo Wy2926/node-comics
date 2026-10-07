@@ -46,6 +46,16 @@ class Pipeline:
             self.agent.request_claim()
         return True
 
+    def release_render_cache(self, page):
+        with self.memory_lock:
+            amount = page.render_cache_reserved
+            if not amount:
+                return
+            page.render_cache_reserved = 0
+            page.reserved -= amount
+            self.used -= amount
+        self.agent.request_claim()
+
     def claim_capacity(self):
         pages = list(self.agent.pages.values())
         downloading = [page for page in pages if page.step == 'download' and not page.stopped and not page.terminal]
@@ -60,6 +70,8 @@ class Pipeline:
     def close(self):
         for pool in (self.download, self.compute, self.render, self.control, self.delivery):
             pool.shutdown(wait=True)
+        for page in list(self.agent.pages.values()):
+            self.release_render_cache(page)
 
     def submit(self, page, pool, name, operation):
         page.phase = name
@@ -116,6 +128,7 @@ class Pipeline:
         page.step = 'deliver'
 
     def release(self, page):
+        self.release_render_cache(page)
         self.resize_reservation(page, 0)
         page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.completion = None
 
@@ -158,6 +171,9 @@ class Pipeline:
                 page.pending_error = error
         if page.future and page.future.done():
             future, page.future = page.future, None
+            # The renderer's cache has been discarded, even when result() will
+            # raise. Keep only real working buffers through error/stop delivery.
+            self.release_render_cache(page)
             try:
                 value = future.result()
                 if page.step == 'download':
@@ -222,6 +238,16 @@ class Pipeline:
                 elif page.step == 'inpaint':
                     operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
                 else:
-                    operation = lambda p=page: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
+                    metadata = page.lease['input']
+                    cache_bytes = metadata['width'] * metadata['height'] * len(page.analysis['regions'])
+                    with self.memory_lock:
+                        # Cache only spare memory; a page must still finish when
+                        # its working buffers already fill the resident budget.
+                        cache_bytes = min(cache_bytes, max(0, self.limit - self.used))
+                        self.used += cache_bytes
+                        page.reserved += cache_bytes
+                        page.render_cache_reserved = cache_bytes
+                    operation = lambda p=page, budget=cache_bytes: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
+                        mask_cache_bytes=budget,
                         **({'allow_tiles': True} if p.lease['config'].get('result_format') == 'overlay-tiles-v1' else {}))
                 self.submit(page, pool, page.step, operation)

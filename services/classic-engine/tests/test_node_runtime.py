@@ -26,7 +26,7 @@ def fixture(alpha=None):
                 'width': 80, 'height': 64, 'mime': 'image/png', 'normalization_version': 1}
     runtime = Runtime.__new__(Runtime)
     runtime.version = 'test'
-    runtime.engine = SimpleNamespace(renderer=SimpleNamespace(render=lambda original, cleaned, *args: cleaned))
+    runtime.engine = SimpleNamespace(renderer=SimpleNamespace(render=lambda original, cleaned, *args, **kwargs: cleaned))
     analysis = {'version': runtime.version, 'format': Runtime.ANALYSIS_FORMAT, 'input_hash': metadata['sha256'], 'segments': [{'id': '0'}],
                 'regions': [{'bbox': [0, 0, 80, 64]}]}
     translated = {'analysis_hash': digest(analysis), 'language': 'en',
@@ -40,7 +40,7 @@ def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alp
     rgb, opacity = runtime.decode(data, metadata)
     cleaned = rgb.copy()
     cleaned[6, 7] = (31, 45, 60)  # Erasure may be outside the new glyph.
-    def draw(original, cleaned, *args):
+    def draw(original, cleaned, *args, **kwargs):
         rendered = cleaned.copy()
         rendered[10, 10] = (100, 101, 102)
         return rendered
@@ -76,6 +76,24 @@ def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alp
     expected[10, 10] = (100, 101, 102)
     assert np.array_equal(reconstructed[..., :3], expected)
     assert np.all(reconstructed[..., 3] == (255 if alpha is None else alpha))
+
+
+def test_render_cache_budget_reaches_renderer_without_changing_result_identity(monkeypatch):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    budgets = []
+    def draw(original, cleaned, *args, mask_cache_bytes=None):
+        budgets.append(mask_cache_bytes)
+        rendered = cleaned.copy()
+        rendered[10, 10] = (100, 101, 102)
+        return rendered
+    monkeypatch.setattr(runtime.engine.renderer, 'render', draw)
+    original_identity = digest(analysis), digest(translated)
+    uncapped = runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+    for budget in (0, 1024, rgb.shape[0] * rgb.shape[1]):
+        assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha, mask_cache_bytes=budget) == uncapped
+    assert budgets == [None, 0, 1024, rgb.shape[0] * rgb.shape[1]]
+    assert (digest(analysis), digest(translated)) == original_identity
 
 
 def test_zero_visible_diff_returns_successful_original_without_artifact():
@@ -134,7 +152,7 @@ def test_empty_segment_keeps_erasure_and_does_not_block_following_text(monkeypat
     cleaned = rgb.copy()
     cleaned[6, 7] = (31, 45, 60)
     drawn = []
-    def draw(original, cleaned, regions, texts, *args):
+    def draw(original, cleaned, regions, texts, *args, **kwargs):
         drawn.extend(texts)
         rendered = cleaned.copy()
         rendered[10, 10] = (100, 101, 102)

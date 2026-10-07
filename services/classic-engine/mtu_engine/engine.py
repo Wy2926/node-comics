@@ -82,13 +82,14 @@ class Renderer:
         return all(any(font.supportsCharacter(ord(char)) for font in self.raw_fonts)
                    for char in text if not char.isspace())
 
-    def render(self, original, cleaned, regions, translations, language, bubble_mask):
+    def render(self, original, cleaned, regions, translations, language, bubble_mask, *, mask_cache_bytes=None):
         import cv2
         from manga_translator.config import Direction
         from manga_translator.rendering import (
             dispatch, resize_regions_to_font_size, calc_font_from_box, calc_box_from_font,
             _region_lines_fully_inside_mask, _apply_default_english_line_break_method, text_render)
         from manga_translator.utils import TextBlock, build_region_reference_mask, erode_bubble_mask
+        from manga_translator.utils.bubble import reference_mask_cache
         from manga_translator.rendering.rich_text import legacy_line_breaks_to_document
         config = configuration()
         target = LANGUAGES[language]
@@ -128,9 +129,11 @@ class Renderer:
             blocks.append(block)
         if not blocks:
             return cleaned
+        if mask_cache_bytes is None:
+            mask_cache_bytes = cleaned.shape[0] * cleaned.shape[1] * len(blocks)
         # MTU's font selection is thread-local; its registry/hyphenator caches
         # are shared. Bound the whole upstream call until concurrency is proven.
-        with self._lock:
+        with self._lock, reference_mask_cache(mask_cache_bytes):
             enclosed, free = [], []
             labels = None
             if bubble_mask is not None and np.any(bubble_mask):

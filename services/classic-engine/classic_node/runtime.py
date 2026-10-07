@@ -121,7 +121,7 @@ class Runtime:
         return self.engine.inpaint(rgb, decode_mask(analysis, 'mask', size),
             decode_mask(analysis, 'raw_mask', size), decode_mask(analysis, 'bubble_mask', size), analysis['regions'])
 
-    def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False):
+    def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False, mask_cache_bytes=None):
         self.validate_analysis(analysis)
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}
@@ -133,7 +133,7 @@ class Runtime:
         started = perf_counter()
         if any(text.strip() for text in texts):
             rendered = self.engine.renderer.render(original, cleaned, analysis['regions'], texts, language,
-                decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0])))
+                decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0])), mask_cache_bytes=mask_cache_bytes)
         else:
             rendered = cleaned
         record('render_layout', perf_counter() - started)

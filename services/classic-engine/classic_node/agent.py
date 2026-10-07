@@ -27,6 +27,7 @@ class Page:
         self.future = self.analysis_future = self.pending_error = None
         self.analysis_accepted = False
         self.reserved = 0
+        self.render_cache_reserved = 0
         self.next_stop = 0
         self.data = self.metadata = self.rgb = self.cleaned = self.analysis = self.alpha = self.completion = None
         self.received_at = sent_at

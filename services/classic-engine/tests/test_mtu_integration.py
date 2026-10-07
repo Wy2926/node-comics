@@ -166,6 +166,49 @@ def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, mon
         assert np.array_equal(empty, source)
 
 
+@pytest.mark.parametrize(('language', 'text'), [
+    ('en', 'THIS PERSON COULD WIELD MAGIC TO CONTROL ALL THINGS.'),
+    ('zh-Hans', '这个人能够运用魔法，控制世间的一切事物。'),
+    ('ja', 'この人は魔法を使って、すべてのものを操ることができた。'),
+    ('ko', '이 사람은 마법을 사용하여 모든 것을 제어할 수 있었습니다.'),
+    ('ar', 'كان هذا الشخص قادرًا على تسخير السحر للتحكم في كل شيء.'),
+])
+def test_qt_mask_optimization_preserves_pixels_and_layout(assets, offline, monkeypatch, language, text):
+    import cv2
+    from mtu_engine.assets import LOCK
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator import rendering
+    from manga_translator.utils import TextBlock
+    from manga_translator.utils.bubble import _reference_masks
+    source = np.full((1800, 720, 3), 240, dtype=np.uint8)
+    mask = np.zeros(source.shape[:2], dtype=np.uint8)
+    regions = []
+    for top in (90, 650, 1200):
+        mask[top:top + 450, 80:650] = 255
+        block = TextBlock([[[260, top + 70], [430, top + 70], [430, top + 370], [260, top + 370]]],
+                          ['source'], font_size=48, direction='v')
+        regions.append(serialize_region(block))
+    dispatch, observed = rendering.dispatch, []
+    async def capture(*args, **kwargs):
+        output = await dispatch(*args, **kwargs)
+        observed.extend((block.translation, block.font_size, block.dst_points.tolist()) for block in args[1])
+        return output
+    monkeypatch.setattr(rendering, 'dispatch', capture)
+    optimized = rendering._polygon_fully_inside_mask
+    namespace = {'np': np, 'cv2': cv2}
+    exec(LOCK['source']['patches']['manga_translator/rendering/__init__.py']['before'], namespace)
+    monkeypatch.setattr(rendering, '_polygon_fully_inside_mask', namespace['_polygon_fully_inside_mask'])
+    baseline = renderer.render(source, source, regions, [text] * 3, language, mask, mask_cache_bytes=0)
+    layout = observed.copy()
+    observed.clear()
+    monkeypatch.setattr(rendering, '_polygon_fully_inside_mask', optimized)
+    candidate = renderer.render(source, source, regions, [text] * 3, language, mask)
+    assert np.array_equal(baseline, candidate)
+    assert observed == layout
+    assert _reference_masks.get() is None
+
+
 @pytest.mark.parametrize('enclosed', [False, True])
 @pytest.mark.parametrize('fg,bg', [([235, 35, 60], [80, 80, 80]), ([245, 245, 245], [20, 40, 130]),
                                   ([210, 40, 60], [205, 38, 58])])

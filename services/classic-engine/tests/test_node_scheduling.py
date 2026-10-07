@@ -343,7 +343,7 @@ def test_late_configuration_response_never_rolls_back_newer_version(agent):
 
 
 def isolate_pipeline_pools(agent):
-    for name in ('compute', 'render', 'delivery'):
+    for name in ('download', 'compute', 'render', 'delivery'):
         getattr(agent.pipeline, name).shutdown(wait=True)
         setattr(agent.pipeline, name, PendingPool())
 
@@ -356,6 +356,7 @@ def test_render_has_independent_bounded_slots_and_keeps_memory(agent, workers):
     for page in pages:
         page.step = 'render' if int(page.lease['lease_id']) < 3 else 'inpaint'
         page.rgb = page.cleaned = object()
+        page.analysis = {'regions': [{}]}
         agent.pipeline.resize_reservation(page, 1024)
     agent.pipeline.tick()
     assert len(agent.pipeline.render.calls) == workers
@@ -365,7 +366,7 @@ def test_render_has_independent_bounded_slots_and_keeps_memory(agent, workers):
         agent.pipeline.tick()
     assert len(agent.pipeline.render.calls) == workers  # No executor backlog.
     assert len(agent.pipeline.compute.calls) == 2
-    assert agent.pipeline.used == 6 * 1024
+    assert agent.pipeline.used == 6 * 1024 + workers * 100
     # Finish computation while the first render remains blocked.
     agent.pipeline.compute.finish(0, response=object())
     agent.pipeline.tick()
@@ -379,7 +380,8 @@ def test_real_render_thread_does_not_hold_compute_slot(agent):
     agent.local['local_pages'] = 1
     rendering, waiting = add_page(agent, 0), add_page(agent, 1)
     rendering.step, waiting.step = 'render', 'text'
-    def render(*_):
+    rendering.analysis = {'regions': [{}]}
+    def render(*_, **kwargs):
         began.set()
         assert release.wait(5)
         return {'result': {'output': None}, 'output_bytes': None}
@@ -414,14 +416,19 @@ def test_cancelled_render_drains_before_releasing_buffers(agent, terminal):
     page = add_page(agent)
     page.step = 'render'
     page.rgb = page.cleaned = sentinel = object()
+    page.analysis = {'regions': [{}, {}]}
     agent.pipeline.resize_reservation(page, 1024)
     agent.pipeline.tick()
     page.update({'status': 'terminal' if terminal else 'stop'})
     agent.reap()
-    assert page.rgb is sentinel and agent.pipeline.used == 1024
-    agent.pipeline.render.calls[0][0].set_exception(NodeFailure('LEASE_STOPPED'))
+    assert page.rgb is sentinel and agent.pipeline.used == 1224
+    agent.pipeline.render.finish(0)
     agent.reap()
     if not terminal:
+        assert page.render_cache_reserved == 0
+        assert page.rgb is page.cleaned is sentinel and agent.pipeline.used == page.reserved == 1024
+        for _ in range(3):
+            agent.reap()
         assert agent.pipeline.used == 1024
         agent.pipeline.delivery.finish(response={'status': 'terminal'})
         agent.reap()
@@ -432,11 +439,137 @@ def test_failed_render_does_not_block_other_pages(agent):
     isolate_pipeline_pools(agent)
     first, second = add_page(agent, 0), add_page(agent, 1)
     first.step = second.step = 'render'
+    for page in (first, second):
+        page.analysis = {'regions': [{}]}
+        agent.pipeline.resize_reservation(page, 1024)
     agent.pipeline.tick()
     agent.pipeline.render.calls[0][0].set_exception(NodeFailure('CLASSIC_LAYOUT_OVERFLOW'))
     agent.pipeline.tick()
     assert first.step == 'deliver' and first.completion['error']['code'] == 'CLASSIC_LAYOUT_OVERFLOW'
     assert second.future is not None and len(agent.pipeline.render.calls) == 2
+    assert first.render_cache_reserved == 0 and first.reserved == 1024
+    assert agent.pipeline.used == 2 * 1024 + 100
+    agent.pipeline.delivery.finish(response={'status': 'terminal'})
+    agent.reap()
+    assert list(agent.pages) == ['1'] and agent.pipeline.used == second.reserved == 1124
+
+
+@pytest.mark.parametrize('spare', [0, 75, 300, 1000])
+def test_render_cache_is_bounded_reserved_once_and_freed_after_drain(agent, spare):
+    isolate_pipeline_pools(agent)
+    agent.pipeline.render_workers = 3
+    pages = [add_page(agent, i) for i in range(3)]
+    for page in pages:
+        page.step = 'render'
+        page.analysis = {'regions': [{}, {}]}
+        agent.pipeline.resize_reservation(page, agent.pipeline.input_reservation(page))
+    initial = agent.pipeline.used
+    agent.pipeline.limit = initial + spare
+    seen = []
+    def render(*_, mask_cache_bytes):
+        seen.append(mask_cache_bytes)
+        return {'result': {'output': None}, 'output_bytes': None}
+    agent.runtime.render = render
+    budgets = [min(200, max(0, spare - index * 200)) for index in range(3)]
+    for _ in range(3):
+        agent.pipeline.tick()
+    assert len(agent.pipeline.render.calls) == 3  # Zero cache must not stall work.
+    assert agent.pipeline.used == initial + sum(budgets) <= agent.pipeline.limit
+    assert [page.reserved - agent.pipeline.input_reservation(page) for page in pages] == budgets
+    assert [page.render_cache_reserved for page in pages] == budgets
+    for index in range(3):
+        agent.pipeline.render.finish(index)
+    assert seen == budgets  # Each submitted operation captures its own budget.
+    for page in pages:
+        agent.pipeline.advance(page)
+        assert page.render_cache_reserved == 0
+        assert page.reserved == agent.pipeline.delivery_reservation(page.completion)
+    assert agent.pipeline.used == sum(page.reserved for page in pages) < initial
+    for page in pages:
+        agent.pipeline.release(page)
+    assert agent.pipeline.used == 0
+
+
+def test_render_cache_reservation_blocks_new_downloads_until_freeze(agent):
+    isolate_pipeline_pools(agent)
+    page = add_page(agent)
+    page.step, page.analysis = 'render', {'regions': [{}, {}]}
+    initial = agent.pipeline.input_reservation(page)
+    agent.pipeline.resize_reservation(page, initial)
+    # A minimum-size download fits before cache admission, but not afterward.
+    empty_download = Page(lease(1, pixels=0), clock()[0], time.monotonic())
+    download_bytes = agent.pipeline.input_reservation(empty_download)
+    agent.pipeline.limit = initial + download_bytes + 100
+    assert agent.pipeline.claim_capacity() > 0
+    agent.pipeline.tick()
+    assert page.reserved == initial + 200 and agent.pipeline.claim_capacity() == 0
+    waiting = add_page(agent, 1, pixels=0)
+    agent.pipeline.tick()
+    assert waiting.future is None and waiting.reserved == 0
+    agent.pipeline.render.finish(response={'result': {'output': None}, 'output_bytes': None})
+    agent.pipeline.tick()
+    assert waiting.future is not None and waiting.reserved == download_bytes
+    assert agent.pipeline.used <= agent.pipeline.limit
+
+
+@pytest.mark.parametrize('outcome', ['render-error', 'freeze-error', 'stop', 'cancel-future'])
+def test_render_cache_returns_before_slow_failure_receipt_without_discarding_working_buffers(agent, monkeypatch, outcome):
+    isolate_pipeline_pools(agent)
+    page = add_page(agent, pixels=24_000_000)
+    page.step, page.analysis = 'render', {'regions': [{}, {}, {}]}
+    page.rgb = page.cleaned = sentinel = object()
+    initial = agent.pipeline.input_reservation(page)
+    agent.pipeline.resize_reservation(page, initial)
+    download_bytes = agent.pipeline.input_reservation(SimpleNamespace(lease=lease(1)))
+    agent.pipeline.limit = initial + download_bytes
+    agent.pipeline.tick()
+    assert page.render_cache_reserved == download_bytes and agent.pipeline.used == agent.pipeline.limit
+    waiting = add_page(agent, 1)
+    agent.pipeline.tick()
+    assert waiting.future is None
+    if outcome == 'render-error':
+        page.future.set_exception(NodeFailure('CLASSIC_LAYOUT_OVERFLOW'))
+    elif outcome == 'freeze-error':
+        def fail_freeze(current, result):
+            assert current.render_cache_reserved == 0 and current.reserved == initial
+            raise OSError('fixture freeze failed')
+        monkeypatch.setattr(agent.pipeline, 'freeze', fail_freeze)
+        agent.pipeline.render.finish(response={'result': {'output': None}, 'output_bytes': None})
+    elif outcome == 'stop':
+        page.update({'status': 'stop'})
+        agent.pipeline.render.finish()  # page.check fails before render starts.
+    else:
+        assert page.future.cancel()
+    agent.reap()
+    assert page.step == 'deliver' and page.future is not None and not page.future.done()
+    assert page.render_cache_reserved == 0 and page.reserved == initial
+    assert page.rgb is page.cleaned is sentinel
+    assert waiting.future is not None and waiting.reserved == download_bytes
+    assert agent.pipeline.used == initial + download_bytes
+    # A slow/retried failure receipt keeps RGB/cleaned, not a dead render cache.
+    page.future.set_exception(ControlFailure('CONTROL_UNAVAILABLE'))
+    page.next_stop = 0
+    for _ in range(3):
+        agent.reap()
+    assert page.render_cache_reserved == 0 and page.reserved == initial
+    assert page.rgb is page.cleaned is sentinel
+    assert agent.pipeline.used == initial + download_bytes
+
+
+def test_close_returns_render_cache_after_draining_without_changing_working_budget(agent):
+    page = add_page(agent)
+    page.step, page.analysis = 'render', {'regions': [{}, {}]}
+    page.rgb = page.cleaned = sentinel = object()
+    agent.pipeline.resize_reservation(page, 1024)
+    agent.runtime.render = lambda *args, **kwargs: {'result': {'output': None}, 'output_bytes': None}
+    agent.pipeline.tick()
+    page.future.result(timeout=5)
+    assert page.render_cache_reserved == 200 and agent.pipeline.used == 1224
+    agent.pipeline.close()
+    assert page.render_cache_reserved == 0 and page.reserved == agent.pipeline.used == 1024
+    assert page.rgb is page.cleaned is sentinel
+    agent.pipeline.close()
+    assert page.reserved == agent.pipeline.used == 1024
 
 
 def test_render_timings_survive_freeze_without_changing_result(agent):
