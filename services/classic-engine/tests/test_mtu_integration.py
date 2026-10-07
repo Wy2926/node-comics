@@ -324,11 +324,12 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             assert probe.session.get_providers()[0] == 'CUDAExecutionProvider'
             assert int(probe.session.get_provider_options()['CUDAExecutionProvider']['device_id']) == engine.gpu
             assert probe.session.get_session_options().intra_op_num_threads == 2
-        assert engine.recognizers['ch'].model.device.type == 'cuda'
+        assert engine.recognizers is engine.probes
+        assert len({id(probe.session) for probe in engine.probes.values()}) == 3
         assert engine.japanese.model.model.device.type == 'cuda'
         assert engine.color_model.use_gpu
         assert next(engine.color_model.model.parameters()).device.type == 'cuda'
-        assert engine.colors.predictor.color_model is engine.color_model.model
+        assert engine.colors.predictor.color_model.model is engine.color_model.model
         import asyncio
         from types import SimpleNamespace
         from PIL import Image, ImageDraw, ImageFont
@@ -342,8 +343,9 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             x1, y1, x2, y2 = draw.textbbox((12, 8), text, font=font)
             quad = np.array([[x1-3,y1-3],[x2+3,y1-3],[x2+3,y2+3],[x1-3,y2+3]])
             block = SimpleNamespace(xyxy=[x1-3,y1-3,x2+3,y2+3], lines=[quad], src_is_vertical=False)
-            assert engine.router.classify(np.array(image), [block]) == [language]
             line = Quadrilateral(quad, '', 1)
+            routes, _ = engine.router.classify(np.array(image), [block], [[line]])
+            assert routes == [language]
             if language == 'japan':
                 engine.japanese.recognize(np.array(image), [block], [[line]])
             else:
@@ -421,18 +423,30 @@ def test_long_lines_and_partial_ocr_continue_at_different_positions(assets, offl
                  'Our next adventure begins early tomorrow.']
     font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 24)
     recognize = engine.recognizers['en'].recognize
+    classify = engine.router.classify
     failure = None
+
+    def rejected(text):
+        return failure == 'all-empty' or (failure and 'evening' in text)
+
+    def incomplete_readings(*args):
+        routes, readings = classify(*args)
+        for index, reading in enumerate(readings):
+            if reading is not None and rejected(reading[1]['text']):
+                readings[index] = (reading[0], {'text': '', 'conf': 0.})
+        return routes, readings
 
     async def incomplete(*args, **kwargs):
         result = await recognize(*args, **kwargs)
         for line in args[1]:
-            if failure == 'all-empty' or (failure and 'evening' in line.text):
+            if rejected(line.text):
                 # The OCR adapter already drops text below its line threshold.
                 line.text = ''
                 line.prob = 0.1 if failure == 'low-confidence' else 0.0
         return result
 
     monkeypatch.setattr(engine.recognizers['en'], 'recognize', incomplete)
+    monkeypatch.setattr(engine.router, 'classify', incomplete_readings)
     try:
         engine.warmup()
         for top in (32, 440, 900):

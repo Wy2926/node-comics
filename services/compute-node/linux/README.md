@@ -1,6 +1,6 @@
 # Linux NVIDIA 计算节点
 
-Vast 扩容采用 **固定 CUDA 基础模板 + 版本化运行包 + 每实例独立身份**。不上传完整 CUDA 镜像，不在目标机重新转换模型或安装 Python 依赖；复用官方基础镜像的 Ubuntu、Python、CUDA/cuDNN 与平台管理服务。检测、气泡分割、抹字及中日专用 OCR 使用 PyTorch CUDA，PP-OCRv5 试读与韩英识别使用 ONNX Runtime CUDA，嵌字使用 MTU 的 Qt 离屏渲染，`nvidia-smi` 成功不等于节点就绪。
+Vast 扩容采用 **固定 CUDA 基础模板 + 版本化运行包 + 每实例独立身份**。不上传完整 CUDA 镜像，不在目标机重新转换模型或安装 Python 依赖；复用官方基础镜像的 Ubuntu、Python、CUDA/cuDNN 与平台管理服务。检测、气泡分割、抹字及日文 OCR 使用 PyTorch CUDA，PP-OCRv5 试读与中韩英识别使用 ONNX Runtime CUDA，嵌字使用 MTU 的 Qt 离屏渲染，`nvidia-smi` 成功不等于节点就绪。
 
 ## Vast 扩容
 

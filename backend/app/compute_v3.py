@@ -477,8 +477,10 @@ class PageResult(RequestBody):
 
 Timings = dict[Literal['download', 'download_queue', 'analyze', 'analyze_queue', 'inpaint',
     'inpaint_queue', 'render', 'render_queue', 'analysis_submit', 'text_wait', 'local_total', 'output_put',
+    'analyze_decode', 'analyze_detect', 'analyze_group', 'analyze_route', 'analyze_ocr',
+    'analyze_colors', 'analyze_bubbles', 'analyze_refine', 'analyze_serialize',
     'render_areas', 'render_layout', 'render_diff', 'render_encode',
-    'detect_lock_wait', 'ocr_lock_wait', 'inpaint_lock_wait'],
+    'detect_lock_wait', 'ocr_lock_wait', 'bubble_lock_wait', 'inpaint_lock_wait'],
     Annotated[float, Field(ge=0, le=86400, allow_inf_nan=False)]]
 
 

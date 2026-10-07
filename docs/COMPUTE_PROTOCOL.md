@@ -139,7 +139,11 @@ metadata 是 JSON 文本：
 
 result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bbox 不得越界。original 的 bbox/output 均为 null，并省略 output 文件。metadata 最多 64 KiB，output 受中心 `cluster_max_result_bytes` 约束，与原图 `max_upload_bytes` 分开；节点编码和传输上限为 88 MiB，与中心默认值一致。这是单文件协议限制，不作为磁盘容量准入。未知字段、多余文件或重复字段均被拒绝。timings 不参与 result 摘要。
 
-`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（WebP 编码）。`detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；OCR 值是并行文本块锁等待的累计时间，不是页墙钟时间。细分计时仅用于诊断，不改变结果身份、租约与结算；先升级中心以接受这些字段，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
+`analyze` 是该页图像分析的墙钟耗时，不是纯 OCR：包含原图解码、检测、分组、语言试读与分流、正式 OCR、取色、气泡、蒙版细化和检查点处理，以及阶段内部的模型锁等待。`analyze_queue` 单独记录分析执行前的调度等待，不包含在 `analyze` 内。
+
+分析细项为 `analyze_decode`（图片解码与校验）、`analyze_detect`（文字检测）、`analyze_group`（段落分组）、`analyze_route`（语言试读与分流）、`analyze_ocr`（正式 OCR）、`analyze_colors`（字色与描边取色）、`analyze_bubbles`（气泡检测）、`analyze_refine`（文字蒙版细化）和 `analyze_serialize`（新检查点构造、蒙版 PNG 编码、校验及本页蒙版保留）。模型细项在获取锁后计时，不包含 `detect_lock_wait`、`ocr_lock_wait` 和 `bubble_lock_wait`；这些锁等待已包含在分析总耗时中。OCR / 取色锁等待按该页实际获取共享锁的次数累计。恢复检查点或不含有效文字时，只上报实际执行的细项，不补零，也不通过相减推断纯 GPU 推理时间。异常退出仍在节点本次操作内记录已执行阶段，但现有失败回执不携带计时值。
+
+`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（WebP 编码）。`inpaint_lock_wait` 若由节点上报，也已包含在抹字阶段内。细项和锁等待仅用于诊断，不能再与所属总耗时相加；不同页和阶段可以交错，不保证细项之和等于墙钟总耗时。计时不增加 CUDA 同步；计时值不进入 analysis/result 身份或改变租约与结算。先升级中心接受新增计时字段，再更新节点；旧节点缺失的细项保持缺失。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
 
 中心先冻结提交摘要和交付意图，在调度锁外检查文件长度、SHA-256、容器声明尺寸和文件结构。像素解码和二值 alpha 校验已由节点完成。校验完成后再次检查租约及最早截止，在短事务中持久化受理时间与截止快照，然后耐久发布文件。最终事务与崩溃恢复共用同一规则：必须有及时受理记录、当前执行代次、对应分析/译文版本且未取消，才能提交 Job 结果描述、产物关联、任务成功、一次结算和稳定回执。无文件 original 也必须完成请求校验后才能受理。恢复与清理规则以[文件存储](OBJECT_STORAGE.md#文件发布与恢复)为准。
 

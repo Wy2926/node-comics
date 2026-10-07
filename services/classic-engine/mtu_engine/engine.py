@@ -8,6 +8,8 @@ from threading import Lock, current_thread, main_thread
 
 import numpy as np
 
+from classic_node.timing import measured, waiting_for
+
 from .assets import activate
 from .colors import ensure_stroke_contrast
 
@@ -242,7 +244,7 @@ class Engine:
         from manga_translator.ocr.model_48px import Model48pxOCR
         from .colors import Colors
         from .ocr import Paddle
-        from .experts import Chinese, Japanese
+        from .experts import Japanese
         from .routing import ScriptRouter
         # Select only the upstream CUDA checkpoint; do not fetch an unused CPU
         # ONNX model just to satisfy the upstream multi-backend download map.
@@ -263,8 +265,7 @@ class Engine:
             self.colors = Colors(self.color_model)
             self.probes = {language: Paddle(self.models, language, gpu, threads)
                            for language in ('en', 'ch', 'korean')}
-            self.recognizers = {'en': self.probes['en'], 'korean': self.probes['korean'],
-                'ch': Chinese(self.models, gpu, self.probes['ch'].recognizer.crop)}
+            self.recognizers = self.probes
             self.japanese = Japanese(self.models, gpu)
             self.router = ScriptRouter(self.models, self.probes)
             self.bubbles = MangaLensBubbleDetector(
@@ -284,7 +285,7 @@ class Engine:
             c = self.config
             await self.detector.detect(rgb, c.detector.detection_size, c.detector.text_threshold,
                                        c.detector.box_threshold, c.detector.unclip_ratio)
-            for model in (*self.probes.values(), self.recognizers['ch']):
+            for model in self.probes.values():
                 await model.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
             # Manga OCR runs its bundled example during construction. Exercise
             # the upstream scorer too, without downloads or text logging.
@@ -305,25 +306,35 @@ class Engine:
             TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
-            with self._detector_lock:
-                lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
-                    c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
+            with waiting_for(self._detector_lock, 'detect_lock_wait'):
+                with measured('analyze_detect'):
+                    lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
+                        c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
             # Retain the approved upstream paragraph grouping and reading
             # order, using DBNet lines without loading or running a CTD model.
-            blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
-            groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
+            with measured('analyze_group'):
+                blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
+                groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
             # RapidOCR sorts by aspect ratio, pads bounded batches and restores
             # input order; paragraph grouping remains entirely upstream.
-            with self._ocr_lock:
-                buckets = self.router.classify(rgb, blocks)
-                for language, model in self.recognizers.items():
-                    selected = [line for bucket, group in zip(buckets, groups)
-                                if bucket == language for line in group]
-                    if selected:
-                        await model.recognize(rgb, selected, c.ocr)
-                japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
-                if japanese:
-                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
+            with waiting_for(self._ocr_lock, 'ocr_lock_wait'):
+                with measured('analyze_route'):
+                    buckets, readings = self.router.classify(rgb, blocks, groups)
+                with measured('analyze_ocr'):
+                    for group, reading in zip(groups, readings, strict=True):
+                        if reading is not None:
+                            index, row = reading
+                            group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
+                            group[index].prob = row['conf']
+                    for language, model in self.recognizers.items():
+                        selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
+                                    if bucket == language for index, line in enumerate(group)
+                                    if reading is None or index != reading[0]]
+                        if selected:
+                            await model.recognize(rgb, selected, c.ocr)
+                    japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
+                    if japanese:
+                        self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h',
@@ -337,14 +348,18 @@ class Engine:
                 return [], None, None, None
             # Use original pixels only, after OCR/language filtering and before
             # erasure. Checkpoints retain colors; resume/render never predicts.
-            with self._ocr_lock:
-                self.colors.apply(rgb, regions)
-            with self._bubble_lock:
-                detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
-            bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
-            mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
-                                kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
-                                bubble_mask=bubbles)
+            with waiting_for(self._ocr_lock, 'ocr_lock_wait'):
+                with measured('analyze_colors'):
+                    self.colors.apply(rgb, regions)
+            with waiting_for(self._bubble_lock, 'bubble_lock_wait'):
+                with measured('analyze_bubbles'):
+                    detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
+            with measured('analyze_bubbles'):
+                bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
+            with measured('analyze_refine'):
+                mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
+                                    kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
+                                    bubble_mask=bubbles)
             return regions, mask, raw, bubbles
         with torch.cuda.device(self.gpu):
             return asyncio.run(run())
@@ -375,7 +390,7 @@ class Engine:
         import torch
         # Node shutdown joins the compute pool before unloading model weights.
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
-            for model in (*self.probes.values(), self.recognizers['ch'], self.japanese, self.colors):
+            for model in (*self.probes.values(), self.japanese, self.colors):
                 model.close()
             for model in (self.detector, self.inpainter, self.color_model):
                 asyncio.run(model.unload())

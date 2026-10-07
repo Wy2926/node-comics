@@ -16,9 +16,11 @@ The lock also records the DBNet checkpoint from [manga-image-translator](https:/
 
 Text fill and single-outline colors use MTU's unmodified `ModelPaddleOCR._estimate_colors_batch`, its perspective crop, `Model48pxOCR` loader and `TextBlock.update_font_colors`. The `ocr_ar_48px.ckpt` and `alphabet-all-v7.txt` files from manga-image-translator's `beta-0.3` release are SHA-256-pinned in the same lock; the upstream GPL-3.0 source notices remain in the prepared MTU tree. One shared 48px model supplies colors only; its decoded text does not replace the selected language recognizer. The adapter limits crop batches and maps RGB/checkpoint fields, without a local color estimator, model conversion or upstream color-source patch.
 
+The color adapter transfers the unchanged decoder tensors to CPU before native aggregation, avoiding per-character CUDA scalar reads. Beam inference, its parameters and color aggregation rules are unchanged.
+
 ## RapidOCR
 
-[RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR) 3.9.2 provides the unmodified `TextRecognizer` aspect-ratio sorting, bounded batching, resize/padding and order restoration. Its wheel and SHA-256 are pinned in `uv.lock`; Apache-2.0 notices remain in the package metadata and source. The adapter supplies the existing MTU CUDA session and decoder instead of loading RapidOCR's default models or dictionary. No upstream algorithm is copied or rewritten.
+[RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR) 3.9.2 provides the unmodified `TextRecognizer` aspect-ratio sorting, bounded batching, resize/padding and order restoration. Its wheel and SHA-256 are pinned in `uv.lock`; Apache-2.0 notices remain in the package metadata and source. The adapter supplies the existing MTU CUDA session and decoder instead of loading RapidOCR's default models or dictionary. Before calling it, the adapter separates crops whose width at height 48 is at most 320 from longer crops; each group retains native batches of at most six and native resize/padding. No upstream recognition algorithm is copied or rewritten.
 
 ## BallonsTranslator
 
@@ -26,17 +28,16 @@ Text fill and single-outline colors use MTU's unmodified `ModelPaddleOCR._estima
 
 ## Paragraph sampling and language routing
 
-[ogkalu2/comic-translate](https://github.com/ogkalu2/comic-translate) supplies the unmodified largest-line crop helper. Preparation retains its pinned `modules/`, `imkit/`, Apache-2.0 `LICENSE` and dependency manifests under `upstream/comic_translate/`. Its OSD model, GUI, account/credits, cloud OCR and OCR factory are not used.
+[ogkalu2/comic-translate](https://github.com/ogkalu2/comic-translate) supplies the unmodified `_line_area` rule used to select a paragraph's largest line, retaining the first line on ties. The selected line uses the same MTU perspective crop and rotation as final recognition, not Comic Translate's axis-aligned crop. Preparation retains its pinned `modules/`, `imkit/`, Apache-2.0 `LICENSE` and dependency manifests under `upstream/comic_translate/`. Its OSD model, GUI, account/credits, cloud OCR and OCR factory are not used.
 
 [Yuff1010/Manga-Overlay-Translator](https://github.com/Yuff1010/Manga-Overlay-Translator) supplies the unmodified `detect_lang`, character-script categories and weights. Its complete OCR module and MIT notice are pinned by revision and SHA-256 under `upstream/mot/`. The adapter supplies existing paragraph crops and three batched PP-OCRv5 predictions instead of repeating detection; English replaces the Spanish candidate using the same Latin weights, and Chinese/Japanese share the CJK probe prediction. Empty/unsupported evidence is rejected before the upstream first-candidate default. No learned classifier, custom scoring, model training or conversion is maintained.
 
 ## Language-specific recognition
 
-- Chinese: [Topdu/OpenOCR](https://github.com/Topdu/OpenOCR), `openocr-python==0.1.5`, native SVTRv2 server PyTorch recognition. The configuration, Apache-2.0 notice and published `openocr_svtrv2_ch.pth` are pinned in `upstream.lock.json`; package code and dictionary are pinned by wheel hashes in `uv.lock`.
+- Chinese / Korean / English: separate PP-OCRv5 mobile recognizers, shared between paragraph probing and final recognition. English and Chinese use the published [ogkalu/ppocr-v5-onnx](https://huggingface.co/ogkalu/ppocr-v5-onnx) ONNX weights and dictionaries under Apache-2.0; Korean files are distributed by MTU. All files are checksum-pinned. The Chinese probe also supplies Japanese routing evidence. Only selected-model representative lines padded to width 320 reuse their probe result; longer lines are recognized normally, and private results are not cached across pages.
 - Japanese: [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr), `manga-ocr==0.1.16`, and [manga-ocr-base](https://huggingface.co/kha-white/manga-ocr-base) at the locked revision. Original model, tokenizer, processor, model card and Apache-2.0 notice are retained. Native paragraph generation and postprocessing are unchanged.
-- Korean / English: separate PP-OCRv5 mobile recognizers. English and the Chinese/Japanese probe use the published [ogkalu/ppocr-v5-onnx](https://huggingface.co/ogkalu/ppocr-v5-onnx) ONNX weights and dictionaries under Apache-2.0; Korean files are distributed by MTU. All files are checksum-pinned. The probe is not the Chinese/Japanese final recognizer.
 
-Models load from prepared local paths only. OpenOCR's CPU `onnxruntime` dependency is excluded to avoid overwriting `onnxruntime-gpu`; the CUDA distribution supplies that module. The OpenOCR absolute `tools.*` imports share the namespace with the project's CLI without modifying upstream source.
+Models load from prepared local paths only. The locked `onnxruntime-gpu` distribution supplies the CUDA inference runtime; no separate CPU `onnxruntime` distribution is installed.
 
 PySide6-Essentials / Shiboken6 are required by upstream utility imports; their original Qt LGPL/GPL notices remain in the wheel metadata. Both are pinned to Qt 6.9.2 to match the existing PyQt6 Qt runtime. `mahotas` retains its MIT license in its distribution. Open-source license obligations remain applicable; no commercial OCR license is used.
 

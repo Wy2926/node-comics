@@ -28,11 +28,60 @@ def colors(monkeypatch):
                         SimpleNamespace(ModelPaddleOCR=lambda: native))
     monkeypatch.setitem(sys.modules, 'manga_translator.utils', SimpleNamespace(
         chunks=lambda items, size: (items[i:i+size] for i in range(0, len(items), size))))
-    model = SimpleNamespace(model=object(), device='cuda', use_gpu=True)
+    model = SimpleNamespace(model=SimpleNamespace(dictionary=['<S>', 'A', '</S>']), device='cuda', use_gpu=True)
     adapter = Colors(model)
-    assert adapter.predictor.color_model is model.model
+    assert adapter.predictor.color_model.model is model.model
+    assert adapter.predictor.color_model.dictionary is model.model.dictionary
     assert adapter.predictor.device == 'cuda' and adapter.predictor.use_gpu
     return adapter, native
+
+
+def test_color_model_returns_detached_cpu_tensors_without_changing_inference(colors):
+    import torch
+    adapter, native = colors
+    proxy = native.color_model
+    indices = torch.tensor([1, 2], dtype=torch.int64)
+    # Boundary-adjacent values keep dtype and exact bits: no color re-rounding.
+    channels = torch.tensor([[89.99 / 255, 90 / 255, 1.], [0., .5, .25]], requires_grad=True)
+    flags = torch.tensor([[1., 0.], [0., 1.]], requires_grad=True)
+    predictions = [(indices, .95, channels, channels + .1, flags, flags + .1)]
+    calls = []
+
+    def infer(*args, **kwargs):
+        calls.append((args, kwargs))
+        return predictions
+
+    proxy.model.infer_beam_batch_tensor = infer
+    pixels, widths = object(), [240]
+    for _ in range(2):
+        result = proxy.infer_beam_batch_tensor(pixels, widths, beams_k=5, max_seq_length=255)
+        assert result[0][1] is predictions[0][1]
+        for original, actual in zip(predictions[0], result[0], strict=True):
+            if torch.is_tensor(original):
+                assert actual.device.type == 'cpu' and not actual.requires_grad
+                assert actual.dtype == original.dtype and torch.equal(actual, original)
+        # No result cache: the second call must use the model's next predictions.
+        predictions = [(indices, .8, channels + .2, channels + .3, flags, flags)]
+    assert len(calls) == 2
+    assert all(args == (pixels, widths) and kwargs == {'beams_k': 5, 'max_seq_length': 255}
+               for args, kwargs in calls)
+    assert proxy.model.infer_beam_batch_tensor is infer
+    assert channels.requires_grad and flags.requires_grad
+
+
+def test_color_model_preserves_native_exception_for_upstream_fallback(colors):
+    _, native = colors
+    failure = RuntimeError('fixture inference failure')
+    calls = []
+
+    def fail(*args, **kwargs):
+        calls.append(True)
+        raise failure
+
+    native.color_model.model.infer_beam_batch_tensor = fail
+    with pytest.raises(RuntimeError) as caught:
+        native.color_model.infer_beam_batch_tensor(object(), [240], beams_k=5, max_seq_length=255)
+    assert caught.value is failure and len(calls) == 1
 
 
 def test_native_prediction_receives_bounded_bgr_crops_and_preserves_ocr(colors):

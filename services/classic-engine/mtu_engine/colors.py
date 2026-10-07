@@ -22,12 +22,29 @@ def ensure_stroke_contrast(region):
     region.adjust_bg_color = False
 
 
+class _CpuColorModel:
+    """Keep native beam inference; avoid per-character CUDA scalar transfers."""
+    def __init__(self, model):
+        self.model = model
+
+    @property
+    def dictionary(self):
+        return self.model.dictionary
+
+    def infer_beam_batch_tensor(self, *args, **kwargs):
+        # Keep torch out of CPU-only render workers importing the contrast guard.
+        import torch
+        predictions = self.model.infer_beam_batch_tensor(*args, **kwargs)
+        return [tuple(value.detach().cpu() if torch.is_tensor(value) else value for value in row)
+                for row in predictions]
+
+
 class Colors:
     def __init__(self, model):
         from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         # Construct only the adapter, never another Paddle session or 48px model.
         self.predictor = ModelPaddleOCR()
-        self.predictor.color_model = model.model
+        self.predictor.color_model = _CpuColorModel(model.model)
         self.predictor.device = model.device
         self.predictor.use_gpu = model.use_gpu
 

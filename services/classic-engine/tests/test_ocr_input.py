@@ -53,3 +53,38 @@ def test_empty_lines_do_not_call_inference(monkeypatch):
     recognizer = Recognizer(model)
     monkeypatch.setattr(TextRecognizer, '__call__', lambda *args: pytest.fail('empty inference'))
     assert recognizer.recognize(None, [], 0.5) == []
+
+
+def test_short_and_long_inputs_use_two_native_groups_with_original_order(monkeypatch):
+    recognizer = Recognizer.__new__(Recognizer)
+    crops = [np.full((48, width, 3), index, dtype=np.uint8)
+             for index, width in enumerate((720, 40, 321, 320, 3200, 3201, 100))]
+    batches = []
+    def infer(self, args):
+        batches.append([image.shape[1] for image in args.img])
+        return TextRecOutput(txts=tuple(str(image[0, 0, 0]) for image in args.img),
+                             scores=tuple(.9 for _ in args.img))
+    monkeypatch.setattr(TextRecognizer, '__call__', infer)
+    rows = recognizer.read(crops)
+    assert batches == [[40, 320, 100], [720, 321, 3200]]
+    assert [row['text'] for row in rows] == ['0', '1', '2', '3', '4', '', '6']
+
+
+def test_short_text_tensor_padding_is_independent_of_a_long_peer():
+    recognizer = Recognizer.__new__(Recognizer)
+    recognizer.rec_batch_num = OCR_BATCH_SIZE
+    recognizer.rec_image_shape = OCR_IMAGE_SHAPE
+    recognizer.cfg = SimpleNamespace(lang_type='ch', font_path=None)
+    recognizer.RTL_LANGS = set()
+    tensors = []
+    def infer(batch):
+        tensors.append(batch.copy())
+        return batch
+    recognizer.session = infer
+    recognizer.postprocess_op = lambda batch, *args, **kwargs: ([('read', .9)] * len(batch), [])
+    short = np.full((32, 90, 3), [20, 30, 40], np.uint8)
+    long = np.ones((48, 2500, 3), np.uint8)
+    recognizer.read([short, long])
+    recognizer.read([short])
+    assert [batch.shape for batch in tensors] == [(1, 3, 48, 320), (1, 3, 48, 2500), (1, 3, 48, 320)]
+    np.testing.assert_array_equal(tensors[0], tensors[2])

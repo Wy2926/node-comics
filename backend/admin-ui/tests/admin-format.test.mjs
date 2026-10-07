@@ -24,7 +24,7 @@ function load(relative, parent = import.meta.url) {
 const {columnText} = load('../src/AdminResource.tsx');
 const {billingStatus} = load('../src/billing.ts');
 const {auditChanges, flat} = load('../src/AuditLog.tsx');
-const {taskTimingRows} = load('../src/timings.ts');
+const {taskTimingRows, timingLabel} = load('../src/timings.ts');
 
 test('node substage timings are displayed but protocol version is not a duration', () => {
   assert.deepEqual(taskTimingRows({node: {render: 1.9, render_encode: .7, ocr_lock_wait: .2}, delivery: {protocol: 3}}), [
@@ -33,6 +33,19 @@ test('node substage timings are displayed but protocol version is not a duration
     {key: 'ocr_lock_wait', seconds: .2, source: '节点'},
   ]);
   assert.deepEqual(taskTimingRows(undefined), []);
+});
+
+test('analysis details remain separate from the total and absent stages are not invented', () => {
+  const values = {analyze: 2, analyze_route: .2, analyze_ocr: .3, analyze_colors: .4, bubble_lock_wait: .1};
+  assert.deepEqual(taskTimingRows({node: values}), Object.entries(values).map(([key, seconds]) => ({key, seconds, source: '节点'})));
+  assert.equal(timingLabel('analyze'), '图像分析（含 OCR）');
+  assert.equal(timingLabel('analyze_ocr'), '分析：正式 OCR');
+  assert.equal(timingLabel('analyze_colors'), '分析：字色与描边取色');
+  assert.equal(timingLabel('ocr_lock_wait'), 'OCR / 取色模型锁等待');
+  assert.equal(timingLabel('future_timing'), 'future_timing');
+  for (const key of ['analyze_decode', 'analyze_detect', 'analyze_group', 'analyze_route', 'analyze_bubbles', 'analyze_refine', 'analyze_serialize', 'bubble_lock_wait']) {
+    assert.notEqual(timingLabel(key), key);
+  }
 });
 
 test('column formatter distinguishes payment pending from event pending and preserves unknown states', () => {

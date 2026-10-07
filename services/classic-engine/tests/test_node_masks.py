@@ -8,6 +8,7 @@ from PIL import Image
 from classic_node import runtime as module
 from classic_node.protocol import NodeFailure, digest, png64
 from classic_node.runtime import Runtime
+from classic_node.timing import collect
 
 
 def fixture(monkeypatch, *, bubbles=True):
@@ -29,6 +30,35 @@ def fixture(monkeypatch, *, bubbles=True):
 def translated(analysis):
     return {'analysis_hash': digest(analysis), 'language': 'en', 'revision': 'r1',
             'translations': {'0': 'Translated'}}
+
+
+def test_checkpoint_timing_excludes_engine_and_preserves_analysis_identity(monkeypatch):
+    runtime, rgb, _ = fixture(monkeypatch)
+    expected = runtime.analyze(rgb, 'a' * 64)
+    clock = [0.]
+    analyze, encode, serialize = runtime.engine.analyze, module.png64, module.serialize_region
+
+    def analyze_engine(image):
+        clock[0] += 100.
+        return analyze(image)
+
+    def encode_mask(*args, **kwargs):
+        clock[0] += 1.
+        return encode(*args, **kwargs)
+
+    def serialize_geometry(region):
+        clock[0] += 2.
+        return serialize(region)
+
+    monkeypatch.setattr('classic_node.timing.perf_counter', lambda: clock[0])
+    monkeypatch.setattr(runtime.engine, 'analyze', analyze_engine)
+    monkeypatch.setattr(module, 'png64', encode_mask)
+    monkeypatch.setattr(module, 'serialize_region', serialize_geometry)
+    with collect() as timings:
+        actual = runtime.analyze(rgb, 'a' * 64, masks={})
+    assert timings == {'analyze_serialize': 5.}
+    assert actual == expected and digest(actual) == digest(expected)
+    assert 'timings' not in actual
 
 
 @pytest.mark.parametrize('bubbles', [False, True])
@@ -110,9 +140,11 @@ def test_native_mask_shape_rejected_before_any_cache_is_retained(monkeypatch):
     runtime, rgb, arrays = fixture(monkeypatch)
     runtime.engine.analyze = lambda _: ([SimpleNamespace(text='Hello')], arrays[0], arrays[1][2:3], arrays[2])
     masks = {}
-    with pytest.raises(NodeFailure, match='CLASSIC_ANALYZE_FAILED'):
-        runtime.analyze(rgb, 'a' * 64, masks=masks)
+    with collect() as timings:
+        with pytest.raises(NodeFailure, match='CLASSIC_ANALYZE_FAILED'):
+            runtime.analyze(rgb, 'a' * 64, masks=masks)
     assert masks == {}
+    assert set(timings) == {'analyze_serialize'} and timings['analyze_serialize'] >= 0
 
 
 @pytest.mark.parametrize('contiguous', [False, True])

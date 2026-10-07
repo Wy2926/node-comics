@@ -139,12 +139,6 @@
       "sha256": "c63e0bb5b3ff798c5991de18a8e0956c7ee6d1563aca6729029815eda6f5c2eb",
       "file": "manga/pytorch_model.bin",
       "license": "Apache-2.0"
-    },
-    {
-      "url": "https://github.com/Topdu/OpenOCR/releases/download/develop0.0.1/openocr_svtrv2_ch.pth",
-      "sha256": "3be361b72dc52e8d4f5569ae822d263b4e70671486bbaa45605711d17b8aec27",
-      "file": "openocr/openocr_svtrv2_ch.pth",
-      "license": "Apache-2.0"
     }
   ],
   "support": [
@@ -164,18 +158,6 @@
       "url": "https://raw.githubusercontent.com/kha-white/manga-ocr/c333b5d36e88d539d6b040b4c4cf90ad5ecd4f69/LICENSE",
       "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "file": "upstream/manga_ocr/LICENSE",
-      "license": "Apache-2.0"
-    },
-    {
-      "url": "https://raw.githubusercontent.com/Topdu/OpenOCR/1ccfc6ee6161f7133b192e16af3a9265273997ba/LICENSE",
-      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-      "file": "upstream/openocr/LICENSE",
-      "license": "Apache-2.0"
-    },
-    {
-      "url": "https://raw.githubusercontent.com/Topdu/OpenOCR/1ccfc6ee6161f7133b192e16af3a9265273997ba/configs/rec/svtrv2/svtrv2_ch.yml",
-      "sha256": "f94d9b64cb941fbe6b0d9a8a25eda48a60d579d1642408e5e18083ec91f3491e",
-      "file": "upstream/openocr/svtrv2_ch.yml",
       "license": "Apache-2.0"
     },
     {

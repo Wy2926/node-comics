@@ -27,6 +27,16 @@ def record(name, seconds):
 
 
 @contextmanager
+def measured(name):
+    """Record wall time, including failure; callers place this inside model locks."""
+    start = perf_counter()
+    try:
+        yield
+    finally:
+        record(name, perf_counter() - start)
+
+
+@contextmanager
 def waiting_for(lock, name):
     start = perf_counter()
     lock.acquire()

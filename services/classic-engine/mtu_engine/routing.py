@@ -1,7 +1,9 @@
-"""Paragraph sampling with Comic Translate; language scoring owned by MOT."""
+"""Upstream largest-line selection and scoring with shared MTU OCR crops."""
 import importlib.util
 from pathlib import Path
 import numpy as np
+
+from .ocr import short_crop, valid_crop
 
 class ScriptRouter:
     def __init__(self, models, probes):
@@ -28,23 +30,30 @@ class ScriptRouter:
         finally:
             native._ocr_lines = None  # Do not retain private text between pages.
 
-    def classify(self, image, blocks):
-        from modules.detection.script_detection import _largest_line_crop
-        from modules.utils.textblock import TextBlock
+    def classify(self, image, blocks, groups):
+        from modules.detection.script_detection import _line_area
         crops, indices = [], []
         routes = [None] * len(blocks)
+        readings = [None] * len(blocks)
         for index, block in enumerate(blocks):
-            candidate = TextBlock(text_bbox=block.xyxy, lines=np.asarray(block.lines).tolist(),
-                                  direction='vertical' if block.src_is_vertical else 'horizontal')
-            crop, direction = _largest_line_crop(image, candidate)
-            if crop is None or not crop.size:
+            if not len(block.lines):
                 continue
-            crops.append(np.rot90(crop) if direction == 'vertical' else crop)
-            indices.append(index)
+            line_index = max(range(len(block.lines)), key=lambda i: _line_area(block.lines[i]))
+            # The same perspective crop/vertical rotation as formal recognition;
+            # retain upstream largest-line selection without a second detector.
+            crop = self.probes['ch'].recognizer.crop(image, groups[index][line_index].pts)
+            if not valid_crop(crop):
+                continue
+            crops.append(crop)
+            indices.append((index, line_index))
         if crops:
             results = {lang: model.probe(crops) for lang, model in self.probes.items()}
-            for offset, index in enumerate(indices):
+            for offset, (index, line_index) in enumerate(indices):
                 routes[index] = self.choose({
                     'en': results['en'][offset], 'korean': results['korean'][offset],
                     'ch': results['ch'][offset], 'japan': results['ch'][offset]})
-        return routes
+                # Long-line padding depends on its batch peers. Reuse only the
+                # fixed-width path and only the model selected for this block.
+                if routes[index] in self.probes and short_crop(crops[offset]):
+                    readings[index] = (line_index, results[routes[index]][offset])
+        return routes, readings  # Page-local; do not retain private text/crops.

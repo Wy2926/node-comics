@@ -37,37 +37,104 @@ def test_floor_then_delegate_scoring_and_release_private_text():
     assert instance.native._ocr_lines is None
 
 
+def test_native_scoring_failure_releases_private_text_before_next_page(monkeypatch):
+    instance, calls = router()
+    values = {lang: {'text': 'first page', 'conf': .9} for lang in instance.native._WEIGHTS}
+    failure = RuntimeError('Native scoring failed')
+    def fail(image):
+        assert instance.native._ocr_lines(image, 'en') == [values['en']]
+        raise failure
+    with monkeypatch.context() as patch:
+        patch.setattr(instance.native, 'detect_lang', fail)
+        with pytest.raises(RuntimeError) as raised:
+            instance.choose(values)
+        assert raised.value is failure
+        assert instance.native._ocr_lines is None
+    next_values = {lang: {'text': 'next page', 'conf': .8} for lang in instance.native._WEIGHTS}
+    assert instance.choose(next_values) == 'korean'
+    assert calls == [{lang: [row] for lang, row in next_values.items()}]
+    assert instance.native._ocr_lines is None
+
+
 def test_every_probe_runs_once_per_page_and_routes_stay_per_paragraph(monkeypatch):
     instance, _ = router()
     calls, shapes = [], []
     crop = np.zeros((12, 24, 3), dtype=np.uint8)
+    vertical = np.ones((24, 48, 3), dtype=np.uint8)
+    quads = [np.array([[i, 0], [i+width, 0], [i+width, 12], [i, 12]])
+             for i, width in ((0, 6), (1, 24), (2, 12), (3, 24))]
     monkeypatch.setitem(sys.modules, 'modules.detection.script_detection', SimpleNamespace(
-        _largest_line_crop=lambda image, block: (None, 'horizontal') if block.text_bbox[0] == 2 else (crop, block.direction)))
-    monkeypatch.setitem(sys.modules, 'modules.utils.textblock', SimpleNamespace(TextBlock=SimpleNamespace))
+        _line_area=lambda pts: np.ptp(pts[:, 0]) * np.ptp(pts[:, 1])))
+    extracted = []
+    def extract(image, points):
+        extracted.append(points)
+        return {1: crop, 2: vertical, 3: None}[points[0, 0]]
     def probe(language, images):
         calls.append(language)
         shapes.append([image.shape for image in images])
         return [{'text': str(i), 'conf': .9} for i in range(len(images))]
     instance.probes = {lang: SimpleNamespace(probe=lambda images, lang=lang: probe(lang, images))
                        for lang in ('en', 'ch', 'korean')}
+    instance.probes['ch'].recognizer = SimpleNamespace(crop=extract)
     instance.choose = lambda predictions: ['ch', 'japan'][int(predictions['ch']['text'])]
-    blocks = [SimpleNamespace(xyxy=[i, 0, 24, 12], lines=[], src_is_vertical=i == 1) for i in range(3)]
-    assert instance.classify(crop, blocks) == ['ch', 'japan', None]
+    blocks = [SimpleNamespace(lines=quads[:2]), SimpleNamespace(lines=[quads[2]]),
+              SimpleNamespace(lines=[quads[3]]), SimpleNamespace(lines=[])]
+    groups = [[SimpleNamespace(pts=quad) for quad in block.lines] for block in blocks]
+    routes, readings = instance.classify(crop, blocks, groups)
+    assert routes == ['ch', 'japan', None, None]
+    assert readings == [(1, {'text': '0', 'conf': .9}), None, None, None]
+    for actual, expected in zip(extracted, quads[1:], strict=True):
+        np.testing.assert_array_equal(actual, expected)
     assert calls == ['en', 'ch', 'korean']
-    assert shapes == [[(12, 24, 3), (24, 12, 3)]] * 3
+    assert shapes == [[(12, 24, 3), (24, 48, 3)]] * 3  # No second rotation.
     calls.clear()
-    assert instance.classify(crop, []) == []
+    assert instance.classify(crop, [], []) == ([], [])
     assert not calls
+    assert not hasattr(instance, 'readings')  # No cross-page private text cache.
 
 
-def test_probe_width_limit_preserves_candidate_alignment():
-    from mtu_engine.ocr import Paddle
+def test_probe_width_limit_preserves_candidate_alignment(monkeypatch):
+    from mtu_engine.ocr import Paddle, Recognizer
+    from rapidocr.ch_ppocr_rec import TextRecognizer
     model = Paddle.__new__(Paddle)
     seen = []
-    def recognize(inputs):
+    def recognize(self, inputs):
         seen.append(inputs)
         return SimpleNamespace(txts=['valid'], scores=[.9])
-    model.recognizer = recognize
+    monkeypatch.setattr(TextRecognizer, '__call__', recognize)
+    model.recognizer = Recognizer.__new__(Recognizer)
     rows = model.probe([np.zeros((1, 4000, 3), np.uint8), np.zeros((48, 240, 3), np.uint8), None])
     assert rows == [{'text': '', 'conf': 0.}, {'text': 'valid', 'conf': .9}, {'text': '', 'conf': 0.}]
     assert len(seen) == 1
+
+
+@pytest.mark.parametrize('route,width,reusable', [('en', 320, True), ('korean', 100, True),
+                                               ('ch', 321, False), (None, 100, False)])
+def test_only_selected_expert_fixed_width_readings_can_be_reused(monkeypatch, route, width, reusable):
+    instance, _ = router()
+    monkeypatch.setitem(sys.modules, 'modules.detection.script_detection', SimpleNamespace(_line_area=lambda _: 1))
+    instance.probes = {lang: SimpleNamespace(probe=lambda _, lang=lang: [{'text': lang, 'conf': .7}])
+                       for lang in ('en', 'ch', 'korean')}
+    instance.probes['ch'].recognizer = SimpleNamespace(crop=lambda *args: np.zeros((48, width, 3), np.uint8))
+    instance.choose = lambda predictions: route
+    block = SimpleNamespace(lines=[np.zeros((4, 2))])
+    routes, readings = instance.classify(None, [block], [[SimpleNamespace(pts=block.lines[0])]])
+    assert routes == [route]
+    assert readings == ([(0, {'text': route, 'conf': .7})] if reusable else [None])
+
+
+def test_probe_uses_formal_quadrilateral_point_order_not_raw_group_points(monkeypatch):
+    instance, _ = router()
+    monkeypatch.setitem(sys.modules, 'modules.detection.script_detection', SimpleNamespace(_line_area=lambda _: 1))
+    raw = np.array([[0, 10], [10, 10], [10, 0], [0, 0]])
+    canonical = raw[::-1].copy()
+    seen = []
+    def crop(image, points):
+        seen.append(points)
+        return np.zeros((48, 100, 3), np.uint8)
+    instance.probes = {lang: SimpleNamespace(probe=lambda _: [{'text': 'text', 'conf': .8}])
+                       for lang in ('en', 'ch', 'korean')}
+    instance.probes['ch'].recognizer = SimpleNamespace(crop=crop)
+    instance.choose = lambda _: 'en'
+    instance.classify(None, [SimpleNamespace(lines=[raw])], [[SimpleNamespace(pts=canonical)]])
+    assert len(seen) == 1 and seen[0] is canonical

@@ -17,6 +17,11 @@ def valid_crop(crop):
             and crop.shape[1] * OCR_IMAGE_SHAPE[1] <= crop.shape[0] * OCR_MAX_WIDTH)
 
 
+def short_crop(crop):
+    """These crops always use RapidOCR's fixed minimum padding width."""
+    return valid_crop(crop) and crop.shape[1] * OCR_IMAGE_SHAPE[1] <= crop.shape[0] * OCR_IMAGE_SHAPE[2]
+
+
 class Recognizer(TextRecognizer):
     def __init__(self, model):
         # Reuse the prepared CUDA session and official dictionary via MTU's
@@ -30,24 +35,29 @@ class Recognizer(TextRecognizer):
         self.RTL_LANGS = set()
         self.crop = model._get_rotate_crop_image
 
-    def recognize(self, image, lines, threshold):
-        crops, valid = [], []
-        for line in lines:
-            line.text, line.prob = '', 0.0
-            crop = self.crop(image, line.pts)
-            # Reject unsupported input instead of squeezing it or allocating
-            # unbounded tensors. Other recognized lines can still be translated.
-            if not valid_crop(crop):
+    def read(self, crops):
+        rows = [{'text': '', 'conf': 0.} for _ in crops]
+        groups = ([], [])
+        for index, crop in enumerate(crops):
+            # Reject unsupported input rather than squeezing or truncating it.
+            if valid_crop(crop):
+                groups[0 if short_crop(crop) else 1].append(index)
+        for indices in groups:
+            if not indices:
                 continue
-            crops.append(cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
-            valid.append(line)
-        if crops:
-            # Upstream owns aspect-ratio sorting, batch padding, inference and
-            # restoration of the original line order. No local OCR algorithm.
-            result = self(TextRecInput(crops))
-            for line, text, score in zip(valid, result.txts, result.scores):
-                line.text = text if score >= threshold else ''
-                line.prob = float(score)
+            # Only separate short lines from long ones: a long disclaimer must
+            # not change a short dialogue's padding. RapidOCR still owns batch
+            # size, sorting, resize/padding and restoration inside each group.
+            result = self(TextRecInput([cv2.cvtColor(crops[i], cv2.COLOR_RGB2BGR) for i in indices]))
+            for index, text, score in zip(indices, result.txts, result.scores, strict=True):
+                rows[index] = {'text': text, 'conf': float(score)}
+        return rows
+
+    def recognize(self, image, lines, threshold):
+        rows = self.read([self.crop(image, line.pts) for line in lines])
+        for line, row in zip(lines, rows, strict=True):
+            line.text = row['text'] if row['conf'] >= threshold else ''
+            line.prob = row['conf']
         return lines
 
 
@@ -70,7 +80,7 @@ class Paddle:
         model.session, _ = create_inference_session(ort,
             str(directory / f'{language}_PP-OCRv5_rec_mobile_infer.onnx'),
             device='cuda', sess_options=options,
-            cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'DEFAULT'},
+            cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'HEURISTIC'},
             fallback_to_cpu=False, logger=model.logger)
         if model.session.get_providers()[0] != 'CUDAExecutionProvider':
             raise RuntimeError('PP-OCR requires ONNX Runtime CUDAExecutionProvider')
@@ -81,13 +91,7 @@ class Paddle:
         self.recognizer = Recognizer(model)
 
     def probe(self, crops):
-        indices = [index for index, crop in enumerate(crops) if valid_crop(crop)]
-        rows = [{'text': '', 'conf': 0.} for _ in crops]
-        if indices:
-            result = self.recognizer(TextRecInput([cv2.cvtColor(crops[i], cv2.COLOR_RGB2BGR) for i in indices]))
-            for index, text, score in zip(indices, result.txts, result.scores, strict=True):
-                rows[index] = {'text': text, 'conf': float(score)}
-        return rows
+        return self.recognizer.read(crops)
 
     async def recognize(self, image, lines, config):
         return self.recognizer.recognize(image, lines, config.prob)
