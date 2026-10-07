@@ -299,6 +299,7 @@ def test_native_48px_colors_reuse_ocr_and_keep_failure_fallback_offline(assets, 
     import torch
     from PIL import Image, ImageDraw, ImageFont
     from mtu_engine.colors import Colors
+    from test_color_text_inference import _incremental_colors
     models, fonts = assets
     Renderer(models, fonts)
     from manga_translator.utils import ModelWrapper, TextBlock
@@ -320,11 +321,29 @@ def test_native_48px_colors_reuse_ocr_and_keep_failure_fallback_offline(assets, 
                           ['COLOR TEST'], language='en', adjust_bg_color=False)
         def failed(*args, **kwargs):
             raise RuntimeError('Injected color prediction failure')
+        parallel = colors.predictor.color_model._forced_colors
+        compared = []
+
+        def compare(image, widths, tokens):
+            actual = parallel(image, widths, tokens)
+            expected = _incremental_colors(native.model, image, widths, tokens)
+            compared.append((actual, expected))
+            return actual
+
         with monkeypatch.context() as guarded:
             guarded.setattr(native.model, 'infer_beam_batch_tensor', failed)
             guarded.setattr(native.model.pred, 'forward', failed)
             guarded.setattr(native.model.pred1, 'forward', failed)
+            guarded.setattr(native.model.decoders, 'forward', failed)
+            guarded.setattr(colors.predictor.color_model, '_forced_colors', compare)
             colors.apply(np.array(image), [block])
+        assert len(compared) == 1
+        for actual, expected in zip(*compared[0], strict=True):
+            assert actual[:2] == expected[:2]
+            for index, (head, reference) in enumerate(zip(actual[2:], expected[2:], strict=True)):
+                torch.testing.assert_close(head.cpu(), reference, atol=2e-5, rtol=2e-5)
+                if index >= 2:
+                    assert torch.equal(head.cpu().argmax(-1), reference.argmax(-1))
         fg, bg = block.get_font_colors()
         np.testing.assert_allclose(fg, [235, 35, 60], atol=35, rtol=0)
         np.testing.assert_allclose(bg, [80, 80, 80], atol=35, rtol=0)
@@ -600,6 +619,99 @@ def test_single_word_preserves_characters_without_internal_breaks(assets, offlin
     assert np.any(output != source)
     assert observed[0].translation == text
     assert observed[0].font_size > 0
+
+
+@pytest.mark.parametrize(('language', 'text', 'shape'), [
+    ('de', 'WUNDERSCHÖN.', 'solid'),
+    ('en', 'Beautiful.', 'solid'),
+    ('de', 'WUNDERSCHÖN.', 'hole'),
+    ('de', 'WUNDERSCHÖN.', 'neighbor'),
+])
+def test_single_word_uses_enclosing_bubble_without_splitting(assets, offline, monkeypatch, language, text, shape):
+    import cv2
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator import rendering
+    from manga_translator.utils import TextBlock
+    source = np.full((1000, 500, 3), 255, dtype=np.uint8)
+    # Actual narrow vertical source geometry; target words must fit the bubble,
+    # not stay trapped inside the original 43px-wide OCR rectangle.
+    block = TextBlock([[[207, 770], [250, 770], [250, 851], [207, 851]]],
+                      ['source'], font_size=43, direction='v')
+    region = serialize_region(block)
+    mask = np.zeros(source.shape[:2], dtype=np.uint8)
+    cv2.ellipse(mask, (230, 812), (86, 86), 0, 0, 360, 255, -1)
+    if shape == 'hole':
+        # Outside the source lines, but inside the larger word's possible box.
+        mask[792:831, 280:296] = 0
+    elif shape == 'neighbor':
+        cv2.ellipse(mask, (415, 812), (60, 82), 0, 0, 360, 255, -1)
+    dispatch, observed = rendering.dispatch, []
+
+    async def capture(*args, **kwargs):
+        result = await dispatch(*args, **kwargs)
+        observed.extend((str(args[2].render.layout_mode), item) for item in args[1])
+        return result
+
+    monkeypatch.setattr(rendering, 'dispatch', capture)
+    free_output = renderer.render(source, source, [region], [text], language, None)
+    free_mode, free = observed.pop()
+    assert free_mode == 'smart_scaling' and free.translation == text
+    assert np.any(free_output != source) and 0 < free.font_size < 20
+    output = renderer.render(source, source, [region], [text], language, mask)
+    mode, enclosed = observed.pop()
+    painted = np.any(output != source, axis=2)
+    assert mode == 'balloon_fill' and painted.any()
+    assert enclosed.translation == text and '[BR]' not in enclosed.translation
+    assert not np.any(painted & (mask == 0))
+    assert enclosed.font_size > 0
+    if shape != 'hole':
+        assert enclosed.font_size >= 20
+    if shape == 'neighbor':
+        assert not np.any(painted[:, 355:])
+    # No per-page layout state may turn a later uncontained word into a bubble.
+    assert np.array_equal(renderer.render(source, source, [region], [text], language, None), free_output)
+
+
+@pytest.mark.parametrize(('texts', 'lefts', 'shape'), [
+    (['WUNDERSCHÖN.', 'WUNDERSCHÖN.'], (158, 398), 'rectangle'),
+    (['WUNDERSCHÖN.', 'DIE WELT IST SCHÖN.'], (158, 370), 'rectangle'),
+    (['DIE WELT IST SCHÖN.', 'WUNDERSCHÖN.'], (158, 370), 'rectangle'),
+    (['WUNDERSCHÖN.', 'WUNDERSCHÖN.'], (240, 298), 'ellipse'),
+], ids=['rich-rich', 'rich-plain', 'plain-rich', 'nearby-anchors'])
+def test_enlarged_single_word_avoids_other_paragraph_in_same_bubble(assets, offline, monkeypatch, texts, lefts, shape):
+    import cv2
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator import rendering
+    from manga_translator.utils import TextBlock
+    source = np.full((400, 600, 3), 255, dtype=np.uint8)
+    mask = np.zeros(source.shape[:2], dtype=np.uint8)
+    if shape == 'ellipse':
+        cv2.ellipse(mask, (300, 200), (250, 170), 0, 0, 360, 255, -1)
+    else:
+        mask[60:340, 40:560] = 255
+    regions = [serialize_region(TextBlock([[[left, 160], [left + 43, 160],
+        [left + 43, 241], [left, 241]]], ['source'], font_size=43, direction='v'))
+        for left in lefts]
+    dispatch, observed = rendering.dispatch, []
+
+    async def capture(*args, **kwargs):
+        result = await dispatch(*args, **kwargs)
+        observed.extend(args[1])
+        return result
+
+    monkeypatch.setattr(rendering, 'dispatch', capture)
+    output = renderer.render(source, source, regions, texts, 'de', mask)
+    painted = np.any(output != source, axis=2)
+    assert painted.any() and not np.any(painted & (mask == 0))
+    assert len(observed) == 2
+    for block, text in zip(observed, texts):
+        assert block.font_size > 0
+        assert re.sub(r'\s*\[BR\]\s*', ' ', block.translation).split() == text.split()
+        if len(text.split()) == 1:
+            assert block.translation == text
+    assert not rendering._polygons_overlap(observed[0].dst_points, observed[1].dst_points)
 
 
 @pytest.mark.parametrize('angle', [0, 15, -15])

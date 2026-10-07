@@ -29,6 +29,35 @@ def ensure_stroke_contrast(region):
     region.adjust_bg_color = False
 
 
+class _ParallelCrossAttention:
+    """Reuse native attention with the incremental decoder's XPOS query scale."""
+    def __init__(self, attention):
+        self.attention = attention
+
+    def __getattr__(self, name):
+        return getattr(self.attention, name)
+
+    def xpos(self, values, offset=0, downscale=False):
+        import torch
+        xpos = self.attention.xpos
+        result = xpos(values, offset=offset, downscale=downscale)
+        if not downscale:
+            length = values.size(1)
+            positions = torch.arange(1, length + 1, device=values.device)
+            # Native XPOS centers a prefix of size n at -ceil(n/2). Self
+            # attention cancels that center between Q/K; cross attention does
+            # not, since its image keys have a fixed length. Restore each
+            # query's original prefix scale after the native full-row XPOS.
+            centers = (length + 1) // 2 - (positions + 1) // 2
+            correction = xpos.scale ** (centers.to(xpos.scale)[:, None] / xpos.scale_base)
+            result = result * correction.repeat_interleave(2, dim=-1)
+        return result
+
+    def __call__(self, *args, **kwargs):
+        # A read-only view, not a copied Module with a shared _modules dict.
+        return type(self.attention).forward(self, *args, **kwargs)
+
+
 class _CpuColorModel:
     """Share one model lock and return color tensors without CUDA scalar reads."""
     def __init__(self, model):
@@ -79,7 +108,7 @@ class _CpuColorModel:
         return predictions
 
     def _forced_colors(self, img, img_widths, tokens):
-        """Native incremental decoder conditioned on OCR, without a text search."""
+        """Decode known OCR tokens together, keeping native per-character colors."""
         import torch
         model = self.model
         memory = model.backbone(img).squeeze(2).transpose(1, 2)
@@ -92,10 +121,15 @@ class _CpuColorModel:
         # characters, never predictions. Ignore padded positions in the result.
         inputs = torch.tensor([[1, *row[:-1], *([0] * (length - len(row)))] for row in tokens],
                               dtype=torch.long, device=img.device)
-        cache = memory.new_zeros((len(tokens), len(model.decoders) + 1, length, memory.size(2)))
-        for step in range(length):
-            _, cache = model.decoders(model.embd(inputs[:, step:step + 1]), cache, memory, mask, step)
-        features = model.color_pred1(cache[:, -1])
+        decoded = model.embd(inputs)
+        causal = memory.new_full((length, length), float('-inf')).triu_(1)
+        for layer in model.decoders:
+            normalized = layer.norm1(decoded)
+            decoded = decoded + layer.self_attn(normalized, normalized, normalized, attn_mask=causal)[0]
+            decoded = decoded + _ParallelCrossAttention(layer.multihead_attn)(
+                layer.norm2(decoded), memory, memory, key_padding_mask=mask)[0]
+            decoded = decoded + layer._ff_block(layer.norm3(decoded))
+        features = model.color_pred1(decoded)
         heads = [head(features) for head in (model.color_pred_fg, model.color_pred_bg,
                                             model.color_pred_fg_ind, model.color_pred_bg_ind)]
         # The native aggregator ignores confidence. None is not an OCR score.
