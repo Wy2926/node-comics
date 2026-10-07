@@ -30,7 +30,7 @@ def test_adapter_preserves_order_confidence_and_skips_unsupported_crops(monkeypa
     monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
     recognizer = Recognizer(model)
     assert recognizer.rec_batch_num == OCR_BATCH_SIZE
-    assert recognizer.session is model.session
+    assert recognizer.session._session is model.session
     assert recognizer.postprocess_op([0])[0] == [('unused', 1)]
     crops = [np.full((24, 200, 3), [20, 30, 40], dtype=np.uint8),
              np.zeros((0, 10, 3), dtype=np.uint8),

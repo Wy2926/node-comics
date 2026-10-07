@@ -1,8 +1,10 @@
 """Upstream largest-line selection and scoring with shared MTU OCR crops."""
 import importlib.util
 from pathlib import Path
+from threading import Lock
 import numpy as np
 
+from classic_node.timing import waiting_for
 from .ocr import short_crop, valid_crop
 
 class ScriptRouter:
@@ -14,6 +16,7 @@ class ScriptRouter:
         self.native.DETECT_CANDIDATES = ['en', 'japan', 'korean', 'ch']
         self.native._WEIGHTS['en'] = self.native._WEIGHTS['es']
         self.probes = probes
+        self._score_lock = Lock()
 
     def choose(self, predictions):
         native = self.native
@@ -24,11 +27,14 @@ class ScriptRouter:
         if not any(native._WEIGHTS[lang].get(native._script(char), 0) > 0
                    for lang, rows in accepted.items() for row in rows for char in row['text']):
             return None
-        native._ocr_lines = lambda image, lang, retry=False: accepted[lang]
-        try:
-            return native.detect_lang(np.zeros((1, 1, 3), dtype=np.uint8))
-        finally:
-            native._ocr_lines = None  # Do not retain private text between pages.
+        # Only the scoring bridge mutates the shared upstream module. Crops and
+        # GPU probes stay outside this short CPU-only critical section.
+        with waiting_for(self._score_lock, 'ocr_lock_wait'):
+            native._ocr_lines = lambda image, lang, retry=False: accepted[lang]
+            try:
+                return native.detect_lang(np.zeros((1, 1, 3), dtype=np.uint8))
+            finally:
+                native._ocr_lines = None  # Do not retain private text between pages.
 
     def classify(self, image, blocks, groups):
         from modules.detection.script_detection import _line_area

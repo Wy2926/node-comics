@@ -223,10 +223,9 @@ class Engine:
         self.keep_lang = keep_lang
         self.renderer = Renderer(models, font)
         self.config = configuration(detect_size, inpainting_size)
-        # Upstream model wrappers own mutable state. Serialize each instance,
-        # while allowing other models and CPU mask work to make progress.
+        # Detection wrappers own mutable state. OCR adapters protect their own
+        # model calls, without serializing other models or CPU preparation.
         self._detector_lock = Lock()
-        self._ocr_lock = Lock()
         self._bubble_lock = Lock()
         torch.set_num_threads(threads)
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -289,10 +288,12 @@ class Engine:
             # the upstream scorer too, without downloads or text logging.
             self.router.choose({lang: {'text': 'test', 'conf': .9}
                                 for lang in ('en', 'ch', 'japan', 'korean')})
+            # Exercise both text-conditioned colors and the unaligned fallback.
             self.colors.apply(rgb, [TextBlock(
-                lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=['warmup'])])
+                lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=[text], language=language)
+                for text, language in [('warmup', 'en'), ('', 'unknown')]])
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
-        with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+        with self._detector_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
             self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
 
@@ -313,27 +314,28 @@ class Engine:
             groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
             # RapidOCR sorts by aspect ratio, pads bounded batches and restores
             # input order; paragraph grouping remains entirely upstream.
-            with self._ocr_lock:
-                buckets, readings = self.router.classify(rgb, blocks, groups)
-                for group, reading in zip(groups, readings, strict=True):
-                    if reading is not None:
-                        index, row = reading
-                        group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
-                        group[index].prob = row['conf']
-                for language, model in self.recognizers.items():
-                    selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
-                                if bucket == language for index, line in enumerate(group)
-                                if reading is None or index != reading[0]]
-                    if selected:
-                        await model.recognize(rgb, selected, c.ocr)
-                japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
-                if japanese:
-                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
-            regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
+            buckets, readings = self.router.classify(rgb, blocks, groups)
+            for group, reading in zip(groups, readings, strict=True):
+                if reading is not None:
+                    index, row = reading
+                    group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
+                    group[index].prob = row['conf']
+            for language, model in self.recognizers.items():
+                selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
+                            if bucket == language for index, line in enumerate(group)
+                            if reading is None or index != reading[0]]
+                if selected:
+                    await model.recognize(rgb, selected, c.ocr)
+            japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
+            if japanese:
+                self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
+            # Keep the selected OCR route local to this analysis, so color
+            # extraction can distinguish line OCR from Japanese paragraph OCR.
+            regions = [TextBlock(lines=block.lines, texts=[line.text for line in group], language=language,
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h',
                                  default_stroke_width=c.render.stroke_width, adjust_bg_color=False)
-                       for block, group in zip(blocks, groups)
+                       for block, group, language in zip(blocks, groups, buckets, strict=True)
                        if group]
             regions = [region for region in regions
                        if len(region.text.strip()) >= c.ocr.min_text_length and is_valuable_text(region.text)
@@ -342,8 +344,7 @@ class Engine:
                 return [], None, None, None
             # Use original pixels only, after OCR/language filtering and before
             # erasure. Checkpoints retain colors; resume/render never predicts.
-            with self._ocr_lock:
-                self.colors.apply(rgb, regions)
+            self.colors.apply(rgb, regions)
             with self._bubble_lock:
                 detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
             bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
@@ -379,7 +380,7 @@ class Engine:
     def close(self):
         import torch
         # Node shutdown joins the compute pool before unloading model weights.
-        with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+        with self._detector_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             for model in (*self.probes.values(), self.japanese, self.colors):
                 model.close()
             for model in (self.detector, self.inpainter, self.color_model):

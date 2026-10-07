@@ -1,18 +1,22 @@
 """Color adapter wiring and bounded crops; no neural model or CUDA execution."""
 import json
+import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from mtu_engine.colors import Colors, ensure_stroke_contrast
+from mtu_engine.colors import Colors, _CpuColorModel, ensure_stroke_contrast
 from mtu_engine.engine import serialize_region
 from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_MAX_WIDTH
 
 
-def region(lines):
-    value = SimpleNamespace(lines=lines, texts=['original OCR'], text='original OCR', updates=[])
+def region(lines, texts=None, language='unknown'):
+    value = SimpleNamespace(lines=lines, texts=texts if texts is not None else ['original OCR'],
+                            text='original OCR', language=language, updates=[])
     def set_colors(fg, bg):
         value.fg_colors, value.bg_colors = fg, bg
         value.updates.clear()
@@ -37,7 +41,7 @@ def colors(monkeypatch):
 
 
 def test_color_model_returns_detached_cpu_tensors_without_changing_inference(colors):
-    import torch
+    torch = pytest.importorskip('torch')
     adapter, native = colors
     proxy = native.color_model
     indices = torch.tensor([1, 2], dtype=torch.int64)
@@ -69,8 +73,9 @@ def test_color_model_returns_detached_cpu_tensors_without_changing_inference(col
     assert channels.requires_grad and flags.requires_grad
 
 
-def test_color_model_preserves_native_exception_for_upstream_fallback(colors):
+def test_color_model_preserves_native_exception_for_upstream_fallback(colors, monkeypatch):
     _, native = colors
+    monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(is_tensor=lambda value: False))
     failure = RuntimeError('fixture inference failure')
     calls = []
 
@@ -82,6 +87,39 @@ def test_color_model_preserves_native_exception_for_upstream_fallback(colors):
     with pytest.raises(RuntimeError) as caught:
         native.color_model.infer_beam_batch_tensor(object(), [240], beams_k=5, max_seq_length=255)
     assert caught.value is failure and len(calls) == 1
+    assert not native.color_model._lock.locked()
+
+
+@pytest.mark.parametrize('fail_transfer', [False, True])
+def test_color_model_keeps_cpu_transfer_inside_lock_and_releases_on_failure(monkeypatch, fail_transfer):
+    failure = RuntimeError('fixture transfer failure')
+
+    class Tensor:
+        def detach(self):
+            assert proxy._lock.locked()
+            return self
+
+        def cpu(self):
+            assert proxy._lock.locked()
+            if fail_transfer:
+                raise failure
+            return 'cpu result'
+
+    monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(is_tensor=lambda value: isinstance(value, Tensor)))
+    proxy = _CpuColorModel(SimpleNamespace(infer_beam_batch_tensor=lambda: [(Tensor(), .9)]))
+    if fail_transfer:
+        with pytest.raises(RuntimeError) as caught:
+            proxy.infer_beam_batch_tensor()
+        assert caught.value is failure
+    else:
+        assert proxy.infer_beam_batch_tensor() == [('cpu result', .9)]
+    assert not proxy._lock.locked()
+
+
+def test_contrast_guard_import_does_not_load_torch_in_cpu_render_workers():
+    subprocess.run([sys.executable, '-c',
+        "import sys; from mtu_engine.colors import ensure_stroke_contrast; assert 'torch' not in sys.modules"],
+        check=True, capture_output=True, text=True)
 
 
 def test_native_prediction_receives_bounded_bgr_crops_and_preserves_ocr(colors):
@@ -124,6 +162,106 @@ def test_empty_regions_do_not_crop_or_predict_and_close_releases_reference(color
     adapter.apply(None, [])
     adapter.close()
     assert adapter.predictor is None
+
+
+@pytest.fixture
+def text_colors(monkeypatch):
+    calls, requests = [], []
+
+    class Predictor:
+        def _get_rotate_crop_image(self, image, points):
+            return points
+
+        def _estimate_colors_batch(self, crops):
+            requests.append(self)
+            return self.color_model.infer_beam_batch_tensor(crops, [crop.shape[1] for crop in crops],
+                                                           beams_k=5, max_seq_length=255)
+
+    monkeypatch.setitem(sys.modules, 'manga_translator.ocr.model_paddleocr',
+                        SimpleNamespace(ModelPaddleOCR=Predictor))
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils', SimpleNamespace(
+        chunks=lambda items, size: (items[i:i+size] for i in range(0, len(items), size))))
+    dictionary = ['<PAD>', '<S>', '</S>', '<SP>', 'A', 'B', '中', '文', '日', '本', '한']
+    adapter = Colors(SimpleNamespace(model=SimpleNamespace(dictionary=dictionary), device='cuda', use_gpu=True))
+    model = adapter.predictor.color_model
+
+    def predict(pixels, widths, **kwargs):
+        calls.append((pixels, widths, kwargs))
+        return [(*crop[0, 0, ::-1].tolist(), 90, 100, 110) for crop in pixels]
+
+    # This fixture tests request wiring, not tensor inference (covered separately).
+    model.infer_with_text = predict
+    model.infer_beam_batch_tensor = predict
+    return adapter, model, calls, requests
+
+
+@pytest.mark.parametrize('language,text,tokens', [
+    ('en', 'A B', [4, 3, 5]), ('ch', '中文', [6, 7]), ('japan', '日本', [8, 9]),
+    ('korean', '한', [10]), ('en', ' A ', [3, 4, 3]), ('en', 'A' * 255, [4] * 255),
+])
+def test_aligned_text_reuses_native_aggregation_with_request_local_tokens(text_colors, language, text, tokens):
+    adapter, model, calls, requests = text_colors
+    crop = np.full((48, 120, 3), [210, 30, 50], dtype=np.uint8)
+    block = region([crop], [text], language)
+    adapter.apply(None, [block])
+    assert calls[0][2] == {'text_indices': [tokens], 'beams_k': 5, 'max_seq_length': 255}
+    assert requests[0] is not adapter.predictor
+    assert requests[0].device == 'cuda' and requests[0].use_gpu
+    assert requests[0].color_model.dictionary is model.dictionary
+    assert adapter.predictor.color_model is model
+    assert block.updates == [([210, 30, 50], [90, 100, 110])]
+    assert block.texts == [text] and block.text == 'original OCR'
+
+
+@pytest.mark.parametrize('language,texts,count', [
+    ('japan', ['日本', ''], 2),  # Paragraph text must not condition the first line.
+    ('japan', ['日', '本'], 2), ('unknown', ['A'], 1),
+    ('en', ['A'], 2), ('en', [''], 1), ('en', ['   '], 1),
+    ('en', ['A😀B'], 1), ('en', ['A\nB'], 1), ('en', ['A' * 256], 1),
+])
+def test_unaligned_or_unrepresentable_text_keeps_native_fallback(text_colors, language, texts, count):
+    adapter, model, calls, requests = text_colors
+    block = region([np.zeros((48, 120, 3), dtype=np.uint8)] * count, texts, language)
+    adapter.apply(None, [block])
+    assert len(calls) == 1 and 'text_indices' not in calls[0][2]
+    assert requests == [adapter.predictor] and adapter.predictor.color_model is model
+    assert block.texts == texts and len(block.updates) == count
+
+
+def test_mixed_texts_invalid_crops_and_multiple_owners_stay_aligned(text_colors):
+    adapter, _, calls, _ = text_colors
+    red = np.full((48, 100, 3), [200, 30, 40], dtype=np.uint8)
+    blue = np.full((48, 300, 3), [20, 40, 220], dtype=np.uint8)
+    first = region([None, red, blue], ['A', 'B', ''], 'en')
+    second = region([red, blue], ['A', '😀'], 'en')
+    adapter.apply(None, [first, second])
+    assert len(calls) == 1  # Do not repad known/fallback groups separately.
+    assert calls[0][1] == [100, 300, 100, 300]
+    assert calls[0][2]['text_indices'] == [[5], None, [4], None]
+    assert first.updates == [([0, 0, 0], [255, 255, 255]),
+                             ([200, 30, 40], [90, 100, 110]), ([20, 40, 220], [90, 100, 110])]
+    assert second.updates == first.updates[1:]
+
+
+def test_text_context_is_isolated_between_pages(text_colors):
+    adapter, model, _, requests = text_colors
+    entered = Barrier(2, timeout=5)
+
+    def predict(pixels, widths, *, text_indices, **kwargs):
+        entered.wait()
+        assert adapter.predictor.color_model is model
+        return [(text_indices[0][0], 0, 0, 255, 255, 255)]
+
+    model.infer_with_text = predict
+    blocks = [region([np.zeros((48, 120, 3), dtype=np.uint8)], [text], 'en') for text in ('A', 'B')]
+    with ThreadPoolExecutor(2) as workers:
+        futures = [workers.submit(adapter.apply, None, [block]) for block in blocks]
+        for future in futures:
+            future.result(timeout=5)
+    assert [block.updates for block in blocks] == [
+        [([4, 0, 0], [255, 255, 255])], [([5, 0, 0], [255, 255, 255])]]
+    assert len(requests) == 2 and requests[0] is not requests[1]
+    assert all(request is not adapter.predictor for request in requests)
 
 
 def test_color_checkpoint_preserves_prediction_until_rendering():

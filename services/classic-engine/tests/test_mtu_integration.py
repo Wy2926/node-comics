@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import socket
+from threading import Barrier
 
 import numpy as np
 import pytest
@@ -275,7 +276,7 @@ def test_native_color_aggregation_preserves_raw_channels(assets):
     assert block.texts == ['first', 'second']
 
 
-def test_native_48px_colors_and_failure_fallback_offline(assets, offline, monkeypatch):
+def test_native_48px_colors_reuse_ocr_and_keep_failure_fallback_offline(assets, offline, monkeypatch):
     import asyncio
     import torch
     from PIL import Image, ImageDraw, ImageFont
@@ -298,18 +299,22 @@ def test_native_48px_colors_and_failure_fallback_offline(assets, offline, monkey
                   stroke_width=4, stroke_fill=(80, 80, 80))
         x1, y1, x2, y2 = draw.textbbox((95, 45), 'COLOR TEST', font=font, stroke_width=4)
         block = TextBlock([[[x1-3, y1-3], [x2+3, y1-3], [x2+3, y2+3], [x1-3, y2+3]]],
-                          ['selected OCR text'], adjust_bg_color=False)
-        colors.apply(np.array(image), [block])
+                          ['COLOR TEST'], language='en', adjust_bg_color=False)
+        def failed(*args, **kwargs):
+            raise RuntimeError('Injected color prediction failure')
+        with monkeypatch.context() as guarded:
+            guarded.setattr(native.model, 'infer_beam_batch_tensor', failed)
+            guarded.setattr(native.model.pred, 'forward', failed)
+            guarded.setattr(native.model.pred1, 'forward', failed)
+            colors.apply(np.array(image), [block])
         fg, bg = block.get_font_colors()
         np.testing.assert_allclose(fg, [235, 35, 60], atol=35, rtol=0)
         np.testing.assert_allclose(bg, [80, 80, 80], atol=35, rtol=0)
-        assert block.texts == ['selected OCR text']
-        def failed(*args, **kwargs):
-            raise RuntimeError('Injected color prediction failure')
-        monkeypatch.setattr(native.model, 'infer_beam_batch_tensor', failed)
+        assert block.texts == ['COLOR TEST']
+        monkeypatch.setattr(native.model.color_pred1, 'forward', failed)
         colors.apply(np.array(image), [block])
         assert block.get_font_colors() == ((0., 0., 0.), (255., 255., 255.))
-        assert block.texts == ['selected OCR text']
+        assert block.texts == ['COLOR TEST']
     finally:
         colors.close()
         asyncio.run(native.unload())
@@ -362,6 +367,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
         edge_font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 26)
         sentence = 'BUT UNLIKE ME'
         edge_inputs = []
+        edge_regions = {}
         for count in (17, 4):
             image = Image.new('RGB', (720, 1203), 'white')
             draw = ImageDraw.Draw(image)
@@ -374,9 +380,21 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             assert recognized.count(sentence) == count
             assert mask is not None and mask[-8:].any()
             edge_inputs.append((np.array(image), count))
+            edge_regions[count] = [serialize_region(region) for region in regions]
         assert sum(shape[0] for shape in shapes) >= 21  # Includes representative-line probes.
         assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
                    OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)
+        # Pair analyses at the same start gate and compare full checkpoint
+        # regions, including line order and colors, against serial inference.
+        gate = Barrier(2)
+        def analyze_pair(image):
+            gate.wait(timeout=30)
+            return engine.analyze(image)
+        with ThreadPoolExecutor(2) as workers:
+            paired = [(count, workers.submit(analyze_pair, image)) for image, count in edge_inputs]
+            for count, job in paired:
+                regions, *_ = job.result()
+                assert [serialize_region(region) for region in regions] == edge_regions[count]
         source = np.full((256, 256, 3), 220, dtype=np.uint8)
         source[110:135, 110:135] = 0
         mask = np.zeros(source.shape[:2], dtype=np.uint8)
@@ -400,6 +418,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
                 else:
                     regions, edge_mask, _, _ = output
                     assert ' '.join(region.text for region in regions).count(sentence) == count
+                    assert [serialize_region(region) for region in regions] == edge_regions[count]
                     assert edge_mask is not None and edge_mask[-8:].any()
         assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
                    OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)

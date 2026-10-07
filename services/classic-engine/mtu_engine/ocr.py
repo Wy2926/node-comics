@@ -1,11 +1,14 @@
 """Adapt MTU crops/session/CTC to RapidOCR's unmodified recognition pipeline."""
 from types import SimpleNamespace
 from pathlib import Path
+from threading import Lock
 
 import cv2
 from rapidocr.ch_ppocr_rec import TextRecognizer
 from rapidocr.ch_ppocr_rec.typings import TextRecInput
 from rapidocr.inference_engine.onnxruntime import OrtInferSession
+
+from classic_node.timing import waiting_for
 
 OCR_IMAGE_SHAPE = (3, 48, 320)
 OCR_MAX_WIDTH = 3200  # PaddleX's standard recognition width limit.
@@ -22,11 +25,22 @@ def short_crop(crop):
     return valid_crop(crop) and crop.shape[1] * OCR_IMAGE_SHAPE[1] <= crop.shape[0] * OCR_IMAGE_SHAPE[2]
 
 
+class _LockedSession:
+    """Serialize one resident model's inference, not RapidOCR preprocessing/CTC."""
+    def __init__(self, session):
+        self._session = session
+        self._lock = Lock()
+
+    def __call__(self, batch):
+        with waiting_for(self._lock, 'ocr_lock_wait'):
+            return self._session(batch)
+
+
 class Recognizer(TextRecognizer):
     def __init__(self, model):
         # Reuse the prepared CUDA session and official dictionary via MTU's
         # decoder; do not initialize/download another model or dictionary.
-        self.session = OrtInferSession({'session': model.session})
+        self.session = _LockedSession(OrtInferSession({'session': model.session}))
         self.postprocess_op = lambda predictions, *args, **kwargs: (
             [model._decode_ctc(prediction) for prediction in predictions], [])
         self.rec_batch_num = OCR_BATCH_SIZE

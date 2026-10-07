@@ -581,18 +581,19 @@ def test_close_returns_render_cache_after_draining_without_changing_working_budg
     assert page.reserved == agent.pipeline.used == 1024
 
 
-def test_render_timings_survive_freeze_without_changing_result(agent):
+@pytest.mark.parametrize('timing_name', ['render_layout', 'ocr_lock_wait'])
+def test_diagnostic_timings_survive_freeze_without_changing_result(agent, timing_name):
     from classic_node.timing import record
     page = add_page(agent)
     page.step = 'render'
     def operation():
-        record('render_layout', .125)
+        record(timing_name, .125)
         return {'result': {'output': None}, 'output_bytes': None}
     agent.pipeline.submit(page, agent.pipeline.render, 'render', operation)
     page.future.result(timeout=5)
     agent.pipeline.advance(page)
     saved = agent.journal.get('lease:0')['completion']
-    assert saved['timings']['render_layout'] == .125
+    assert saved['timings'][timing_name] == .125
     assert saved['result'] == {'output': None}
 
 

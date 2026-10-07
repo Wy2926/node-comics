@@ -1,4 +1,6 @@
 """Adapter tests: input rejection, native scoring and batched paragraph routing."""
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
 from types import SimpleNamespace
 import sys
 
@@ -6,6 +8,7 @@ import numpy as np
 import pytest
 
 from mtu_engine.routing import ScriptRouter
+from classic_node.timing import collect
 
 
 def router():
@@ -18,6 +21,7 @@ def router():
         return 'korean'  # Scoring belongs to upstream, not this adapter test.
     native.detect_lang = detect
     result.native = native
+    result._score_lock = Lock()
     return result, calls
 
 
@@ -50,10 +54,57 @@ def test_native_scoring_failure_releases_private_text_before_next_page(monkeypat
             instance.choose(values)
         assert raised.value is failure
         assert instance.native._ocr_lines is None
+        assert not instance._score_lock.locked()
     next_values = {lang: {'text': 'next page', 'conf': .8} for lang in instance.native._WEIGHTS}
     assert instance.choose(next_values) == 'korean'
     assert calls == [{lang: [row] for lang, row in next_values.items()}]
     assert instance.native._ocr_lines is None
+
+
+def test_scoring_hook_isolated_between_concurrent_pages():
+    instance, _ = router()
+    entered, attempted, release = Event(), Event(), Event()
+    lock = instance._score_lock
+
+    def acquire():
+        if lock.locked():
+            attempted.set()
+        lock.acquire()
+
+    instance._score_lock = SimpleNamespace(acquire=acquire, release=lock.release)
+
+    def detect(image):
+        before = instance.native._ocr_lines(image, 'en')[0]['text']
+        if before == 'first':
+            entered.set()
+            assert release.wait(5), 'Test did not release the first scorer'
+        assert instance.native._ocr_lines(image, 'en')[0]['text'] == before
+        return before
+
+    def choose(text):
+        values = {lang: {'text': text, 'conf': .9} for lang in instance.native._WEIGHTS}
+        with collect() as timings:
+            result = instance.choose(values)
+        return result, timings
+
+    instance.native.detect_lang = detect
+    with ThreadPoolExecutor(2) as pool:
+        first = pool.submit(choose, 'first')
+        try:
+            assert entered.wait(5)
+            second = pool.submit(choose, 'second')
+            assert attempted.wait(5)
+            assert not second.done()
+            assert instance.native._ocr_lines(None, 'en')[0]['text'] == 'first'
+        finally:
+            release.set()
+        for job, expected in ((first, 'first'), (second, 'second')):
+            result, timings = job.result(timeout=5)
+            assert result == expected
+            assert set(timings) == {'ocr_lock_wait'}
+            assert timings['ocr_lock_wait'] >= 0
+    assert instance.native._ocr_lines is None
+    assert not lock.locked()
 
 
 def test_every_probe_runs_once_per_page_and_routes_stay_per_paragraph(monkeypatch):

@@ -1,7 +1,8 @@
 """Mocked analysis-stage policy tests; no neural model or CUDA execution."""
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import sys
-from threading import Lock
+from threading import Event, Lock
 from types import SimpleNamespace
 
 import numpy as np
@@ -43,13 +44,13 @@ def analysis(monkeypatch):
         detector=SimpleNamespace(detection_size=1280, text_threshold=0.5, box_threshold=0.7, unclip_ratio=2.3),
         render=SimpleNamespace(stroke_width=0.1),
         ocr=SimpleNamespace(prob=0.5, min_text_length=1), mask_dilation_offset=0, kernel_size=3)
-    engine._detector_lock, engine._ocr_lock, engine._bubble_lock = Lock(), Lock(), Lock()
+    engine._detector_lock, engine._bubble_lock = Lock(), Lock()
     engine.detector = SimpleNamespace(detect=detect)
     engine.router = SimpleNamespace(classify=lambda image, blocks, groups: (['en'] * len(blocks), [None] * len(blocks)))
     engine.recognizers = {}
     engine.japanese = SimpleNamespace(recognize=lambda *args: pytest.fail('Unexpected Japanese branch'))
     def colors(image, regions):
-        assert image is source and engine._ocr_lock.locked()
+        assert image is source and not hasattr(engine, '_ocr_lock')
         assert all(not region.adjust_bg_color and region.default_stroke_width == .1 for region in regions)
         calls.append(('colors', regions))
     engine.colors = SimpleNamespace(apply=colors)
@@ -72,6 +73,7 @@ def test_partial_ocr_retains_recognized_text_order_and_original_geometry(analysi
     regions, mask, raw, bubbles = engine.analyze(source)
     assert len(regions) == 1
     assert regions[0].texts == texts
+    assert regions[0].language == 'en'  # Request-local route for line-aligned color reuse.
     np.testing.assert_array_equal(regions[0].lines, quads)
     assert mask is raw and bubbles.shape == source.shape[:2]
     assert [call[0] for call in calls] == ['colors', 'bubbles', 'refine']
@@ -130,6 +132,7 @@ def test_mixed_page_routes_korean_only_and_preserves_paragraph_order(analysis, m
     regions, *_ = engine.analyze(source)
     assert observed == [('other', 1), ('ko', 2)]
     assert [region.text for region in regions] == ['첫 번째', 'middle', '마지막']
+    assert [region.language for region in regions] == ['korean', 'en', 'korean']
     for region, quad in zip(regions, quads):
         np.testing.assert_array_equal(region.lines, [quad])
 
@@ -156,6 +159,7 @@ def test_four_languages_use_selected_experts_without_fallback(analysis, monkeypa
     regions, *_ = engine.analyze(source)
     assert observed == ['en', 'ch', 'korean', 'japan']
     assert [r.text for r in regions] == ['japan', 'ch', 'korean']
+    assert [r.language for r in regions] == ['japan', 'ch', 'korean']
     assert [r.text for r in calls[0][1]] == ['japan', 'ch', 'korean']
     assert [name for name, _ in calls] == ['colors', 'bubbles', 'refine']
 
@@ -232,4 +236,49 @@ def test_analysis_failure_releases_locks_without_new_timing_keys(analysis):
     with collect() as values, pytest.raises(RuntimeError, match='OCR failed'):
         engine.analyze(source)
     assert values == {}
-    assert not engine._detector_lock.locked() and not engine._ocr_lock.locked()
+    assert not engine._detector_lock.locked() and not engine._bubble_lock.locked()
+
+
+@pytest.mark.parametrize('held_stage', ['colors', 'japan'])
+def test_other_page_ocr_progresses_while_a_different_model_is_busy(analysis, held_stage):
+    engine, source, _, _ = analysis
+    other = source.copy()
+    entered, release, other_read = Event(), Event(), Event()
+
+    def classify(image, blocks, groups):
+        language = 'japan' if image is source and held_stage == 'japan' else 'en'
+        return [language] * len(blocks), [None] * len(blocks)
+
+    async def recognize(image, lines, config):
+        for line in lines:
+            line.text, line.prob = ('first' if image is source else 'second'), .9
+        if image is other:
+            other_read.set()
+
+    def japanese(image, blocks, groups):
+        assert image is source
+        entered.set()
+        assert release.wait(5), 'Test did not release the Japanese model'
+        for group in groups:
+            for line in group:
+                line.text = 'first'
+
+    def colors(image, regions):
+        if image is source and held_stage == 'colors':
+            entered.set()
+            assert release.wait(5), 'Test did not release the color model'
+
+    engine.router = SimpleNamespace(classify=classify)
+    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.japanese = SimpleNamespace(recognize=japanese)
+    engine.colors = SimpleNamespace(apply=colors)
+    with ThreadPoolExecutor(2) as pool:
+        first = pool.submit(engine.analyze, source)
+        try:
+            assert entered.wait(5)
+            second = pool.submit(engine.analyze, other)
+            assert other_read.wait(5), 'Unrelated model blocked the second page OCR'
+            assert second.result(timeout=5)[0][0].texts == ['second'] * 3
+        finally:
+            release.set()
+        assert first.result(timeout=5)[0][0].texts == ['first'] * 3
