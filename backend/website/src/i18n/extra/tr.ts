@@ -193,6 +193,11 @@ export const commerce = {
     "Abonelik kontrol ediliyor"
   ],
   "comparison": {
+    "model": {
+      "label": "Çeviri modelleri",
+      "free": "GPT 6.1 Luna ve benzeri modeller",
+      "lite": "Gemini 3.8 Flash ve benzeri modeller"
+    },
     "feature": "Özellikler ve faydalar",
     "highlights": "Lite İLE ÇEVİR",
     "reading": {

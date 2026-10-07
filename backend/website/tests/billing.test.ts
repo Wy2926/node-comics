@@ -2,6 +2,19 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {annualSavings,amount,selectedChannel,hasManagedSubscription,offerBenefits,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
 import {selectedInterval} from '../src/components/BillingCycle';
+import {comparisonCopy} from '../src/lib/pricing-comparison';
+import {locales} from '../src/i18n/locales';
+
+test('all pricing locales distinguish ordinary and subscription translation models',()=>{
+  for(const locale of locales){
+    const copy=comparisonCopy(locale);
+    assert.ok(copy.model.label.trim(),locale);
+    assert.match(copy.model.free,/GPT 6\.1 Luna/,locale);
+    assert.match(copy.model.lite,/Gemini 3\.8 Flash/,locale);
+    assert.doesNotMatch(copy.model.free,/Gemini/,locale);
+    assert.doesNotMatch(copy.model.lite,/GPT/,locale);
+  }
+});
 
 test('billing cycles use available quotes and preserve the chosen cadence',()=>{
   const month={interval:'month'} as BillingOffer,year={interval:'year'} as BillingOffer;

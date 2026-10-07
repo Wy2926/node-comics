@@ -193,6 +193,11 @@ export const commerce = {
     "Controllo dell'abbonamento"
   ],
   "comparison": {
+    "model": {
+      "label": "Modelli di traduzione",
+      "free": "GPT 6.1 Luna e modelli simili",
+      "lite": "Gemini 3.8 Flash e modelli simili"
+    },
     "feature": "Caratteristiche e vantaggi",
     "highlights": "TRADUCI CON Lite",
     "reading": {

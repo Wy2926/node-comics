@@ -26,13 +26,16 @@ const comparison=async(target,hourlyPages)=>{
  assert.equal(await frame.locator('.pricing-grid .price-card').count(),2,'both pricing cards share the comparison frame');
  const table=frame.locator('table.plan-comparison');
  assert.equal(await table.locator('thead th').count(),3,'comparison has feature, ordinary and Lite columns');
- assert.equal(await table.locator('tbody tr').count(),5,'five feature comparison rows');
- for(const feature of ['reading','classic','rate','priority','early']){
+ assert.equal(await table.locator('tbody tr').count(),6,'six feature comparison rows');
+ for(const feature of ['reading','classic','model','rate','priority','early']){
   const row=table.locator(`tbody tr[data-feature="${feature}"]`);
   assert.equal(await row.count(),1,`comparison feature ${feature}`);
   assert.equal(await row.locator(':scope > th, :scope > td').count(),3,`aligned columns for ${feature}`);
  }
  assert((await table.locator('[data-feature="rate"] td').last().innerText()).replace(/\D/g,'').includes(String(hourlyPages)),'Lite hourly request limit follows the active catalog');
+ const models=table.locator('[data-feature="model"] td');
+ assert.match(await models.nth(0).innerText(),/GPT 6\.1 Luna/);
+ assert.match(await models.nth(1).innerText(),/Gemini 3\.8 Flash/);
  assert(!/PLUS|\b300\b/.test(await frame.innerText()),'retired PLUS is absent from new-purchase pricing');
 };
 const live=async()=>{
@@ -120,5 +123,5 @@ try {
  done();release=null;onCatalogRequest=null;await live();
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
  assert.deepEqual(errors,[]);
- console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected five-feature comparison, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: sixteen locales with and without JavaScript, eight widths, connected six-feature comparison including plan-specific models, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

@@ -3,13 +3,14 @@ import { commerceCopy, formatCopy } from '../i18n/commerce';
 interface ComparisonRow {label:string;free:string;lite:string}
 export interface PricingComparisonCopy {
   feature:string;highlights:string;
-  reading:ComparisonRow;classic:ComparisonRow;
+  reading:ComparisonRow;classic:ComparisonRow;model:ComparisonRow;
   rate:Omit<ComparisonRow,'lite'>&{lite:(hourly:number)=>string};
   priority:ComparisonRow;early:ComparisonRow;note:string;
 }
 const labels:Record<string,PricingComparisonCopy>={
   'zh-CN':{
     feature:'功能与权益',highlights:'Lite 翻译权益',
+    model:{label:'翻译模型',free:'GPT 6.1 Luna 等系列',lite:'Gemini 3.8 Flash 等系列'},
     reading:{label:'阅读功能',free:'全部基础阅读功能',lite:'全部基础阅读功能'},
     classic:{label:'常规翻译',free:'30 页 / 天',lite:'不设日／月累计上限'},
     rate:{label:'新翻译受理限额',free:'10 页 / 滚动分钟',lite:n=>`100 页 / 滚动分钟；${n.toLocaleString('zh-CN')} 页 / 滚动小时`},
@@ -19,6 +20,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   'zh-TW':{
     feature:'功能與權益',highlights:'Lite 翻譯權益',
+    model:{label:'翻譯模型',free:'GPT 6.1 Luna 等系列',lite:'Gemini 3.8 Flash 等系列'},
     reading:{label:'閱讀功能',free:'全部基本閱讀功能',lite:'全部基本閱讀功能'},
     classic:{label:'一般翻譯',free:'30 頁 / 天',lite:'不設日／月累計上限'},
     rate:{label:'新翻譯受理上限',free:'10 頁 / 滾動分鐘',lite:n=>`100 頁 / 滾動分鐘；${n.toLocaleString('zh-TW')} 頁 / 滾動小時`},
@@ -28,6 +30,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   en:{
     feature:'Features and benefits',highlights:'TRANSLATE WITH Lite',
+    model:{label:'Translation models',free:'GPT 6.1 Luna and similar models',lite:'Gemini 3.8 Flash and similar models'},
     reading:{label:'Reading',free:'All core reading features',lite:'All core reading features'},
     classic:{label:'Classic translation',free:'30 pages / day',lite:'No daily or monthly total cap'},
     rate:{label:'New translation request limit',free:'10 pages / rolling minute',lite:n=>`100 pages / rolling minute; ${n.toLocaleString('en')} pages / rolling hour`},
@@ -37,6 +40,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   ja:{
     feature:'機能と特典',highlights:'Lite の翻訳特典',
+    model:{label:'翻訳モデル',free:'GPT 6.1 Luna などのモデル',lite:'Gemini 3.8 Flash などのモデル'},
     reading:{label:'読書機能',free:'すべての基本読書機能',lite:'すべての基本読書機能'},
     classic:{label:'通常翻訳',free:'30 ページ / 日',lite:'日・月の累計上限なし'},
     rate:{label:'新規翻訳の受付上限',free:'直近1分で10ページ',lite:n=>`直近1分で100ページ、直近1時間で${n.toLocaleString('ja')}ページ`},
@@ -46,6 +50,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   ko:{
     feature:'기능과 혜택',highlights:'Lite 번역 혜택',
+    model:{label:'번역 모델',free:'GPT 6.1 Luna 등 모델',lite:'Gemini 3.8 Flash 등 모델'},
     reading:{label:'읽기 기능',free:'모든 기본 읽기 기능',lite:'모든 기본 읽기 기능'},
     classic:{label:'일반 번역',free:'30페이지 / 일',lite:'일일·월간 총 페이지 제한 없음'},
     rate:{label:'새 번역 요청 한도',free:'최근 1분 동안 10페이지',lite:n=>`최근 1분 동안 100페이지, 최근 1시간 동안 ${n.toLocaleString('ko')}페이지`},

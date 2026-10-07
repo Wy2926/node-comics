@@ -193,6 +193,11 @@ export const commerce = {
     "Đang kiểm tra đăng ký"
   ],
   "comparison": {
+    "model": {
+      "label": "Mô hình dịch",
+      "free": "GPT 6.1 Luna và các mô hình tương tự",
+      "lite": "Gemini 3.8 Flash và các mô hình tương tự"
+    },
     "feature": "Tính năng và lợi ích",
     "highlights": "DỊCH VỚI Lite",
     "reading": {

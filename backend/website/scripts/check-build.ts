@@ -92,12 +92,14 @@ for (const file of htmlFiles) {
     const comparison = $('.pricing-comparison');
     const table = comparison.find('table.plan-comparison');
     if (comparison.length !== 1 || comparison.find('.pricing-grid .price-card').length !== 2 || table.length !== 1) errors.push(`${label}: pricing cards and feature comparison must share one connected frame`);
-    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 5) errors.push(`${label}: expected a three-column comparison with five feature rows`);
-    for (const feature of ['reading', 'classic', 'rate', 'priority', 'early']) {
+    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 6) errors.push(`${label}: expected a three-column comparison with six feature rows`);
+    for (const feature of ['reading', 'classic', 'model', 'rate', 'priority', 'early']) {
       const row = table.find(`tbody tr[data-feature="${feature}"]`);
       if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
     }
     if (!table.find('[data-feature="rate"] td').last().text().replace(/\D/g,'').includes('1200')) errors.push(`${label}: missing Lite rolling hourly request limit`);
+    const models = table.find('[data-feature="model"] td');
+    if (!models.eq(0).text().includes('GPT 6.1 Luna') || !models.eq(1).text().includes('Gemini 3.8 Flash')) errors.push(`${label}: missing plan-specific translation models`);
     if (/PLUS|\b300\b/.test(comparison.text())) errors.push(`${label}: retired PLUS must not be advertised for new purchase`);
     if (comparison.find('.billing-availability button[disabled]').length !== 1 || $('.billing-availability[data-state="loading"]').length !== 1) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
     if ($('a[href*="price="]').length || $('[data-billing-catalog="live"]').length) errors.push(`${label}: static pricing must not fabricate a purchasable API offer`);

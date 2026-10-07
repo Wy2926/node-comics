@@ -193,6 +193,11 @@ export const commerce = {
     "Abonnement prüfen"
   ],
   "comparison": {
+    "model": {
+      "label": "Übersetzungsmodelle",
+      "free": "GPT 6.1 Luna und ähnliche Modelle",
+      "lite": "Gemini 3.8 Flash und ähnliche Modelle"
+    },
     "feature": "Funktionen und Vorteile",
     "highlights": "ÜBERSETZEN MIT Lite",
     "reading": {

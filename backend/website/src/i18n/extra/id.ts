@@ -193,6 +193,11 @@ export const commerce = {
     "Memeriksa langganan"
   ],
   "comparison": {
+    "model": {
+      "label": "Model terjemahan",
+      "free": "GPT 6.1 Luna dan model sejenis",
+      "lite": "Gemini 3.8 Flash dan model sejenis"
+    },
     "feature": "Fitur dan manfaat",
     "highlights": "TERJEMAHKAN DENGAN Lite",
     "reading": {

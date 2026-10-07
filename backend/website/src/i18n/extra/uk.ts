@@ -193,6 +193,11 @@ export const commerce = {
     "Перевірка підписки"
   ],
   "comparison": {
+    "model": {
+      "label": "Моделі перекладу",
+      "free": "GPT 6.1 Luna та аналогічні моделі",
+      "lite": "Gemini 3.8 Flash та аналогічні моделі"
+    },
     "feature": "Особливості та переваги",
     "highlights": "ПЕРЕКЛАДАТИ З Lite",
     "reading": {

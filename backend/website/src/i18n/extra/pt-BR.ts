@@ -193,6 +193,11 @@ export const commerce = {
     "Verificando assinatura"
   ],
   "comparison": {
+    "model": {
+      "label": "Modelos de tradução",
+      "free": "GPT 6.1 Luna e modelos semelhantes",
+      "lite": "Gemini 3.8 Flash e modelos semelhantes"
+    },
     "feature": "Recursos e benefícios",
     "highlights": "TRADUZIR COM Lite",
     "reading": {
