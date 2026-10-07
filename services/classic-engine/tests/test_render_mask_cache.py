@@ -29,13 +29,13 @@ def execute(source, filename):
 
 @pytest.fixture
 def helpers(tmp_path, monkeypatch):
-    patches = {path: LOCK['source']['patches'][path] for path in (RENDER_PATH, BUBBLE_PATH)}
+    patches = {path: LOCK['source']['patches'][path][0] for path in (RENDER_PATH, BUBBLE_PATH)}
     for path, patch in patches.items():
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(patch['before'], encoding='utf-8')
     # Exercise the real preparation path, scoped to the files this fixture owns.
-    monkeypatch.setitem(LOCK['source'], 'patches', patches)
+    monkeypatch.setitem(LOCK['source'], 'patches', {path: [patch] for path, patch in patches.items()})
     apply_source_patches(tmp_path)
     loaded = {}
     for path, patch in patches.items():

@@ -9,19 +9,23 @@ from tools.prepare_mtu import apply_source_patches
 
 
 PATCH_PATH = 'manga_translator/utils/generic.py'
-PATCH = LOCK['source']['patches'][PATCH_PATH]
+PATCH = LOCK['source']['patches'][PATCH_PATH][0]
 
 
 def test_preparation_applies_only_the_pinned_edit(tmp_path):
     sources = {}
-    for relative, patch in LOCK['source']['patches'].items():
+    for relative, patches in LOCK['source']['patches'].items():
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        sources[relative] = '# Upstream license retained\n' + patch['before'] + '# Other source retained\n'
+        sources[relative] = ('# Upstream license retained\n'
+                             + ''.join(patch['before'] for patch in patches) + '# Other source retained\n')
         target.write_text(sources[relative], encoding='utf-8')
     apply_source_patches(tmp_path)
-    for relative, patch in LOCK['source']['patches'].items():
-        assert (tmp_path / relative).read_text(encoding='utf-8') == sources[relative].replace(patch['before'], patch['after'])
+    for relative, patches in LOCK['source']['patches'].items():
+        expected = sources[relative]
+        for patch in patches:
+            expected = expected.replace(patch['before'], patch['after'])
+        assert (tmp_path / relative).read_text(encoding='utf-8') == expected
     # Do not silently double-patch an already prepared or drifted source tree.
     with pytest.raises(ValueError, match='target changed'):
         apply_source_patches(tmp_path)
@@ -38,9 +42,23 @@ def test_preparation_rejects_missing_or_ambiguous_anchor(tmp_path, source):
 
 
 def test_preparation_rejects_patch_outside_bundle(tmp_path, monkeypatch):
-    monkeypatch.setitem(LOCK['source'], 'patches', {'../outside.py': PATCH})
+    monkeypatch.setitem(LOCK['source'], 'patches', {'../outside.py': [PATCH]})
     with pytest.raises(ValueError, match='Unsafe upstream patch'):
         apply_source_patches(tmp_path)
+
+
+@pytest.mark.parametrize('last_anchor_count', [0, 2])
+def test_preparation_does_not_partially_write_a_file_when_later_edit_drifts(tmp_path, monkeypatch, last_anchor_count):
+    relative = 'manga_translator/rendering/__init__.py'
+    patches = LOCK['source']['patches'][relative]
+    source = ''.join(patch['before'] for patch in patches[:-1]) + patches[-1]['before'] * last_anchor_count
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding='utf-8')
+    monkeypatch.setitem(LOCK['source'], 'patches', {relative: patches})
+    with pytest.raises(ValueError, match='target changed'):
+        apply_source_patches(tmp_path)
+    assert target.read_text(encoding='utf-8') == source
 
 
 @pytest.mark.parametrize('height,width', [(12930, 720), (12960, 720), (16000, 320), (10000, 1024)])

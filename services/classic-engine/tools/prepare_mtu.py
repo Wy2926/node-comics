@@ -17,14 +17,16 @@ from mtu_engine.assets import LOCK
 def apply_source_patches(upstream):
     """Apply exact, reviewable lockfile edits; fail if the pinned source drifts."""
     upstream = Path(upstream).resolve()
-    for relative, patch in LOCK['source'].get('patches', {}).items():
+    for relative, patches in LOCK['source'].get('patches', {}).items():
         path = (upstream / relative).resolve()
         if not path.is_relative_to(upstream):
             raise ValueError('Unsafe upstream patch path')
         text = path.read_text(encoding='utf-8')
-        if text.count(patch['before']) != 1:
-            raise ValueError(f'Pinned upstream patch target changed: {relative}')
-        path.write_text(text.replace(patch['before'], patch['after'], 1), encoding='utf-8', newline='\n')
+        for patch in patches:
+            if text.count(patch['before']) != 1:
+                raise ValueError(f'Pinned upstream patch target changed: {relative}')
+            text = text.replace(patch['before'], patch['after'], 1)
+        path.write_text(text, encoding='utf-8', newline='\n')
 
 
 def prepare(output, cache):

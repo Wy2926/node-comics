@@ -4,11 +4,12 @@
 
 The image pipeline imports source from [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui), pinned by commit, archive URL and SHA-256 in [upstream.lock.json](mtu_engine/upstream.lock.json). Preparation retains `manga_translator/`, the upstream `LICENSE.txt`, dependency manifests and checksums under `upstream/`. The project carries GPL-3.0 terms; original notices within source files remain intact.
 
-Three local source patches are recorded verbatim in the lockfile:
+Local source edits are recorded verbatim as ordered per-file patches in the lockfile:
 
 - `build_det_rearrange_plan` in `manga_translator/utils/generic.py` calculates the stripe count with a maximum 80% stride, ensuring at least 20% overlap rounded down to whole pixels. Native packing, inference, feathered map merging, contour extraction and model weights are unchanged.
 - `_polygon_fully_inside_mask` in `manga_translator/rendering/__init__.py` rasterizes only the clipped polygon's bounding rectangle, preserving integer conversion, clipping and containment semantics.
-- `manga_translator/utils/bubble.py` adds a byte-bounded, single-render cache around the unchanged reference-mask builder. It retains full connected-component unions as read-only arrays, isolates render contexts and releases references on exit; it does not change layout or font sizing rules.
+- `find_largest_inscribed_rect` in the same module removes only empty outer mask rows/columns before the unchanged histogram/stack search, then restores page coordinates. All components, holes and equal-area tie ordering remain intact; non-CJK bubble-mask layout stays enabled.
+- `manga_translator/utils/bubble.py` adds a byte-bounded, single-render cache around the unchanged reference-mask builder. It retains full connected-component unions as read-only arrays, isolates render contexts and releases references on exit. Largest-inscribed-rectangle results are cached only for these already-retained immutable masks, without retaining additional arrays; layout and font sizing rules are unchanged.
 
 Preparation requires an exact single match for each patch, marks the changes in source, and hashes the resulting files in the asset manifest. Other MTU source files remain unmodified. Existing assets must be prepared again; startup rejects the previous lock hash.
 

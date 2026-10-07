@@ -170,9 +170,21 @@ def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, mon
 @pytest.mark.parametrize(('language', 'text'), [
     ('en', 'THIS PERSON COULD WIELD MAGIC TO CONTROL ALL THINGS.'),
     ('zh-Hans', '这个人能够运用魔法，控制世间的一切事物。'),
+    ('zh-Hant', '這個人能夠運用魔法，控制世間的一切事物。'),
     ('ja', 'この人は魔法を使って、すべてのものを操ることができた。'),
     ('ko', '이 사람은 마법을 사용하여 모든 것을 제어할 수 있었습니다.'),
     ('ar', 'كان هذا الشخص قادرًا على تسخير السحر للتحكم في كل شيء.'),
+    ('fr', 'CETTE PERSONNE POUVAIT TOUT CONTRÔLER PAR LA MAGIE.'),
+    ('es', 'ESTA PERSONA PODÍA CONTROLAR TODO CON MAGIA.'),
+    ('pt-BR', 'ESTA PESSOA PODIA CONTROLAR TODAS AS COISAS COM MAGIA.'),
+    ('de', 'DIESE PERSON KONNTE MIT MAGIE ALLES KONTROLLIEREN.'),
+    ('it', 'QUESTA PERSONA POTEVA CONTROLLARE TUTTO CON LA MAGIA.'),
+    ('ru', 'Этот человек мог управлять всем с помощью магии.'),
+    ('pl', 'Ta osoba mogła kontrolować wszystko za pomocą magii.'),
+    ('uk', 'Ця людина могла керувати всім за допомогою магії.'),
+    ('tr', 'Bu kişi sihir kullanarak her şeyi kontrol edebilirdi.'),
+    ('vi', 'Người này có thể dùng phép thuật để điều khiển mọi thứ.'),
+    ('id', 'Orang ini bisa mengendalikan segalanya dengan sihir.'),
 ])
 def test_qt_mask_optimization_preserves_pixels_and_layout(assets, offline, monkeypatch, language, text):
     import cv2
@@ -197,13 +209,19 @@ def test_qt_mask_optimization_preserves_pixels_and_layout(assets, offline, monke
         return output
     monkeypatch.setattr(rendering, 'dispatch', capture)
     optimized = rendering._polygon_fully_inside_mask
+    optimized_rectangle = rendering.find_largest_inscribed_rect
     namespace = {'np': np, 'cv2': cv2}
-    exec(LOCK['source']['patches']['manga_translator/rendering/__init__.py']['before'], namespace)
+    patches = LOCK['source']['patches']['manga_translator/rendering/__init__.py']
+    exec(patches[0]['before'], namespace)
+    rectangle = next(p for p in patches if p['before'].startswith('def find_largest_inscribed_rect('))
+    exec(rectangle['before'], namespace)
     monkeypatch.setattr(rendering, '_polygon_fully_inside_mask', namespace['_polygon_fully_inside_mask'])
+    monkeypatch.setattr(rendering, 'find_largest_inscribed_rect', namespace['find_largest_inscribed_rect'])
     baseline = renderer.render(source, source, regions, [text] * 3, language, mask, mask_cache_bytes=0)
     layout = observed.copy()
     observed.clear()
     monkeypatch.setattr(rendering, '_polygon_fully_inside_mask', optimized)
+    monkeypatch.setattr(rendering, 'find_largest_inscribed_rect', optimized_rectangle)
     candidate = renderer.render(source, source, regions, [text] * 3, language, mask)
     assert np.array_equal(baseline, candidate)
     assert observed == layout

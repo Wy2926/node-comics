@@ -58,7 +58,8 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         entries = {prefix + name + '/__init__.py': '' for name in modules}
         entries[prefix + 'LICENSE'] = 'retained source license'
         if key == 'source':
-            entries.update({prefix + name: patch['before'] for name, patch in source['patches'].items()})
+            entries.update({prefix + name: ''.join(patch['before'] for patch in patches)
+                            for name, patches in source['patches'].items()})
         archives[source['url']] = entries
     archives[LOCK['hyphenation']['url']] = {
         'pyphen/dictionaries/hyph_en_US.dic': 'UTF-8\n',
