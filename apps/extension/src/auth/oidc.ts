@@ -4,6 +4,7 @@ import type { User } from '../types';
 import {secureIdentityUrl,tokenLifetime,type Session} from './model';
 import {launchLoginWindow} from './auth-window';
 import {requireHostAccess} from '../host-permissions';
+import {requestOidcToken} from './token-request';
 export interface AuthConfig { mode: 'development'|'oidc'; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
 interface Pending { state:string; verifier:string; redirect:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
 const KEY='nc-oidc-pending';
@@ -16,7 +17,7 @@ async function exchange(callback:string,pending:Pending):Promise<Session> {
   if(returned.searchParams.has('error'))throw Error(msg("身份服务未完成登录，请重试。"));
   const code=returned.searchParams.get('code');if(!code)throw Error(msg("身份服务未返回授权码。"));
   const issuedAt=Date.now();
-  const response=await fetch(pending.tokenEndpoint,{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:pending.clientId,code,redirect_uri:pending.redirect,code_verifier:pending.verifier,...(pending.resource?{resource:pending.resource}:{})})});
+  const response=await requestOidcToken(pending.tokenEndpoint,new URLSearchParams({grant_type:'authorization_code',client_id:pending.clientId,code,redirect_uri:pending.redirect,code_verifier:pending.verifier,...(pending.resource?{resource:pending.resource}:{})}));
   if(!response.ok){
     const failure=await response.json().catch(()=>null);
     // Never display the raw response: providers may echo codes or other secrets.

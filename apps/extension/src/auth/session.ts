@@ -1,6 +1,7 @@
 import {StaleOperation} from '../concurrency';
 import {readAuth,updateSession} from './storage';
 import {RefreshUnavailable,SessionExpired,tokenLifetime,type Session} from './model';
+import {requestOidcToken} from './token-request';
 
 export interface Authorization {
   readonly cacheKey?:string;
@@ -39,7 +40,7 @@ export function sessionAuthorization(id:string):Authorization{
       let response:Response;
       const issuedAt=Date.now();
       try{
-        response=await fetch(credential.tokenEndpoint,{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:credential.refreshToken,client_id:credential.clientId,...(credential.resource?{resource:credential.resource}:{})})});
+        response=await requestOidcToken(credential.tokenEndpoint,new URLSearchParams({grant_type:'refresh_token',refresh_token:credential.refreshToken,client_id:credential.clientId,...(credential.resource?{resource:credential.resource}:{})}));
       }catch{return unavailable(session,rejected);}
       // Logout/account switch can complete while the refresh is on the network.
       await currentSession(id);
