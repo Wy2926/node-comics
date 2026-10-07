@@ -34,5 +34,5 @@ export function checkoutUrl(value: string, provider:'stripe'|'creem', portal = f
 }
 
 export function accountReturnPath(value: string) {
-  return /^\/(?:account\/(?:\?price=[a-zA-Z0-9_-]{1,36})?|translate\/)$/.test(basePath(value)) ? value : '/account/';
+  return /^\/(?:account\/(?:\?price=[a-zA-Z0-9_-]{1,36})?|pricing\/\?price=[a-zA-Z0-9_-]{1,36}|translate\/)$/.test(basePath(value)) ? value : '/account/';
 }

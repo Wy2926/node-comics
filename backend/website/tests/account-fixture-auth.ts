@@ -36,7 +36,7 @@ if(scenario?.startsWith('gift-')){
   if(scenario==='gift-resuming'&&billing.subscription)billing.subscription.renewal_state='resuming';
 }
 export const session=async()=>scenario==='signed-out'?null:{};
-export const signIn=async()=>{};
+export const signIn=async(path?:string)=>{const output=document.getElementById('checkout-observation');if(output)output.textContent=`模拟登录返回：${path}`;};
 export const signOut=async()=>{};
 export const finishLogin=async()=>{};
 export const loginReturnPath=()=>'/account/';
@@ -44,7 +44,11 @@ export async function api<T>(path:string,_method?:string,body?:unknown):Promise<
   if(path==='/v1/me')return {user:{id:'synthetic',name:'界面验收'},entitlements} as T;
   if(path==='/v1/billing/status'){if(scenario==='error')throw new ApiError('账户服务暂时不可用，请重试。',503);return structuredClone(billing) as T;}
   if(path==='/v1/billing/sync')return structuredClone({billing,entitlements}) as T;
-  if(path==='/v1/billing/checkouts')throw new ApiError(`已验证报价：${(body as {price_id:string}).price_id} · ${(body as {provider:string}).provider}`,418);
+  if(path==='/v1/billing/checkouts'){
+    const message=`已验证报价：${(body as {price_id:string}).price_id} · ${(body as {provider:string}).provider}`;
+    const output=document.getElementById('checkout-observation');if(output)output.textContent=message+'（模拟响应丢失，不创建真实订单）';
+    throw new ApiError(message,418);
+  }
   if(path==='/v1/billing/portal')throw new ApiError(`已验证订阅管理：${(body as {provider:string}).provider}`,418);
   if(path==='/v1/billing/cancel-renewal'){
     if(!billing.subscription?.can_cancel||(body as {provider:string}).provider!==billing.subscription.provider)throw new ApiError('重复或无效取消',409);

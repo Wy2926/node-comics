@@ -31,6 +31,8 @@
 .translation-files-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .translation-files-heading h2 { font-size: .96rem; font-weight: 500; }
 .translation-files-heading .button { font-size: .8rem; min-height: 42px; }
+.translation-file-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.translation-cache-notice { color: var(--muted); font-size: .85rem; margin-block: 0 16px; }
 .translation-progress { display: grid; gap: 10px; margin: 16px 0; color: var(--muted); font-size: .74rem; }
 .translation-progress progress { width: 100%; height: 4px; border: 0; border-radius: 4px; background: var(--surface-soft); }
 .translation-progress progress::-webkit-progress-bar { background: var(--surface-soft); border-radius: 4px; }

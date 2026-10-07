@@ -3,6 +3,7 @@ import ImageDropzone from './ImageDropzone';
 import Turnstile from './Turnstile';
 import { translationError } from '../i18n/translation-error';
 import type { TranslationCopy } from '../i18n/translate';
+import { translationCacheCopy } from '../i18n/translation-cache';
 import { localPath, type Locale } from '../i18n/locales';
 import { signIn } from '../lib/auth';
 import {
@@ -13,6 +14,7 @@ import {
   readImages,
   recordOrder,
   removeRecord,
+  removeRecords,
   saveRecord,
   storageBytes,
   type RecordMeta,
@@ -57,6 +59,7 @@ const delay = (ms: number, signal: AbortSignal) =>
   });
 
 export default function TranslationWorkbench({ locale, copy: t }: { locale: Locale; copy: TranslationCopy }) {
+  const cacheCopy = translationCacheCopy[locale];
   const [rows, setRows] = useState<RecordMeta[]>([]),
     [account, setAccount] = useState<Account>(),
     [guest, setGuest] = useState<Guest>(),
@@ -65,6 +68,9 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [downloading, setDownloading] = useState(false),
+    [importing, setImporting] = useState(false),
+    [clearing, setClearing] = useState(false),
+    [cacheNotice, setCacheNotice] = useState(''),
     [language, setLanguage] = useState(
       locale === 'zh-CN' ? 'zh-Hans' : locale === 'zh-TW' ? 'zh-Hant' : locale === 'pt-BR' ? 'pt' : locale,
     ),
@@ -78,6 +84,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   const controller = useRef<AbortController | undefined>(undefined);
   const running = useRef(false);
   const exporting = useRef(false);
+  const removing = useRef(false);
   const resumeOnReturn = useRef(false);
   const runningIds = useRef<string[]>([]);
   const resumePending = useRef<() => void>(() => undefined);
@@ -250,7 +257,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     });
   }
   async function run(candidates: RecordMeta[]) {
-    if (!candidates.length || running.current || !caps || !ready) return;
+    if (!candidates.length || running.current || removing.current || importing || !caps || !ready) return;
     runningIds.current = candidates.map((row) => row.id);
     if (document.hidden || !navigator.onLine) {
       resumeOnReturn.current = candidates.some((row) => !!row.requestId);
@@ -589,7 +596,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     return { blob, name: translationFilename(meta.name, meta.language, blob.type) };
   }
   async function download(records: RecordMeta[], archive = false) {
-    if (!records.length || exporting.current) return;
+    if (!records.length || exporting.current || removing.current) return;
     exporting.current = true;
     setDownloading(true);
     setError('');
@@ -615,6 +622,28 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         : row.scope === 'user:' + account?.id),
   );
   const completed = displayed.filter((row) => row.state === 'succeeded' || row.id === volatile?.id);
+  async function clearCache() {
+    if (running.current || exporting.current || removing.current || importing || !displayed.length) return;
+    if (!confirm(cacheCopy.confirm)) return;
+    removing.current = true;
+    setClearing(true);
+    setError('');
+    setCacheNotice('');
+    resumeOnReturn.current = false;
+    runningIds.current = [];
+    try {
+      await removeRecords(displayed.map(row => row.id));
+      setVolatile(undefined);
+      await refresh();
+      setHasGuestHistory((await listRecords(['guest:*'])).length > 0);
+      setCacheNotice(cacheCopy.cleared);
+    } catch (error) {
+      fail(error);
+    } finally {
+      removing.current = false;
+      setClearing(false);
+    }
+  }
   return (
     <section className="translation-workbench container" data-has-images={!!displayed.length}>
       <header className="translation-heading">
@@ -656,8 +685,9 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           copy={t}
           locale={locale}
           compact={!!displayed.length}
-          disabled={busy || !ready}
+          disabled={busy || clearing || !ready}
           onAdded={refresh}
+          onBusyChange={(value) => { setImporting(value); if (value) setCacheNotice(''); }}
         />
         <div className="translation-settings">
         <label>
@@ -678,6 +708,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           className="button"
           disabled={
             !ready ||
+            clearing || importing ||
             busy ||
             !language ||
             (isGuestScope && !guest?.enabled) ||
@@ -730,22 +761,27 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       <section className="translation-files" aria-label={t.files}>
         <div className="translation-files-heading">
           <h2>{t.files} <span className="translation-history-count">{displayed.length}</span></h2>
-          <button className="button secondary" disabled={downloading || !completed.length}
+          <div className="translation-file-actions">
+          <button className="button secondary" data-download-all disabled={downloading || clearing || !completed.length}
             onClick={() => void download(completed, true)}>
             {downloading ? t.busy : t.downloadAll}
           </button>
+          <button className="button secondary" data-clear-cache disabled={busy || downloading || importing || clearing || !displayed.length}
+            onClick={() => void clearCache()}>{clearing ? t.busy : cacheCopy.clear}</button>
+          </div>
         </div>
-          {account && hasGuestHistory && (
+          {cacheNotice && <p role="status" className="translation-cache-notice">{cacheNotice}</p>}
+          {account && (hasGuestHistory || showGuest) && (
             <div className="translation-tabs" role="group" aria-label={t.history}>
               <button
-                disabled={busy || downloading}
+                disabled={busy || downloading || importing || clearing}
                 aria-pressed={!showGuest}
                 onClick={() => void changeHistory(false).catch(fail)}
               >
                 {t.myHistory}
               </button>
               <button
-                disabled={busy || downloading}
+                disabled={busy || downloading || importing || clearing}
                 aria-pressed={showGuest}
                 onClick={() => void changeHistory(true).catch(fail)}
               >
@@ -777,15 +813,15 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                   </div>
                   <div className="record-actions">
                     {(row.state === 'succeeded' || volatile?.id === row.id) && (
-                      <button className="button secondary" disabled={downloading} onClick={() => void download([row])}>{t.download}</button>
+                      <button className="button secondary" disabled={downloading || clearing} onClick={() => void download([row])}>{t.download}</button>
                     )}
                     {row.requestId && !['failed', 'succeeded'].includes(row.state) && (
-                      <button className="button secondary" disabled={busy} onClick={() => void run([row])}>{t.resume}</button>
+                      <button className="button secondary" disabled={busy || importing || clearing} onClick={() => void run([row])}>{t.resume}</button>
                     )}
                     {row.mode === 'classic' && row.state === 'failed' && (
-                      <button className="button secondary" disabled={busy} onClick={() => void again(row)}>{t.retry}</button>
+                      <button className="button secondary" disabled={busy || importing || clearing} onClick={() => void again(row)}>{t.retry}</button>
                     )}
-                    <button className="text-link" disabled={busy || downloading} onClick={() => {
+                    <button className="text-link" disabled={busy || downloading || importing || clearing} onClick={() => {
                       if (confirm(t.confirmDelete)) void removeRecord(row.id).then(refresh).catch(fail);
                     }}>{t.remove}</button>
                   </div>

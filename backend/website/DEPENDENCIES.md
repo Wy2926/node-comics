@@ -12,6 +12,7 @@
 | @zip.js/zip.js | 2.15.0 | BSD-3-Clause | [npm source](https://registry.npmjs.org/@zip.js/zip.js/-/zip.js-2.15.0.tgz) | `sha512-hYAuHAaWjt0axbofaDL5XUlmrQPsBDcK3f45ApZuh6N+8UGVk26GoGdtGDvcvzahsHytTQ6DtBVXwG9IcCMjjQ==` |
 | astro | 7.3.3 | MIT | [npm source](https://registry.npmjs.org/astro/-/astro-7.3.3.tgz) | `sha512-NF08hk3edFkVmr9avf9HW/rQyf6NrpbVDyYj2cVN3JfijDhfJYh1ivWVTY5PUd5+rRZn/Vtu4iaeyNlP0Iv6mg==` |
 | cheerio | 1.2.0 | MIT | [npm source](https://registry.npmjs.org/cheerio/-/cheerio-1.2.0.tgz) | `sha512-WDrybc/gKFpTYQutKIK6UvfcuxijIZfMfXaYm8NMsPQxSYvf+13fXUJ4rztGGbJcBQ/GF55gvrZ0Bc0bj/mqvg==` |
+| fake-indexeddb | 6.2.4 | Apache-2.0 | [npm source](https://registry.npmjs.org/fake-indexeddb/-/fake-indexeddb-6.2.4.tgz) | `sha512-INKeIKEtSViN4yVtEWEUqbsqmaIy7Ls+MfU0yxQVXg67pOJ/sH1ZxcVrP8XrKULUFohcPD9gnmym+qBfEybACw==` |
 | jwt-decode | 4.0.0 | MIT | [npm source](https://registry.npmjs.org/jwt-decode/-/jwt-decode-4.0.0.tgz) | `sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==` |
 | oidc-client-ts | 3.5.0 | Apache-2.0 | [npm source](https://registry.npmjs.org/oidc-client-ts/-/oidc-client-ts-3.5.0.tgz) | `sha512-l2q8l9CTCTOlbX+AnK4p3M+4CEpKpyQhle6blQkdFhm0IsBqsxm15bYaSa11G7pWdsYr6epdsRZxJpCyCRbT8A==` |
 | react | 19.2.0 | MIT | [npm source](https://registry.npmjs.org/react/-/react-19.2.0.tgz) | `sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==` |

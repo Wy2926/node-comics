@@ -53,6 +53,7 @@
 :where(.language-menu a, .mobile-nav nav a:not(.mobile-download)):is(:hover, [aria-current]) {
   background: var(--comic-control-selected-bg); color: var(--comic-control-selected-ink);
 }
+.language-menu a:focus-visible, .mobile-nav a:focus-visible { outline: var(--comic-focus-ring); outline-offset: -2px; }
 .mobile-nav { display: none; }
 .mobile-nav summary { width: var(--comic-control-height-icon); padding: 8px; }
 .mobile-nav nav {

@@ -7,16 +7,18 @@ import BillingCycle,{type BillingInterval} from './BillingCycle';
 import {offerForInterval} from '../lib/billing-cycle';
 import {LitePrice,PublishedPurchaseAvailability,publishedAmount,publishedAmountParts,publishedAnnualDiscount} from './PublishedLitePricing';
 import PriceAmount from './PriceAmount';
+import CheckoutButton, { type CheckoutCopy } from './CheckoutButton';
 import '../styles/pricing.css';
 
 interface Props {
   locale:string;
   accountHref:string;
   downloadHref:string;
+  checkoutCopy:CheckoutCopy;
   free:{name:string;description:string;action:string;note:string;priceLabel:string};
 }
 
-export default function BillingOffers({locale,accountHref,downloadHref,free}:Props){
+export default function BillingOffers({locale,accountHref,downloadHref,free,checkoutCopy}:Props){
   const [offers,setOffers]=useState<BillingOffer[]>(),[error,setError]=useState(false);
   const [preferred,setPreferred]=useState<BillingInterval>('month');
   const [selectedPrice,setSelectedPrice]=useState('');
@@ -28,6 +30,8 @@ export default function BillingOffers({locale,accountHref,downloadHref,free}:Pro
       if(!r.ok)throw Error();
       const catalog=await r.json();
       if(!Array.isArray(catalog.offers))throw Error();
+      const requested=catalog.offers.find((offer:BillingOffer)=>offer.id===new URLSearchParams(location.search).get('price'));
+      if(requested){setPreferred(requested.interval);setSelectedPrice(requested.id);}
       setOffers(catalog.offers.filter((offer:BillingOffer)=>offer?.plan_id==='lite'&&offer?.channels?.length>0));
     }).catch(()=>{if(!controller.signal.aborted)setError(true);}).finally(()=>clearTimeout(timeout));
     return()=>{clearTimeout(timeout);controller.abort();};
@@ -63,7 +67,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free}:Pro
       <td aria-hidden="true"></td>
       <td className="free-action"><a className="button secondary" data-install-extension href={downloadHref}>{free.action}<span className="ui-icon icon-arrow" aria-hidden="true"/></a><p className="trial-note">{free.note}</p></td>
       <td className="paid-action">{offer?<>
-        <a className="button" data-purchase-link href={`${accountHref}?price=${encodeURIComponent(offer.id)}`}>{benefits.subscribe(offer.name)}<span className="ui-icon icon-arrow" aria-hidden="true"/></a>
+        <CheckoutButton priceId={offer.id} accountHref={accountHref} label={benefits.subscribe(offer.name)} copy={checkoutCopy}/>
         <p className="trial-note">{offer.trial_days>0&&trialCopy(offer.trial_days,locale)} {renewalCopy(offer,locale)} {text.cancel} {publishedPricingCopy(locale).tax}</p>
       </>:<PublishedPurchaseAvailability locale={locale} state={error?'error':offers?'unavailable':'loading'}/>}</td>
       </tr></tfoot>

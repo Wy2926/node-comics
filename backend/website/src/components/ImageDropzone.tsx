@@ -1,30 +1,36 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { translationError } from '../i18n/translation-error';
 import type { TranslationCopy } from '../i18n/translate';
 import { localPath, type Locale } from '../i18n/locales';
 import { importImages } from '../lib/translation-store';
+import { bindImageImport } from '../lib/image-import-events';
 import '../styles/translate.css';
 export default function ImageDropzone({
   locale,
   copy: t,
   onAdded,
+  onBusyChange,
   disabled = false,
   compact = false,
 }: {
   locale: Locale;
   copy: TranslationCopy;
   onAdded?: () => Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
   compact?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null),
     descriptionId = useId();
+  const importing = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [drag, setDrag] = useState(false);
   async function add(files: File[]) {
-    if (busy || disabled) return;
+    if (importing.current || disabled) return;
+    importing.current = true;
     setBusy(true);
+    onBusyChange?.(true);
     setError('');
     try {
       await importImages(files);
@@ -35,9 +41,13 @@ export default function ImageDropzone({
         translationError(error instanceof Error ? error.message : '', t),
       );
     } finally {
+      importing.current = false;
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
+  useEffect(() => bindImageImport(document, files => { setDrag(false); void add(files); }),
+    [disabled, locale, onAdded, onBusyChange]);
   return (
     <div
       className="image-dropzone"
@@ -68,13 +78,6 @@ export default function ImageDropzone({
         event.preventDefault();
         setDrag(false);
         void add(Array.from(event.dataTransfer.files));
-      }}
-      onPaste={(event) => {
-        const files = Array.from(event.clipboardData.files);
-        if (files.length) {
-          event.preventDefault();
-          void add(files);
-        }
       }}
     >
       <div className="upload-mark" aria-hidden="true">

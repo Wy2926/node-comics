@@ -152,10 +152,17 @@ async function saveRecords(records: { meta: RecordMeta; data?: RecordData }[]) {
   return bytes;
 }
 export async function removeRecord(id: string) {
+  return removeRecords([id]);
+}
+/** Delete only the explicitly selected history, atomically with its image blobs. */
+export async function removeRecords(ids: string[]) {
+  if (!ids.length) return;
   const tx = (await database()).transaction(['records', 'images'], 'readwrite');
   const committed = done(tx);
-  tx.objectStore('records').delete(id);
-  tx.objectStore('images').delete(id);
+  for (const id of new Set(ids)) {
+    tx.objectStore('records').delete(id);
+    tx.objectStore('images').delete(id);
+  }
   await committed;
 }
 export function draftScope() {

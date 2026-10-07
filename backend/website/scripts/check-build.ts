@@ -95,7 +95,7 @@ for (const file of htmlFiles) {
   if (basePath(route) === '/manga-translator/') errors.push(`${label}: removed advertising landing page remains in output`);
   if (basePath(route) === '/translate/') {
     if (!noindex || $('.translation-workbench').length !== 1 || $('.translation-composer input[type=file]').length !== 1) errors.push(`${label}: translator must be a private, usable work surface`);
-    if (!$('.translation-composer input[type=file]').is('[multiple]') || $('.translation-files').length !== 1 || $('.translation-files-heading button[disabled]').length !== 1) errors.push(`${label}: translator needs batch upload, file list and an initially disabled ZIP download`);
+    if (!$('.translation-composer input[type=file]').is('[multiple]') || $('.translation-files').length !== 1 || $('button[data-download-all][disabled]').length !== 1 || $('button[data-clear-cache][disabled]').length !== 1) errors.push(`${label}: translator needs batch upload, file list, disabled ZIP download and local cache clearing`);
     if ($('.translation-workbench img, .translation-viewer, .translation-canvas, .translation-workbench input[type=range]').length) errors.push(`${label}: translator must not include image previews, comparison or zoom controls`);
   }
   if (basePath(route) === '/pricing/') {

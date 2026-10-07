@@ -1,5 +1,8 @@
 import {basePath, languageNames, locales, type Locale} from '../i18n/locales';
 import {languageSuggestion, languageTarget, preferenceCookie} from './language-preference';
+import {bindHeaderMenus} from './header-menu';
+
+bindHeaderMenus(document);
 
 const notice = document.querySelector<HTMLElement>('[data-language-notice]');
 const dismissedKey = 'nc-site-language-dismissed';

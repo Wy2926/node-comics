@@ -19,6 +19,7 @@
 
 | 国旗素材 | 对应语言 | 上游 SVG SHA-256 |
 | --- | --- | --- |
+| [src/assets/flags/sa.svg](src/assets/flags/sa.svg) | العربية | `5738c8cfca5fea63587cbcf69237996c8ce6283f8016853150686f37311b620e` |
 | [src/assets/flags/cn.svg](src/assets/flags/cn.svg) | 简体中文 | `981da9bdf82d48e31691f20578cefcb26cf7d0bd95e4ebd5c0df00bdfe988c1a` |
 | [src/assets/flags/tw.svg](src/assets/flags/tw.svg) | 繁體中文 | `931757f06b9ee751fd1a0cc8dd7cf862e21fdcaf894d10ed7bcc68dabcca59ad` |
 | [src/assets/flags/us.svg](src/assets/flags/us.svg) | English | `e7be4240cf57987926673708f09233be1ab6bdf35acc7b86bd32a263f197a2a7` |
