@@ -1,8 +1,25 @@
-"""Adapt MTU's unmodified 48px color prediction and TextBlock aggregation."""
+"""Adapt MTU color prediction and keep the rendered outline readable."""
 import cv2
 import numpy as np
 
-from .ocr import OCR_BATCH_SIZE, valid_crop
+
+def _luminance(color):
+    # Match the integer RGB channels ultimately passed to Qt.
+    rgb = [int(channel) / 255 for channel in color]
+    linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    return sum(c * weight for c, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+
+def ensure_stroke_contrast(region):
+    """Keep the predicted fill; replace only low-contrast outlines (below 3:1)."""
+    foreground, background = _luminance(region.fg_colors), _luminance(region.bg_colors)
+    if (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05) < 3:
+        black_contrast = (foreground + 0.05) / 0.05
+        white_contrast = 1.05 / (foreground + 0.05)
+        region.bg_colors = np.full(3, 0 if black_contrast >= white_contrast else 255)
+    # Prevent upstream's gray-color heuristic from overriding this decision or
+    # dropping the outline. This also covers older checkpoints without a flag.
+    region.adjust_bg_color = False
 
 
 class Colors:
@@ -16,6 +33,8 @@ class Colors:
 
     def apply(self, image, regions):
         from manga_translator.utils import chunks
+        # CPU-only render workers use the contrast guard, not the OCR runtime.
+        from .ocr import OCR_BATCH_SIZE, valid_crop
         for region in regions:
             region.set_font_colors(np.zeros(3), np.zeros(3))
         lines = [(region, points) for region in regions for points in region.lines]

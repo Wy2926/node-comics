@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from mtu_engine.colors import Colors
+from mtu_engine.colors import Colors, ensure_stroke_contrast
 from mtu_engine.engine import serialize_region
 from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_MAX_WIDTH
 
@@ -77,7 +77,7 @@ def test_empty_regions_do_not_crop_or_predict_and_close_releases_reference(color
     assert adapter.predictor is None
 
 
-def test_color_checkpoint_preserves_raw_style_without_contrast_adjustment():
+def test_color_checkpoint_preserves_prediction_until_rendering():
     block = SimpleNamespace(lines=np.zeros((1, 4, 2)), texts=['source'], font_size=36,
         angle=0, fg_colors=np.array([210, 40, 60]), bg_colors=np.array([120, 120, 120]),
         prob=.9, _direction='h', default_stroke_width=.1, adjust_bg_color=False,
@@ -87,6 +87,34 @@ def test_color_checkpoint_preserves_raw_style_without_contrast_adjustment():
     assert restored['bg_color'] == [120, 120, 120]
     assert restored['default_stroke_width'] == .1
     assert restored['adjust_bg_color'] is False
+
+
+@pytest.mark.parametrize('fg,bg,expected', [
+    ([0, 0, 0], [0, 0, 0], [255, 255, 255]),
+    ([5, 8, 12], [18, 22, 28], [255, 255, 255]),
+    ([0, 0, 0], [0, 0, 100], [255, 255, 255]),
+    ([255, 255, 255], [240, 240, 240], [0, 0, 0]),
+    ([210, 40, 60], [205, 38, 58], [255, 255, 255]),
+    ([0, 0, 255], [0, 0, 250], [255, 255, 255]),
+    ([0, 255, 0], [0, 250, 0], [0, 0, 0]),
+    ([255, 255, 0], [250, 250, 0], [0, 0, 0]),
+    ([120, 120, 120], [120, 120, 120], [0, 0, 0]),
+    ([0, 0, 0], [255, 255, 255], [255, 255, 255]),
+    ([245, 245, 245], [20, 40, 130], [20, 40, 130]),
+    ([220, 30, 50], [255, 255, 255], [255, 255, 255]),
+    # Check the 3:1 boundary after the same integer conversion as Qt.
+    ([0, 0, 0], [89.99, 89.99, 89.99], [255, 255, 255]),
+    ([0, 0, 0], [90, 90, 90], [90, 90, 90]),
+])
+@pytest.mark.parametrize('adjust', [False, True])
+def test_render_color_guard_preserves_fill_and_only_fixes_low_contrast(fg, bg, expected, adjust):
+    block = SimpleNamespace(fg_colors=np.array(fg), bg_colors=np.array(bg),
+                            adjust_bg_color=adjust, default_stroke_width=.1)
+    for _ in range(2):  # Repeated rendering must not flip colors.
+        ensure_stroke_contrast(block)
+        np.testing.assert_array_equal(block.fg_colors, fg)
+        np.testing.assert_array_equal(block.bg_colors, expected)
+        assert not block.adjust_bg_color and block.default_stroke_width == .1
 
 
 def test_color_assets_are_pinned():

@@ -9,6 +9,7 @@ from threading import Lock, current_thread, main_thread
 import numpy as np
 
 from .assets import activate
+from .colors import ensure_stroke_contrast
 
 LANGUAGES = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'ko': 'KOR', 'en': 'ENG',
              'fr': 'FRA', 'es': 'ESP', 'pt-BR': 'PTB', 'de': 'DEU', 'it': 'ITA', 'ru': 'RUS',
@@ -115,6 +116,7 @@ class Renderer:
             if not text.strip():
                 continue
             block = TextBlock(**data)
+            ensure_stroke_contrast(block)
             block.translation = text
             block.target_lang = target
             block.font_family = config.render.font_family

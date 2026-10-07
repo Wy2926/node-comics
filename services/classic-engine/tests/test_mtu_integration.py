@@ -210,26 +210,38 @@ def test_qt_mask_optimization_preserves_pixels_and_layout(assets, offline, monke
 
 
 @pytest.mark.parametrize('enclosed', [False, True])
-@pytest.mark.parametrize('fg,bg', [([235, 35, 60], [80, 80, 80]), ([245, 245, 245], [20, 40, 130]),
-                                  ([210, 40, 60], [205, 38, 58])])
-def test_qt_retains_predicted_fill_and_stroke_through_checkpoint(assets, offline, enclosed, fg, bg):
+@pytest.mark.parametrize('matching_background', [False, True])
+@pytest.mark.parametrize('adjust', [False, True, None])
+@pytest.mark.parametrize('fg,bg,stroke', [
+    ([0, 0, 0], [10, 10, 10], [255, 255, 255]),
+    ([255, 255, 255], [240, 240, 240], [0, 0, 0]),
+    ([235, 35, 60], [80, 80, 80], [0, 0, 0]),
+    ([245, 245, 245], [20, 40, 130], [20, 40, 130]),
+    ([210, 40, 60], [205, 38, 58], [255, 255, 255]),
+    ([0, 0, 0], [90, 90, 90], [90, 90, 90]),
+])
+def test_qt_guards_stroke_contrast_after_checkpoint_restore(
+        assets, offline, enclosed, matching_background, adjust, fg, bg, stroke):
     models, fonts = assets
     renderer = Renderer(models, fonts)
     from manga_translator.utils import TextBlock
     block = TextBlock([[[100, 80], [500, 80], [500, 210], [100, 210]]], ['source'],
         font_size=48, fg_color=fg, bg_color=bg, default_stroke_width=.1, adjust_bg_color=False)
     data = json.loads(json.dumps(serialize_region(block)))
-    restored = TextBlock(**data)
-    assert restored.get_font_colors() == (tuple(fg), tuple(bg))
-    assert restored.stroke_width == .1 and not restored.adjust_bg_color
-    cleaned = np.full((300, 600, 3), [240, 220, 190], dtype=np.uint8)
+    if adjust is None:
+        data.pop('adjust_bg_color')
+    else:
+        data['adjust_bg_color'] = adjust
+    # Also match the page to the fill: only the outline keeps text visible.
+    cleaned = np.full((300, 600, 3), fg if matching_background else [240, 220, 190], dtype=np.uint8)
     bubble = np.zeros(cleaned.shape[:2], dtype=np.uint8)
     if enclosed:
         bubble[30:260, 40:560] = 255
     result = renderer.render(cleaned, cleaned, [data], ['COLOR TEST'], 'en', bubble)
     assert np.count_nonzero(np.all(result == fg, axis=2)) > 20
-    assert np.count_nonzero(np.all(result == bg, axis=2)) > 20
+    assert np.count_nonzero(np.all(result == stroke, axis=2)) > 20
     assert data['fg_color'] == fg and data['bg_color'] == bg
+    assert data.get('adjust_bg_color') is adjust  # Do not mutate saved checkpoints.
 
 
 def test_legacy_checkpoint_retains_black_white_without_color_inference(assets, offline):
