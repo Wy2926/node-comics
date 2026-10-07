@@ -25,7 +25,7 @@ def configuration(detect_size=1280, inpainting_size=512):
                       'solid_fill_pure_bubbles': True, 'per_block_inpainting': True},
         'render': {'renderer': 'default', 'layout_mode': 'smart_scaling',
                    'balloon_fill_mask_layout': False, 'center_text_in_bubble': True,
-                   'no_hyphenation': True, 'font_color': '000000:FFFFFF',
+                   'no_hyphenation': True,
                    'stroke_width': 0.1, 'font_scale_ratio': 0.96},
         'translator': {'translator': 'none'},
     })
@@ -38,7 +38,8 @@ def serialize_region(region):
             'font_size': float(region.font_size), 'angle': float(region.angle),
             'fg_color': list(map(int, region.fg_colors)), 'bg_color': list(map(int, region.bg_colors)),
             'prob': float(region.prob), 'direction': region._direction,
-            'default_stroke_width': float(region.stroke_width),
+            'default_stroke_width': float(region.default_stroke_width),
+            'adjust_bg_color': bool(region.adjust_bg_color),
             'line_spacing': float(region.line_spacing), 'letter_spacing': float(region.letter_spacing)}
 
 
@@ -116,9 +117,7 @@ class Renderer:
             block.translation = text
             block.target_lang = target
             block.font_family = config.render.font_family
-            block.fg_colors = [0, 0, 0]
-            block.bg_colors = [255, 255, 255]
-            block.default_stroke_width = 0.1
+            block.default_stroke_width = config.render.stroke_width
             if language not in ('zh-Hans', 'zh-Hant', 'ja'):
                 block._direction = config.render.direction.value
                 if len(text.split()) == 1:
@@ -235,6 +234,8 @@ class Engine:
         ballons_logger.propagate = False
         ballons_logger.setLevel(logging.CRITICAL + 1)
         from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
+        from manga_translator.ocr.model_48px import Model48pxOCR
+        from .colors import Colors
         from .ocr import Paddle
         from .experts import Chinese, Japanese
         from .routing import ScriptRouter
@@ -245,7 +246,8 @@ class Engine:
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
             self.inpainter = CudaLama()
-            for model in (self.detector, self.inpainter):
+            self.color_model = Model48pxOCR()
+            for model in (self.detector, self.inpainter, self.color_model):
                 # Keep upstream model diagnostics out of operational logs.
                 model.logger.handlers = [logging.NullHandler()]
                 model.logger.propagate = False
@@ -253,6 +255,7 @@ class Engine:
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
                 asyncio.run(model.load('cuda'))
+            self.colors = Colors(self.color_model)
             self.probes = {language: Paddle(self.models, language, gpu, threads)
                            for language in ('en', 'ch', 'korean')}
             self.recognizers = {'en': self.probes['en'], 'korean': self.probes['korean'],
@@ -268,7 +271,7 @@ class Engine:
 
     def warmup(self):
         import torch
-        from manga_translator.utils import Quadrilateral
+        from manga_translator.utils import Quadrilateral, TextBlock
         rgb = np.full((512, 512, 3), 255, dtype=np.uint8)
         mask = np.zeros((512, 512), dtype=np.uint8)
         mask[230:260, 230:260] = 255
@@ -282,6 +285,8 @@ class Engine:
             # the upstream scorer too, without downloads or text logging.
             self.router.choose({lang: {'text': 'test', 'conf': .9}
                                 for lang in ('en', 'ch', 'japan', 'korean')})
+            self.colors.apply(rgb, [TextBlock(
+                lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=['warmup'])])
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
@@ -316,7 +321,8 @@ class Engine:
                     self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
-                                 direction='v' if block.src_is_vertical else 'h')
+                                 direction='v' if block.src_is_vertical else 'h',
+                                 default_stroke_width=c.render.stroke_width, adjust_bg_color=False)
                        for block, group in zip(blocks, groups)
                        if group]
             regions = [region for region in regions
@@ -324,6 +330,10 @@ class Engine:
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
             if not regions:
                 return [], None, None, None
+            # Use original pixels only, after OCR/language filtering and before
+            # erasure. Checkpoints retain colors; resume/render never predicts.
+            with self._ocr_lock:
+                self.colors.apply(rgb, regions)
             with self._bubble_lock:
                 detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
             bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
@@ -360,8 +370,8 @@ class Engine:
         import torch
         # Node shutdown joins the compute pool before unloading model weights.
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
-            for model in (*self.probes.values(), self.recognizers['ch'], self.japanese):
+            for model in (*self.probes.values(), self.recognizers['ch'], self.japanese, self.colors):
                 model.close()
-            for model in (self.detector, self.inpainter):
+            for model in (self.detector, self.inpainter, self.color_model):
                 asyncio.run(model.unload())
             self.bubbles.model = None

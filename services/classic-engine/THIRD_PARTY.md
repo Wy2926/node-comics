@@ -8,6 +8,8 @@ One local source edit is recorded verbatim in the lockfile: `build_det_rearrange
 
 The lock also records the DBNet checkpoint from [manga-image-translator](https://github.com/zyddnys/manga-image-translator), PP-OCRv5 Korean weights/dictionary distributed by MTU, the LaMa Large checkpoint from [AnimeMangaInpainting](https://huggingface.co/dreMaz/AnimeMangaInpainting), and MangaLens weights distributed by the MTU author. PP-OCR reuses MTU's Apache-2.0 perspective crop and CTC decoder with published ONNX files pinned by SHA-256; no locally exported models or patched inference bindings are shipped.
 
+Text fill and single-outline colors use MTU's unmodified `ModelPaddleOCR._estimate_colors_batch`, its perspective crop, `Model48pxOCR` loader and `TextBlock.update_font_colors`. The `ocr_ar_48px.ckpt` and `alphabet-all-v7.txt` files from manga-image-translator's `beta-0.3` release are SHA-256-pinned in the same lock; the upstream GPL-3.0 source notices remain in the prepared MTU tree. One shared 48px model supplies colors only; its decoded text does not replace the selected language recognizer. The adapter limits crop batches and maps RGB/checkpoint fields, without a local color estimator, model conversion or upstream color-source patch.
+
 ## RapidOCR
 
 [RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR) 3.9.2 provides the unmodified `TextRecognizer` aspect-ratio sorting, bounded batching, resize/padding and order restoration. Its wheel and SHA-256 are pinned in `uv.lock`; Apache-2.0 notices remain in the package metadata and source. The adapter supplies the existing MTU CUDA session and decoder instead of loading RapidOCR's default models or dictionary. No upstream algorithm is copied or rewritten.

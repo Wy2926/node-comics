@@ -166,6 +166,100 @@ def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, mon
         assert np.array_equal(empty, source)
 
 
+@pytest.mark.parametrize('enclosed', [False, True])
+@pytest.mark.parametrize('fg,bg', [([235, 35, 60], [80, 80, 80]), ([245, 245, 245], [20, 40, 130]),
+                                  ([210, 40, 60], [205, 38, 58])])
+def test_qt_retains_predicted_fill_and_stroke_through_checkpoint(assets, offline, enclosed, fg, bg):
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator.utils import TextBlock
+    block = TextBlock([[[100, 80], [500, 80], [500, 210], [100, 210]]], ['source'],
+        font_size=48, fg_color=fg, bg_color=bg, default_stroke_width=.1, adjust_bg_color=False)
+    data = json.loads(json.dumps(serialize_region(block)))
+    restored = TextBlock(**data)
+    assert restored.get_font_colors() == (tuple(fg), tuple(bg))
+    assert restored.stroke_width == .1 and not restored.adjust_bg_color
+    cleaned = np.full((300, 600, 3), [240, 220, 190], dtype=np.uint8)
+    bubble = np.zeros(cleaned.shape[:2], dtype=np.uint8)
+    if enclosed:
+        bubble[30:260, 40:560] = 255
+    result = renderer.render(cleaned, cleaned, [data], ['COLOR TEST'], 'en', bubble)
+    assert np.count_nonzero(np.all(result == fg, axis=2)) > 20
+    assert np.count_nonzero(np.all(result == bg, axis=2)) > 20
+    assert data['fg_color'] == fg and data['bg_color'] == bg
+
+
+def test_legacy_checkpoint_retains_black_white_without_color_inference(assets, offline):
+    models, fonts = assets
+    renderer = Renderer(models, fonts)
+    from manga_translator.utils import TextBlock
+    block = TextBlock([[[100, 80], [500, 80], [500, 210], [100, 210]]], ['source'], font_size=48)
+    data = serialize_region(block)
+    data.pop('adjust_bg_color')
+    cleaned = np.full((300, 600, 3), 220, dtype=np.uint8)
+    result = renderer.render(cleaned, cleaned, [data], ['LEGACY TEST'], 'en', None)
+    assert np.count_nonzero(np.all(result == [0, 0, 0], axis=2)) > 20
+    assert np.count_nonzero(np.all(result == [255, 255, 255], axis=2)) > 20
+
+
+def test_native_color_aggregation_preserves_raw_channels(assets):
+    from mtu_engine.assets import activate
+    models, _ = assets
+    activate(models)
+    from manga_translator.utils import TextBlock
+    from mtu_engine.colors import Colors
+    from types import SimpleNamespace
+    predictor = SimpleNamespace(_get_rotate_crop_image=lambda *args: np.zeros((48, 100, 3), dtype=np.uint8),
+        _estimate_colors_batch=lambda crops: [(180, 20, 40, 80, 80, 80), (220, 40, 60, 120, 120, 120)])
+    colors = Colors.__new__(Colors)
+    colors.predictor = predictor
+    block = TextBlock([[[0, 0], [100, 0], [100, 48], [0, 48]]] * 2, ['first', 'second'],
+                      adjust_bg_color=False)
+    colors.apply(None, [block])
+    assert block.get_font_colors() == ((200., 30., 50.), (100., 100., 100.))
+    assert block.texts == ['first', 'second']
+
+
+def test_native_48px_colors_and_failure_fallback_offline(assets, offline, monkeypatch):
+    import asyncio
+    import torch
+    from PIL import Image, ImageDraw, ImageFont
+    from mtu_engine.colors import Colors
+    models, fonts = assets
+    Renderer(models, fonts)
+    from manga_translator.utils import ModelWrapper, TextBlock
+    from manga_translator.ocr.model_48px import Model48pxOCR
+    ModelWrapper._MODEL_DIR = str(models)
+    native = Model48pxOCR()
+    assert native.is_downloaded()
+    # This component probe can run on CPU; Engine still requires CUDA.
+    asyncio.run(native.load('cuda' if torch.cuda.is_available() else 'cpu'))
+    colors = Colors(native)
+    try:
+        image = Image.new('RGB', (700, 160), (240, 220, 190))
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 48)
+        draw.text((95, 45), 'COLOR TEST', font=font, fill=(235, 35, 60),
+                  stroke_width=4, stroke_fill=(80, 80, 80))
+        x1, y1, x2, y2 = draw.textbbox((95, 45), 'COLOR TEST', font=font, stroke_width=4)
+        block = TextBlock([[[x1-3, y1-3], [x2+3, y1-3], [x2+3, y2+3], [x1-3, y2+3]]],
+                          ['selected OCR text'], adjust_bg_color=False)
+        colors.apply(np.array(image), [block])
+        fg, bg = block.get_font_colors()
+        np.testing.assert_allclose(fg, [235, 35, 60], atol=35, rtol=0)
+        np.testing.assert_allclose(bg, [80, 80, 80], atol=35, rtol=0)
+        assert block.texts == ['selected OCR text']
+        def failed(*args, **kwargs):
+            raise RuntimeError('Injected color prediction failure')
+        monkeypatch.setattr(native.model, 'infer_beam_batch_tensor', failed)
+        colors.apply(np.array(image), [block])
+        assert block.get_font_colors() == ((0., 0., 0.), (255., 255., 255.))
+        assert block.texts == ['selected OCR text']
+    finally:
+        colors.close()
+        asyncio.run(native.unload())
+
+
 def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypatch):
     models, fonts = assets
     engine = Engine(models, fonts)
@@ -177,6 +271,9 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             assert probe.session.get_session_options().intra_op_num_threads == 2
         assert engine.recognizers['ch'].model.device.type == 'cuda'
         assert engine.japanese.model.model.device.type == 'cuda'
+        assert engine.color_model.use_gpu
+        assert next(engine.color_model.model.parameters()).device.type == 'cuda'
+        assert engine.colors.predictor.color_model is engine.color_model.model
         import asyncio
         from types import SimpleNamespace
         from PIL import Image, ImageDraw, ImageFont
