@@ -65,3 +65,12 @@ def test_scope_edit_serializes_with_new_admission(admin_case):
         jobs = db.scalars(select(Job)).all()
         assert all(job.config['text']['provider_id'] == provider['id'] for job in jobs)
         assert {job.entitlement['plan'] for job in jobs} == ({'free', 'plus'} if status == 202 else {'plus'})
+
+
+def test_idle_worker_query_does_not_compare_json_plan_scopes(admin_case):
+    from app.scheduler import next_control_delay
+    supplier(admin_case, ['free'])
+    supplier(admin_case, ['plus'])
+    with session_factory()() as db:
+        # PostgreSQL rejects DISTINCT over JSON even when the queue is empty.
+        assert next_control_delay(db) == 5

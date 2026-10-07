@@ -171,7 +171,7 @@ def next_control_delay(db, maximum=5):
             Job.cancel_requested.is_(False), Job.discard_output.is_(False)))
     first = db.scalar(pending.order_by(JobStage.available_at).limit(1))
     delay = min(maximum, max(0, (first - at).total_seconds())) if first else maximum
-    providers = db.scalars(select(TranslationProvider).join(Job,
+    providers = db.execute(select(TranslationProvider.id, TranslationProvider.requests_per_minute).join(Job,
         Job.config['text']['provider_id'].as_string() == TranslationProvider.id)
         .join(JobStage, JobStage.job_id == Job.id).where(TranslationProvider.enabled.is_(True),
             JobStage.name == 'text', JobStage.status == 'ready', JobStage.available_at <= at,
