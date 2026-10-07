@@ -16,7 +16,7 @@ from app import classic
 from app.adapters.llm import TextResponse
 from app.config import settings
 from app.db import session_factory
-from app.models import ClassicState, Job, TextCall, now
+from app.models import Job, TextCall, now
 from app.providers import digest
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import claim_stage
@@ -31,15 +31,10 @@ def test_node_detailed_timings_are_bounded_and_whitelisted():
     from pydantic import TypeAdapter, ValidationError
     from app.compute_v3 import Timings
     adapter = TypeAdapter(Timings)
-    values = {key: .25 for key in (
-        'analyze_decode', 'analyze_detect', 'analyze_group', 'analyze_route', 'analyze_ocr',
-        'analyze_colors', 'analyze_bubbles', 'analyze_refine', 'analyze_serialize',
-        'render_areas', 'render_layout', 'render_diff', 'render_encode',
-        'detect_lock_wait', 'ocr_lock_wait', 'bubble_lock_wait', 'inpaint_lock_wait')}
+    values = {key: .25 for key in ('render_areas', 'render_layout', 'render_diff', 'render_encode',
+                                  'detect_lock_wait', 'ocr_lock_wait', 'inpaint_lock_wait')}
     assert adapter.validate_python(values) == values
-    assert adapter.validate_python({'analyze_ocr': 0, 'analyze_colors': 86400}) == {'analyze_ocr': 0., 'analyze_colors': 86400.}
-    for invalid in ({'render_encode': -1}, {'render_layout': float('nan')}, {'not_a_timing': 1},
-                    {'analyze_colors': float('inf')}, {'analyze_ocr': 86401}, {'bubble_lock_wait': -1}):
+    for invalid in ({'render_encode': -1}, {'render_layout': float('nan')}, {'not_a_timing': 1}):
         with pytest.raises(ValidationError):
             adapter.validate_python(invalid)
 
@@ -140,11 +135,8 @@ def result_for(v3, lease, png):
     return result, data
 
 
-def deliver(v3, lease, result, data=None, *, token=None, timings=None):
-    body = {'lease_token': token or lease['lease_token'], 'result': result}
-    if timings is not None:
-        body['timings'] = timings
-    files = {'metadata': (None, json.dumps(body),
+def deliver(v3, lease, result, data=None, *, token=None):
+    files = {'metadata': (None, json.dumps({'lease_token': token or lease['lease_token'], 'result': result}),
                           'application/json')}
     if data is not None:
         files['output'] = ('overlay.webp', data, 'image/webp')
@@ -448,17 +440,12 @@ def test_identity_result_has_no_file_and_retains_success(v3, png):
     text(lease)
     result, _ = result_for(v3, lease, png)
     result.update(representation='original', bbox=None, output=None)
-    timings = {'analyze': 2., 'analyze_decode': .1, 'analyze_route': .2, 'analyze_ocr': .3,
-               'analyze_colors': .4, 'analyze_serialize': .1, 'ocr_lock_wait': .2, 'bubble_lock_wait': .1}
-    reply = deliver(v3, lease, result, timings=timings)
+    reply = deliver(v3, lease, result)
     assert reply.status_code == 200 and reply.json()['job_status'] == 'succeeded'
     assert deliver(v3, lease, result).json() == reply.json()
-    assert deliver(v3, lease, result, timings={'analyze': 99.}).json() == reply.json()
     with session_factory()() as db:
         job = db.get(Job, lease['job_id'])
         assert job.output_asset_id is None and job.result_description['representation'] == 'original'
-        state = db.scalar(select(ClassicState).where(ClassicState.job_id == job.id))
-        assert state.timings == {'node': timings, 'delivery': {'protocol': 3}}
 
 
 def test_late_direct_upload_cannot_publish_after_cancel_or_new_generation(v3, png):

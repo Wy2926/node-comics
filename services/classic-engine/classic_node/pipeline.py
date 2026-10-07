@@ -6,7 +6,7 @@ import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
 from .operations import report_page_failure
-from .timing import collect, measured
+from .timing import collect
 
 
 class Pipeline:
@@ -133,8 +133,7 @@ class Pipeline:
         page.future.add_done_callback(lambda _: self.agent.wake.set())
 
     def prepare(self, page):
-        with measured('analyze_decode'):
-            rgb, alpha = self.agent.runtime.decode(page.data, page.metadata)
+        rgb, alpha = self.agent.runtime.decode(page.data, page.metadata)
         page.data = None
         analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'], masks=page.masks)
         if analysis['input_hash'] != page.metadata['sha256']:

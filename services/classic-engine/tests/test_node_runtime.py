@@ -39,33 +39,6 @@ def fixture(alpha=None):
     return runtime, data, metadata, analysis, translated
 
 
-def test_prepare_decode_timing_excludes_analysis_and_keeps_parent_wall_time(monkeypatch):
-    from classic_node.timing import collect, measured
-    runtime, data, metadata, analysis, _ = fixture()
-    clock = [0.]
-    decode = runtime.decode
-
-    def timed_decode(*args):
-        clock[0] += .25
-        return decode(*args)
-
-    def analyze(*_args, **_kwargs):
-        clock[0] += 5.
-        return analysis
-
-    monkeypatch.setattr('classic_node.timing.perf_counter', lambda: clock[0])
-    monkeypatch.setattr(runtime, 'decode', timed_decode)
-    runtime.analyze = analyze
-    pipeline = Pipeline.__new__(Pipeline)
-    pipeline.agent = SimpleNamespace(runtime=runtime)
-    page = SimpleNamespace(data=data, metadata=metadata, analysis=None, masks={})
-    with collect() as timings:
-        with measured('analyze'):
-            _, _, actual = pipeline.prepare(page)
-    assert actual is analysis and page.data is None
-    assert timings == {'analyze_decode': .25, 'analyze': 5.25}
-
-
 @pytest.mark.parametrize('alpha', [None, 255, 90, 1, 0])
 def test_render_crops_all_inpaint_and_lettering_changes_and_preserves_source_alpha(monkeypatch, alpha):
     runtime, data, metadata, analysis, translated = fixture(alpha)
@@ -444,7 +417,6 @@ def test_old_engine_checkpoint_cannot_resume_even_when_blank(blank):
 
 
 def test_compatible_checkpoint_from_another_build_keeps_its_paid_translation():
-    from classic_node.timing import collect
     runtime, data, metadata, analysis, translated = fixture()
     analysis['version'] = 'another-os-and-dependency-build'
     analysis['mask'] = png64(Image.new('L', (80, 64), 255))
@@ -453,10 +425,8 @@ def test_compatible_checkpoint_from_another_build_keeps_its_paid_translation():
     pipeline = Pipeline.__new__(Pipeline)
     pipeline.agent = SimpleNamespace(runtime=runtime)
     page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis, masks={})
-    with collect() as timings:
-        rgb, alpha, resumed = pipeline.prepare(page)
+    rgb, alpha, resumed = pipeline.prepare(page)
     assert resumed is analysis
-    assert set(timings) == {'analyze_decode'} and timings['analyze_decode'] >= 0
     assert runtime.render(rgb, rgb, resumed, translated, 'en', alpha)['result']['representation'] == 'original'
 
 

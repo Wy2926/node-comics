@@ -213,45 +213,23 @@ def test_close_does_not_unload_shared_probe_recognizers_twice(analysis):
     assert closed == ['en', 'ch', 'korean', 'japan', 'colors', 'unload', 'unload', 'unload']
 
 
-def test_analysis_records_model_work_and_lock_wait_separately(analysis, monkeypatch):
-    from classic_node import timing
+def test_analysis_does_not_require_new_center_timing_keys(analysis):
     engine, source, _, _ = analysis
-    clock = [0.0]
-    monkeypatch.setattr(timing, 'perf_counter', lambda: clock[0])
-
-    class DelayedLock:
-        def acquire(self):
-            clock[0] += 5.0
-
-        def release(self):
-            pass
-
-        def locked(self):
-            return True
-
-    engine._detector_lock = engine._ocr_lock = engine._bubble_lock = DelayedLock()
     async def recognize(rgb, lines, config):
-        clock[0] += 2.0
         for line in lines:
             line.text = 'recognized'
     engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values:
         engine.analyze(source)
-    assert values['detect_lock_wait'] == values['bubble_lock_wait'] == 5.0
-    assert values['ocr_lock_wait'] == 10.0  # Recognition and color acquisition.
-    assert values['analyze_ocr'] == 2.0
-    for stage in ('detect', 'group', 'route', 'colors', 'bubbles', 'refine'):
-        assert values[f'analyze_{stage}'] == 0.0
+    assert values == {}  # Existing pipeline totals remain the protocol boundary.
 
 
-def test_analysis_failure_records_completed_stages_only_and_releases_locks(analysis):
+def test_analysis_failure_releases_locks_without_new_timing_keys(analysis):
     engine, source, _, _ = analysis
     async def recognize(*args):
         raise RuntimeError('OCR failed')
     engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values, pytest.raises(RuntimeError, match='OCR failed'):
         engine.analyze(source)
-    assert set(values) == {'detect_lock_wait', 'analyze_detect', 'analyze_group',
-                           'ocr_lock_wait', 'analyze_route', 'analyze_ocr'}
-    assert all(value >= 0 for value in values.values())
+    assert values == {}
     assert not engine._detector_lock.locked() and not engine._ocr_lock.locked()

@@ -8,8 +8,6 @@ from threading import Lock, current_thread, main_thread
 
 import numpy as np
 
-from classic_node.timing import measured, waiting_for
-
 from .assets import activate
 from .colors import ensure_stroke_contrast
 
@@ -306,35 +304,31 @@ class Engine:
             TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
-            with waiting_for(self._detector_lock, 'detect_lock_wait'):
-                with measured('analyze_detect'):
-                    lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
-                        c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
+            with self._detector_lock:
+                lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
+                    c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
             # Retain the approved upstream paragraph grouping and reading
             # order, using DBNet lines without loading or running a CTD model.
-            with measured('analyze_group'):
-                blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
-                groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
+            blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
+            groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
             # RapidOCR sorts by aspect ratio, pads bounded batches and restores
             # input order; paragraph grouping remains entirely upstream.
-            with waiting_for(self._ocr_lock, 'ocr_lock_wait'):
-                with measured('analyze_route'):
-                    buckets, readings = self.router.classify(rgb, blocks, groups)
-                with measured('analyze_ocr'):
-                    for group, reading in zip(groups, readings, strict=True):
-                        if reading is not None:
-                            index, row = reading
-                            group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
-                            group[index].prob = row['conf']
-                    for language, model in self.recognizers.items():
-                        selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
-                                    if bucket == language for index, line in enumerate(group)
-                                    if reading is None or index != reading[0]]
-                        if selected:
-                            await model.recognize(rgb, selected, c.ocr)
-                    japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
-                    if japanese:
-                        self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
+            with self._ocr_lock:
+                buckets, readings = self.router.classify(rgb, blocks, groups)
+                for group, reading in zip(groups, readings, strict=True):
+                    if reading is not None:
+                        index, row = reading
+                        group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
+                        group[index].prob = row['conf']
+                for language, model in self.recognizers.items():
+                    selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
+                                if bucket == language for index, line in enumerate(group)
+                                if reading is None or index != reading[0]]
+                    if selected:
+                        await model.recognize(rgb, selected, c.ocr)
+                japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
+                if japanese:
+                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h',
@@ -348,18 +342,14 @@ class Engine:
                 return [], None, None, None
             # Use original pixels only, after OCR/language filtering and before
             # erasure. Checkpoints retain colors; resume/render never predicts.
-            with waiting_for(self._ocr_lock, 'ocr_lock_wait'):
-                with measured('analyze_colors'):
-                    self.colors.apply(rgb, regions)
-            with waiting_for(self._bubble_lock, 'bubble_lock_wait'):
-                with measured('analyze_bubbles'):
-                    detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
-            with measured('analyze_bubbles'):
-                bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
-            with measured('analyze_refine'):
-                mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
-                                    kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
-                                    bubble_mask=bubbles)
+            with self._ocr_lock:
+                self.colors.apply(rgb, regions)
+            with self._bubble_lock:
+                detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
+            bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
+            mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
+                                kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
+                                bubble_mask=bubbles)
             return regions, mask, raw, bubbles
         with torch.cuda.device(self.gpu):
             return asyncio.run(run())

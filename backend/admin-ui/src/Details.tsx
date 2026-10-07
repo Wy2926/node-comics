@@ -4,7 +4,7 @@ import {MembershipActions} from './MembershipActions';
 import {TaskActions} from './TaskActions';
 import {TaskAttempts} from './TaskAttempts';
 import {UserHistory} from './UserHistory';
-import {taskTimingRows, timingLabel} from './timings';
+import {taskTimingRows} from './timings';
 
 export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
@@ -32,8 +32,8 @@ export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; 
     </Table> : <Empty>尚无执行记录</Empty>}
     <p className="panel-note">阶段占用来自持久化租约，包含执行期间的网络与存储操作。多阶段并行时，各阶段之和 {duration(j.worker_seconds)} 可大于合并后的执行占用。</p>
     {(j.timings?.node || j.timings?.delivery) && <><h3 className="detail-heading">计算与交付耗时</h3>
-      <Table heads={['环节', '耗时', '来源']}>{taskTimingRows(j.timings).map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{timingLabel(key)}</td><td className="numeric">{seconds < 1 ? `${Math.round(seconds * 1000)} 毫秒` : duration(seconds)}</td><td>{source}</td></tr>)}</Table>
-      <p className="panel-note">图像分析包含检测、语言分流、OCR、取色、气泡、蒙版和检查点处理，不是纯 OCR。分析与嵌字细项已包含在各自总耗时中；分析细项不含模型锁等待，锁等待已包含在分析总耗时中。OCR / 取色锁等待按该页实际获取共享锁的次数累计。未执行或旧节点未上报的细项不补零；各阶段可交错，分项不能与总耗时相加，整页租约占用也不代表 GPU 计算时间。</p></>}
+      <Table heads={['环节', '耗时', '来源']}>{taskTimingRows(j.timings).map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{({download: '原图下载', download_queue: '下载等待', analyze: '检测 / OCR', analyze_queue: '分析等待', inpaint: '抹字', inpaint_queue: '抹字等待', render: '嵌字与编码', render_queue: '嵌字等待', render_areas: '嵌字：气泡分析', render_layout: '嵌字：排版绘字', render_diff: '嵌字：差异提取', render_encode: '嵌字：WebP 编码', detect_lock_wait: '检测模型锁等待', ocr_lock_wait: 'OCR 模型锁等待（各文本块累计）', inpaint_lock_wait: '抹字模型锁等待', analysis_submit: '分析提交', text_wait: '等待译文', local_total: '领取至结果冻结', output_put: '结果提交', total: '中心登记与结算'} as Record<string, string>)[key] ?? key}</td><td className="numeric">{seconds < 1 ? `${Math.round(seconds * 1000)} 毫秒` : duration(seconds)}</td><td>{source}</td></tr>)}</Table>
+      <p className="panel-note">节点耗时用于观测；嵌字细项已包含在嵌字与编码内，锁等待已包含在所属计算阶段内。OCR 锁等待为并行文本块累计值，可能大于实际墙钟时间。各阶段可并行，分项不能直接相加；整页租约占用不代表 GPU 计算时间。</p></>}
     {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ¥{(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。成本仅计量，不限制文本调用；次数、时限与限流仍生效。</p>
       <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>
         <tr key={c.id}><td>{c.model}<small>{c.provider_id}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>
