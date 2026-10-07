@@ -214,6 +214,15 @@ def test_status_publish_retries_windows_reader_sharing_violation(tmp_path, monke
     assert json.loads((tmp_path / 'status.json').read_text())['phase'] == 'starting'
 
 
+def test_status_reports_resolved_cpu_budget_before_model_startup(tmp_path):
+    resources = {'effective_cpus': 11.52, 'budget_cpus': 11, 'analysis_threads': 3,
+                 'render_workers': 5, 'render_threads': 1, 'warnings': []}
+    operations = Operations(tmp_path, Event(), cpu_resources=resources)
+    operations.write()
+    status = json.loads((tmp_path / 'status.json').read_text())
+    assert status['phase'] == 'starting' and status['cpu_resources'] == resources
+
+
 def test_single_owner_prevents_second_runtime_before_model_loading(tmp_path, monkeypatch):
     from classic_node import __main__ as cli
     import sys

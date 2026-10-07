@@ -71,13 +71,14 @@ class NetworkLog:
 class Operations:
     """Network outages retry in-process; only local stalls cause watchdog exit."""
     def __init__(self, directory, stop, *, startup_seconds=600, stall_seconds=120,
-                 shutdown_seconds=60, hard_exit=os._exit):
+                 shutdown_seconds=60, hard_exit=os._exit, cpu_resources=None):
         self.directory = Path(directory)
         self.stop = stop
         self.hard_exit = hard_exit
         self.startup_seconds = startup_seconds
         self.stall_seconds = stall_seconds
         self.shutdown_seconds = shutdown_seconds
+        self.cpu_resources = cpu_resources
         self.started_at = utc_now()
         self.last_pulse = time.monotonic()
         self.phase = 'starting'
@@ -110,6 +111,7 @@ class Operations:
                 'heartbeat_at': last, 'heartbeat_age_seconds': round(age, 1) if age is not None else None,
                 'connected': bool(age is not None and age < 60 and self.phase == 'running'),
                 'active_leases': len(agent.pages) if agent else 0,
+                'cpu_resources': self.cpu_resources,
                 'config_version': agent.config['version'] if agent and agent.config else None}
 
     def write(self):

@@ -4,15 +4,16 @@ from importlib.metadata import version as package_version
 from io import BytesIO
 import json
 from pathlib import Path
-from time import perf_counter
+from threading import Lock
 
 import numpy as np
 from PIL import Image
 
 from mtu_engine.assets import LOCK, file_hash, verify
 from mtu_engine.engine import Engine, serialize_region
-from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64, pack_result
-from .timing import record
+from .render_pool import RenderPool, RenderPoolError, RenderMemoryError, ipc_bytes, render_page
+from .operations import LOG
+from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -28,11 +29,15 @@ def model_identity(models):
     return verify(models)['files']
 
 
-def decode_mask(analysis, name, size):
+def decode_mask(analysis, name, size, masks=None):
+    if masks is not None and name in masks:
+        return masks[name]
     if analysis.get(name) is None:
         return np.zeros((size[1], size[0]), dtype=np.uint8)
     with mask_image(analysis[name], size, allow_empty=name != 'mask') as decoded:
-        return np.array(decoded)
+        value = np.array(decoded)
+    value.flags.writeable = False
+    return value
 
 
 class Runtime:
@@ -43,6 +48,9 @@ class Runtime:
         options = config['engine']
         assets = model_identity(options['models'])
         self.engine = Engine(**options)
+        self.render_pool = None
+        self._render_warning_lock = Lock()
+        self._render_fallback_warned = set()
         self.languages = [lang for lang, probe in LANGUAGE_PROBES.items() if self.engine.renderer.covers(probe)]
         if not self.languages:
             self.engine.close()
@@ -60,12 +68,35 @@ class Runtime:
             'code': code, 'assets': assets, 'dependencies': dependencies,
             'fonts': [file_hash(path) for path in options['font']],
             'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'threads', 'gpu'}}})[:32]
+        if config.get('render_workers', 1) > 1:
+            try:
+                self.render_pool = RenderPool(options['models'], options['font'], config['render_workers'],
+                    config['_render_threads'])
+            except Exception:
+                self.engine.close()
+                raise
 
     def close(self):
-        self.engine.close()
+        try:
+            if self.render_pool is not None:
+                self.render_pool.close()
+        finally:
+            self.engine.close()
 
     def warmup(self):
         self.engine.warmup()
+        if self.render_pool is not None:
+            self.render_pool.warmup()
+
+    def render_ipc_bytes(self, width, height):
+        return ipc_bytes(width, height) if self.render_pool is not None else 0
+
+    def warn_render_fallback(self, reason):
+        with self._render_warning_lock:
+            if reason not in self._render_fallback_warned:
+                LOG.warning('event=render_local_fallback reason=%s mixed_cpu_slots=%s', reason,
+                            self.config.get('_cpu_resources', {}).get('mixed_render_cpu_slots'))
+                self._render_fallback_warned.add(reason)
 
     def validate_analysis(self, analysis):
         # Build fingerprints are provenance, not a cross-node resume barrier.
@@ -99,29 +130,60 @@ class Runtime:
                 alpha.close()
             raise NodeFailure('INPUT_INVALID') from error
 
-    def analyze(self, rgb, input_hash):
+    def restore_masks(self, analysis, size, masks):
+        """Decode a recovered checkpoint once; native arrays never enter its identity."""
+        masks.clear()
+        self.validate_analysis(analysis)
+        if analysis.get('segments') and analysis.get('mask') is None:
+            raise NodeFailure('CLASSIC_OCR_INVALID')
+        for name in ('mask', 'raw_mask', 'bubble_mask'):
+            if analysis.get(name) is not None:
+                masks[name] = decode_mask(analysis, name, size)
+
+    def analyze(self, rgb, input_hash, *, masks=None):
         regions, mask, raw, bubbles = self.engine.analyze(rgb)
         if regions and (mask is None or not mask.any()):
             raise NodeFailure('CLASSIC_ANALYZE_FAILED')
-        def encoded(value):
-            return png64(Image.fromarray(value), MAX_CHECKPOINT_BYTES) if value is not None and value.any() else None
+        native = {}
+        def encoded(name, value):
+            if value is None or not value.any():
+                return None
+            if value.dtype != np.uint8 or value.shape != rgb.shape[:2]:
+                raise NodeFailure('CLASSIC_ANALYZE_FAILED')
+            with Image.fromarray(value) as image:
+                payload = png64(image, MAX_CHECKPOINT_BYTES)
+            if masks is not None:
+                # DBNet can return a crop of its padded mask. Retain only this
+                # page's compact pixels, so nbytes accounts for the whole buffer.
+                if not value.flags.owndata or not value.flags.c_contiguous:
+                    value = value.copy()
+                value.flags.writeable = False
+                native[name] = value
+            return payload
         analysis = {'version': self.version, 'format': self.ANALYSIS_FORMAT, 'input_hash': input_hash,
             'width': rgb.shape[1], 'height': rgb.shape[0],
             'segments': [{'id': str(index), 'source': region.text} for index, region in enumerate(regions)],
             'regions': [serialize_region(region) for region in regions],
-            'mask': encoded(mask), 'raw_mask': encoded(raw), 'bubble_mask': encoded(bubbles)}
+            'mask': encoded('mask', mask), 'raw_mask': encoded('raw_mask', raw),
+            'bubble_mask': encoded('bubble_mask', bubbles)}
         if (len(regions) > 200 or any(not item['source'].strip() or len(item['source']) > 4000 for item in analysis['segments'])
                 or len(json.dumps(analysis, allow_nan=False).encode()) > MAX_CHECKPOINT_BYTES):
             raise NodeFailure('CLASSIC_ANALYZE_FAILED')
+        if masks is not None:
+            masks.clear()
+            masks.update(native)
         return analysis
 
-    def inpaint(self, rgb, analysis):
+    def inpaint(self, rgb, analysis, *, masks=None):
         self.validate_analysis(analysis)
         size = (rgb.shape[1], rgb.shape[0])
-        return self.engine.inpaint(rgb, decode_mask(analysis, 'mask', size),
-            decode_mask(analysis, 'raw_mask', size), decode_mask(analysis, 'bubble_mask', size), analysis['regions'])
+        return self.engine.inpaint(rgb, decode_mask(analysis, 'mask', size, masks),
+            decode_mask(analysis, 'raw_mask', size, masks), decode_mask(analysis, 'bubble_mask', size, masks), analysis['regions'])
 
-    def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False, mask_cache_bytes=None):
+    def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False,
+               mask_cache_bytes=None, use_render_pool=True, check_cancelled=None, masks=None):
+        if check_cancelled:
+            check_cancelled()
         self.validate_analysis(analysis)
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}
@@ -130,11 +192,33 @@ class Runtime:
         texts = [translated['translations'][item['id']] for item in analysis['segments']]
         if not all(isinstance(text, str) for text in texts):
             raise NodeFailure('CLASSIC_RENDER_MISMATCH')
-        started = perf_counter()
-        if any(text.strip() for text in texts):
-            rendered = self.engine.renderer.render(original, cleaned, analysis['regions'], texts, language,
-                decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0])), mask_cache_bytes=mask_cache_bytes)
-        else:
-            rendered = cleaned
-        record('render_layout', perf_counter() - started)
-        return pack_result(Image.fromarray(rendered), original, alpha, self.version, analysis, translated, allow_tiles=allow_tiles)
+        has_text = any(text.strip() for text in texts)
+        bubble = (decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0]), masks)
+                  if has_text and analysis.get('bubble_mask') is not None else None)
+        args = (original, cleaned, analysis['regions'], texts, language, bubble)
+        # Only output identity crosses the process boundary, not encoded masks
+        # or the complete translation checkpoint already validated above.
+        options = {'alpha': alpha, 'version': self.version,
+                   'analysis': {'input_hash': analysis['input_hash']},
+                   'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']},
+                   'allow_tiles': allow_tiles, 'mask_cache_bytes': mask_cache_bytes}
+        pooled = has_text and use_render_pool and self.render_pool is not None
+        if has_text and self.render_pool is not None and not use_render_pool:
+            self.warn_render_fallback('page_budget')
+        if pooled:
+            try:
+                result = self.render_pool.render(*args, **options, check_cancelled=check_cancelled)
+            except RenderMemoryError:
+                # Resident memory and /dev/shm have independent limits.
+                # Only allocation failures may safely use the local path.
+                self.warn_render_fallback('shared_memory')
+                pooled = False
+            except RenderPoolError as error:
+                raise NodeFailure(error.code) from error
+        if not pooled:
+            if check_cancelled:
+                check_cancelled()
+            result = render_page(self.engine.renderer, *args, **options, check_cancelled=check_cancelled)
+        if check_cancelled:
+            check_cancelled()
+        return result

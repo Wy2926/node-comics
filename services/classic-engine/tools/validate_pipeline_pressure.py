@@ -43,7 +43,7 @@ class FixtureRuntime:
     def decode(self, data, metadata):
         return np.array(Image.open(BytesIO(data)).convert('RGB')), None
 
-    def analyze(self, rgb, input_hash):
+    def analyze(self, rgb, input_hash, *, masks=None):
         time.sleep(.005)
         mask = Image.new('L', (rgb.shape[1], rgb.shape[0]))
         ImageDraw.Draw(mask).rectangle((160, 260, 410, 310), fill=255)
@@ -52,14 +52,24 @@ class FixtureRuntime:
                 'segments': [{'id': '0', 'source': 'Hello world'}],
                 'regions': [], 'mask': png64(mask)}
 
-    def inpaint(self, rgb, analysis):
+    def restore_masks(self, analysis, size, masks):
+        from classic_node.runtime import Runtime
+        Runtime.restore_masks(self, analysis, size, masks)
+
+    def inpaint(self, rgb, analysis, *, masks=None):
         time.sleep(.005)
         return rgb.copy()
 
-    def render(self, original, cleaned, analysis, translated, language, alpha, *, mask_cache_bytes=None):
+    def render_ipc_bytes(self, width, height):
+        return 0
+
+    def render(self, original, cleaned, analysis, translated, language, alpha, *, mask_cache_bytes=None,
+               use_render_pool=True, check_cancelled=None, masks=None):
+        if check_cancelled:
+            check_cancelled()
         image = Image.fromarray(cleaned)
         image.putpixel((10, 10), (1, 2, 3))
-        return pack_result(image, original, alpha, self.version, analysis, translated)
+        return pack_result(np.asarray(image), original, alpha, self.version, analysis, translated)
 
 
 class SimulatedTransport:

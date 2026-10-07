@@ -56,6 +56,7 @@ def execute(args):
             runtime.warmup()
             print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
+                'cpu_resources': config.get('_cpu_resources'),
                 'inpainting_backend': 'pytorch-cuda-fp32', 'renderer': 'mtu-pyqt6'}))
         finally:
             runtime.close()
@@ -75,13 +76,16 @@ def execute(args):
         resources.callback(LOG.removeHandler, handler)
         logging.getLogger('httpx').setLevel(logging.WARNING)
         stop = Event()
-        operations = Operations(directory, stop)
+        operations = Operations(directory, stop, cpu_resources=config.get('_cpu_resources'))
         for name in (signal.SIGINT, signal.SIGTERM):
             signal.signal(name, lambda *_: stop.set())
         operations.start()
         failed = True
         try:
             LOG.info('event=starting python=%s', sys.version.split()[0])
+            LOG.info('event=cpu_resources data=%s', json.dumps(config.get('_cpu_resources'), sort_keys=True))
+            for warning in config.get('_cpu_resources', {}).get('warnings', []):
+                LOG.warning('event=cpu_budget_warning detail=%s', warning)
             from .runtime import Runtime
             from .transport import Transport
             from .agent import Agent

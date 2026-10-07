@@ -6,14 +6,14 @@
   "resource_id": "REPLACE_WITH_UNIQUE_MACHINE_GPU_RESOURCE_ID",
   "state_dir": "/data/state",
   "local_pages": 2,
-  "render_workers": 1,
+  "render_workers": "auto",
   "max_leases": 8,
   "download_workers": 6,
   "delivery_workers": 6,
   "resident_bytes": 2147483648,
   "engine": {
     "gpu": 0,
-    "threads": 2,
+    "threads": "auto",
     "detect_size": 1280,
     "inpainting_size": 512
   }

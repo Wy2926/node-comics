@@ -4,7 +4,7 @@ from threading import Lock
 import re
 import time
 
-from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest, mask_image
+from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
 from .operations import report_page_failure
 from .timing import collect
 
@@ -27,7 +27,8 @@ class Pipeline:
     def input_reservation(page):
         metadata = page.lease.get('input') or {}
         pixels = metadata.get('width', 0) * metadata.get('height', 0)
-        return pixels * 16 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
+        # Existing working/output allowance plus three cached uint8 masks.
+        return pixels * 19 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
 
     @staticmethod
     def delivery_reservation(body):
@@ -46,15 +47,55 @@ class Pipeline:
             self.agent.request_claim()
         return True
 
-    def release_render_cache(self, page):
+    def release_render_buffers(self, page):
         with self.memory_lock:
-            amount = page.render_cache_reserved
+            amount = page.render_reserved
             if not amount:
                 return
-            page.render_cache_reserved = 0
+            page.render_reserved = 0
             page.reserved -= amount
             self.used -= amount
         self.agent.request_claim()
+
+    def retain_masks(self, page, *names):
+        # Only the drained page owner may discard masks; in-flight stages read
+        # this same dictionary. The initial three-mask allowance shrinks to the
+        # actual arrays after analysis, then to bubble_mask after inpainting.
+        for name in tuple(page.masks):
+            if name not in names:
+                del page.masks[name]
+        amount = sum(mask.nbytes for mask in page.masks.values())
+        with self.memory_lock:
+            released = page.mask_reserved - amount
+            page.mask_reserved = amount
+            page.reserved -= released
+            self.used -= released
+        if released > 0:
+            self.agent.request_claim()
+
+    def reserve_render_batch(self, pages):
+        reservations = {}
+        with self.memory_lock:
+            available = max(0, self.limit - self.used)
+            # Preserve useful per-page mask reuse before admitting more IPC.
+            # A full budget still permits uncached local rendering to progress.
+            for page in pages:
+                metadata = page.lease['input']
+                texts = (page.translations or {}).get('translations', {}).values()
+                blocks = sum(isinstance(text, str) and bool(text.strip()) for text in texts)
+                needed = self.agent.runtime.render_ipc_bytes(metadata['width'], metadata['height']) if blocks else 0
+                ipc = needed if 0 < needed <= available else 0
+                available -= ipc
+                cache = 0
+                if page.analysis.get('bubble_mask'):
+                    cache = min(metadata['width'] * metadata['height'] * blocks, available)
+                available -= cache
+                extra = ipc + cache
+                self.used += extra
+                page.reserved += extra
+                page.render_reserved = extra
+                reservations[page] = (ipc, cache)
+        return reservations
 
     def claim_capacity(self):
         pages = list(self.agent.pages.values())
@@ -71,7 +112,8 @@ class Pipeline:
         for pool in (self.download, self.compute, self.render, self.control, self.delivery):
             pool.shutdown(wait=True)
         for page in list(self.agent.pages.values()):
-            self.release_render_cache(page)
+            self.release_render_buffers(page)
+            self.retain_masks(page)
 
     def submit(self, page, pool, name, operation):
         page.phase = name
@@ -93,15 +135,12 @@ class Pipeline:
     def prepare(self, page):
         rgb, alpha = self.agent.runtime.decode(page.data, page.metadata)
         page.data = None
-        analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'])
+        analysis = page.analysis or self.agent.runtime.analyze(rgb, page.metadata['sha256'], masks=page.masks)
         if analysis['input_hash'] != page.metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         if page.analysis:
-            self.agent.runtime.validate_analysis(analysis)
-        if page.analysis and analysis.get('segments'):
-            # A restored checkpoint must pass pixel checks before text work can resume.
-            with mask_image(analysis['mask'], (page.metadata['width'], page.metadata['height'])):
-                pass
+            # Restore and validate each encoded mask once before text work can resume.
+            self.agent.runtime.restore_masks(analysis, (page.metadata['width'], page.metadata['height']), page.masks)
         return rgb, alpha, analysis
 
     def accepted(self, page):
@@ -124,15 +163,19 @@ class Pipeline:
         self.agent.journal.freeze('lease:' + key, {**saved, 'completion': body}, result['output_bytes'])
         page.completion = body
         page.rgb = page.cleaned = page.analysis = page.alpha = None
+        self.retain_masks(page)
         self.resize_reservation(page, self.delivery_reservation(body))
         page.step = 'deliver'
 
     def release(self, page):
-        self.release_render_cache(page)
+        self.release_render_buffers(page)
+        self.retain_masks(page)
         self.resize_reservation(page, 0)
         page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.completion = None
 
     def error(self, page, error):
+        if not page.future and not page.analysis_future:
+            self.retain_masks(page)
         if page.terminal or page.stopped:
             return
         if isinstance(error, NodeFailure) and error.code == 'LEASE_STOPPED':
@@ -171,9 +214,9 @@ class Pipeline:
                 page.pending_error = error
         if page.future and page.future.done():
             future, page.future = page.future, None
-            # The renderer's cache has been discarded, even when result() will
-            # raise. Keep only real working buffers through error/stop delivery.
-            self.release_render_cache(page)
+            # The renderer has drained and discarded its cache and IPC buffers,
+            # even when result() will raise. Keep the page's working buffers.
+            self.release_render_buffers(page)
             try:
                 value = future.result()
                 if page.step == 'download':
@@ -182,11 +225,13 @@ class Pipeline:
                     self.agent.request_claim()
                 elif page.step == 'analyze':
                     page.rgb, page.alpha, page.analysis = value
+                    self.retain_masks(page, 'mask', 'raw_mask', 'bubble_mask')
                     page.analysis_future = self.control.submit(self.accepted, page)
                     page.analysis_future.add_done_callback(lambda _: self.agent.wake.set())
                     page.step = 'inpaint' if page.analysis['segments'] else 'text'
                 elif page.step == 'inpaint':
                     page.cleaned = value
+                    self.retain_masks(page, 'bubble_mask')
                     page.step = 'text'
                 elif page.step == 'render':
                     self.freeze(page, value)
@@ -195,9 +240,12 @@ class Pipeline:
             except Exception as error:
                 page.pending_error = error
             page.ready_at = time.monotonic()
-        if not page.future and not page.analysis_future and page.pending_error:
-            error, page.pending_error = page.pending_error, None
-            self.error(page, error)
+        if not page.future and not page.analysis_future:
+            if page.pending_error:
+                error, page.pending_error = page.pending_error, None
+                self.error(page, error)
+            if page.stopped or page.terminal:
+                self.retain_masks(page)
         if page.step == 'text' and not page.future and page.analysis_accepted and page.translations and page.cleaned is not None:
             page.timings['text_wait'] = time.monotonic() - page.ready_at
             page.step, page.ready_at = 'render', time.monotonic()
@@ -218,6 +266,7 @@ class Pipeline:
                     continue
                 if not self.resize_reservation(page, reserve, bounded=True):
                     continue
+                page.mask_reserved = page.lease['input']['width'] * page.lease['input']['height'] * 3
                 self.submit(page, self.download, 'download', lambda p=page: self.agent.input_bytes(p))
             elif page.step == 'deliver':
                 self.submit(page, self.delivery, 'deliver', lambda p=page: self.agent.deliver(p, p.completion))
@@ -232,22 +281,16 @@ class Pipeline:
             ready = sorted((p for p in pages if not p.future and not p.pending_error
                             and not p.stopped and not p.terminal and p.step in stages),
                            key=lambda p: (p.step == 'analyze', p.ready_at))
-            for page in ready[:max(0, capacity - running)]:
+            ready = ready[:max(0, capacity - running)]
+            reservations = self.reserve_render_batch(ready) if stages == {'render'} else {}
+            for page in ready:
                 if page.step == 'analyze':
                     operation = lambda p=page: self.prepare(p)
                 elif page.step == 'inpaint':
-                    operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis)
+                    operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis, masks=p.masks)
                 else:
-                    metadata = page.lease['input']
-                    cache_bytes = metadata['width'] * metadata['height'] * len(page.analysis['regions'])
-                    with self.memory_lock:
-                        # Cache only spare memory; a page must still finish when
-                        # its working buffers already fill the resident budget.
-                        cache_bytes = min(cache_bytes, max(0, self.limit - self.used))
-                        self.used += cache_bytes
-                        page.reserved += cache_bytes
-                        page.render_cache_reserved = cache_bytes
-                    operation = lambda p=page, budget=cache_bytes: self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
-                        mask_cache_bytes=budget,
+                    ipc, cache_bytes = reservations[page]
+                    operation = lambda p=page, budget=cache_bytes, pooled=bool(ipc): self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
+                        mask_cache_bytes=budget, use_render_pool=pooled, check_cancelled=p.check, masks=p.masks,
                         **({'allow_tiles': True} if p.lease['config'].get('result_format') == 'overlay-tiles-v1' else {}))
                 self.submit(page, pool, page.step, operation)

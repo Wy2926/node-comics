@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from .resources import resolve_cpu_resources
+
 
 def origin(value, allow_http=False):
     parsed = urlsplit(value)
@@ -28,13 +30,13 @@ def load(path):
     value['node_token'] = os.environ.get('NODE_TOKEN') or value.get('node_token')
     if not value['node_token'] or not value['node_id'] or not value['resource_id']:
         raise ValueError('Node identity and credential are required')
-    defaults = {'models': '.assets/models', 'gpu': 0, 'threads': 2,
+    defaults = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto',
                 'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None}
     if set(value.get('engine', {})) - set(defaults):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
     value.setdefault('local_pages', 2)
-    value.setdefault('render_workers', 1)
+    value.setdefault('render_workers', 'auto')
     value.setdefault('max_leases', 8)
     value.setdefault('download_workers', 4)
     value.setdefault('delivery_workers', 4)
@@ -42,16 +44,18 @@ def load(path):
     value['state_dir'] = str((path.parent / value.get('state_dir', 'state')).resolve())
     value['engine']['models'] = str((path.parent / value['engine']['models']).resolve())
     value['engine']['font'] = [str((path.parent / font).resolve()) for font in value['engine']['font']]
-    if not 1 <= value['local_pages'] <= value['max_leases'] <= 32:
+    if (not all(type(value[k]) is int for k in ('local_pages', 'max_leases'))
+            or not 1 <= value['local_pages'] <= value['max_leases'] <= 32):
         raise ValueError('Require 1 <= local_pages <= max_leases <= 32')
-    if type(value['render_workers']) is not int or not 1 <= value['render_workers'] <= min(16, value['max_leases']):
-        raise ValueError('render_workers must be between 1 and min(16, max_leases)')
+    if value['render_workers'] != 'auto' and (type(value['render_workers']) is not int
+                                            or not 1 <= value['render_workers'] <= value['max_leases']):
+        raise ValueError('render_workers must be auto or between 1 and max_leases')
     if not all(type(value[k]) is int and 1 <= value[k] <= 16 for k in ('download_workers', 'delivery_workers')):
         raise ValueError('Network worker counts must be between 1 and 16')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
         raise ValueError('Reserve at least 512 MiB for page buffers')
-    if type(value['engine']['threads']) is not int or value['engine']['threads'] < 1:
-        raise ValueError('Thread counts must be positive')
+    if value['engine']['threads'] != 'auto' and (type(value['engine']['threads']) is not int or value['engine']['threads'] < 1):
+        raise ValueError('engine.threads must be auto or a positive integer')
     if type(value['engine']['gpu']) is not int or value['engine']['gpu'] < 0:
         raise ValueError('gpu must be an NVIDIA CUDA device index')
     if type(value['engine']['inpainting_size']) is not int or value['engine']['inpainting_size'] not in (512, 768, 1024):
@@ -63,4 +67,10 @@ def load(path):
         language = value['engine']['keep_lang']
         if not isinstance(language, str) or len(language) != 2 or not language.islower() or not tag_is_valid(language):
             raise ValueError('keep_lang must be an ISO 639-1 source language code or null')
+    resources = resolve_cpu_resources(analysis_threads=value['engine']['threads'], render_workers=value['render_workers'],
+                                      local_pages=value['local_pages'], max_leases=value['max_leases'])
+    value['engine']['threads'] = resources['analysis_threads']
+    value['render_workers'] = resources['render_workers']
+    value['_render_threads'] = resources['render_threads']
+    value['_cpu_resources'] = resources
     return value

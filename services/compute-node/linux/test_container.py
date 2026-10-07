@@ -85,7 +85,8 @@ class ContainerTests(unittest.TestCase):
             config = json.loads(path.read_text())
             self.assertEqual([config[key] for key in ('local_pages', 'max_leases',
                 'download_workers', 'delivery_workers')], [2, 8, 6, 6])
-            self.assertEqual(config['render_workers'], 1)
+            self.assertEqual(config['render_workers'], 'auto')
+            self.assertEqual(config['engine']['threads'], 'auto')
             self.assertEqual(config['state_dir'], str(root / 'state'))
             if sys.platform != 'win32':
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)

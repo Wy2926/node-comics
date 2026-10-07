@@ -43,14 +43,29 @@ class FixtureRuntime:
     def decode(self, data, metadata):
         return (data, metadata), None
 
-    def analyze(self, source, input_hash):
+    def analyze(self, source, input_hash, *, masks=None):
         self.analyzed += 1
         return analysis_for({'input': source[1]})
 
-    def inpaint(self, source, analysis):
+    def restore_masks(self, analysis, size, masks):
+        # This controller fixture does not load NumPy, Qt or image models.
+        from classic_node.protocol import mask_image
+        self.validate_analysis(analysis)
+        for name in ('mask', 'raw_mask', 'bubble_mask'):
+            if analysis.get(name) is not None:
+                with mask_image(analysis[name], size, allow_empty=name != 'mask'):
+                    pass
+
+    def inpaint(self, source, analysis, *, masks=None):
         return source
 
-    def render(self, original, source, analysis, translated, language, alpha, *, mask_cache_bytes=None):
+    def render_ipc_bytes(self, width, height):
+        return 0
+
+    def render(self, original, source, analysis, translated, language, alpha, *, mask_cache_bytes=None,
+               use_render_pool=True, check_cancelled=None, masks=None):
+        if check_cancelled:
+            check_cancelled()
         self.rendered += 1
         image = Image.open(BytesIO(source[0])).convert('RGB')
         stream = BytesIO()

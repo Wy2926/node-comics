@@ -29,3 +29,21 @@ def test_no_supported_font_rejects_before_claim(monkeypatch, tmp_path):
     config = prepare(monkeypatch, tmp_path, lambda text: False)
     with pytest.raises(ValueError, match='Fonts do not cover'):
         runtime.Runtime(config)
+
+
+def test_resolved_cpu_settings_start_only_cpu_pool_and_do_not_change_identity(monkeypatch, tmp_path):
+    config = prepare(monkeypatch, tmp_path, str.isascii)
+    config.update(render_workers=1, _render_threads=2)
+    config['engine']['threads'] = 2
+    direct = runtime.Runtime(config)
+    assert direct.render_pool is None and direct.render_ipc_bytes(80, 64) == 0
+    calls = []
+    pool = SimpleNamespace(close=lambda: calls.append('closed'))
+    monkeypatch.setattr(runtime, 'RenderPool', lambda *args: (calls.append(args), pool)[1])
+    config.update(render_workers=4, _render_threads=1)
+    config['engine']['threads'] = 3
+    parallel = runtime.Runtime(config)
+    assert parallel.version == direct.version and parallel.render_pool is pool
+    assert calls == [('unused', config['engine']['font'], 4, 1)]
+    parallel.close()
+    assert calls[-1] == 'closed'

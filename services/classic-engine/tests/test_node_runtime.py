@@ -5,6 +5,7 @@ import json
 import struct
 import zlib
 from types import SimpleNamespace
+from threading import Lock
 
 import numpy as np
 import pytest
@@ -25,6 +26,10 @@ def fixture(alpha=None):
     metadata = {'byte_size': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
                 'width': 80, 'height': 64, 'mime': 'image/png', 'normalization_version': 1}
     runtime = Runtime.__new__(Runtime)
+    runtime.render_pool = None
+    runtime._render_warning_lock = Lock()
+    runtime._render_fallback_warned = set()
+    runtime.config = {}
     runtime.version = 'test'
     runtime.engine = SimpleNamespace(renderer=SimpleNamespace(render=lambda original, cleaned, *args, **kwargs: cleaned))
     analysis = {'version': runtime.version, 'format': Runtime.ANALYSIS_FORMAT, 'input_hash': metadata['sha256'], 'segments': [{'id': '0'}],
@@ -99,10 +104,97 @@ def test_render_cache_budget_reaches_renderer_without_changing_result_identity(m
 def test_zero_visible_diff_returns_successful_original_without_artifact():
     runtime, data, metadata, analysis, translated = fixture()
     rgb, alpha = runtime.decode(data, metadata)
-    packed = pack_result(Image.fromarray(rgb), rgb, alpha, runtime.version, analysis, translated)
+    packed = pack_result(rgb, rgb, alpha, runtime.version, analysis, translated)
     assert packed['output_bytes'] is None
     assert packed['result']['representation'] == 'original'
     assert packed['result']['bbox'] is packed['result']['output'] is None
+
+
+def test_pool_renders_with_same_identity_and_receives_budget_and_cancellation():
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    expected = runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+    calls = []
+    checks = []
+    check = lambda: checks.append(True)
+    def render(*args, **kwargs):
+        calls.append((args, kwargs))
+        return expected
+    runtime.render_pool = SimpleNamespace(render=render)
+    assert runtime.render_ipc_bytes(80, 64) == 80 * 64 * 8
+    assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha,
+                          mask_cache_bytes=1234, check_cancelled=check) == expected
+    assert len(calls) == 1 and len(checks) == 2
+    assert calls[0][1] == {'mask_cache_bytes': 1234, 'check_cancelled': check,
+        'alpha': alpha, 'version': runtime.version, 'allow_tiles': False,
+        'analysis': {'input_hash': analysis['input_hash']},
+        'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']}}
+    assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha, use_render_pool=False) == expected
+    assert len(calls) == 1
+
+
+def test_shared_memory_failure_falls_back_locally_and_warns_once(caplog, monkeypatch):
+    from classic_node.render_pool import RenderMemoryError
+    from classic_node.operations import LOG
+    monkeypatch.setattr(LOG, 'propagate', True)
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    expected = runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+    def fail(*args, **kwargs):
+        raise RenderMemoryError()
+    runtime.render_pool = SimpleNamespace(render=fail)
+    for _ in range(2):
+        assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha) == expected
+    assert caplog.text.count('event=render_local_fallback reason=shared_memory') == 1
+    for _ in range(2):
+        assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha, use_render_pool=False) == expected
+    assert caplog.text.count('event=render_local_fallback reason=page_budget') == 1
+
+
+def test_worker_failure_does_not_silently_retry_or_fall_back(monkeypatch):
+    from classic_node.render_pool import RenderPoolError
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    def fail(*args, **kwargs):
+        raise RenderPoolError()
+    runtime.render_pool = SimpleNamespace(render=fail)
+    monkeypatch.setattr(runtime.engine.renderer, 'render', lambda *_a, **_k: pytest.fail('No retry'))
+    with pytest.raises(NodeFailure, match='CLASSIC_RENDER_WORKER_FAILED'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha)
+
+
+@pytest.mark.parametrize('pooled', [False, True])
+def test_cancelled_render_never_returns_a_late_result(monkeypatch, pooled):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    cancelled = False
+    def check():
+        if cancelled:
+            raise NodeFailure('LEASE_STOPPED')
+    def render(*args, **kwargs):
+        nonlocal cancelled
+        cancelled = True
+        return args[1]
+    if pooled:
+        runtime.render_pool = SimpleNamespace(render=render)
+    else:
+        runtime.engine.renderer.render = render
+    monkeypatch.setattr('classic_node.render_pool.pack_result', lambda *_a, **_k: pytest.fail('Late output'))
+    with pytest.raises(NodeFailure, match='LEASE_STOPPED'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha, check_cancelled=check)
+
+
+def test_runtime_closes_cpu_workers_before_models_even_when_pool_close_fails():
+    runtime, *_ = fixture()
+    order = []
+    def close():
+        order.append('pool')
+        raise RuntimeError('fixture')
+    runtime.render_pool = SimpleNamespace(close=close)
+    runtime.engine.close = lambda: order.append('engine')
+    with pytest.raises(RuntimeError):
+        runtime.close()
+    assert order == ['pool', 'engine']
 
 
 def test_result_encoding_uses_its_own_byte_limit(monkeypatch):
@@ -112,11 +204,11 @@ def test_result_encoding_uses_its_own_byte_limit(monkeypatch):
     final = Image.fromarray(rgb)
     final.putpixel((1, 1), (10, 20, 30))
     monkeypatch.setattr(protocol, 'MAX_MASK_BYTES', 1)
-    packed = pack_result(final, rgb, alpha, runtime.version, analysis, translated)
+    packed = pack_result(np.asarray(final), rgb, alpha, runtime.version, analysis, translated)
     assert len(packed['output_bytes']) > protocol.MAX_MASK_BYTES
     monkeypatch.setattr(protocol, 'MAX_RESULT_BYTES', len(packed['output_bytes']) - 1)
     with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
-        pack_result(final, rgb, alpha, runtime.version, analysis, translated)
+        pack_result(np.asarray(final), rgb, alpha, runtime.version, analysis, translated)
 
 
 @pytest.mark.parametrize('empty', ['', ' \n\t ', '\u3000\u00a0'])
@@ -194,7 +286,7 @@ def test_output_encoding_error_is_not_a_local_interruption(monkeypatch):
         raise OSError('encoder failed')
     monkeypatch.setattr(Image.Image, 'save', fail)
     with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_ENCODE_FAILED'):
-        pack_result(final, rgb, alpha, runtime.version, analysis, translated)
+        pack_result(np.asarray(final), rgb, alpha, runtime.version, analysis, translated)
 
 
 def test_hidden_rgb_changes_do_not_expand_the_visible_bbox():
@@ -204,7 +296,7 @@ def test_hidden_rgb_changes_do_not_expand_the_visible_bbox():
     final = Image.fromarray(rgb)
     final.putpixel((0, 0), (10, 20, 30))
     final.putpixel((10, 10), (40, 50, 60))
-    packed = pack_result(final, rgb, alpha, runtime.version, analysis, translated)
+    packed = pack_result(np.asarray(final), rgb, alpha, runtime.version, analysis, translated)
     assert packed['result']['bbox'] == {'x': 10, 'y': 10, 'width': 1, 'height': 1}
 
 
@@ -250,8 +342,8 @@ def test_tiles_partition_final_glyph_pixels_across_boundaries_without_relayout()
     analysis = {'input_hash': 'a' * 64}
     translated = {'analysis_hash': 'b' * 64, 'revision': 'c' * 64}
     with pytest.raises(NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
-        pack_result(final, rgb, None, 'test', analysis, translated)
-    packed = pack_result(final, rgb, None, 'test', analysis, translated, allow_tiles=True)
+        pack_result(np.asarray(final), rgb, None, 'test', analysis, translated)
+    packed = pack_result(np.asarray(final), rgb, None, 'test', analysis, translated, allow_tiles=True)
     data = packed['output_bytes']
     assert packed['result']['representation'] == 'overlay-tiles-v1' and data[:8] == b'NCOT0001'
     length = struct.unpack('<I', data[8:12])[0]
@@ -275,8 +367,8 @@ def test_tile_capability_preserves_existing_single_webp_bytes():
     rgb = np.array(Image.open(BytesIO(data)))
     final = Image.fromarray(rgb)
     final.putpixel((10, 10), (0, 0, 0))
-    ordinary = pack_result(final, rgb, None, runtime.version, analysis, translated)
-    assert pack_result(final, rgb, None, runtime.version, analysis, translated, allow_tiles=True) == ordinary
+    ordinary = pack_result(np.asarray(final), rgb, None, runtime.version, analysis, translated)
+    assert pack_result(np.asarray(final), rgb, None, runtime.version, analysis, translated, allow_tiles=True) == ordinary
 
 
 def corrupt_png_pixels(data):
@@ -314,7 +406,7 @@ def test_old_engine_checkpoint_cannot_resume_even_when_blank(blank):
         analysis['segments'] = analysis['regions'] = []
     pipeline = Pipeline.__new__(Pipeline)
     pipeline.agent = SimpleNamespace(runtime=runtime)
-    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis, masks={})
     with pytest.raises(NodeFailure, match='^CLASSIC_ENGINE_MISMATCH$'):
         pipeline.prepare(page)
     rgb = np.array(Image.open(BytesIO(data)))
@@ -332,7 +424,7 @@ def test_compatible_checkpoint_from_another_build_keeps_its_paid_translation():
     runtime.analyze = lambda *_: pytest.fail('resuming must not rerun OCR or text work')
     pipeline = Pipeline.__new__(Pipeline)
     pipeline.agent = SimpleNamespace(runtime=runtime)
-    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis, masks={})
     rgb, alpha, resumed = pipeline.prepare(page)
     assert resumed is analysis
     assert runtime.render(rgb, rgb, resumed, translated, 'en', alpha)['result']['representation'] == 'original'
@@ -359,7 +451,7 @@ def test_restored_checkpoint_pixels_are_checked_before_text_can_resume(failure):
     runtime.analyze = lambda *_: pytest.fail('restored analysis must not be regenerated')
     pipeline = Pipeline.__new__(Pipeline)
     pipeline.agent = SimpleNamespace(runtime=runtime)
-    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis)
+    page = SimpleNamespace(data=data, metadata=metadata, analysis=analysis, masks={})
     with pytest.raises(NodeFailure, match='^CLASSIC_OCR_INVALID$'):
         pipeline.prepare(page)
 
@@ -382,5 +474,5 @@ def test_encoded_overlay_pixels_are_verified_on_node_before_freezing(monkeypatch
             real_save(broken, stream, *args, **kwargs)
     monkeypatch.setattr(Image.Image, 'save', broken_encoder)
     with pytest.raises(NodeFailure, match='^CLASSIC_OUTPUT_ENCODE_FAILED$'):
-        pack_result(final, original, None, 'test', {'input_hash': 'a' * 64},
+        pack_result(np.asarray(final), original, None, 'test', {'input_hash': 'a' * 64},
                     {'analysis_hash': 'b' * 64, 'revision': 'c' * 64}, allow_tiles=tiles)

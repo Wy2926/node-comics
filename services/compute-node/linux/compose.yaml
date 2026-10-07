@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 90s
     read_only: true
+    shm_size: ${NODE_SHM_SIZE:-2gb}
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:

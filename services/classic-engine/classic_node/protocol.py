@@ -35,11 +35,11 @@ def png64(image, limit=MAX_MASK_BYTES):
     return base64.b64encode(out.getvalue()).decode('ascii')
 
 
-def pack_result(image, original, alpha, version, analysis, translated, *, allow_tiles=False):
+def pack_result(final, original, alpha, version, analysis, translated, *, allow_tiles=False):
     """Final RGB replacement pixels; the browser preserves source alpha with source-atop."""
     import numpy as np
     started = perf_counter()
-    final = np.asarray(image.convert('RGB'))
+    height, width = final.shape[:2]
     changed = np.any(final != original, axis=2)
     if alpha is not None:
         changed &= np.asarray(alpha) > 0
@@ -47,7 +47,7 @@ def pack_result(image, original, alpha, version, analysis, translated, *, allow_
         'version': version, 'input_hash': analysis['input_hash'],
         'analysis_hash': translated['analysis_hash'], 'translations_revision': translated['revision'],
         'representation': 'original', 'normalization_version': 1,
-        'width': image.width, 'height': image.height, 'bbox': None, 'output': None}
+        'width': width, 'height': height, 'bbox': None, 'output': None}
     if not changed.any():
         record('render_diff', perf_counter() - started)
         return {'output_bytes': None, 'result': result}
@@ -76,13 +76,13 @@ def pack_result(image, original, alpha, version, analysis, translated, *, allow_
                     'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data)})
                 bodies.append(data)
         manifest = json.dumps({'format': 'overlay-tiles-v1', 'input_sha256': analysis['input_hash'],
-            'width': image.width, 'height': image.height, 'tiles': tiles}, separators=(',', ':')).encode()
+            'width': width, 'height': height, 'tiles': tiles}, separators=(',', ':')).encode()
         if len(manifest) > 256 * 1024 or byte_size + len(manifest) + 12 > MAX_RESULT_BYTES:
             raise NodeFailure('CLASSIC_OUTPUT_TOO_LARGE')
         data = b'NCOT0001' + struct.pack('<I', len(manifest)) + manifest + b''.join(bodies)
         record('render_encode', perf_counter() - started)
         result.update(representation='overlay-tiles-v1', output={'sha256': hashlib.sha256(data).hexdigest(),
-            'byte_size': len(data), 'width': image.width, 'height': image.height,
+            'byte_size': len(data), 'width': width, 'height': height,
             'mime': 'application/vnd.nodelane.overlay-tiles'})
         return {'output_bytes': data, 'result': result}
     record('render_diff', perf_counter() - started)

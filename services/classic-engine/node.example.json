@@ -6,7 +6,7 @@
   "resource_id": "machine:cuda:0",
   "state_dir": "state",
   "local_pages": 2,
-  "render_workers": 1,
+  "render_workers": "auto",
   "max_leases": 8,
   "download_workers": 4,
   "delivery_workers": 4,
@@ -14,7 +14,7 @@
   "engine": {
     "models": ".assets/models",
     "gpu": 0,
-    "threads": 2,
+    "threads": "auto",
     "detect_size": 1280,
     "inpainting_size": 512,
     "font": [
