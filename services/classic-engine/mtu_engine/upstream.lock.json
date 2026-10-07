@@ -4,7 +4,13 @@
     "revision": "a1ad823b0d679d1a0665b8bc94de7e8a1c38e54d",
     "url": "https://codeload.github.com/hgmzhn/manga-translator-ui/zip/a1ad823b0d679d1a0665b8bc94de7e8a1c38e54d",
     "sha256": "f2194c2d8e9cee4c59ae0b309e3255955c2bec2735a298fc3eb07958f259ac19",
-    "license": "GPL-3.0"
+    "license": "GPL-3.0",
+    "patches": {
+      "manga_translator/utils/generic.py": {
+        "before": "    ph_num = int(np.ceil(h / ph))\n",
+        "after": "    # Node Comics: preserve at least 20% overlap before native feathered merging.\n    stride = max(1, ph - ph // 5)\n    ph_num = max(1, int(np.ceil((h - ph) / stride)) + 1)\n"
+      }
+    }
   },
   "ballons": {
     "repository": "https://github.com/dmMaze/BallonsTranslator",

@@ -27,7 +27,7 @@ def verify(models):
 
 
 def activate(models):
-    """Import the verified, unmodified upstream application as a library."""
+    """Import the verified upstream bundle, including checksum-pinned source edits."""
     root = Path(models).resolve().parent / 'upstream'
     for package, directory in (('manga_translator', root), ('ballontranslator', root),
                                ('modules', root / 'comic_translate'), ('imkit', root / 'comic_translate')):

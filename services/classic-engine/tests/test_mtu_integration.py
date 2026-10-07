@@ -30,6 +30,29 @@ def deny_network(*args, **kwargs):
     raise AssertionError('Prepared image stages must work offline')
 
 
+@pytest.mark.parametrize('height,width', [(12930,720), (720,12930), (16000,320), (320,16000)])
+def test_native_rearrange_overlap_and_roundtrip(assets, height, width):
+    from mtu_engine.assets import activate
+    activate(assets[0])
+    from manga_translator.utils.generic import (build_det_rearrange_plan,
+        det_rearrange_patch_array, det_rearrange_patch_spans, det_unrearrange_patch_maps)
+    source = np.zeros((height, width, 3), dtype=np.uint8)
+    plan = build_det_rearrange_plan(source, 1280)
+    spans = det_rearrange_patch_spans(plan)
+    assert spans[0][0] == 0 and spans[-1][1] == max(height, width)
+    assert all(left[1] - right[0] >= plan['patch_size'] // 5 for left, right in zip(spans, spans[1:]))
+    # Feed coordinate ramps through native packing and feathered stitching,
+    # including horizontal transposition and the padded tail of the last batch.
+    view = np.broadcast_to(np.arange(plan['h'], dtype=np.float32)[:, None, None],
+                           (plan['h'], plan['w'], 1))
+    coordinate_image = np.swapaxes(view, 0, 1) if plan['transpose'] else view
+    coordinate_plan = build_det_rearrange_plan(coordinate_image, 1280)
+    patches = det_rearrange_patch_array(coordinate_plan)
+    restored = det_unrearrange_patch_maps(list(patches), coordinate_plan, data_format='hwc')
+    np.testing.assert_allclose(restored, coordinate_image, atol=.002, rtol=0)
+    assert build_det_rearrange_plan(source[:400,:400],1280) is None
+
+
 @pytest.fixture
 def offline(monkeypatch):
     connect = socket.socket.connect
@@ -40,6 +63,59 @@ def offline(monkeypatch):
         return deny_network()
     monkeypatch.setattr(socket.socket, 'connect', loopback_only)
     monkeypatch.setattr(socket, 'create_connection', deny_network)
+
+
+def test_long_page_cross_seam_lines_are_complete_without_duplicate_ocr(assets, offline, monkeypatch):
+    import asyncio
+    import torch
+    from PIL import Image, ImageDraw, ImageFont
+    models, fonts = assets
+    Renderer(models, fonts)
+    from manga_translator.detection import default
+    from manga_translator.utils import ModelWrapper, Quadrilateral
+    from manga_translator.utils.generic import build_det_rearrange_plan, det_rearrange_patch_spans
+    from ballontranslator.utils.textblock import group_output
+    from mtu_engine.engine import configuration
+    from mtu_engine.ocr import Paddle
+    ModelWrapper._MODEL_DIR = str(models)
+    detector = default.DefaultDetector()
+    asyncio.run(detector.load('cuda'))
+    native = default.det_rearrange_forward
+    # This focused regression can run beside an existing service. It retains
+    # native tile geometry, inference and merging, but limits GPU batch size.
+    monkeypatch.setattr(default, 'det_rearrange_forward',
+        lambda image, forward, size, batch, **kw: native(image, forward, size, 1, **kw))
+    english = None
+    try:
+        image = Image.new('RGB', (720, 12930), 'white')
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 26)
+        sentence = 'TALKING ABOUT MAGIC'
+        bounds = draw.textbbox((0, 0), sentence, font=font)
+        # Center line 20 on the old 2160px tile edge. The paragraph is longer
+        # than the new overlap, so it also exercises whole-page grouping.
+        first_y = 2160 - 20 * 40 - (bounds[1] + bounds[3]) // 2
+        for index in range(30):
+            draw.text((180, first_y + index * 40), sentence, font=font, fill='black')
+        rgb = np.array(image)
+        config = configuration()
+        lines, raw, _ = asyncio.run(detector.detect(rgb, 1280, .5, .7, 2.3))
+        torch.cuda.empty_cache()
+        blocks = group_output([], [line.pts for line in lines], 720, 12930)
+        assert len(lines) == 30 and sum(len(block.lines) for block in blocks) == 30
+        english = Paddle(models, 'en', 0, 2)
+        grouped = [Quadrilateral(np.asarray(line), '', 1) for block in blocks for line in block.lines]
+        asyncio.run(english.recognize(rgb, grouped, config.ocr))
+        assert [line.text for line in grouped] == [sentence] * 30
+        seams = [top for top, _ in det_rearrange_patch_spans(build_det_rearrange_plan(rgb, 1280))[1:]]
+        assert any(block.xyxy[1] < seam < block.xyxy[3] for block in blocks for seam in seams)
+        assert raw.shape == rgb.shape[:2]
+    finally:
+        if english is not None:
+            english.close()
+        asyncio.run(detector.unload())
+        default.MODEL = None
+        torch.cuda.empty_cache()
 
 
 def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, monkeypatch):

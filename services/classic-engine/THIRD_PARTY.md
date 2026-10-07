@@ -2,7 +2,9 @@
 
 ## Manga Translator UI
 
-The image pipeline imports unmodified source from [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui), pinned by commit, archive URL and SHA-256 in [upstream.lock.json](mtu_engine/upstream.lock.json). Preparation retains `manga_translator/`, the upstream `LICENSE.txt`, dependency manifests and checksums under `upstream/`. The project carries GPL-3.0 terms; original notices within source files remain intact.
+The image pipeline imports source from [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui), pinned by commit, archive URL and SHA-256 in [upstream.lock.json](mtu_engine/upstream.lock.json). Preparation retains `manga_translator/`, the upstream `LICENSE.txt`, dependency manifests and checksums under `upstream/`. The project carries GPL-3.0 terms; original notices within source files remain intact.
+
+One local source edit is recorded verbatim in the lockfile: `build_det_rearrange_plan` in `manga_translator/utils/generic.py` calculates the stripe count with a maximum 80% stride, ensuring at least 20% overlap rounded down to whole pixels. Preparation requires an exact single match, marks the change in source, and hashes the resulting file in the asset manifest. Native packing, inference, feathered map merging, contour extraction and model weights are unchanged. Other MTU source files remain unmodified. Existing assets must be prepared again; startup rejects the previous lock hash.
 
 The lock also records the DBNet checkpoint from [manga-image-translator](https://github.com/zyddnys/manga-image-translator), PP-OCRv5 Korean weights/dictionary distributed by MTU, the LaMa Large checkpoint from [AnimeMangaInpainting](https://huggingface.co/dreMaz/AnimeMangaInpainting), and MangaLens weights distributed by the MTU author. PP-OCR reuses MTU's Apache-2.0 perspective crop and CTC decoder with published ONNX files pinned by SHA-256; no locally exported models or patched inference bindings are shipped.
 

@@ -14,6 +14,19 @@ from build_support import download, sha256
 from mtu_engine.assets import LOCK
 
 
+def apply_source_patches(upstream):
+    """Apply exact, reviewable lockfile edits; fail if the pinned source drifts."""
+    upstream = Path(upstream).resolve()
+    for relative, patch in LOCK['source'].get('patches', {}).items():
+        path = (upstream / relative).resolve()
+        if not path.is_relative_to(upstream):
+            raise ValueError('Unsafe upstream patch path')
+        text = path.read_text(encoding='utf-8')
+        if text.count(patch['before']) != 1:
+            raise ValueError(f'Pinned upstream patch target changed: {relative}')
+        path.write_text(text.replace(patch['before'], patch['after'], 1), encoding='utf-8', newline='\n')
+
+
 def prepare(output, cache):
     output, cache = Path(output).resolve(), Path(cache).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -51,6 +64,7 @@ def prepare(output, cache):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with package.open(info) as src, target.open('wb') as dst:
                     shutil.copyfileobj(src, dst)
+    apply_source_patches(output / 'upstream')
     # The native paragraph grouping imports BallonsTranslator's text types.
     for relative in ('config/textstyles', 'data'):
         directory = output / 'upstream' / relative

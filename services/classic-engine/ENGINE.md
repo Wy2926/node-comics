@@ -14,7 +14,7 @@
 | 嵌字 | MTU Qt 渲染器：QTextLayout、QRawFont、QPainter，在 CPU 离屏绘制 |
 | 字体 | Bangers、霞鹜漫黑、Jua、Comic Relief Bold、Lalezar；保留 Noto 字体回退，Qt 负责字形塑形 |
 
-`mtu_engine/` 只处理上游加载、阶段调用、输入校验和协议数据映射。MTU、BallonsTranslator、Comic Translate 源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录，保持原文件；RapidOCR 包按 `uv.lock` 固定版本与摘要。`classic_node/` 管理租约、检查点、网络和覆盖文件。不维护自研排版、气泡推测、修复、文字分类算法或模型转换链路。
+`mtu_engine/` 只处理上游加载、阶段调用、输入校验和协议数据映射。MTU、BallonsTranslator、Comic Translate 源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录；唯一源码补丁在同一锁文件记录替换前后内容，为 MTU 长图切片保证最小重叠，准备时严格匹配一次并记录修改后的文件摘要。其余上游文件保持原样；RapidOCR 包按 `uv.lock` 固定版本与摘要。`classic_node/` 管理租约、检查点、网络和覆盖文件。不维护自研排版、气泡推测、修复、文字分类算法或模型转换链路。
 
 ## 排版配置
 
@@ -47,6 +47,10 @@ DBNet 同样可能漏检艺术字和小字，不能把目标语言覆盖视为�
 采用上游模型不等于已选出每种漫画的最优组合。气泡输入尺寸和置信度需要在实际版面上校验；较大的输入可能增加漏检。当前 768 是私有漫画样本的折中值，不能消除非气泡物体的高置信度误检。气泡蒙版提供容器，DBNet 提供文字范围，Qt 再计算换行、字号与位置，三者的质量分别验收。
 
 DBNet 默认输入边长 1280、文字阈值 0.5、框阈值 0.7、扩张比例 2.3。它同时提供识别框和抹字蒙版，避免重复运行检测网络。分组直接传入原生 `group_output`，保留既有长段落与阅读顺序，不增加分镜检测或本地分组算法。改变检测器须同时回归裁图完整性、段落合并、阅读顺序和既有认可图片，不能仅凭单条 OCR 结果替换。
+
+超长或超宽图继续使用 MTU 原生方块重排、等比缩放和按距切边距离加权的热图回拼。切片最大步长限制为片长减去其 20%（向下取整），避免原生均分在页长接近整倍数时仅重叠数像素、把整行文字切断。首尾覆盖、横图转置、末批补齐和回拼均由上游处理；先回拼热图再统一提框、分组和 OCR，不逐片重复翻译。普通页不触发重排，行为不变；重叠增加长图推理方块数，具体开销受尺寸及每块打包条带数影响，不能用 20% 直接当作耗时增幅。
+
+切片不是段落边界，文字行可以跨接缝归组；但 BallonsTranslator 仍按文字几何分段，MangaLens 气泡蒙版仅提供修复与排版容器，不强制“一个气泡对应一个翻译段落”。同气泡多段文字可能保持多个翻译单元；重叠修复不改变该分组规则。
 
 模型选型分别检查公开裁图评测和整页实测。[JMangaBench_Mixed](https://github.com/muscgab/JMangaBench_Mixed) 比较日文 MangaOCR、Baberu、Hayai 和 PaddleOCR-VL 漫画版，只评价给定裁图的识别，不评价检测；它也不等同于当前使用的 PP-OCRv6。PaddleOCR 的[官方 PP-OCRv6 数据](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PP-OCRv6/PP-OCRv6.en.md)是多场景数据，不能直接换算为漫画页准确率。应以固定样本、同一归一化规则和本机延迟核对，不能跨数据集按一个分数宣称最优。
 
