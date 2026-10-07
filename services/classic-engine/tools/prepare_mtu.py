@@ -27,8 +27,9 @@ def prepare(output, cache):
             raise ValueError('Unsafe asset output path')
         if directory.exists():
             shutil.rmtree(directory)
-    for key, repository, module in (('source', 'manga-translator-ui', 'manga_translator'),
-                                     ('ballons', 'BallonsTranslator', 'ballontranslator')):
+    for key, repository, modules in (('source', 'manga-translator-ui', ('manga_translator',)),
+                                    ('ballons', 'BallonsTranslator', ('ballontranslator', 'resources')),
+                                    ('comic_translate', 'comic-translate', ('modules', 'imkit'))):
         source = LOCK[key]
         archive = download(source['url'], source['sha256'], cache / source['sha256'])
         with zipfile.ZipFile(archive) as package:
@@ -37,11 +38,13 @@ def prepare(output, cache):
                 if info.is_dir() or not info.filename.startswith(prefix):
                     continue
                 relative = info.filename[len(prefix):]
-                if not (relative.startswith(module + '/') or (key == 'ballons' and relative.startswith('resources/')) or relative in (
+                if not (any(relative.startswith(module + '/') for module in modules) or relative in (
                         'LICENSE', 'LICENSE.txt', 'pyproject.toml', 'uv.lock', 'requirements.txt')):
                     continue
                 if key == 'ballons' and '/' not in relative:
                     relative = repository + '-' + relative
+                if key == 'comic_translate':
+                    relative = 'comic_translate/' + relative
                 target = (output / 'upstream' / relative).resolve()
                 if not target.is_relative_to(output / 'upstream'):
                     raise ValueError('Unsafe upstream archive path')
@@ -53,6 +56,12 @@ def prepare(output, cache):
         directory = output / 'upstream' / relative
         directory.mkdir(parents=True, exist_ok=True)
         (directory / '.node-prepared').write_text('Prepared for paragraph grouping imports.\n', encoding='utf-8')
+    for asset in LOCK['support']:
+        target = (output / asset['file']).resolve()
+        if not target.is_relative_to(output / 'upstream'):
+            raise ValueError('Unsafe upstream support path')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(download(asset['url'], asset['sha256'], cache / asset['sha256']), target)
     for asset in LOCK['models']:
         cached = download(asset['url'], asset['sha256'], cache / asset['sha256'])
         if 'archive' in asset:
@@ -101,6 +110,7 @@ def prepare(output, cache):
     manifest = {
         'upstream': LOCK['source']['revision'],
         'ballons': LOCK['ballons']['revision'],
+        'comic_translate': LOCK['comic_translate']['revision'],
         'lock_sha256': sha256(ENGINE / 'mtu_engine/upstream.lock.json'),
         'files': {path.relative_to(output).as_posix(): sha256(path)
                   for directory in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation')

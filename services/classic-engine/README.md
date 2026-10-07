@@ -1,6 +1,6 @@
 # MTU 计算节点
 
-常规漫画翻译的 v3 图像计算节点。组装固定版本的 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) DBNet 检测与文字蒙版、PP-OCRv6 medium、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字；OCR 等比缩放与批处理使用 [RapidOCR](https://github.com/RapidAI/RapidOCR)，段落合并与阅读顺序使用 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 原生分组。神经网络统一使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
+常规漫画翻译的 v3 图像计算节点。组装固定版本的 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) DBNet 检测与文字蒙版、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字；复用 [Manga-Overlay-Translator](https://github.com/Yuff1010/Manga-Overlay-Translator) 文字类别加权评分，逐段试读并分流到中文 OpenOCR、日文 Manga OCR、韩文／英文各自的 PP-OCRv5 专用模型。Paddle 等比缩放与批处理使用 [RapidOCR](https://github.com/RapidAI/RapidOCR)，段落合并与阅读顺序使用 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 原生分组。图像模型使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
 
 ## 开发运行
 

@@ -53,7 +53,9 @@ class Runtime:
                 for path in sorted((source / directory).glob('*.py'))}
         dependencies = {name: package_version(name) for name in (
             'torch', 'torchvision', 'onnxruntime-gpu', 'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
-            'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr')}
+            'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr',
+            'PySide6-Essentials', 'shiboken6', 'mahotas', 'manga-ocr', 'openocr-python',
+            'transformers', 'huggingface-hub', 'tokenizers')}
         self.version = 'mtu-cuda-v1-' + digest({'upstream': LOCK['source']['revision'],
             'code': code, 'assets': assets, 'dependencies': dependencies,
             'fonts': [file_hash(path) for path in options['font']],

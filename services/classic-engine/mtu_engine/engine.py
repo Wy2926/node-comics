@@ -234,23 +234,18 @@ class Engine:
         ballons_logger.handlers = [logging.NullHandler()]
         ballons_logger.propagate = False
         ballons_logger.setLevel(logging.CRITICAL + 1)
-        from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
-        from .ocr import Recognizer
+        from .ocr import Paddle
+        from .experts import Chinese, Japanese
+        from .routing import ScriptRouter
         # Select only the upstream CUDA checkpoint; do not fetch an unused CPU
         # ONNX model just to satisfy the upstream multi-backend download map.
         class CudaLama(LamaLargeInpainter):
             _MODEL_MAPPING = {'model': LamaLargeInpainter._MODEL_MAPPING['model']}
-        class CudaPaddle(ModelPaddleOCR):
-            # Lettering has fixed black/white colors; no extra 48px color model.
-            _COMMON_MODEL_MAPPING_KEYS = ()
-            async def _infer(self, image, textlines, config, *args, **kwargs):
-                return self.recognizer.recognize(image, textlines, config.prob)
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
-            self.ocr = CudaPaddle()
             self.inpainter = CudaLama()
-            for model in (self.detector, self.ocr, self.inpainter):
+            for model in (self.detector, self.inpainter):
                 # Keep upstream model diagnostics out of operational logs.
                 model.logger.handlers = [logging.NullHandler()]
                 model.logger.propagate = False
@@ -258,29 +253,12 @@ class Engine:
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
                 asyncio.run(model.load('cuda'))
-            # The OCR loader exposes no session options. Recreate its session
-            # once at startup with the native factory: bind the selected GPU,
-            # bound CPU helpers, and avoid spinning against the Qt render pool.
-            from manga_translator.utils.onnx_runtime import create_inference_session, import_onnxruntime
-            ort = import_onnxruntime()
-            # cuDNN plan-selection warnings use ORT's global logger rather than
-            # the session logger. Preserve errors without per-convolution spam.
-            ort.set_default_logger_severity(3)
-            options = self.ocr.session.get_session_options()
-            options.intra_op_num_threads = threads
-            options.inter_op_num_threads = 1
-            options.add_session_config_entry('session.intra_op.allow_spinning', '0')
-            options.add_session_config_entry('session.inter_op.allow_spinning', '0')
-            self.ocr.session = None
-            self.ocr.session, _ = create_inference_session(ort,
-                self.ocr._get_file_path(self.ocr._MODELS[self.ocr.model_type]['onnx']),
-                device='cuda', sess_options=options,
-                cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'DEFAULT'},
-                fallback_to_cpu=False, logger=self.ocr.logger)
-            if self.ocr.session.get_providers()[0] != 'CUDAExecutionProvider':
-                raise RuntimeError('PP-OCRv6 requires ONNX Runtime CUDAExecutionProvider')
-            self.ocr.session.disable_fallback()
-            self.ocr.recognizer = Recognizer(self.ocr)
+            self.probes = {language: Paddle(self.models, language, gpu, threads)
+                           for language in ('en', 'ch', 'korean')}
+            self.recognizers = {'en': self.probes['en'], 'korean': self.probes['korean'],
+                'ch': Chinese(self.models, gpu, self.probes['ch'].recognizer.crop)}
+            self.japanese = Japanese(self.models, gpu)
+            self.router = ScriptRouter(self.models, self.probes)
             self.bubbles = MangaLensBubbleDetector(
                 model_path=self.models / 'detection/mangalens.pt', device=f'cuda:{gpu}',
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)
@@ -298,7 +276,12 @@ class Engine:
             c = self.config
             await self.detector.detect(rgb, c.detector.detection_size, c.detector.text_threshold,
                                        c.detector.box_threshold, c.detector.unclip_ratio)
-            await self.ocr.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
+            for model in (*self.probes.values(), self.recognizers['ch']):
+                await model.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
+            # Manga OCR runs its bundled example during construction. Exercise
+            # the upstream scorer too, without downloads or text logging.
+            self.router.choose({lang: {'text': 'test', 'conf': .9}
+                                for lang in ('en', 'ch', 'japan', 'korean')})
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
@@ -322,13 +305,20 @@ class Engine:
             # RapidOCR sorts by aspect ratio, pads bounded batches and restores
             # input order; paragraph grouping remains entirely upstream.
             with self._ocr_lock:
-                await self.ocr.recognize(rgb, [line for group in groups for line in group], c.ocr)
+                buckets = self.router.classify(rgb, blocks)
+                for language, model in self.recognizers.items():
+                    selected = [line for bucket, group in zip(buckets, groups)
+                                if bucket == language for line in group]
+                    if selected:
+                        await model.recognize(rgb, selected, c.ocr)
+                japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
+                if japanese:
+                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group],
                                  font_size=block.font_size, angle=block.angle,
                                  direction='v' if block.src_is_vertical else 'h')
                        for block, group in zip(blocks, groups)
-                       # Never erase a whole paragraph with missing OCR lines.
-                       if group and all(line.text.strip() and line.prob >= c.ocr.prob for line in group)]
+                       if group]
             regions = [region for region in regions
                        if len(region.text.strip()) >= c.ocr.min_text_length and is_valuable_text(region.text)
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
@@ -370,7 +360,8 @@ class Engine:
         import torch
         # Node shutdown joins the compute pool before unloading model weights.
         with self._detector_lock, self._ocr_lock, self._bubble_lock, torch.cuda.device(self.gpu):
-            self.ocr.recognizer = None
-            for model in (self.detector, self.ocr, self.inpainter):
+            for model in (*self.probes.values(), self.recognizers['ch'], self.japanese):
+                model.close()
+            for model in (self.detector, self.inpainter):
                 asyncio.run(model.unload())
             self.bubbles.model = None

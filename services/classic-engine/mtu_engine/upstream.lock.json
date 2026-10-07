@@ -13,6 +13,13 @@
     "sha256": "a6e46a259693f508f4746868eb04260be4dc485b4119f1b9228484e062156cac",
     "license": "GPL-3.0"
   },
+  "comic_translate": {
+    "repository": "https://github.com/ogkalu2/comic-translate",
+    "revision": "8977b91a4f7a40c3917c5a268e9e7d78e1d818da",
+    "url": "https://codeload.github.com/ogkalu2/comic-translate/zip/8977b91a4f7a40c3917c5a268e9e7d78e1d818da",
+    "sha256": "db8ccb74697ee66f81af983642227b642c098eb0025e8a24e6a0ea4e6518509f",
+    "license": "Apache-2.0"
+  },
   "hyphenation": {
     "url": "https://files.pythonhosted.org/packages/7b/1f/c2142d2edf833a90728e5cdeb10bdbdc094dde8dbac078cee0cf33f5e11b/pyphen-0.17.2-py3-none-any.whl",
     "sha256": "3a07fb017cb2341e1d9ff31b8634efb1ae4dc4b130468c7c39dd3d32e7c3affd",
@@ -21,19 +28,21 @@
   },
   "models": [
     {
+      "url": "https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.1/korean_PP-OCRv5_rec_mobile_infer.onnx",
+      "sha256": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b",
+      "file": "ocr/korean_PP-OCRv5_rec_mobile_infer.onnx",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.1/ppocrv5_korean_dict.txt",
+      "sha256": "a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7",
+      "file": "ocr/ppocrv5_korean_dict.txt",
+      "license": "Apache-2.0"
+    },
+    {
       "url": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect-20241225.ckpt",
       "sha256": "67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e",
       "file": "detection/detect-20241225.ckpt"
-    },
-    {
-      "url": "https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/master/inference.onnx",
-      "sha256": "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba",
-      "file": "ocr/PP-OCRv6_medium_rec.onnx"
-    },
-    {
-      "url": "https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/master/inference.yml",
-      "sha256": "991b700facf5b50a7de193468207d5f4255b538dde0d312ae3b7c7a9b6873129",
-      "file": "ocr/PP-OCRv6_medium_rec.yml"
     },
     {
       "url": "https://huggingface.co/dreMaz/AnimeMangaInpainting/resolve/main/lama_large_512px.ckpt",
@@ -44,6 +53,116 @@
       "url": "https://www.modelscope.cn/models/hgmzhn/manga-translator-ui/resolve/master/mangalens.pt",
       "sha256": "4028152940f7c910f40192f46ede3b3f6c7129e5c76849c324d3564f8ac50198",
       "file": "detection/mangalens.pt"
+    },
+    {
+      "url": "https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/3b76726c3606c4af92f5133b359ed14e0d30a455/en_PP-OCRv5_rec_mobile_infer.onnx",
+      "sha256": "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8",
+      "file": "ocr/en_PP-OCRv5_rec_mobile_infer.onnx",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/3b76726c3606c4af92f5133b359ed14e0d30a455/ppocrv5_en_dict.txt",
+      "sha256": "e025a66d31f327ba0c232e03f407ae8d105e1e709e7ccb3f408aa778c24e70d6",
+      "file": "ocr/ppocrv5_en_dict.txt",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/3b76726c3606c4af92f5133b359ed14e0d30a455/ch_PP-OCRv5_rec_mobile_infer.onnx",
+      "sha256": "5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5",
+      "file": "ocr/ch_PP-OCRv5_rec_mobile_infer.onnx",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/3b76726c3606c4af92f5133b359ed14e0d30a455/ppocrv5_dict.txt",
+      "sha256": "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b",
+      "file": "ocr/ppocrv5_dict.txt",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/config.json",
+      "sha256": "8c0e395de8fa699daaac21aee33a4ba9bd1309cfbff03147813d2a025f39f349",
+      "file": "manga/config.json",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/preprocessor_config.json",
+      "sha256": "af4eb4d79cf61b47010fc0bc9352ee967579c417423b4917188d809b7e048948",
+      "file": "manga/preprocessor_config.json",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/special_tokens_map.json",
+      "sha256": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+      "file": "manga/special_tokens_map.json",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/tokenizer_config.json",
+      "sha256": "d775ad1deac162dc56b84e9b8638f95ed8a1f263d0f56f4f40834e26e205e266",
+      "file": "manga/tokenizer_config.json",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/vocab.txt",
+      "sha256": "344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d",
+      "file": "manga/vocab.txt",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/pytorch_model.bin",
+      "sha256": "c63e0bb5b3ff798c5991de18a8e0956c7ee6d1563aca6729029815eda6f5c2eb",
+      "file": "manga/pytorch_model.bin",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://github.com/Topdu/OpenOCR/releases/download/develop0.0.1/openocr_svtrv2_ch.pth",
+      "sha256": "3be361b72dc52e8d4f5569ae822d263b4e70671486bbaa45605711d17b8aec27",
+      "file": "openocr/openocr_svtrv2_ch.pth",
+      "license": "Apache-2.0"
+    }
+  ],
+  "support": [
+    {
+      "url": "https://raw.githubusercontent.com/Yuff1010/Manga-Overlay-Translator/454d0816869192e60a3aee455d509ab5b59ecdc5/server/ocr.py",
+      "sha256": "120e466e45ffb75fa4ddacddc6a470ca2155762f8e3c1c5ebf941fb3c0207bd3",
+      "file": "upstream/mot/ocr.py",
+      "license": "MIT"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Yuff1010/Manga-Overlay-Translator/454d0816869192e60a3aee455d509ab5b59ecdc5/LICENSE",
+      "sha256": "24df42cf36f4da5eb5b10fbe9314c781d31e30e2ffe4f0b935ac9313c627c960",
+      "file": "upstream/mot/LICENSE",
+      "license": "MIT"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/kha-white/manga-ocr/c333b5d36e88d539d6b040b4c4cf90ad5ecd4f69/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "file": "upstream/manga_ocr/LICENSE",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Topdu/OpenOCR/1ccfc6ee6161f7133b192e16af3a9265273997ba/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "file": "upstream/openocr/LICENSE",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Topdu/OpenOCR/1ccfc6ee6161f7133b192e16af3a9265273997ba/configs/rec/svtrv2/svtrv2_ch.yml",
+      "sha256": "f94d9b64cb941fbe6b0d9a8a25eda48a60d579d1642408e5e18083ec91f3491e",
+      "file": "upstream/openocr/svtrv2_ch.yml",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/3b76726c3606c4af92f5133b359ed14e0d30a455/README.md",
+      "sha256": "98b45ea81164d1e1a1dd82255207053b15cd6c69d922a1c5cf3387ce604d4b74",
+      "file": "upstream/mot/ppocr-model-card.md",
+      "license": "Apache-2.0"
+    },
+    {
+      "url": "https://huggingface.co/kha-white/manga-ocr-base/resolve/aa6573bd10b0d446cbf622e29c3e084914df9741/README.md",
+      "sha256": "32f413afcc4295151e77d25202c5c5d81ef621b46f947da1c3bde13256dc0d5f",
+      "file": "upstream/manga_ocr/model-card.md",
+      "license": "Apache-2.0"
     }
   ]
 }
