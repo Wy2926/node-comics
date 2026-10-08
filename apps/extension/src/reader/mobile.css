@@ -1,0 +1,195 @@
+/* Image and EPUB readers keep one chrome tree and the same visual tokens. */
+.nc-reader .nc-translation-scrim { display: none; }
+
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
+  .nc-app .nc-reader {
+    --reader-gutter: 0px;
+    --reader-mobile-header: 106px;
+    --reader-mobile-footer: calc(var(--reader-tool-size) + 18px);
+    --reader-tool-size: 48px;
+    --reader-tool-gap: 2px;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* Reserve the chrome space even while hidden: revealing it never shifts a page. */
+  .nc-app .nc-reader .nc-reading-viewport {
+    margin: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px))
+      env(safe-area-inset-right, 0px)
+      calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom, 0px))
+      env(safe-area-inset-left, 0px);
+  }
+
+  .nc-app .nc-reader .nc-reader-rail {
+    left: calc(4px + env(safe-area-inset-left, 0px));
+    right: calc(4px + env(safe-area-inset-right, 0px));
+    width: auto;
+    max-height: none;
+    transform: none;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .nc-app .nc-reader .nc-reader-rail button {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: var(--text-caption);
+  }
+
+  .nc-app .nc-reader .nc-reader-rail.left {
+    top: calc(4px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    grid-template-columns: 44px 44px 44px minmax(0, 1fr) 44px;
+    grid-template-rows: 44px 44px;
+    align-items: center;
+  }
+
+  .nc-app .nc-reader .nc-reader-rail.left > [data-reader-back-trigger] { grid-area: 1 / 1; }
+  .nc-app .nc-reader .nc-reader-rail.left > [data-reader-directory-trigger] { grid-area: 1 / 2; }
+  .nc-app .nc-reader .nc-reader-rail.left > .nc-rail-divider { display: none; }
+  .nc-app .nc-reader .nc-reader-navigation { display: contents; }
+  .nc-app .nc-reader .nc-reader-navigation > button:first-child { grid-area: 1 / 3; }
+  .nc-app .nc-reader .nc-reader-navigation > label { grid-area: 1 / 4; }
+  .nc-app .nc-reader .nc-reader-navigation > button:last-child { grid-area: 1 / 5; }
+  .nc-app .nc-reader .nc-reader-navigation > button .nc-icon { rotate: -90deg; }
+
+  .nc-app .nc-reader .nc-reader-navigation label {
+    flex-direction: row;
+    justify-content: center;
+    min-width: 0;
+    font-size: var(--text-caption);
+    white-space: nowrap;
+  }
+
+  .nc-app .nc-reader .nc-reader-navigation input[type=number] {
+    width: 48px;
+    min-width: 0;
+    min-height: 44px;
+    font-size: max(16px, 1rem);
+  }
+
+  .nc-app .nc-reader .nc-reader-navigation > .nc-reader-progress {
+    grid-area: 2 / 1 / 3 / -1;
+    writing-mode: horizontal-tb;
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    margin: 0;
+  }
+
+  .nc-app .nc-reader .nc-reader-navigation:has(.nc-epub-progress-label) > .nc-reader-progress { grid-column-end: 5; }
+  .nc-app .nc-reader .nc-reader-navigation > .nc-epub-progress-label { grid-area: 2 / 5; text-align: center; }
+  .nc-app .nc-reader .nc-reader-progress::-webkit-slider-runnable-track { width: 100%; height: 6px; }
+  .nc-app .nc-reader .nc-reader-progress::-webkit-slider-thumb { width: 24px; height: 18px; margin: -7px 0 0; }
+  .nc-app .nc-reader .nc-reader-progress::-moz-range-track { width: 100%; height: 6px; }
+  .nc-app .nc-reader .nc-reader-progress::-moz-range-thumb { width: 24px; height: 18px; }
+
+  .nc-app .nc-reader .nc-reader-rail.right {
+    top: auto;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    grid-template-columns: minmax(0, 1fr) 1px auto;
+    grid-template-rows: var(--reader-tool-size);
+    column-gap: 4px;
+    align-items: stretch;
+  }
+
+  .nc-app .nc-reader .nc-reader-tool-group {
+    min-width: 0;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .nc-app .nc-reader .nc-reader-tool-group:first-child { overflow-x: auto; overscroll-behavior-x: contain; }
+  .nc-app .nc-reader .nc-reader-tool-group > button,
+  .nc-app .nc-reader .nc-page-versions button { width: 48px; height: var(--reader-tool-size); }
+  .nc-app .nc-reader .nc-reader-rail.right button { gap: 1px; padding: 2px; }
+  .nc-app .nc-reader .nc-reader-rail.right .nc-reader-tool-group > button > span { display: none; }
+  .nc-app .nc-reader .nc-reader-rail.right .nc-reader-tool-group > button[data-reader-feedback-trigger] > span { display: -webkit-box; }
+  .nc-app .nc-reader .nc-reader-rail.right > .nc-rail-divider { height: 36px; width: 1px; margin: 0; }
+
+  .nc-app .nc-reader .nc-page-versions {
+    order: -1;
+    flex: none;
+    display: flex;
+  }
+
+  .nc-app .nc-reader .nc-reader-rail.left:not(:has(.nc-reader-navigation)) { grid-template-rows: 44px; }
+  .nc-app .nc-reader:not(:has(.nc-reader-navigation)) { --reader-mobile-header: 60px; }
+
+  /* Full-screen contents/settings, a bottom sheet for the short translation form. */
+  .nc-app .nc-reader .nc-reader-drawer:is(.left, .right) {
+    inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    width: auto;
+    max-width: none;
+    max-height: none;
+  }
+
+  .nc-app .nc-reader .nc-drawer-title { flex: none; gap: 12px; padding: 8px 12px; }
+  .nc-app .nc-reader .nc-drawer-title h2 { min-width: 0; font-size: var(--text-title); }
+  .nc-app .nc-reader .nc-drawer-title .icon-button { flex: none; width: 44px; height: 44px; }
+  .nc-app .nc-reader .nc-drawer-content { padding: 16px; overscroll-behavior: contain; }
+  .nc-app .nc-reader .nc-translation-scrim { display: block; z-index: 34; background: var(--dialog-backdrop); }
+  .nc-app .nc-reader .nc-translation-popover {
+    inset: auto env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px);
+    overflow: hidden;
+  }
+
+  .nc-app .nc-reader .nc-translation-popover .nc-drawer-title { margin-bottom: 0; }
+  .nc-app .nc-reader .nc-translation-popover .field { font-size: var(--text-body); }
+  .nc-app .nc-reader .nc-translation-popover .nc-default-mode-note { font-size: var(--text-small); }
+  .nc-app .nc-reader .nc-reader-choices { flex-wrap: wrap; }
+  .nc-app .nc-reader .nc-reader-choices button { min-height: 44px; white-space: normal; font-size: var(--text-small); }
+  .nc-app .nc-reader .nc-reader-option { gap: 12px; padding-block: 16px; }
+  .nc-app .nc-reader .nc-reader-option .icon-button { min-width: 44px; min-height: 44px; }
+  .nc-app .nc-reader .nc-reader-option .switch { flex: none; }
+  .nc-app .nc-reader .nc-stack-actions .button { min-height: 44px; }
+
+  .nc-app .nc-reader .nc-directory-search input { font-size: max(16px, 1rem); }
+  .nc-app .nc-reader .nc-directory-search button,
+  .nc-app .nc-reader .nc-chapter-expand,
+  .nc-app .nc-reader .nc-directory-tabs button { min-width: 44px; min-height: 44px; }
+  .nc-app .nc-reader .nc-directory-footer { max-height: 20%; overflow: auto; }
+
+  .nc-app .nc-reader .nc-reveal {
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    width: 48px;
+    height: 48px;
+  }
+
+  .nc-app .nc-reader .nc-reading-progress {
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    bottom: calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom, 0px) + 8px);
+    max-width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px);
+  }
+
+  .nc-app .nc-reader .nc-source-action { top: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px)); }
+  .nc-app .nc-reader .nc-empty { margin: auto 16px; padding-block: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px)) calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom, 0px)); }
+  .nc-app .nc-reader .nc-image-translation-action { min-height: 44px; }
+  .nc-app .nc-reader .nc-image-translation-dismiss,
+  .nc-app .nc-reader .nc-image-translation.is-collapsed,
+  .nc-app .nc-reader .nc-image-failure.over-image > .nc-image-failure-dismiss,
+  .nc-app .nc-reader .nc-image-failure-retry { min-width: 44px; min-height: 44px; }
+}
+
+/* Short landscape phones use a single navigation row to leave room for content. */
+@media (max-width: 1000px) and (max-height: 500px) and (orientation: landscape) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape) and (hover: none) {
+  .nc-app .nc-reader { --reader-mobile-header: 60px; }
+  .nc-app .nc-reader .nc-reader-rail.left {
+    grid-template-columns: 44px 44px 44px 84px minmax(44px, 1fr) 44px;
+    grid-template-rows: 44px;
+  }
+  .nc-app .nc-reader .nc-reader-rail.left:has(.nc-epub-progress-label) {
+    grid-template-columns: 44px 44px 44px 84px minmax(44px, 1fr) 44px 44px;
+  }
+  .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > .nc-reader-progress { grid-area: 1 / 5; }
+  .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > .nc-epub-progress-label { grid-area: 1 / 6; }
+  .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > button:last-child { grid-area: 1 / -2; }
+}

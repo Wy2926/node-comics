@@ -50,7 +50,7 @@ async function owned(message: Message, sender = extensionSender) {
   return result.response!;
 }
 
-beforeEach(async () => {
+async function setupBackground(mobile = false) {
   // Each case starts a new worker. Reusing one module graph would register
   // permanent background/auth subscriptions repeatedly in the same process.
   vi.resetModules();
@@ -78,11 +78,11 @@ beforeEach(async () => {
     },
     storage: {local: storage(local), session: storage(session), onChanged: event()},
     alarms: {get:async()=>({}),create:async()=>{},clear:async()=>true,onAlarm:event()},
-    contextMenus: {onClicked: event(), update: vi.fn(async () => {})},
-    commands:{onCommand:event()},
+    contextMenus: mobile ? undefined : {onClicked: event(), update: vi.fn(async () => {})},
+    commands: mobile ? undefined : {onCommand:event()},
     permissions: {onRemoved: event(), contains: vi.fn(async () => false), request: vi.fn(async () => true)},
     scripting: {executeScript: vi.fn(async () => [])},
-    windows: {
+    windows: mobile ? undefined : {
       create: async ({url}:{url:string}) => {const tab={id:7,url};tabs.set(tab.id,tab);return {id:1,tabs:[tab]};},
       remove: vi.fn(async()=>{}),
     },
@@ -98,7 +98,8 @@ beforeEach(async () => {
   const {default:background}=await import('../entrypoints/background');
   background.main();
   expect(listeners).toHaveLength(9); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts.
-});
+}
+beforeEach(() => setupBackground());
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
@@ -134,6 +135,23 @@ describe('inline image port authorization', () => {
 });
 
 describe('production background listeners share the runtime message channel', () => {
+  it('initializes without desktop APIs and keeps mobile locale, actions and Drive bridge available', async () => {
+    await setupBackground(true);
+    // Exercise installation too: mobile must not attempt to create desktop menus.
+    for (const [listener] of vi.mocked(chrome.runtime.onInstalled.addListener).mock.calls)
+      listener({reason: 'update'} as chrome.runtime.InstalledDetails);
+    expect(await owned({type: 'NC_UI_LOCALE'})).toMatchObject({locale: 'en'});
+    const connected = await owned({type: 'NC_DRIVE_CONNECT'});
+    expect(connected).toMatchObject({ok: true, tabId: 7});
+    const sender: chrome.runtime.MessageSender = {id: extensionId, url: tabs.get(7)!.url, tab: {id: 7} as chrome.tabs.Tab, frameId: 0, documentId: 'mobile-document'};
+    expect(await owned({type: 'NC_DRIVE_BRIDGE_INIT'}, sender)).toMatchObject({ok: true, nonce: expect.any(String)});
+    expect(await owned({type: 'NC_DRIVE_BRIDGE_INIT'}, {...sender, documentId: 'other-document'})).toMatchObject({ok: false});
+    expect(await owned({type: 'NC_DRIVE_DISCONNECT', accountId: 'account-1'})).toEqual({ok: true});
+    expect(await owned({type: 'NC_DRIVE_STATUS', id: connected.id})).toMatchObject({ok: false, code: 'cancelled'});
+    expect(session['nc-drive-pending:7']).toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('uses installed host access without a prompt and starts a manual session with automatic tabs disabled', async () => {
     vi.mocked(chrome.permissions.contains).mockImplementation(async()=>true);
     vi.stubGlobal('navigator', {locks: {request: async (_name:string, run:()=>Promise<unknown>) => run()}});

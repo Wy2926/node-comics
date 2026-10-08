@@ -50,7 +50,7 @@ export function DiscoveryControls({query, genres, count, loading, refreshDisable
         <div className="nc-discovery-search-slot">
           {draft !== null ? <form className="nc-discovery-search" onSubmit={event => {event.preventDefault(); onChange({...query, search: draft.trim()});}}>
             <Icon name="search" size={18}/>
-            <input ref={input} value={draft} maxLength={120} aria-label={msg('搜索作品名称')} placeholder={msg('搜索作品名称')}
+            <input ref={input} value={draft} maxLength={120} enterKeyHint="search" aria-label={msg('搜索作品名称')} placeholder={msg('搜索作品名称')}
               onChange={event => setDraft(event.target.value)} onBlur={() => setDraft(null)}
               onKeyDown={event => {
                 if (event.key !== 'Escape') return;

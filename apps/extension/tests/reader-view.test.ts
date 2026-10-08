@@ -12,6 +12,11 @@ describe('comic viewing choices',()=>{
   it.each([{width:1000,height:3000},{width:800,height:24000}])('initializes a first long image %j to width and 50 percent',page=>{
     expect(initialReadingView(page)).toEqual({mode:'classic',preference:'original',zoom:50,fit:'width'});
   });
+  it('uses the full phone width for a new long image without changing a saved zoom',()=>{
+    expect(initialReadingView({width:800,height:24000},true)).toEqual({mode:'classic',preference:'original',zoom:100,fit:'width'});
+    vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'original',zoom:50,fit:'width'})});
+    expect(readStoredReadingView('comic')?.zoom).toBe(50);
+  });
   it.each([{width:1000,height:1500},{width:1500,height:1000},{width:1000,height:2999}])('keeps a regular image %j at window and 100 percent',page=>{
     expect(initialReadingView(page)).toEqual({mode:'classic',preference:'original',zoom:100,fit:'window'});
   });

@@ -16,7 +16,10 @@ function protectedTarget(event:KeyboardEvent):boolean {
 
 /** Top-layer placement alone is not modal: scrollbars and passive hints also use popovers. */
 export function hasShortcutOverlay(document:Document):boolean {
-  return !!document.querySelector('dialog[open],[role="dialog"][aria-modal="true"],[popover]:popover-open:is([role="menu"],[role="listbox"],[role="dialog"])');
+  const interactive=':is([role="menu"],[role="listbox"],[role="dialog"])';
+  const popover=typeof document.defaultView?.HTMLElement.prototype.showPopover==='function'
+    ? `,[popover]:popover-open${interactive}` : '';
+  return !!document.querySelector(`dialog[open],[role="dialog"][aria-modal="true"],[data-popover-fallback-open]${interactive}${popover}`);
 }
 
 export function bindShortcuts(target:Window,handlers:ShortcutHandlers,options:{getOverrides:()=>ShortcutOverrides;enabled?:()=>boolean}):()=>void {

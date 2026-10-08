@@ -4,6 +4,7 @@ import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
 import {ReleaseFeatureArtwork} from './ReleaseFeatureArtwork';
 import {hasUnseenReleaseNotes, markReleaseNotesSeen, releaseNotes, releaseNotesStorageKey} from './content';
+import {useDialogViewport} from '../visual-viewport';
 import './release-notes.css';
 
 export function ReleaseNotes({active}: {active: boolean}) {
@@ -33,6 +34,7 @@ export function ReleaseNotes({active}: {active: boolean}) {
 
 function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShown: () => void; onClose: () => void; trigger: HTMLButtonElement | null}) {
   const dialog = useRef<HTMLDialogElement>(null), closeButton = useRef<HTMLButtonElement>(null), titleId = useId(), introId = useId();
+  useDialogViewport(dialog);
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
@@ -46,7 +48,7 @@ function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShow
       target?.focus({preventScroll: true});
     };
   }, [onShown, trigger]);
-  return <dialog ref={dialog} id={id} className="modal nc-release-notes" aria-labelledby={titleId} aria-describedby={introId}
+  return <dialog ref={dialog} id={id} className="modal nc-release-notes nc-viewport-dialog" aria-labelledby={titleId} aria-describedby={introId}
     onCancel={event => {event.preventDefault(); event.stopPropagation(); onClose();}}>
     <button ref={closeButton} className="icon-button nc-release-close" aria-label={msg('releaseNotes.close')} onClick={onClose}><Icon name="close"/></button>
     <header className="nc-release-cover">

@@ -120,7 +120,10 @@ function Fixture() {
     translation.onReadingWindow(targets, visible);
   }, [translation.onReadingWindow]);
   useEffect(() => onMaterialized(identity => setCopy(previous => ({...previous, pages: previous.pages.map(page => page.id === identity.pageId ? {...page, imageSha256: identity.imageSha256, width: identity.width, height: identity.height, imageByteSize: identity.byteSize, imageMime: identity.mime} : page)}))), []);
-  useEffect(() => {if (mounted) void progress.open(copyRef.current); return () => {void progress.close();};}, [progress, mounted]);
+  useEffect(() => {
+    if (mounted) void progress.open(copyRef.current).catch(error => {if (error?.name !== 'AbortError') throw error;});
+    return () => {void progress.close();};
+  }, [progress, mounted]);
   return <div className="nc-app">
     <Scrollbars/>
     {mounted ? <EpubReader copy={copy} settings={settings} setSettings={setSettings} update={update} viewKey={localSample ? 'epub-local-' + localSample : 'epub-artwork-ui-fixture'}

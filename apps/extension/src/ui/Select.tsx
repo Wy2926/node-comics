@@ -1,5 +1,6 @@
 import {Children, Fragment, isValidElement, useId, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode} from 'react';
 import {Icon} from '../icons';
+import {menuPosition, visibleViewport} from './visual-viewport';
 import './select.css';
 
 /** Value-only change contract; this is deliberately not a native select event. */
@@ -41,6 +42,7 @@ function readOptions(children: ReactNode, disabled = false): Option[] {
 export function Select({value, onChange, children, trigger, placement = 'auto', menuWidth = 180, disabled, id, name, className = '', onKeyDown, onClick, onBlur, ...props}: SelectProps) {
   const generatedId = useId(), buttonId = id ?? `nc-select-${generatedId}`, listId = `${buttonId}-list`;
   const buttonRef = useRef<HTMLButtonElement>(null), listRef = useRef<HTMLSpanElement>(null);
+  const touchingList = useRef(false);
   const [open, setOpen] = useState(false), [active, setActive] = useState(-1);
   const [implicitLabel, setImplicitLabel] = useState<string>();
   const search = useRef({text: '', time: 0});
@@ -64,8 +66,14 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
   });
 
   function close() {
+    touchingList.current = false;
     setOpen(false);
     search.current = {text: '', time: 0};
+  }
+  function restoreTouchFocus() {
+    if (!touchingList.current) return;
+    touchingList.current = false;
+    buttonRef.current?.focus({preventScroll: true});
   }
   function show(index = enabled.includes(selected) ? selected : enabled[0]) {
     if (unavailable) return;
@@ -88,40 +96,34 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
     if (!button || !list || !expanded) return;
     // Keeping the popover in the DOM subtree preserves dialog interactivity and theme tokens.
     // The browser's top layer escapes ancestor overflow without a body portal.
-    list.showPopover();
+    const nativePopover = typeof list.showPopover === 'function';
+    if (nativePopover) list.showPopover();
     function position() {
       if (!button || !list) return;
-      const rect = button.getBoundingClientRect(), gap = 6, margin = 8;
-      // Stay inside the document viewport, including embedded extension surfaces.
-      const root = document.documentElement;
-      const viewportWidth = Math.min(root.clientWidth, root.getBoundingClientRect().width);
-      const availableWidth = placement === 'left' ? rect.left - gap - margin : viewportWidth - margin * 2;
-      const width = Math.max(0, Math.min(Math.max(rect.width, menuWidth), availableWidth));
-      const below = window.innerHeight - rect.bottom - gap - margin, above = rect.top - gap - margin;
-      list.style.width = `${width}px`;
-      if (placement === 'left') {
-        list.style.maxHeight = `${Math.max(0, Math.min(320, window.innerHeight - margin * 2))}px`;
-        const height = list.getBoundingClientRect().height;
-        list.style.left = `${Math.max(margin, rect.left - gap - width)}px`;
-        list.style.top = `${Math.max(margin, Math.min(rect.top + (rect.height - height) / 2, window.innerHeight - height - margin))}px`;
-        return;
-      }
-      const upwards = below < Math.min(list.scrollHeight + 4, 320) && above > below;
-      list.style.maxHeight = `${Math.max(0, Math.min(320, upwards ? above : below))}px`;
-      list.style.left = `${Math.max(margin, Math.min(rect.left, viewportWidth - width - margin))}px`;
-      list.style.top = `${upwards ? rect.top - gap - list.getBoundingClientRect().height : rect.bottom + gap}px`;
+      const bounds = visibleViewport(), rect = button.getBoundingClientRect();
+      // Set width before measuring wrapped labels, then keep the list above the soft keyboard.
+      list.style.width = `${Math.max(0, Math.min(Math.max(rect.width, menuWidth), bounds.width - 16))}px`;
+      const position = menuPosition(rect, bounds, menuWidth, list.scrollHeight + 4, placement);
+      for (const [key, value] of Object.entries(position)) list.style[key as 'left' | 'top' | 'width' | 'maxHeight'] = `${value}px`;
     }
     position();
     const resize = new ResizeObserver(position);
     resize.observe(button);
     const scroll = (event: Event) => { if (event.target !== list) position(); };
+    const dismiss = (event: PointerEvent) => { if (!list.contains(event.target as Node) && !button.contains(event.target as Node)) close(); };
     window.addEventListener('resize', position);
+    window.visualViewport?.addEventListener('resize', position);
+    window.visualViewport?.addEventListener('scroll', position);
     document.addEventListener('scroll', scroll, true);
+    if (!nativePopover) document.addEventListener('pointerdown', dismiss);
     return () => {
       resize.disconnect();
       window.removeEventListener('resize', position);
+      window.visualViewport?.removeEventListener('resize', position);
+      window.visualViewport?.removeEventListener('scroll', position);
       document.removeEventListener('scroll', scroll, true);
-      if (list.matches(':popover-open')) list.hidePopover();
+      document.removeEventListener('pointerdown', dismiss);
+      if (nativePopover && list.matches(':popover-open')) list.hidePopover();
     };
   }, [expanded, placement, menuWidth]);
 
@@ -178,16 +180,18 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
     <button {...props} ref={buttonRef} id={buttonId} type="button" name={name} value={value} data-value={value} aria-label={label}
       className={`nc-select ${className}`} disabled={unavailable} role="combobox" aria-haspopup="listbox"
       aria-expanded={expanded} aria-controls={listId} aria-activedescendant={expanded && activeIndex !== undefined ? `${listId}-${activeIndex}` : undefined}
-      onKeyDown={keyDown} onBlur={event => { close(); onBlur?.(event); }}
-      onClick={event => { onClick?.(event); if (!event.defaultPrevented) { if (expanded) close(); else show(); } }}>
+      onKeyDown={keyDown} onBlur={event => { if (!touchingList.current) close(); onBlur?.(event); }}
+      onClick={event => { onClick?.(event); if (!event.defaultPrevented) { event.currentTarget.focus({preventScroll: true}); if (expanded) close(); else show(); } }}>
       {trigger ?? <><span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value">{options[selected]?.label ?? String(value)}</span></span>
       <Icon name="chevron" size={16} className="nc-select-chevron"/></>}
     </button>
     {name && <input type="hidden" name={name} value={value} disabled={unavailable} form={props.form}/>}
-    <span ref={listRef} id={listId} popover="auto" role="listbox" className="nc-select-list"
+    <span ref={listRef} id={listId} popover="auto" role="listbox" className="nc-select-list" hidden={!expanded}
+      data-popover-fallback-open={expanded && typeof HTMLElement.prototype.showPopover !== 'function' || undefined}
       aria-labelledby={buttonId}
-      onToggle={() => { if (!listRef.current?.matches(':popover-open')) close(); }}
-      onPointerDown={event => event.preventDefault()}
+      onToggle={() => { if (listRef.current && typeof listRef.current.showPopover === 'function' && !listRef.current.matches(':popover-open')) close(); }}
+      onPointerDown={event => { if (event.pointerType === 'touch') touchingList.current = true; else event.preventDefault(); }}
+      onPointerUp={restoreTouchFocus} onPointerCancel={restoreTouchFocus}
       onMouseDown={event => {
         // Firefox extension pages ignore pointerdown.preventDefault() (Mozilla bug 1484186).
         event.preventDefault();
@@ -195,7 +199,7 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
       {options.map((option, index) => <span key={option.value} id={`${listId}-${index}`} role="option" data-value={option.value}
         aria-selected={index === selected} aria-disabled={option.disabled || undefined}
         className="nc-select-option" data-active={expanded && index === activeIndex || undefined}
-        onPointerMove={() => { if (!option.disabled) setActive(index); }}
+        onPointerMove={event => { if (event.pointerType !== 'touch' && !option.disabled) setActive(index); }}
         onClick={event => { event.preventDefault(); event.stopPropagation(); choose(index); }}>
         <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label">{option.label}</span></span><Icon name="check" size={16} className="nc-select-check"/>
       </span>)}

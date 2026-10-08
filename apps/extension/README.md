@@ -1,6 +1,6 @@
 # Node Comics 插件
 
-WXT + React + TypeScript，提供桌面浏览器阅读器、单来源书架与网页原位翻译。
+WXT + React + TypeScript，提供桌面及手机布局的浏览器阅读器、单来源书架与网页原位翻译。手机适配面向 Firefox Android 与 iOS Orion，界面共用视觉令牌及业务流程；浏览器 API 和真机验收边界见[手机布局](../../docs/POPUP_AND_THEME.md#手机布局与浏览器能力)。
 
 ## 运行与构建
 
@@ -26,10 +26,12 @@ Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页
 | Chrome 手动安装包 | `npm run zip` |
 | Edge 手动安装包 | `npm run zip:edge` |
 | Chrome／Edge 商店包 | `npm run zip:chrome:store` / `npm run zip:edge:store` |
-| Firefox MV3 审核包 | `npm run zip -- --browser firefox --mv3` |
+| Firefox MV3 审核包／Orion 本地 ZIP | `npm run zip -- --browser firefox --mv3` |
 | 网页预览构建 | `npm run build:web` |
 
 商店包不含 `manifest.key`；Firefox 公开下载使用 AMO 签名 XPI。包校验、上传与发布见[部署规范](../../docs/DEPLOYMENT.md)。
+
+Orion 本地安装复用 Firefox MV3 ZIP，不另设浏览器业务分支。打包前配置上述正式 API 与 Drive 连接地址；把生成的扩展 ZIP 保存到 iPhone“文件”，在 Orion 的“扩展 → ＋ → 从文件安装”选择它，无需解压。不是带 `-sources` 的源码包，也不是供 Firefox 正式安装的签名 XPI。文件安装入口见 [Orion 官方说明](https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html#ios-extensions-management)；本地包仍需 iOS 真机验证扩展 API 与授权流程。
 
 ## 开发入口
 

@@ -5,9 +5,11 @@
   border-radius: var(--comic-panel-radius);
   background: var(--surface);
   box-shadow: var(--comic-dialog-shadow);
+  overflow: hidden;
 }
-.nc-login-spread { display: grid; grid-template-columns: .94fr 1fr; }
-.nc-login-close { position: absolute; right: 12px; top: 12px; z-index: 2; }
+.nc-app .modal.nc-login[open] { display: flex; flex-direction: column; }
+.nc-login-spread { display: grid; grid-template-columns: .94fr 1fr; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.nc-login-controls { position: absolute; right: 12px; top: 12px; z-index: 2; }
 .nc-login-cover { padding: 28px; display: flex; flex-direction: column; border-right: var(--comic-perforation); }
 .nc-login-masthead { display: flex; gap: 8px; align-items: center; font-size: .625rem; font-weight: 800; letter-spacing: .09em; }
 .nc-login-masthead svg { color: var(--accent); }
@@ -56,19 +58,21 @@
 .nc-login-resume small { display: block; color: var(--muted); margin-top: 3px; font-size: .6875rem; }
 .nc-login-resume.error .nc-login-bookmark { color: var(--danger); background: var(--danger-soft); }
 @keyframes nc-login-page-turn { 0%,100% { transform: rotate(7deg); } 50% { transform: perspective(600px) rotateY(-15deg) rotate(3deg) translateY(-5px); } }
-@media (max-width: 640px) {
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+  .nc-login-controls { position: static; display: flex; justify-content: flex-end; flex: none; padding: 8px 12px; }
   .nc-login-spread { grid-template-columns: 1fr; }
-  .nc-login-cover { padding: 18px 24px; border-right: 0; border-bottom: var(--comic-perforation); }
-  .nc-login-masthead { padding-right: 26px; }
-  .nc-login-masthead > span:last-child { display: none; }
-  .nc-login-cover-title { margin-top: 16px; font-size: 2rem; }
-  .nc-login-cover-title br { display: none; }
-  .nc-login-star, .nc-login-panels, .nc-login-cover-bottom { display: none; }
-  .nc-login-content { padding: 24px; }
-  .nc-app .nc-login-content h2 { font-size: 1.5rem; margin-top: 10px; }
-  .nc-login-content form { margin-top: 18px; }
+  .nc-login-cover { display: none; }
+}
+@media (max-width: 700px) {
+  .nc-login-content { padding: 0 16px 18px; }
+  .nc-login-kicker { display: none; }
+  .nc-app .nc-login-content h2 { font-size: 1.25rem; margin-top: 0; }
+  .nc-login-content form { margin-top: 14px; }
   .nc-login-footnote { padding-top: 14px; }
-  .nc-login-resume { right: 16px; bottom: 20px; }
+  .nc-login-resume { right: max(12px, env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+@media (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+  .nc-login-content { padding: 16px 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .nc-login.is-connecting .translated, .nc-login.is-connecting .nc-login-star { animation: none; }

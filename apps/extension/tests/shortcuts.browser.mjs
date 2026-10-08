@@ -371,7 +371,8 @@ test('native starts display actual assignments, refresh on focus and reject conf
   await page.addInitScript(() => {
     window.fixtureBrowserCommands = [{name: 'nc-translate-tab', shortcut: 'Alt+Shift+Z'}, {name: 'nc-translate-region', shortcut: 'Alt+Shift+R'}];
     window.fixtureShortcutSettings = [];
-    Object.assign(window.chrome, {
+    // A normal HTTP page need not expose chrome; install the complete native fixture.
+    Object.assign(window.chrome ??= {}, {
       commands: {getAll: async () => window.fixtureBrowserCommands},
       tabs: {create: async options => {window.fixtureShortcutSettings.push(options.url);}},
       runtime: {getURL: path => 'chrome-extension://fixture' + path},
@@ -402,7 +403,7 @@ test('native starts display actual assignments, refresh on focus and reject conf
 test('native shortcut lookup errors recover without changing saved reader shortcuts or position', async () => {
   await page.addInitScript(() => {
     window.fixtureBrowserCommandsFail = true;
-    Object.assign(window.chrome, {
+    Object.assign(window.chrome ??= {}, {
       commands: {getAll: async () => {
         if (window.fixtureBrowserCommandsFail) throw Error('fixture lookup failure');
         return [{name: 'nc-translate-tab', shortcut: 'Alt+Shift+T'}];

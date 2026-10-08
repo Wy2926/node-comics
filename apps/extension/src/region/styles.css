@@ -159,6 +159,28 @@ button:disabled {
 [hidden] {
   display: none!important;
 }
+@media (max-width: 700px), (pointer: coarse), (hover: none) {
+  button { min-height: 44px; min-width: 44px; }
+  .bar {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    max-width: none;
+    max-height: 40dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .label { flex-basis: 100%; max-width: none; }
+  .preview {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    width: auto;
+    max-height: calc(55dvh - env(safe-area-inset-top));
+    overscroll-behavior: contain;
+  }
+  .preview img { max-height: 30dvh; }
+}
 @media (prefers-reduced-motion: reduce) {
   .loading-frame::after {
     animation: none;

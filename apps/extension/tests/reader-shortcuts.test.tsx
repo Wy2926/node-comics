@@ -28,6 +28,8 @@ vi.mock('../src/reader/useChapterStream',()=>({
 import {Reader} from '../src/reader/Reader';
 import {ReaderShell, ReaderDrawer, ReaderNavigation, ReaderSettingsButton, ReaderTools} from '../src/reader/ReaderChrome';
 import {ReaderSettings, ReaderScale, ReaderChoice, ReaderTranslationSettings} from '../src/reader/ReaderSettings';
+import {ComicDirectory} from '../src/reader/ComicDirectory';
+import {ThumbnailDirectory} from '../src/reader/ThumbnailDirectory';
 import {defaults} from '../src/types';
 import {installDictionary} from '../src/i18n/runtime';
 
@@ -163,6 +165,20 @@ describe('reader shortcut action integration',()=>{
   expect(props.onOpenShortcuts).toHaveBeenCalledOnce();
   const after=render(props);expect(nodes(after).some(node=>node.type==='aside'||node.type==='dialog')).toBe(false);
  });
+ it.each([true,false])('dismisses selected phone chapters/pages without changing the desktop directory (%s)',compact=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:compact}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  const props=fixture();render(props);hooks.handlers['reader.directory']();
+  const directory=nodes(render(props)).find(node=>node.type===ComicDirectory)!;
+  (directory.props.onNavigate as (id:string)=>void)('chapter-2');
+  expect(props.onNavigate).toHaveBeenCalledWith('chapter-2',undefined,undefined);
+  expect(actions.preserve).toHaveBeenCalledOnce();expect(actions.persist).toHaveBeenCalledOnce();
+  expect(nodes(render(props)).some(node=>node.type==='aside')).toBe(!compact);
+  if(compact)hooks.handlers['reader.directory']();
+  const thumbnails=nodes(render(props)).find(node=>node.type===ThumbnailDirectory)!;
+  (thumbnails.props.onJump as (index:number)=>void)(3);
+  expect(actions.jump).toHaveBeenCalledWith(3);
+  expect(nodes(render(props)).some(node=>node.type==='aside')).toBe(!compact);
+ });
  it('preserves and persists before leaving or finding alternate languages',()=>{
   const props=fixture();render(props);hooks.handlers['reader.back']();hooks.handlers['reader.find']();
   expect(actions.preserve).toHaveBeenCalledTimes(2);expect(actions.persist).toHaveBeenCalledTimes(2);
@@ -218,10 +234,10 @@ describe('reader shortcut action integration',()=>{
   expect(nodes(render(props)).some(node=>node.type==='aside')).toBe(false);
   for(const cleanup of cleanups)cleanup?.();
  });
- it.each(['menu','listbox','dialog'])('lets an open nested %s popover handle Escape before reader settings',role=>{
+ it.each(['menu','listbox','dialog'].flatMap(role=>[true,false].map(native=>({role,native}))))('lets an open nested $role popover handle Escape before reader settings (native: $native)',({role,native})=>{
   const documentListeners=vi.fn(),windowListeners=vi.fn();let open=true;
-  const querySelector=vi.fn((selector:string)=>open&&selector.includes(':popover-open')&&selector.includes(`role="${role}"`)?{}:null);
-  vi.stubGlobal('document',{querySelector,addEventListener:documentListeners,removeEventListener:vi.fn()});
+  const querySelector=vi.fn((selector:string)=>open&&selector.includes(native?':popover-open':'[data-popover-fallback-open]')&&selector.includes(`role="${role}"`)?{}:null);
+  vi.stubGlobal('document',{defaultView:{HTMLElement:{prototype:native?{showPopover:()=>{}}:{}}},querySelector,addEventListener:documentListeners,removeEventListener:vi.fn()});
   vi.stubGlobal('window',{addEventListener:windowListeners,removeEventListener:vi.fn()});
   const props=fixture();render(props);hooks.handlers['reader.translationSettings']();render(props);
   const cleanups=hooks.effects.map(effect=>effect());

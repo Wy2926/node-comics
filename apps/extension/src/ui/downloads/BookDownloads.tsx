@@ -14,6 +14,7 @@ import {clearBookDownloads,downloadLanguages,readDownloadScope,saveDownloadLangu
 import type {BookDownloadsController} from './useBookDownloads';
 import './downloads.css';
 import {FileDownloadRows} from './FileDownloads';
+import {visibleViewport} from '../visual-viewport';
 
 const cacheSize=(bytes:number)=>bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GB`:`${(bytes/1024**2).toFixed(1)} MB`;
 const languageName=(id:string)=>id===unknownDownloadLanguage?msg('语言未标注'):contentLanguageLabel(id);
@@ -114,21 +115,28 @@ function LanguageSelection({comicId,anchor,controller}:{comicId:string;anchor:HT
   const toggle=(id:string)=>setLanguages(previous=>{const next=new Set(previous??scope?.languages.map(language=>language.id));if(next.has(id))next.delete(id);else next.add(id);return next.size===scope?.languages.length?null:[...next];});
   const popover=useRef<HTMLDivElement>(null),close=useRef(controller.close);close.current=controller.close;
   useLayoutEffect(()=>{
-    const node=popover.current!;node.showPopover();node.focus({preventScroll:true});
+    const node=popover.current!;let native=false;
+    try{if(typeof node.showPopover==='function'){node.showPopover();native=true;}}catch{/* Older WebKit versions expose a partial Popover API. */}
+    if(!native){node.removeAttribute('popover');node.dataset.popoverFallbackOpen='true';}
+    node.focus({preventScroll:true});
     const position=()=>{
       if(!anchor.isConnected){close.current(false);return;}
-      const rect=anchor.getBoundingClientRect(),margin=12,gap=12,width=Math.min(360,document.documentElement.clientWidth-margin*2);
+      const viewport=visibleViewport(),rect=anchor.getBoundingClientRect(),margin=12,gap=12,width=Math.max(0,Math.min(360,viewport.width-margin*2));
+      const minX=viewport.left+margin,minY=viewport.top+margin,maxX=viewport.left+viewport.width-margin,maxY=viewport.top+viewport.height-margin;
       node.style.width=width+'px';
-      const height=node.getBoundingClientRect().height,left=rect.left>=width+margin+gap;
-      const x=left?rect.left-width-gap:Math.max(margin,Math.min(rect.right-width,document.documentElement.clientWidth-width-margin));
-      const below=window.innerHeight-rect.bottom>=height+gap+margin;
-      const y=Math.max(margin,Math.min(left?rect.top:below?rect.bottom+gap:rect.top-height-gap,window.innerHeight-height-margin));
+      node.style.setProperty('--nc-download-picker-height',Math.max(0,viewport.height-60)+'px');
+      const height=node.getBoundingClientRect().height,left=rect.left-width-gap>=minX;
+      const x=left?rect.left-width-gap:Math.max(minX,Math.min(rect.right-width,maxX-width));
+      const below=maxY-rect.bottom>=height+gap;
+      const y=Math.max(minY,Math.min(left?rect.top:below?rect.bottom+gap:rect.top-height-gap,maxY-height));
       node.style.left=x+'px';node.style.top=y+'px';node.dataset.side=left?'left':below?'below':'above';
       node.style.setProperty('--pointer-offset',(left?Math.max(18,Math.min(rect.top+rect.height/2-y,height-18)):Math.max(18,Math.min(rect.left+rect.width/2-x,width-18)))+'px');
     };
+    const dismiss=(event:PointerEvent)=>{if(!native&&!node.contains(event.target as Node)&&!anchor.contains(event.target as Node))close.current(false);};
     position();const observer=new ResizeObserver(position);observer.observe(anchor);observer.observe(node);
     window.addEventListener('resize',position);document.addEventListener('scroll',position,true);
-    return()=>{observer.disconnect();window.removeEventListener('resize',position);document.removeEventListener('scroll',position,true);if(node.matches(':popover-open'))node.hidePopover();};
+    window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);document.addEventListener('pointerdown',dismiss);
+    return()=>{observer.disconnect();window.removeEventListener('resize',position);document.removeEventListener('scroll',position,true);window.visualViewport?.removeEventListener('resize',position);window.visualViewport?.removeEventListener('scroll',position);document.removeEventListener('pointerdown',dismiss);if(native&&node.matches(':popover-open'))node.hidePopover();};
   },[anchor]);
   useEffect(()=>{if(scope)popover.current?.querySelector<HTMLInputElement>('input')?.focus({preventScroll:true});},[scope]);
   return <div ref={popover} id="nc-download-language-popover" tabIndex={-1} popover="auto" role="dialog" aria-label={msg('缓存语言')} className="nc-download-language-popover" onToggle={event=>{if(event.newState==='closed')controller.close(false);}} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();controller.close();}}}>

@@ -45,7 +45,10 @@
 }
 .nc-notification-action:hover { text-decoration: underline; text-underline-offset: 3px; }
 .nc-app .nc-notification .nc-notification-close { flex-shrink: 0; width: 32px; min-width: 32px; height: 32px; min-height: 32px; margin: -4px -4px 0 0; }
-@media (max-width: 760px) {
-  .nc-notifications { right: 16px; bottom: 16px; }
-  .is-reading .nc-notifications { bottom: 72px; }
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
+  .nc-notifications { right: max(8px, env(safe-area-inset-right)); bottom: calc(var(--nc-mobile-nav-size, 0px) + 12px + env(safe-area-inset-bottom)); width: calc(100vw - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))); }
+  .is-reading .nc-notifications { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .nc-notification { padding: 12px; gap: 8px; }
+  .nc-notification-action { min-height: 44px; }
+  .nc-app .nc-notification .nc-notification-close { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
 }

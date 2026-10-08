@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "Der Anmeldekontext fehlt. Bitte melden Sie sich erneut an.",
   "管理员尚未配置正式登录服务。": "Der Administrator hat den formellen Anmeldedienst nicht konfiguriert.",
   "登录窗口已关闭。": "Das Anmeldefenster wurde geschlossen.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Dieser Browser unterstützt keine sichere Anmeldung. Bitte aktualisieren Sie Ihren Browser und versuchen Sie es erneut.",
   "登录会话或服务地址无效。": "Die Anmeldesitzung oder Dienstadresse ist ungültig.",
   "暂时连接不到登录服务，请检查网络后重试。": "Der Anmeldedienst kann vorübergehend nicht verbunden werden. Bitte überprüfen Sie das Netzwerk und versuchen Sie es erneut.",
   "正在确认登录结果": "Anmeldeergebnis wird bestätigt",

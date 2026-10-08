@@ -165,3 +165,46 @@
   .nc-app .button, .nc-app button.button.nc-comic-action { transition: none; }
   .nc-app .button:hover:not(:disabled), .nc-app .button:active:not(:disabled) { transform: none; }
 }
+
+/* Responsive geometry stays separate from the shared color, radius and shadow tokens. */
+.nc-app fieldset { min-inline-size: 0; min-width: 0; }
+.nc-app dialog.modal.nc-viewport-dialog, .nc-app dialog.nc-shortcut-panel.nc-viewport-dialog {
+  max-width: calc(var(--nc-viewport-width, 100vw) - 32px);
+  max-height: calc(var(--nc-viewport-height, 100dvh) - 32px);
+}
+.nc-export-options .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-block: 18px; }
+.nc-export-options .form-grid > label { display: grid; min-width: 0; gap: 8px; }
+.nc-export-options .form-grid .nc-select { width: 100%; }
+.nc-export-footer > div { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; justify-content: flex-end; }
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+  .nc-app dialog.modal.nc-viewport-dialog, .nc-app dialog.nc-shortcut-panel.nc-viewport-dialog {
+    position: fixed;
+    inset: calc(var(--nc-viewport-top, 0px) + max(8px, env(safe-area-inset-top))) auto auto calc(var(--nc-viewport-left, 0px) + max(8px, env(safe-area-inset-left)));
+    transform: none;
+    margin: 0;
+    width: calc(var(--nc-viewport-width, 100vw) - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right)));
+    max-width: calc(var(--nc-viewport-width, 100vw) - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right)));
+    max-height: calc(var(--nc-viewport-height, 100dvh) - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    min-height: 0;
+  }
+}
+@media (max-width: 700px) {
+  .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) { padding: 0; margin-bottom: 16px; border: 0; background: none; box-shadow: none; }
+  .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) :is(.eyebrow, p, .nc-heading-star) { display: none; }
+  .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) h1 { font-size: 1.25rem; margin: 0; line-height: 1.4; }
+  .nc-app .settings-card { padding: 16px; margin-bottom: 16px; min-width: 0; }
+  .nc-preferences > .settings-card > h3 { gap: 8px; padding-bottom: 12px; font-size: 1rem; overflow-wrap: anywhere; }
+  .nc-preferences > .settings-card > h3::after { display: none; }
+  .nc-app .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 14px; }
+  .nc-app .setting-row b { font-size: var(--text-small); }
+  .nc-app .setting-row p { margin-top: 5px; line-height: 1.55; }
+  .nc-app .setting-row:has(> .switch) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .nc-app .setting-row > :is(.nc-select, .api-input, .button) { width: 100%; min-width: 0; max-width: 100%; }
+  .nc-app .nc-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
+  .nc-app .nc-theme-options button { min-width: 0; min-height: 44px; justify-content: flex-start; text-align: start; overflow-wrap: anywhere; }
+  .nc-app .privacy-note { padding: 14px; min-width: 0; }
+  .nc-app .privacy-note p { min-width: 0; overflow-wrap: anywhere; }
+  .nc-export-options .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .nc-export-options > label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  .nc-export-footer > div > .button { flex: 1 1 160px; }
+}

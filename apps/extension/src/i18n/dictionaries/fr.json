@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "Le contexte de connexion est manquant, veuillez vous reconnecter.",
   "管理员尚未配置正式登录服务。": "L'administrateur n'a pas configuré le service de connexion formelle.",
   "登录窗口已关闭。": "La fenêtre de connexion a été fermée.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Ce navigateur ne prend pas en charge la connexion sécurisée. Mettez-le à jour, puis réessayez.",
   "登录会话或服务地址无效。": "La session de connexion ou l'adresse de service n'est pas valide.",
   "暂时连接不到登录服务，请检查网络后重试。": "Le service de connexion ne peut pas être connecté temporairement, veuillez vérifier le réseau et réessayer.",
   "正在确认登录结果": "Confirmation du résultat de la connexion",

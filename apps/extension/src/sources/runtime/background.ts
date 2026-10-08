@@ -103,6 +103,8 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
   void recoverImageHeaders().catch(()=>{});
   void chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   chrome.runtime.onInstalled.addListener(() => {
+    // Mobile browsers expose the popup actions without desktop context menus.
+    if (!chrome.contextMenus?.removeAll || !chrome.contextMenus.create) return;
     void localeReady().then(() =>
       chrome.contextMenus.removeAll(() => {
         chrome.contextMenus.create({
@@ -126,7 +128,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
       }),
     );
   });
-  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
     if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-image' || info.menuItemId === 'nc-translate-region') && tab?.id != null) {
       try {
         await requireHostAccess();

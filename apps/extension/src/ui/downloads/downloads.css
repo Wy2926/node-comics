@@ -46,7 +46,7 @@
 .nc-download-language-popover[data-side=left]::before {right:-7px;top:calc(var(--pointer-offset) - 5px);border-left:0;border-bottom:0}
 .nc-download-language-popover[data-side=below]::before {top:-7px;left:calc(var(--pointer-offset) - 5px);border-right:0;border-bottom:0}
 .nc-download-language-popover[data-side=above]::before {bottom:-7px;left:calc(var(--pointer-offset) - 5px);border-left:0;border-top:0}
-.nc-download-language-content {max-height:calc(100dvh - 64px);overflow:auto;overscroll-behavior:contain}
+.nc-download-language-content {max-height:var(--nc-download-picker-height,calc(100dvh - 64px));overflow:auto;overscroll-behavior:contain}
 .nc-download-language-popover h3 {margin:0;font-size:var(--text-title)}
 .nc-download-language-title {margin:8px 0 0;overflow-wrap:anywhere}
 .nc-download-language-popover .nc-download-languages {max-height:260px;overflow:auto;padding:8px 0;margin:12px 0}
@@ -72,11 +72,23 @@
  .nc-download-actions {grid-column:2;flex-direction:row;align-items:center;gap:12px}
  .nc-download-controls {justify-content:flex-start}
 }
-@media(max-width:560px) {
+@media(max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
  .nc-download-center .nc-page-heading {align-items:flex-start;flex-direction:column;gap:14px}
- .nc-download-book {padding:16px;grid-template-columns:60px minmax(0,1fr);gap:14px}
+ .nc-download-book {padding:16px;grid-template-columns:60px minmax(0,1fr);gap:14px;scroll-margin-block:80px calc(96px + env(safe-area-inset-bottom,0px))}
  .nc-download-cover {width:60px;height:86px;grid-row:1}
- .nc-download-actions {grid-column:1/-1}
+ .nc-download-actions {grid-column:1/-1;align-items:flex-start;flex-wrap:wrap;gap:14px}
  .nc-download-meta {gap:8px;margin:8px 0 12px}
  .nc-download-title h2 {font-size:var(--text-body)}
+ .nc-download-controls {flex:1;min-width:0;flex-wrap:wrap}
+ .nc-download-controls .button {min-height:44px;white-space:normal;flex:1}
+ .nc-download-controls .icon-button {min-width:44px;width:44px;height:44px}
+ .nc-download-size {margin-inline-start:auto}
+ .nc-download-progress {grid-template-columns:minmax(0,1fr) auto}
+ .nc-download-language-popover {z-index:120;overflow:hidden;max-width:calc(100vw - 24px)}
+ .nc-download-language-popover::before {display:none}
+ .nc-download-language-popover .nc-download-languages {max-height:none}
+ .nc-download-language-popover .nc-download-languages label {min-height:44px}
+ .nc-download-language-popover .nc-cache-actions {gap:12px}
+ .nc-download-language-popover .nc-cache-actions .button {min-height:44px;flex:1;white-space:normal}
 }
+.nc-download-language-popover[data-popover-fallback-open] {display:block;z-index:120}

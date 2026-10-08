@@ -4,6 +4,7 @@ import {imageMimeFromBytes} from '../formats/identify';
 import HashWorker from './hash.worker?worker';
 import {needsNormalization} from './image-metadata';
 import {bitmapPng} from '../../../../../backend/shared/translation-images/png';
+import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
 export interface PageInput {name: string; blob: Blob; width?: number; height?: number}
 
 async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {
@@ -46,8 +47,8 @@ export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
     if (await needsNormalization(blob)) {
       if(Math.max(width,height)>16383)blob=await bitmapPng(bitmap);
       else{
-        const canvas = new OffscreenCanvas(width, height);
-        try { canvas.getContext('2d',{colorSpace:'srgb'})!.drawImage(bitmap, 0, 0); blob = await canvas.convertToBlob({type: 'image/png'}); }
+        const canvas = createImageCanvas(width, height);
+        try { (canvas.getContext('2d',{colorSpace:'srgb'}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D).drawImage(bitmap, 0, 0); blob = await imageCanvasBlob(canvas, 'image/png'); }
         finally { canvas.width = canvas.height = 1; }
       }
     }

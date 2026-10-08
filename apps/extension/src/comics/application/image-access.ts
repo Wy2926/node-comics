@@ -6,6 +6,7 @@ import { sourcePageCache } from '../../storage/source-pages';
 import { thumbnailCache } from '../../storage/thumbnails';
 import { RequestPool } from '../../concurrency';
 import {openSourceCover} from './cover-access';
+import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
 
 const thumbnails=new RequestPool(2);
 export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<PageLease,'blob'|'release'>>{
@@ -32,9 +33,12 @@ export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob
       signal?.throwIfAborted();
       const bitmap=await createImageBitmap(lease.blob,{resizeWidth:240,resizeQuality:'medium'});
       try{
-        const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
-        canvas.getContext('2d')!.drawImage(bitmap,0,0);
-        const blob=await canvas.convertToBlob({type:'image/webp',quality:.75});
+        const canvas=createImageCanvas(bitmap.width,bitmap.height);
+        let blob:Blob;
+        try{
+          (canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D).drawImage(bitmap,0,0);
+          blob=await imageCanvasBlob(canvas,'image/webp',.75);
+        }finally{canvas.width=canvas.height=1;}
         signal?.throwIfAborted();await source?.validate();
         if(token)await thumbnailCache.put(key,blob,{owner,connectionId:source?.connectionId,contentId:reference?.contentId,token});
         await source?.validate();return blob;

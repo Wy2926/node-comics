@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "Konteks login hilang, silakan login lagi.",
   "管理员尚未配置正式登录服务。": "Administrator belum mengkonfigurasi layanan login formal.",
   "登录窗口已关闭。": "Jendela login telah ditutup.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Browser ini tidak mendukung login aman. Perbarui browser lalu coba lagi.",
   "登录会话或服务地址无效。": "Sesi login atau alamat layanan tidak valid.",
   "暂时连接不到登录服务，请检查网络后重试。": "Layanan login tidak dapat terhubung untuk sementara, silakan periksa jaringan dan coba lagi.",
   "正在确认登录结果": "Mengonfirmasi hasil login",

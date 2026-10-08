@@ -303,10 +303,12 @@ export function registerDriveBackground() {
         };
         assertActive();
         const id = crypto.randomUUID(), nonce = crypto.randomUUID() + crypto.randomUUID();
-        // Keep authorization outside the reader's tab strip. The popup's tab still
-        // uses the same document-bound bridge and cancellation handling.
-        const popup = await chrome.windows.create({url: 'about:blank', type: 'popup', width: 1000, height: 800, focused: true});
-        const tab = popup?.tabs?.[0];
+        // Mobile browsers have no separate windows. Both presentations retain
+        // the same document-bound bridge, nonce checks and cancellation handling.
+        const popup = chrome.windows?.create
+          ? await chrome.windows.create({url: 'about:blank', type: 'popup', width: 1000, height: 800, focused: true})
+          : undefined;
+        const tab = popup ? popup.tabs?.[0] : await chrome.tabs.create({url: 'about:blank', active: true});
         if (tab?.id === undefined) {
           if (popup?.id !== undefined) await chrome.windows.remove(popup.id).catch(() => {});
           throw new DriveError('unavailable', '无法打开授权页面。');

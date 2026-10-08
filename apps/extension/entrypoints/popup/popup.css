@@ -1,12 +1,12 @@
 html,body,#root {
   margin: 0;
-  width: 420px;
+  width: min(420px, 100vw);
   min-width: 0;
   min-height: 0;
 }
 .nc-app.nc-popup {
-  width: 420px;
-  max-height: 600px;
+  width: 100%;
+  max-height: min(600px, 100dvh);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -40,6 +40,7 @@ html,body,#root {
   overflow-y: auto;
   min-height: 0;
   padding: 14px 20px 16px;
+  overscroll-behavior: contain;
 }
 .nc-popup-section-heading {
   display: flex;
@@ -271,4 +272,22 @@ html,body,#root {
   .nc-popup-tool {
     transition: none;
   }
+}
+@media (max-width: 380px), (pointer: coarse), (hover: none) {
+  .nc-popup-header { gap: 10px; padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); }
+  .nc-popup-scroll { padding: 12px max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .nc-popup-brand { min-height: 44px; min-width: 0; }
+  .nc-popup-brand .nc-brand-logo { width: min(174px, 48vw); }
+  .nc-popup-request { min-height: 44px; }
+  .nc-popup-language { align-items: stretch; flex-direction: column; gap: 8px; }
+  .nc-popup-language .nc-select { width: 100%; min-height: 44px; font-size: var(--text-small); }
+  .nc-popup-reading-actions { grid-template-columns: minmax(0, 1fr); }
+  .nc-popup-reading-actions .nc-popup-tool { min-height: 48px; }
+  .nc-popup-tool { align-content: center; min-height: 64px; }
+}
+@media (pointer: coarse), (hover: none) {
+  html { background: var(--surface); }
+  html, body, #root { width: 100vw; }
+  .nc-app.nc-popup { max-height: 100dvh; }
+  .nc-popup-shortcut { display: none; }
 }

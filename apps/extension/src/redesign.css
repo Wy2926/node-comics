@@ -191,6 +191,14 @@ a {
   gap: 14px;
   margin-left: auto;
 }
+.nc-header-utilities,.nc-header-utilities-content {
+  display: flex;
+  align-items: center;
+  gap: inherit;
+}
+.nc-header-utilities .nc-header-utilities-trigger {
+  display: none;
+}
 .nc-avatar {
   display: grid;
   place-items: center;
@@ -1403,15 +1411,8 @@ a {
   .nc-page-heading p {
     font-size: .9375rem;
   }
-  .nc-library-tools {
-    gap: 14px;
-  }
   .nc-search {
     width: 100%;
-  }
-  .nc-library-tools>.nc-inline {
-    width: 100%;
-    justify-content: space-between;
   }
   .nc-stat-grid {
     grid-template-columns: 1fr;
@@ -1498,19 +1499,12 @@ a {
   }
 }
 @media(max-width:440px) {
-  .nc-main {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
   .nc-book-cover {
     max-height: 430px;
   }
   .nc-eyebrow {
     font-size: .6875rem;
     letter-spacing: 1.4px;
-  }
-  .nc-app-header nav>button>svg {
-    display: none;
   }
 }
 @media(prefers-reduced-motion:reduce) {
@@ -2054,4 +2048,93 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
     gap: 6px;
     padding: 7px 9px;
   }
+}
+
+/* Phone navigation uses the existing destinations and actions, never a second page tree. */
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
+  .nc-app:not(.is-reading) {
+    --nc-mobile-nav-size: 80px;
+  }
+  .nc-app:not(.is-reading) .nc-workspace {
+    padding-bottom: calc(var(--nc-mobile-nav-size) + env(safe-area-inset-bottom, 0px));
+  }
+  .nc-app .nc-app-header {
+    min-height: 64px;
+    height: auto;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+  }
+  .nc-app .nc-app-header .nc-brand { min-height: 44px; }
+  .nc-app .nc-app-header .nc-brand-logo { width: clamp(84px, calc(100vw - 240px), 150px); }
+  .nc-app .nc-app-header .nc-header-actions { gap: 6px; flex-shrink: 0; }
+  .nc-app .nc-app-header .nc-header-actions .icon-button { width: 44px; height: 44px; min-width: 44px; flex: none; }
+  .nc-app .nc-app-header .nc-header-actions .nc-icon { width: 24px; height: 24px; }
+  .nc-app .nc-header-actions>.icon-button[aria-current=page] { border-color: var(--comic-stroke); background: var(--accent-soft); box-shadow: var(--comic-shadow-small); }
+  .nc-app .nc-header-utilities { order: 4; }
+  .nc-app .nc-header-utilities .nc-header-utilities-trigger { display: inline-flex; }
+  .nc-header-utilities .nc-header-utilities-content { display: none; }
+  .nc-header-utilities[data-open] .nc-header-utilities-content {
+    display: flex;
+    position: absolute;
+    top: calc(100% + 8px);
+    inset-inline-end: max(12px, env(safe-area-inset-right, 0px));
+    gap: 12px;
+    padding: 12px;
+    border: var(--comic-border);
+    border-radius: var(--comic-panel-radius);
+    background: var(--surface);
+    box-shadow: var(--comic-shadow);
+  }
+  .nc-app .nc-app-header>nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 41;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: 100%;
+    height: calc(var(--nc-mobile-nav-size) + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    margin: 0;
+    padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+    border-top: var(--comic-border);
+    background: var(--surface);
+    overflow: visible;
+  }
+  .nc-app .nc-app-header>nav>button {
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    padding: 4px 2px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    font-size: .6875rem;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
+  .nc-app .nc-app-header>nav>button>.nc-icon { display: block; width: 24px; height: 24px; flex: none; }
+  .nc-app .nc-app-header>nav>button>span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .nc-app .nc-main { min-width: 0; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+  .nc-app .nc-main .nc-page-heading { padding: 0; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; border: 0; background: none; box-shadow: none; }
+  .nc-app .nc-page-heading h1 { font-size: 1.125rem; margin: 0; overflow-wrap: anywhere; }
+  .nc-app .nc-page-heading .nc-eyebrow { display: none; }
+  .nc-app .nc-page-heading p { margin-top: 8px; line-height: 1.6; }
+  .nc-app .nc-page-heading>.nc-inline { width: auto; margin-inline-start: auto; }
+  .nc-app .nc-page-heading>.nc-inline>.button { flex: none; min-width: 0; min-height: 44px; white-space: normal; }
+  .nc-app :is(.nc-library,.nc-sites-page,.nc-remote-library)>.nc-page-heading p { display: none; }
+  .nc-app .nc-main :is(.nc-library,.nc-remote-library,.nc-download-center) .nc-empty { min-height: 0; padding: 24px 0; gap: 12px; border: 0; background: none; box-shadow: none; }
+  .nc-app .nc-main .nc-import-empty>.nc-empty-symbol,.nc-app .nc-main .nc-import-empty>h2 { display: none; }
+  .nc-app .nc-main .nc-import-empty p { margin: 0; }
+  .nc-app .nc-library:has(.nc-import-empty)>.nc-shelf-tools,.nc-app .nc-library:has(.nc-import-empty) .nc-shelf-count { display: none; }
+  .nc-app .nc-library:has(.nc-import-empty)>.nc-page-heading>.nc-inline>.button.primary { display: none; }
+  .nc-app .nc-main :is(.nc-remote-library,.nc-download-center) .nc-empty>.nc-icon { display: none; }
+  .nc-app .nc-main :is(.nc-remote-library,.nc-download-center) .nc-empty>h2 { font-size: 1rem; }
+  .nc-app .nc-pagination { justify-content: center; gap: 10px; }
+  .nc-app .nc-pagination>span { flex-basis: 100%; text-align: center; }
+}
+@media (pointer: coarse) and (max-height: 500px) and (min-width: 701px), (hover: none) and (max-height: 500px) and (min-width: 701px) {
+  .nc-app:not(.is-reading) { --nc-mobile-nav-size: 58px; }
+  .nc-app .nc-app-header>nav>button { flex-direction: row; gap: 8px; font-size: .8125rem; }
 }

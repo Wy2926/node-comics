@@ -18,7 +18,7 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,onRe
   const views:('original'|'classic')[]=['original',...(modes===undefined||modes.includes('classic')?['classic' as const]:[])];
   const showRetry=!!onRetry&&canRetry,showFeedback=!!allowsFeedback&&!!shownJob,showTranslation=modes===undefined||modes.length>0;
   return <ReaderTools label={msg("翻译与阅读工具")} above={views.length+Number(!!contentLanguageControl)+Number(showRetry)} below={1+Number(showTranslation)+Number(showFeedback)}>
-    <div className="nc-reader-tool-group">
+    <div className="nc-reader-tool-group" data-scrollbar-mode="overlay">
     {contentLanguageControl}
     {showRetry&&<button data-reader-retry-trigger="true" aria-label={msg('重新翻译此页')} title={msg('重新翻译此页')} disabled={retrying} aria-busy={retrying||undefined} onClick={()=>void retry()}><Icon name="refresh"/><span>{retrying?msg('重试中…'):msg('重新翻译')}</span></button>}
     <div className="nc-page-versions" role="group" aria-label={msg("漫画查看方式")} data-shown-job={shownJob?.id??'original'}>
@@ -26,10 +26,10 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,onRe
     </div>
     </div>
     <span className="nc-rail-divider" aria-hidden="true"/>
-    <div className="nc-reader-tool-group">
+    <div className="nc-reader-tool-group" data-scrollbar-mode="overlay">
     {showTranslation&&<button className="nc-translation-trigger" aria-label={translationLabel} title={translationLabel} aria-expanded={panel==='translation'} aria-controls="nc-translation-settings" aria-haspopup="dialog" onClick={()=>onPanel('translation')}><Icon name="translate"/><span>{msg("翻译设置")}</span></button>}
     <ReaderSettingsButton open={panel==='settings'} onClick={()=>onPanel('settings')}/>
-    {allowsFeedback&&shownJob&&<button data-reader-feedback-trigger="true" aria-label={msg("译图有问题")} title={msg("译图有问题")} onClick={onFeedback}><Icon name="info"/><span>{msg("反馈")}</span></button>}
+    {showFeedback&&<button data-reader-feedback-trigger="true" aria-label={msg("译图有问题")} title={msg("译图有问题")} onClick={onFeedback}><Icon name="info"/><span>{msg("反馈")}</span></button>}
     </div>
   </ReaderTools>;
 }

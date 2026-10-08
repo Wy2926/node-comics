@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "Thiếu ngữ cảnh đăng nhập, vui lòng đăng nhập lại.",
   "管理员尚未配置正式登录服务。": "Quản trị viên chưa định cấu hình dịch vụ đăng nhập chính thức.",
   "登录窗口已关闭。": "Cửa sổ đăng nhập đã bị đóng.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Trình duyệt này không hỗ trợ đăng nhập an toàn. Vui lòng cập nhật trình duyệt rồi thử lại.",
   "登录会话或服务地址无效。": "Phiên đăng nhập hoặc địa chỉ dịch vụ không hợp lệ.",
   "暂时连接不到登录服务，请检查网络后重试。": "Dịch vụ đăng nhập tạm thời không thể kết nối được, vui lòng kiểm tra mạng và thử lại.",
   "正在确认登录结果": "Xác nhận kết quả đăng nhập",

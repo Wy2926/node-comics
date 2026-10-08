@@ -48,7 +48,7 @@
 .nc-account-empty>svg {color:var(--accent)}
 .nc-account-empty h2 {font-size:19px}.nc-account-empty p {color:var(--muted);font-size:14px;margin:14px 0 22px}
 @media(max-width:1050px){.nc-app .nc-account-page>.nc-account-heading{align-items:flex-start;flex-direction:column;gap:24px}.nc-account-identity{max-width:100%;width:100%;border-top:var(--comic-perforation);padding-top:20px}.nc-account-identity>.button{margin-left:auto}.nc-quota-card{min-height:220px}}
-@media(max-width:600px){.nc-rights-grid{grid-template-columns:1fr}.nc-quota-card{min-height:0}.nc-account-identity{display:grid;grid-template-columns:46px minmax(0,1fr)}.nc-account-identity>.button{grid-column:2;justify-self:start;margin-left:0}.nc-rate-card{gap:14px}.nc-account-activity .nc-section-heading{align-items:flex-start;flex-wrap:wrap;gap:14px}}
+@media(max-width:600px){.nc-rights-grid{grid-template-columns:1fr}.nc-quota-card{min-height:0}.nc-account-identity>.button{justify-self:start}.nc-rate-card{gap:14px}.nc-account-activity .nc-section-heading{align-items:flex-start;flex-wrap:wrap;gap:14px}}
 
 .nc-account-page .nc-stat>span,.nc-account-page .nc-feedback-inbox h2 {display:flex;align-items:center;gap:8px}
 .nc-account-page .nc-stat>span svg,.nc-account-page .nc-feedback-inbox h2 svg {color:var(--accent)}
@@ -67,3 +67,35 @@
 .nc-billing-cycle button[aria-pressed=true] {background:var(--surface);color:var(--accent);box-shadow:0 1px 4px #0000000d}
 .nc-billing-cycle button:disabled {opacity:.5;cursor:default}
 .nc-billing-cycle button:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+
+@media(max-width:700px){
+ .nc-account-page,.nc-account-panel{gap:16px}
+ .nc-app .nc-account-page>.nc-account-heading{gap:12px}
+ .nc-account-heading>svg{display:none}
+ .nc-account-identity{padding-top:0;border-top:0;display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px}
+ .nc-account-page .nc-profile-avatar{width:36px;height:36px;font-size:18px}
+ .nc-account-identity>.button{grid-column:auto;min-width:44px;margin-left:0;padding-inline:8px;font-size:var(--text-caption)}
+ .nc-account-meta{gap:5px;margin-top:5px}
+ .nc-account-page .nc-rights-grid,.nc-account-page .nc-stat-grid{grid-template-columns:minmax(0,1fr)}
+ .nc-account-page .nc-rights-card,.nc-account-page .nc-chart-card{padding:16px}
+ .nc-account-page .nc-rights-label{margin-bottom:12px}
+ .nc-account-page .nc-rights-card strong{font-size:1.5rem}
+ .nc-account-page .nc-rights-card p{margin:8px 0 5px}
+ .nc-account-page .nc-stat{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;padding:14px 16px}
+ .nc-account-page .nc-stat>b{margin:0;font-size:1.5rem}
+ .nc-account-page .nc-stat>p{grid-column:1/-1;margin:4px 0 0}
+ .nc-account-page .nc-membership-card{padding:16px}
+ .nc-account-page .nc-quota-card{min-height:0}
+ .nc-membership-heading{flex-wrap:wrap}
+ .nc-membership-heading>.nc-eyebrow{flex-basis:calc(100% - 60px)}
+ .nc-billing-cycle{width:100%;margin-left:0}
+ .nc-billing-cycle button{flex:1;min-height:44px;white-space:normal}
+ .nc-membership-footer>.button{flex:1 1 140px}
+ .nc-account-page .nc-chart-card>p{overflow-wrap:anywhere}
+ .nc-account-page .nc-section-heading>.nc-inline{width:100%}
+ .nc-account-page .nc-section-heading>.nc-inline>.nc-select{flex:1;min-width:0}
+ .nc-account-page summary{display:flex;align-items:center;min-height:44px}
+ .nc-account-page .nc-data-table{overscroll-behavior:contain}
+ .nc-account-page .nc-data-table th,.nc-account-page .nc-data-table td{padding:10px 8px;white-space:nowrap}
+ .nc-account-page .nc-feedback-record>.nc-select{width:100%}
+}

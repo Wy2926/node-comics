@@ -5,6 +5,7 @@ import {setUiLanguage} from '../i18n/load';
 import {useEffect,type ReactNode} from 'react';
 import type {Settings} from '../types';
 import {Icon} from '../icons';
+import './touch-controls.css';
 export function useAppearance(settings:Settings){
   useUiLocale();
   useEffect(()=>{const apply=()=>void setUiLanguage(settings.uiLanguage).catch(()=>{});apply();window.addEventListener('languagechange',apply);return()=>window.removeEventListener('languagechange',apply);},[settings.uiLanguage]);

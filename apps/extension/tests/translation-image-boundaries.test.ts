@@ -115,6 +115,41 @@ describe('optional input encoding boundaries',()=>{
 });
 
 describe('streamed PNG bitmap ownership',()=>{
+  function documentCanvas(){
+    const canvas={width:0,height:0,getContext:()=>({drawImage:draw,getImageData:(_x:number,_y:number,width:number,height:number)=>({data:new Uint8ClampedArray(width*height*4)})})};
+    const createElement=vi.fn(()=>{canvases.push(canvas);return canvas;});
+    vi.stubGlobal('OffscreenCanvas',undefined);vi.stubGlobal('document',{createElement});
+    return {canvas,createElement};
+  }
+  it('reuses a document canvas across columns without taking ownership of borrowed bitmaps',async()=>{
+    const {canvas,createElement}=documentCanvas();
+    const base={width:4097,height:1,close:vi.fn()} as unknown as ImageBitmap,patch={width:4097,height:1,close:vi.fn()} as unknown as ImageBitmap;
+    const blob=await png.bitmapPng(base,[{x:0,y:0,width:4097,height:1,bitmap:patch}]);
+    expect(blob.type).toBe('image/png');expect(createElement).toHaveBeenCalledExactlyOnceWith('canvas');
+    expect(draw.mock.calls.filter(call=>call[0]===base)).toEqual([
+      [base,0,0,2048,1,0,0,2048,1],[base,2048,0,2048,1,0,0,2048,1],[base,4096,0,1,1,0,0,1,1],
+    ]);
+    expect(draw.mock.calls.filter(call=>call[0]===patch)).toHaveLength(3);
+    expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+    expect(base.close).not.toHaveBeenCalled();expect(patch.close).not.toHaveBeenCalled();expect(canvas).toMatchObject({width:1,height:1});
+  });
+  it('normalizes a long source through document canvas bands and releases both canvas and bitmap',async()=>{
+    const {canvas,createElement}=documentCanvas(),base={width:1,height:16384,close} as unknown as ImageBitmap;
+    vi.mocked(createImageBitmap).mockResolvedValue(base);vi.spyOn(metadata,'needsNormalization').mockResolvedValue(true);
+    const prepared=await prepareComicPage({name:'document canvas long source',blob:source});
+    expect(prepared).toMatchObject({width:1,height:16384,imageSha256:await hashFile(prepared.blob)});expect(prepared.blob.type).toBe('image/png');
+    const dimensions=new DataView(await prepared.blob.slice(16,24).arrayBuffer());
+    expect([dimensions.getUint32(0),dimensions.getUint32(4)]).toEqual([1,16384]);
+    expect(createElement).toHaveBeenCalledExactlyOnceWith('canvas');expect(draw).toHaveBeenCalledTimes(4);
+    expect(draw).toHaveBeenLastCalledWith(base,0,12288,1,4096,0,0,1,4096);
+    expect(encode).not.toHaveBeenCalled();expect(close).toHaveBeenCalledOnce();expect(canvas).toMatchObject({width:1,height:1});
+  });
+  it('releases the document canvas and owned tile when streaming fails without closing the borrowed base',async()=>{
+    const {canvas}=documentCanvas(),base={width:2,height:2,close:vi.fn()} as unknown as ImageBitmap,tile={width:2,height:2,close:vi.fn()} as unknown as ImageBitmap;
+    vi.mocked(createImageBitmap).mockResolvedValue(tile);draw.mockImplementation(bitmap=>{if(bitmap===tile)throw Error('Synthetic document drawing failure');});
+    await expect(png.bitmapPng(base,[{x:0,y:0,width:2,height:2,blob:new Blob()}])).rejects.toThrow('Synthetic document drawing failure');
+    expect(tile.close).toHaveBeenCalledOnce();expect(base.close).not.toHaveBeenCalled();expect(canvas).toMatchObject({width:1,height:1});
+  });
   it('borrows a decoded patch across canvas columns without decoding or closing it',async()=>{
     const base={width:4097,height:1,close:vi.fn()} as unknown as ImageBitmap,patch={width:4097,height:1,close:vi.fn()} as unknown as ImageBitmap;
     expect((await png.bitmapPng(base,[{x:0,y:0,width:4097,height:1,bitmap:patch}])).type).toBe('image/png');

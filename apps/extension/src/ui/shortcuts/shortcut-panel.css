@@ -119,17 +119,18 @@
   .nc-shortcut-command { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 }
 @media (max-width: 700px) {
-  .nc-app dialog.nc-shortcut-panel { width: calc(100vw - 24px); height: calc(100dvh - 24px); border-radius: var(--comic-control-radius); }
+  .nc-app dialog.nc-shortcut-panel { width: calc(100vw - 24px); height: calc(var(--nc-viewport-height, 100dvh) - 24px); }
   .nc-shortcut-header { gap: 12px; padding: 18px; }
   .nc-shortcut-heading { gap: 12px; }
   .nc-shortcut-emblem { flex-basis: 36px; width: 36px; height: 36px; }
   .nc-shortcut-header h2 { font-size: var(--text-title); }
-  .nc-shortcut-subtitle { font-size: var(--text-caption); }
-  .nc-shortcut-layout { grid-template-columns: 112px minmax(0, 1fr); }
-  .nc-shortcut-nav { gap: 10px; padding: 16px 8px; }
-  .nc-shortcut-nav-title { margin-inline: 4px; }
-  .nc-shortcut-anchor { flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; padding: 10px 8px; font-size: var(--text-caption); }
-  .nc-shortcut-scroll { padding: 20px 16px 24px; }
+  .nc-shortcut-subtitle { font-size: var(--text-caption); max-height: 4.95em; overflow: auto; }
+  .nc-shortcut-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .nc-shortcut-nav { flex-direction: row; gap: 8px; padding: 10px 12px; overflow-x: auto; border-right: 0; border-bottom: var(--comic-perforation); }
+  .nc-shortcut-nav-title { display: none; }
+  .nc-shortcut-anchor { width: auto; flex: none; min-height: 44px; gap: 6px; padding: 8px 10px; font-size: var(--text-caption); }
+  .nc-shortcut-anchor-label { white-space: nowrap; }
+  .nc-shortcut-scroll { padding: 16px 12px 20px; }
   .nc-shortcut-intro { margin-bottom: 20px; }
   .nc-shortcut-group-heading { gap: 8px; padding: 14px; }
   .nc-shortcut-group-body { padding-inline: 14px; }
@@ -139,24 +140,29 @@
   .nc-shortcut-native .nc-shortcut-action { justify-self: start; }
   .nc-shortcut-footer { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 18px; }
   .nc-shortcut-footer-actions { justify-content: flex-start; }
+  .nc-shortcut-feedback:has(> .nc-shortcut-status:only-child:empty) { display: none; }
+  .nc-shortcut-key, .nc-shortcut-remove { min-height: 44px; }
+  .nc-shortcut-remove { flex-basis: 44px; width: 44px; }
 }
 @media (max-width: 460px) {
   .nc-shortcut-header { padding: 14px; }
   .nc-shortcut-heading { gap: 9px; }
   .nc-shortcut-emblem { display: none; }
-  .nc-shortcut-layout { grid-template-columns: 88px minmax(0, 1fr); }
   .nc-shortcut-nav { padding-inline: 6px; }
   .nc-shortcut-anchor { padding-inline: 6px; }
-  .nc-shortcut-scroll { padding-inline: 12px; }
   .nc-shortcut-group-heading { flex-wrap: wrap; gap: 6px; padding: 12px; }
   .nc-shortcut-group-body { padding-inline: 12px; }
-  .nc-shortcut-assignment { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .nc-shortcut-restore { justify-self: end; }
 }
 @media (max-height: 600px) and (min-width: 701px) {
-  .nc-app dialog.nc-shortcut-panel { height: calc(100dvh - 24px); }
+  .nc-app dialog.nc-shortcut-panel { height: calc(var(--nc-viewport-height, 100dvh) - 24px); }
   .nc-shortcut-header { padding-block: 14px; }
   .nc-shortcut-footer { padding-block: 10px; }
+}
+@media (max-height: 500px) {
+  .nc-shortcut-header { padding: 10px 14px; }
+  .nc-shortcut-emblem { display: none; }
+  .nc-shortcut-subtitle { max-height: 3.3em; overflow: auto; }
+  .nc-shortcut-footer { max-height: 30dvh; overflow: auto; padding-block: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .nc-shortcut-anchor, .nc-shortcut-binding, .nc-shortcut-close, .nc-shortcut-action { transition: none; }

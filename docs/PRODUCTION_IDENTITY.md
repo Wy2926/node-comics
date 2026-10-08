@@ -28,7 +28,7 @@ docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 | `CORS_ORIGINS` | 精确 HTTPS 网页来源，不能含路径、通配符或凭据；只服务扩展时可空 |
 | `EXTENSION_IDS` | 逗号分隔的固定 32 字符扩展 ID；不允许扩展来源通配符 |
 
-插件回调以 `chrome.identity.getRedirectURL('oidc')` 为准，网页回调为实际 origin 与路径；更换扩展 ID 后同步身份平台和 `EXTENSION_IDS`。
+插件有 `identity` API 时使用 `chrome.identity.getRedirectURL('oidc')`；缺少该 API 的 Firefox Android／Firefox 格式移动包根据固定 Gecko ID 生成相同回调，不使用随机的 `moz-extension://<UUID>` 阅读页。普通网页回调仍为实际 origin 与路径；更换扩展 ID 后同步身份平台和 `EXTENSION_IDS`。
 
 ### Firefox 回调与请求来源
 
@@ -38,7 +38,9 @@ Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR �
 
 ## 撤销与并发行为
 
-插件登录保留浏览器原生 `identity.launchWebAuthFlow` 和既有 OIDC 回调，在授权期间将新开的身份服务弹出窗口调整为 600 × 760，不占主窗口标签栏。完成授权后由浏览器自动关闭；手动关闭可重试，清理本次登录上下文与窗口监听。网页阅读器仍使用原页面跳转。
+支持 `identity.launchWebAuthFlow` 的插件保留浏览器原生授权和既有 OIDC 回调；存在窗口 API 时将新开的身份服务弹出窗口调整为 600 × 760，完成后由浏览器关闭。Firefox Android 等缺少 identity 的环境先创建空白标签页、绑定其 tab ID 和监听，再导航到授权站；只读取该标签页主框架的精确回调，保留 PKCE、state、有效期和返回 issuer 校验，拒绝重复或冲突的回调参数。授权、令牌与回调域均须具有已安装的网站访问权限。这个非 blocking 监听不等于原生网络拦截，不能依赖回调域真的返回网页。
+
+标签页授权成功、取消、关闭、导航失败、发起页面卸载或十分钟超时后移除本次监听，仅关闭本次创建的标签页，不按 window ID 关闭浏览器。凭据和 PKCE verifier 留在原扩展上下文，网页内容脚本不参与换码；阅读页不会导航离开。缺少固定扩展 ID 或必要标签页／请求监听 API 时明确拒绝启动。普通网页阅读器仍使用原页面跳转；Orion 的完整授权与令牌请求能力需 iOS 真机单独验收。
 
 插件退出登录清除本机账户会话，身份服务的浏览器 SSO 会话仍可能存在。插件与网页阅读器主动登录统一请求 `openid profile offline_access` 和 `prompt=login consent`，允许输入其他账户并授权自动续期；不触发其他应用的全局退出。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
 

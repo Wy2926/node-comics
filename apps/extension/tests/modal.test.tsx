@@ -17,9 +17,25 @@ describe('shared Modal presentation', () => {
 
   it('retains consumer classes, custom close labels and optional subtitles', () => {
     const html = renderToStaticMarkup(<Modal title="Import result" className="nc-local-import-modal" closeLabel="Collapse import" onClose={() => {}}><footer className="nc-import-footer">Done</footer></Modal>);
-    expect(html).toContain('class="modal nc-generic-modal nc-local-import-modal"');
+    const classes = html.match(/<dialog\b[^>]*class="([^"]+)"/)?.[1].split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(['modal', 'nc-generic-modal', 'nc-viewport-dialog', 'nc-local-import-modal']));
     expect(html).toContain('aria-label="Collapse import"');
     expect(html).toContain('<footer class="nc-import-footer">Done</footer></div></dialog>');
     expect(html).not.toContain('modal-subtitle');
+    expect(html).not.toContain('nc-modal-actions');
+  });
+
+  it('keeps an optional action footer outside the scroll body without duplicating the form', () => {
+    const html = renderToStaticMarkup(<Modal title="Connect channel" onClose={() => {}} footer={<footer><button type="submit" form="channel-form">Connect</button></footer>}>
+      <form id="channel-form"><input aria-label="Channel name"/></form>
+    </Modal>);
+    const body = html.match(/<div class="nc-modal-body"[^>]*>([\s\S]*?)<\/div><div class="nc-modal-actions">/)?.[1];
+    expect(body).toContain('<form id="channel-form">');
+    expect(body).not.toContain('<footer');
+    expect(body).not.toContain('>Connect</button>');
+    expect(html).toContain('<div class="nc-modal-actions"><footer><button type="submit" form="channel-form">Connect</button></footer></div></dialog>');
+    expect(html.match(/<form\b/g)).toHaveLength(1);
+    expect(html.match(/<input\b/g)).toHaveLength(1);
+    expect(html.match(/>Connect<\/button>/g)).toHaveLength(1);
   });
 });

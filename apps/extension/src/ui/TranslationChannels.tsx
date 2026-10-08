@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useId,useState} from 'react';
 import {msg} from '../i18n/runtime';
 import {availableChannelProtocols,connectChannel,listChannels,removeChannel,savedChannelSecretFields,selectChannel,subscribeChannels,type ChannelProfile} from '../translation/channels';
 import {Icon} from '../icons';
@@ -15,6 +15,7 @@ function ChannelGuide({url}:{url?:string}){
 }
 
 export function TranslationChannels(){
+  const formId=useId();
   const definitions=availableChannelProtocols();
   const protocols=definitions.filter(item=>item.configurable);
   const [profiles,setProfiles]=useState<ChannelProfile[]>([]);
@@ -159,8 +160,15 @@ export function TranslationChannels(){
       </div>
     </fieldset>
     {error&&editing===undefined&&<p role="alert" className="error">{error}</p>}
-    {editing!==undefined&&<Modal className="nc-channel-dialog" title={editing?msg('重新连接翻译渠道'):msg('添加翻译渠道')} onClose={close}>
-      <form className="nc-channel-form" onSubmit={e=>{
+    {editing!==undefined&&<Modal className="nc-channel-dialog" title={editing?msg('重新连接翻译渠道'):msg('添加翻译渠道')} onClose={close} footer={
+      <div className="nc-channel-form-actions">
+        <button className="button secondary" type="button" disabled={busy} onClick={close}>{msg('取消')}</button>
+        <button className="button primary" type="submit" form={formId} disabled={busy||!definition}>
+          {busy?msg('正在连接…'):msg('连接并使用')}
+        </button>
+      </div>
+    }>
+      <form id={formId} className="nc-channel-form" onSubmit={e=>{
         e.preventDefault();
         void save();
       }}>
@@ -205,12 +213,6 @@ export function TranslationChannels(){
           {msg('账号凭据保存在本机；修改服务地址或用户名时需重新输入密码。')}
         </p>
         {error&&<p role="alert" className="error">{error}</p>}
-        <div className="nc-channel-form-actions">
-          <button className="button secondary" type="button" disabled={busy} onClick={close}>{msg('取消')}</button>
-          <button className="button primary" type="submit" disabled={busy||!definition}>
-            {busy?msg('正在连接…'):msg('连接并使用')}
-          </button>
-        </div>
       </form>
     </Modal>}
   </section>;

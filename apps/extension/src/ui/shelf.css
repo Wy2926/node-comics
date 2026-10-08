@@ -14,16 +14,13 @@
 .nc-shelf-updates[aria-pressed=true] .nc-shelf-updates-hatch{stroke:var(--accent-on)}
 .nc-shelf-updates:hover:not(:disabled){transform:translateY(-2px) rotate(-4deg)}
 .nc-shelf-updates:active:not(:disabled){transform:translate(2px,2px) rotate(0)}
-.nc-shelf-updates:disabled{--update-paper:var(--surface-soft);--update-ink:var(--muted);--update-number:var(--line);--update-number-ink:var(--muted);--update-stroke:var(--line);--update-shadow:var(--comic-shadow-disabled-color);opacity:1;transform:none}
-.nc-shelf-updates:disabled .nc-shelf-updates-hatch{stroke:var(--muted)}
-.nc-library .nc-shelf-tools{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.nc-library .nc-shelf-tools{gap:16px}
 .nc-library .nc-shelf-tools>.nc-sort-label{margin-left:auto;flex-shrink:0;white-space:nowrap}
 .nc-shelf-tools>.nc-sort-label .nc-select{min-width:140px}
 .nc-shelf-window{position:relative;overflow-anchor:none;margin-bottom:32px}
 .nc-shelf-window>.nc-shelf-grid{position:absolute;top:0;left:0;right:0;margin:0}
 .nc-shelf-window .nc-book{align-self:start;position:relative;overflow:visible}
 .nc-shelf-window .nc-book-cover{overflow:hidden;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
-.nc-shelf-window .nc-book[aria-busy=true] .nc-book-cover{background:var(--surface-soft)}
 .nc-card-source{position:absolute;top:12px;left:12px;max-width:calc(100% - 116px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px;border:1px solid #ffffff40;border-radius:6px;background:#172337ed;color:#fff;font-size:.6875rem;font-weight:800;line-height:1.45;backdrop-filter:blur(8px)}
 .nc-card-reading-time{position:absolute;bottom:12px;left:12px;display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);padding:5px 8px;border:1px solid #ffffff26;border-radius:6px;background:#172337dc;color:#fff;font-size:.6875rem;line-height:1.45;text-align:left;backdrop-filter:blur(8px)}
 .nc-card-reading-time>svg{flex-shrink:0}
@@ -36,7 +33,34 @@
 .nc-batch-toolbar>span{font-weight:700;margin-right:auto}
 .nc-batch-toolbar>.nc-inline{flex-wrap:wrap;gap:16px}
 .nc-removal-list{padding-left:24px;overflow-wrap:anywhere}
-@media(max-width:640px){.nc-library .nc-shelf-title{gap:14px}.nc-app .nc-profile-avatar.nc-shelf-count{min-width:40px;height:40px;font-size:20px}.nc-shelf-updates{height:48px;padding:0 7px 4px 12px;gap:5px;font-size:.75rem}.nc-shelf-updates-count{min-width:31px;height:32px;padding:0 7px;font-size:1.25rem}.nc-shelf-updates-spark{width:23px;height:27px;top:-5px;left:-7px}.nc-library .nc-shelf-tools>.nc-search{flex:1 1 160px}.nc-shelf-tools>.nc-sort-label .nc-select{min-width:118px}}
+@media (max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
+ .nc-library .nc-shelf-title {gap:10px}
+ .nc-app .nc-profile-avatar.nc-shelf-count {min-width:28px;height:28px;font-size:1rem}
+ .nc-shelf-updates {height:44px;padding:0 7px 4px 12px;gap:5px;font-size:.75rem}
+ .nc-shelf-updates-count {min-width:31px;height:32px;padding:0 7px;font-size:1.25rem}
+ .nc-shelf-updates-spark {width:23px;height:27px;top:-5px;left:-7px}
+ .nc-library .nc-shelf-tools {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:stretch}
+ .nc-app .nc-library .nc-shelf-tools>.nc-search {grid-column:1/-1;width:100%;max-width:none;margin:0}
+ .nc-library .nc-shelf-tools>.nc-sort-label {margin:0;min-width:0;gap:8px;white-space:normal}
+ .nc-shelf-tools>.nc-sort-label .nc-select {min-width:0;flex:1}
+ .nc-library .nc-shelf-tools>.button {min-width:0;padding-inline:12px;white-space:normal}
+ .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}
+ .nc-shelf-window .nc-library-card-body {--card-title-size:.875rem;padding:10px}
+ .nc-shelf-window .nc-card-source {top:8px;left:8px;max-width:calc(100% - 16px);padding:3px 6px;font-size:.625rem}
+ .nc-shelf-window .nc-book:has(.nc-card-update) .nc-card-source {max-width:calc(100% - 54px)}
+ .nc-shelf-window .nc-card-update {top:-12px;right:-8px;width:64px;height:58px}
+ .nc-shelf-window .nc-card-reading-time {bottom:8px;left:8px;max-width:calc(100% - 16px);gap:4px;padding:4px 6px;font-size:.625rem}
+ .nc-shelf-window .nc-card-select {top:10px;right:10px;width:24px;height:24px}
+ .nc-shelf-window .nc-book.is-managing .nc-card-select {top:54px}
+ .nc-library .nc-batch-toolbar {gap:12px;padding:14px;margin-bottom:22px}
+ .nc-library .nc-batch-toolbar>span {flex-basis:100%}
+ .nc-library .nc-batch-toolbar>.nc-inline {flex:1;gap:8px}
+ .nc-library .nc-batch-toolbar .button {white-space:normal}
+ .nc-shelf-window .nc-cover-retry {top:42px;right:8px;min-height:44px}
+}
+@media (pointer:coarse) and (max-height:500px) and (min-width:701px), (hover:none) and (max-height:500px) and (min-width:701px) {
+ .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid {grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
 @media(prefers-reduced-motion:reduce){.nc-shelf-updates{transition:none}.nc-shelf-updates:hover:not(:disabled),.nc-shelf-updates:active:not(:disabled){transform:rotate(-2deg)}}
 .nc-cover-retry{position:absolute;top:44px;right:10px;z-index:2}
 .nc-card-progress{height:5px;flex-shrink:0;background:var(--surface-soft);overflow:hidden}

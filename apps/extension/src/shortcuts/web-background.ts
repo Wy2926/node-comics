@@ -14,7 +14,7 @@ const publicOverrides=(value:ShortcutOverrides):ShortcutOverrides=>Object.fromEn
 export function registerWebShortcutsBackground() {
   const startingTabs=new Set<number>();
   // A native command grants activeTab. A website keydown does not authorize captureVisibleTab.
-  chrome.commands.onCommand.addListener((command,source)=>{
+  chrome.commands?.onCommand?.addListener((command,source)=>{
     if(command!=='nc-translate-tab'&&command!=='nc-translate-region')return;
     void (async()=>{
       const tab=source?.id!=null?await chrome.tabs.get(source.id):(await chrome.tabs.query({active:true,lastFocusedWindow:true}))[0];

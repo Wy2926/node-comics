@@ -46,12 +46,15 @@
 .nc-import-dock-main small{display:block;font-size:var(--text-caption);color:var(--muted);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-import-dock-main>.text-link{flex-shrink:0}
 .nc-import-dock-icon{display:flex;color:var(--accent)}
-@media(max-width:640px){
+@media(max-width:700px){
  .nc-local-import-modal>.nc-modal-body{gap:16px}
  .nc-import-summary{padding:14px;gap:12px}
  .nc-import-summary>div{flex-basis:100px}
  .nc-app .nc-import-item{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:start;gap:12px 10px}
  .nc-import-item-action{grid-column:2;justify-self:start}
  .nc-import-footer{align-items:stretch;flex-direction:column-reverse}
- .nc-import-footer-actions{justify-content:flex-end}
+ .nc-import-footer-actions>.button{flex:1 1 130px}
+ .nc-import-list{max-height:none;overflow:visible}
+ .nc-import-dock{right:max(12px,env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:calc(100vw - max(12px,env(safe-area-inset-left)) - max(12px,env(safe-area-inset-right)));padding:12px}
+ .nc-import-dock-main{min-height:44px}
 }

@@ -191,6 +191,9 @@ test('hidden mode removes rails and gutters while preserving scrolling and the s
 });
 
 test('page scrollbar modes keep the masthead full width and reserve space only in the workspace', async () => {
+  // This test measures the masthead, not first-run release notes. Use the bundled
+  // version's normal acknowledgement before navigating away from the fixture.
+  await page.evaluate(async () => (await import('/src/ui/release-notes/content.ts')).markReleaseNotesSeen());
   await page.goto(origin);await page.locator('input[type=file]').waitFor({state:'attached'});
   const header = page.locator('.nc-app-header'), actions = page.locator('.nc-header-actions');
   const initialHeader = await header.boundingBox(), initialActions = await actions.boundingBox();

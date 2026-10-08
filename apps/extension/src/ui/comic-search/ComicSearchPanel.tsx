@@ -13,6 +13,7 @@ import {LanguageFlag} from '../LanguageFlag';
 import {searchResultCoverKey} from './SearchResultCover';
 import {SearchResultCard} from './SearchResultCard';
 import {SearchSiteIcon} from './SearchSiteIcon';
+import {useDialogViewport} from '../visual-viewport';
 import './comic-search.css';
 
 export interface ComicSearchPanelProps {
@@ -50,6 +51,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
   const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
+  useDialogViewport(dialog,open&&sheet);
   const lastQuery=useRef(snapshot.query);
   useEffect(()=>{if(lastQuery.current!==snapshot.query){lastQuery.current=snapshot.query;setQuery(snapshot.query);}},[snapshot.query]);
   useEffect(()=>{

@@ -7,6 +7,7 @@ import {findConflict, resolveBindings} from '../../shortcuts/model';
 import {browserShortcutBinding, browserShortcutCommands, canManageBrowserShortcuts, openBrowserShortcutSettings, readBrowserShortcuts, type BrowserShortcuts} from '../../shortcuts/native';
 import {useShortcutPreferences} from '../../shortcuts/react';
 import {ShortcutBindingControl} from './ShortcutBindingControl';
+import {useDialogViewport} from '../visual-viewport';
 import './shortcut-panel.css';
 
 type Recording = {id: ShortcutId; index: number};
@@ -34,6 +35,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
   const [browserShortcut, setBrowserShortcut] = useState<{value: BrowserShortcuts; loading: boolean; failed: boolean}>({value: {}, loading: canManageBrowserShortcuts(), failed: false});
   const [browserSettingsError, setBrowserSettingsError] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null), viewport = useRef<HTMLDivElement>(null);
+  useDialogViewport(dialog);
   const sections = useRef<Partial<Record<Scope, HTMLElement>>>({}), frame = useRef(0), firstScope = useRef(initialScope ?? 'global'), opening = useRef(true);
   const resetButton = useRef<HTMLButtonElement>(null), confirmButton = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef(typeof document === 'undefined' ? null : document.activeElement);
@@ -165,7 +167,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
     void commit({});
   }
 
-  return <dialog ref={dialog} className="nc-shortcut-panel" aria-labelledby={titleId}
+  return <dialog ref={dialog} className="nc-shortcut-panel nc-viewport-dialog" aria-labelledby={titleId}
     onPointerDownCapture={() => {opening.current = false;}} onWheelCapture={() => {opening.current = false;}} onKeyDownCapture={() => {opening.current = false;}}
     onCancel={event => {
     event.preventDefault();

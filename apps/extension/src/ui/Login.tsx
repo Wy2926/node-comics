@@ -2,6 +2,7 @@ import {msg} from '../i18n/runtime';
 import {useEffect,useId,useRef} from 'react';
 import {Icon} from '../icons';
 import type {useLogin} from '../auth/useLogin';
+import {useDialogViewport} from './visual-viewport';
 import './login.css';
 
 export function Login({login}:{login:ReturnType<typeof useLogin>}){
@@ -17,6 +18,7 @@ export function Login({login}:{login:ReturnType<typeof useLogin>}){
 function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
   const {setOpen,state,development,config,configLoading,configError,username,setUsername,authenticate,reloadConfig}=login;
   const ref=useRef<HTMLDialogElement>(null),titleId=useId();
+  useDialogViewport(ref);
   useEffect(()=>{
     const trigger=document.activeElement;
     ref.current?.showModal();
@@ -26,8 +28,8 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
   const configured=development||config?.mode==='oidc'&&Boolean(config.authorization_endpoint&&config.token_endpoint&&config.client_id);
   const unavailable=!configLoading&&!configured;
   const failed=state.kind==='error'||unavailable;
-  return <dialog ref={ref} className={`modal nc-login ${pending?'is-connecting':''} ${failed?'has-error':''}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();setOpen(false);}}>
-    <button className="nc-login-close icon-button" aria-label={pending?msg("收起登录进度"):msg("关闭登录")} onClick={()=>setOpen(false)}><Icon name="close"/></button>
+  return <dialog ref={ref} className={`modal nc-login nc-viewport-dialog ${pending?'is-connecting':''} ${failed?'has-error':''}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();setOpen(false);}}>
+    <div className="nc-login-controls"><button className="nc-login-close icon-button" aria-label={pending?msg("收起登录进度"):msg("关闭登录")} onClick={()=>setOpen(false)}><Icon name="close"/></button></div>
     <div className="nc-login-spread">
       <div className="nc-login-cover nc-comic-paper" aria-hidden="true">
         <div className="nc-login-masthead"><Icon name="spark" size={18}/><span>NODELANE COMICS</span><span>{msg("漫译通行证")}</span></div>

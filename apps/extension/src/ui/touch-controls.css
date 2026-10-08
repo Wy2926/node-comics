@@ -1,0 +1,18 @@
+/* Geometry only: desktop and touch surfaces consume exactly the same visual tokens. */
+@media (max-width: 700px), (pointer: coarse), (hover: none) {
+  .nc-app :is(button.button, button.icon-button, button.text-link, a.text-link, .segmented > button) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .nc-app button.icon-button { width: 44px; height: 44px; }
+  .nc-app button.button { white-space: normal; overflow-wrap: anywhere; }
+  .nc-app button, .nc-app a { touch-action: manipulation; }
+  .nc-app input:where(:not([type=checkbox]):not([type=radio]):not([type=range])),
+  .nc-app textarea, .nc-app .field :is(input, textarea) { font-size: max(16px, 1rem); }
+  .nc-app input[type=checkbox], .nc-app input[type=radio] { flex-shrink: 0; }
+  .nc-app button.switch { width: 46px; min-width: 46px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .nc-app button.switch.on { background: transparent; }
+  .nc-app button.switch::before { content: ''; position: absolute; inset: 8px 0; border: var(--comic-border); border-radius: var(--comic-control-radius); background: var(--surface-soft); }
+  .nc-app button.switch.on::before { background: var(--accent); border-color: var(--ink); }
+  .nc-app button.switch i { top: 13px; left: 5px; }
+}

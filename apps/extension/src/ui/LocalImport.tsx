@@ -26,7 +26,19 @@ export function LocalImport({queue,expanded,onExpand,onCollapse,onOpen,reading}:
    <span className="text-link">{msg('展开')}</span>
   </button>
  </aside>;
- return <Modal title={title} onClose={onCollapse} closeLabel={msg('收起导入面板')} className="nc-local-import-modal">
+ return <Modal title={title} onClose={onCollapse} closeLabel={msg('收起导入面板')} className="nc-local-import-modal" footer={
+  <footer className="nc-import-footer">
+   <button className="text-link" onClick={onCollapse}>{msg('收起，继续浏览')}</button>
+   <div className="nc-import-footer-actions">{busy?<>
+    <button className="button secondary small" disabled={!running} onClick={()=>queue.cancelCurrent()}>{msg('取消当前')}</button>
+    <button className="button secondary small" onClick={()=>queue.stopRemaining()}>{msg('停止剩余')}</button>
+    {running?<button className="button secondary small" disabled={pauseRequested} onClick={()=>queue.pause()}>{msg('完成当前后暂停')}</button>:<button className="button primary small" onClick={()=>void queue.resume()}>{msg('继续导入')}</button>}
+   </>:<>
+    {!!failures.length&&<button className="button secondary small" onClick={()=>void queue.retry(failures.map(item=>item.id))}><Icon name="refresh" size={16}/>{msg('重试失败项（{0}）',{'0':failures.length})}</button>}
+    <button className="button primary small" onClick={()=>{queue.clear();onCollapse();}}><Icon name="check" size={16}/>{msg('完成')}</button>
+   </>}</div>
+  </footer>
+ }>
   <div className="nc-local-import">
    <dl className="nc-import-summary nc-comic-paper">
     {summaryStatuses.filter(status=>status!=='cancelled'||counts.cancelled>0).map(status=><div key={status} data-status={status}>
@@ -51,16 +63,5 @@ export function LocalImport({queue,expanded,onExpand,onCollapse,onOpen,reading}:
     </article>)}
    </div>
   </div>
-  <footer className="nc-import-footer">
-   <button className="text-link" onClick={onCollapse}>{msg('收起，继续浏览')}</button>
-   <div className="nc-import-footer-actions">{busy?<>
-    <button className="button secondary small" disabled={!running} onClick={()=>queue.cancelCurrent()}>{msg('取消当前')}</button>
-    <button className="button secondary small" onClick={()=>queue.stopRemaining()}>{msg('停止剩余')}</button>
-    {running?<button className="button secondary small" disabled={pauseRequested} onClick={()=>queue.pause()}>{msg('完成当前后暂停')}</button>:<button className="button primary small" onClick={()=>void queue.resume()}>{msg('继续导入')}</button>}
-   </>:<>
-    {!!failures.length&&<button className="button secondary small" onClick={()=>void queue.retry(failures.map(item=>item.id))}><Icon name="refresh" size={16}/>{msg('重试失败项（{0}）',{'0':failures.length})}</button>}
-    <button className="button primary small" onClick={()=>{queue.clear();onCollapse();}}><Icon name="check" size={16}/>{msg('完成')}</button>
-   </>}</div>
-  </footer>
  </Modal>;
 }

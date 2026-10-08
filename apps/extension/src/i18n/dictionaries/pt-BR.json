@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "O contexto de login está faltando, faça login novamente.",
   "管理员尚未配置正式登录服务。": "O administrador não configurou o serviço de login formal.",
   "登录窗口已关闭。": "A janela de login foi fechada.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Este navegador não oferece suporte ao login seguro. Atualize o navegador e tente novamente.",
   "登录会话或服务地址无效。": "A sessão de login ou endereço de serviço é inválido.",
   "暂时连接不到登录服务，请检查网络后重试。": "O serviço de login não pode ser conectado temporariamente, verifique a rede e tente novamente.",
   "正在确认登录结果": "Confirmando resultado de login",

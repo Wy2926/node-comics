@@ -81,6 +81,21 @@ button:focus-visible, .status:focus-visible { outline: 2px solid var(--accent); 
 }
 .status button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 700px), (pointer: coarse), (hover: none) {
+  button, .status button { min-height: 44px; min-width: 44px; }
+  .bar {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    max-width: none;
+    max-height: 40dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .bar button { flex: 1 1 auto; }
+  .label { flex-basis: 100%; max-width: none; }
+  .status { max-width: min(260px, calc(100vw - 16px)); }
+}
 @media (forced-colors: active) {
   .bar, .status, button { border-color: CanvasText; box-shadow: none; }
   button:focus-visible, .status:focus-visible { outline-color: Highlight; }

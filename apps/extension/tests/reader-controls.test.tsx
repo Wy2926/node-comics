@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import type {FocusEvent, PointerEvent} from 'react';
+import type {FocusEvent, KeyboardEvent, PointerEvent} from 'react';
 
 // Run the shared image/EPUB chrome hook with real fake-timer scheduling.
 // Browser focus-visible semantics are additionally checked in the local reader.
@@ -29,7 +29,7 @@ vi.mock('react', async original => ({
   },
 }));
 import {useReaderControls} from '../src/reader/useReaderControls';
-import {ReaderShell} from '../src/reader/ReaderChrome';
+import {ReaderShell, dismissReaderKeyboard} from '../src/reader/ReaderChrome';
 
 let blocked: boolean, focusVisible: boolean;
 const focus = vi.fn();
@@ -64,6 +64,20 @@ beforeEach(() => {
   render();
 });
 afterEach(() => {cleanup(); vi.useRealTimers(); vi.unstubAllGlobals();});
+
+describe('reader numeric keyboard', () => {
+  it.each([
+    {key: 'Enter', composing: false, keyCode: 13, dismiss: true},
+    {key: 'Enter', composing: true, keyCode: 13, dismiss: false},
+    {key: 'Enter', composing: false, keyCode: 229, dismiss: false},
+    {key: 'ArrowRight', composing: false, keyCode: 39, dismiss: false},
+  ])('dismisses only a completed Done key: %j', ({key, composing, keyCode, dismiss}) => {
+    const blur = vi.fn(), preventDefault = vi.fn();
+    dismissReaderKeyboard({key, nativeEvent: {isComposing: composing, keyCode}, currentTarget: {blur}, preventDefault} as unknown as KeyboardEvent<HTMLInputElement>);
+    expect(blur).toHaveBeenCalledTimes(Number(dismiss));
+    expect(preventDefault).toHaveBeenCalledTimes(Number(dismiss));
+  });
+});
 
 describe('immersive reader controls', () => {
   it('hides after 1200ms and does not restart for unrelated renders', () => {
@@ -148,5 +162,15 @@ describe('immersive reader controls', () => {
     shell().onPointerMove!({target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 4} as unknown as PointerEvent<HTMLDivElement>);
     render(); expect(controls.hidden).toBe(false);
     expect(bounds).toHaveBeenCalledOnce();
+  });
+
+  it('does not reopen tools or measure the canvas while a touch scroll passes an edge', () => {
+    enable(); advance();
+    const bounds = vi.fn(() => ({left: 0, right: 390}));
+    shell().onPointerMove!({pointerType: 'touch', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
+    render();
+    expect(controls.hidden).toBe(true);
+    expect(bounds).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -119,7 +119,7 @@ describe('OIDC public-client boundaries', () => {
     expect(session!.refreshAt).toBe(session!.expiresAt-60000);
   });
 
-  it.each(['state', 'origin', 'path', 'expiry'] as const)(
+  it.each(['state', 'origin', 'path', 'expiry', 'issuer', 'duplicate-code', 'duplicate-state', 'duplicate-issuer', 'mixed-result', 'fragment', 'userinfo'] as const)(
     'rejects a mismatched %s before making any token or API request', async (mismatch) => {
       const pending = await begin();
       if (mismatch === 'expiry') {
@@ -130,6 +130,13 @@ describe('OIDC public-client boundaries', () => {
       if (mismatch === 'state') current.searchParams.set('state', 'different-state');
       if (mismatch === 'origin') current = callback(pending, 'https://other.example.test/reader.html');
       if (mismatch === 'path') current = callback(pending, 'https://reader.example.test/other.html');
+      if (mismatch === 'issuer') current.searchParams.set('iss', 'https://other-issuer.example.test');
+      if (mismatch === 'duplicate-code') current.searchParams.append('code', 'another-code');
+      if (mismatch === 'duplicate-state') current.searchParams.append('state', pending.state);
+      if (mismatch === 'duplicate-issuer') current.searchParams.append('iss', config.issuer), current.searchParams.append('iss', config.issuer);
+      if (mismatch === 'mixed-result') current.searchParams.set('error', 'access_denied');
+      if (mismatch === 'fragment') current.hash = 'fragment';
+      if (mismatch === 'userinfo') current.username = 'other-user';
       await expect(finishOidc()).rejects.toThrow('登录状态无效或已过期');
       expect(request).not.toHaveBeenCalled();
       expect(current.search).toBe('');
@@ -246,5 +253,35 @@ describe('OIDC public-client boundaries', () => {
     expect(assigned).not.toHaveBeenCalled();
     expect(entries.has(KEY)).toBe(false);
     expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the registered callback and same exchange on an extension without identity', async () => {
+    const event = {addListener: vi.fn(), removeListener: vi.fn()};
+    const authorizations: URL[] = [];
+    const remove = vi.fn(async () => undefined);
+    const permissions = vi.fn(async () => true);
+    vi.stubGlobal('chrome', {
+      runtime: {id: 'comics@nodelane.net', getManifest: () => ({browser_specific_settings: {gecko: {id: 'comics@nodelane.net'}}})},
+      permissions: {contains: permissions},
+      tabs: {getCurrent: vi.fn(async () => ({id: 2})), create: vi.fn(async () => ({id: 4})), remove, onUpdated: event, onRemoved: event,
+        update: vi.fn(async (_id: number, {url}: {url?: string; active?: boolean}) => {
+          if (!url) return {id: 2};
+          authorizations.push(new URL(url));
+          const returned = callback(JSON.parse(entries.get(KEY)!) as Pending);
+          returned.searchParams.set('iss', config.issuer);
+          return {url: returned.href};
+        })},
+      webRequest: {onBeforeRequest: event},
+    });
+    successfulResponses();
+    expect(await startOidc(config, API)).toMatchObject({token: TOKEN, user, apiOrigin: API});
+    const redirect = 'https://b6537bc59408f22ed5813efab806261a7e62bd16.extensions.allizom.org/oidc';
+    expect(authorizations[0].searchParams.get('redirect_uri')).toBe(redirect);
+    expect(authorizations[0].searchParams.get('code_challenge_method')).toBe('S256');
+    expect(permissions).toHaveBeenCalledExactlyOnceWith({origins: ['https://identity.example.test/*', new URL(redirect).origin + '/*']});
+    expect((request.mock.calls[0][1].body as URLSearchParams).get('redirect_uri')).toBe(redirect);
+    expect(assigned).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledExactlyOnceWith(4);
+    expect(entries.has(KEY)).toBe(false);
   });
 });

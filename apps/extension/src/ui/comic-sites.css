@@ -7,17 +7,15 @@
 .nc-site-card { display: block; height: 100%; padding: 16px 16px 0; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background: var(--surface); transition: transform .15s, box-shadow .15s; }
 .nc-site-card:hover { transform: translate(-2px, -2px); box-shadow: var(--comic-shadow-hover); }
 .nc-site-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.nc-site-monogram { display: grid; place-items: center; width: 36px; height: 36px; border: var(--comic-border); border-radius: 4px 10px 10px 10px; box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--accent); transform: rotate(-4deg); }
+.nc-site-monogram { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; overflow: hidden; border: var(--comic-border); border-radius: 4px 10px 10px 10px; box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--accent); transform: rotate(-4deg); }
 .nc-site-languages { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; min-width: 0; }
 .nc-site-languages>span { display: inline-flex; }
-.nc-site-monogram { position: relative; overflow: hidden; flex-shrink: 0; }
 .nc-site-monogram img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 .nc-site-contact-note { color: var(--muted); font-size: .6875rem; font-weight: 400; }
 .nc-site-card h3 { font-size: 1rem; letter-spacing: -.02em; overflow-wrap: anywhere; }
 .nc-site-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.nc-site-tags>span { padding: 2px 7px; border-radius: 4px; background: var(--surface-soft); color: var(--muted); font-size: .6875rem; font-weight: 650; }
-.nc-site-free { padding: 2px 7px; border-radius: 4px; background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); font-size: .6875rem; font-weight: 650; }
-.nc-site-access { padding: 2px 7px; border-radius: 4px; background: var(--surface-soft); color: var(--muted); font-size: .6875rem; font-weight: 650; }
+.nc-site-tags>span, .nc-site-free, .nc-site-access { padding: 2px 7px; border-radius: 4px; background: var(--surface-soft); color: var(--muted); font-size: .6875rem; font-weight: 650; }
+.nc-site-free { background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
 .nc-site-access-partial-web { background: var(--accent-soft); color: var(--accent); }
 .nc-site-access-paid-content { background: color-mix(in srgb, var(--warning) 12%, var(--surface)); color: var(--warning); }
 .nc-site-supported { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -49,3 +47,33 @@
 .nc-site-link-import > div {display:flex;gap:12px;}
 .nc-site-link-import input {flex:1;min-width:0;padding:12px;background:var(--surface);color:inherit;}
 .nc-site-link-import p {margin:10px 0 0;color:var(--muted);font-size:13px;}
+.nc-site-request-shortcut {display:none}
+@media (max-width:1000px) {
+ .nc-sites-layout {grid-template-columns:minmax(0,1fr);gap:28px}
+ .nc-site-request {max-width:640px;width:100%}
+}
+@media (max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
+ .nc-sites-layout {grid-template-columns:minmax(0,1fr);gap:24px}
+ .nc-sites-page .nc-sites-heading-icon {display:none}
+ .nc-sites-page .nc-site-request-shortcut {display:inline-flex;width:100%}
+ .nc-site-link-import {padding:16px}
+ .nc-site-link-import>div {flex-direction:column}
+ .nc-site-link-import input {width:100%;min-height:48px}
+ .nc-site-link-import .button {width:100%;white-space:normal}
+ .nc-sites-section-heading {gap:10px;align-items:flex-start}
+ .nc-sites-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}
+ .nc-site-card {padding:12px 10px 0}
+ .nc-site-card-top {gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap}
+ .nc-site-languages {justify-content:flex-start;gap:6px}
+ .nc-site-monogram {width:32px;height:32px}
+ .nc-site-card h3 {font-size:var(--text-small)}
+ .nc-site-card-footer {gap:6px;align-items:flex-start}
+ .nc-site-card-footer>.nc-icon {width:15px;height:15px}
+ .nc-site-request {max-width:none;padding:20px;scroll-margin-block:80px calc(96px + env(safe-area-inset-bottom,0px))}
+ .nc-site-request-icon {display:none}
+ .nc-site-request .button {min-height:44px;white-space:normal}
+ .nc-site-request .nc-support-form .button {width:100%}
+}
+@media (pointer:coarse) and (max-height:500px) and (min-width:701px), (hover:none) and (max-height:500px) and (min-width:701px) {
+ .nc-sites-grid {grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+}

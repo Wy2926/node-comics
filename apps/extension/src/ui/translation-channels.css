@@ -237,7 +237,7 @@
   border-top: 1px solid var(--line);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .nc-channel-card {
     padding: 14px;
   }
@@ -259,5 +259,8 @@
   .nc-channel-form-actions>.button {
     flex: 1;
   }
-
+  .nc-channel-heading > .button { width: 100%; }
+  .nc-channel-choice, .nc-channel-service { min-height: 44px; }
+  .nc-channel-actions { flex-wrap: wrap; margin-inline-start: 0; gap: 8px 18px; }
+  .nc-channel-actions .text-link, .nc-channel-guide { min-height: 44px; display: inline-flex; align-items: center; }
 }

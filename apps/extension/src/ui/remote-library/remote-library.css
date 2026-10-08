@@ -103,17 +103,34 @@ button.nc-remote-crumb:hover:not(:disabled) { color: var(--accent); background: 
   .nc-remote-title { gap: 8px; }
   .nc-remote-title h2 { font-size: var(--text-body); }
 }
-@media (max-width: 760px) {
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
   .nc-remote-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .nc-remote-sidebar { position: static; padding: 14px 12px; }
   .nc-remote-sidebar h2 { margin-bottom: 12px; }
   .nc-remote-sidebar-note { display: none; }
-  .nc-remote-connections { display: flex; overflow-x: auto; gap: 10px; padding: 0 4px 6px; }
-  .nc-remote-connection { flex: 0 0 190px; width: 190px; }
+  .nc-remote-connections { display: flex; overflow-x: auto; gap: 10px; padding: 0 4px 6px; scroll-snap-type: x proximity; }
+  .nc-remote-connection { flex: 0 0 190px; width: 190px; scroll-snap-align: start; }
   .nc-remote-grid { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 22px 14px; }
-  .nc-remote-navigation { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   .nc-remote-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
   .nc-remote-search { grid-column: 1 / -1; grid-row: 2; }
   .nc-remote-breadcrumbs { margin-bottom: 16px; }
   .nc-remote-crumb { max-width: 180px; padding-inline: 10px; }
+  .nc-remote-heading>.button { width:100%; min-height:48px; }
+  .nc-remote-title { flex-wrap:wrap; gap:8px; }
+  .nc-remote-title h2 { flex:1 1 100%; white-space:normal; overflow-wrap:anywhere; }
+  .nc-remote-search[data-unavailable] { display:none; }
+  .nc-remote-facets { display:grid; grid-template-columns:minmax(0,1fr); }
+  .nc-remote-facets details { min-width:0; }
+  .nc-remote-facets summary { min-height:44px; display:flex; align-items:center; }
+  .nc-remote-facets .button { min-height:44px; }
+  .nc-remote-navigation { grid-template-columns:minmax(0,1fr); }
+  .nc-remote-publication .nc-remote-cover-frame>.nc-remote-details-button { top:8px; inset-inline-end:8px; width:44px; min-width:44px; height:44px; }
+  .nc-remote-cover-formats { top:8px; inset-inline-start:8px; max-width:calc(100% - 64px); }
+  .nc-remote-cover-caption { inset:auto 8px 8px; }
+  .nc-remote-publication h3 button { min-height:44px; }
+  .nc-remote-group-links { margin-inline-start:0; flex-basis:100%; }
+  .nc-remote-group-links .text-link { min-height:44px; }
+  .nc-remote-pagination { gap:12px; flex-wrap:wrap; }
+  .nc-remote-pagination>.button { flex:1; min-width:0; white-space:normal; }
+  .nc-connection-removal-warning { padding:14px; gap:10px; }
 }

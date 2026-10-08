@@ -10,6 +10,7 @@ import {formatLabels, statusLabels} from './labels';
 import type {TextTranslationSession} from '../../text-translation';
 import {useTextTranslation} from './useTextTranslation';
 import {TextTranslationStatus} from './TextTranslationStatus';
+import {useDialogViewport} from '../visual-viewport';
 
 export interface DiscoverySearchContext {
   seed: SearchSeed;
@@ -35,7 +36,8 @@ const ratingOutline = 'm14 14 37 2 6-10 20 8 80-5-3 25 15 8-10 20 2 56-35-2-11 1
 /** Owns only the details/search presentation. The host supplies the source-search workflow. */
 export function DiscoveryDialog({active, work, detail, loading, error, onRetry, onClose, renderSearch, translator, language, translate}: Props) {
   const dialog = useRef<HTMLDialogElement>(null), closeButton = useRef<HTMLButtonElement>(null);
-  const detailBody = useRef<HTMLDivElement>(null);
+  const detailBody = useRef<HTMLDivElement>(null), detailScroll = useRef<HTMLDivElement>(null);
+  useDialogViewport(dialog, active);
   const [pane, setPane] = useState<Pane>('details');
   const [sourceSeed, setSourceSeed] = useState<SearchSeed>();
   const [expanded, setExpanded] = useState(false);
@@ -48,10 +50,10 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
   const current = useRef({active, pane});
   current.current = {active, pane};
   const scroll = useRef({details: 0, sources: 0}), returnFocus = useRef<HTMLElement | null>(null);
-  const scrollAreas = {details: detailBody, sources: dialog};
+  const scrollArea = (key: Pane) => key === 'sources' ? dialog.current : detailScroll.current && getComputedStyle(detailScroll.current).overflowY === 'auto' ? detailScroll.current : detailBody.current;
   const rememberScroll = () => {
     const key = current.current.pane;
-    scroll.current[key] = scrollAreas[key].current?.scrollTop ?? 0;
+    scroll.current[key] = scrollArea(key)?.scrollTop ?? 0;
   };
   useLayoutEffect(() => {
     const element = dialog.current;
@@ -69,7 +71,7 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
     };
   }, [active]);
   useLayoutEffect(() => {
-    const element = scrollAreas[pane].current;
+    const element = scrollArea(pane);
     if (active && element) element.scrollTop = scroll.current[pane];
   }, [active, pane]);
   const showPane = (next: Pane) => {
@@ -93,7 +95,7 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
       {searching && <button className="button secondary small" onClick={() => showPane('details')}>{msg('返回作品详情')}</button>}
       <button ref={closeButton} className="icon-button" aria-label={msg('关闭弹窗')} onClick={close}><Icon name="close"/></button>
     </header>
-    <div className="nc-discovery-detail" hidden={searching}>
+    <div ref={detailScroll} className="nc-discovery-detail" hidden={searching}>
       <aside className="nc-discovery-detail-art">
         <DiscoveryCover work={value}/>
       </aside>

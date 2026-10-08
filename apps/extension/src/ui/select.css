@@ -60,7 +60,11 @@ button.nc-select:disabled {
   font-size: .9375rem;
   line-height: 1.4;
   text-align: start;
+  z-index: 100;
+  touch-action: pan-y;
 }
+.nc-select-list[hidden] { display: none; }
+.nc-select-list[data-popover-fallback-open] { display: block; }
 .nc-select-list::backdrop { background: transparent; }
 .nc-select-option {
   display: flex;
@@ -83,3 +87,9 @@ button.nc-select:disabled {
 .nc-popup-language .nc-select { width: 148px; min-width: 0; min-height: 40px; padding: 8px; gap: 6px; font-size: .75rem; }
 .nc-popup-language .nc-select-list { font-size: .75rem; }
 .nc-popup-language .nc-select-content { gap: 7px; }
+
+@media (max-width: 700px), (pointer: coarse), (hover: none) {
+  .nc-library .nc-select, .nc-popup-language .nc-select { min-height: 44px; }
+  .nc-select-option { min-height: 44px; padding-block: 10px; }
+  .nc-select-list, .nc-popup-language .nc-select-list { font-size: var(--text-small); }
+}

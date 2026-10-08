@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type Rendition from "epubjs/types/rendition";
 import type { Location } from "epubjs/types/rendition";
 import type { EpubSession } from "../comics/formats/epub";
@@ -19,7 +19,7 @@ import {languageLabel, modeLabels, type Capabilities, type Mode, type Page, type
 import type {ReadingTarget, TranslationState} from '../translation/automatic';
 import { useShortcuts } from "../shortcuts/react";
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
-import {ReaderShell, ReaderNavigation, ReaderDrawer} from './ReaderChrome';
+import {ReaderShell, ReaderNavigation, ReaderDrawer, ReaderNumberInput} from './ReaderChrome';
 import {ReaderSettings, ReaderScale, ReaderTranslationSettings} from './ReaderSettings';
 import {PageTranslationBar} from './PageTranslationBar';
 import {EpubDirectory} from './EpubDirectory';
@@ -166,7 +166,9 @@ export function EpubReader({
     { enabled: !controlsBlocked },
   );
 
-  useEffect(() => {
+  // Capture/release while the iframe is still attached. Firefox no longer exposes
+  // its computed styles after React removes it, before passive effect cleanup.
+  useLayoutEffect(() => {
     const element = viewport.current;
     if (!element || !copy.contentId) return;
     const controller = new AbortController();
@@ -419,8 +421,8 @@ export function EpubReader({
         <button aria-label={msg('上一页')} title={msg('上一页')} disabled={disabled || position?.atStart}
           onClick={() => run(() => turnEpub(rendition.current!, -1))}><Icon name="chevron" style={{transform: 'rotate(-90deg)'}}/></button>
         <label title={msg('第 {0} 章，共 {1} 章', {'0': chapter + 1, '1': chapterCount})}>
-          <input aria-label={msg('跳转章节')} type="number" min={1} max={chapterCount} value={chapter + 1} disabled={disabled}
-            onChange={event => jumpChapter(Number(event.target.value) - 1)}/><span>/ {chapterCount}</span>
+          <ReaderNumberInput label={msg('跳转章节')} value={chapter + 1} max={chapterCount} disabled={disabled}
+            onCommit={value => jumpChapter(value - 1)}/><span>/ {chapterCount}</span>
         </label>
         <input className="nc-reader-progress" type="range" aria-label={msg('阅读进度')} aria-valuetext={`${progress}%`}
           min={0} max={100} step={1} value={progress} disabled={disabled}

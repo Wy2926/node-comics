@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 
 describe('shortcut preference panel presentation', () => {
-  it('keeps all four command groups in one scroll surface and uses the sidebar only for anchors', () => {
+  it('keeps all four command groups in one scroll surface and uses navigation only for anchors', () => {
     const html = renderToStaticMarkup(<ShortcutPanel initialScope="reader" onClose={() => {}}/>);
     expect(html).toContain('aria-label="快捷键范围"');
     expect(html).toMatch(/<nav\b[^>]*class="nc-shortcut-nav"/);
@@ -52,8 +52,9 @@ describe('shortcut preference panel presentation', () => {
   it('uses a dedicated dialog shell with a separate fixed header, close control and footer', () => {
     const html = renderToStaticMarkup(<ShortcutPanel initialScope="global" onClose={() => {}}/>);
     const dialog = html.match(/<dialog\b[^>]*>/)?.[0];
-    expect(dialog).toContain('class="nc-shortcut-panel"');
-    expect(dialog).not.toMatch(/class="[^"]*\bmodal\b/);
+    const classes = dialog?.match(/class="([^"]+)"/)?.[1].split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(['nc-shortcut-panel', 'nc-viewport-dialog']));
+    expect(classes).not.toContain('modal');
     expect(html).toMatch(/<header\b[^>]*class="nc-shortcut-header"/);
     expect(html).toMatch(/<button\b[^>]*class="[^"]*nc-shortcut-close/);
     expect(html).toMatch(/<footer\b[^>]*class="nc-shortcut-footer"/);

@@ -1,4 +1,5 @@
 import type {OverlayTile} from './tiles';
+import {createImageCanvas} from './canvas';
 
 export class ImageOutputTooLargeError extends Error {
   readonly code='IMAGE_OUTPUT_TOO_LARGE';
@@ -26,7 +27,7 @@ export async function bitmapPng(base:ImageBitmap,tiles:PngPatch[]=[],maxBytes=In
   const ihdr=new Uint8Array(13),view=new DataView(ihdr.buffer);
   view.setUint32(0,width);view.setUint32(4,height);ihdr[8]=8;ihdr[9]=6;
   const parts:BlobPart[]=[new Uint8Array([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr)];
-  let y=0,compressedBytes=0,pendingBytes=0,canvas:OffscreenCanvas|undefined;
+  let y=0,compressedBytes=0,pendingBytes=0,canvas:OffscreenCanvas|HTMLCanvasElement|undefined;
   const pending=new Uint8Array(65536);
   const source=new ReadableStream<BufferSource>({
     async pull(controller){
@@ -35,8 +36,8 @@ export async function bitmapPng(base:ImageBitmap,tiles:PngPatch[]=[],maxBytes=In
       const patches=tiles.filter(tile=>tile.y<y+rows&&tile.y+tile.height>y);
       for(let x=0;x<width;x+=2048){
         const columns=Math.min(2048,width-x);
-        canvas??=new OffscreenCanvas(columns,rows);canvas.width=columns;canvas.height=rows;
-        const context=canvas.getContext('2d',{colorSpace:'srgb'});
+        canvas??=createImageCanvas(columns,rows);canvas.width=columns;canvas.height=rows;
+        const context=canvas.getContext('2d',{colorSpace:'srgb'}) as CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D|null;
         if(!context)throw Error('Image canvas unavailable');
         context.imageSmoothingEnabled=false;
         context.drawImage(base,x,y,columns,rows,0,0,columns,rows);

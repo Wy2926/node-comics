@@ -50,10 +50,14 @@ export function useReaderControls<Panel extends string>({blocked, notify}: {
     return () => clearTimeout(hideTimer.current);
   }, [immersive, panel, blocked]);
   useEffect(() => {
-    if (panel !== 'translation') return;
+    if (!panel) return;
+    if (panel !== 'translation') {
+      root.current?.querySelector<HTMLButtonElement>('.nc-reader-drawer .nc-drawer-title button')?.focus({preventScroll: true});
+      return;
+    }
     const bubble = root.current?.querySelector<HTMLElement>('.nc-translation-popover');
     const trigger = root.current?.querySelector<HTMLButtonElement>('.nc-translation-trigger');
-    bubble?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+    (bubble?.querySelector<HTMLButtonElement>('[aria-pressed="true"]') ?? bubble?.querySelector<HTMLButtonElement>('.nc-drawer-title button'))?.focus({preventScroll: true});
     function outside(event: PointerEvent) {
       const target = event.target as Node;
       if (!bubble?.contains(target) && !trigger?.contains(target)) setPanel(undefined);

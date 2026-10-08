@@ -30,6 +30,7 @@ import { type Capabilities, type Entitlements, type ReadingEntry, type Settings 
 import { AccountPage, type AccountTab } from './ui/Account';
 import { useAppearance } from './ui/Appearance';
 import { BrandLogo } from './ui/BrandLogo';
+import { HeaderUtilities } from './ui/HeaderUtilities';
 import { ComicSites } from './ui/ComicSites';
 import { SupportRequestForm } from './ui/SupportRequestForm';
 import { Modal } from './ui/components';
@@ -357,18 +358,20 @@ export function App(){
   {!current&&<header className="nc-app-header">
    <button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button>
    <nav aria-label={msg('主导航')}>
-    <button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book" size={28}/>{msg('我的漫画')}</button>
-    <button aria-current={view==='remote-library'?'page':undefined} onClick={()=>nav('remote-library')}><Icon name="cloud" size={28}/>{msg('远程书库')}</button>
-    <button aria-current={view==='discover'?'page':undefined} onClick={()=>nav('discover')}><Icon name="spark" size={28}/>{msg('发现')}</button>
-    <button aria-current={view==='search'?'page':undefined} onClick={()=>nav('search')}><Icon name="comic-search" size={28}/>{msg('搜索漫画')}</button>
-    <button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe" size={28}/>{msg('漫画网站')}</button>
+    <button aria-current={view==='library'?'page':undefined} onClick={()=>nav('library')}><Icon name="book" size={28}/><span>{msg('我的漫画')}</span></button>
+    <button aria-current={view==='remote-library'?'page':undefined} onClick={()=>nav('remote-library')}><Icon name="cloud" size={28}/><span>{msg('远程书库')}</span></button>
+    <button aria-current={view==='discover'?'page':undefined} onClick={()=>nav('discover')}><Icon name="spark" size={28}/><span>{msg('发现')}</span></button>
+    <button aria-current={view==='search'?'page':undefined} onClick={()=>nav('search')}><Icon name="comic-search" size={28}/><span>{msg('搜索漫画')}</span></button>
+    <button aria-current={view==='sites'?'page':undefined} onClick={()=>nav('sites')}><Icon name="globe" size={28}/><span>{msg('漫画网站')}</span></button>
    </nav>
    <div className="nc-header-actions">
-    <ReleaseNotes active={releaseNotesActive}/>
+    <HeaderUtilities page={view}>
+     <ReleaseNotes active={releaseNotesActive}/>
+     <a className="icon-button" href="https://github.com/Wy2926/node-comics" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><Icon name="github" size={28}/></a>
+     <button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message" size={28}/></button>
+    </HeaderUtilities>
     <button className="icon-button nc-download-trigger" data-downloads-trigger aria-label={msg('离线缓存')} aria-current={view==='downloads'?'page':undefined} title={msg('离线缓存')} onClick={()=>downloads.open()}><Icon name="download" size={28}/>{activeDownloads>0&&<small>{activeDownloads}</small>}</button>
-    <a className="icon-button" href="https://github.com/Wy2926/node-comics" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><Icon name="github" size={28}/></a>
-    <button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message" size={28}/></button>
-    <button className="icon-button" aria-label={msg('外观与设置')} onClick={()=>nav('settings')}><Icon name="settings" size={28}/></button>
+    <button className="icon-button" aria-label={msg('外观与设置')} aria-current={view==='settings'?'page':undefined} onClick={()=>nav('settings')}><Icon name="settings" size={28}/></button>
     <button aria-label={msg('我的账户')} title={account?(rights?(rights.plan==='lite'?msg('Lite 会员'):rights.plan==='plus'?msg('会员'):msg('普通用户')):msg('权益读取中')):msg('我的账户')} aria-current={view==='account'?'page':undefined} className="icon-button nc-account-button" onClick={()=>nav('account')}><Icon name={account?(rights&&rights.plan!=='free'?'user-member':'user-basic'):'user'} size={28}/></button>
    </div>
   </header>}

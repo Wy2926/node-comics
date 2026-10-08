@@ -3,16 +3,21 @@ import { Api } from '../api';
 import type { User } from '../types';
 import {secureIdentityUrl,tokenLifetime,type Session} from './model';
 import {launchLoginWindow} from './auth-window';
+import {loginRedirectUrl} from './auth-redirect';
 import {requireHostAccess} from '../host-permissions';
 import {requestOidcToken} from './token-request';
 export interface AuthConfig { mode: 'development'|'oidc'; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
-interface Pending { state:string; verifier:string; redirect:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
+interface Pending { state:string; verifier:string; redirect:string; issuer:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
 const KEY='nc-oidc-pending';
 function encode(bytes:Uint8Array) {return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 export function isOidcCallback() {const query=new URLSearchParams(location.search);return query.has('state')&&(query.has('code')||query.has('error'));}
 async function exchange(callback:string,pending:Pending):Promise<Session> {
   const returned=new URL(callback);const expected=new URL(pending.redirect);
-  if(returned.origin!==expected.origin||returned.pathname!==expected.pathname||returned.searchParams.get('state')!==pending.state||Date.now()-pending.created>600000)throw Error(msg("登录状态无效或已过期，请重新登录。"));
+  if(returned.origin!==expected.origin||returned.pathname!==expected.pathname||returned.username||returned.password||returned.hash||
+    returned.searchParams.getAll('state').length!==1||returned.searchParams.get('state')!==pending.state||
+    ['code','error','iss'].some(key=>returned.searchParams.getAll(key).length>1)||
+    returned.searchParams.has('code')&&returned.searchParams.has('error')||
+    returned.searchParams.has('iss')&&returned.searchParams.get('iss')!==pending.issuer||Date.now()-pending.created>600000)throw Error(msg("登录状态无效或已过期，请重新登录。"));
   sessionStorage.removeItem(KEY);
   if(returned.searchParams.has('error'))throw Error(msg("身份服务未完成登录，请重试。"));
   const code=returned.searchParams.get('code');if(!code)throw Error(msg("身份服务未返回授权码。"));
@@ -40,12 +45,13 @@ export async function finishOidc():Promise<Session|null> {
 export async function startOidc(config:AuthConfig,apiBase:string):Promise<Session|null> {
   if(config.mode!=='oidc'||!config.client_id||!config.authorization_endpoint||!config.token_endpoint)throw Error(msg("管理员尚未配置正式登录服务。"));
   const authorization=secureIdentityUrl(config.authorization_endpoint);const token=secureIdentityUrl(config.token_endpoint);
-  const extension=typeof chrome!=='undefined'&&Boolean(chrome.identity?.launchWebAuthFlow);
-  if(extension)await requireHostAccess([...new Set([authorization.origin+'/*',token.origin+'/*'])]);
+  const extension=typeof chrome!=='undefined'&&Boolean(chrome.runtime?.id);
+  const redirect=extension?await loginRedirectUrl():(location.origin+location.pathname);
+  if(extension)await requireHostAccess([...new Set([authorization.origin+'/*',token.origin+'/*',
+    ...typeof chrome.identity?.launchWebAuthFlow!=='function'?[secureIdentityUrl(redirect).origin+'/*']:[]])]);
   const verifier=encode(crypto.getRandomValues(new Uint8Array(48)));const state=encode(crypto.getRandomValues(new Uint8Array(24)));
   const challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
-  const redirect=extension?chrome.identity.getRedirectURL('oidc'):(location.origin+location.pathname);
-  const pending:Pending={state,verifier,redirect,apiBase,tokenEndpoint:token.href,clientId:config.client_id,resource:config.audience,created:Date.now()};
+  const pending:Pending={state,verifier,redirect,issuer:config.issuer,apiBase,tokenEndpoint:token.href,clientId:config.client_id,resource:config.audience,created:Date.now()};
   sessionStorage.setItem(KEY,JSON.stringify(pending));
   // Local sign-out leaves the identity provider's SSO cookie intact. Explicit
   // sign-in must let the reader enter another account instead of reusing it.

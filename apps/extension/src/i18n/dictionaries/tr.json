@@ -163,6 +163,7 @@
   "缺少本次登录上下文，请重新登录。": "Oturum açma içeriği eksik, lütfen tekrar oturum açın.",
   "管理员尚未配置正式登录服务。": "Yönetici resmi oturum açma hizmetini yapılandırmadı.",
   "登录窗口已关闭。": "Oturum açma penceresi kapatıldı.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "Bu tarayıcı güvenli oturum açmayı desteklemiyor. Lütfen tarayıcınızı güncelleyip tekrar deneyin.",
   "登录会话或服务地址无效。": "Oturum açma oturumu veya hizmet adresi geçersiz.",
   "暂时连接不到登录服务，请检查网络后重试。": "Oturum açma hizmetine geçici olarak bağlanılamıyor, lütfen ağı kontrol edin ve tekrar deneyin.",
   "正在确认登录结果": "Oturum açma sonucu onaylanıyor",

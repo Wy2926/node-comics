@@ -1,9 +1,28 @@
 import {describe,expect,it} from 'vitest';
 import {chapterWindow,pageWindow,pageAtHeight} from '../src/reader/virtual-window';
+import {pageFrame} from '../src/reader/geometry';
 import type {ReadingEntry,Page} from '../src/types';
 
 const chapter=(id:string,count:number):ReadingEntry=>({id,title:id,source:'local',sourceKey:id,pages:Array.from({length:count},(_,index)=>({id:`${id}-${index}`,name:`${index}`,width:800,height:1000+index,jobs:[],outputBlobs:{}} as Page)),generation:1,createdAt:0,updatedAt:0,pageId:`${id}-0`,relativeOffset:0,discoveryComplete:true});
 describe('bounded reader geometry',()=>{
+ it('keeps both comparison panes readable on phones, using the existing horizontal canvas scroll',()=>{
+  const page={width:800,height:1200},phone={width:390,height:640};
+  const regular=pageFrame(page,phone,'width'),comparison=pageFrame(page,phone,'width',100,true);
+  expect(comparison.width).toBe(regular.width*2);
+  expect(comparison.height).toBe(regular.height);
+  const desktop=pageFrame(page,{width:1200,height:900},'width',100,true);
+  expect(desktop.width).toBe(1176);
+ });
+ it('retains the current page and fractional anchor when a phone rotates in comparison mode',()=>{
+  const book=chapter('phone-book',50),index=25,relativeOffset=.42;
+  for(const viewport of [{width:390,height:620},{width:800,height:240}]){
+   const height=(page:Page)=>pageFrame(page,viewport,'width',100,true).height;
+   const [window]=pageWindow([book],book.id,index,height);
+   const top=window.offsets[index]+height(book.pages[index])*relativeOffset;
+   expect(pageAtHeight(window.offsets,top)).toBe(index);
+   expect((top-window.offsets[index])/height(book.pages[index])).toBeCloseTo(relativeOffset);
+  }
+ });
  it('retains at most three chapters and eleven total page elements across thirty chapters',()=>{
   const sequence=Array.from({length:30},(_,index)=>chapter('chapter-'+index,100));
   for(let active=0;active<30;active++)for(const index of [0,1,50,98,99]){

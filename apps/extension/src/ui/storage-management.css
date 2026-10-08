@@ -11,3 +11,9 @@
 .nc-source-account-details dt{flex-shrink:0;color:var(--muted)}
 .nc-source-account-details dd{margin:0;overflow-wrap:anywhere}
 .nc-source-account-actions{justify-content:flex-end;flex-shrink:0;gap:10px}
+@media(max-width:700px){
+ .nc-source-account{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+ .nc-source-account-actions{justify-content:flex-start;flex-wrap:wrap;width:100%}
+ .nc-source-account-actions>.button{flex:1 1 140px}
+ .nc-source-account-details>div{flex-wrap:wrap}
+}

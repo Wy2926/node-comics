@@ -25,7 +25,9 @@ export function DocumentExport({document:doc,channel,settings,onClose}:DocumentE
     }catch(failure){await destination?.abort(failure).catch(()=>{});if((failure as Error).name!=='AbortError')setError((failure as Error).message);}
     finally{setBusy(false);active.current=null;}
   };
-  return <Modal title={msg("导出漫画")} subtitle={doc.title} onClose={()=>{active.current?.abort();onClose();}}>
+  return <Modal title={msg("导出漫画")} subtitle={doc.title} onClose={()=>{active.current?.abort();onClose();}} footer={
+    <footer className="nc-import-footer nc-export-footer"><div>{source&&<button className="button secondary" disabled={busy} onClick={()=>void run(true)}>{msg("保存完整源文件")}</button>}{busy?<button className="button secondary" onClick={()=>active.current?.abort()}>{msg("取消导出")}</button>:doc.format!=='epub'&&<button className="button primary" onClick={()=>void run()}>{msg("导出全部页面")}</button>}</div></footer>
+  }>
     <div className="nc-export-options">
       {doc.format!=='epub'&&<>
       <p>{msg("导出会主动读取当前内容的全部页面，可能从云盘或来源网站下载图片。已有译图导出不创建翻译任务，缺少译图的页面保留原图。")}</p>
@@ -37,7 +39,6 @@ export function DocumentExport({document:doc,channel,settings,onClose}:DocumentE
       {doc.format==='epub'&&!source&&!error&&<p role="status">{sourceLoading?msg('加载中…'):msg('完整源文件不可用，请重新获取后再导出。')}</p>}
       {progress&&<div role="status"><progress value={progress.completed} max={Math.max(1,progress.total)}/><p>{progress.phase} · {progress.completed} / {progress.total}</p></div>}
       {error&&<p role="alert">{error}</p>}{done&&<p role="status">{done}</p>}
-      <footer className="nc-import-footer"><div>{source&&<button className="button secondary" disabled={busy} onClick={()=>void run(true)}>{msg("保存完整源文件")}</button>}{busy?<button className="button secondary" onClick={()=>active.current?.abort()}>{msg("取消导出")}</button>:doc.format!=='epub'&&<button className="button primary" onClick={()=>void run()}>{msg("导出全部页面")}</button>}</div></footer>
     </div>
   </Modal>;
 }

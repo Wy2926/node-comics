@@ -182,3 +182,43 @@ test('shared language controls work with popup sizing and the same option helper
   assert(!(await language.isDisabled()));
   assert.match(await language.locator('img').getAttribute('src'), /\/flags\/cn\.svg$/);
 });
+
+test('touch list gestures do not cancel scrolling or close on the browser blur, and return focus afterwards', async () => {
+  await page.setViewportSize({width: 390, height: 640});
+  const control = page.getByRole('combobox', {name: '长列表'});
+  await control.click();
+  const list = await listFor(control);
+  const prevented = await list.evaluate(element => {
+    const event = new PointerEvent('pointerdown', {bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1});
+    element.dispatchEvent(event);
+    document.activeElement.blur();
+    return event.defaultPrevented;
+  });
+  assert.equal(prevented, false);
+  assert.equal(await control.getAttribute('aria-expanded'), 'true');
+  await list.dispatchEvent('pointercancel', {pointerType: 'touch', pointerId: 1});
+  await focused(control);
+  await list.locator('[data-value="3"]').click();
+  assert.equal((await changes()).at(-1)?.target.value, '3');
+  await focused(control);
+});
+
+test('Select and context menu retain selection and dismissal without the Popover API', async () => {
+  await page.addInitScript(() => { Object.defineProperty(HTMLElement.prototype, 'showPopover', {value: undefined, configurable: true}); });
+  await page.reload();
+  await work().click();
+  const list = await listFor(work());
+  assert.equal(await list.getAttribute('data-popover-fallback-open'), 'true');
+  await list.locator('[data-value=banana]').click();
+  assert.equal(await work().getAttribute('data-value'), 'banana');
+  await focused(work());
+  await work().click();
+  await page.locator('#before').click();
+  assert.equal(await work().getAttribute('aria-expanded'), 'false');
+  await page.getByRole('button', {name: 'Long menu', exact: true}).click();
+  const menu = page.getByRole('menu', {name: 'Long menu', exact: true});
+  assert.equal(await menu.getAttribute('data-popover-fallback-open'), 'true');
+  await menu.getByRole('menuitem', {name: 'Action 3', exact: true}).click();
+  assert.equal(await page.locator('#menu-selection').textContent(), '3');
+  assert.equal(await menu.count(), 0);
+});

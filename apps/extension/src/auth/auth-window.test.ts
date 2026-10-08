@@ -20,6 +20,16 @@ function fixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('browser-owned login popup', () => {
+  it('keeps native authorization on mobile without the windows API', async () => {
+    const f = fixture();
+    Object.assign(chrome, {windows: undefined});
+    const result = launchLoginWindow('https://identity.example/authorize?state=ours');
+    f.resolve('https://extension.chromiumapp.org/oidc?code=fixture');
+    expect(await result).toContain('/oidc?code=fixture');
+    expect(f.update).not.toHaveBeenCalled();
+    expect(f.updated.listeners.size).toBe(0);
+  });
+
   it('sizes only a new provider popup and leaves existing windows, other sites and other states alone', async () => {
     const f = fixture(), result = launchLoginWindow('https://identity.example/authorize?state=ours');
     const navigate = (windowId: number, url: string) => f.updated.emit(1, {url}, {windowId, url});

@@ -136,6 +136,7 @@
   "缺少本次登录上下文，请重新登录。": "The login context is missing, please log in again.",
   "管理员尚未配置正式登录服务。": "The administrator has not configured the formal login service.",
   "登录窗口已关闭。": "The login window has been closed.",
+  "当前浏览器不支持安全登录，请更新浏览器后重试。": "This browser does not support secure sign-in. Update your browser and try again.",
   "登录会话或服务地址无效。": "The login session or service address is invalid.",
   "暂时连接不到登录服务，请检查网络后重试。": "The login service cannot be connected temporarily, please check the network and try again.",
   "正在确认登录结果": "Confirming login result",
