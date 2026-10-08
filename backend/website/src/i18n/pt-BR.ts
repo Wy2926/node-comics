@@ -338,7 +338,7 @@ export default {
     {
       "title": "Permissões e arquivos locais",
       "paragraphs": [
-        "As permissões de acesso a sites e imagens são declaradas na instalação. O navegador ainda pode restringir alguns sites; confira suas configurações quando uma imagem estiver inacessível. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
+        "A extensão declara na instalação o acesso a todos os sites e domínios de imagens HTTP/HTTPS, sem solicitar permissões por site ou domínio durante o uso. Você pode limitar o acesso nas configurações de extensões do navegador; se algum recurso parar de funcionar, restaure o acesso a todos os sites e tente novamente. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
         "A análise local dos quadrinhos acontece no navegador. Colocar um arquivo em sua estante local não significa fazer upload de todo o arquivo de origem. Imagens de páginas relevantes e informações de tarefas são enviadas quando a tradução é necessária."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "slug": "remote-library",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Permissões e armazenamento local",
             "paragraphs": [
-              "As permissões de acesso a sites e imagens são declaradas na instalação. O navegador ainda pode restringir alguns sites; confira suas configurações quando uma imagem estiver inacessível. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
+              "A extensão declara na instalação o acesso a todos os sites e domínios de imagens HTTP/HTTPS, sem solicitar permissões por site ou domínio durante o uso. Você pode limitar o acesso nas configurações de extensões do navegador; se algum recurso parar de funcionar, restaure o acesso a todos os sites e tente novamente. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
               "A biblioteca, posição de leitura, preferências e dados locais importados ficam no navegador; a análise é local e as imagens relevantes são enviadas quando a tradução é solicitada. A biblioteca não é sincronizada automaticamente. O site mantém o estado da conta e autorização, tokens de acesso e atualização no armazenamento da sessão da guia atual. A extensão possui suas próprias regras de armazenamento de sessão. Limpar os dados do navegador pode desconectar você ou remover informações de leitura local. O progresso OPDS só é sincronizado quando a fonte oferece essa função e sua compatibilidade foi verificada. Em caso de falha, o progresso local é preservado. Isso não sincroniza toda a biblioteca nem os arquivos de origem. Após conectar, a senha e o token do MTU ficam salvos localmente neste computador. Com o mesmo endereço de serviço e nome de usuário, deixe a senha em branco para reutilizar a salva. Digite-a novamente se o endereço, usuário ou senha mudar, se ela deixar de ser válida ou se um perfil antigo contiver apenas um token. Salvar a senha e reconectar com o campo em branco requer a extensão 0.10.2 ou posterior; nas versões anteriores, digite a senha em cada reconexão."
             ]
           },
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "A extensão carrega cookies do site ou histórico de navegação?",
-        "answer": "As permissões de acesso a sites e imagens são declaradas na instalação. O navegador ainda pode restringir alguns sites; confira suas configurações quando uma imagem estiver inacessível. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
+        "answer": "A extensão declara na instalação o acesso a todos os sites e domínios de imagens HTTP/HTTPS, sem solicitar permissões por site ou domínio durante o uso. Você pode limitar o acesso nas configurações de extensões do navegador; se algum recurso parar de funcionar, restaure o acesso a todos os sites e tente novamente. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

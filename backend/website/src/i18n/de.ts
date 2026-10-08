@@ -338,7 +338,7 @@ export default {
     {
       "title": "Berechtigungen und lokale Dateien",
       "paragraphs": [
-        "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
+        "Die Erweiterung deklariert bei der Installation Zugriff auf alle HTTP/HTTPS-Websites und Bilddomains, ohne während der Nutzung einzelne Websites oder Domains zur Freigabe anzufragen. Du kannst den Zugriff in den Erweiterungseinstellungen des Browsers einschränken; funktionieren betroffene Funktionen nicht mehr, stelle den Zugriff auf alle Websites wieder her und versuche es erneut. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
         "Das lokale Comic-Parsen erfolgt im Browser. Das Ablegen einer Datei in Ihrem lokalen Regal bedeutet nicht, dass die gesamte Quelldatei hochgeladen wird. Relevante Seitenbilder und Aufgabeninformationen werden gesendet, wenn eine Übersetzung erforderlich ist."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "slug": "remote-library",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Berechtigungen und lokaler Speicher",
             "paragraphs": [
-              "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
+              "Die Erweiterung deklariert bei der Installation Zugriff auf alle HTTP/HTTPS-Websites und Bilddomains, ohne während der Nutzung einzelne Websites oder Domains zur Freigabe anzufragen. Du kannst den Zugriff in den Erweiterungseinstellungen des Browsers einschränken; funktionieren betroffene Funktionen nicht mehr, stelle den Zugriff auf alle Websites wieder her und versuche es erneut. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
               "Die Bibliothek, Leseposition, Präferenzen und importierten lokalen Daten leben im Browser; Die Analyse erfolgt lokal und relevante Bilder werden gesendet, wenn eine Übersetzung angefordert wird. Die Bibliothek wird nicht automatisch synchronisiert. Die Website speichert den Konto- und Autorisierungsstatus sowie Zugriffs- und Aktualisierungstoken im Sitzungsspeicher der aktuellen Registerkarte. Die Erweiterung verfügt über eigene Sitzungsspeicherregeln. Durch das Löschen von Browserdaten können Sie sich abmelden oder lokale Leseinformationen entfernen. Der OPDS-Lesefortschritt wird nur synchronisiert, wenn die Quelle dies unterstützt und ihre Kompatibilität geprüft wurde. Bei einem Fehler bleibt der lokale Fortschritt erhalten. Die gesamte Bibliothek und Quelldateien werden dadurch nicht synchronisiert. Nach der Verbindung werden MTU-Passwort und Token lokal auf diesem Computer gespeichert. Bei gleicher Dienstadresse und gleichem Benutzernamen lässt du das Passwort leer, um das gespeicherte wiederzuverwenden. Gib es erneut ein, wenn sich Adresse, Benutzername oder Passwort ändern, es ungültig ist oder ein altes Profil nur einen Token enthält. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
             ]
           },
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Lädt die Erweiterung Website-Cookies oder den Browserverlauf hoch?",
-        "answer": "Zugriffsberechtigungen für Websites und Bilder werden bei der Installation angegeben. Der Browser kann einzelne Websites trotzdem einschränken; prüfe seine Einstellungen, wenn ein Bild nicht erreichbar ist. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
+        "answer": "Die Erweiterung deklariert bei der Installation Zugriff auf alle HTTP/HTTPS-Websites und Bilddomains, ohne während der Nutzung einzelne Websites oder Domains zur Freigabe anzufragen. Du kannst den Zugriff in den Erweiterungseinstellungen des Browsers einschränken; funktionieren betroffene Funktionen nicht mehr, stelle den Zugriff auf alle Websites wieder her und versuche es erneut. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

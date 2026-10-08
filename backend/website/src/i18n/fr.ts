@@ -338,7 +338,7 @@ export default {
     {
       "title": "Autorisations et fichiers locaux",
       "paragraphs": [
-        "Les autorisations d’accès aux sites et aux images sont déclarées lors de l’installation. Le navigateur peut encore restreindre l’accès à certains sites ; vérifiez ses réglages si une image est inaccessible. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
+        "L’extension déclare à l’installation l’accès à tous les sites et domaines d’images HTTP/HTTPS, sans demander d’autorisation site par site ou domaine par domaine pendant l’utilisation. Vous pouvez limiter cet accès dans les réglages des extensions du navigateur ; si des fonctions ne marchent plus, rétablissez l’accès à tous les sites et réessayez. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
         "L'analyse des bandes dessinées locales s'effectue dans le navigateur. Mettre un fichier sur votre étagère locale ne signifie pas télécharger l'intégralité du fichier source. Les images de page pertinentes et les informations sur les tâches sont envoyées lorsqu'une traduction est nécessaire."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "slug": "remote-library",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Autorisations et stockage local",
             "paragraphs": [
-              "Les autorisations d’accès aux sites et aux images sont déclarées lors de l’installation. Le navigateur peut encore restreindre l’accès à certains sites ; vérifiez ses réglages si une image est inaccessible. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
+              "L’extension déclare à l’installation l’accès à tous les sites et domaines d’images HTTP/HTTPS, sans demander d’autorisation site par site ou domaine par domaine pendant l’utilisation. Vous pouvez limiter cet accès dans les réglages des extensions du navigateur ; si des fonctions ne marchent plus, rétablissez l’accès à tous les sites et réessayez. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
               "La bibliothèque, la position de lecture, les préférences et les données locales importées vivent dans le navigateur ; l'analyse est locale et les images pertinentes sont envoyées lorsque la traduction est demandée. La bibliothèque n'est pas automatiquement synchronisée. Le site Web conserve l’état du compte et de l’autorisation, les jetons d’accès et d’actualisation dans le stockage de session de l’onglet actuel. L'extension possède ses propres règles de stockage de session. La suppression des données du navigateur peut vous déconnecter ou supprimer les informations de lecture locale. La progression OPDS n’est synchronisée que si la source prend en charge cette fonction et que sa compatibilité a été vérifiée. En cas d’échec, la progression locale est conservée. Cela ne synchronise ni toute la bibliothèque ni les fichiers sources. Après connexion, le mot de passe et le jeton MTU sont conservés localement sur cet ordinateur. Avec la même adresse de service et le même nom d’utilisateur, laissez le mot de passe vide pour réutiliser celui enregistré. Saisissez-le à nouveau si l’adresse, le compte ou le mot de passe change, s’il n’est plus valide ou si un ancien profil ne contient qu’un jeton. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
             ]
           },
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "L'extension télécharge-t-elle des cookies de site Web ou un historique de navigation ?",
-        "answer": "Les autorisations d’accès aux sites et aux images sont déclarées lors de l’installation. Le navigateur peut encore restreindre l’accès à certains sites ; vérifiez ses réglages si une image est inaccessible. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
+        "answer": "L’extension déclare à l’installation l’accès à tous les sites et domaines d’images HTTP/HTTPS, sans demander d’autorisation site par site ou domaine par domaine pendant l’utilisation. Vous pouvez limiter cet accès dans les réglages des extensions du navigateur ; si des fonctions ne marchent plus, rétablissez l’accès à tous les sites et réessayez. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Hướng dẫn dịch thuật cục bộ",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-10-04",
+    "updated": "2026-10-08",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -71,7 +71,7 @@ export const localTranslationGuides: Guide[] = [
         "steps": [
           "Chọn Thêm kênh dịch và xác nhận manga-translator-ui làm dịch vụ. Tùy ý đặt cho nó một cái tên dễ nhận biết, chẳng hạn như “Máy tính của tôi”.",
           "Nhập http://127.0.0.1:8000 làm địa chỉ dịch vụ. Sử dụng root dịch vụ, không có /auth/login, /translate/with-form/image hoặc đường dẫn trang quản trị.",
-          "Nhập tên người dùng và mật khẩu MTU của bạn, sau đó chọn Kết nối và sử dụng. Cho phép truy cập vào địa chỉ dịch vụ nếu trình duyệt yêu cầu quyền.",
+          "Nhập tên người dùng và mật khẩu MTU, sau đó chọn Kết nối và sử dụng. Kết nối không xin quyền website riêng; nếu truy cập bị giới hạn, hãy khôi phục quyền truy cập tất cả website trong phần cài đặt tiện ích rồi thử lại.",
           "Kiểm tra xem Kênh hiện tại có hiển thị dịch vụ mới không. Bạn có thể lưu nhiều cấu hình dịch vụ nhưng mỗi lần chỉ sử dụng kênh đã chọn."
         ]
       },

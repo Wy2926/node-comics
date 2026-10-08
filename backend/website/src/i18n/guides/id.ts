@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Tutorial terjemahan lokal",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-10-04",
+    "updated": "2026-10-08",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -71,7 +71,7 @@ export const localTranslationGuides: Guide[] = [
         "steps": [
           "Pilih Tambahkan saluran terjemahan dan konfirmasikan manga-translator-ui sebagai layanan. Secara opsional, beri nama yang dapat dikenali, seperti “Komputer saya”.",
           "Masukkan http://127.0.0.1:8000 sebagai alamat layanan. Gunakan root layanan, tanpa /auth/login, /translate/with-form/image atau jalur halaman administrasi.",
-          "Masukkan nama pengguna dan kata sandi MTU Anda, lalu pilih Hubungkan dan gunakan. Izinkan akses ke alamat layanan jika browser meminta izin.",
+          "Masukkan nama pengguna dan kata sandi MTU, lalu pilih Hubungkan dan gunakan. Koneksi tidak meminta izin situs tambahan; jika akses dibatasi, pulihkan akses ke semua situs di pengaturan ekstensi lalu coba lagi.",
           "Periksa apakah Saluran saat ini menampilkan layanan baru. Anda dapat menyimpan beberapa profil layanan, namun hanya saluran yang dipilih yang digunakan pada satu waktu."
         ]
       },

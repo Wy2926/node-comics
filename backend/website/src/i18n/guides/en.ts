@@ -5,7 +5,7 @@ export const localTranslationGuides: Guide[] = [
     slug: 'local-translation',
     title: 'Local manga translation: connect manga-translator-ui to NodeLane',
     description: 'Set up the manga-translator-ui Web service, connect it to NodeLane, and translate your first comic page. Includes connection, login, waiting and cache troubleshooting.',
-    category: 'Local translation tutorial', minutes: 8, published: '2026-09-28', updated: "2026-10-04",
+    category: 'Local translation tutorial', minutes: 8, published: '2026-09-28', updated: "2026-10-08",
     related: ['local-manga-translator', 'local-comics', 'translation-troubleshooting'],
     sections: [
       { title: 'Before you start', paragraphs: [
@@ -25,7 +25,7 @@ export const localTranslationGuides: Guide[] = [
       ], steps: [
         'Choose Add translation channel and confirm manga-translator-ui as the service. Optionally give it a recognizable name, such as “My computer”.',
         'Enter http://127.0.0.1:8000 as the service address. Use the service root, without /auth/login, /translate/with-form/image or an administration page path.',
-        'Enter your MTU username and password, then choose Connect and use. Allow access to the service address if the browser requests permission.',
+        'Enter your MTU username and password, then choose Connect and use. Connecting does not request a separate site permission; if browser access is restricted, restore access to all websites in the extension settings and retry.',
         'Check that Current channel shows the new service. You may save multiple service profiles, but only the selected channel is used at a time.'
       ] },
       { title: '4. Read your first translated page', paragraphs: [

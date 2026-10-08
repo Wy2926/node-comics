@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Tutoriel de traduction locale",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-10-04",
+    "updated": "2026-10-08",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -71,7 +71,7 @@ export const localTranslationGuides: Guide[] = [
         "steps": [
           "Choisissez Ajouter un canal de traduction et confirmez manga-translator-ui comme service. Donnez-lui éventuellement un nom reconnaissable, tel que « Mon ordinateur ».",
           "Entrez http://127.0.0.1:8000 comme adresse de service. Utilisez la racine du service, sans /auth/login, /translate/with-form/image ou un chemin de page d'administration.",
-          "Entrez votre nom d’utilisateur et votre mot de passe MTU, puis choisissez Se connecter et utiliser. Vérifiez les restrictions d’accès à cette adresse dans les réglages du navigateur.",
+          "Entrez votre nom d’utilisateur et votre mot de passe MTU, puis choisissez Se connecter et utiliser. La connexion ne demande pas d’autorisation de site supplémentaire ; si l’accès est restreint, rétablissez l’accès à tous les sites dans les réglages de l’extension et réessayez.",
           "Vérifiez que la chaîne actuelle affiche le nouveau service. Vous pouvez enregistrer plusieurs profils de service, mais seul le canal sélectionné est utilisé à la fois."
         ]
       },

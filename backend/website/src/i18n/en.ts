@@ -338,7 +338,7 @@ export default {
           {
             "title": "Website access, files and service credentials",
             "paragraphs": [
-              "Website access is declared at extension installation; browser settings can still restrict it. Site cookies, login tokens and browsing history are not uploaded to NodeLane. Source login, payment and regional restrictions must still be satisfied.",
+              "The extension declares access to all HTTP/HTTPS websites and image domains at installation, without requesting access site by site or domain by domain during use. You can still restrict access in the browser’s extension settings; affected features may stop working until you restore access to all websites and retry. Site cookies, login tokens and browsing history are not uploaded to NodeLane. Source login, payment and regional restrictions must still be satisfied.",
               "Local comic containers are parsed in your browser. OPDS authorization and MTU credentials stay in local connection storage and are used with the selected service, not uploaded as source credentials to the official translation service. Reading progress may be shared with a compatible connected source; the whole shelf is not automatically synchronized."
             ]
           },
@@ -357,7 +357,7 @@ export default {
             ]
           }
         ],
-        "updated": "2026-10-04"
+        "updated": "2026-10-08"
       },
       {
         "slug": "remote-library",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Permissions and local storage",
             "paragraphs": [
-              "Website access is declared by the extension at installation. Browser site-access settings still control reading page and image-host content. Source-site cookies, login tokens and browsing history are not uploaded to NodeLane. Remote library authorization and MTU passwords and tokens are stored on this device and sent only to their configured service as needed; removing a connection removes its saved credentials. Saving passwords and reconnecting with a blank password require extension 0.10.2 or later; earlier versions require the password on each reconnection.",
+              "The extension declares access to all HTTP/HTTPS websites and image domains at installation, without requesting access site by site or domain by domain during use. You can still restrict access in the browser’s extension settings; affected features may stop working until you restore access to all websites and retry. Source-site cookies, login tokens and browsing history are not uploaded to NodeLane. Remote library authorization and MTU passwords and tokens are stored on this device and sent only to their configured service as needed; removing a connection removes its saved credentials. Saving passwords and reconnecting with a blank password require extension 0.10.2 or later; earlier versions require the password on each reconnection.",
               "The shelf, local reading positions, preferences and imported files live in the browser. Supported remote sources may read and write progress when the source exposes that capability; the whole shelf is not automatically synchronized. Translation sends only selected images and necessary task information to the chosen channel. Website account tokens remain in the current tab’s session storage; clearing browser data can remove sessions and local reading data."
             ]
           },
@@ -464,7 +464,7 @@ export default {
           {
             "title": "Security, choices and minors",
             "paragraphs": [
-              "The central server checks account authorization and returns result files directly, without issuing short-lived signed download links. Provider keys stay on the backend. Protect your account and device, and do not share access tokens. You may decline new permissions, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
+              "The central server checks account authorization and returns result files directly, without issuing short-lived signed download links. Provider keys stay on the backend. Protect your account and device, and do not share access tokens. You may restrict website access in the browser’s extension settings, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
               "Minors should use the service with appropriate guardian knowledge and guidance and obtain necessary authorization for subscriptions. Do not submit children’s sensitive personal information. Guardians may contact us to request verification and handling of inappropriate processing. Report security concerns using necessary, redacted information only; passwords and tokens are not needed."
             ]
           }
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Does the extension upload website cookies or browsing history?",
-        "answer": "Source-site cookies, login tokens and browsing history are not uploaded to NodeLane. Website access is declared at installation and can be restricted in browser settings. Only images selected for translation and necessary task information are sent to your chosen channel. Remote-library authorization and MTU credentials are stored locally and used with their configured service.",
+        "answer": "Source-site cookies, login tokens and browsing history are not uploaded to NodeLane. The extension declares access to all HTTP/HTTPS websites and image domains at installation, without requesting access site by site or domain by domain during use. You can still restrict access in the browser’s extension settings; affected features may stop working until you restore access to all websites and retry. Only images selected for translation and necessary task information are sent to your chosen channel. Remote-library authorization and MTU credentials are stored locally and used with their configured service.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

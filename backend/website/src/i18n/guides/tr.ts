@@ -8,7 +8,7 @@ export const localTranslationGuides: Guide[] = [
     "category": "Yerel çeviri eğitimi",
     "minutes": 8,
     "published": "2026-09-28",
-    "updated": "2026-10-04",
+    "updated": "2026-10-08",
     "related": [
       "local-manga-translator",
       "local-comics",
@@ -71,7 +71,7 @@ export const localTranslationGuides: Guide[] = [
         "steps": [
           "Çeviri kanalı ekle'yi seçin ve hizmet olarak manga-translator-ui'yi onaylayın. İsteğe bağlı olarak “Bilgisayarım” gibi tanınabilir bir ad verin.",
           "Hizmet adresi olarak http://127.0.0.1:8000 girin. /auth/login, /translate/with-form/image veya yönetim sayfası yolu olmadan hizmet kökünü kullanın.",
-          "MTU kullanıcı adınızı ve şifrenizi girin, ardından Bağlan ve kullan'ı seçin. Tarayıcı izin isterse hizmet adresine erişime izin verin.",
+          "MTU kullanıcı adınızı ve şifrenizi girin, ardından Bağlan ve kullan’ı seçin. Bağlantı ayrı bir site izni istemez; erişim kısıtlıysa uzantı ayarlarından tüm sitelere erişimi geri açıp tekrar deneyin.",
           "Geçerli kanalın yeni hizmeti gösterdiğini kontrol edin. Birden fazla hizmet profilini kaydedebilirsiniz ancak aynı anda yalnızca seçilen kanal kullanılır."
         ]
       },

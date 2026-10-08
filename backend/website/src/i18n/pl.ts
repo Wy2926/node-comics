@@ -338,7 +338,7 @@ export default {
     {
       "title": "Uprawnienia i pliki lokalne",
       "paragraphs": [
-        "Dostęp do stron i domen obrazów jest deklarowany podczas instalacji. Przeglądarka może go ograniczyć; jeśli wykrywanie lub tłumaczenie nie działa, sprawdź dostęp do strony i obrazów. Cookies źródłowej strony, tokeny logowania i historia przeglądania nie są wysyłane do usługi tłumaczenia.",
+        "Podczas instalacji rozszerzenie deklaruje dostęp do wszystkich stron i domen obrazów HTTP/HTTPS, bez proszenia o zgodę dla poszczególnych stron lub domen podczas używania. Dostęp można ograniczyć w ustawieniach rozszerzeń przeglądarki; jeśli powiązane funkcje przestaną działać, przywróć dostęp do wszystkich stron i spróbuj ponownie. Cookies źródłowej strony, tokeny logowania i historia przeglądania nie są wysyłane do usługi tłumaczenia.",
         "Lokalne analizowanie komiksów odbywa się w przeglądarce. Umieszczenie pliku na półce lokalnej nie oznacza przesłania całego pliku źródłowego. Gdy potrzebne jest tłumaczenie, wysyłane są odpowiednie obrazy stron i informacje o zadaniu."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "title": "Połącz bibliotekę OPDS: czytanie, EPUB i postęp",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Uprawnienia i pamięć lokalna",
             "paragraphs": [
-              "Dostęp do stron i domen obrazów jest deklarowany podczas instalacji. Przeglądarka może go ograniczyć; jeśli wykrywanie lub tłumaczenie nie działa, sprawdź dostęp do strony i obrazów. Cookies źródłowej strony, tokeny logowania i historia przeglądania nie są wysyłane do usługi tłumaczenia.",
+              "Podczas instalacji rozszerzenie deklaruje dostęp do wszystkich stron i domen obrazów HTTP/HTTPS, bez proszenia o zgodę dla poszczególnych stron lub domen podczas używania. Dostęp można ograniczyć w ustawieniach rozszerzeń przeglądarki; jeśli powiązane funkcje przestaną działać, przywróć dostęp do wszystkich stron i spróbuj ponownie. Cookies źródłowej strony, tokeny logowania i historia przeglądania nie są wysyłane do usługi tłumaczenia.",
               "Pozycja jest zapisywana lokalnie. Synchronizacja ze źródłem jest dostępna tylko wtedy, gdy źródło ją obsługuje, a zgodność została sprawdzona. Przy błędzie synchronizacji lokalna pozycja pozostaje zachowana. Biblioteka, pozycja czytania, preferencje i zaimportowane dane lokalne są dostępne w przeglądarce; analiza ma charakter lokalny, a odpowiednie obrazy są wysyłane, gdy wymagane jest tłumaczenie. Biblioteka nie jest automatycznie synchronizowana. Strona przechowuje stan konta i autoryzację, tokeny dostępu i odświeżania w pamięci sesji bieżącej karty. Rozszerzenie ma własne zasady przechowywania sesji. Wyczyszczenie danych przeglądarki może spowodować wylogowanie lub usunięcie informacji o czytaniu lokalnym."
             ]
           },
@@ -464,7 +464,7 @@ export default {
           {
             "title": "Bezpieczeństwo, wybory i nieletni",
             "paragraphs": [
-              "Serwer centralny sprawdza autoryzację konta i bezpośrednio zwraca pliki wynikowe, bez wydawania krótkotrwałych podpisanych linków do pobierania. Klucze dostawcy pozostają w zapleczu. Chroń swoje konto i urządzenie i nie udostępniaj tokenów dostępu. Możesz odmówić nowych uprawnień, zatrzymać tłumaczenie, wylogować się lub usunąć dane lokalnej przeglądarki; niezbędna funkcjonalność może być wtedy niedostępna. Witryna nie zawiera modułów do śledzenia reklam ani skryptów analitycznych stron trzecich.",
+              "Serwer centralny sprawdza autoryzację konta i bezpośrednio zwraca pliki wynikowe, bez wydawania krótkotrwałych podpisanych linków do pobierania. Klucze dostawcy pozostają w zapleczu. Chroń swoje konto i urządzenie i nie udostępniaj tokenów dostępu. Możesz ograniczyć dostęp do stron w ustawieniach rozszerzeń przeglądarki, zatrzymać tłumaczenie, wylogować się lub usunąć dane lokalnej przeglądarki; niezbędna funkcjonalność może być wtedy niedostępna. Witryna nie zawiera modułów do śledzenia reklam ani skryptów analitycznych stron trzecich.",
               "Osoby niepełnoletnie powinny korzystać z usługi, mając odpowiednią wiedzę i wskazówki opiekuna oraz uzyskując niezbędne zezwolenia na subskrypcję. Nie podawaj wrażliwych danych osobowych dzieci. Opiekunowie mogą skontaktować się z nami, aby poprosić o weryfikację i zajęcie się niewłaściwym przetwarzaniem. Zgłaszaj obawy dotyczące bezpieczeństwa, korzystając wyłącznie z niezbędnych, zredagowanych informacji; hasła i tokeny nie są potrzebne."
             ]
           }
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Czy rozszerzenie przesyła pliki cookie witryny lub historię przeglądania?",
-        "answer": "Cookies, tokeny logowania źródłowej strony i historia przeglądania nie są wysyłane do usługi tłumaczenia. Dostęp do stron jest deklarowany podczas instalacji; przeglądarka może go ograniczyć, dlatego sprawdź dostęp do strony i domeny obrazów. Tłumaczenie wysyła wybrane obrazy oraz niezbędne dane zadania.",
+        "answer": "Cookies, tokeny logowania źródłowej strony i historia przeglądania nie są wysyłane do usługi tłumaczenia. Podczas instalacji rozszerzenie deklaruje dostęp do wszystkich stron i domen obrazów HTTP/HTTPS, bez proszenia o zgodę dla poszczególnych stron lub domen podczas używania. Dostęp można ograniczyć w ustawieniach rozszerzeń przeglądarki; jeśli powiązane funkcje przestaną działać, przywróć dostęp do wszystkich stron i spróbuj ponownie. Tłumaczenie wysyła wybrane obrazy oraz niezbędne dane zadania.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

@@ -338,7 +338,7 @@ export default {
     {
       "title": "Autorizzazioni e file locali",
       "paragraphs": [
-        "I permessi di accesso a siti e immagini sono dichiarati all’installazione. Il browser può comunque limitare alcuni siti; controlla le sue impostazioni se un’immagine non è accessibile. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
+        "L’estensione dichiara all’installazione l’accesso a tutti i siti e domini di immagini HTTP/HTTPS, senza richiedere permessi per singolo sito o dominio durante l’uso. Puoi limitarlo nelle impostazioni delle estensioni del browser; se alcune funzioni non funzionano più, ripristina l’accesso a tutti i siti e riprova. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
         "L'analisi dei fumetti locale avviene nel browser. Mettere un file sullo scaffale locale non significa caricare l'intero file sorgente. Le immagini delle pagine pertinenti e le informazioni sulle attività vengono inviate quando è necessaria la traduzione."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "slug": "remote-library",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Autorizzazioni e archiviazione locale",
             "paragraphs": [
-              "I permessi di accesso a siti e immagini sono dichiarati all’installazione. Il browser può comunque limitare alcuni siti; controlla le sue impostazioni se un’immagine non è accessibile. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
+              "L’estensione dichiara all’installazione l’accesso a tutti i siti e domini di immagini HTTP/HTTPS, senza richiedere permessi per singolo sito o dominio durante l’uso. Puoi limitarlo nelle impostazioni delle estensioni del browser; se alcune funzioni non funzionano più, ripristina l’accesso a tutti i siti e riprova. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
               "La biblioteca, la posizione di lettura, le preferenze e i dati locali importati risiedono nel browser; l'analisi è locale e le immagini pertinenti vengono inviate quando viene richiesta la traduzione. La libreria non viene sincronizzata automaticamente. Il sito Web mantiene lo stato dell'account e dell'autorizzazione, i token di accesso e di aggiornamento nella memoria della sessione della scheda corrente. L'estensione ha le proprie regole di archiviazione della sessione. La cancellazione dei dati del browser può farti uscire o rimuovere le informazioni di lettura locali. Il progresso OPDS viene sincronizzato soltanto se la fonte lo supporta e la compatibilità è stata verificata. In caso di errore, il progresso locale viene conservato. Questo non sincronizza l’intera biblioteca o i file di origine. Dopo la connessione, password e token MTU sono conservati localmente su questo computer. Con lo stesso indirizzo del servizio e lo stesso nome utente, lascia vuota la password per riutilizzare quella salvata. Inseriscila di nuovo se cambia l’indirizzo, l’utente o la password, se non è più valida o se un vecchio profilo contiene soltanto un token. Il salvataggio della password e la riconnessione con il campo vuoto richiedono l’estensione 0.10.2 o successiva; nelle versioni precedenti la password va inserita a ogni riconnessione."
             ]
           },
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "L'estensione carica i cookie del sito web o la cronologia di navigazione?",
-        "answer": "I permessi di accesso a siti e immagini sono dichiarati all’installazione. Il browser può comunque limitare alcuni siti; controlla le sue impostazioni se un’immagine non è accessibile. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
+        "answer": "L’estensione dichiara all’installazione l’accesso a tutti i siti e domini di immagini HTTP/HTTPS, senza richiedere permessi per singolo sito o dominio durante l’uso. Puoi limitarlo nelle impostazioni delle estensioni del browser; se alcune funzioni non funzionano più, ripristina l’accesso a tutti i siti e riprova. Cookie e token di accesso del sito di origine e cronologia di navigazione non vengono inviati al servizio ufficiale di traduzione. Si elaborano soltanto le immagini selezionate e i dati necessari all’attività.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

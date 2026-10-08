@@ -338,7 +338,7 @@ export default {
     {
       "title": "Izin dan file lokal",
       "paragraphs": [
-        "Akses situs dan domain gambar dideklarasikan saat instalasi. Browser dapat membatasinya; jika penemuan atau terjemahan tidak berjalan, periksa akses halaman serta gambar. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
+        "Ekstensi mendeklarasikan akses ke semua situs dan domain gambar HTTP/HTTPS saat instalasi, tanpa meminta izin per situs atau domain selama penggunaan. Anda dapat membatasi akses melalui pengaturan ekstensi browser; jika fitur terkait tidak berfungsi, pulihkan akses ke semua situs lalu coba lagi. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
         "Penguraian komik lokal terjadi di browser. Menempatkan file di rak lokal Anda tidak berarti mengunggah seluruh file sumber. Gambar halaman yang relevan dan informasi tugas dikirim saat terjemahan diperlukan."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "title": "Hubungkan pustaka OPDS: membaca, EPUB, dan progres",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Izin dan penyimpanan lokal",
             "paragraphs": [
-              "Akses situs dan domain gambar dideklarasikan saat instalasi. Browser dapat membatasinya; jika penemuan atau terjemahan tidak berjalan, periksa akses halaman serta gambar. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
+              "Ekstensi mendeklarasikan akses ke semua situs dan domain gambar HTTP/HTTPS saat instalasi, tanpa meminta izin per situs atau domain selama penggunaan. Anda dapat membatasi akses melalui pengaturan ekstensi browser; jika fitur terkait tidak berfungsi, pulihkan akses ke semua situs lalu coba lagi. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
               "Posisi disimpan secara lokal. Sinkronisasi dengan sumber hanya tersedia jika sumber mendukungnya dan kompatibilitas telah diverifikasi. Jika sinkronisasi gagal, posisi lokal tetap tersimpan. Perpustakaan, posisi membaca, preferensi, dan data lokal yang diimpor ada di browser; penguraian bersifat lokal, dan gambar yang relevan dikirim saat terjemahan diminta. Perpustakaan tidak disinkronkan secara otomatis. Situs web menyimpan status akun dan otorisasi, mengakses dan menyegarkan token di penyimpanan sesi tab saat ini. Ekstensi ini memiliki aturan penyimpanan sesinya sendiri. Menghapus data browser dapat mengeluarkan Anda atau menghapus informasi bacaan lokal."
             ]
           },
@@ -464,7 +464,7 @@ export default {
           {
             "title": "Keamanan, pilihan dan anak di bawah umur",
             "paragraphs": [
-              "Server pusat memeriksa otorisasi akun dan mengembalikan file hasil secara langsung, tanpa mengeluarkan tautan unduhan bertanda tangan yang berumur pendek. Kunci penyedia tetap berada di backend. Lindungi akun dan perangkat Anda, dan jangan bagikan token akses. Anda dapat menolak izin baru, menghentikan terjemahan, keluar, atau menghapus data browser lokal; fungsionalitas yang diperlukan mungkin tidak tersedia. Situs web ini tidak memiliki pelacak iklan atau skrip analitik pihak ketiga.",
+              "Server pusat memeriksa otorisasi akun dan mengembalikan file hasil secara langsung, tanpa mengeluarkan tautan unduhan bertanda tangan yang berumur pendek. Kunci penyedia tetap berada di backend. Lindungi akun dan perangkat Anda, dan jangan bagikan token akses. Anda dapat membatasi akses situs melalui pengaturan ekstensi browser, menghentikan terjemahan, keluar, atau menghapus data browser lokal; fungsionalitas yang diperlukan mungkin tidak tersedia. Situs web ini tidak memiliki pelacak iklan atau skrip analitik pihak ketiga.",
               "Anak di bawah umur harus menggunakan layanan ini dengan pengetahuan dan bimbingan wali yang sesuai dan mendapatkan izin yang diperlukan untuk berlangganan. Jangan kirimkan informasi pribadi sensitif anak-anak. Wali dapat menghubungi kami untuk meminta verifikasi dan penanganan pemrosesan yang tidak pantas. Laporkan masalah keamanan hanya dengan menggunakan informasi yang diperlukan dan telah disunting; kata sandi dan token tidak diperlukan."
             ]
           }
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Apakah ekstensi mengunggah cookie situs web atau riwayat penelusuran?",
-        "answer": "Cookie, token login situs sumber, dan riwayat penelusuran tidak dikirim ke layanan terjemahan. Akses situs dideklarasikan saat instalasi; browser dapat membatasinya, jadi periksa akses halaman serta domain gambar. Terjemahan mengirim gambar pilihan dan data tugas yang diperlukan.",
+        "answer": "Cookie, token login situs sumber, dan riwayat penelusuran tidak dikirim ke layanan terjemahan. Ekstensi mendeklarasikan akses ke semua situs dan domain gambar HTTP/HTTPS saat instalasi, tanpa meminta izin per situs atau domain selama penggunaan. Anda dapat membatasi akses melalui pengaturan ekstensi browser; jika fitur terkait tidak berfungsi, pulihkan akses ke semua situs lalu coba lagi. Terjemahan mengirim gambar pilihan dan data tugas yang diperlukan.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

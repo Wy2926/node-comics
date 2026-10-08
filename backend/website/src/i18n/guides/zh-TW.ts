@@ -5,7 +5,7 @@ export const localTranslationGuides: Guide[] = [
     slug: 'local-translation',
     title: '本機漫畫翻譯教學：將 manga-translator-ui 連接至 NodeLane',
     description: '從啟動 manga-translator-ui Web 服務、填寫位址與帳號，到在瀏覽器翻譯第一張漫畫，逐步完成本機翻譯設定，並排查連線、密碼、等待及快取問題。',
-    category: '本機翻譯教學', minutes: 8, published: '2026-09-28', updated: '2026-10-04',
+    category: '本機翻譯教學', minutes: 8, published: '2026-09-28', updated: '2026-10-08',
     related: ['local-manga-translator', 'local-comics', 'translation-troubleshooting'],
     sections: [
       { title: '開始前：準備擴充功能與翻譯服務', paragraphs: [
@@ -25,7 +25,7 @@ export const localTranslationGuides: Guide[] = [
       ], steps: [
         '點選新增翻譯管道，確認服務類型為 manga-translator-ui；可填寫容易辨識的名稱，例如「我的電腦」。',
         '服務位址填入 http://127.0.0.1:8000。請填服務根位址，不要加上 /auth/login、/translate/with-form/image 或管理頁面路徑。',
-        '填寫 MTU 的使用者名稱與密碼，點選連接並使用；若瀏覽器要求該位址的存取權限，請允許。',
+        '填寫 MTU 的使用者名稱與密碼，點選連接並使用。連線不會另外申請該位址的存取權限；若瀏覽器已限制存取，請在擴充功能設定中恢復「所有網站」存取後重試。',
         '連線完成後，確認目前管道為剛新增的服務。可以儲存多個服務設定，但每次只使用目前選取的一個。'
       ] },
       { title: '第四步：選擇常規翻譯，閱讀第一張譯圖', paragraphs: [

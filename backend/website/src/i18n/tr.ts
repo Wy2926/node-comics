@@ -338,7 +338,7 @@ export default {
     {
       "title": "İzinler ve yerel dosyalar",
       "paragraphs": [
-        "Site ve görsel alan adı erişimi kurulumda bildirilir. Tarayıcı erişimi sınırlayabilir; keşif veya çeviri çalışmıyorsa sayfa ve görsel izinlerini kontrol edin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
+        "Uzantı kurulum sırasında tüm HTTP/HTTPS sitelerine ve görsel alan adlarına erişim bildirir; kullanım sırasında her site veya alan adı için ayrı izin istemez. Tarayıcının uzantı ayarlarından erişimi kısıtlayabilirsiniz; ilgili özellikler çalışmazsa tüm sitelere erişimi geri açıp tekrar deneyin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
         "Yerel çizgi roman ayrıştırma tarayıcıda gerçekleşir. Bir dosyayı yerel rafınıza koymak, kaynak dosyanın tamamını yüklemek anlamına gelmez. Çeviri gerektiğinde ilgili sayfa görselleri ve görev bilgileri gönderilir."
       ]
     },
@@ -357,7 +357,7 @@ export default {
       ]
     }
   ],
-  "updated": "2026-10-04"
+  "updated": "2026-10-08"
 },
 {
   "title": "OPDS kitaplığı bağlayın: okuma, EPUB ve ilerleme",
@@ -442,7 +442,7 @@ export default {
           {
             "title": "İzinler ve yerel depolama",
             "paragraphs": [
-              "Site ve görsel alan adı erişimi kurulumda bildirilir. Tarayıcı erişimi sınırlayabilir; keşif veya çeviri çalışmıyorsa sayfa ve görsel izinlerini kontrol edin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
+              "Uzantı kurulum sırasında tüm HTTP/HTTPS sitelerine ve görsel alan adlarına erişim bildirir; kullanım sırasında her site veya alan adı için ayrı izin istemez. Tarayıcının uzantı ayarlarından erişimi kısıtlayabilirsiniz; ilgili özellikler çalışmazsa tüm sitelere erişimi geri açıp tekrar deneyin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
               "Konum yerelde saklanır. Kaynakla eşitleme yalnızca kaynak bu özelliği destekliyorsa ve uyumluluk doğrulanmışsa kullanılabilir. Eşitleme hatasında yerel konum korunur. Kitaplık, okuma konumu, tercihler ve içe aktarılan yerel veriler tarayıcıda canlı olarak bulunur; ayrıştırma yereldir ve çeviri istendiğinde ilgili görseller gönderilir. Kitaplık otomatik olarak senkronize edilmez. Web sitesi, hesap ve yetkilendirme durumunu, erişim ve yenileme belirteçlerini mevcut sekmenin oturum deposunda tutar. Uzantının kendi oturum depolama kuralları vardır. Tarayıcı verilerini temizlemek oturumunuzu kapatabilir veya yerel okuma bilgilerini kaldırabilir."
             ]
           },
@@ -464,7 +464,7 @@ export default {
           {
             "title": "Güvenlik, seçimler ve reşit olmayanlar",
             "paragraphs": [
-              "Merkezi sunucu, hesap yetkilendirmesini kontrol eder ve kısa ömürlü imzalı indirme bağlantıları vermeden sonuç dosyalarını doğrudan döndürür. Sağlayıcı anahtarları arka uçta kalır. Hesabınızı ve cihazınızı koruyun ve erişim jetonlarını paylaşmayın. Yeni izinleri reddedebilir, çeviriyi durdurabilir, oturumu kapatabilir veya yerel tarayıcı verilerini kaldırabilirsiniz; bu durumda gerekli işlevsellik kullanılamayabilir. Web sitesinde hiçbir reklam izleyici veya üçüncü taraf analiz komut dosyası yoktur.",
+              "Merkezi sunucu, hesap yetkilendirmesini kontrol eder ve kısa ömürlü imzalı indirme bağlantıları vermeden sonuç dosyalarını doğrudan döndürür. Sağlayıcı anahtarları arka uçta kalır. Hesabınızı ve cihazınızı koruyun ve erişim jetonlarını paylaşmayın. Tarayıcının uzantı ayarlarından site erişimini kısıtlayabilir, çeviriyi durdurabilir, oturumu kapatabilir veya yerel tarayıcı verilerini kaldırabilirsiniz; bu durumda gerekli işlevsellik kullanılamayabilir. Web sitesinde hiçbir reklam izleyici veya üçüncü taraf analiz komut dosyası yoktur.",
               "Reşit olmayanlar hizmeti uygun veli bilgisi ve rehberliği ile kullanmalı ve abonelikler için gerekli yetkiyi almalıdır. Çocukların hassas kişisel bilgilerini göndermeyin. Vasiler, doğrulama ve uygunsuz işlemenin ele alınmasını talep etmek için bizimle iletişime geçebilir. Yalnızca gerekli, düzeltilmiş bilgileri kullanarak güvenlik endişelerini bildirin; şifrelere ve belirteçlere ihtiyaç yoktur."
             ]
           }
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Uzantı web sitesi çerezlerini veya tarama geçmişini yüklüyor mu?",
-        "answer": "Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez. Site erişimi kurulumda bildirilir; tarayıcı bunu sınırlayabilir, bu nedenle sayfa ve görsel alan adının erişimini kontrol edin. Çeviriye seçilen görseller ve gerekli görev verileri gönderilir.",
+        "answer": "Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez. Uzantı kurulum sırasında tüm HTTP/HTTPS sitelerine ve görsel alan adlarına erişim bildirir; kullanım sırasında her site veya alan adı için ayrı izin istemez. Tarayıcının uzantı ayarlarından erişimi kısıtlayabilirsiniz; ilgili özellikler çalışmazsa tüm sitelere erişimi geri açıp tekrar deneyin. Çeviriye seçilen görseller ve gerekli görev verileri gönderilir.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {

@@ -5,7 +5,7 @@ export const localTranslationGuides: Guide[] = [
     slug: 'local-translation',
     title: '로컬 만화 번역 가이드: manga-translator-ui를 NodeLane에 연결하기',
     description: 'manga-translator-ui Web 서비스를 실행하고 NodeLane에 연결해 첫 만화 페이지를 번역하세요. 연결, 로그인, 대기 및 캐시 문제를 해결하는 방법도 안내합니다.',
-    category: '로컬 번역 사용법', minutes: 8, published: '2026-09-28', updated: '2026-10-04',
+    category: '로컬 번역 사용법', minutes: 8, published: '2026-09-28', updated: '2026-10-08',
     related: ['local-manga-translator', 'local-comics', 'translation-troubleshooting'],
     sections: [
       { title: '시작 전 준비', paragraphs: [
@@ -25,7 +25,7 @@ export const localTranslationGuides: Guide[] = [
       ], steps: [
         '번역 채널 추가를 선택하고 서비스가 manga-translator-ui인지 확인합니다. “내 컴퓨터”처럼 알아보기 쉬운 이름을 지정할 수 있습니다.',
         '서비스 주소에 http://127.0.0.1:8000을 입력합니다. /auth/login, /translate/with-form/image 또는 관리 화면 경로는 붙이지 않습니다.',
-        'MTU 사용자 이름과 비밀번호를 입력하고 연결 후 사용 버튼을 누릅니다. 브라우저가 해당 주소 접근 권한을 요청하면 허용합니다.',
+        'MTU 사용자 이름과 비밀번호를 입력하고 연결 후 사용 버튼을 누릅니다. 연결 시 별도의 사이트 권한을 요청하지 않습니다. 접근이 제한되어 있으면 확장 프로그램 설정에서 모든 웹사이트 접근을 복원한 뒤 다시 시도하세요.',
         '현재 채널이 새 서비스로 선택되었는지 확인합니다. 여러 서비스 설정을 저장할 수 있지만 한 번에 선택된 채널 하나만 사용합니다.'
       ] },
       { title: '4. 일반 번역으로 첫 페이지 읽기', paragraphs: [

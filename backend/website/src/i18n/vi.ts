@@ -330,7 +330,7 @@ export default {
 },
 {
   "slug": "comic-reader-privacy",
-        "updated": "2026-10-04",
+        "updated": "2026-10-08",
   "minutes": 4,
   "title": "Phần mở rộng dịch truyện tranh tải lên những gì?",
   "description": "Hiểu các quyền của trang web, phân tích cú pháp cục bộ, tải lên bản dịch, bản gốc tạm thời, kết quả riêng tư và xóa.",
@@ -339,7 +339,7 @@ export default {
     {
       "title": "Quyền và tập tin cục bộ",
       "paragraphs": [
-        "Quyền website được khai báo trong cấu hình cài tiện ích và kiểm tra theo quyền trình duyệt hiện tại. Bạn có thể giới hạn từng website. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
+        "Tiện ích khai báo quyền truy cập tất cả website và miền ảnh HTTP/HTTPS khi cài đặt, không xin quyền riêng cho từng website hoặc miền trong lúc sử dụng. Bạn có thể giới hạn truy cập trong phần cài đặt tiện ích của trình duyệt; nếu tính năng liên quan ngừng hoạt động, hãy khôi phục quyền truy cập tất cả website rồi thử lại. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
         "Phân tích truyện tranh cục bộ xảy ra trong trình duyệt. Đặt tệp trên kệ cục bộ của bạn không có nghĩa là tải toàn bộ tệp nguồn lên. Hình ảnh trang có liên quan và thông tin nhiệm vụ sẽ được gửi khi cần dịch."
       ]
     },
@@ -442,7 +442,7 @@ export default {
           {
             "title": "Quyền và lưu trữ cục bộ",
             "paragraphs": [
-              "Quyền website được khai báo trong cấu hình cài tiện ích và kiểm tra theo quyền trình duyệt hiện tại. Bạn có thể giới hạn từng website. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
+              "Tiện ích khai báo quyền truy cập tất cả website và miền ảnh HTTP/HTTPS khi cài đặt, không xin quyền riêng cho từng website hoặc miền trong lúc sử dụng. Bạn có thể giới hạn truy cập trong phần cài đặt tiện ích của trình duyệt; nếu tính năng liên quan ngừng hoạt động, hãy khôi phục quyền truy cập tất cả website rồi thử lại. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
               "Kệ sách, vị trí đọc, cài đặt và dữ liệu đã nhập nằm trong trình duyệt; toàn bộ kệ không tự đồng bộ. Website giữ thông tin xác thực trong bộ nhớ phiên của tab hiện tại. Sau khi kết nối MTU thành công, mật khẩu và mã được lưu trong kho thông tin đăng nhập cục bộ của tiện ích, xóa cùng kênh. Thông tin OPDS cũng lưu cục bộ. Xóa dữ liệu trình duyệt có thể làm mất đăng nhập, vị trí đọc và cấu hình kết nối. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
             ]
           },
@@ -464,7 +464,7 @@ export default {
           {
             "title": "An ninh, lựa chọn và trẻ vị thành niên",
             "paragraphs": [
-              "Máy chủ trung tâm kiểm tra ủy quyền tài khoản và trả về trực tiếp các tệp kết quả mà không đưa ra các liên kết tải xuống đã ký trong thời gian ngắn. Khóa nhà cung cấp vẫn ở phần phụ trợ. Bảo vệ tài khoản và thiết bị của bạn và không chia sẻ mã thông báo truy cập. Bạn có thể từ chối các quyền mới, ngừng dịch, đăng xuất hoặc xóa dữ liệu trình duyệt cục bộ; chức năng cần thiết sau đó có thể không có sẵn. Trang web không có trình theo dõi quảng cáo hoặc tập lệnh phân tích của bên thứ ba.",
+              "Máy chủ trung tâm kiểm tra ủy quyền tài khoản và trả về trực tiếp các tệp kết quả mà không đưa ra các liên kết tải xuống đã ký trong thời gian ngắn. Khóa nhà cung cấp vẫn ở phần phụ trợ. Bảo vệ tài khoản và thiết bị của bạn và không chia sẻ mã thông báo truy cập. Bạn có thể giới hạn truy cập website trong phần cài đặt tiện ích của trình duyệt, ngừng dịch, đăng xuất hoặc xóa dữ liệu trình duyệt cục bộ; chức năng cần thiết sau đó có thể không có sẵn. Trang web không có trình theo dõi quảng cáo hoặc tập lệnh phân tích của bên thứ ba.",
               "Trẻ vị thành niên nên sử dụng dịch vụ với kiến thức và hướng dẫn phù hợp của người giám hộ cũng như phải có được sự cho phép cần thiết để đăng ký. Không gửi thông tin cá nhân nhạy cảm của trẻ em. Người giám hộ có thể liên hệ với chúng tôi để yêu cầu xác minh và xử lý việc xử lý không phù hợp. Chỉ báo cáo những lo ngại về bảo mật bằng cách sử dụng thông tin cần thiết, đã được biên tập lại; mật khẩu và mã thông báo là không cần thiết."
             ]
           }
@@ -578,7 +578,7 @@ export default {
       {
         "id": "website-permissions",
         "question": "Có gửi Cookie hoặc lịch sử của website gốc không?",
-        "answer": "Cookie, mã đăng nhập và lịch sử duyệt của website gốc không gửi đến máy chủ dịch. Quyền website được khai báo khi cài tiện ích và kiểm tra theo quyền hiện tại; bạn có thể giới hạn từng website trong trình duyệt. Kết nối MTU yêu cầu quyền địa chỉ dịch vụ. Dịch chỉ gửi ảnh được chọn; dịch vùng chỉ gửi điểm ảnh trong vùng đó.",
+        "answer": "Cookie, mã đăng nhập và lịch sử duyệt của website gốc không gửi đến máy chủ dịch. Tiện ích khai báo quyền truy cập tất cả website và miền ảnh HTTP/HTTPS khi cài đặt, không xin quyền riêng cho từng website hoặc miền trong lúc sử dụng. Bạn có thể giới hạn truy cập trong phần cài đặt tiện ích của trình duyệt; nếu tính năng liên quan ngừng hoạt động, hãy khôi phục quyền truy cập tất cả website rồi thử lại. Dịch chỉ gửi ảnh được chọn; dịch vùng chỉ gửi điểm ảnh trong vùng đó.",
         "relatedPath": "/guides/comic-reader-privacy/"
       },
       {
