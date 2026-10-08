@@ -94,6 +94,8 @@ def versions():
     exec(compile(ast.parse(NATIVE), '<pinned-solid-fill>', 'exec'), baseline)
     patched = NATIVE
     for patch in LOCK['source']['patches']['manga_translator/inpainting/ballon_fill.py']:
+        if patch['before'] not in NATIVE:  # This fixture only contains solid fill, not the LaMa loop.
+            continue
         assert patched.count(patch['before']) == 1
         patched = patched.replace(patch['before'], patch['after'], 1)
     candidate = dict(scope)

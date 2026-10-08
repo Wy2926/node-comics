@@ -144,7 +144,8 @@ class Renderer:
     def _render_blocks(self, original, cleaned, blocks, language, config, bubble_mask, components, cache_bytes):
         from manga_translator.rendering import (dispatch, resize_regions_to_font_size,
             calc_font_from_box, calc_box_from_font, _region_lines_fully_inside_mask,
-            _apply_default_english_line_break_method, text_render)
+            _apply_default_english_line_break_method, _apply_default_english_case_preferences,
+            _resolve_initial_layout_font_size, text_render)
         from manga_translator.utils import build_region_reference_mask
         from manga_translator.utils.bubble import reference_mask_cache, cached_bubble_labels
         with reference_mask_cache(cache_bytes, bubble_mask=bubble_mask, components=components, record=record):
@@ -161,12 +162,22 @@ class Renderer:
                 (enclosed if inside else free).append(block)
             enclosed_texts = [block.translation for block in enclosed]
             if language not in ('zh-Hans', 'zh-Hant', 'ja'):
-                # MTU first supplies its word breaks. A second layout
-                # pass runs its Qt size search on those explicit breaks, instead
-                # of preserving the source CJK font size from the first pass.
+                # The automatic word-break branch keeps the source font size;
+                # its preliminary geometry is discarded before the actual fit.
+                # Prepare only those breaks for free text, retaining native
+                # prelayout for rich/explicit-break inputs and enclosed blocks.
+                prelayout = list(enclosed)
+                for block in free:
+                    config._current_region = block
+                    text_render.set_font(block.font_family)
+                    _apply_default_english_case_preferences(block, config)
+                    if not _apply_default_english_line_break_method(
+                            block, _resolve_initial_layout_font_size(block, cleaned, config), None, config):
+                        prelayout.append(block)
                 scale = config.render.font_scale_ratio
                 config.render.font_scale_ratio = 1.0
-                resize_regions_to_font_size(cleaned, blocks, config, None, skip_text_replacements=True)
+                if prelayout:
+                    resize_regions_to_font_size(cleaned, prelayout, config, None, skip_text_replacements=True)
                 config.render.font_scale_ratio = scale
             points = resize_regions_to_font_size(cleaned, free, config, None, skip_text_replacements=True)
             height, width = cleaned.shape[:2]
@@ -383,12 +394,14 @@ class Engine:
         # dilation for background sampling; no local repair/layout algorithm.
         blocks = [TextBlock(**data) for data in regions]
         with stage('inpaint_prepare'):
-            tight = cv2.resize(raw_mask, rgb.shape[1::-1], interpolation=cv2.INTER_LINEAR)
-            tight = cv2.dilate(np.where(tight >= 127, 255, 0).astype(np.uint8), None, iterations=2)
+            tight = raw_mask
+            if tight.shape[:2] != rgb.shape[:2]:
+                tight = cv2.resize(tight, rgb.shape[1::-1], interpolation=cv2.INTER_LINEAR)
+            tight = cv2.dilate(cv2.compare(tight, 127, cv2.CMP_GE), None, iterations=2)
             inset = erode_bubble_mask(bubble_mask, MODEL_BUBBLE_SHRINK_RATIO)
             components = None
             if np.any(inset):
-                _, labels, stats, _ = cv2.connectedComponentsWithStats((inset > 0).astype(np.uint8), connectivity=8)
+                _, labels, stats, _ = cv2.connectedComponentsWithStats(inset, connectivity=8)
                 components = (labels, stats)
             if cache is not None:
                 inset.flags.writeable = False

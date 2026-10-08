@@ -31,6 +31,98 @@ def deny_network(*args, **kwargs):
     raise AssertionError('Prepared image stages must work offline')
 
 
+def test_font_search_prepares_plain_text_once_and_preserves_native_sizes(assets, monkeypatch):
+    import inspect
+    from mtu_engine.assets import LOCK
+    from mtu_engine.engine import configuration
+    Renderer(*assets)
+    from manga_translator import rendering
+    from manga_translator.rendering.text_render import _render
+    patch = next(p for p in LOCK['source']['patches']['manga_translator/rendering/__init__.py']
+                 if 'def _fits(fs:' in p['before'])
+    source = inspect.getsource(rendering.calc_font_from_box)
+    assert source.count(patch['after']) == 1
+    scope = dict(vars(rendering))
+    exec(source.replace(patch['after'], patch['before']), scope)
+    native = scope['calc_font_from_box']
+    convert, calls = _render.legacy_line_breaks_to_document, []
+
+    def counted(text, *args, **kwargs):
+        calls.append(text)
+        return convert(text, *args, **kwargs)
+
+    monkeypatch.setattr(_render, 'legacy_line_breaks_to_document', counted)
+    monkeypatch.setattr(rendering, 'legacy_line_breaks_to_document', counted)
+    for text in ('THIS PERSON[BR]COULD USE MAGIC.', '你好，世界。\n第二行', 'مرحبا بالعالم', 'A'):
+        for horizontal in (True, False):
+            options = dict(width=230, height=95, text=text, is_horizontal=horizontal,
+                           config=configuration(), stroke_width=.1)
+            expected = native(**options)
+            calls.clear()
+            assert rendering.calc_font_from_box(**options) == expected
+            assert calls == [text]
+
+
+def test_style_value_copy_keeps_all_mutable_children_independent(assets):
+    import copy
+    Renderer(*assets)
+    from manga_translator.rendering.rich_text import TextStyle
+    style = TextStyle.from_dict({'bold': True, 'italic': 12, 'color': '#123456',
+        'stroke': {'color': '#111111', 'width': .1},
+        'outerStroke': {'color': '#ffffff', 'width': .2},
+        'glow': {'color': '#444444', 'blur': 3}, 'transform': {'rotation': 15, 'scaleX': 2}})
+    result = style.copy()
+    assert result == copy.deepcopy(style) and result is not style
+    for name in ('stroke', 'outer_stroke', 'glow', 'transform'):
+        assert getattr(result, name) is not getattr(style, name)
+    result.stroke.color = '#aaaaaa'
+    result.outer_stroke.width = 1
+    result.glow.blur = 9
+    result.transform.scale_x = 3
+    assert style.stroke.color == '#111111' and style.outer_stroke.width == .2
+    assert style.glow.blur == 3 and style.transform.scale_x == 2
+    assert TextStyle().copy() == TextStyle()
+
+
+def test_inpaint_crop_copy_cleanup_preserves_overlapping_window_order(assets):
+    import asyncio
+    import inspect
+    from mtu_engine.assets import LOCK
+    Renderer(*assets)
+    from manga_translator.inpainting import ballon_fill
+    source = inspect.getsource(ballon_fill.inpaint_regions_per_block)
+    for patch in reversed(LOCK['source']['patches']['manga_translator/inpainting/ballon_fill.py']):
+        if patch['after'] in source:
+            source = source.replace(patch['after'], patch['before'])
+    scope = dict(vars(ballon_fill))
+    exec(source, scope)
+    image = np.random.default_rng(43).integers(0, 256, (70, 90, 3), dtype=np.uint8)
+    snapshots, outputs = [], []
+    for fn in (scope['inpaint_regions_per_block'], ballon_fill.inpaint_regions_per_block):
+        mask = np.zeros(image.shape[:2], np.uint8)
+        mask[1:14, 0:12] = 255
+        mask[16:29, 14:27] = 255  # Disjoint masks, overlapping enlarged windows.
+        mask[-10:, -9:] = 255
+        original = image.copy()
+        seen = []
+
+        async def repair(crop, local_mask):
+            assert not np.shares_memory(crop, image)
+            seen.append((crop.copy(), local_mask.copy()))
+            crop[:] = (crop.astype(np.uint16) + 13) % 256
+            return crop
+
+        result, count = asyncio.run(fn(image, mask, repair))
+        assert count == 3 and not np.any(mask)
+        np.testing.assert_array_equal(image, original)
+        snapshots.append(seen)
+        outputs.append(result)
+    np.testing.assert_array_equal(*outputs)
+    for native, current in zip(*snapshots):
+        for a, b in zip(native, current):
+            np.testing.assert_array_equal(a, b)
+
+
 @pytest.mark.parametrize('height,width', [(12930,720), (720,12930), (16000,320), (320,16000)])
 def test_native_rearrange_overlap_and_roundtrip(assets, height, width):
     from mtu_engine.assets import activate
