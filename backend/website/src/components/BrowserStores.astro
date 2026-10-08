@@ -19,8 +19,8 @@ const m = mobileCopy[locale];
   </div>
   <div class="hero-store-row" data-platform-row="mobile">
   {mobilePlatforms.map(platform => <a class="hero-store hero-mobile" data-platform={platform.id}
-    href={localPath(`/guides/${platform.slug}/`, locale)} aria-label={`${platform.name} · ${platform.browser} · ${m.label}`}>
-    <span class="hero-store-heading"><img src={platform.icon} alt="" aria-hidden="true" width="32" height="32" /><span class="hero-mobile-copy"><strong>{platform.name}</strong><small>{platform.browser} · {m.label}</small></span></span>
+    href={localPath(`/guides/${platform.slug}/`, locale)} aria-label={`${platform.name} · ${platform.browser} · ${platform.id === 'ios' ? m.iosStatus : m.label}`}>
+    <span class="hero-store-heading"><img src={platform.icon} alt="" aria-hidden="true" width="32" height="32" /><span class="hero-mobile-copy"><strong>{platform.name}</strong><small>{platform.browser} · {platform.id === 'ios' ? m.iosStatus : m.label}</small></span></span>
   </a>)}
   </div>
 </nav>

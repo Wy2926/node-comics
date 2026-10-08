@@ -10,7 +10,7 @@ const copy = mobileCopy[locale];
   {mobilePlatforms.map(platform => <a class="mobile-platform" data-platform={platform.id}
     href={localPath(`/guides/${platform.slug}/`, locale)} aria-current={selected === platform.slug ? 'page' : undefined}>
     <img src={platform.icon} width="36" height="36" alt="" aria-hidden="true" />
-    <span><strong>{platform.name} <span class="platform-browser">/ {platform.browser}</span></strong><small>{copy.label}</small></span>
+    <span><strong>{platform.name} <span class="platform-browser">/ {platform.browser}</span></strong><small>{platform.id === 'ios' ? copy.iosStatus : copy.label}</small></span>
     <span class="ui-icon icon-arrow" aria-hidden="true"></span>
   </a>)}
 </nav>

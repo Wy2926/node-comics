@@ -93,8 +93,8 @@ for (const file of htmlFiles) {
     for (const platform of mobilePlatforms) {
       const entrance = $(`.hero-store[data-platform="${platform.id}"]`);
       if (entrance.length !== 1 || entrance.attr('href') !== localPath(`/guides/${platform.slug}/`, locale)
-        || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(mobileCopy[locale].label))
-        errors.push(`${label}: mobile entrance must be a localized tutorial ${platform.id}`);
+        || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(platform.id === 'ios' ? mobileCopy[locale].iosStatus : mobileCopy[locale].label))
+        errors.push(`${label}: mobile entrance must be a localized tutorial or compatibility status ${platform.id}`);
     }
     if ($('.home-faq, .home-cta, .home-steps').length || $('.home-cycle input[type=radio]').length !== 2) errors.push(`${label}: keep one focused hero and a static monthly/yearly plan preview`);
     for (const feature of ['classic', 'model', 'rate', 'priority', 'reading']) {
@@ -108,9 +108,18 @@ for (const file of htmlFiles) {
   }
   const mobilePlatform = mobilePlatforms.find(platform => basePath(route) === `/guides/${platform.slug}/`);
   if (mobilePlatform) {
-    const expected = mobilePlatform.id === 'android' ? 3 : 4;
-    if ($('.guide-screenshot').length !== expected || $('.screenshot-placeholder').length !== expected)
-      errors.push(`${label}: missing mobile screenshot placeholders`);
+    const expected = mobilePlatform.id === 'android' ? 3 : 0;
+    if ($('.guide-screenshot img').length !== expected || $('.screenshot-placeholder').length !== 0)
+      errors.push(`${label}: incorrect Android screenshots or premature iOS screenshots`);
+    $('.guide-screenshot img').each((index, element) => {
+      const image = $(element);
+      const language = locale.startsWith('zh') ? 'zh-CN' : 'en';
+      const expectedSrc = `/guides/firefox/${language}/${['01-firefox-open', '02-add-extension', '03-read-sample'][index]}.png`;
+      if (image.attr('src') !== expectedSrc || image.attr('width') !== '1080' || image.attr('height') !== '2400' || image.attr('loading') !== 'lazy')
+        errors.push(`${label}: incorrect screenshot language, dimensions or loading`);
+    });
+    if (mobilePlatform.id === 'ios' && !$('h1').text().includes(mobileCopy[locale].iosStatus))
+      errors.push(`${label}: missing iOS compatibility status`);
     if ($('.mobile-platform[aria-current=page]').length !== 1 || !$(`a[href="${mobilePlatform.sourceUrl}"]`).length)
       errors.push(`${label}: missing mobile navigation or official reference`);
   }

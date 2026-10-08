@@ -21,7 +21,7 @@ const headingId = `section-${index + 1}`;
   </div>
   {section.screenshot && <figure class="guide-screenshot" data-screenshot={section.screenshot.id}>
     {section.screenshot.src
-      ? <img src={section.screenshot.src} alt={section.screenshot.caption} width="720" height="1280" loading="lazy" decoding="async" />
+      ? <img src={section.screenshot.src} alt={section.screenshot.caption} width="1080" height="2400" loading="lazy" decoding="async" />
       : <div class="screenshot-placeholder">
           <div class="placeholder-phone" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg><span>{section.screenshot.id.toUpperCase()}</span></div>
           <strong>{section.screenshot.label}</strong>

@@ -14,7 +14,7 @@
 | `/pricing/` | 漫画翻译免费额度、Lite 订阅价格 | free manga translation, Lite subscription |
 | `/guides/` | 漫画翻译教程、本地漫画阅读指南 | manga translation guides, local comic reader guides |
 | `/guides/android-firefox/` | 安卓 Firefox 漫画插件安装教程 | Android Firefox manga extension setup |
-| `/guides/ios-orion/` | iPhone／iPad Orion 漫画插件教程 | iOS Orion manga extension setup |
+| `/guides/ios-orion/` | iPhone／iPad Orion 适配状态 | iOS Orion compatibility in progress |
 | `/faq/` | 插件安装、支持格式、免费额度等具体问题 | manga translator FAQ, supported files, limits |
 | `/help/` | 插件使用帮助、权限与登录问题 | manga translator help, extension troubleshooting |
 | `/about/` | NodeLane 漫译品牌与用途 | about NodeLane Comics |
@@ -51,7 +51,7 @@
 - [LocalizedPage.astro](src/components/LocalizedPage.astro) 输出产品 SoftwareApplication、指南 Article 和 FAQPage；公共布局包含 Organization、WebSite、WebPage、内页面包屑。只标记真实可见内容，不编造评分、销量或价格。新指南填写实际 `published` 与 `updated` 日期，内容更新时修改该篇 `updated`，不用构建时间冒充内容更新时间。指南通过 `related` 指定相关文章；正文命令、表格和链接由 [ArticleSection.astro](src/components/ArticleSection.astro) 输出静态 HTML，站内链接随当前语言切换。
 - [sitemap.xml.ts](src/pages/sitemap.xml.ts) 从 `publicPaths` 生成全部 17 语公开页面（包括手机安装教程），并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
 - 首页商店入口直接使用可抓取的链接和本地浏览器标识；Chrome、Edge、Firefox 均指向各自官方商店。地址统一维护在 [site.ts](src/data/site.ts)，安装包与手动安装说明留在下载页。
-- Android／iOS 图标使用可抓取的同语言教程链接，不标为 App 下载；教程复用 Article、canonical 与 hreflang，正文保留官方参考与 Orion 测试阶段说明。截图占位不作为实测图片或应用兼容性证据。
+- Android／iOS 图标使用可抓取的同语言页面链接，不标为 App 下载；页面复用 Article、canonical 与 hreflang。Android 使用中英文模拟器实图，正文注明来源和验证边界；iOS 的标题、摘要、入口与正文同步标为“适配中”，不声称 Orion 已正式支持，也不展示安装步骤或伪造截图。
 
 ## FAQ
 

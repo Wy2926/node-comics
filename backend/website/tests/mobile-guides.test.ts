@@ -23,11 +23,12 @@ test('mobile actions route to guides including iPad desktop user agents', () => 
   assert.equal(mobileGuidePath({ userAgent: '', userAgentData: { mobile: true } }), undefined);
 });
 
-test('all locales provide complete linked mobile guides with explicit screenshot placeholders', () => {
+test('all locales provide Android screenshots and an honest iOS compatibility status', () => {
   assert.deepEqual(Object.keys(mobileCopy).sort(), [...locales].sort());
   for (const locale of locales) {
     const copy = mobileCopy[locale];
-    assert.equal(copy.steps.length, 7, locale);
+    assert.equal(copy.steps.length, 3, locale);
+    assert.ok(copy.iosStatus.trim());
     assert.ok(copy.steps.every(step => step.length === 2 && step.every(text => text.trim())), locale);
     const dictionary = dictionaries[locale];
     assert.equal(dictionary.ui.downloadDescription, copy.availability);
@@ -36,14 +37,23 @@ test('all locales provide complete linked mobile guides with explicit screenshot
       const guide = dictionary.documents.guides.find(guide => guide.slug === platform.slug)!;
       assert.ok(publicPaths.includes(`/guides/${guide.slug}/`));
       const screenshots = guide.sections.flatMap(section => section.screenshot ? [section.screenshot] : []);
-      assert.equal(screenshots.length, platform.id === 'android' ? 3 : 4);
+      assert.equal(screenshots.length, platform.id === 'android' ? 3 : 0);
+      if (platform.id === 'ios') {
+        assert.ok(guide.title.includes(copy.iosStatus));
+        assert.equal(guide.description, copy.notices[1]);
+      } else assert.ok(guide.sections.some(section => section.paragraphs.includes(copy.screenshotNote)));
       screenshots.forEach((shot, i) => {
         assert.equal(shot.id, `${platform.id}-${i + 1}`);
         assert.equal(shot.label, copy.placeholder);
-        assert.ok(!shot.src, 'do not pretend placeholders are real screenshots');
+        const language = locale.startsWith('zh') ? 'zh-CN' : 'en';
+        assert.equal(shot.src, `/guides/firefox/${language}/${['01-firefox-open', '02-add-extension', '03-read-sample'][i]}.png`);
+        const png = readFileSync(new URL(`../public${shot.src}`, import.meta.url));
+        assert.equal(png.subarray(1, 4).toString(), 'PNG');
+        assert.equal(png.readUInt32BE(16), 1080);
+        assert.equal(png.readUInt32BE(20), 2400);
       });
       const links = guide.sections.flatMap(section => section.links ?? []);
-      for (const url of [platform.browserUrl, platform.sourceUrl, site.stores.firefox])
+      for (const url of platform.id === 'android' ? [platform.browserUrl, platform.sourceUrl, site.stores.firefox] : [platform.sourceUrl])
         assert.ok(links.some(link => link.href === url), `${locale}/${platform.id}: ${url}`);
       assert.ok(!links.some(link => /\.apk|\.ipa|\.zip|\.xpi/.test(link.href)));
     }

@@ -65,7 +65,24 @@
 
 首页和下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
 
-Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simple-icons/simple-icons/tree/16.0.0) 的 Android／Apple 标识，保留原始路径，仅分别添加绿色和浅色填充以适配官网深色背景。[CC0 1.0 许可](public/licenses/simple-icons.txt)随静态产物分发；许可不授予商标权。教程中的手机轮廓为本项目 CSS 占位，明确标注“截图待补充”，不是产品实测图。
+Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simple-icons/simple-icons/tree/16.0.0) 的 Android／Apple 标识，保留原始路径，仅分别添加绿色和浅色填充以适配官网深色背景。[CC0 1.0 许可](public/licenses/simple-icons.txt)随静态产物分发；许可不授予商标权。iOS 当前为“适配中”状态页，不使用模拟截图。
+
+## Android Firefox 教程截图
+
+六张原始 PNG 来自专用 Android 14 模拟器、实际 Firefox 157.0.1，尺寸均为 1080×2400（9:20）。01 是 Firefox 欢迎页，02 是实际 AMO 页面及添加按钮，03 是原图模式的真实阅读器（1/1 页）。截图保留浏览器操作区、提示与 AMO 安全提醒，未经拼接或改写。简繁中文共用 zh-CN，其余语言使用 en；图注随页面本地化。
+
+阅读器使用 AMO 同版、Mozilla 签名的 NodeLane Comics 0.10.3 XPI，经官方 web-ext 临时加载。模拟器上的商店／文件永久安装未确认；这些图片不表示实体手机商店安装全流程通过。试读使用项目原创 `samples/starlight-bookshop.png` 制成单页 CBZ，经真实文件选择器导入；两版只切换界面语言，漫画仍是英文原图，不是翻译或授权登录证明，未进行账号登录或付费翻译。第三方浏览器／商店 UI 与商标归各自权利人，不重新授权为本站原创素材。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| [public/guides/firefox/en/01-firefox-open.png](public/guides/firefox/en/01-firefox-open.png) | `f98f47e4ad2d0648fa037e19d8cec11ec0593d0b58a8a802a31a0516af6bbd4e` |
+| [public/guides/firefox/en/02-add-extension.png](public/guides/firefox/en/02-add-extension.png) | `71dfd5fc7cfe70eb032e567f839ad6bd86dbf12ed095815ee0080a5fab9fa611` |
+| [public/guides/firefox/en/03-read-sample.png](public/guides/firefox/en/03-read-sample.png) | `a9795962763b18ff3125f754ccfcd01b03810205363307aa49a1fab89a3e5a00` |
+| [public/guides/firefox/zh-CN/01-firefox-open.png](public/guides/firefox/zh-CN/01-firefox-open.png) | `f29fa8988f3682deb1fec1685154c58591b3f8c542cffedfe16314167813f64c` |
+| [public/guides/firefox/zh-CN/02-add-extension.png](public/guides/firefox/zh-CN/02-add-extension.png) | `8889c35b628c21f1f6b729c282016a463e96dc516df45e8429bfb08c2029c471` |
+| [public/guides/firefox/zh-CN/03-read-sample.png](public/guides/firefox/zh-CN/03-read-sample.png) | `e9f28f00d417149c8cd741c05a3cacbe7f65c205506aeadbdebd27d41eba1624` |
+
+## 浏览器与平台标识摘要
 
 | 文件 | 固定版本来源 | 本地 SHA-256 |
 | --- | --- | --- |
