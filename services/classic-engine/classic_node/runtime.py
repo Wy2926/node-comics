@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 from threading import Lock
+from types import SimpleNamespace
 
 import numpy as np
 from PIL import Image
@@ -14,6 +15,7 @@ from mtu_engine.engine import Engine, serialize_region
 from .render_pool import RenderPool, RenderPoolError, RenderMemoryError, ipc_bytes, render_page
 from .operations import LOG
 from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64
+from .timing import stage
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -88,8 +90,21 @@ class Runtime:
         if self.render_pool is not None:
             self.render_pool.warmup()
 
-    def render_ipc_bytes(self, width, height):
-        return ipc_bytes(width, height) if self.render_pool is not None else 0
+    def render_ipc_bytes(self, width, height, *, masks=None):
+        stats = (masks or {}).get('bubble_stats')
+        return ipc_bytes(width, height, len(stats) if stats is not None else 0) if self.render_pool is not None else 0
+
+    def render_cache_bytes(self, analysis, translated, masks):
+        texts = translated.get('translations', {})
+        regions = [SimpleNamespace(**region) for segment, region in zip(analysis.get('segments', []),
+                   analysis.get('regions', [])) if texts.get(str(segment['id']), '').strip()]
+        if not regions or not analysis.get('bubble_mask'):
+            return 0
+        if 'bubble_labels' in masks:
+            from manga_translator.utils.bubble import reference_cache_bytes
+            with stage('render_cache_plan'):
+                return reference_cache_bytes(regions, masks['bubble_inset'], masks['bubble_labels'])
+        return analysis['width'] * analysis['height'] * len(regions)
 
     def warn_render_fallback(self, reason):
         with self._render_warning_lock:
@@ -150,7 +165,7 @@ class Runtime:
                 return None
             if value.dtype != np.uint8 or value.shape != rgb.shape[:2]:
                 raise NodeFailure('CLASSIC_ANALYZE_FAILED')
-            with Image.fromarray(value) as image:
+            with stage('analyze_checkpoint'), Image.fromarray(value) as image:
                 payload = png64(image, MAX_CHECKPOINT_BYTES)
             if masks is not None:
                 # DBNet can return a crop of its padded mask. Retain only this
@@ -178,7 +193,8 @@ class Runtime:
         self.validate_analysis(analysis)
         size = (rgb.shape[1], rgb.shape[0])
         return self.engine.inpaint(rgb, decode_mask(analysis, 'mask', size, masks),
-            decode_mask(analysis, 'raw_mask', size, masks), decode_mask(analysis, 'bubble_mask', size, masks), analysis['regions'])
+            decode_mask(analysis, 'raw_mask', size, masks), decode_mask(analysis, 'bubble_mask', size, masks),
+            analysis['regions'], **({'cache': masks} if masks is not None else {}))
 
     def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False,
                mask_cache_bytes=None, use_render_pool=True, check_cancelled=None, masks=None):
@@ -193,8 +209,10 @@ class Runtime:
         if not all(isinstance(text, str) for text in texts):
             raise NodeFailure('CLASSIC_RENDER_MISMATCH')
         has_text = any(text.strip() for text in texts)
-        bubble = (decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0]), masks)
-                  if has_text and analysis.get('bubble_mask') is not None else None)
+        prepared = masks is not None and 'bubble_inset' in masks
+        bubble = masks['bubble_inset'] if prepared else (
+            decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0]), masks)
+            if has_text and analysis.get('bubble_mask') is not None else None)
         args = (original, cleaned, analysis['regions'], texts, language, bubble)
         # Only output identity crosses the process boundary, not encoded masks
         # or the complete translation checkpoint already validated above.
@@ -202,6 +220,10 @@ class Runtime:
                    'analysis': {'input_hash': analysis['input_hash']},
                    'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']},
                    'allow_tiles': allow_tiles, 'mask_cache_bytes': mask_cache_bytes}
+        if prepared:
+            options['bubble_prepared'] = True
+            if 'bubble_labels' in masks:
+                options['bubble_components'] = (masks['bubble_labels'], masks['bubble_stats'])
         pooled = has_text and use_render_pool and self.render_pool is not None
         if has_text and self.render_pool is not None and not use_render_pool:
             self.warn_render_fallback('page_budget')

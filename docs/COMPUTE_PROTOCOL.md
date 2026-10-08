@@ -139,7 +139,7 @@ metadata 是 JSON 文本：
 
 result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bbox 不得越界。original 的 bbox/output 均为 null，并省略 output 文件。metadata 最多 64 KiB，output 受中心 `cluster_max_result_bytes` 约束，与原图 `max_upload_bytes` 分开；节点编码和传输上限为 88 MiB，与中心默认值一致。这是单文件协议限制，不作为磁盘容量准入。未知字段、多余文件或重复字段均被拒绝。timings 不参与 result 摘要。
 
-`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（WebP 编码）。可选诊断字段 `detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；当前 MTU 的 `ocr_lock_wait` 累计本页等待各识别／取色模型及语言评分锁的时间，不是 GPU 执行时间，也不能跨页相加当作端到端延迟。细分计时不改变结果身份、租约与结算；新增字段须先升级中心以接受，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
+`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（输出编码／校验）。节点采用大图提前分块时，块内差分、编码和校验并发完成，整体墙钟计入 `render_encode`，`render_diff` 仅为分块前规划；跨版本比较输出成本使用二者之和，细节见[节点运行](../services/classic-engine/docs/NODE_OPERATIONS.md#状态与恢复)。可选诊断字段 `detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；当前 MTU 的 `ocr_lock_wait` 累计本页等待各识别／取色模型及语言评分锁的时间，不是 GPU 执行时间，也不能跨页相加当作端到端延迟。细分计时不改变结果身份、租约与结算；新增字段须先升级中心以接受，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
 
 中心先冻结提交摘要和交付意图，在调度锁外检查文件长度、SHA-256、容器声明尺寸和文件结构。像素解码和二值 alpha 校验已由节点完成。校验完成后再次检查租约及最早截止，在短事务中持久化受理时间与截止快照，然后耐久发布文件。最终事务与崩溃恢复共用同一规则：必须有及时受理记录、当前执行代次、对应分析/译文版本且未取消，才能提交 Job 结果描述、产物关联、任务成功、一次结算和稳定回执。无文件 original 也必须完成请求校验后才能受理。恢复与清理规则以[文件存储](OBJECT_STORAGE.md#文件发布与恢复)为准。
 

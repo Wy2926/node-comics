@@ -44,7 +44,9 @@ class FixtureRuntime:
         return (data, metadata), None
 
     def analyze(self, source, input_hash, *, masks=None):
+        from classic_node.timing import record
         self.analyzed += 1
+        record('analyze_ocr', .001)
         return analysis_for({'input': source[1]})
 
     def restore_masks(self, analysis, size, masks):
@@ -59,11 +61,14 @@ class FixtureRuntime:
     def inpaint(self, source, analysis, *, masks=None):
         return source
 
-    def render_ipc_bytes(self, width, height):
+    def render_ipc_bytes(self, width, height, *, masks=None):
+        return 0
+
+    def render_cache_bytes(self, analysis, translated, masks):
         return 0
 
     def render(self, original, source, analysis, translated, language, alpha, *, mask_cache_bytes=None,
-               use_render_pool=True, check_cancelled=None, masks=None):
+               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False):
         if check_cancelled:
             check_cancelled()
         self.rendered += 1
@@ -167,6 +172,8 @@ def test_text_wait_does_not_hold_compute_and_buffers_are_released(v3, tmp_path):
             timings = db.get(ClassicState, jobs[0]).timings
             assert timings['node']['analyze'] >= 0
             assert timings['node']['render'] >= 0
+            assert 'analyze_ocr' not in timings['node']
+            assert 'render_cache_budget_bytes' not in timings['node']
             assert timings['delivery']['protocol'] == 3
     finally:
         agent.close()

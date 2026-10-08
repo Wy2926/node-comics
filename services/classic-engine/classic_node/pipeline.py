@@ -6,7 +6,7 @@ import time
 
 from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
 from .operations import report_page_failure
-from .timing import collect
+from .timing import WIRE_FIELDS, collect
 
 
 class Pipeline:
@@ -27,8 +27,9 @@ class Pipeline:
     def input_reservation(page):
         metadata = page.lease.get('input') or {}
         pixels = metadata.get('width', 0) * metadata.get('height', 0)
-        # Existing working/output allowance plus three cached uint8 masks.
-        return pixels * 19 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
+        # 16P working/output plus 6P persistent masks: inset, int32 labels and
+        # bounded component stats after inpaint replace the three raw masks.
+        return pixels * 22 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
 
     @staticmethod
     def delivery_reservation(body):
@@ -57,14 +58,14 @@ class Pipeline:
             self.used -= amount
         self.agent.request_claim()
 
-    def retain_masks(self, page, *names):
+    def retain_masks(self, page, *names, minimum=0):
         # Only the drained page owner may discard masks; in-flight stages read
-        # this same dictionary. The initial three-mask allowance shrinks to the
-        # actual arrays after analysis, then to bubble_mask after inpainting.
+        # this same dictionary. Keep the derived-mask allowance through analysis,
+        # then shrink to the actual inset, labels and stats after inpainting.
         for name in tuple(page.masks):
             if name not in names:
                 del page.masks[name]
-        amount = sum(mask.nbytes for mask in page.masks.values())
+        amount = max(minimum, sum(mask.nbytes for mask in page.masks.values()))
         with self.memory_lock:
             released = page.mask_reserved - amount
             page.mask_reserved = amount
@@ -75,26 +76,44 @@ class Pipeline:
 
     def reserve_render_batch(self, pages):
         reservations = {}
+        requests = {}
+        for page in pages:
+            with collect() as details:
+                requests[page] = self.agent.runtime.render_cache_bytes(page.analysis, page.translations or {}, page.masks)
+            page.timings.update(details)
         with self.memory_lock:
             available = max(0, self.limit - self.used)
-            # Preserve useful per-page mask reuse before admitting more IPC.
-            # A full budget still permits uncached local rendering to progress.
+            # Admit IPC across this ready batch first. Labels already live in
+            # accounted page working data; optional cache cannot displace them.
             for page in pages:
                 metadata = page.lease['input']
                 texts = (page.translations or {}).get('translations', {}).values()
                 blocks = sum(isinstance(text, str) and bool(text.strip()) for text in texts)
-                needed = self.agent.runtime.render_ipc_bytes(metadata['width'], metadata['height']) if blocks else 0
+                needed = self.agent.runtime.render_ipc_bytes(metadata['width'], metadata['height'], masks=page.masks) if blocks else 0
                 ipc = needed if 0 < needed <= available else 0
                 available -= ipc
-                cache = 0
-                if page.analysis.get('bubble_mask'):
-                    cache = min(metadata['width'] * metadata['height'] * blocks, available)
-                available -= cache
+                reservations[page] = [ipc, 0]
+                page.timings.update(render_ipc_bytes=ipc, render_cache_requested_bytes=requests[page],
+                                    render_local_fallback=int(bool(needed) and not ipc))
+            # Whole reference masks, round-robin: no useless fractional-mask
+            # reservation, and no first page monopolizing every cache byte.
+            pending = [p for p in pages if requests[p]]
+            while pending:
+                next_round = []
+                for page in pending:
+                    pixels = page.lease['input']['width'] * page.lease['input']['height']
+                    if pixels <= available:
+                        reservations[page][1] += pixels
+                        available -= pixels
+                        if reservations[page][1] < requests[page]:
+                            next_round.append(page)
+                pending = next_round
+            for page, (ipc, cache) in reservations.items():
                 extra = ipc + cache
                 self.used += extra
                 page.reserved += extra
                 page.render_reserved = extra
-                reservations[page] = (ipc, cache)
+                page.timings['render_cache_budget_bytes'] = cache
         return reservations
 
     def claim_capacity(self):
@@ -157,7 +176,8 @@ class Pipeline:
         key = page.lease['lease_id']
         # Timings are transport metadata, outside the immutable image identity.
         body = {'lease_token': page.lease['lease_token'], 'result': result['result'],
-                'timings': {**page.timings, 'local_total': time.monotonic() - page.received_at}}
+                'timings': {**{k: v for k, v in page.timings.items() if k in WIRE_FIELDS},
+                            'local_total': time.monotonic() - page.received_at}}
         saved = self.agent.journal.get('lease:' + key)
         saved.pop('analysis', None)
         self.agent.journal.freeze('lease:' + key, {**saved, 'completion': body}, result['output_bytes'])
@@ -225,13 +245,15 @@ class Pipeline:
                     self.agent.request_claim()
                 elif page.step == 'analyze':
                     page.rgb, page.alpha, page.analysis = value
-                    self.retain_masks(page, 'mask', 'raw_mask', 'bubble_mask')
+                    minimum = page.lease['input']['width'] * page.lease['input']['height'] * 6 if page.analysis.get('bubble_mask') else 0
+                    self.retain_masks(page, 'mask', 'raw_mask', 'bubble_mask', minimum=minimum)
                     page.analysis_future = self.control.submit(self.accepted, page)
                     page.analysis_future.add_done_callback(lambda _: self.agent.wake.set())
                     page.step = 'inpaint' if page.analysis['segments'] else 'text'
                 elif page.step == 'inpaint':
                     page.cleaned = value
-                    self.retain_masks(page, 'bubble_mask')
+                    self.retain_masks(page, *('bubble_inset', 'bubble_labels', 'bubble_stats')
+                                      if 'bubble_inset' in page.masks else ('bubble_mask',))
                     page.step = 'text'
                 elif page.step == 'render':
                     self.freeze(page, value)
@@ -266,7 +288,7 @@ class Pipeline:
                     continue
                 if not self.resize_reservation(page, reserve, bounded=True):
                     continue
-                page.mask_reserved = page.lease['input']['width'] * page.lease['input']['height'] * 3
+                page.mask_reserved = page.lease['input']['width'] * page.lease['input']['height'] * 6
                 self.submit(page, self.download, 'download', lambda p=page: self.agent.input_bytes(p))
             elif page.step == 'deliver':
                 self.submit(page, self.delivery, 'deliver', lambda p=page: self.agent.deliver(p, p.completion))

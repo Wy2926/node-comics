@@ -1,4 +1,4 @@
-"""The local comparison harness must verify wire pixels without GPU assets."""
+"""The local output harness must verify wire pixels without GPU assets."""
 import json
 from types import SimpleNamespace
 
@@ -82,10 +82,10 @@ def test_private_manifest_uses_local_checkpoint_and_anonymous_case_name(tmp_path
 @pytest.mark.parametrize('option', ['--workers', '--threads', '--pages', '--rounds', '--max-shared-mib'])
 def test_invalid_counts_fail_before_loading_assets(tmp_path, option):
     with pytest.raises(ValueError, match='must be positive'):
-        main(['--baseline-dir', str(tmp_path), '--output', str(tmp_path / 'metrics.json'), option, '0'])
+        main(['--output', str(tmp_path / 'metrics.json'), option, '0'])
     assert not (tmp_path / 'metrics.json').exists()
 
 
 def test_negative_cache_fails_before_loading_assets(tmp_path):
     with pytest.raises(ValueError, match='nonnegative'):
-        main(['--baseline-dir', str(tmp_path), '--output', str(tmp_path / 'metrics.json'), '--mask-cache-bytes', '-1'])
+        main(['--output', str(tmp_path / 'metrics.json'), '--mask-cache-bytes', '-1'])

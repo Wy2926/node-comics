@@ -9,19 +9,18 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from mtu_engine.colors import Colors, _CpuColorModel, ensure_stroke_contrast
+from classic_node.timing import collect
+from mtu_engine.colors import Colors, _CpuColorModel, _monochrome, ensure_stroke_contrast
 from mtu_engine.engine import serialize_region
 from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_MAX_WIDTH
 
 
 def region(lines, texts=None, language='unknown'):
     value = SimpleNamespace(lines=lines, texts=texts if texts is not None else ['original OCR'],
-                            text='original OCR', language=language, updates=[])
+                            text='original OCR', language=language)
     def set_colors(fg, bg):
         value.fg_colors, value.bg_colors = fg, bg
-        value.updates.clear()
     value.set_font_colors = set_colors
-    value.update_font_colors = lambda fg, bg: value.updates.append((fg.tolist(), bg.tolist()))
     return value
 
 
@@ -32,6 +31,10 @@ def colors(monkeypatch):
                         SimpleNamespace(ModelPaddleOCR=lambda: native))
     monkeypatch.setitem(sys.modules, 'manga_translator.utils', SimpleNamespace(
         chunks=lambda items, size: (items[i:i+size] for i in range(0, len(items), size))))
+    monkeypatch.setitem(sys.modules, 'modules.detection.script_detection', SimpleNamespace(
+        _line_area=lambda crop: crop.shape[0] * crop.shape[1] if crop is not None else 0))
+    # Wiring tests exercise prediction; gate tests replace this with chroma checks.
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils.bubble', SimpleNamespace(check_color=lambda _: True))
     model = SimpleNamespace(model=SimpleNamespace(dictionary=['<S>', 'A', '</S>']), device='cuda', use_gpu=True)
     adapter = Colors(model)
     assert adapter.predictor.color_model.model is model.model
@@ -124,21 +127,21 @@ def test_contrast_guard_import_does_not_load_torch_in_cpu_render_workers():
 
 def test_native_prediction_receives_bounded_bgr_crops_and_preserves_ocr(colors):
     adapter, native = colors
-    first = region([np.full((48, 120, 3), [20, 70, 180], dtype=np.uint8)] * (OCR_BATCH_SIZE + 1))
-    second = region([np.full((48, 220, 3), [180, 30, 40], dtype=np.uint8)] * OCR_BATCH_SIZE)
+    first = [region([np.full((48, 120, 3), [20, 70, 180], dtype=np.uint8)]) for _ in range(OCR_BATCH_SIZE + 1)]
+    second = [region([np.full((48, 220, 3), [180, 30, 40], dtype=np.uint8)]) for _ in range(OCR_BATCH_SIZE)]
     sizes = []
     def predict(crops):
         sizes.append(len(crops))
         return [(*crop[0, 0, ::-1].tolist(), 90, 100, 110) for crop in crops]
     native._estimate_colors_batch = predict
-    adapter.apply(None, [first, second])
+    adapter.apply(None, first + second)
     assert sizes == [OCR_BATCH_SIZE, OCR_BATCH_SIZE, 1]
-    assert first.updates == [([20, 70, 180], [90, 100, 110])] * len(first.lines)
-    assert second.updates == [([180, 30, 40], [90, 100, 110])] * len(second.lines)
-    assert first.texts == second.texts == ['original OCR']
-    assert first.text == second.text == 'original OCR'
-    adapter.apply(None, [first])
-    assert len(first.updates) == len(first.lines)
+    assert all(block.fg_colors.tolist() == [20, 70, 180] for block in first)
+    assert all(block.fg_colors.tolist() == [180, 30, 40] for block in second)
+    assert all(block.bg_colors.tolist() == [90, 100, 110] for block in first + second)
+    assert all(block.texts == ['original OCR'] and block.text == 'original OCR' for block in first + second)
+    adapter.apply(None, first)
+    assert first[0].fg_colors.tolist() == [20, 70, 180]
 
 
 def test_invalid_crops_use_native_default_without_losing_other_lines(colors):
@@ -151,7 +154,7 @@ def test_invalid_crops_use_native_default_without_losing_other_lines(colors):
         return [(200, 50, 60, 70, 80, 90)]
     native._estimate_colors_batch = predict
     adapter.apply(None, [block])
-    assert block.updates == [([0, 0, 0], [255, 255, 255])] * 3 + [([200, 50, 60], [70, 80, 90])]
+    assert block.fg_colors.tolist() == [200, 50, 60] and block.bg_colors.tolist() == [70, 80, 90]
     assert len(block.lines) == 4 and block.text == 'original OCR'
 
 
@@ -162,6 +165,135 @@ def test_empty_regions_do_not_crop_or_predict_and_close_releases_reference(color
     adapter.apply(None, [])
     adapter.close()
     assert adapter.predictor is None
+
+
+@pytest.fixture
+def plain_gate(monkeypatch):
+    calls = []
+    def check_color(crop):
+        calls.append(crop)
+        # Actual native thresholds are exercised by prepared-asset integration.
+        return np.any(np.ptp(crop, axis=2) > 16)
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils.bubble', SimpleNamespace(check_color=check_color))
+    return calls
+
+
+def plain_crop():
+    crop = np.full((48, 160, 3), 255, np.uint8)
+    crop[12:36, 30:70] = 0
+    return crop
+
+
+def test_plain_gate_uses_original_pixels_and_native_chroma_check(plain_gate):
+    crop = plain_crop()
+    crop[11, 30:70] = 160  # Antialiasing need not be strictly black or white.
+    crop.flags.writeable = False
+    assert _monochrome(crop)
+    assert len(plain_gate) == 1 and np.shares_memory(plain_gate[0], crop)
+    assert not crop.flags.writeable
+
+
+@pytest.mark.parametrize('kind,skip', [('blank', True), ('dark', True), ('reversed', True),
+    ('gray_text', True), ('gray_background', True), ('faint_tint', True), ('oversized', True),
+    ('color_text', False), ('color_outline', False), ('tiny_color', False), ('empty', False)])
+def test_only_obvious_chroma_requires_model_not_gray_style(plain_gate, kind, skip):
+    crop = plain_crop()
+    if kind == 'blank':
+        crop[:] = 255
+    elif kind == 'dark':
+        crop[:] = 0
+    elif kind == 'reversed':
+        crop = 255 - crop
+    elif kind == 'gray_text':
+        crop[12:36, 30:70] = 100
+    elif kind == 'gray_background':
+        crop[crop[..., 0] == 255] = 190
+    elif kind == 'faint_tint':
+        crop[crop[..., 0] == 255] = [250, 248, 249]
+    elif kind == 'color_text':
+        crop[12:36, 30:70] = [120, 0, 0]
+    elif kind == 'color_outline':
+        crop[10:12, 30:70] = [40, 100, 220]
+    elif kind == 'tiny_color':
+        crop[20:23, 110:114] = [200, 20, 20]
+    elif kind == 'oversized':
+        crop = np.tile(crop, (32, 2, 1))
+    elif kind == 'empty':
+        crop = crop[:0]
+    assert _monochrome(crop) is skip
+    assert all(tile.shape[0] <= 512 and tile.shape[1] <= 512 for tile in plain_gate)
+
+
+def test_large_chroma_gate_checks_last_tile_and_stops_on_color(plain_gate):
+    crop = np.full((1025, 1025, 3), 190, np.uint8)
+    crop[1024, 520:550] = [220, 30, 40]
+    with collect() as metrics:
+        assert not _monochrome(crop)
+    assert len(plain_gate) == 8  # Last row, second column: no final tile needed.
+    assert metrics['color_gate_pixels'] == 1025 * 1025 - 1
+
+
+def test_monochrome_paragraph_skips_model_without_bubble_and_preserves_ocr(colors, plain_gate):
+    adapter, native = colors
+    crops = [plain_crop(), plain_crop()]
+    block = region(crops, ['first', 'last'], 'en')
+    native._estimate_colors_batch = lambda *args: pytest.fail('Plain dialogue must not run the model')
+    for _ in range(2):
+        with collect() as metrics:
+            adapter.apply(None, [block])
+        np.testing.assert_array_equal(block.fg_colors, [0, 0, 0])
+        np.testing.assert_array_equal(block.bg_colors, [255, 255, 255])
+        assert metrics['color_fast_regions'] == 1 and metrics['color_fast_lines'] == 2
+        assert metrics['color_model_lines'] == 0
+    assert block.texts == ['first', 'last']
+    assert all(a is b for a, b in zip(block.lines, crops))
+
+
+def test_invalid_lines_do_not_force_valid_gray_lines_through_model(colors, plain_gate):
+    adapter, native = colors
+    native._estimate_colors_batch = lambda *_: pytest.fail('Valid gray lines need no model')
+    block = region([None, np.zeros((0, 10, 3), np.uint8), plain_crop()])
+    with collect() as metrics:
+        adapter.apply(None, [block])
+    assert block.fg_colors.tolist() == [0, 0, 0] and block.bg_colors.tolist() == [255, 255, 255]
+    assert metrics['color_fast_regions'] == 1 and metrics['color_model_lines'] == 0
+    assert len(plain_gate) == 1
+
+
+def test_one_colored_line_keeps_region_on_model_path_and_other_regions_can_skip(colors, plain_gate):
+    adapter, native = colors
+    plain, colored = plain_crop(), plain_crop()
+    colored[12:36, 30:70] = [180, 10, 20]
+    first = region([plain, colored], ['first', 'colored'], 'en')
+    second = region([plain_crop()], ['plain'], 'en')
+    batches = []
+    def predict(crops):
+        batches.append(crops)
+        return [(20, 30, 40, 220, 230, 240)] * len(crops)
+    native._estimate_colors_batch = predict
+    with collect() as metrics:
+        adapter.apply(None, [first, second])
+    assert list(map(len, batches)) == [1]
+    assert first.fg_colors.tolist() == [20, 30, 40] and first.bg_colors.tolist() == [220, 230, 240]
+    np.testing.assert_array_equal(batches[0][0], plain[..., ::-1])  # First wins equal-area ties.
+    assert first.texts == ['first', 'colored'] and len(first.lines) == 2
+    np.testing.assert_array_equal(second.fg_colors, [0, 0, 0])
+    assert metrics['color_fast_lines'] == 1 and metrics['color_model_lines'] == 1
+
+
+def test_fast_gate_does_not_hold_model_lock_or_retain_page_decisions(colors, plain_gate):
+    adapter, native = colors
+    block = region([plain_crop()])
+    native.color_model._lock.acquire()
+    try:
+        with ThreadPoolExecutor(1) as pool:
+            pool.submit(adapter.apply, None, [block]).result(timeout=3)
+    finally:
+        native.color_model._lock.release()
+    native._estimate_colors_batch = lambda crops: [(60, 70, 80, 220, 230, 240)] * len(crops)
+    block.lines = [np.full((48, 160, 3), [180, 30, 40], np.uint8)]
+    adapter.apply(None, [block])
+    assert block.fg_colors.tolist() == [60, 70, 80] and block.bg_colors.tolist() == [220, 230, 240]
 
 
 @pytest.fixture
@@ -181,6 +313,9 @@ def text_colors(monkeypatch):
                         SimpleNamespace(ModelPaddleOCR=Predictor))
     monkeypatch.setitem(sys.modules, 'manga_translator.utils', SimpleNamespace(
         chunks=lambda items, size: (items[i:i+size] for i in range(0, len(items), size))))
+    monkeypatch.setitem(sys.modules, 'modules.detection.script_detection', SimpleNamespace(
+        _line_area=lambda crop: crop.shape[0] * crop.shape[1] if crop is not None else 0))
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils.bubble', SimpleNamespace(check_color=lambda _: True))
     dictionary = ['<PAD>', '<S>', '</S>', '<SP>', 'A', 'B', '中', '文', '日', '本', '한']
     adapter = Colors(SimpleNamespace(model=SimpleNamespace(dictionary=dictionary), device='cuda', use_gpu=True))
     model = adapter.predictor.color_model
@@ -209,7 +344,7 @@ def test_aligned_text_reuses_native_aggregation_with_request_local_tokens(text_c
     assert requests[0].device == 'cuda' and requests[0].use_gpu
     assert requests[0].color_model.dictionary is model.dictionary
     assert adapter.predictor.color_model is model
-    assert block.updates == [([210, 30, 50], [90, 100, 110])]
+    assert block.fg_colors.tolist() == [210, 30, 50] and block.bg_colors.tolist() == [90, 100, 110]
     assert block.texts == [text] and block.text == 'original OCR'
 
 
@@ -225,7 +360,8 @@ def test_unaligned_or_unrepresentable_text_keeps_native_fallback(text_colors, la
     adapter.apply(None, [block])
     assert len(calls) == 1 and 'text_indices' not in calls[0][2]
     assert requests == [adapter.predictor] and adapter.predictor.color_model is model
-    assert block.texts == texts and len(block.updates) == count
+    assert block.texts == texts and len(block.lines) == count
+    assert block.fg_colors.tolist() == [0, 0, 0]
 
 
 def test_mixed_texts_invalid_crops_and_multiple_owners_stay_aligned(text_colors):
@@ -236,11 +372,11 @@ def test_mixed_texts_invalid_crops_and_multiple_owners_stay_aligned(text_colors)
     second = region([red, blue], ['A', '😀'], 'en')
     adapter.apply(None, [first, second])
     assert len(calls) == 1  # Do not repad known/fallback groups separately.
-    assert calls[0][1] == [100, 300, 100, 300]
-    assert calls[0][2]['text_indices'] == [[5], None, [4], None]
-    assert first.updates == [([0, 0, 0], [255, 255, 255]),
-                             ([200, 30, 40], [90, 100, 110]), ([20, 40, 220], [90, 100, 110])]
-    assert second.updates == first.updates[1:]
+    assert calls[0][1] == [100, 300]
+    assert calls[0][2]['text_indices'] == [[5], None]
+    assert first.fg_colors.tolist() == [200, 30, 40]
+    assert second.fg_colors.tolist() == [20, 40, 220]
+    assert first.texts == ['A', 'B', ''] and second.texts == ['A', '😀']
 
 
 def test_text_context_is_isolated_between_pages(text_colors):
@@ -258,10 +394,32 @@ def test_text_context_is_isolated_between_pages(text_colors):
         futures = [workers.submit(adapter.apply, None, [block]) for block in blocks]
         for future in futures:
             future.result(timeout=5)
-    assert [block.updates for block in blocks] == [
-        [([4, 0, 0], [255, 255, 255])], [([5, 0, 0], [255, 255, 255])]]
+    assert [block.fg_colors.tolist() for block in blocks] == [[4, 0, 0], [5, 0, 0]]
     assert len(requests) == 2 and requests[0] is not requests[1]
     assert all(request is not adapter.predictor for request in requests)
+
+
+def test_representative_uses_largest_valid_recognized_line_and_keeps_tie_order(text_colors):
+    adapter, _, calls, _ = text_colors
+    small = np.full((48, 100, 3), [30, 40, 50], np.uint8)
+    large = np.full((48, 300, 3), [90, 100, 110], np.uint8)
+    unread = np.full((48, 500, 3), [180, 190, 200], np.uint8)
+    invalid = np.zeros((48, OCR_MAX_WIDTH + 1, 3), np.uint8)
+    block = region([small, large, large.copy(), unread, invalid], ['A', 'B', 'A', '', 'A'], 'en')
+    adapter.apply(None, [block])
+    assert len(calls) == 1 and calls[0][1] == [300]
+    assert calls[0][2]['text_indices'] == [[5]]
+    assert block.fg_colors.tolist() == [90, 100, 110]
+    assert block.bg_colors.tolist() == [90, 100, 110]
+    assert len(block.lines) == 5 and block.texts == ['A', 'B', 'A', '', 'A']
+
+
+def test_no_valid_representative_uses_default_without_model(colors):
+    adapter, native = colors
+    native._estimate_colors_batch = lambda *_: pytest.fail('No valid input')
+    block = region([None, np.zeros((0, 10, 3), np.uint8)])
+    adapter.apply(None, [block])
+    assert block.fg_colors.tolist() == [0, 0, 0] and block.bg_colors.tolist() == [255, 255, 255]
 
 
 def test_color_checkpoint_preserves_prediction_until_rendering():

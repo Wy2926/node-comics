@@ -12,7 +12,6 @@ from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, Recog
 @pytest.mark.parametrize(('height', 'width'), [(48, 180), (32, 600), (48, 3200), (90, 120)])
 def test_native_resize_is_not_overridden_and_preserves_long_line_width(height, width):
     assert Recognizer.__call__ is TextRecognizer.__call__
-    assert Recognizer.resize_norm_img is TextRecognizer.resize_norm_img
     image = np.full((height, width, 3), 255, dtype=np.uint8)
     ratio = max(OCR_IMAGE_SHAPE[2] / OCR_IMAGE_SHAPE[1], width / height)
     result = Recognizer.resize_norm_img(SimpleNamespace(rec_image_shape=OCR_IMAGE_SHAPE), image, ratio)

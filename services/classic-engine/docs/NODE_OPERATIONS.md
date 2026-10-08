@@ -20,7 +20,7 @@
 - `supervisor.json`、`state/status.json` 提供状态；`logs/supervisor.log`、`state/logs/node.log` 在 10 MiB 时轮转，各自保留当前文件及最多 5 份备份。诊断日志不保存令牌、正文或图片；私有恢复数据库按上一项单独保护。
 - `check` 输出、启动日志与 `state/status.json` 的 `cpu_resources` 显示逻辑 CPU、亲和性、可见 cgroup 配额、解析后的线程／进程预算及告警。探测在启动时进行，修改 CPU 限额后须排空重启。既有显式整数不自动改为 `auto`；`event=render_local_fallback` 按原因各告警一次：`page_budget` 表示页预算不足，`shared_memory` 表示共享段分配失败，需核查 `/dev/shm` 和内存上限。本地回退共享分析进程的原生线程，混合峰值可能高于常态预算；`mixed_render_cpu_slots` 显示此保守估计，不代表实际 CPU 利用率或硬隔离。
 - 单页失败记录 `event=page_failed`、租约 ID、阶段、错误码、异常类型及文件／函数／行号，不记录原始异常消息、源码行或局部变量。本地绘字异常映射为 `CLASSIC_RENDER_FAILED`，子进程异常／退出为 `CLASSIC_RENDER_WORKER_FAILED`，检查点不一致为 `CLASSIC_RENDER_MISMATCH`；输出仍区分 `CLASSIC_OUTPUT_ENCODE_FAILED` 和 `CLASSIC_OUTPUT_TOO_LARGE`，不会被改成通用 worker 错误。这些确定性错误不自动重试；未知异常保留当前阶段的通用错误码。
-- `render_layout`、`render_diff`、`render_encode` 分别记录绘字、差分和编码／校验；子进程计时合并回父进程，不写入结果身份。整段 `render` 还包括共享输入分配、复制、IPC 和清理，不能仅用三个子项之和代替它，也不能与旧版含 IPC 的 `render_layout` 直接比较。
+- `render_layout` 记录绘字，`render_diff`／`render_encode` 记录输出；大图提前分块时各块的差分、编码和校验并发执行，统一计入 `render_encode` 墙钟时间，`render_diff` 仅记录分块前规划，应以两项之和比较新旧输出成本。子进程计时合并回父进程，不写入结果身份。整段 `render` 还包括 CPU 配额等待、共享输入分配、复制、IPC 和清理，不能仅用三个子项之和代替它，也不能与旧版含 IPC 的 `render_layout` 直接比较。更多分析细分、缓存命中／预算等本地指标见[测量命令](../README.md#验证)，不向中心新增字段。
 
 ## 升级与验收
 
@@ -28,14 +28,14 @@
 
 目标电脑分别验收 GPU 预热、中心注册、断网重连、进程崩溃恢复和正常停止。Windows 服务还需验证虚拟账户下的 GPU／网络权限、无人登录启动与重启恢复；桌面诊断不代替服务验收。
 
-## 本地 CPU 输出对比
+## 本地 CPU 输出验证
 
-在引擎目录运行，先把待比较旧版的 `mtu_engine/render_pool.py` 和 `classic_node/protocol.py` 另存为可信本地基线目录中的 `render_pool.py`、`protocol.py`。该目录按 Python 源码加载，不能使用不可信文件；基线与报告放在仓库外或 ignored `artifacts/` 内，不在生产实现保留旧路径。
+在引擎目录运行，使用与当前源码匹配的已准备资产。需要版本对比时，分别在可信源码快照中用相同硬件、样本和线程数运行，再对照报告；工具不加载旧实现。源码快照、私有样本与报告放在仓库外或 ignored `artifacts/` 内。
 
 ```powershell
-.\.venv\Scripts\python.exe -m tools.validate_render_output --baseline-dir D:/samples/render-baseline --models .assets/models --output D:/samples/render-comparison.json --workers 2 --threads 1 --pages 4 --rounds 3
+.\.venv\Scripts\python.exe -m tools.validate_render_output --models .assets/models --output D:/samples/render-validation.json --workers 2 --threads 1 --pages 4 --rounds 3
 ```
 
 默认使用固定译文的稀疏页、多段页、透明页、无变化页和超长分块页；`--case sparse --language ar` 可缩小范围，`--mask-cache-bytes 0` 可检查无参考蒙版缓存时的成本。`--samples` 可额外读取私有 JSON 数组，每项包含 `original`、`cleaned`、`analysis` 三个本地路径（相对清单文件）；可复用 `tools.validate_mtu` 的 `.clean.png` 和 `.analysis.json`，仍使用固定译文，不执行 OCR／抹字。工具不下载图片、不连接节点、不加载 GPU 模型。
 
-两版依次预热各自持久进程池，以同硬件、同样本和线程数比较。稳态墙钟包含共享内存分配、复制、绘字、编码、结果返回及清理；额外解码比对在计时外，启动时间单列。报告检查像素、编码字节和元数据一致、输入不变、CUDA 未初始化及共享段释放，保存每轮 CPU 时间、RSS 和吞吐，不保存私有图片或正文。RSS 是诊断父进程与子进程的采样合计，可能重复计算共享页，不是部署净增内存；合成页和 Windows 本机结果均不代表 Linux 服务、真实模型或公网端到端收益。
+工具先预热持久进程池，稳态墙钟包含共享内存分配、复制、绘字、编码、结果返回及清理；额外解码比对在计时外，启动时间单列。报告检查当前版本合成像素、编码字节和元数据稳定，输入不变、CUDA 未初始化及共享段释放，并保存每轮 CPU 时间、RSS、吞吐和结果摘要，不保存私有图片或正文。版本间可比较合成像素摘要；分块边界变化时编码字节与元数据可能不同，工具不自动判断跨版本一致性。RSS 是诊断父进程与子进程的采样合计，可能重复计算共享页，不是部署净增内存；合成页和 Windows 本机结果均不代表 Linux 服务、真实模型或公网端到端收益。

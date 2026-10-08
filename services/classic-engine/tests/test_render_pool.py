@@ -23,7 +23,8 @@ from classic_node.timing import collect, record
 
 
 class FakeRenderer:
-    def render(self, original, cleaned, regions, translations, language, mask, *, mask_cache_bytes=None):
+    def render(self, original, cleaned, regions, translations, language, mask, *, mask_cache_bytes=None,
+               bubble_prepared=False, bubble_components=None):
         assert not original.flags.writeable and not cleaned.flags.writeable and not mask.flags.writeable
         if regions:
             Path(regions[0]['started']).touch()
@@ -40,12 +41,18 @@ class FakeRenderer:
         result = np.bitwise_xor(original, cleaned)
         result[:, :, 0] ^= mask
         result[0, 0, 1] = (mask_cache_bytes or 0) % 256
+        if bubble_prepared:
+            labels, stats = bubble_components
+            assert not labels.flags.writeable and not stats.flags.writeable
+            result[..., 2] ^= labels.astype(np.uint8)
+            result[0, 0, 2] ^= int(stats[0, 4]) % 256
         return result
 
 
-def fake_initialize(models, fonts, threads, barrier):
+def fake_initialize(models, fonts, threads, barrier, cpu_slots=None):
     # Top-level functions remain importable by the actual spawn interpreter.
     rp._renderer, rp._startup_barrier = FakeRenderer(), barrier
+    rp._cpu_slots, rp._cpu_width = cpu_slots, threads
     Thread(target=rp._watch_parent, daemon=True).start()
 
 
@@ -127,6 +134,23 @@ def test_spawn_preserves_inputs_pixels_and_persistent_workers(pool, inputs):
         render(instance, inputs)
 
 
+def test_prepared_component_arrays_cross_shared_memory_readonly(pool, inputs):
+    instance, _ = pool
+    labels = np.ones(inputs[2].shape, np.int32)
+    stats = np.array([[0, 0, 1, 1, 23], [0, 0, 1, 1, 49]], np.int32)
+    labels.flags.writeable = stats.flags.writeable = False
+    snapshot = [array.copy() for array in inputs]
+    for array in inputs:
+        array.flags.writeable = False
+    options = {'bubble_prepared': True, 'bubble_components': (labels, stats)}
+    expected = rp.render_page(FakeRenderer(), inputs[0], inputs[1], [], ['text'], 'en', inputs[2],
+                              alpha=None, **identity(), **options)
+    assert render(instance, inputs, **options) == expected
+    assert rp.ipc_bytes(9, 8, 2) == 9 * 8 * 12 + stats.nbytes
+    for before, after in zip(snapshot, inputs):
+        np.testing.assert_array_equal(before, after)
+
+
 def test_worker_errors_are_sanitized_and_pool_survives(pool, inputs):
     instance, names = pool
     with pytest.raises(rp.RenderPoolError) as failure:
@@ -161,7 +185,7 @@ def test_spawn_whole_page_matches_local_with_alpha_and_separate_timings(pool, in
             result = render(instance, inputs, alpha=alpha)
         assert result == expected and set(result) == {'result', 'output_bytes'}
         assert worker_timings.pop('parent_work') == .25
-        assert set(worker_timings) == set(direct_timings)
+        assert set(worker_timings) == set(direct_timings) | {'render_cpu_wait'}
         assert 'render_layout' in worker_timings and 'render_diff' in worker_timings
         assert all(seconds >= 0 for seconds in worker_timings.values())
         if alpha_kind == 'transparent':
@@ -410,7 +434,8 @@ def test_failed_warmup_only_aborts_live_barrier_before_join_and_can_retry(monkey
 
     barrier = SimpleNamespace(abort=abort)
     pool = rp.RenderPool('', (), 2, 1)
-    monkeypatch.setattr(pool, '_context', SimpleNamespace(Barrier=lambda workers: barrier))
+    monkeypatch.setattr(pool, '_context', SimpleNamespace(Barrier=lambda workers: barrier,
+                                                       BoundedSemaphore=lambda _: object()))
     future = Future()
     future.set_exception(BrokenProcessPool('private initialization detail') if broken else KeyboardInterrupt())
     executor = SimpleNamespace(submit=lambda *args: future,
@@ -537,3 +562,50 @@ def test_invalid_cpu_limits_rejected(workers, threads):
 def test_valid_larger_pool_count_is_not_artificially_capped():
     pool = rp.RenderPool('', (), 32, 1)
     pool.close()
+
+
+@pytest.mark.parametrize('fail', [False, True])
+def test_output_borrows_only_idle_cpu_slots_and_returns_them(monkeypatch, fail):
+    slots = rp.BoundedSemaphore(6)
+    monkeypatch.setattr(rp, '_cpu_slots', slots)
+    monkeypatch.setattr(rp, '_cpu_width', 2)
+    # A peer already occupies its two assigned CPU slots.
+    slots.acquire()
+    slots.acquire()
+    try:
+        with rp._working_cpu():
+            with rp._output_cpu() as workers:
+                assert workers == 4
+                assert not slots.acquire(False)
+                if fail:
+                    raise ValueError('encode failed')
+    except ValueError:
+        assert fail
+    assert all(slots.acquire(False) for _ in range(4))
+    assert not slots.acquire(False)
+    for _ in range(6):
+        slots.release()
+
+
+def test_partial_cpu_acquisition_is_released_on_interruption(monkeypatch):
+    events = []
+    def acquire():
+        if events:
+            raise KeyboardInterrupt()
+        events.append('acquire')
+    monkeypatch.setattr(rp, '_cpu_slots', SimpleNamespace(acquire=acquire, release=lambda: events.append('release')))
+    monkeypatch.setattr(rp, '_cpu_width', 2)
+    with pytest.raises(KeyboardInterrupt), rp._working_cpu():
+        pytest.fail('must not start without a full CPU allocation')
+    assert events == ['acquire', 'release']
+
+
+@pytest.mark.parametrize('allow_tiles', [False, True])
+def test_small_output_does_not_borrow_idle_peer_cpu_slots(inputs, allow_tiles):
+    original, cleaned, mask = inputs
+    for array in inputs:
+        array.flags.writeable = False
+    actual = rp.render_page(FakeRenderer(), original, cleaned, [], ['text'], 'en', mask,
+        alpha=None, **identity(), allow_tiles=allow_tiles,
+        output_budget=lambda: pytest.fail('serial small output must not block peers'))
+    assert actual['output_bytes']

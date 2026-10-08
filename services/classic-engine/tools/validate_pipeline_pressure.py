@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from io import BytesIO
 import json
+import struct
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Lock
@@ -60,16 +61,19 @@ class FixtureRuntime:
         time.sleep(.005)
         return rgb.copy()
 
-    def render_ipc_bytes(self, width, height):
+    def render_ipc_bytes(self, width, height, *, masks=None):
+        return 0
+
+    def render_cache_bytes(self, analysis, translated, masks):
         return 0
 
     def render(self, original, cleaned, analysis, translated, language, alpha, *, mask_cache_bytes=None,
-               use_render_pool=True, check_cancelled=None, masks=None):
+               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False):
         if check_cancelled:
             check_cancelled()
         image = Image.fromarray(cleaned)
         image.putpixel((10, 10), (1, 2, 3))
-        return pack_result(np.asarray(image), original, alpha, self.version, analysis, translated)
+        return pack_result(np.asarray(image), original, alpha, self.version, analysis, translated, allow_tiles=allow_tiles)
 
 
 class SimulatedTransport:
@@ -84,6 +88,7 @@ class SimulatedTransport:
         self.leases, self.analyses, self.results, self.done, self.receipts = {}, {}, {}, {}, {}
         self.counts, self.active, self.peak = Counter(), Counter(), Counter()
         self.events = []
+        self.errors = []
         self.claim_batches = []
         self.started = time.monotonic()
         self.claimed = self.heartbeats = self.peak_leases = 0
@@ -126,7 +131,9 @@ class SimulatedTransport:
                     self.scenario == 'text' or self.scenario == 'mixed' and key == '2')):
                 analysis = self.analyses[key]
                 item['translations'] = {'revision': '1', 'analysis_hash': digest(analysis),
-                    'language': 'en', 'translations': {s['id']: 'Translated text' for s in analysis['segments']}}
+                    'language': 'en', 'translations': {s['id']: ('WHY?' if i % 3 == 0 else
+                        'THIS PERSON COULD USE MAGIC TO CONTROL ALL THINGS.')
+                        for i, s in enumerate(analysis['segments'])}}
             if expires or item['status'] != 'active' or 'translations' in item:
                 result.append(item)
         return result
@@ -158,7 +165,7 @@ class SimulatedTransport:
                         mime = Image.MIME[image.format]
                     lease = {'lease_id': key, 'lease_token': 'fixture-token-' + key,
                         'status': 'active', 'expires_at': expires, 'language': 'en',
-                        'config': {'engine': {'protocol_version': 3}},
+                        'config': {'engine': {'protocol_version': 3}, 'result_format': 'overlay-tiles-v1'},
                         'input': {'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data),
                                   'width': width, 'height': height, 'mime': mime,
                                   'path': '/internal/compute/v3/leases/' + key + '/input',
@@ -181,6 +188,7 @@ class SimulatedTransport:
                 self.analyses[key] = body['analysis']
             return {'receipt': None}
         if path.endswith('/complete'):
+            self.errors.append(body.get('error'))
             raise AssertionError(body.get('error'))
         raise AssertionError('Unexpected endpoint: ' + path)
 
@@ -190,14 +198,34 @@ class SimulatedTransport:
         return self.input_for(key)
 
     def deliver(self, key, body, data, check):
-        self.gate('upload', key)
         check()
         info = body['result']['output']
-        assert len(data) == info['byte_size']
-        assert hashlib.sha256(data).hexdigest() == info['sha256']
-        with Image.open(BytesIO(data)) as image:
-            image.load()
-            assert image.size == (info['width'], info['height'])
+        if body['result']['representation'] == 'original':
+            assert info is None and data is None and body['result']['bbox'] is None
+            with self.lock:
+                self.counts['original'] += 1
+        else:
+            self.gate('upload', key)
+            check()
+            assert len(data) == info['byte_size']
+            assert hashlib.sha256(data).hexdigest() == info['sha256']
+            if body['result']['representation'] == 'overlay-tiles-v1':
+                assert data[:8] == b'NCOT0001'
+                length = struct.unpack('<I', data[8:12])[0]
+                manifest = json.loads(data[12:12 + length])
+                offset = 12 + length
+                for tile in manifest['tiles']:
+                    patch = data[offset:offset + tile['byte_size']]
+                    assert hashlib.sha256(patch).hexdigest() == tile['sha256']
+                    with Image.open(BytesIO(patch)) as image:
+                        image.load()
+                        assert image.size == (tile['width'], tile['height'])
+                    offset += len(patch)
+                assert offset == len(data)
+            else:
+                with Image.open(BytesIO(data)) as image:
+                    image.load()
+                    assert image.size == (info['width'], info['height'])
         self.gate('complete', key)
         receipt = {'status': 'terminal', 'lease_id': key}
         with self.lock:
@@ -206,25 +234,38 @@ class SimulatedTransport:
         return receipt
 
 
-def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_pages=2):
+def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_pages=2, inputs=None, local=None):
     runtime = runtime or FixtureRuntime()
-    data = fixture_image()
+    data = inputs or fixture_image()
     transport = SimulatedTransport(runtime, scenario, total, data)
     journal = Journal(directory)
     config = {'node_id': 'pressure', 'resource_id': 'fixture', 'engine': {'gpu': 0},
               'max_leases': 8, 'local_pages': local_pages, 'delivery_workers': 4,
-              'download_workers': 4, 'resident_bytes': 1024 * 1024 * 1024}
+              'download_workers': 4, 'resident_bytes': 1024 * 1024 * 1024, **(local or {})}
     agent = Agent(config, runtime, transport, journal)
     peak_reserved = 0
     snapshot = None
     started = time.monotonic()
     spans, spans_lock = [], Lock()
     submit, accepted = agent.pipeline.submit, agent.pipeline.accepted
+    profiles, freeze = [], agent.pipeline.freeze
+
+    def observed_freeze(page, result):
+        metadata = page.lease['input']
+        profiles.append({'input_sha256': metadata['sha256'], 'size': [metadata['width'], metadata['height']],
+            'timings': dict(page.timings), 'lease_seconds': time.monotonic() - page.received_at,
+            'output_bytes': len(result['output_bytes'] or b''),
+            'output_sha256': hashlib.sha256(result['output_bytes'] or b'').hexdigest()})
+        return freeze(page, result)
+    agent.pipeline.freeze = observed_freeze
 
     def observed(page, stage, operation):
         began = time.monotonic()
         try:
             return operation()
+        except BaseException as error:
+            transport.errors.append({'stage': stage, 'type': type(error).__name__})
+            raise
         finally:
             with spans_lock:
                 spans.append({'lease_id': page.lease['lease_id'], 'stage': stage,
@@ -240,11 +281,14 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
         while time.monotonic() - started < timeout:
             agent.poll_control()
             agent.reap()
+            assert not transport.errors, transport.errors
             peak_reserved = max(peak_reserved, agent.pipeline.used)
             assert agent.pipeline.used <= agent.pipeline.limit
             assert len(agent.pages) <= 8
             if snapshot is None:
-                if scenario == 'text':
+                if scenario == 'throughput':
+                    ready = bool(agent.pages) or bool(transport.done)
+                elif scenario == 'text':
                     ready = len(agent.pages) == 8 and all(p.step == 'text' and p.cleaned is not None
                         and p.analysis_accepted and not p.future for p in agent.pages.values())
                 elif scenario == 'upload':
@@ -254,15 +298,17 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
                     # Five blocked pages remain; the other nineteen pass and new
                     # claims continue over several admission windows.
                     ready = len(transport.done) == total - 5
-                if ready and transport.heartbeats >= 2 and time.monotonic() - started >= 1:
+                if ready and (scenario == 'throughput' or (
+                        transport.heartbeats >= 2 and time.monotonic() - started >= 1)):
                     snapshot = {'claimed': transport.claimed, 'completed': len(transport.done),
                         'resident_pages': len(agent.pages), 'phases': dict(Counter(p.step for p in agent.pages.values())),
                         'active_network': dict(transport.active), 'heartbeats': transport.heartbeats,
                         'elapsed_s': time.monotonic() - started}
-                    assert transport.heartbeats > 0
+                    if scenario != 'throughput':
+                        assert transport.heartbeats > 0
                     if scenario in {'text', 'upload'}:
                         assert transport.claimed == 8 and not transport.done
-                    else:
+                    elif scenario == 'mixed':
                         assert transport.claimed == total
                     transport.released.set()
             if len(transport.done) == total and not agent.pages:
@@ -272,15 +318,18 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
                                      'phases': dict(Counter(p.step for p in agent.pages.values()))}
         assert len(transport.done) == total and not agent.pages
         assert agent.pipeline.used == 0 and journal.leases() == {}
-        assert transport.peak['upload'] <= 4 and transport.peak_leases == 8
-        assert transport.counts['analysis'] == transport.counts['upload'] == transport.counts['complete'] == total
+        assert transport.peak['upload'] <= 4 and transport.peak_leases <= 8
+        if scenario != 'throughput':
+            assert transport.peak_leases == 8
+        assert transport.counts['analysis'] == transport.counts['complete'] == total
+        assert transport.counts['upload'] + transport.counts['original'] == total
         assert sum(transport.claim_batches) == total and max(transport.claim_batches) <= 4
         return {'scenario': scenario, 'local_pages': local_pages, 'total': total,
                 'wall_s': time.monotonic() - started, 'blocked_snapshot': snapshot,
                 'network_peak': dict(transport.peak), 'peak_reserved_bytes': peak_reserved,
                 'claim_batches': transport.claim_batches, 'stage_spans': sorted(spans, key=lambda item: item['start_s']),
                 'completed': len(transport.done), 'heartbeats': transport.heartbeats,
-                'journal_empty': True, 'passed': True}
+                'journal_empty': True, 'passed': True, 'page_profiles': profiles}
     finally:
         transport.released.set()
         agent.close()

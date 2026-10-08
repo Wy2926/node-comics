@@ -4,10 +4,10 @@ from functools import partial
 from threading import Lock
 from types import SimpleNamespace
 
-import cv2
 import numpy as np
 
-from classic_node.timing import waiting_for
+from classic_node.timing import record, stage, waiting_for
+from .page_cache import bgr, crop as cached_crop
 
 
 def _luminance(color):
@@ -27,6 +27,22 @@ def ensure_stroke_contrast(region):
     # Prevent upstream's gray-color heuristic from overriding this decision or
     # dropping the outline. This also covers older checkpoints without a flag.
     region.adjust_bg_color = False
+
+
+def _monochrome(crop):
+    """No obvious chroma means default colors, regardless of ink/background gray."""
+    if crop is None or crop.ndim != 3 or crop.shape[2] != 3 or not crop.size:
+        return False
+    from manga_translator.utils.bubble import check_color
+    # Bound native float64 scratch arrays, not eligibility: even large gray
+    # crops can bypass the model. Inspect original pixels without downsampling.
+    for y in range(0, crop.shape[0], 512):
+        for x in range(0, crop.shape[1], 512):
+            tile = crop[y:y+512, x:x+512]
+            record('color_gate_pixels', tile.shape[0] * tile.shape[1])
+            if check_color(tile):
+                return False
+    return True
 
 
 class _ParallelCrossAttention:
@@ -165,28 +181,67 @@ class Colors:
         # used as the conditioning text for just that first line's image.
         return region.texts if aligned else [None] * len(region.lines)
 
+    def _monochrome_region(self, image, region):
+        from .ocr import valid_crop
+        # Inspect every line, not only a representative: a colored last line
+        # must keep the paragraph on the model path rather than the plain style.
+        checked = False
+        for points in region.lines:
+            crop = cached_crop(image, points, self.predictor._get_rotate_crop_image)
+            if not valid_crop(crop):
+                continue
+            checked = True
+            if not _monochrome(crop):
+                return False
+        return checked
+
+    def _representative(self, image, region):
+        from modules.detection.script_detection import _line_area
+        from .ocr import valid_crop
+        texts = self._line_texts(region)
+        # Prefer reliable line-aligned OCR, then the existing native largest-line
+        # rule (first wins ties). Japanese paragraph text stays unaligned here.
+        indices = sorted(range(len(region.lines)), key=lambda i: (
+            bool(texts[i] and texts[i].strip()), _line_area(region.lines[i])), reverse=True)
+        for index in indices:
+            crop = cached_crop(image, region.lines[index], self.predictor._get_rotate_crop_image)
+            if valid_crop(crop):
+                return crop, self._encode(texts[index])
+        return None, None
+
     def apply(self, image, regions):
         from manga_translator.utils import chunks
         # CPU-only render workers use the contrast guard, not the OCR runtime.
-        from .ocr import OCR_BATCH_SIZE, valid_crop
-        for region in regions:
-            region.set_font_colors(np.zeros(3), np.zeros(3))
-        lines = [(region, points, text) for region in regions
-                 for points, text in zip(region.lines, self._line_texts(region), strict=True)]
+        from .ocr import OCR_BATCH_SIZE
+        predicted = []
+        skipped_lines = 0
+        with stage('analyze_color_gate'):
+            for region in regions:
+                if self._monochrome_region(image, region):
+                    region.set_font_colors(np.zeros(3), np.full(3, 255.))
+                    skipped_lines += len(region.lines)
+                else:
+                    region.set_font_colors(np.zeros(3), np.zeros(3))
+                    predicted.append(region)
+        record('color_fast_regions', len(regions) - len(predicted))
+        record('color_fast_lines', skipped_lines)
+        record('color_model_lines', 0)
         # Bound both crops and GPU batches, including on very long pages. Native
-        # geometry, preprocessing and per-character color aggregation stay intact.
-        for batch in chunks(lines, OCR_BATCH_SIZE):
+        # crops, preprocessing and per-character aggregation stay intact. Only
+        # one line contributes colors; full OCR/erasure/layout geometry is retained.
+        for batch in chunks(predicted, OCR_BATCH_SIZE):
             crops, owners, tokens = [], [], []
-            for region, points, text in batch:
-                crop = self.predictor._get_rotate_crop_image(image, points)
-                if not valid_crop(crop):
+            for region in batch:
+                crop, text_indices = self._representative(image, region)
+                if crop is None:
                     # Match upstream's black/white fallback for unusable input.
-                    region.update_font_colors(np.zeros(3), np.full(3, 255.))
+                    region.set_font_colors(np.zeros(3), np.full(3, 255.))
                     continue
-                crops.append(cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
+                crops.append(bgr(crop))
                 owners.append(region)
-                tokens.append(self._encode(text))
+                tokens.append(text_indices)
             if crops:
+                record('color_model_lines', len(crops))
                 predictor = self.predictor
                 if any(row is not None for row in tokens):
                     # This tiny, request-local adapter reuses upstream's input,
@@ -197,7 +252,9 @@ class Colors:
                         infer_beam_batch_tensor=partial(model.infer_with_text, text_indices=tokens))
                 colors = predictor._estimate_colors_batch(crops)
                 for region, color in zip(owners, colors, strict=True):
-                    region.update_font_colors(np.asarray(color[:3]), np.asarray(color[3:]))
+                    # update_font_colors divides by the original OCR line count,
+                    # which would darken a single representative prediction.
+                    region.set_font_colors(np.asarray(color[:3]), np.asarray(color[3:]))
 
     def close(self):
         self.predictor = None

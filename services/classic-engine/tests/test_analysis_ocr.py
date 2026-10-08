@@ -160,8 +160,8 @@ def test_four_languages_use_selected_experts_without_fallback(analysis, monkeypa
     assert observed == ['en', 'ch', 'korean', 'japan']
     assert [r.text for r in regions] == ['japan', 'ch', 'korean']
     assert [r.language for r in regions] == ['japan', 'ch', 'korean']
-    assert [r.text for r in calls[0][1]] == ['japan', 'ch', 'korean']
     assert [name for name, _ in calls] == ['colors', 'bubbles', 'refine']
+    assert [r.text for r in calls[0][1]] == ['japan', 'ch', 'korean']
 
 
 def test_unknown_language_does_not_call_recognizers_or_erase(analysis):
@@ -225,7 +225,9 @@ def test_analysis_does_not_require_new_center_timing_keys(analysis):
     engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values:
         engine.analyze(source)
-    assert values == {}  # Existing pipeline totals remain the protocol boundary.
+    assert {'analyze_detect', 'analyze_route', 'analyze_ocr', 'analyze_colors',
+            'analyze_bubbles', 'analyze_bubble_mask', 'analyze_refine'} <= values.keys()
+    assert all(value >= 0 for value in values.values())
 
 
 def test_analysis_failure_releases_locks_without_new_timing_keys(analysis):
@@ -235,7 +237,7 @@ def test_analysis_failure_releases_locks_without_new_timing_keys(analysis):
     engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values, pytest.raises(RuntimeError, match='OCR failed'):
         engine.analyze(source)
-    assert values == {}
+    assert values['analyze_ocr'] >= 0
     assert not engine._detector_lock.locked() and not engine._bubble_lock.locked()
 
 

@@ -136,6 +136,8 @@ def test_pool_renders_with_same_identity_and_receives_budget_and_cancellation():
 def test_shared_memory_failure_falls_back_locally_and_warns_once(caplog, monkeypatch):
     from classic_node.render_pool import RenderMemoryError
     from classic_node.operations import LOG
+    # Isolate capture from handlers installed by earlier operational-log tests.
+    monkeypatch.setattr(LOG, 'handlers', [])
     monkeypatch.setattr(LOG, 'propagate', True)
     runtime, data, metadata, analysis, translated = fixture()
     rgb, alpha = runtime.decode(data, metadata)
@@ -369,6 +371,23 @@ def test_tile_capability_preserves_existing_single_webp_bytes():
     final.putpixel((10, 10), (0, 0, 0))
     ordinary = pack_result(np.asarray(final), rgb, None, runtime.version, analysis, translated)
     assert pack_result(np.asarray(final), rgb, None, runtime.version, analysis, translated, allow_tiles=True) == ordinary
+
+
+@pytest.mark.parametrize('opacity', [None, 0, 128])
+def test_large_negotiated_page_partitions_before_webp_limit_and_parallel_is_exact(opacity):
+    from tools.validate_render_output import reconstruct
+    rgb = np.full((10000, 900, 3), 230, np.uint8)
+    final = rgb.copy()
+    final[4090:4102, 10:110] = [15, 25, 35]
+    final[9500:9510, 100:200] = [45, 55, 65]
+    alpha = np.full(rgb.shape[:2], opacity, np.uint8) if opacity is not None else None
+    analysis, translated = {'input_hash': 'a' * 64}, {'analysis_hash': 'b' * 64, 'revision': 'c' * 64}
+    serial = pack_result(final, rgb, alpha, 'fixture', analysis, translated, allow_tiles=True, output_workers=1)
+    parallel = pack_result(final, rgb, alpha, 'fixture', analysis, translated, allow_tiles=True, output_workers=3)
+    assert parallel == serial
+    assert parallel['result']['representation'] == ('original' if opacity == 0 else 'overlay-tiles-v1')
+    restored = np.asarray(reconstruct(parallel, rgb, alpha))
+    np.testing.assert_array_equal(restored[..., :3], rgb if opacity == 0 else final)
 
 
 def corrupt_png_pixels(data):

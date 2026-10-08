@@ -21,7 +21,7 @@ def fixture(monkeypatch, *, bubbles=True):
     region = SimpleNamespace(text='Hello')
     monkeypatch.setattr(module, 'serialize_region', lambda _: {'lines': []})
     runtime.engine = SimpleNamespace(analyze=lambda _: ([region], mask, raw, bubble),
-        inpaint=lambda original, *_: original.copy(),
+        inpaint=lambda original, *_, **__: original.copy(),
         renderer=SimpleNamespace(render=lambda original, cleaned, *_args, **_kwargs: cleaned))
     return runtime, rgb, (mask, raw, bubble)
 
@@ -44,7 +44,8 @@ def test_fresh_native_masks_are_read_only_and_reused_without_decoding(monkeypatc
     assert sum(array.nbytes for array in masks.values()) == rgb.shape[0] * rgb.shape[1] * len(masks)
     seen = []
 
-    def inpaint(original, mask, raw, bubble, regions):
+    def inpaint(original, mask, raw, bubble, regions, *, cache):
+        assert cache is masks
         assert mask is masks['mask'] and raw is masks['raw_mask']
         assert bubble is masks['bubble_mask'] if bubbles else not bubble.any()
         seen.append('inpaint')
@@ -86,6 +87,22 @@ def test_recovered_masks_decode_once_then_match_uncached_output(monkeypatch):
     runtime.inpaint(rgb, analysis, masks=masks)
     assert runtime.render(rgb, cleaned, analysis, texts, 'en', None, masks=masks) == baseline
     assert len(calls) == 3
+
+
+def test_prepared_bubble_arrays_bypass_eroded_and_raw_checkpoint_decode(monkeypatch):
+    runtime, rgb, _ = fixture(monkeypatch)
+    analysis = runtime.analyze(rgb, 'a' * 64)
+    inset = np.ones(rgb.shape[:2], np.uint8)
+    labels = np.ones(rgb.shape[:2], np.int32)
+    stats = np.array([[0, 0, 0, 0, 0], [0, 0, 24, 16, 384]], np.int32)
+    masks = {'bubble_inset': inset, 'bubble_labels': labels, 'bubble_stats': stats}
+    def render(original, cleaned, regions, texts, language, bubble, **kwargs):
+        assert bubble is inset and kwargs['bubble_prepared']
+        assert kwargs['bubble_components'][0] is labels and kwargs['bubble_components'][1] is stats
+        return cleaned
+    runtime.engine.renderer.render = render
+    monkeypatch.setattr(module, 'decode_mask', lambda *_: pytest.fail('prepared page must not decode raw bubbles'))
+    runtime.render(rgb, rgb, analysis, translated(analysis), 'en', None, masks=masks)
 
 
 @pytest.mark.parametrize('name', ['mask', 'raw_mask', 'bubble_mask'])

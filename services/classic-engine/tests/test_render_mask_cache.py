@@ -2,6 +2,7 @@
 import ast
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 import gc
 from threading import Barrier
 from types import SimpleNamespace
@@ -84,8 +85,10 @@ def test_roi_matches_pinned_integer_clipping_and_input_side_effects(helpers, dty
         np.testing.assert_array_equal(candidate_points, baseline_points)
 
 
-@pytest.mark.parametrize('points', [None, np.zeros((0, 2)), np.zeros((2, 2)), np.zeros(3)])
-@pytest.mark.parametrize('shape', [(0, 0), (0, 3), (3, 0), (1, 1), (12, 15)])
+@pytest.mark.parametrize('points,shape', [
+    *((points, (12, 15)) for points in (None, np.zeros((0, 2)), np.zeros((2, 2)), np.zeros(3))),
+    *((np.array([[0, 0], [1, 0], [0, 1]]), shape) for shape in ((0, 0), (0, 3), (3, 0), (1, 1))),
+])
 def test_roi_invalid_and_empty_inputs_keep_upstream_result(helpers, points, shape):
     mask = np.ones(shape, np.uint8)
     assert helpers.inside(points, mask) == helpers.original_inside(points, mask)
@@ -331,3 +334,115 @@ def test_simultaneous_threads_have_independent_page_caches(helpers, bubbles):
         left, right = left.result(timeout=15), right.result(timeout=15)
     assert left is not right
     np.testing.assert_array_equal(left, right)
+
+
+@pytest.mark.parametrize('prepared', [False, True])
+def test_reference_roi_matches_native_random_multiline_polygons(helpers, prepared):
+    rng = np.random.default_rng(481)
+    for _ in range(200):
+        mask = (rng.random((61, 83)) > .6).astype(np.uint8) * 255
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+        lines = rng.uniform([-30, -30], [120, 100], size=(3, 4, 2))
+        block = SimpleNamespace(lines=lines)
+        expected = helpers.original_build(block, mask, labels)
+        context = helpers.cache(mask.nbytes, bubble_mask=mask, components=(labels, stats)) if prepared else nullcontext()
+        with context:
+            np.testing.assert_array_equal(helpers.build(block, mask, labels), expected)
+
+
+def test_labels_and_shared_bubble_unions_are_accounted_and_released(helpers, bubbles, monkeypatch):
+    mask, expected_labels = bubbles
+    label = helpers.bubble_globals['cached_bubble_labels']
+    native = cv2.connectedComponentsWithStats
+    calls = []
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return native(*args, **kwargs)
+
+    monkeypatch.setattr(cv2, 'connectedComponentsWithStats', counted)
+    with helpers.cache(mask.nbytes * 2):
+        labels = label(mask)
+        assert label(mask) is labels
+        assert not labels.flags.writeable
+        np.testing.assert_array_equal(labels, expected_labels)
+        first = helpers.build(region(), mask, labels)
+        # Different text geometry intersecting exactly the same bubble.
+        assert helpers.build(region(4, 4, 13, 13), mask, labels) is first
+        second = helpers.build(region(26, 4, 36, 12), mask, labels)
+        assert second is not first
+        state = helpers.bubble_globals['_reference_masks'].get()
+        assert state['used'] == first.nbytes + second.nbytes
+        assert len(state['unions']) == 2
+        assert len(calls) == 1
+        assert helpers.build(region(5, 28, 10, 31), mask, labels).flags.writeable
+        refs = [weakref.ref(x) for x in (labels, first, second)]
+        del labels, first, second
+    assert all(ref() is None for ref in refs)
+
+
+@pytest.mark.parametrize('budget_pages', [0, 1])
+def test_label_cache_budget_and_page_invalidation(helpers, bubbles, budget_pages):
+    mask, _ = bubbles
+    label = helpers.bubble_globals['cached_bubble_labels']
+    with helpers.cache(mask.nbytes * budget_pages):
+        first = label(mask)
+        assert label(mask) is first  # Mandatory working data, not optional unions.
+        result = helpers.build(region(), mask, first)
+        np.testing.assert_array_equal(result, helpers.original_build(region(), mask, first))
+        assert helpers.bubble_globals['_reference_masks'].get()['used'] <= mask.nbytes * budget_pages
+        other = mask.copy()
+        other[3:6, 3:6] = 0
+        changed = label(other)
+        assert changed is not first
+        result = helpers.build(region(), other, changed)
+        np.testing.assert_array_equal(result, helpers.original_build(region(), other, changed))
+
+
+def test_larger_reference_budgets_never_displace_masks_for_labels(helpers, bubbles):
+    mask, _ = bubbles
+    requests = [region(), region(26, 4, 36, 12), region(5, 28, 10, 31)]
+    counts = []
+    for units in range(8):
+        metrics = {}
+        with helpers.cache(units * mask.nbytes, record=lambda key, value: metrics.update({key: value})):
+            for _ in range(4):
+                labels = helpers.bubble_globals['cached_bubble_labels'](mask)
+                for item in requests:
+                    helpers.build(item, mask, labels)
+        counts.append(metrics['render_reference_builds'])
+        assert metrics['render_reference_bytes'] <= units * mask.nbytes
+        assert metrics['render_label_builds'] == 1
+        assert metrics.get('render_reference_full_pixels', 0) == 0
+    assert counts == sorted(counts, reverse=True) and counts[-1] == 3
+
+
+def test_prepared_components_reuse_stats_and_plan_unique_bubbles(helpers, bubbles, monkeypatch):
+    mask, _ = bubbles
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+    requests = [region(), region(4, 4, 13, 13), region(26, 4, 36, 12)]
+    expected = [helpers.original_build(item, mask, labels) for item in requests]
+    demand = helpers.bubble_globals['reference_cache_bytes'](requests, mask, labels)
+    assert demand == mask.nbytes * 2
+    monkeypatch.setattr(cv2, 'connectedComponentsWithStats', lambda *_a, **_k: pytest.fail('relabelled prepared page'))
+    monkeypatch.setattr(np, 'isin', lambda *_a, **_k: pytest.fail('full-page union scan'))
+    with helpers.cache(demand, bubble_mask=mask, components=(labels, stats)):
+        assert helpers.bubble_globals['cached_bubble_labels'](mask) is labels
+        for item, pixels in zip(requests, expected):
+            np.testing.assert_array_equal(helpers.build(item, mask, labels), pixels)
+
+
+def test_empty_references_do_not_consume_unique_bubble_budget(helpers, bubbles):
+    mask, _ = bubbles
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+    empty, first, second = region(20, 23, 23, 25), region(), region(26, 4, 36, 12)
+    demand = helpers.bubble_globals['reference_cache_bytes']([empty, first, second], mask, labels)
+    assert demand == 2 * mask.nbytes
+    with helpers.cache(demand, bubble_mask=mask, components=(labels, stats)):
+        assert not helpers.build(empty, mask, labels).any()
+        state = helpers.bubble_globals['_reference_masks'].get()
+        assert state['used'] == 0
+        retained = [helpers.build(item, mask, labels) for item in (first, second)]
+        for item, value in zip((first, second), retained):
+            assert helpers.build(item, mask, labels) is value
+        assert state['used'] == demand and len(state['unions']) == 2

@@ -1,6 +1,7 @@
 """Bounded CPU page workers; the parent owns each shared input buffer."""
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import contextmanager
 import multiprocessing
 from multiprocessing.connection import wait
 from multiprocessing.shared_memory import SharedMemory
@@ -9,7 +10,7 @@ import sys
 from threading import BoundedSemaphore, Condition, Lock, Thread
 from time import perf_counter
 
-from .protocol import NodeFailure, pack_result
+from .protocol import NodeFailure, pack_result, tiled_output
 from .timing import collect, record
 
 
@@ -27,31 +28,72 @@ class RenderMemoryError(RenderPoolError):
         super().__init__('CLASSIC_RENDER_IPC_MEMORY')
 
 
-def ipc_bytes(width, height):
+def ipc_bytes(width, height, components=0):
     """RGB original, RGB cleaned, bubble mask and source alpha; no RGB return copy."""
-    return int(width) * int(height) * 8
+    return int(width) * int(height) * (12 if components else 8) + components * 5 * 4
 
 
 def render_page(renderer, original, cleaned, regions, translations, language, bubble_mask, *,
                 alpha, version, analysis, translated, allow_tiles=False, mask_cache_bytes=None,
-                check_cancelled=None):
+                check_cancelled=None, bubble_prepared=False, bubble_components=None, output_budget=None):
     """The same whole-page operation serves child workers and local fallback."""
     import numpy as np
     started = perf_counter()
     try:
         rendered = renderer.render(original, cleaned, regions, translations, language, bubble_mask,
-                                   mask_cache_bytes=mask_cache_bytes) if any(text.strip() for text in translations) else cleaned
+                                   mask_cache_bytes=mask_cache_bytes,
+                                   **({'bubble_prepared': True, 'bubble_components': bubble_components}
+                                      if bubble_prepared else {})) if any(text.strip() for text in translations) else cleaned
     finally:
         record('render_layout', perf_counter() - started)
     if check_cancelled is not None:
         check_cancelled()
     if not isinstance(rendered, np.ndarray) or rendered.shape != original.shape or rendered.dtype != np.uint8:
         raise RenderPoolError()
-    return pack_result(rendered, original, alpha, version, analysis, translated, allow_tiles=allow_tiles)
+    if output_budget is None or not allow_tiles or not tiled_output(original.shape[1], original.shape[0]):
+        return pack_result(rendered, original, alpha, version, analysis, translated, allow_tiles=allow_tiles)
+    with output_budget() as workers:
+        return pack_result(rendered, original, alpha, version, analysis, translated,
+                           allow_tiles=allow_tiles, output_workers=workers)
 
 
 _renderer = None
 _startup_barrier = None
+_cpu_slots = None
+_cpu_width = 1
+
+
+@contextmanager
+def _working_cpu():
+    started = perf_counter()
+    acquired = 0
+    try:
+        if _cpu_slots is not None:
+            for _ in range(_cpu_width):
+                _cpu_slots.acquire()
+                acquired += 1
+        record('render_cpu_wait', perf_counter() - started)
+        yield
+    finally:
+        if _cpu_slots is not None:
+            for _ in range(acquired):
+                _cpu_slots.release()
+
+
+@contextmanager
+def _output_cpu():
+    # Borrow idle peers only for output; no extra CPU budget and no blocking
+    # attempt to expand. A newly arriving page waits for borrowed slots to return.
+    borrowed = 0
+    if _cpu_slots is not None:
+        while _cpu_slots.acquire(False):
+            borrowed += 1
+    try:
+        yield _cpu_width + borrowed
+    finally:
+        if _cpu_slots is not None:
+            for _ in range(borrowed):
+                _cpu_slots.release()
 
 
 def _watch_parent():
@@ -64,8 +106,9 @@ def _watch_parent():
             os._exit(1)
 
 
-def _initialize(models, fonts, threads, barrier):
-    global _renderer, _startup_barrier
+def _initialize(models, fonts, threads, barrier, cpu_slots=None):
+    global _renderer, _startup_barrier, _cpu_slots, _cpu_width
+    _cpu_slots, _cpu_width = cpu_slots, threads
     Thread(target=_watch_parent, name='render-parent', daemon=True).start()
     try:
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -93,32 +136,37 @@ def _ready():
     _startup_barrier.wait()
 
 
-def _views(segment, shape):
+def _views(segment, shape, components=0):
     import numpy as np
     height, width = shape
     pixels = height * width
-    return {
+    arrays = {
         'original': np.ndarray((height, width, 3), np.uint8, buffer=segment.buf),
         'cleaned': np.ndarray((height, width, 3), np.uint8, buffer=segment.buf, offset=pixels * 3),
         'mask': np.ndarray((height, width), np.uint8, buffer=segment.buf, offset=pixels * 6),
         'alpha': np.ndarray((height, width), np.uint8, buffer=segment.buf, offset=pixels * 7),
     }
+    if components:
+        arrays['labels'] = np.ndarray((height, width), np.int32, buffer=segment.buf, offset=pixels * 8)
+        arrays['stats'] = np.ndarray((components, 5), np.int32, buffer=segment.buf, offset=pixels * 12)
+    return arrays
 
 
 def _render_shared(name, shape, regions, translations, language, mask_cache_bytes, has_alpha,
-                   version, analysis, translated, allow_tiles):
+                   version, analysis, translated, allow_tiles, bubble_prepared=False, components=0):
     segment, arrays, packed, timings, error_code = None, {}, None, {}, None
     try:
         segment = SharedMemory(name=name)
-        arrays = _views(segment, shape)
+        arrays = _views(segment, shape, components)
         for value in arrays.values():
             value.flags.writeable = False
         del value
-        with collect() as timings:
+        with collect() as timings, _working_cpu():
             packed = render_page(_renderer, arrays['original'], arrays['cleaned'], regions,
                 translations, language, arrays['mask'], alpha=arrays['alpha'] if has_alpha else None,
                 version=version, analysis=analysis, translated=translated,
-                allow_tiles=allow_tiles, mask_cache_bytes=mask_cache_bytes)
+                allow_tiles=allow_tiles, mask_cache_bytes=mask_cache_bytes, bubble_prepared=bubble_prepared,
+                bubble_components=(arrays['labels'], arrays['stats']) if components else None, output_budget=_output_cpu)
     except NodeFailure as error:
         error_code = error.code if error.code in _OUTPUT_ERRORS else 'CLASSIC_RENDER_WORKER_FAILED'
     except BaseException:
@@ -197,8 +245,9 @@ class RenderPool:
                 raise RenderPoolError('CLASSIC_RENDER_POOL_CLOSED')
             if self._pool is None:
                 barrier = self._context.Barrier(self.workers)
+                cpu_slots = self._context.BoundedSemaphore(self.workers * self.threads)
                 pool = ProcessPoolExecutor(self.workers, mp_context=self._context, initializer=_initialize,
-                                           initargs=(self.models, self.fonts, self.threads, barrier))
+                                           initargs=(self.models, self.fonts, self.threads, barrier, cpu_slots))
                 try:
                     futures = [pool.submit(_ready) for _ in range(self.workers)]
                     for future in futures:
@@ -227,9 +276,10 @@ class RenderPool:
 
     def render(self, original, cleaned, regions, translations, language, bubble_mask, *,
                alpha=None, version, analysis, translated, allow_tiles=False,
-               mask_cache_bytes=None, check_cancelled=None):
+               mask_cache_bytes=None, check_cancelled=None, bubble_prepared=False, bubble_components=None):
         import numpy as np
         has_alpha = alpha is not None
+        components = len(bubble_components[1]) if bubble_components is not None else 0
         if has_alpha:
             alpha = np.asarray(alpha)
         if (not isinstance(original, np.ndarray) or original.ndim != 3 or original.shape[2] != 3
@@ -238,6 +288,11 @@ class RenderPool:
                 or (bubble_mask is not None and (not isinstance(bubble_mask, np.ndarray)
                     or bubble_mask.shape != original.shape[:2] or bubble_mask.dtype != np.uint8))
                 or (alpha is not None and (alpha.shape != original.shape[:2] or alpha.dtype != np.uint8))):
+            raise RenderPoolError('CLASSIC_RENDER_INPUT_INVALID')
+        if bubble_components is not None and (not bubble_prepared
+                or bubble_components[0].shape != original.shape[:2] or bubble_components[0].dtype != np.int32
+                or bubble_components[1].shape != (components, 5) or bubble_components[1].dtype != np.int32
+                or bubble_components[1].nbytes > original.shape[0] * original.shape[1]):
             raise RenderPoolError('CLASSIC_RENDER_INPUT_INVALID')
         if check_cancelled is not None:
             check_cancelled()
@@ -258,13 +313,16 @@ class RenderPool:
             if check_cancelled is not None:
                 check_cancelled()
             try:
-                segment = SharedMemory(create=True, size=ipc_bytes(original.shape[1], original.shape[0]))
+                segment = SharedMemory(create=True, size=ipc_bytes(original.shape[1], original.shape[0], components))
                 _reserve_backing(segment)
             except (OSError, MemoryError):
                 raise RenderMemoryError() from None
-            arrays = _views(segment, original.shape[:2])
+            arrays = _views(segment, original.shape[:2], components)
             np.copyto(arrays['original'], original)
             np.copyto(arrays['cleaned'], cleaned)
+            if components:
+                np.copyto(arrays['labels'], bubble_components[0])
+                np.copyto(arrays['stats'], bubble_components[1])
             if bubble_mask is None:
                 arrays['mask'].fill(0)
             else:
@@ -280,7 +338,7 @@ class RenderPool:
                 try:
                     future = pool.submit(_render_shared, segment.name, original.shape[:2], regions,
                                          translations, language, mask_cache_bytes, has_alpha,
-                                         version, analysis, translated, allow_tiles)
+                                         version, analysis, translated, allow_tiles, bubble_prepared, components)
                 except (BrokenProcessPool, RuntimeError):
                     # Retire outside this non-reentrant lifecycle lock.
                     pass

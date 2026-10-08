@@ -8,8 +8,11 @@ from threading import Lock, current_thread, main_thread
 
 import numpy as np
 
+from classic_node.timing import record, stage, waiting_for
+
 from .assets import activate
 from .colors import ensure_stroke_contrast
+from .page_cache import page_images
 
 LANGUAGES = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'ko': 'KOR', 'en': 'ENG',
              'fr': 'FRA', 'es': 'ESP', 'pt-BR': 'PTB', 'de': 'DEU', 'it': 'ITA', 'ru': 'RUS',
@@ -83,14 +86,10 @@ class Renderer:
         return all(any(font.supportsCharacter(ord(char)) for font in self.raw_fonts)
                    for char in text if not char.isspace())
 
-    def render(self, original, cleaned, regions, translations, language, bubble_mask, *, mask_cache_bytes=None):
-        import cv2
+    def render(self, original, cleaned, regions, translations, language, bubble_mask, *, mask_cache_bytes=None,
+               bubble_prepared=False, bubble_components=None):
         from manga_translator.config import Direction
-        from manga_translator.rendering import (
-            dispatch, resize_regions_to_font_size, calc_font_from_box, calc_box_from_font,
-            _region_lines_fully_inside_mask, _apply_default_english_line_break_method, text_render)
-        from manga_translator.utils import TextBlock, build_region_reference_mask, erode_bubble_mask
-        from manga_translator.utils.bubble import reference_mask_cache
+        from manga_translator.utils import TextBlock, erode_bubble_mask
         from manga_translator.rendering.rich_text import legacy_line_breaks_to_document
         config = configuration()
         target = LANGUAGES[language]
@@ -135,14 +134,25 @@ class Renderer:
             mask_cache_bytes = cleaned.shape[0] * cleaned.shape[1] * len(blocks)
         # MTU's font selection is thread-local; its registry/hyphenator caches
         # are shared. Bound the whole upstream call until concurrency is proven.
-        with self._lock, reference_mask_cache(mask_cache_bytes):
+        with self._lock:
+            if bubble_mask is not None and not bubble_prepared:
+                with stage('render_bubble_prepare'):
+                    bubble_mask = erode_bubble_mask(bubble_mask, 0.02)
+            return self._render_blocks(original, cleaned, blocks, language, config, bubble_mask,
+                                       bubble_components, mask_cache_bytes)
+
+    def _render_blocks(self, original, cleaned, blocks, language, config, bubble_mask, components, cache_bytes):
+        from manga_translator.rendering import (dispatch, resize_regions_to_font_size,
+            calc_font_from_box, calc_box_from_font, _region_lines_fully_inside_mask,
+            _apply_default_english_line_break_method, text_render)
+        from manga_translator.utils import build_region_reference_mask
+        from manga_translator.utils.bubble import reference_mask_cache, cached_bubble_labels
+        with reference_mask_cache(cache_bytes, bubble_mask=bubble_mask, components=components, record=record):
             enclosed, free = [], []
             labels = None
             if bubble_mask is not None and np.any(bubble_mask):
-                # Leave a small inset inside the segmentation's edge, using
-                # MTU's per-component erosion rather than cropping painted text.
-                bubble_mask = erode_bubble_mask(bubble_mask, 0.02)
-                _, labels = cv2.connectedComponents((bubble_mask > 0).astype(np.uint8))
+                # Reuse the same native 2% inset and labels as solid-fill.
+                labels = cached_bubble_labels(bubble_mask)
             for block in blocks:
                 # Use MTU's own enclosure test. A text detection rectangle or a
                 # partially overlapping segmentation is not a layout container.
@@ -288,8 +298,8 @@ class Engine:
             # the upstream scorer too, without downloads or text logging.
             self.router.choose({lang: {'text': 'test', 'conf': .9}
                                 for lang in ('en', 'ch', 'japan', 'korean')})
-            # Exercise both text-conditioned colors and the unaligned fallback.
-            self.colors.apply(rgb, [TextBlock(
+            # Colored input must exercise both model paths, not the gray bypass.
+            self.colors.apply(np.full_like(rgb, (180, 30, 50)), [TextBlock(
                 lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=[text], language=language)
                 for text, language in [('warmup', 'en'), ('', 'unknown')]])
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
@@ -305,16 +315,18 @@ class Engine:
             TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
-            with self._detector_lock:
+            with stage('analyze_detect'), waiting_for(self._detector_lock, 'detect_lock_wait'):
                 lines, raw, _ = await self.detector.detect(rgb, c.detector.detection_size,
                     c.detector.text_threshold, c.detector.box_threshold, c.detector.unclip_ratio)
             # Retain the approved upstream paragraph grouping and reading
             # order, using DBNet lines without loading or running a CTD model.
-            blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
-            groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
+            with stage('analyze_group'):
+                blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
+                groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
             # RapidOCR sorts by aspect ratio, pads bounded batches and restores
             # input order; paragraph grouping remains entirely upstream.
-            buckets, readings = self.router.classify(rgb, blocks, groups)
+            with stage('analyze_route'):
+                buckets, readings = self.router.classify(rgb, blocks, groups)
             for group, reading in zip(groups, readings, strict=True):
                 if reading is not None:
                     index, row = reading
@@ -325,10 +337,12 @@ class Engine:
                             if bucket == language for index, line in enumerate(group)
                             if reading is None or index != reading[0]]
                 if selected:
-                    await model.recognize(rgb, selected, c.ocr)
+                    with stage('analyze_ocr'):
+                        await model.recognize(rgb, selected, c.ocr)
             japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
             if japanese:
-                self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
+                with stage('analyze_ocr'):
+                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
             # Keep the selected OCR route local to this analysis, so color
             # extraction can distinguish line OCR from Japanese paragraph OCR.
             regions = [TextBlock(lines=block.lines, texts=[line.text for line in group], language=language,
@@ -342,20 +356,24 @@ class Engine:
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
             if not regions:
                 return [], None, None, None
-            # Use original pixels only, after OCR/language filtering and before
-            # erasure. Checkpoints retain colors; resume/render never predicts.
-            self.colors.apply(rgb, regions)
-            with self._bubble_lock:
+            # Original pixels and OCR remain untouched. Color selection does
+            # not depend on bubbles; gray text goes straight to default colors.
+            # Checkpoints retain colors; resume/render never predicts again.
+            with stage('analyze_colors'):
+                self.colors.apply(rgb, regions)
+            with stage('analyze_bubbles'), self._bubble_lock:
                 detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
-            bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
-            mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
-                                kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
-                                bubble_mask=bubbles)
+            with stage('analyze_bubble_mask'):
+                bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
+            with stage('analyze_refine'):
+                mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
+                                    kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
+                                    bubble_mask=bubbles)
             return regions, mask, raw, bubbles
-        with torch.cuda.device(self.gpu):
+        with page_images(rgb), torch.cuda.device(self.gpu):
             return asyncio.run(run())
 
-    def inpaint(self, rgb, mask, raw_mask, bubble_mask, regions):
+    def inpaint(self, rgb, mask, raw_mask, bubble_mask, regions, *, cache=None):
         import cv2
         import torch
         from manga_translator.utils import TextBlock, erode_bubble_mask
@@ -364,17 +382,33 @@ class Engine:
         # These are MTU's documented stage inputs, including its 2px raw-mask
         # dilation for background sampling; no local repair/layout algorithm.
         blocks = [TextBlock(**data) for data in regions]
-        tight = cv2.resize(raw_mask, rgb.shape[1::-1], interpolation=cv2.INTER_LINEAR)
-        tight = cv2.dilate(np.where(tight >= 127, 255, 0).astype(np.uint8), None, iterations=2)
-        filled, remaining, _ = solid_fill_pure_bubbles(rgb, mask, blocks, tight,
-            erode_bubble_mask(bubble_mask, MODEL_BUBBLE_SHRINK_RATIO), self.config.ocr.model_bubble_overlap_threshold)
+        with stage('inpaint_prepare'):
+            tight = cv2.resize(raw_mask, rgb.shape[1::-1], interpolation=cv2.INTER_LINEAR)
+            tight = cv2.dilate(np.where(tight >= 127, 255, 0).astype(np.uint8), None, iterations=2)
+            inset = erode_bubble_mask(bubble_mask, MODEL_BUBBLE_SHRINK_RATIO)
+            components = None
+            if np.any(inset):
+                _, labels, stats, _ = cv2.connectedComponentsWithStats((inset > 0).astype(np.uint8), connectivity=8)
+                components = (labels, stats)
+            if cache is not None:
+                inset.flags.writeable = False
+                cache['bubble_inset'] = inset
+                # Persistent page masks have a 6P allowance. Pathological tiny
+                # components must not retain an unbounded statistics table.
+                if components is not None and stats.nbytes <= inset.nbytes:
+                    labels.flags.writeable = stats.flags.writeable = False
+                    cache['bubble_labels'], cache['bubble_stats'] = components
+        with stage('inpaint_solid_fill'):
+            filled, remaining, _ = solid_fill_pure_bubbles(rgb, mask, blocks, tight,
+                inset, self.config.ocr.model_bubble_overlap_threshold, components=components)
         async def inpaint(crop, local_mask):
             # The loaded FP32 LaMa eval path only reads model state; its input
             # tensors and padding are per-call. The compute pool bounds readers.
             return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
                                                 self.config.inpainter.inpainting_size)
-        with torch.cuda.device(self.gpu):
-            result, _ = asyncio.run(inpaint_regions_per_block(filled, remaining.copy(), inpaint))
+        with stage('inpaint_lama'), torch.cuda.device(self.gpu):
+            # solid_fill returns an owned mask; the native block loop may clear it.
+            result, _ = asyncio.run(inpaint_regions_per_block(filled, remaining, inpaint))
         return result
 
     def close(self):

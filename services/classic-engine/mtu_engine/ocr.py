@@ -9,6 +9,7 @@ from rapidocr.ch_ppocr_rec.typings import TextRecInput
 from rapidocr.inference_engine.onnxruntime import OrtInferSession
 
 from classic_node.timing import waiting_for
+from .page_cache import bgr, crop as cached_crop, normalized
 
 OCR_IMAGE_SHAPE = (3, 48, 320)
 OCR_MAX_WIDTH = 3200  # PaddleX's standard recognition width limit.
@@ -47,7 +48,11 @@ class Recognizer(TextRecognizer):
         self.rec_image_shape = OCR_IMAGE_SHAPE
         self.cfg = SimpleNamespace(lang_type='ch', font_path=None)
         self.RTL_LANGS = set()
-        self.crop = model._get_rotate_crop_image
+        self.crop = lambda image, points: cached_crop(image, points, model._get_rotate_crop_image)
+
+    def resize_norm_img(self, image, max_wh_ratio):
+        return normalized(image, max_wh_ratio, self.rec_image_shape,
+            lambda: TextRecognizer.resize_norm_img(self, image, max_wh_ratio))
 
     def read(self, crops):
         rows = [{'text': '', 'conf': 0.} for _ in crops]
@@ -62,7 +67,7 @@ class Recognizer(TextRecognizer):
             # Only separate short lines from long ones: a long disclaimer must
             # not change a short dialogue's padding. RapidOCR still owns batch
             # size, sorting, resize/padding and restoration inside each group.
-            result = self(TextRecInput([cv2.cvtColor(crops[i], cv2.COLOR_RGB2BGR) for i in indices]))
+            result = self(TextRecInput([bgr(crops[i]) for i in indices]))
             for index, text, score in zip(indices, result.txts, result.scores, strict=True):
                 rows[index] = {'text': text, 'conf': float(score)}
         return rows

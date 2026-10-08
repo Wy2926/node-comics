@@ -28,7 +28,8 @@ def helpers(tmp_path, monkeypatch):
     apply_source_patches(tmp_path)
     bubble = {'np': np, 'cv2': cv2}
     exec(compile((tmp_path / bubble_path).read_text(encoding='utf-8'), bubble_path, 'exec'), bubble)
-    render = {'np': np, 'cv2': cv2, 'cached_largest_inscribed_rect': bubble['cached_largest_inscribed_rect']}
+    render = {'np': np, 'cv2': cv2, 'cached_largest_inscribed_rect': bubble['cached_largest_inscribed_rect'],
+              'reference_mask_bounds': bubble['reference_mask_bounds']}
     prepared = (tmp_path / render_path).read_text(encoding='utf-8')
     assert prepared == rectangle['after']
     exec(compile(prepared, render_path, 'exec'), render)
@@ -132,7 +133,7 @@ def test_reuses_only_budgeted_readonly_masks_and_releases_metadata(helpers):
         assert len(calls) == 3
         del uncached
         assert released() is None  # Rectangle metadata never retains extra masks.
-    assert state['rectangles'] == state['entries'] == {}
+    assert not state
     assert helpers.rect(stored) == (0, 0, 30, 24)
     assert len(calls) == 4  # No reuse across render invocations.
 
@@ -153,7 +154,7 @@ def test_mask_change_mutable_inputs_and_exception_cleanup(helpers):
             mask[:, 10:] = 0
             assert helpers.rect(mask) == (0, 0, 10, 24)
             raise RuntimeError('cancelled')
-    assert state['rectangles'] == state['entries'] == {}
+    assert not state
     assert helpers.bubble['_reference_masks'].get() is None
 
 
@@ -177,4 +178,4 @@ def test_nested_and_concurrent_render_caches_are_isolated(helpers):
     with ThreadPoolExecutor(2) as pool:
         left, right = list(pool.map(render, (20, 30)))
     assert left is not right
-    assert left['rectangles'] == right['rectangles'] == {}
+    assert not left and not right

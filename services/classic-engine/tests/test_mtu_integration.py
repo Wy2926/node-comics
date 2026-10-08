@@ -276,22 +276,63 @@ def test_legacy_checkpoint_retains_black_white_without_color_inference(assets, o
     assert np.count_nonzero(np.all(result == [255, 255, 255], axis=2)) > 20
 
 
-def test_native_color_aggregation_preserves_raw_channels(assets):
+def test_native_representative_color_is_not_divided_by_original_line_count(assets):
     from mtu_engine.assets import activate
     models, _ = assets
     activate(models)
     from manga_translator.utils import TextBlock
     from mtu_engine.colors import Colors
     from types import SimpleNamespace
-    predictor = SimpleNamespace(_get_rotate_crop_image=lambda *args: np.zeros((48, 100, 3), dtype=np.uint8),
-        _estimate_colors_batch=lambda crops: [(180, 20, 40, 80, 80, 80), (220, 40, 60, 120, 120, 120)])
+    predictor = SimpleNamespace(_get_rotate_crop_image=lambda *args: np.full((48, 100, 3), (180, 30, 40), dtype=np.uint8),
+        _estimate_colors_batch=lambda crops: [(220, 40, 60, 120, 120, 120)] * len(crops))
     colors = Colors.__new__(Colors)
     colors.predictor = predictor
     block = TextBlock([[[0, 0], [100, 0], [100, 48], [0, 48]]] * 2, ['first', 'second'],
                       adjust_bg_color=False)
     colors.apply(None, [block])
-    assert block.get_font_colors() == ((200., 30., 50.), (100., 100., 100.))
+    assert block.get_font_colors() == ((220., 40., 60.), (120., 120., 120.))
     assert block.texts == ['first', 'second']
+
+
+@pytest.mark.parametrize('style,skip', [('plain', True), ('colored', False), ('reversed', True),
+    ('gray', True), ('gray_background', True), ('faint_tint', True), ('small_color', False)])
+def test_native_monochrome_color_gate_without_bubble(assets, style, skip):
+    from PIL import Image, ImageDraw, ImageFont
+    from types import SimpleNamespace
+    from mtu_engine.assets import activate
+    from mtu_engine.colors import Colors
+    from classic_node.timing import collect
+    models, _ = assets
+    activate(models)
+    from manga_translator.utils import TextBlock
+    from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
+    background = {'reversed': 'black', 'gray_background': (160, 160, 160),
+                  'faint_tint': (250, 248, 249)}.get(style, 'white')
+    image = Image.new('RGB', (500, 140), background)
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 48)
+    fill = {'colored': (200, 20, 40), 'reversed': 'white', 'gray': (120, 120, 120)}.get(style, 'black')
+    draw.text((35, 30), 'PLAIN TEXT', font=font, fill=fill)
+    x1, y1, x2, y2 = draw.textbbox((35, 30), 'PLAIN TEXT', font=font)
+    block = TextBlock([[[x1-4, y1-4], [x2+4, y1-4], [x2+4, y2+4], [x1-4, y2+4]]],
+                      ['PLAIN TEXT'], language='en', adjust_bg_color=False)
+    if style == 'small_color':
+        draw.rectangle((x1+1, y1-3, x1+12, y1-2), fill=(240, 0, 0))
+    calls = []
+    def predict(crops):
+        calls.append(len(crops))
+        return [(90, 60, 30, 200, 210, 220)] * len(crops)
+    colors = Colors.__new__(Colors)
+    colors._characters = {}
+    colors.predictor = SimpleNamespace(_get_rotate_crop_image=ModelPaddleOCR()._get_rotate_crop_image,
+                                      _estimate_colors_batch=predict)
+    with collect() as metrics:
+        colors.apply(np.array(image), [block])
+    assert metrics['color_fast_regions'] == int(skip)
+    assert calls == ([] if skip else [1])
+    assert block.get_font_colors() == (((0., 0., 0.), (255., 255., 255.)) if skip else
+                                      ((90., 60., 30.), (200., 210., 220.)))
+    assert block.texts == ['PLAIN TEXT'] and len(block.lines) == 1
 
 
 def test_native_48px_colors_reuse_ocr_and_keep_failure_fallback_offline(assets, offline, monkeypatch):
@@ -361,7 +402,14 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
     models, fonts = assets
     engine = Engine(models, fonts)
     try:
+        color_batches = []
+        estimate_colors = engine.colors.predictor._estimate_colors_batch
+        def predict(crops):
+            color_batches.append(len(crops))
+            return estimate_colors(crops)
+        monkeypatch.setattr(engine.colors.predictor, '_estimate_colors_batch', predict)
         engine.warmup()
+        assert color_batches == [2]  # Both known-text and fallback models were warmed.
         for probe in engine.probes.values():
             assert probe.session.get_providers()[0] == 'CUDAExecutionProvider'
             assert int(probe.session.get_provider_options()['CUDAExecutionProvider']['device_id']) == engine.gpu

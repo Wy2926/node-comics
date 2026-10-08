@@ -1,15 +1,13 @@
-"""Offline CPU/Qt comparison: legacy RGB return versus worker-side output packing.
+"""Offline CPU/Qt validation of the current worker-side output path.
 
-Run from the engine directory with prepared assets. --baseline-dir is a trusted,
-local snapshot containing the pre-change render_pool.py and protocol.py; it is
-loaded as Python code, never downloaded. No Engine, GPU model, node or network is
-started. Reports contain metrics/hashes only, not images, paths or private text.
+Run from each source snapshot with its prepared assets to compare reports.
+No Engine, GPU model, node or network is started. Reports contain metrics/hashes
+only, not images, paths or private text.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import hashlib
-import importlib.util
 from io import BytesIO
 import json
 import multiprocessing
@@ -19,7 +17,6 @@ import platform
 import socket
 import statistics
 import struct
-import sys
 import threading
 from time import perf_counter
 
@@ -28,7 +25,7 @@ from PIL import Image, ImageDraw
 import psutil
 
 from classic_node.protocol import digest, mask_image
-from classic_node.timing import collect, record
+from classic_node.timing import collect
 
 TEXTS = {'en': 'THIS PERSON COULD WIELD MAGIC TO CONTROL ALL THINGS.',
          'zh-Hans': '这个人能够运用魔法，控制世间的一切事物。',
@@ -39,21 +36,7 @@ CASES = {'sparse': (720, 12000, 3), 'many': (720, 12000, 12),
          'tiles': (720, 20000, 3)}
 
 
-def load_baseline(directory):
-    """Register names that the legacy pool's spawn tasks can import after init."""
-    modules = []
-    for name, filename in (('mtu_engine._validation_legacy_pool', 'render_pool.py'),
-                           ('classic_node._validation_legacy_protocol', 'protocol.py')):
-        if name not in sys.modules:
-            spec = importlib.util.spec_from_file_location(name, Path(directory) / filename)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-        modules.append(sys.modules[name])
-    return tuple(modules)
-
-
-def initialize_worker(kind, baseline, ready, models, fonts, threads, barrier):
+def initialize_worker(ready, models, fonts, threads, barrier, cpu_slots):
     # Windows asyncio's local wakeup socket is not a network request.
     connect = socket.socket.connect
     def local_only(sock, address):
@@ -61,22 +44,16 @@ def initialize_worker(kind, baseline, ready, models, fonts, threads, barrier):
             raise RuntimeError('External network disabled in render validation')
         return connect(sock, address)
     socket.socket.connect = local_only
-    if kind == 'legacy':
-        module, _ = load_baseline(baseline)
-    else:
-        from classic_node import render_pool as module
-    module._initialize(models, fonts, threads, barrier)
+    from classic_node import render_pool as module
+    module._initialize(models, fonts, threads, barrier, cpu_slots)
     import cv2
     import torch
     ready.put({'pid': os.getpid(), 'cuda_initialized': torch.cuda.is_initialized(),
                'torch_threads': torch.get_num_threads(), 'cv_threads': cv2.getNumThreads()})
 
 
-def worker_finished(kind, baseline):
-    if kind == 'legacy':
-        module, _ = load_baseline(baseline)
-    else:
-        from classic_node import render_pool as module
+def worker_finished():
+    from classic_node import render_pool as module
     module._ready()  # One final state probe per persistent worker, not per task.
     import torch
     return {'pid': os.getpid(), 'cuda_initialized': torch.cuda.is_initialized()}
@@ -261,15 +238,11 @@ class SharedTracker:
         assert not self.live, 'Shared segments remain live'
 
 
-def run_variant(kind, args, fonts, case_sources, references):
-    if kind == 'legacy':
-        module, protocol = load_baseline(args.baseline_dir)
-    else:
-        from classic_node import render_pool as module
-        protocol = None
+def run_pool(args, fonts, case_sources):
+    from classic_node import render_pool as module
     ready = multiprocessing.get_context('spawn').Queue()
     initialize = module._initialize
-    module._initialize = partial(initialize_worker, kind, str(args.baseline_dir), ready)
+    module._initialize = partial(initialize_worker, ready)
     pool = module.RenderPool(args.models, fonts, args.workers, args.threads)
     rows = []
     started = perf_counter()
@@ -294,25 +267,17 @@ def run_variant(kind, args, fonts, case_sources, references):
                 def render_one(_):
                     begin = perf_counter()
                     with collect() as timings:
-                        if kind == 'legacy':
-                            rendered = pool.render(*case['args'], mask_cache_bytes=args.mask_cache_bytes)
-                            record('legacy_layout_with_ipc', perf_counter() - begin)
-                            with Image.fromarray(rendered) as image:
-                                packed = protocol.pack_result(image, case['args'][0], **case['kwargs'])
-                        else:
-                            packed = pool.render(*case['args'], **case['kwargs'], mask_cache_bytes=args.mask_cache_bytes)
+                        packed = pool.render(*case['args'], **case['kwargs'], mask_cache_bytes=args.mask_cache_bytes)
                     return packed, perf_counter() - begin, timings
                 # Prime this shape with one concurrent call per worker.
                 warm = list(callers.map(render_one, range(args.workers)))
                 actual = fingerprint(warm[0][0], case)
-                if kind == 'legacy':
-                    references[case['name']] = actual
-                assert actual == references[case['name']], 'Baseline/candidate output mismatch'
                 for repeat in range(args.rounds):
                     tracker.peak = 0
                     outputs, metrics = measured(lambda: list(callers.map(render_one, range(args.pages))))
                     # Decoding/comparison is deliberately outside the timed boundary.
-                    assert all(fingerprint(item[0], case) == references[case['name']] for item in outputs)
+                    # Every warmed worker must produce stable pixels, bytes and metadata.
+                    assert all(fingerprint(item[0], case) == actual for item in outputs)
                     latencies = [item[1] for item in outputs]
                     assert not tracker.live
                     rows.append({'case': case['name'], 'repeat': repeat, 'pages': args.pages,
@@ -323,12 +288,11 @@ def run_variant(kind, args, fonts, case_sources, references):
                                  'stage_timings': [item[2] for item in outputs],
                                  'peak_shared_bytes': tracker.peak, 'shared_segments_cleaned': tracker.cleaned,
                                  'pixel_bytes_metadata_identical': True, **actual})
-                    print(json.dumps({'variant': kind, 'case': case['name'], 'repeat': repeat,
+                    print(json.dumps({'case': case['name'], 'repeat': repeat,
                                       'wall_seconds': metrics['wall_seconds']}), flush=True)
                 assert input_hashes == [hashlib.sha256(value.tobytes()).hexdigest() for value in inputs]
                 del warm, outputs, case, inputs
-        futures = [pool._get_pool().submit(worker_finished, kind, str(args.baseline_dir))
-                   for _ in range(args.workers)]
+        futures = [pool._get_pool().submit(worker_finished) for _ in range(args.workers)]
         final_states = [future.result(timeout=30) for future in futures]
         assert {state['pid'] for state in final_states} == {state['pid'] for state in states}
         assert all(not state['cuda_initialized'] for state in final_states)
@@ -343,7 +307,6 @@ def run_variant(kind, args, fonts, case_sources, references):
 
 def parser():
     value = argparse.ArgumentParser(description=__doc__)
-    value.add_argument('--baseline-dir', type=Path, required=True)
     value.add_argument('--models', type=Path, default=Path('.assets/models'))
     value.add_argument('--output', type=Path, required=True)
     value.add_argument('--workers', type=int, default=2)
@@ -364,7 +327,7 @@ def main(argv=None):
         raise ValueError('Workers, threads, pages, rounds and memory limit must be positive')
     if args.mask_cache_bytes is not None and args.mask_cache_bytes < 0:
         raise ValueError('Mask cache must be nonnegative')
-    args.models, args.baseline_dir = args.models.resolve(), args.baseline_dir.resolve()
+    args.models = args.models.resolve()
     os.environ.update(CUDA_VISIBLE_DEVICES='', HF_HUB_OFFLINE='1', QT_QPA_PLATFORM='offscreen')
     from mtu_engine.assets import verify, file_hash
     verify(args.models)
@@ -378,23 +341,18 @@ def main(argv=None):
     report = {'scope': 'Local CPU Qt only; fixed synthetic text; no Engine, GPU, network, OCR or inpainting',
               'timed_boundary': 'Warm pool; allocate/copy inputs, Qt, pack, IPC return, cleanup; excludes verification decode',
               'rss_note': 'Diagnostic parent+children RSS sum can double-count shared pages; not production incremental memory',
-              'case_note': 'Original case has no regions: legacy Renderer returns cleaned unchanged; candidate skips Renderer; both still use pool IPC and diff. Not the node no-work fast path.',
+              'case_note': 'Original case has no regions and skips Renderer but still uses pool IPC and diff. Not the node no-work fast path.',
               'cpu_note': 'Parent CPU includes the same 20ms RSS sampling overhead; page p95 is service time, excluding caller queue.',
-              'order': ['legacy', 'candidate'], 'python': platform.python_version(), 'platform': platform.platform(),
+              'python': platform.python_version(), 'platform': platform.platform(),
               'numpy': np.__version__, 'pillow': Image.__version__, 'workers': args.workers, 'threads': args.threads,
               'language': args.language, 'mask_cache_bytes': args.mask_cache_bytes,
-              'baseline_sha256': {name: file_hash(args.baseline_dir / name) for name in ('render_pool.py', 'protocol.py')},
-              'candidate_sha256': {name: file_hash(Path(__file__).resolve().parents[1] / 'classic_node' / name)
-                                   for name in ('render_pool.py', 'protocol.py')},
-              'variants': {}}
-    references = {}
-    for kind in report['order']:
-        report['variants'][kind] = run_variant(kind, args, fonts, sources, references)
+              'source_sha256': {name: file_hash(Path(__file__).resolve().parents[1] / 'classic_node' / name)
+                               for name in ('render_pool.py', 'protocol.py')},
+              'run': run_pool(args, fonts, sources)}
     report['summary'] = {}
-    for name in references:
-        medians = {kind: statistics.median(row['wall_seconds'] for row in data['rows'] if row['case'] == name)
-                   for kind, data in report['variants'].items()}
-        report['summary'][name] = {**medians, 'wall_reduction_fraction': 1 - medians['candidate'] / medians['legacy']}
+    for name in dict.fromkeys(row['case'] for row in report['run']['rows']):
+        report['summary'][name] = {'wall_median_seconds': statistics.median(
+            row['wall_seconds'] for row in report['run']['rows'] if row['case'] == name)}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=True) + '\n', encoding='utf-8')
     print(json.dumps(report['summary']), flush=True)
