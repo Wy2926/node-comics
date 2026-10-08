@@ -11,10 +11,14 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
 .button-arrow { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #0d1a2c; color: #fff; }
 .home-try { display: flex; align-items: center; gap: 10px; width: fit-content; margin-top: 22px; font-size: .98rem; color: var(--accent); }
 .home-try:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 5px; }
-.product-home .hero-stores { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 24px; margin-top: 46px; }
+.product-home .hero-stores { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; margin-top: 46px; }
+.product-home .hero-store-row { display: flex; align-items: center; gap: 24px; min-width: 0; }
 .product-home .hero-store { display: inline-flex; gap: 10px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); box-shadow: none; font-size: .96rem; font-weight: 400; }
 .product-home .hero-store:is(:hover, :active) { background: transparent; color: var(--accent); box-shadow: none; transform: none; }
 .product-home .hero-store img { width: 40px; height: 40px; flex: none; object-fit: contain; }
+.product-home .hero-store strong { font-weight: 400; }
+.product-home .hero-store-arrow { display: none; }
+.product-home .hero-mobile { min-height: 48px; }
 .home-access { margin-top: 25px; max-width: 420px; color: var(--muted); font-size: .72rem; line-height: 1.8; }
 .home-preview { position: relative; min-width: 0; scroll-margin-top: 120px; }
 .home-anchor { display: block; scroll-margin-top: 120px; }
@@ -45,6 +49,7 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
 .home-billing-note { margin-top: 22px; color: var(--muted); font-size: .68rem; line-height: 1.7; text-align: center; }
 @media (max-width: 1100px) {
   .product-home .hero-stores { gap: 14px; }
+  .product-home .hero-store-row { gap: 14px; }
   .product-home .hero-store { gap: 7px; font-size: .85rem; }
   .product-home .hero-store img { width: 32px; height: 32px; }
   .home-hero { gap: 32px; padding-block: 58px 80px; }
@@ -67,6 +72,7 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
   .home-hero h1 { font-size: clamp(2.9rem, 12vw, 3.7rem); }
   .home-description { font-size: .95rem; }
   .product-home .hero-stores { gap: 16px; margin-top: 34px; }
+  .product-home .hero-store-row { gap: 16px; }
   .product-home .hero-store { font-size: .82rem; gap: 7px; }
   .product-home .hero-store img { width: 29px; height: 29px; }
   .home-preview figcaption { font-size: .65rem; text-align: start; }

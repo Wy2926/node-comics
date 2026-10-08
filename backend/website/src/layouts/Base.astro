@@ -95,9 +95,11 @@ const graph = [
       <div class="container footer-bottom"><span>© {new Date().getFullYear()} {t.brandName}. {t.copyright}</span><span>{t.artNote}</span><a href={href('/feed.xml')}>RSS ↗</a></div>
     </footer>
     <script>
-      import { browserStoreUrl } from '../lib/browser-store';
+      import { browserStoreUrl, mobileGuidePath } from '../lib/browser-store';
+      import { localPath, localeFromPath } from '../i18n/locales';
       const stores = JSON.parse(document.body.dataset.installStores ?? '{}');
-      const destination = browserStoreUrl(navigator, stores);
+      const guide = mobileGuidePath(navigator);
+      const destination = guide ? localPath(guide, localeFromPath(location.pathname)) : browserStoreUrl(navigator, stores);
       if (destination) {
         const update = (link: HTMLAnchorElement) => { link.href = destination; };
         document.querySelectorAll<HTMLAnchorElement>('a[data-install-extension]').forEach(link => {

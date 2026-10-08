@@ -1,6 +1,6 @@
 ---
 import { getImage } from 'astro:assets';
-import { browserStores } from '../data/site';
+import BrowserStores from './BrowserStores.astro';
 import { publishedLite } from '../data/published-lite';
 import { dictionaries, localPath, type Locale } from '../i18n';
 import { homeCopy } from '../i18n/home';
@@ -37,14 +37,7 @@ const previews = await Promise.all(previewWidths.map(width =>
         {h.install}<span class="button-arrow" aria-hidden="true"><span class="ui-icon icon-arrow"></span></span>
       </a>
       <a class="home-try" href={href('/translate/')}>{translationCopy[locale].open}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
-      <nav class="hero-stores" aria-label={t.storeHeading}>
-        {browserStores.map(store => <a class="hero-store" data-browser={store.id}
-          href={store.url || href('/download/') + '#' + store.id}
-          target={store.url ? '_blank' : undefined} rel={store.url ? 'noopener noreferrer' : undefined}>
-          <img src={store.icon} alt="" aria-hidden="true" width="44" height="44" />
-          <span>{store.name.replace('Google ', '').replace('Microsoft ', '').replace('Mozilla ', '')}</span>
-        </a>)}
-      </nav>
+      <BrowserStores locale={locale} compact />
       <p class="home-access">{h.readerAccess}</p>
     </div>
     <figure class="home-preview" id="see-it">

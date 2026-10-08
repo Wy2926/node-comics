@@ -65,6 +65,13 @@
 
 首页和下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
 
+Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simple-icons/simple-icons/tree/16.0.0) 的 Android／Apple 标识，保留原始路径，仅分别添加绿色和浅色填充以适配官网深色背景。[CC0 1.0 许可](public/licenses/simple-icons.txt)随静态产物分发；许可不授予商标权。教程中的手机轮廓为本项目 CSS 占位，明确标注“截图待补充”，不是产品实测图。
+
+| 文件 | 固定版本来源 | 本地 SHA-256 |
+| --- | --- | --- |
+| [android.svg](public/browsers/android.svg) | [Simple Icons 16.0.0 / Android](https://github.com/simple-icons/simple-icons/blob/16.0.0/icons/android.svg) | `400d686d4ce859395e374febaa56bdf561658595923be4404d7dcde7a8c73fea` |
+| [apple.svg](public/browsers/apple.svg) | [Simple Icons 16.0.0 / Apple](https://github.com/simple-icons/simple-icons/blob/16.0.0/icons/apple.svg) | `5757c99cbf159b9c60af004cfa15600a35bc6618bc18449cff5c6635b66a029c` |
+
 | 文件 | 来源 | SHA-256 |
 | --- | --- | --- |
 | [public/browsers/chrome.svg](public/browsers/chrome.svg) | [官方来源](https://www.google.com/chrome/static/images/chrome-logo.svg) | `2bb1a2c9b9ae4d36f62ea53811554636cf3c5b74d9845e1dbacca0ce62dc7880` |

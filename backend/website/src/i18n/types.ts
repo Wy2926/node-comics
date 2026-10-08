@@ -1,6 +1,7 @@
 export type Locale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr' | 'es' | 'pt-BR' | 'de' | 'it' | 'ru' | 'pl' | 'uk' | 'tr' | 'vi' | 'id' | 'ar';
 export interface GuideSection {
   title:string;paragraphs:string[];steps?:string[];
+  screenshot?:{id:string;label:string;caption:string;src?:string};
   code?:string;
   links?:{label:string;href:string}[];
   table?:{headers:string[];rows:string[][]};

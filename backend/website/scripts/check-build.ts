@@ -2,6 +2,8 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { load } from 'cheerio';
 import { browserStores, site } from '../src/data/site';
+import { mobilePlatforms } from '../src/data/mobile';
+import { mobileCopy } from '../src/i18n/mobile';
 import { publishedAmount } from '../src/components/PublishedLitePricing';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
@@ -74,6 +76,12 @@ for (const file of htmlFiles) {
     } catch { errors.push(`${label}: invalid JSON-LD graph`); }
   });
   if (basePath(route) === '/') {
+    const platformRows = $('.hero-stores > .hero-store-row');
+    if (platformRows.length !== 2 || platformRows.eq(0).attr('data-platform-row') !== 'desktop'
+      || platformRows.eq(0).find('[data-browser]').length !== 3
+      || platformRows.eq(1).attr('data-platform-row') !== 'mobile'
+      || platformRows.eq(1).find('[data-platform]').length !== 2)
+      errors.push(`${label}: desktop browsers must be grouped above the mobile tutorials`);
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
     if ($('.home-hero .button').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
     if (!$(`.home-service a[href="${localPath('/pricing/',locale)}"]`).length || $('.home-plan').length !== 2) errors.push(`${label}: missing Free/Lite plan entrance`);
@@ -81,6 +89,12 @@ for (const file of htmlFiles) {
       const entrance = $(`.hero-store[data-browser="${store.id}"]`);
       const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
       if (entrance.length !== 1 || entrance.attr('href') !== target) errors.push(`${label}: missing configured ${store.id} platform entrance`);
+    }
+    for (const platform of mobilePlatforms) {
+      const entrance = $(`.hero-store[data-platform="${platform.id}"]`);
+      if (entrance.length !== 1 || entrance.attr('href') !== localPath(`/guides/${platform.slug}/`, locale)
+        || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(mobileCopy[locale].label))
+        errors.push(`${label}: mobile entrance must be a localized tutorial ${platform.id}`);
     }
     if ($('.home-faq, .home-cta, .home-steps').length || $('.home-cycle input[type=radio]').length !== 2) errors.push(`${label}: keep one focused hero and a static monthly/yearly plan preview`);
     for (const feature of ['classic', 'model', 'rate', 'priority', 'reading']) {
@@ -91,6 +105,20 @@ for (const file of htmlFiles) {
     const preview = $('.home-screenshot img').attr('src');
     if (!preview || $('.home-screenshot img').length !== 1 || !$('.home-screenshot img').attr('srcset')) errors.push(`${label}: expected one responsive real product screenshot`);
     else homePreviews.set(locale, preview);
+  }
+  const mobilePlatform = mobilePlatforms.find(platform => basePath(route) === `/guides/${platform.slug}/`);
+  if (mobilePlatform) {
+    const expected = mobilePlatform.id === 'android' ? 3 : 4;
+    if ($('.guide-screenshot').length !== expected || $('.screenshot-placeholder').length !== expected)
+      errors.push(`${label}: missing mobile screenshot placeholders`);
+    if ($('.mobile-platform[aria-current=page]').length !== 1 || !$(`a[href="${mobilePlatform.sourceUrl}"]`).length)
+      errors.push(`${label}: missing mobile navigation or official reference`);
+  }
+  if (['/download/', '/help/'].includes(basePath(route))) {
+    for (const platform of mobilePlatforms) {
+      if (!$(`.mobile-platform[href="${localPath(`/guides/${platform.slug}/`, locale)}"]`).length)
+        errors.push(`${label}: missing mobile setup guide ${platform.id}`);
+    }
   }
   if (basePath(route) === '/manga-translator/') errors.push(`${label}: removed advertising landing page remains in output`);
   if (basePath(route) === '/translate/') {

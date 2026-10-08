@@ -1,3 +1,5 @@
+import { mobilePlatforms } from '../data/mobile';
+
 export type StoreBrowser = 'chrome' | 'edge' | 'firefox';
 
 interface BrowserIdentity {
@@ -7,8 +9,8 @@ interface BrowserIdentity {
   userAgentData?: { mobile?: boolean; brands?: readonly { brand: string }[] };
 }
 
-// Use only local, low-entropy browser information; unknown/mobile browsers keep
-// the localized download page instead of advertising an unsupported installation.
+// Only desktop browsers can link straight to a store. Mobile guides are resolved
+// separately; unknown browsers retain the localized download chooser.
 export function desktopBrowser(identity: BrowserIdentity): StoreBrowser | undefined {
   const { userAgent: ua, userAgentData: hints } = identity;
   if (hints?.mobile || /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
@@ -24,4 +26,13 @@ export function desktopBrowser(identity: BrowserIdentity): StoreBrowser | undefi
 export function browserStoreUrl(identity: BrowserIdentity, stores: Record<StoreBrowser, string>) {
   const browser = desktopBrowser(identity);
   return browser ? stores[browser] || undefined : undefined;
+}
+
+// A mobile installation action always opens instructions, never an app package.
+export function mobileGuidePath(identity: BrowserIdentity): string | undefined {
+  const { userAgent, platform, maxTouchPoints = 0 } = identity;
+  const id = /Android/i.test(userAgent) ? 'android'
+    : /iPhone|iPad|iPod/i.test(userAgent) || platform === 'MacIntel' && maxTouchPoints > 1 ? 'ios' : undefined;
+  const guide = mobilePlatforms.find(item => item.id === id);
+  return guide ? `/guides/${guide.slug}/` : undefined;
 }

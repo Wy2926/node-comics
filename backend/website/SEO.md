@@ -13,6 +13,8 @@
 | `/download/` | Chrome／Edge／Firefox 漫画翻译插件下载 | manga translator Chrome / Edge / Firefox |
 | `/pricing/` | 漫画翻译免费额度、Lite 订阅价格 | free manga translation, Lite subscription |
 | `/guides/` | 漫画翻译教程、本地漫画阅读指南 | manga translation guides, local comic reader guides |
+| `/guides/android-firefox/` | 安卓 Firefox 漫画插件安装教程 | Android Firefox manga extension setup |
+| `/guides/ios-orion/` | iPhone／iPad Orion 漫画插件教程 | iOS Orion manga extension setup |
 | `/faq/` | 插件安装、支持格式、免费额度等具体问题 | manga translator FAQ, supported files, limits |
 | `/help/` | 插件使用帮助、权限与登录问题 | manga translator help, extension troubleshooting |
 | `/about/` | NodeLane 漫译品牌与用途 | about NodeLane Comics |
@@ -47,8 +49,9 @@
 - [src/i18n](src/i18n) 是17 语内容来源，本地翻译的两篇文章维护在 [src/i18n/guides](src/i18n/guides)。普通页面的 `seo*Title` 用于搜索标题，页面介绍用于 description 和可见正文；指南和政策使用自身的 `title`、`description`。首页摘要来自 [src/i18n/home](src/i18n/home)，标题和正文共同表明产品用途。
 - [Base.astro](src/layouts/Base.astro) 输出每页自引用 canonical、17 个互相对应的 hreflang 和简中 `x-default`；各语言保持独立可抓取 URL，不按 IP 或浏览器语言强制跳转。标题、摘要同步到 Open Graph 和 Twitter，并提供分享图和替代文本。[Google 多语言建议](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)
 - [LocalizedPage.astro](src/components/LocalizedPage.astro) 输出产品 SoftwareApplication、指南 Article 和 FAQPage；公共布局包含 Organization、WebSite、WebPage、内页面包屑。只标记真实可见内容，不编造评分、销量或价格。新指南填写实际 `published` 与 `updated` 日期，内容更新时修改该篇 `updated`，不用构建时间冒充内容更新时间。指南通过 `related` 指定相关文章；正文命令、表格和链接由 [ArticleSection.astro](src/components/ArticleSection.astro) 输出静态 HTML，站内链接随当前语言切换。
-- [sitemap.xml.ts](src/pages/sitemap.xml.ts) 收录 21 类公开页面 × 17 语言，共 357 个 URL，并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
+- [sitemap.xml.ts](src/pages/sitemap.xml.ts) 从 `publicPaths` 生成全部 17 语公开页面（包括手机安装教程），并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
 - 首页商店入口直接使用可抓取的链接和本地浏览器标识；Chrome、Edge、Firefox 均指向各自官方商店。地址统一维护在 [site.ts](src/data/site.ts)，安装包与手动安装说明留在下载页。
+- Android／iOS 图标使用可抓取的同语言教程链接，不标为 App 下载；教程复用 Article、canonical 与 hreflang，正文保留官方参考与 Orion 测试阶段说明。截图占位不作为实测图片或应用兼容性证据。
 
 ## FAQ
 
