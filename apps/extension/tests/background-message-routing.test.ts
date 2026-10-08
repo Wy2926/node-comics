@@ -97,7 +97,7 @@ beforeEach(async () => {
   });
   const {default:background}=await import('../entrypoints/background');
   background.main();
-  expect(listeners).toHaveLength(9); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts.
+  expect(listeners).toHaveLength(10); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts, tracking.
 });
 
 afterEach(() => {vi.unstubAllGlobals(); vi.unstubAllEnvs();});

@@ -3,6 +3,9 @@ deploy/engine.json
 .env.*
 !.env.example
 !deploy/.env.server.example
+# Public AniList client IDs only.
+!/apps/extension/.env.chrome
+!/apps/extension/.env.edge
 node_modules/
 .venv/
 __pycache__/

@@ -34,6 +34,8 @@ const schema: Record<Exclude<CatalogTable,'translationBindings'>, [string, strin
   catalogs: [['comicId', 'comicId']],
   tasks: [['entryId', 'entryId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
   metadata: [], tombstones: [],
+  trackingBindings: [['mediaId', 'mediaId']],
+  trackingJobs: [['scope', 'scope'], ['due', ['scope', 'nextRunAt']], ['blocked', ['scope', 'status', 'reason']]],
 };
 export const idbRequest = <T>(request: IDBRequest<T>): Promise<T> => new Promise((resolve, reject) => {
   request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
@@ -51,7 +53,15 @@ const databaseSchema: DatabaseSchema = Object.fromEntries(Object.entries(schema)
   indexes: indices.map(([name, keyPath, unique]) => ({ name, keyPath, unique })),
 }]));
 export function openCatalog(): Promise<IDBDatabase> {
-  if (!opening) opening = openSourceDatabase('catalog', databaseSchema, () => { opening = undefined; }).catch(error => { opening = undefined; throw error; });
+  if (!opening) opening = openSourceDatabase('catalog', databaseSchema, () => { opening = undefined; }, undefined, undefined, {
+    version: 2,
+    upgrade(tx, oldVersion) {
+      if (oldVersion < 2) for (const name of ['trackingBindings', 'trackingJobs'] as const) {
+        const definition = databaseSchema[name], store = tx.db.createObjectStore(name, {keyPath: definition.keyPath!});
+        for (const index of definition.indexes ?? []) store.createIndex(index.name, index.keyPath, {unique: !!index.unique});
+      }
+    },
+  }).catch(error => { opening = undefined; throw error; });
   return opening;
 }
 function openTables(tables:CatalogTable[]):Promise<IDBDatabase>{
@@ -113,7 +123,7 @@ export const catalog = {
         const ids=writes.get(table);if(ids)ids.push(key);else writes.set(table,[key]);
       },
       async remove(table, id) {
-        tx.objectStore(table).delete(id); if(table!=='catalogs'&&table!=='tombstones')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
+        tx.objectStore(table).delete(id); if(table!=='catalogs'&&table!=='tombstones'&&table!=='trackingBindings'&&table!=='trackingJobs')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
         const ids=writes.get(table);if(ids)ids.push(id);else writes.set(table,[id]);
       },
     };
@@ -275,9 +285,10 @@ export const catalog = {
       if (comic && (comic.lastReadAt ?? 0) <= position.updatedAt) await tx.put('comics', {...comic, lastEntryId: entry.id, lastReadAt: position.updatedAt, lastPage: page.ordinal + 1, lastPageCount: entry.knownTotal ?? (entry.discoveryComplete ? entry.pageCount : undefined)});
     });
   },
-  async markRead(entryId: string): Promise<void> {
+  async markRead(entryId: string, identity?: {contentId:string;generation:number}): Promise<void> {
     await catalog.mutate(['entries'], async tx => {
       const entry = await tx.get('entries', entryId);
+      if (identity && (entry?.contentId !== identity.contentId || entry.generation !== identity.generation)) return;
       if (entry && !entry.readAt && entry.discoveryComplete && (entry.pageCount||entry.document?.chapters.length) && !entry.error) await tx.put('entries', {...entry, readAt: Date.now()});
     });
   },
@@ -349,6 +360,9 @@ export const catalog = {
       await tx.remove('metadata', 'reading-preferences:' + comicId);
       await tx.remove('metadata', 'book-download:' + comicId);
       await tx.remove('metadata', 'download-languages:' + comicId);
+      // A removed source cannot authorize future tracker sends. In-flight workers recheck it.
+      await tx.remove('trackingBindings', comicId);
+      await tx.remove('metadata', 'tracking-candidate:' + comicId);
       await tx.remove('comics', comicId); return entries;
     });
   },

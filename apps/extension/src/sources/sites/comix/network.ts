@@ -8,12 +8,15 @@ import {search} from './search';
 function text(value:unknown){if(typeof value!=='string'||!value.trim()||value.length>2048)throw Error('Comix 文本字段无效。');return value;}
 function integer(value:unknown){if(!Number.isSafeInteger(value)||Number(value)<0)throw Error('Comix 数量字段无效。');return Number(value);}
 function location(url:string){const value=comixLocation(new URL(url));if(!value)throw Error('Comix 来源地址无效。');return value;}
-interface Chapter {id:number;number:number;url:string;official:boolean;group:string;name:string;}
+interface Chapter {id:number;number:number;chapterNumber:string;url:string;official:boolean;group:string;name:string;}
 function chapter(value:unknown,hid:string,mangaId:number):Chapter{
   const row=object(value),url=new URL(text(row.url),'https://comix.to').href,loc=location(url);
-  const id=integer(row.id),number=Number(row.number);
+  // Keep the source's decimal label: coercion of null/booleans or a truncated title is not chapter evidence.
+  const chapterNumber=typeof row.number==='string'?row.number:typeof row.number==='number'?String(row.number):'';
+  if(chapterNumber.length>32||!/^(0|[1-9]\d*)(?:\.\d+)?$/.test(chapterNumber))throw Error('Comix 话号字段无效。');
+  const id=integer(row.id),number=Number(chapterNumber);
   if(row.mangaId!==mangaId||loc.hid!==hid||Number(loc.chapterId)!==id||!Number.isFinite(number)||number<0||Number(loc.number)!==number||row.language!=='en')throw Error('Comix 章节归属或语言无效。');
-  return {id,number,url,official:row.isOfficial===true,group:row.group?text(object(row.group).name):'未标注来源',name:typeof row.name==='string'?row.name:''};
+  return {id,number,chapterNumber,url,official:row.isOfficial===true,group:row.group?text(object(row.group).name):'未标注来源',name:typeof row.name==='string'?row.name:''};
 }
 export const network={
   pageTransport:['catalog','pages'],
@@ -46,6 +49,7 @@ export const network={
     const entries:SourceEntry[]=[...chosen.values()].sort((a,b)=>a.number-b.number).map((row,order)=>({
       id:id+':chapter:'+row.number,catalogId:id,remoteId:String(row.id),url:row.url,
       title:'Chapter '+row.number+(row.name?' · '+row.name:''),groupIds:['chapters'],rawTypes:[row.official?'官方':row.group],order,related:false,sequenceId:id,
+      chapterNumber:row.chapterNumber,
     }));
     const poster=detail.poster as {large?:unknown;medium?:unknown}|undefined;
     const snapshot:SourceCatalogSnapshot={id,sourceId:'comix',url:canonical,title:text(detail.title),observedAt:Date.now(),complete:true,

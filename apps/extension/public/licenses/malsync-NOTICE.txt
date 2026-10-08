@@ -1,0 +1,17 @@
+Node Comics includes an adapted AniList protocol implementation from MALSync.
+
+Upstream: https://github.com/MALSync/MALSync
+Version: 0.12.5
+Commit: f40f226b8bc52cdb42655f2a8448441b1b18b6f8
+Attribution: lolamtisch (lolamtisch@gmail.com) and MALSync contributors.
+License: GPL-3.0-only. See malsync-GPL-3.0.txt in this directory.
+
+Original files: src/_provider/AniList/single.ts and helper.ts.
+Adapted file: Node Comics apps/extension/src/tracking/anilist.ts.
+Modified by Node Comics on 2026-10-07 for manga-only validation, minimal
+progress mutations, identity checks, private credentials and bounded transport.
+The upstream client ID, token logging and UI/runtime are not included.
+
+Corresponding Node Comics source and build instructions:
+https://github.com/Wy2926/node-comics
+The distributor must provide source matching the distributed revision.

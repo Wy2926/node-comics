@@ -1,0 +1,25 @@
+.nc-tracking p { font-size: var(--text-caption); line-height: 1.6; }
+.nc-tracking code { display: block; overflow-wrap: anywhere; user-select: all; font-size: var(--text-caption); }
+.nc-tracking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nc-tracking .setting-row .nc-tracking-actions { flex-shrink: 0; }
+.nc-tracking-error { color: var(--danger); }
+.nc-tracking-note { color: var(--muted); }
+.nc-tracking-comic { margin-block: 16px; padding-block: 16px; border-block: 1px solid var(--line); }
+.nc-tracking-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.nc-tracking-heading h3 { margin: 0; font-size: var(--text-small); }
+.nc-tracking-status { color: var(--muted); font-size: var(--text-caption); }
+.nc-tracking-status[data-state=pending], .nc-tracking-status[data-state=blocked] { color: var(--warning); }
+.nc-tracking-status[data-state=syncing] { color: var(--accent); }
+.nc-tracking-status[data-state=synced] { color: var(--success); }
+.nc-tracking-comic a { overflow-wrap: anywhere; font-size: var(--text-small); }
+.nc-tracking-confirm, .nc-tracking-editor { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface-soft); }
+.nc-tracking-editor { display: grid; gap: 12px; }
+.nc-tracking-editor p { margin: 0; }
+.nc-tracking-editor form { display: grid; gap: 8px; justify-items: start; }
+.nc-tracking-editor .field, .nc-tracking-editor input:not([type=checkbox]):not([type=radio]) { width: 100%; min-width: 0; }
+.nc-tracking-results { display: grid; gap: 8px; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
+.nc-tracking-results legend { font-size: var(--text-caption); color: var(--muted); }
+.nc-tracking-results label, .nc-tracking-check { display: flex; align-items: flex-start; gap: 8px; font-size: var(--text-caption); line-height: 1.6; }
+.nc-tracking-results input, .nc-tracking-check input { flex-shrink: 0; width: auto; margin-top: 4px; }
+.nc-tracking-results small { display: block; color: var(--muted); }
+@media (max-width: 760px) { .nc-tracking .setting-row { align-items: flex-start; flex-wrap: wrap; } }

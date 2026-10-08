@@ -9,6 +9,7 @@
 ## 实现约定
 
 - `definition.ts` 定义 URL、HID 身份与权限；`network.ts` 显式选择 `pageTransport: ['catalog', 'pages']`，通过同一个 `context.request()` 在源站网页上下文请求 `/api/v1/manga/<hid>`、完整分页目录及 `/api/v1/chapters/<id>` 图片清单。不请求详情页 HTML，也不解析页面已有的作品数据。核对分页、总数、上传 ID 与归属；章节按话号去重，保留 0 和小数话，优先保留已有上传，首次选择官方上传后取最小 ID。
+- 阅读追踪保留已核对作品与 URL 归属的原生 `number` 标签，字符串小数不取整；不从标题、列表顺序推断话号，不将空值、布尔值或指数形式强制转换成章节。本站尚未提供已核验的 tracker 外链提取，作品关联仍需确认。
 - `protocol.ts` 独立实现请求签名和响应解码；`image.ts` 接入图片解码，`images.ts` 还原 `X-Scramble-Algo: 3` 网格，保留边缘像素。Hash `03632`、`02900` 分别修正种子 XOR 58414、117532；未知协议明确失败。
 - `page.ts` 识别 `.rpage-main` 内 `data-page` 正文槽及已加载图片／画布；导入入口挂在 `.mpage__actions`、`.rpage-floatctl`。导航、重绘和容器替换清理旧引用。
 - 封面读取 `poster.large` / `poster.medium`，由 `image.coverTransport: 'page'` 显式在该图片 URL 自身的网页上下文获取原始字节；书架与搜索封面共用此规则。复用同 URL 图片标签页，否则临时打开后台图片页，优先读取本次导航缓存，不加载作品或章节；完成后回收，成功封面沿用缩略图缓存。首次未缓存读取增加一次后台图片页生命周期。

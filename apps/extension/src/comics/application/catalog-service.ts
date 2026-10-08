@@ -32,7 +32,7 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
     if(item.related)continue;
     const old = bySource.get(item.id);
     const navigation = {title:item.title, order:item.order, sourceOrder, sequenceId:item.sequenceId, contentLanguage:item.contentLanguage,
-      readingSlotId:item.readingSlotId, readable:item.readable, sourceUrl:item.url};
+      readingSlotId:item.readingSlotId, chapterNumber:item.chapterNumber, readable:item.readable, sourceUrl:item.url};
     const entry:Entry = old
       ? {...old, ...navigation, sourceRemoved:undefined}
       : {id:crypto.randomUUID(), comicId:current.id, ...navigation, sourceEntryId:item.id, format:'website', contentId:crypto.randomUUID(), generation:1,

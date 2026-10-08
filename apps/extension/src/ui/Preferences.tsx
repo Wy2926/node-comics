@@ -10,6 +10,7 @@ import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
+import {TrackingSettings} from './tracking/TrackingSettings';
 type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
@@ -36,6 +37,7 @@ export function Preferences({ settings, setSettings, caps, children, onOpenShort
       </SettingRow>
     </section>}
     <TranslationChannels/>
+    <TrackingSettings/>
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>

@@ -36,6 +36,8 @@ export function validateCatalog(
     return invalid();
   const { definition, location } = resolveSource(c.url, definitions);
   if (c.cover !== undefined && (!c.cover || !text(c.cover.url, 8192) || safeImageUrl(c.cover.url, c.url) !== c.cover.url)) return invalid();
+  if (c.externalIds !== undefined && (!c.externalIds || typeof c.externalIds !== 'object' || Array.isArray(c.externalIds) ||
+      [c.externalIds.anilist, c.externalIds.myAnimeList].some(id => id !== undefined && (!Number.isSafeInteger(id) || id <= 0)))) return invalid();
   if (
     !definition.capabilities.catalog ||
     location.kind !== 'catalog' ||
@@ -66,6 +68,7 @@ export function validateCatalog(
       typeof e.related !== 'boolean' ||
       (e.sequenceId !== undefined && !text(e.sequenceId)) ||
       (e.readingSlotId !== undefined && !text(e.readingSlotId)) ||
+      (e.chapterNumber !== undefined && (!text(e.chapterNumber, 64) || e.chapterNumber.trim() !== e.chapterNumber || /[\u0000-\u001f\u007f]/.test(e.chapterNumber))) ||
       (e.readable !== undefined && typeof e.readable !== 'boolean') ||
       (e.contentLanguage !== undefined && !normalizeContentLanguage(e.contentLanguage))
     )
@@ -110,6 +113,7 @@ export function validateCatalog(
     url: c.url,
     title: c.title,
     cover: c.cover ? {url: c.cover.url} : undefined,
+    externalIds: c.externalIds ? {anilist: c.externalIds.anilist, myAnimeList: c.externalIds.myAnimeList} : undefined,
     observedAt: c.observedAt,
     complete: c.complete,
     note: c.note,

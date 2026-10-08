@@ -10,6 +10,8 @@ export interface SearchSeed {
   coverKey?:string;
   sourceName?:string;
   comicId?:string;
+  /** App-level candidate only. A source search hit never authorizes account tracking. */
+  anilistMediaId?:number;
 }
 export type SearchPhase='idle'|'resolving-name'|'needs-query'|'searching'|'settled'|'stopped';
 export type SearchSiteStatus='idle'|'queued'|'running'|'ready'|'empty'|'error'|'stopped';

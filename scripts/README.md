@@ -65,6 +65,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_translation_channels.mjs` / `verify_translation_channel_host.mjs` | 渠道设置、模拟 MTU、后台中断与缓存，见[渠道规范](../docs/TRANSLATION_CHANNELS.md#验证) |
 | `verify_translation_channel_live.mjs` | 真实回环 MTU；使用 `MTU_USERNAME`、`MTU_PASSWORD`、可选 `MTU_BASE_URL`，实际调用服务端引擎 |
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
+| `verify_tracking_ui.mjs` | Vite 5181 的隔离阅读追踪 UI：账号开关、候选确认、偏移、失败重试、暂停、重置与解除、语言主题和阅读位置；模拟服务且阻断外网，不代替真实 OAuth／后台同步验收 |
 | `node --test apps/extension/tests/shortcuts.browser.mjs` | Vite 5181 的隔离阅读器与选择器夹具；左侧锚点与连续滚动、固定标题／关闭／底栏、组合键录制／恢复、主题令牌、弹层保护与阅读位置恢复。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，不代替已安装扩展或原生划图授权验证 |
 | `node --test apps/extension/tests/modal.browser.mjs` | 同一 Vite 5181 的通用弹框夹具；长正文滚动时关闭按钮固定、焦点与背景位置恢复、嵌套下拉、关闭守卫、导入列表及短窗口大字号。沿用上述浏览器环境并阻断外网 |
 | `verify_reader_scroll.mjs` | Vite 5181 的阅读窗口夹具；模拟翻译状态与译图更新，检查章节交界、双向滚动、窗口淘汰、失败与位置恢复 |

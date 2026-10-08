@@ -84,7 +84,7 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
     queueMicrotask(() => { if (previous?.isConnected) previous.focus({preventScroll: true}); });
   };
   const startSearch = () => {
-    setSourceSeed(seed => seed ?? {title: work.title, titles: detail?.titles ?? work.titles, sourceName: 'AniList'});
+    setSourceSeed(seed => seed ?? {title: work.title, titles: detail?.titles ?? work.titles, sourceName: 'AniList', anilistMediaId: work.id});
     showPane('sources');
   };
   const value = detail ?? work;

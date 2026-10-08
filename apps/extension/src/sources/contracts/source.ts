@@ -54,6 +54,8 @@ export interface SourceEntry {
   contentLanguage?: string;
   /** Adapter-owned, opaque reading position shared by equivalent releases. */
   readingSlotId?: string;
+  /** Native chapter label, never inferred from title/order or rounded for a tracker. */
+  chapterNumber?: string;
   /** False only when the source explicitly reports an external, removed or empty release. */
   readable?: boolean;
 }
@@ -71,6 +73,8 @@ export interface SourceCatalogSnapshot {
   title: string;
   /** Optional dedicated artwork supplied by this catalog, never a reading page. */
   cover?: {url: string};
+  /** Exact work links supplied by this source; tracker namespaces are independent. */
+  externalIds?: {anilist?: number; myAnimeList?: number};
   observedAt: number;
   complete: boolean;
   note: string;

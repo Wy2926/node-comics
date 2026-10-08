@@ -27,6 +27,7 @@ describe('MangaDex API source', () => {
     expect(value.entries.map(entry => entry.remoteId)).toEqual([uuid(3), uuid(2), uuid(1), uuid(4), uuid(5)]);
     expect(value.entries.map(entry => entry.contentLanguage)).toEqual(['zh-HK', 'en', 'en', 'en', 'en']);
     expect(value.entries.map(entry => entry.order)).toEqual([0, 0, 0, 1, 2]);
+    expect(value.entries.map(entry => entry.chapterNumber)).toEqual(['1', '1', '1', '1.5', '2']);
     expect(value.entries[0].readingSlotId).toBe(value.entries[2].readingSlotId);
     expect(new Set(value.entries.map(entry => entry.sequenceId))).toEqual(new Set(['mangadex:' + mangaId + ':chapters']));
     for (const entry of value.entries) expect(entry.id).toBe(definition.identify(new URL(entry.url))?.pageKey);
@@ -60,6 +61,7 @@ describe('MangaDex API source', () => {
     const rows = [chapter(1, 'en', null), chapter(2, 'en', null), chapter(3, 'en', '1.5'), chapter(4, 'en', '1.25'), chapter(5, 'en', '1a'), chapter(6, 'en', '1')];
     const value = parseCatalog(manga(), rows, aggregate(rows), mangaId);
     expect(value.entries.map(entry => entry.remoteId)).toEqual([uuid(6), uuid(5), uuid(4), uuid(3), uuid(1), uuid(2)]);
+    expect(value.entries.map(entry => entry.chapterNumber)).toEqual(['1', '1a', '1.25', '1.5', undefined, undefined]);
     const unnamed = value.entries.slice(-2);
     expect(unnamed.map(entry => entry.readingSlotId)).toEqual([undefined, undefined]);
     expect(unnamed[0].sequenceId).not.toBe(unnamed[1].sequenceId);
@@ -67,6 +69,19 @@ describe('MangaDex API source', () => {
     expect(unproven.entries.map(entry => entry.readingSlotId)).toEqual([undefined, undefined]);
     expect(unproven.entries[0].sequenceId).not.toBe(unproven.entries[1].sequenceId);
     expect(parseCatalog(manga(), [], {result: 'ok', volumes: []}, mangaId).entries).toEqual([]);
+  });
+
+  it('retains exact tracker namespaces only from this verified manga entity, without extra requests or title guessing', () => {
+    const metadata = manga();
+    const withLinks = (links: unknown) => ({...metadata, data: {...metadata.data, attributes: {...metadata.data.attributes, links}}});
+    expect(validateCatalog(parseCatalog(withLinks({al: '30001', mal: '1', ap: 'fixture-manga'}), [chapter()], aggregate(), mangaId), [definition]).externalIds)
+      .toEqual({anilist: 30001, myAnimeList: 1});
+    expect(parseCatalog(withLinks({mal: '30001'}), [chapter()], aggregate(), mangaId).externalIds)
+      .toEqual({anilist: undefined, myAnimeList: 30001});
+    for (const links of [undefined, null, [], {}, {al: 'https://anilist.co/manga/30001'}, {al: '30001.0'}, {al: '3e4'}, {al: ' 30001 '},
+      {al: '0'}, {al: '-1'}, {al: '2147483648'}, {al: 30001}, {mal: true}])
+      expect(parseCatalog(withLinks(links), [chapter()], aggregate(), mangaId).externalIds).toBeUndefined();
+    expect(() => parseCatalog({...withLinks({al: '30001'}), data: {...withLinks({al: '30001'}).data, id: otherMangaId}}, [chapter()], aggregate(), mangaId)).toThrow();
   });
 
   it('maps MangaDex language codes to their intended BCP 47 meaning', () => {

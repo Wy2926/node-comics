@@ -7,9 +7,11 @@ import {registerOptionalSourceContent} from '../src/sources/runtime/optional-con
 import {registerAnalyticsBackground} from '../src/analytics/background';
 import {registerUninstallFeedback} from '../src/uninstall';
 import {registerWebShortcutsBackground} from '../src/shortcuts/web-background';
+import {registerTrackingBackground} from '../src/tracking/background';
 export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(({reason}) => {
     if (reason === 'install') void chrome.tabs.create({url: chrome.runtime.getURL('/reader.html')}).catch(() => {});
   });
   registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); registerAnalyticsBackground(); registerUninstallFeedback(); registerWebShortcutsBackground();
+  registerTrackingBackground();
 });

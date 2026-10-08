@@ -6,10 +6,11 @@ import {completePageList} from '../comics/application/library-service';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
 import {ChapterResourceWindow} from './chapter-resources';
 import {ReadingProgress,READING_TARGETS} from '../translation/automatic';
+import {CompletionEvidence,completionKey,pageKey} from './completion-evidence';
 
-export const pageKey=(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`;
+export {pageKey} from './completion-evidence';
 export const completeManifest=completePageList;
-type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string)=>void|Promise<void>;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
+type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string)=>void|Promise<void>;onMarkRead:(id:string,identity?:{contentId:string;generation:number})=>Promise<void>;notify:(message:string)=>void};
 /** Three metadata chapters, with viewport position independent of mounted page DOM. */
 export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
  const initialIndex=Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId));
@@ -23,7 +24,7 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
  const restoredGeometry=useRef(''),restorePending=useRef(true);
  const suppressScroll=useRef(false),lastScrollTop=useRef(0),saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),restoreFrame=useRef<number|undefined>(undefined);
  const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
- const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
+ const read=useRef(new Set<string>()),[evidence]=useState(()=>new CompletionEvidence());
  const navigationReason=useRef<'scroll'|'direct'>('direct');
  const [readingProgress]=useState(()=>new ReadingProgress());
  const [ahead,setAhead]=useState({key:'',count:READING_TARGETS});
@@ -60,15 +61,28 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
   restoreFrame.current=requestAnimationFrame(()=>{suppressScroll.current=false;});
  }
  function markRead(chapter:ReadingEntry){
-  if(!completeManifest(chapter))return;const key=`${chapter.id}:${chapter.generation}`;
-  if(!chapter.pages.every(page=>shown.current.has(`${chapter.contentId??chapter.id}:${page.id}`)))return;
-  if(read.current.has(key))return;read.current.add(key);
-  void onMarkRead(chapter.id).catch(error=>{read.current.delete(key);notify(msg('已读状态未保存：{0}',{'0':(error as Error).message}));});
+  if(!completeManifest(chapter)||document.visibilityState!=='visible')return;const key=completionKey(chapter);
+  if(read.current.has(key)||!evidence.complete(chapter))return;read.current.add(key);
+  void onMarkRead(chapter.id,chapter.contentId?{contentId:chapter.contentId,generation:chapter.generation}:undefined).catch(error=>{read.current.delete(key);notify(msg('已读状态未保存：{0}',{'0':(error as Error).message}));});
  }
- function pageShown(chapter:ReadingEntry,pageId:string){
-  shown.current.add(`${chapter.contentId??chapter.id}:${pageId}`);
-  const v=viewport.current,end=ends.current.get(chapter.id);
-  if(v&&end&&elementTop(end)+end.offsetHeight<=v.scrollTop+v.clientHeight+1&&(layout==='continuous'||chapter.id===copyRef.current.id&&indexRef.current===chapter.pages.length-1))markRead(chapter);
+ function observeVisiblePages(){
+  const v=viewport.current;if(!v||document.visibilityState!=='visible')return;
+  const bounds=v.getBoundingClientRect(),top=bounds.top+v.clientTop,left=bounds.left+v.clientLeft;
+  evidence.observe({top,left,bottom:top+v.clientHeight,right:left+v.clientWidth},key=>cells.current.get(key)?.getBoundingClientRect(),true);
+ }
+ function completeVisibleEnds(){
+  const v=viewport.current;if(!v||document.visibilityState!=='visible')return;
+  for(const chapter of stream){const end=ends.current.get(chapter.id);
+   if(end&&elementTop(end)+end.offsetHeight<=v.scrollTop+v.clientHeight+1&&(layout==='continuous'||chapter.id===copyRef.current.id&&indexRef.current===chapter.pages.length-1))markRead(chapter);
+  }
+ }
+ function pageShown(chapter:ReadingEntry,pageId:string,ready=true){
+  evidence.display(chapter,pageId,ready);
+  if(ready){observeVisiblePages();completeVisibleEnds();}
+ }
+ function beginReread(chapter:ReadingEntry){
+  const key=completionKey(chapter);if(!read.current.delete(key))return;
+  evidence.reset(chapter);
  }
  function activate(chapter:ReadingEntry,n:number){
   if(chapter.id!==copyRef.current.id){persist();copyRef.current=chapter;onActiveEntry(chapter.id);}
@@ -83,7 +97,8 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
    for(const chapter of stream){const stack=stacks.current.get(chapter.id),metrics=geometry.current.get(chapter.id);if(!stack||!metrics||!chapter.pages.length)continue;const top=elementTop(stack);if(top<=line||!selected)selected={chapter,index:pageAtHeight(metrics.offsets,line-top)};}
    if(selected)activate(selected.chapter,selected.index);
   }
-  preserve();updateReadingProgress();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(persist,350);
+  if(v.scrollTop<previous&&indexRef.current===0)beginReread(copyRef.current);
+  preserve();updateReadingProgress();observeVisiblePages();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(persist,350);
   if(forward){
    for(const chapter of stream){const end=ends.current.get(chapter.id);if(!end)continue;const top=elementTop(end),crossed=top>previous&&top+end.offsetHeight<=v.scrollTop+v.clientHeight+1;if(crossed&&(layout==='continuous'||indexRef.current===chapter.pages.length-1))markRead(chapter);}
   }
@@ -96,10 +111,12 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
    if(destination){markRead(chapter);persist();anchor.current={entryId:destination.id,pageId:destination.pages[0]?.id??'',relativeOffset:0};activate(destination,0);return;}
   }
   const target=Math.max(0,Math.min(chapter.pages.length-1,Math.trunc(n)));
+  if(target===0)beginReread(chapter);
   anchor.current={entryId:chapter.id,pageId:chapter.pages[target].id,relativeOffset:0};indexRef.current=target;setActive({entryId:chapter.id,index:target});persist();
  }
  // New geometry is already committed. Restore by stable page identity even when its old DOM was evicted.
  useLayoutEffect(()=>{
+  evidence.retain(stream);const current=new Set(stream.map(completionKey));for(const key of read.current)if(!current.has(key))read.current.delete(key);
   if(anchor.current.entryId!==copy.id){anchor.current={entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset};setActive({entryId:copy.id,index:initialIndex});}
   if(!anchor.current.pageId&&copy.pages.length){anchor.current.pageId=copy.pages[0].id;setActive({entryId:copy.id,index:0});}
   const v=viewport.current,n=copy.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(copy,n);
@@ -108,8 +125,12 @@ export function useChapterStream({copy,sequence,layout,update,onActiveEntry,onLo
   // Status/image updates must not replay a stale anchor while a native scroll event is pending.
   if(restorePending.current||restoredGeometry.current!==signature)restore();
   restoredGeometry.current=signature;restorePending.current=false;
-  updateReadingProgress();
+  updateReadingProgress();observeVisiblePages();completeVisibleEnds();
  });
+ useEffect(()=>{
+  const visible=()=>{observeVisiblePages();completeVisibleEnds();};
+  document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible);
+ },[stream,layout]);
  useEffect(()=>{
   resources.prepare(stream,onLoadEntry,()=>setResourceVersion(value=>value+1));
  },[stream,onLoadEntry,resources]);

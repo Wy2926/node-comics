@@ -8,6 +8,8 @@
 
 只有 `/aggregate` 明确聚合且 feed 卷话一致的编号章节共享 `readingSlotId`，同一位置各条目顺序相同，候选保留 feed 顺序；编号章节声明作品内跨语言的逻辑连读序列。标题只保留卷、话和源标题，翻译组独立放在 `rawTypes`，外链、不可用及空页条目标记 `readable: false`。公共层将同话合并显示，并逐话按目标语言、英语、源顺序选择可读条目；手动选择优先，具体规则见[单来源阅读](../../../../../../docs/SIMPLE_COMIC_READING_DESIGN.md#网站与只读目录)。无话号以及未获聚合证明的条目独立保留、独立阅读，不从标题推断对应关系。卷话数值和小数按升序排列，后缀保持源站语义，无话号排在同卷编号章节之后。
 
+阅读追踪保留原生 `attributes.chapter` 标签，小数和字母后缀不取整；缺失时不从标题或目录顺序补号。同次作品资料中的 `links.al`／`links.mal` 按[官方外链定义](https://gitlab.com/mangadex-pub/mangadex-api-docs/blob/main/3-enumerations.md)分别提取精确 AniList／MyAnimeList ID，非法值不作为关联证据；不增加目录网络请求。作品关联与章节计数确认由[追踪模块](../../../../../../docs/READING_PROGRESS_SYNC_DESIGN.md)负责，不改变本地发布条目身份或阅读位置。
+
 原始图片由 `/at-home/server/<chapter UUID>` 的 `data` 数组决定页序，保留重复文件在不同页槽。目录中的章节页数与返回清单必须相等。每页 `contentKey` 使用章节 UUID、图片 hash 和文件名；临时图片节点变更不改变内容身份。只接受 HTTPS `uploads.mangadex.org` 与单层 `*.mangadex.network` 节点，不固定猜测服务器或使用 `dataSaver` 替代原图。外链、不可用及空页发布条目在打开时明确报错，不替换其他发布条目。
 
 网站访问遵循[公共权限规则](../../../../../../docs/SITE_ADAPTERS.md#必须保持的约束)，不逐站申请。具备浏览器访问权限的网页会挂载一个页面级导入／管理入口，使用自有固定位置容器并随导航／销毁清理；该入口不依赖 MangaDex 的专属 DOM 选择器。真实页面布局与 SPA 中入口可见性须在源站网页单独验收，隔离页面测试不能替代。

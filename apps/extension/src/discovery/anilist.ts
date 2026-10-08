@@ -2,6 +2,7 @@ import {
   DiscoveryError, type DiscoveryDetail, type DiscoveryProvider, type DiscoveryQuery,
   type DiscoveryRanking, type DiscoveryWork, type PublicationStatus,
 } from './types';
+import {aniListRateLimit, createAniListRateLimit, type AniListRateLimit} from '../tracking/rate-limit';
 
 const endpoint = 'https://graphql.anilist.co';
 const sorts: Record<DiscoveryRanking, string> = {
@@ -49,23 +50,19 @@ function work(value: unknown): DiscoveryWork {
 }
 
 /** Public, credential-free metadata only. No source cookies, library writes or title translation. */
-export function createAniListProvider(fetcher: typeof fetch = fetch, now = Date.now): DiscoveryProvider {
-  let retryAt = 0;
+export function createAniListProvider(fetcher: typeof fetch = fetch, now = Date.now,
+  rateLimit: AniListRateLimit = now === Date.now ? aniListRateLimit : createAniListRateLimit(now)): DiscoveryProvider {
   async function request(query: string, variables: ObjectValue, signal: AbortSignal): Promise<ObjectValue> {
-    if (retryAt > now()) throw new DiscoveryError('rate-limit', retryAt);
+    const retryAt = await rateLimit.availableAt();
+    if (retryAt) throw new DiscoveryError('rate-limit', retryAt);
     try {
       const response = await fetcher(endpoint, {
         method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error',
         headers: {'Content-Type': 'application/json', Accept: 'application/json'},
         body: JSON.stringify({query, variables}), signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       });
-      if (response.status === 429) {
-        const header = response.headers.get('Retry-After');
-        const seconds = header && /^\d+(?:\.\d+)?$/.test(header) ? Number(header) : undefined;
-        const date = header ? Date.parse(header) : NaN;
-        retryAt = Math.max(now() + 1000, seconds !== undefined ? now() + seconds * 1000 : Number.isFinite(date) ? date : now() + 60_000);
-        throw new DiscoveryError('rate-limit', retryAt);
-      }
+      const cooldown = await rateLimit.observe(response);
+      if (response.status === 429) throw new DiscoveryError('rate-limit', cooldown);
       if (!response.ok) throw new DiscoveryError('unavailable');
       const payload = object(await response.json());
       if (Array.isArray(payload.errors) && payload.errors.length) throw new DiscoveryError('unavailable');

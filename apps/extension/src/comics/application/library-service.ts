@@ -1,4 +1,7 @@
 import {catalog} from '../repositories';
+import {trackingStore} from '../../tracking/store';
+import {wakeTracking} from '../../tracking/client';
+import type {CompletionIdentity} from '../../tracking/model';
 import type {Comic,Entry,PageDescriptor,PageMaterialization,ReadingPosition} from '../domain';
 import type {Page,ReadingEntry} from '../../types';
 import {pageRenderProfile,pageReference} from '../pages/identity';
@@ -176,7 +179,13 @@ export async function removeComics(ids:readonly string[]) {
   return {removed,failures};
 }
 export const subscribeLibrary=catalog.subscribe;
-export const markRead=catalog.markRead;
+export const suggestTrackingMedia=trackingStore.suggest;
+export async function markRead(entryId:string,identity?:CompletionIdentity):Promise<void> {
+  // Only a reader completion bound to the displayed content may create a tracker intent.
+  if(!identity)return catalog.markRead(entryId);
+  try {if(await trackingStore.complete(entryId,identity))wakeTracking();}
+  catch(error) {await catalog.markRead(entryId,identity);throw error;}
+}
 export const completePageList=(copy:ReadingEntry)=>copy.pages.length>0&&copy.discoveryComplete&&(!copy.knownTotal||copy.knownTotal===copy.pages.length);
 export type {Comic,Entry};
 

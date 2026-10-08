@@ -21,6 +21,8 @@ Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页
 
 官方 API 默认由 [service.ts](src/service.ts) 指向产品服务；本地预览沿用该地址。使用隔离后端时，在启动或构建前设置 `VITE_API_BASE`，结束后清除。Drive 构建需要 `VITE_DRIVE_CONNECT_URL`，配置见[连接页](../drive-connect/README.md)。
 
+AniList 阅读追踪在 Chrome／Edge 构建中分别使用 `.env.chrome`／`.env.edge` 中的自有公开 Client ID，手动包与商店包共用对应配置。更换自有应用、Firefox 配置、回调地址与发布验收见[阅读追踪](../../docs/READING_PROGRESS_SYNC_DESIGN.md#账号与部署配置)。MALSync 协议移植的固定版本、摘要和许可见[第三方说明](THIRD_PARTY.md)。
+
 | 产物 | 命令 |
 | --- | --- |
 | Chrome 手动安装包 | `npm run zip` |
@@ -37,6 +39,7 @@ Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页
 | --- | --- |
 | 网站适配 | [适配器边界与站点入口](../../docs/SITE_ADAPTERS.md) |
 | 导入、远程书库、阅读、缓存与导出 | [来源架构与 OPDS](../../docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式模块](src/comics/formats/README.md)、[导出](../../docs/COMIC_EXPORT_DESIGN.md) |
+| 阅读追踪 | [跨网站 → AniList 与 MALSync 移植](../../docs/READING_PROGRESS_SYNC_DESIGN.md)（插件阅读器首期；不替代 OPDS 续读同步） |
 | 翻译 | [渠道](../../docs/TRANSLATION_CHANNELS.md)、[官方契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
 | UI | [共享主题](../../docs/POPUP_AND_THEME.md)、[快捷键](../../docs/POPUP_AND_THEME.md#快捷键)、[国际化](../../docs/UI_INTERNATIONALIZATION.md) |
 | 发现与搜索 | [AniList 发现](../../docs/DISCOVERY.md)、[跨语言网站搜索](../../docs/COMIC_SEARCH_DESIGN.md) |

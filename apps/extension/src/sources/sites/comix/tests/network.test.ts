@@ -21,7 +21,7 @@ vi.mock('../../../runtime/page-network',async()=>{
 });
 
 const url='https://comix.to/title/rrzm-sample';
-const row=(id:number,number:number,official=false)=>({id,number,mangaId:2188,language:'en',isOfficial:official,group:{name:'Group'},name:'',url:`/title/rrzm-sample/${id}-chapter-${number}`});
+const row=(id:number,number:number|string,official=false)=>({id,number,mangaId:2188,language:'en',isOfficial:official,group:{name:'Group'},name:'',url:`/title/rrzm-sample/${id}-chapter-${number}`});
 function fixture(rows=[row(20,0),row(30,1),row(10,1,true),row(40,1.5)],mutate?:(data:any,page:number)=>void){
  const request=vi.fn(async(target:string)=>{
    const u=new URL(target);
@@ -72,10 +72,20 @@ describe('Comix network adapter',()=>{
    const context=fixture(),first=validateSourceCatalog(await network.catalog(url,context));
    expect(context.request).toHaveBeenCalledTimes(3);
    expect(first.entries.map(e=>e.remoteId)).toEqual(['20','10','40']);
+   expect(first.entries.map(e=>e.chapterNumber)).toEqual(['0','1','1.5']);
    const next=await network.catalog(url,{...fixture([row(20,0),row(30,1),row(5,1,true),row(10,1,true),row(40,1.5),row(50,2)]),previous:first});
    expect(next.entries.map(e=>e.remoteId)).toEqual(['20','10','40','50']);
    const replacement=await network.catalog(url,{...fixture([row(20,0),row(30,1),row(40,1.5)]),previous:first});
    expect(replacement.entries[1].id).toBe(first.entries[1].id);expect(replacement.entries[1].remoteId).toBe('30');
+ });
+ it('retains native string chapter labels without rounding decimals or using display titles',async()=>{
+   const rows=[row(20,'1.00'),row(30,'1.50'),row(40,2)];rows[2].name='Chapter 99';
+   const value=validateSourceCatalog(await network.catalog(url,fixture(rows)));
+   expect(value.entries.map(entry=>entry.chapterNumber)).toEqual(['1.00','1.50','2']);
+   expect(value.externalIds).toBeUndefined();
+ });
+ it.each([null,true,false,'',' ','0x1','1e0','-1','1a','1.2.3',{},['1']])('rejects invalid native chapter evidence %s',async number=>{
+   await expect(network.catalog(url,fixture(undefined,(data,page)=>{if(page===1)data.result.items[0].number=number;}))).rejects.toThrow();
  });
  it.each(['partial','repeat','foreign','changed-total','invalid-url'])('rejects %s instead of publishing a partial directory',async(mode)=>{
    const context=fixture(undefined,(d,page)=>{if(page!==2)return;if(mode==='partial')d.result.items.pop();if(mode==='repeat')d.result.items[0]=row(20,0);if(mode==='foreign')d.result.items[0].mangaId=999;if(mode==='changed-total')d.result.meta.total++;if(mode==='invalid-url')d.result.items[0].url='https://evil.test/title/rrzm/10-chapter-1';});

@@ -11,7 +11,7 @@ import { Icon } from './icons';
 import { COMIC_ACCEPT } from './comics/formats/limits';
 import { LocalImportQueue } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
-import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, getComic, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, coverReference, setSourceLanguagePreference, type Comic, type ReadingDirectory } from './comics/application/library-service';
+import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, getComic, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, coverReference, setSourceLanguagePreference, suggestTrackingMedia, type Comic, type ReadingDirectory } from './comics/application/library-service';
 import { importSourceFiles, importManifest } from './comics/application/import-service';
 import {prepareEntryContent} from './comics/application/entry-content';
 import { settings as readSettings, saveSettings } from './comics/application/preferences';
@@ -170,16 +170,18 @@ export function App(){
    const seed:SearchSeed={title:comic.title,comicId:comic.id,sourceName:comic.sourceName,origin,cover:comic.sourceCover,coverKey:coverReference(comic)};
    setComicSearch({seed,key:JSON.stringify([comic.id,comic.title,origin]),open:true});
  }
- async function openSearchHit(hit:SourceSearchResult,isActive?:()=>boolean){
+ async function openSearchHit(hit:SourceSearchResult,isActive?:()=>boolean,anilistMediaId?:number){
    const search=comicSearchRef.current,epoch=readingEpoch.current,intent=searchIntent.current;
    const active=()=>readingEpoch.current===epoch&&api.isCurrent()&&searchIntent.current===intent&&(isActive?isActive()&&!currentRef.current:!!search&&comicSearchRef.current===search&&search.open);
    const close=()=>{if(!isActive)setComicSearch(value=>value&&value===search?{...value,open:false}:value);};
+   // This only pre-fills the later confirmation UI; it never binds or uploads history.
+   const suggest=async(comicId:string)=>{if(anilistMediaId)await suggestTrackingMedia(comicId,anilistMediaId).catch(()=>{});};
    const existing=library.comics.find(comic=>comic.sourceKey===JSON.stringify(['website:'+hit.sourceId,hit.catalogId]));
-   if(existing){const entry=await continueEntry(existing.id,settingsRef.current.language);if(!active())return;if(!entry)throw Error(msg('无法打开来源。'));close();await openEntry(entry.id);return;}
+   if(existing){const entry=await continueEntry(existing.id,settingsRef.current.language);await suggest(existing.id);if(!active())return;if(!entry)throw Error(msg('无法打开来源。'));close();await openEntry(entry.id);return;}
    let opened=false,importedId:string|undefined;
    try{
      const result=await observeImport('website','website',()=>trackWebsiteImport(options=>importSearchResult(hit,settingsRef.current.language,options),async result=>{
-       importedId=result.comic.id;if(!active())return;opened=true;close();void openEntry(result.entry.id);
+       importedId=result.comic.id;await suggest(result.comic.id);if(!active())return;opened=true;close();void openEntry(result.entry.id);
      }));
      if(opened)return;
    // An authorized import may finish after the user leaves; only its original view may navigate.
@@ -387,7 +389,7 @@ export function App(){
   {view==='account'&&<AccountPage tab={accountTab} onTabChange={tab=>nav('account',tab)} api={api} account={account} notify={notify} rights={rights??undefined} testing={login.development} onEntitlements={updateEntitlements} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>:null}
   <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
   <main className="nc-main nc-search-main" hidden={!!current||view!=='search'}>{(searchPageVisited||view==='search')&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:page`} presentation="page" open={!current&&view==='search'} seed={directSearchSeed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='search')}/>}</main>
-  <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
+  <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive(),seed.anilistMediaId)}/>}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={downloads.promptFileDownload}/>}</main>
   </div>
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB'}</p></div>}

@@ -68,6 +68,18 @@ function cover(manga: JsonObject, mangaId: string) {
   if (!/^[a-z\d_-]+\.(?:jpg|jpeg|png|webp|gif|avif)$/i.test(filename)) throw Error('MangaDex 专门封面地址无效。');
   return {url: `https://uploads.mangadex.org/covers/${mangaId}/${filename}.512.jpg`};
 }
+function externalIds(attributes: JsonObject): SourceCatalogSnapshot['externalIds'] {
+  const links = attributes.links;
+  if (!links || typeof links !== 'object' || Array.isArray(links)) return;
+  // MangaDex documents al/mal as numeric ID strings, not arbitrary URLs or title matches.
+  const numericId = (value: unknown) => {
+    if (typeof value !== 'string' || !/^[1-9]\d{0,9}$/.test(value)) return;
+    const parsed = Number(value);
+    return parsed <= 2_147_483_647 ? parsed : undefined;
+  };
+  const anilist = numericId((links as JsonObject).al), myAnimeList = numericId((links as JsonObject).mal);
+  return anilist !== undefined || myAnimeList !== undefined ? {anilist, myAnimeList} : undefined;
+}
 export function parseCatalog(mangaValue: unknown, rawChapters: unknown[], aggregateValue: unknown, mangaId: string): SourceCatalogSnapshot {
   const manga = entity(mangaValue, 'manga', mangaId), attributes = object(manga.attributes), titles = object(attributes.title);
   const title = text(titles.en ?? titles[String(attributes.originalLanguage)] ?? Object.values(titles)[0]);
@@ -83,13 +95,14 @@ export function parseCatalog(mangaValue: unknown, rawChapters: unknown[], aggreg
     return {id: 'mangadex:chapter:' + chapter.id, catalogId, remoteId: chapter.id, url: chapterUrl(chapter.id, mangaId),
       title: chapterTitle(chapter), groupIds: ['volume:' + (chapter.volume ?? 'none')], rawTypes: chapter.groups,
       order: orders.get(slot)!, related: false, contentLanguage: chapter.language, readingSlotId,
+      chapterNumber: chapter.chapter,
       readable: !chapter.external && !chapter.unavailable && chapter.pages > 0,
       // Without a source-proven numbered position, keep the release individually readable.
       sequenceId: readingSlotId ? `${catalogId}:chapters` : `${catalogId}:entry:${chapter.id}`};
   });
   const volumes = [...new Set(chapters.map(chapter => chapter.volume))];
   const first = entries.find(entry => entry.readable);
-  return {id: catalogId, sourceId: 'mangadex', url: catalogUrl(mangaId), title, cover: cover(manga, mangaId), observedAt: Date.now(), complete: true,
+  return {id: catalogId, sourceId: 'mangadex', url: catalogUrl(mangaId), title, cover: cover(manga, mangaId), externalIds: externalIds(attributes), observedAt: Date.now(), complete: true,
     note: chapters.some(chapter => chapter.external || chapter.unavailable || !chapter.pages) ? '目录保留外链及暂不可用章节；打开时会说明源站状态。' : '',
     groups: volumes.map(volume => ({id: 'volume:' + (volume ?? 'none'), title: volume ? `Vol. ${volume}` : '未标注卷', complete: true,
       entryIds: entries.filter(entry => entry.groupIds.includes('volume:' + (volume ?? 'none'))).map(entry => entry.id)})),

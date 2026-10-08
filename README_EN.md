@@ -104,7 +104,7 @@ Each module README lists its requirements and run commands. See the [scripts gui
 
 | Topic | Documentation |
 | --- | --- |
-| Product and reading | [Product design](docs/PRODUCT_DESIGN.md), [Single-source reading](docs/SIMPLE_COMIC_READING_DESIGN.md), [Offline caching](docs/OFFLINE_CACHE_DESIGN.md) |
+| Product and reading | [Product design](docs/PRODUCT_DESIGN.md), [Single-source reading](docs/SIMPLE_COMIC_READING_DESIGN.md), [AniList tracking design](docs/READING_PROGRESS_SYNC_DESIGN.md), [Offline caching](docs/OFFLINE_CACHE_DESIGN.md) |
 | Architecture and data | [System architecture](docs/ARCHITECTURE.md), [Sources and caching](docs/COMIC_SOURCE_ARCHITECTURE.md) |
 | Translation and compute | [Translation contract](docs/READING_TRANSLATION_CONTRACT.md), [Compute protocol](docs/COMPUTE_PROTOCOL.md), [Cluster scheduling](docs/TRANSLATION_CLUSTER_DESIGN.md) |
 | Websites and interface | [Website adapters](docs/SITE_ADAPTERS.md), [Comic discovery](docs/DISCOVERY.md), [Cross-language search](docs/COMIC_SEARCH_DESIGN.md), [Interface localization](docs/UI_INTERNATIONALIZATION.md), [Brand copy](docs/BRAND_AND_STORE_LISTING.md) |

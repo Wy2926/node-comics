@@ -1,4 +1,5 @@
 import type {EpubIndex, EpubLocation} from '../formats/contracts';
+import type {TrackingBinding, TrackingJob} from '../../tracking/model';
 /** Persistent metadata. Bytes, credentials and live browser handles have separate owners. */
 export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'epub' | 'website' | 'image-sequence';
 /** Opaque provider-owned artwork reference, never a credential-bearing URL. */
@@ -28,6 +29,8 @@ export interface Comic {
 export interface Entry {
   id: string; comicId: string; title: string; order: number; sequenceId?: string;
   contentLanguage?: string; readingSlotId?: string; readable?: boolean;
+  /** Source-proven native label; special/decimal chapters are not tracker integers. */
+  chapterNumber?: string;
   /** Candidate preference order supplied by the complete source snapshot. */
   sourceOrder?: number;
   format: EntryFormat; contentId: string; generation: number;
@@ -75,5 +78,6 @@ export interface CatalogTables {
   positions: ReadingPosition; translationBindings: TranslationBinding;
   catalogs: CatalogRecord;
   tasks: CatalogRecord; metadata: CatalogRecord; tombstones: CatalogRecord;
+  trackingBindings: TrackingBinding; trackingJobs: TrackingJob;
 }
 export type CatalogTable = keyof CatalogTables;
