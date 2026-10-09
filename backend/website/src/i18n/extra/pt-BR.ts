@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Finalização da compra concluída",
-  "description": "A finalização da compra da sua assinatura foi concluída. Volte para a extensão para continuar lendo.",
   "heading": "Seu próximo capítulo o aguarda.",
   "body": "Obrigado por escolher NodeLane Comics. Volte para a extensão e continue de onde parou.",
-  "hint": "Os benefícios da assinatura são atualizados automaticamente. Se ainda não aparecerem, atualize Minha conta na extensão.",
+  "hint": 'Os benefícios ou páginas compradas aparecem após a confirmação do pagamento. Atualize sua conta para verificar.',
   "home": "Voltar ao início",
   "footer": "Você pode fechar esta página com segurança."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Tradução clássica com limite de hora em novas solicitações de tradução.",
     "intro": "Escolha um plano de tradução para usar os benefícios da sua assinatura na extensão."
   },
-  "channel": "Provedor de pagamento",
   "manage": "Gerenciar assinatura",
   "statuses": [
     "Ativo",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Todos os principais recursos de leitura"
     },
     "classic": {
-      "label": "Tradução clássica",
+      "label": "Tradução na nuvem",
       "free": "30 páginas/dia",
-      "lite": "Sem limite total diário ou mensal"
+      "lite": "Sem limite total diário ou mensal",
+      "detail": "As páginas são debitadas conforme as traduções concluídas com sucesso; reutilizar seus próprios resultados já existentes não gera novo débito. “Sem limite” significa apenas que não há limite acumulado diário ou mensal; o uso continua sujeito aos limites de aceitação de solicitações e à capacidade do serviço."
+    },
+    "local": {
+      "label": "Tradução local",
+      "free": "Suporte a MTU auto-hospedado",
+      "lite": "Suporte a MTU auto-hospedado",
+      "detail": "A tradução local exige uma instalação própria do MTU; a necessidade de conexão com a Internet depende dos modelos e fornecedores utilizados."
     },
     "rate": {
       "label": "Limite de novas solicitações de tradução",
       "free": "10 páginas em cada janela móvel de um minuto",
-      "lite": "100 páginas em cada janela móvel de um minuto; {n} páginas em cada janela móvel de uma hora"
+      "lite": "100 páginas em cada janela móvel de um minuto; {n} páginas em cada janela móvel de uma hora",
+      "detail": "As janelas móveis são compartilhadas entre dispositivos, modos e idiomas da mesma conta. Solicitações duplicadas e reutilização de resultados concluídos não são contadas novamente. Limites de solicitações e prioridade de processamento não garantem velocidade de conclusão nem uma parcela fixa da capacidade."
     },
     "priority": {
       "label": "Resposta da tarefa de tradução",
       "free": "Agendamento padrão",
       "lite": "Resposta prioritária"
     },
+    "feedback": {
+      "label": "Comentários dos usuários",
+      "free": "Resposta normal",
+      "lite": "Resposta prioritária",
+      "detail": "Os comentários dos membros são tratados com prioridade, sem garantia de prazo de resposta."
+    },
+    "requests": {
+      "label": "Solicitações de recursos",
+      "free": "Avaliação padrão",
+      "lite": "Avaliação prioritária",
+      "detail": "As solicitações de recursos dos membros são avaliadas com prioridade, sem garantia de implementação nem de data de lançamento."
+    },
     "early": {
       "label": "Novos recursos",
       "free": "No lançamento geral",
       "lite": "Acesso antecipado a recursos avançados"
     },
-    "note": "As janelas móveis são compartilhadas entre dispositivos, modos e idiomas da mesma conta. Solicitações duplicadas e reutilização de resultados concluídos não são contadas novamente. Limites de solicitações e prioridade de processamento não garantem velocidade de conclusão nem uma parcela fixa da capacidade. Consulte as notas de versão para conhecer os novos recursos."
+    "note": "Consulte as notas de versão para conhecer os novos recursos."
   },
   "billingCycle": [
     "Mensalmente",

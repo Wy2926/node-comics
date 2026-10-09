@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " i zrozumieć automatyczne odnawianie.",
     "继续原结账": "Wznów proces zakupu",
     "前往安全结账": "Kontynuuj zabezpieczanie transakcji",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Wylogowanie powoduje wyczyszczenie tylko sesji tej karty witryny. Nie anuluje subskrypcji ani nie wylogowuje rozszerzenia ani innych aplikacji.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Wylogowanie kończy sesję witryny we wszystkich kartach tej przeglądarki. Nie anuluje subskrypcji ani nie wylogowuje z rozszerzenia lub innych aplikacji.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Logowanie nie jest skonfigurowane. Spróbuj ponownie później lub skontaktuj się z pomocą techniczną.",
     "暂时无法连接登录服务，请重试。": "Nie można połączyć się z usługą logowania. Spróbuj ponownie.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Odnowienie sesji nie powiodło się. Sprawdź swoje połączenie lub zaloguj się ponownie, jeśli autoryzacja wygasła.",

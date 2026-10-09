@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " e entenda a renovação automática.",
     "继续原结账": "Retomar finalização da compra",
     "前往安全结账": "Continuar para finalizar a compra com segurança",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Sair limpa apenas a sessão desta guia do site. Ele não cancela assinaturas nem desconecta a extensão ou outros aplicativos.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Sair encerra a sessão do site em todas as abas deste navegador. Isso não cancela assinaturas nem desconecta a extensão ou outros aplicativos.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "O login não está configurado. Tente novamente mais tarde ou entre em contato com o suporte.",
     "暂时无法连接登录服务，请重试。": "Não é possível acessar o serviço de login. Por favor, tente novamente.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Falha na renovação da sessão. Verifique sua conexão ou faça login novamente se a autorização expirar.",

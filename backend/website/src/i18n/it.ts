@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " e comprendere il rinnovo automatico.",
     "继续原结账": "Riprendi il pagamento",
     "前往安全结账": "Continua per garantire il pagamento",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "La disconnessione cancella solo la sessione di questa scheda del sito Web. Non annulla gli abbonamenti né disconnette l'estensione o altre app.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "La disconnessione cancella la sessione del sito in tutte le schede di questo browser. Non annulla gli abbonamenti né disconnette l’estensione o altre app.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "L'accesso non è configurato. Riprova più tardi o contatta l'assistenza.",
     "暂时无法连接登录服务，请重试。": "Impossibile raggiungere il servizio di accesso. Per favore riprova.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Rinnovo della sessione non riuscito. Controlla la connessione o accedi nuovamente se l'autorizzazione è scaduta.",

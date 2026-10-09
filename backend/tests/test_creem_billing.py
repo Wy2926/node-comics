@@ -222,8 +222,8 @@ def test_unknown_post_is_never_resent_and_webhook_recovers_original(creem_billin
         assert state['client'].post('/v1/billing/checkouts', headers=state['auth'], json=body).status_code in (409, 503)
     assert len(state['posts']) == 1
     status = state['client'].get('/v1/billing/status', headers=state['auth']).json()
-    assert status['checkout_pending'] and status['checkout_provider'] == 'creem'
-    assert status['checkout_price']['id'] == state['price_id']
+    assert status['subscription_checkout']['provider'] == 'creem'
+    assert status['subscription_checkout']['price']['id'] == state['price_id']
     session = complete(state, synchronize=False)
     payload, headers = signed_event(state, 'checkout.completed', session)
     assert state['client'].post('/webhooks/creem', content=payload, headers=headers).status_code == 200
@@ -411,7 +411,7 @@ def test_product_validation_failure_allows_corrected_new_attempt_without_previou
     response = state['client'].post('/v1/billing/checkouts', headers=state['auth'],
         json={'price_id': state['price_id'], 'provider': 'creem'})
     assert response.status_code == 409 and not state['posts']
-    assert not state['client'].get('/v1/billing/status', headers=state['auth']).json()['checkout_pending']
+    assert state['client'].get('/v1/billing/status', headers=state['auth']).json()['subscription_checkout'] is None
     product['price'] = 999
     checkout(state)
     assert len(state['posts']) == 1
@@ -427,7 +427,7 @@ def test_definitive_post_rejection_allows_new_attempt_unlike_timeout(creem_billi
     response = state['client'].post('/v1/billing/checkouts', headers=state['auth'],
         json={'price_id': state['price_id'], 'provider': 'creem'})
     assert response.status_code == 409 and len(state['posts']) == 1
-    assert not state['client'].get('/v1/billing/status', headers=state['auth']).json()['checkout_pending']
+    assert state['client'].get('/v1/billing/status', headers=state['auth']).json()['subscription_checkout'] is None
     state['reject_create'] = False
     checkout(state)
     assert len(state['posts']) == 2 and state['posts'][0]['request_id'] != state['posts'][1]['request_id']

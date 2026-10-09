@@ -49,9 +49,11 @@ def scheduler_case(text_database):
 def add_job(config, owner='free-user', *, stage='page', suffix=None):
     job_id = suffix or uid()
     with session_factory()() as db:
+        from app.entitlements import membership_benefits
+        plan = membership_benefits(db, db.get(User, owner))['plan']
         job = Job(id=job_id, owner_id=owner, input_asset_id=owner + '-image', source_sha256='a' * 64,
                   mode='classic', target_language='zh-Hans', status='queued', quota_pages=0, quota_kind='unlimited',
-                  settlement='free', config=config, operation='translate', request_hash='r' * 64,
+                  settlement='free', config=config, entitlement={'plan': plan}, operation='translate', request_hash='r' * 64,
                   idempotency_key=uid(), cache_key=hashlib.sha256(job_id.encode()).hexdigest())
         db.add(job)
         db.flush()

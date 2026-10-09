@@ -26,15 +26,29 @@ const comparison=async(target,hourlyPages)=>{
  assert.equal(await frame.locator('.pricing-grid .price-card').count(),2,'both pricing cards share the comparison frame');
  const table=frame.locator('table.plan-comparison');
  assert.equal(await table.locator('thead th').count(),3,'comparison has feature, ordinary and Lite columns');
- assert.equal(await table.locator('tbody tr').count(),6,'six feature comparison rows');
- for(const feature of ['reading','classic','model','rate','priority','early']){
+ assert.equal(await table.locator('tbody tr').count(),9,'nine feature comparison rows');
+ assert.equal(await table.locator('.feature-info-trigger').count(),5,'only detailed feature headings need info controls');
+ for(const feature of ['classic','local','model','rate','priority','reading','feedback','requests','early']){
   const row=table.locator(`tbody tr[data-feature="${feature}"]`);
   assert.equal(await row.count(),1,`comparison feature ${feature}`);
   assert.equal(await row.locator(':scope > th, :scope > td').count(),3,`aligned columns for ${feature}`);
+  const values=row.locator(':scope > td'),shared=feature==='reading'||feature==='local';
+  assert.equal(await values.nth(0).locator('.icon-check').count(),shared?1:0,`ordinary checkmark for ${feature}`);
+  assert.equal(await values.nth(1).locator('.icon-check').count(),1,`Lite checkmark for ${feature}`);
+  assert.equal(await values.nth(1).locator('strong').count(),shared?0:1,`Lite emphasis for ${feature}`);
+  if(shared)assert.equal(await values.nth(0).innerText(),await values.nth(1).innerText(),`shared benefit ${feature}`);
+  const detailed=['classic','local','rate','feedback','requests'].includes(feature),trigger=row.locator('th .feature-info-trigger'),tip=row.locator('[role="tooltip"]');
+  assert.equal(await trigger.count(),detailed?1:0,`info control for ${feature}`);
+  if(detailed){
+   assert.equal(await trigger.getAttribute('aria-describedby'),await tip.getAttribute('id'),`accessible description for ${feature}`);
+   assert.equal(await trigger.getAttribute('aria-label'),await row.locator('.feature-label').innerText(),`localized info label for ${feature}`);
+   assert((await tip.textContent()).trim(),`localized detail for ${feature}`);
+  }
  }
+ for(const value of await table.locator('[data-feature="local"] td').all())assert.match(await value.innerText(),/MTU/,'local translation uses self-hosted MTU');
  assert((await table.locator('[data-feature="rate"] td').last().innerText()).replace(/\D/g,'').includes(String(hourlyPages)),'Lite hourly request limit follows the active catalog');
  const models=table.locator('[data-feature="model"] td');
- assert.match(await models.nth(0).innerText(),/GPT 6\.1 Luna/);
+ assert.match(await models.nth(0).innerText(),/GPT 6 Luna/);
  assert.match(await models.nth(1).innerText(),/Gemini 3\.8 Flash/);
  assert(!/PLUS|\b300\b/.test(await frame.innerText()),'retired PLUS is absent from new-purchase pricing');
 };
@@ -66,12 +80,20 @@ try {
   }
  }finally{await staticContext.close();}
  await page.goto(origin+'/pricing/');await live();
+ const info=page.locator('[data-feature="local"] .feature-info-trigger'),tip=page.locator('[data-feature="local"] [role="tooltip"]');
+ await info.hover();assert(await tip.isVisible(),'hover opens feature detail');
+ await page.keyboard.press('Escape');assert(!(await tip.isVisible()),'Escape dismisses feature detail');
+ await info.focus();assert(await tip.isVisible(),'keyboard focus opens feature detail');
+ await info.press('Tab');assert(!(await tip.isVisible()),'leaving focus dismisses feature detail');
+ await info.click();assert(await tip.isVisible(),'click opens feature detail');
+ await page.locator('h1').click();assert(!(await tip.isVisible()),'outside click dismisses feature detail');
  assert.equal(await page.locator('.account-link').getAttribute('aria-label'),'我的账户');
  assert.match(await page.locator('.billing-offer .price').innerText(),/5.99/);
  await page.locator('input[value="year"]').check({force:true});
  assert.match(await page.locator('.billing-total').innerText(),/59.99/);
- assert.match(await page.locator('.billing-offer .price').innerText(),/5.00/);
- assert.match(await page.locator('.annual-saving').innerText(),/11.89/);
+ assert.match(await page.locator('.billing-offer .price').innerText(),/59.99/);
+ assert.match(await page.locator('.monthly-equivalent').innerText(),/5.00/);
+ assert.match(await page.locator('.annual-badge').innerText(),/16.5/);
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-year/);
  await noOverflow();await shot('desktop-year');
  await page.locator('.language-menu summary').click();await shot('desktop-language');
@@ -91,7 +113,10 @@ try {
  await page.locator('.language-menu summary').click();await shot('mobile-language');await page.locator('.language-menu summary').click();
  await page.locator('.mobile-nav summary').click();assert(await page.locator('.mobile-nav a[href="/account/"]').isVisible());await page.locator('.mobile-nav summary').click();
  await page.setViewportSize({width:1440,height:1100});
- offers=[year];await page.reload();await live();assert(await page.locator('input[value="month"]').isDisabled());assert.equal(await page.locator('.annual-badge').count(),0);
+ offers=[year];await page.reload();await published(page,'unavailable');
+ assert(await page.locator('input[value="month"]').isChecked(),'missing monthly quote does not switch cadence automatically');
+ assert(!(await page.locator('input[value="month"]').isDisabled()),'published monthly preview remains available');
+ await page.locator('input[value="year"]').check({force:true});await live();assert.equal(await page.locator('.annual-badge').count(),0);
  offers=[
   {...month,id:'lite-api-month',plan_revision_id:'lite-v2',unit_amount:699,hourly_image_limit:1500},
   {...year,id:'lite-api-year',plan_revision_id:'lite-v3',hourly_image_limit:1800},
@@ -122,5 +147,5 @@ try {
  done();release=null;onCatalogRequest=null;await live();
  assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
  assert.deepEqual(errors,[]);
- console.log('PASS: seventeen locales with and without JavaScript, eight widths, connected six-feature comparison including plan-specific models, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: seventeen locales with and without JavaScript, eight widths, connected nine-feature comparison with accessible feature tips, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

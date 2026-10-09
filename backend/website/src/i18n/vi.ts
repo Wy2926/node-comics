@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " và hiểu quy tắc tự động gia hạn.",
     "继续原结账": "Tiếp tục thanh toán",
     "前往安全结账": "Tiếp tục thanh toán an toàn",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Việc đăng xuất chỉ xóa phiên của tab trang web này. Nó không hủy đăng ký hoặc đăng xuất tiện ích mở rộng hoặc các ứng dụng khác.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Đăng xuất sẽ xóa phiên trang web trên tất cả thẻ trong trình duyệt này. Thao tác này không hủy đăng ký hoặc đăng xuất tiện ích mở rộng hay ứng dụng khác.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Đăng nhập không được cấu hình. Vui lòng thử lại sau hoặc liên hệ với bộ phận hỗ trợ.",
     "暂时无法连接登录服务，请重试。": "Không thể truy cập dịch vụ đăng nhập. Vui lòng thử lại.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Gia hạn phiên không thành công. Hãy kiểm tra kết nối của bạn hoặc đăng nhập lại nếu ủy quyền đã hết hạn.",

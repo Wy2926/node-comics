@@ -5,6 +5,7 @@ import { browserStores, site } from '../src/data/site';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
 import { publishedAmount } from '../src/components/PublishedLitePricing';
+import { comparisonRows } from '../src/lib/pricing-comparison';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
 async function files(dir: string): Promise<string[]> { return (await Promise.all((await readdir(dir, { withFileTypes: true })).map(entry => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir,entry.name)]))).flat(); }
@@ -142,13 +143,18 @@ for (const file of htmlFiles) {
     const comparison = $('.pricing-comparison');
     const table = comparison.find('table.plan-comparison');
     if (comparison.length !== 1 || comparison.find('.pricing-grid .price-card').length !== 2 || table.length !== 1) errors.push(`${label}: pricing cards and feature comparison must share one connected frame`);
-    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 6) errors.push(`${label}: expected a three-column comparison with six feature rows`);
-    for (const feature of ['reading', 'classic', 'model', 'rate', 'priority', 'early']) {
+    const expectedRows = comparisonRows(locale, 1200);
+    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 9) errors.push(`${label}: expected a three-column comparison with nine feature rows`);
+    for (const { key: feature, label: heading, free, lite, shared, detail } of expectedRows) {
       const row = table.find(`tbody tr[data-feature="${feature}"]`);
       if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
       const values = row.children('td');
-      if (values.eq(0).find('.icon-check').length !== (feature === 'reading' ? 1 : 0) || values.eq(1).find('.icon-check').length !== 1) errors.push(`${label}: checkmarks must distinguish shared and paid benefits for ${feature}`);
-      if (values.eq(1).find('strong').length !== (feature === 'reading' ? 0 : 1)) errors.push(`${label}: paid advantages must have stronger typography for ${feature}`);
+      if (row.find('.feature-label').text() !== heading || values.eq(0).text() !== free || values.eq(1).text() !== lite) errors.push(`${label}: comparison copy must match localized benefits for ${feature}`);
+      const trigger = row.find('th .feature-info-trigger'), tip = row.find('th [role="tooltip"]');
+      if (trigger.length !== (detail ? 1 : 0) || tip.length !== (detail ? 1 : 0) || row.find('td .feature-info').length) errors.push(`${label}: explanatory tips belong only on detailed feature headings for ${feature}`);
+      if (detail && (trigger.attr('type') !== 'button' || trigger.attr('aria-label') !== heading || trigger.attr('aria-describedby') !== tip.attr('id') || tip.text() !== detail || !tip.is('[hidden]'))) errors.push(`${label}: missing accessible localized feature tip for ${feature}`);
+      if (values.eq(0).find('.icon-check').length !== (shared ? 1 : 0) || values.eq(1).find('.icon-check').length !== 1) errors.push(`${label}: checkmarks must distinguish shared and paid benefits for ${feature}`);
+      if (values.eq(1).find('strong').length !== (shared ? 0 : 1)) errors.push(`${label}: paid advantages must have stronger typography for ${feature}`);
     }
     if (comparison.find('.price .price-currency').length !== 2 || comparison.find('.billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: pricing needs separated currency typography and an annual discount slot`);
     if (!table.find('[data-feature="rate"] td').last().text().replace(/\D/g,'').includes('1200')) errors.push(`${label}: missing Lite rolling hourly request limit`);

@@ -62,11 +62,22 @@ def at_rights(state, at):
         return entitlements_json(db, db.get(User,state['owner']),at)
 
 
-def test_catalog_is_private_for_admin_and_drafts_cannot_be_purchased(billing):
+def test_catalog_is_private_for_admin_and_drafts_cannot_be_purchased(billing, monkeypatch):
     c=billing['client']
     assert c.get('/v1/admin/billing/catalog',headers=billing['auth']).status_code==403
     _,payload=quote(billing,publish=False)
-    public=c.get('/v1/billing/catalog').json()['offers']
+    from app import billing_api, billing_catalog
+    original = billing_catalog.offers
+    calls = []
+    def counted_offers(db, *, interval=None):
+        calls.append(interval)
+        return original(db, interval=interval)
+    monkeypatch.setattr(billing_api, 'offers', counted_offers)
+    monkeypatch.setattr(billing_catalog, 'offers', counted_offers)
+    catalog=c.get('/v1/billing/catalog').json()
+    public=catalog['offers']
+    assert calls == [None, 'once']
+    assert [price for product in catalog['products'] for price in product['prices']] == public
     assert {p['id'] for p in public}=={'fixture-price'}
     assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':payload['id']}).status_code==409
     assert not billing['posts']
@@ -172,7 +183,7 @@ def test_pending_checkout_keeps_quote_and_rejects_switch(billing):
     assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':'newmonthly'}).status_code==409
     checkout(billing)
     assert len(billing['posts'])==1
-    assert c.get('/v1/billing/status',headers=billing['auth']).json()['checkout_price']['unit_amount']==999
+    assert c.get('/v1/billing/status',headers=billing['auth']).json()['subscription_checkout']['price']['unit_amount']==999
 
 
 def test_multiple_plans_custom_trial_and_zero_quota_keep_classic_access(billing):

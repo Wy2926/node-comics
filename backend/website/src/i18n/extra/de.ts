@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Bestellvorgang abgeschlossen",
-  "description": "Die Kaufabwicklung für Ihr Abonnement ist abgeschlossen. Kehren Sie zur Erweiterung zurück, um weiterzulesen.",
   "heading": "Ihr nächstes Kapitel wartet auf Sie.",
   "body": "Vielen Dank, dass Sie sich für NodeLane Comics entschieden haben. Wechseln Sie zurück zur Erweiterung und machen Sie dort weiter, wo Sie aufgehört haben.",
-  "hint": "Ihre Mitgliedschaft wird automatisch aktualisiert. Wenn sie noch nicht angezeigt wird, aktualisieren Sie „Mein Konto“ in der Erweiterung.",
+  "hint": 'Leistungen oder gekaufte Seiten erscheinen nach Zahlungsprüfung. Konto zur Prüfung aktualisieren.',
   "home": "Zur Startseite",
   "footer": "Sie können diese Seite bedenkenlos schließen."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Klassische Übersetzung mit einem stündlichen Limit für neue Übersetzungsanfragen.",
     "intro": "Wählen Sie einen Übersetzungsplan, um Ihre Abonnementvorteile in der Erweiterung zu nutzen."
   },
-  "channel": "Zahlungsanbieter",
   "manage": "Abonnement verwalten",
   "statuses": [
     "Aktiv",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Alle wichtigen Lesefunktionen"
     },
     "classic": {
-      "label": "Standardübersetzung",
+      "label": "Cloud-Übersetzung",
       "free": "30 Seiten/Tag",
-      "lite": "Kein tägliches oder monatliches Gesamtseitenlimit"
+      "lite": "Kein tägliches oder monatliches Gesamtseitenlimit",
+      "detail": "Das Seitenkontingent wird nur für tatsächlich erfolgreich übersetzte Seiten belastet; die Wiederverwendung Ihrer eigenen vorhandenen Ergebnisse wird nicht erneut berechnet. „Unbegrenzt“ bedeutet nur, dass es kein kumuliertes Tages- oder Monatslimit gibt; die Nutzung bleibt durch die Limits für die Annahme neuer Anfragen und die Dienstkapazität begrenzt."
+    },
+    "local": {
+      "label": "Lokale Übersetzung",
+      "free": "Selbst gehostetes MTU unterstützt",
+      "lite": "Selbst gehostetes MTU unterstützt",
+      "detail": "Für lokale Übersetzungen ist eine selbst gehostete MTU-Instanz erforderlich; ob eine Internetverbindung benötigt wird, hängt von den verwendeten Modellen und Anbietern ab."
     },
     "rate": {
       "label": "Limit für neue Übersetzungsanfragen",
       "free": "10 Seiten / gleitendes Minutenfenster",
-      "lite": "100 Seiten / gleitendes Minutenfenster; {n} Seiten / gleitendes Stundenfenster"
+      "lite": "100 Seiten / gleitendes Minutenfenster; {n} Seiten / gleitendes Stundenfenster",
+      "detail": "Die gleitenden Zeitfenster gelten gemeinsam für alle Geräte, Modi und Sprachen eines Kontos. Doppelte Anfragen und die Wiederverwendung abgeschlossener Ergebnisse zählen nicht erneut. Anfragelimits und bevorzugte Planung garantieren weder eine Fertigstellungsgeschwindigkeit noch einen festen Kapazitätsanteil."
     },
     "priority": {
       "label": "Antwort auf die Übersetzungsaufgabe",
       "free": "Standardplanung",
       "lite": "Vorrangige Antwort"
     },
+    "feedback": {
+      "label": "Nutzerrückmeldungen",
+      "free": "Reguläre Antwort",
+      "lite": "Bevorzugte Antwort",
+      "detail": "Rückmeldungen von Mitgliedern werden bevorzugt bearbeitet, ohne Garantie einer Antwortfrist."
+    },
+    "requests": {
+      "label": "Funktionswünsche",
+      "free": "Reguläre Prüfung",
+      "lite": "Bevorzugte Prüfung",
+      "detail": "Funktionswünsche von Mitgliedern werden bevorzugt geprüft; weder die Umsetzung noch ein Veröffentlichungstermin werden garantiert."
+    },
     "early": {
       "label": "Neue Funktionen",
       "free": "Bei der allgemeinen Veröffentlichung",
       "lite": "Frühzeitiger Zugriff auf erweiterte Funktionen"
     },
-    "note": "Die gleitenden Zeitfenster gelten gemeinsam für alle Geräte, Modi und Sprachen eines Kontos. Doppelte Anfragen und die Wiederverwendung abgeschlossener Ergebnisse zählen nicht erneut. Anfragelimits und bevorzugte Planung garantieren weder eine Fertigstellungsgeschwindigkeit noch einen festen Kapazitätsanteil. Neue Funktionen finden Sie in den Versionshinweisen."
+    "note": "Neue Funktionen finden Sie in den Versionshinweisen."
   },
   "billingCycle": [
     "Monatlich",

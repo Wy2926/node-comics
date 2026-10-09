@@ -1,6 +1,6 @@
 """Read paid/trial access from granted terms, independently of quota balances."""
-from sqlalchemy import and_, case, func, select
-from .billing_models import BillingPlanRevision, BillingPrice, BillingTerm
+from sqlalchemy import and_, case, func, or_, select
+from .billing_models import BillingOrder, BillingPlanRevision, BillingPrice, BillingTerm
 from .models import now
 
 
@@ -19,10 +19,22 @@ def active_benefits(db, owner_id, at=None):
         BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at)))
 
 
-def access_exists(at):
-    from .models import User
-    return select(BillingTerm.id).where(BillingTerm.owner_id == User.id,
-        BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at).exists()
+def first_purchase(db, owner_id, at):
+    """One available page bucket and its original immutable service quote.
+
+    Depleted permanent purchases are deliberately outside the partial-index
+    selector. No purchase history or account-wide balance is loaded at admission.
+    """
+    from .entitlement_models import QuotaPeriod
+    return db.execute(select(QuotaPeriod, BillingPlanRevision).join(BillingOrder,
+        BillingOrder.id == QuotaPeriod.billing_order_id).join(BillingPrice,
+        BillingPrice.id == BillingOrder.price_id).join(BillingPlanRevision,
+        BillingPlanRevision.id == BillingPrice.plan_revision_id).where(
+            QuotaPeriod.owner_id == owner_id, BillingOrder.owner_id == owner_id,
+            QuotaPeriod.mode == 'classic', QuotaPeriod.source == 'purchase',
+            QuotaPeriod.revoked_at.is_(None), QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved,
+            QuotaPeriod.starts_at <= at, or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))
+        .order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.starts_at, QuotaPeriod.id).limit(1)).first()
 
 
 def plan_expression(at):

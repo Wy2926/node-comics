@@ -1,0 +1,38 @@
+.quota-offers { margin-block: 64px 24px; padding-block-start: 40px; border-top: 1px solid var(--line); }
+.quota-offers .quota-offers-heading { margin-bottom: 24px; }
+.quota-offers .quota-offers-heading h2 { font-size: clamp(1.6rem, 2.5vw, 2rem); font-weight: 550; letter-spacing: -.035em; }
+.quota-offers .quota-purchase-kind { color: var(--muted); font-size: .75rem; line-height: 1.5; }
+.quota-offers .quota-offer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.quota-offers .quota-offer-grid:has(> :only-child) { max-width: 440px; }
+.quota-offers .quota-offer { min-width: 0; display: flex; flex-direction: column; padding: var(--comic-panel-padding); border: var(--comic-border); border-radius: var(--comic-panel-radius); background: radial-gradient(ellipse at 100% 0, var(--accent-soft), transparent 65%), var(--surface); overflow-wrap: anywhere; }
+.quota-offers .quota-offer:focus-within { border-color: var(--accent); }
+.quota-offers .quota-offer-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.quota-offers .quota-offer-heading h3 { min-width: 0; color: var(--muted); font-size: .85rem; font-weight: 550; line-height: 1.5; letter-spacing: 0; }
+.quota-offers .quota-page-mark { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface-soft); color: var(--accent); }
+.quota-offers .quota-icon { display: block; flex: none; width: 20px; height: 20px; }
+.quota-offers .quota-page-mark .quota-icon { width: 24px; height: 24px; }
+.quota-offers .quota-offer-quantity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 20px; color: var(--muted); font-size: .95rem; line-height: 1.2; }
+.quota-offers .quota-offer-quantity strong { color: var(--ink); font-size: clamp(3.8rem, 5vw, 5rem); font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.06em; }
+.quota-offers .quota-offer-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-top: 16px; color: var(--ink); font-size: 2rem; font-weight: 550; font-variant-numeric: tabular-nums; line-height: 1.2; letter-spacing: -.04em; }
+.quota-offers .quota-offer-price .price-value { font: inherit; color: inherit; }
+.quota-offers .quota-offer-price .price-currency { font-size: .6em; color: var(--muted); letter-spacing: 0; }
+.quota-offers .quota-offer-price .quota-purchase-kind { padding: 4px 9px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); font-weight: 400; letter-spacing: 0; }
+.quota-offers .quota-offer-features { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 8px; padding: 22px 0; margin: 24px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.quota-offers .quota-offer-features li { display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface-soft); color: var(--muted); font-size: .75rem; line-height: 1.6; }
+.quota-offers .quota-offer-features .quota-icon { color: var(--accent); width: 18px; height: 18px; }
+.quota-offers .quota-offer-features .quota-tier { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--accent-soft); color: var(--accent); }
+.quota-offers .quota-offer-action { margin-top: auto; padding-top: 4px; }
+.quota-offers .quota-offer-action .button { width: 100%; justify-content: space-between; gap: 12px; white-space: normal; }
+.quota-offers .quota-offer-action .billing-status { margin-top: 12px; color: var(--danger); font-size: .78rem; line-height: 1.8; }
+.quota-offers .quota-offer-policy { padding-top: 22px; color: var(--muted); }
+.quota-offers .quota-offer-notes { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.quota-offers .quota-offer-notes li { display: flex; align-items: flex-start; gap: 9px; font-size: .75rem; line-height: 1.7; }
+.quota-offers .quota-offer-notes .ui-icon { width: 14px; height: 19px; }
+.quota-offers .quota-offer-legal { margin-top: 14px; font-size: .72rem; line-height: 1.8; }
+@media (max-width: 600px) {
+  .quota-offers { margin-top: 44px; padding-top: 28px; }
+  .quota-offers .quota-offers-heading { margin-bottom: 18px; }
+  .quota-offers .quota-offer-grid { gap: 16px; }
+  .quota-offers .quota-offer { padding: 24px; }
+  .quota-offers .quota-offer-quantity strong { font-size: 4rem; }
+}

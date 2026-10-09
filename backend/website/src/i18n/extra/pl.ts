@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Proces zakupu zakończony",
-  "description": "Twoja subskrypcja została zakończona. Wróć do rozszerzenia, aby czytać dalej.",
   "heading": "Twój następny rozdział czeka.",
   "body": "Dziękujemy za wybranie NodeLane Comics. Przełącz się ponownie na rozszerzenie i kontynuuj od miejsca, w którym przerwałeś.",
-  "hint": "Uprawnienia subskrypcji są aktualizowane automatycznie. Jeśli jeszcze ich nie widać, odśwież „Moje konto” w rozszerzeniu.",
+  "hint": 'Uprawnienia lub kupione strony pojawią się po weryfikacji płatności. Odśwież konto, aby sprawdzić.',
   "home": "Wróć na stronę główną",
   "footer": "Możesz bezpiecznie zamknąć tę stronę."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Tłumaczenie klasyczne z godzinowym limitem nowych zleceń tłumaczeniowych.",
     "intro": "Wybierz plan tłumaczeń, aby skorzystać z zalet subskrypcji w rozszerzeniu."
   },
-  "channel": "Dostawca płatności",
   "manage": "Zarządzaj subskrypcją",
   "statuses": [
     "Aktywny",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Wszystkie podstawowe funkcje czytania"
     },
     "classic": {
-      "label": "Tłumaczenie standardowe",
+      "label": "Tłumaczenie w chmurze",
       "free": "30 stron/dzień",
-      "lite": "Bez łącznego limitu dziennego lub miesięcznego"
+      "lite": "Bez łącznego limitu dziennego lub miesięcznego",
+      "detail": "Z puli odejmowane są tylko faktycznie pomyślnie przetłumaczone strony; ponowne użycie własnych gotowych wyników nie powoduje ponownego odjęcia stron. „Bez limitu” oznacza wyłącznie brak łącznego limitu dziennego lub miesięcznego; korzystanie nadal podlega limitom przyjmowania żądań i ograniczeniom dostępnej mocy przetwarzania usługi."
+    },
+    "local": {
+      "label": "Tłumaczenie lokalne",
+      "free": "Obsługa samodzielnie hostowanego MTU",
+      "lite": "Obsługa samodzielnie hostowanego MTU",
+      "detail": "Tłumaczenie lokalne wymaga samodzielnego uruchomienia MTU; konieczność połączenia z Internetem zależy od używanych modeli i dostawców."
     },
     "rate": {
       "label": "Limit nowych żądań tłumaczenia",
       "free": "10 stron / ruchome okno minutowe",
-      "lite": "100 stron / ruchome okno minutowe; {n} stron / ruchome okno godzinne"
+      "lite": "100 stron / ruchome okno minutowe; {n} stron / ruchome okno godzinne",
+      "detail": "Ruchome okna czasowe są wspólne dla wszystkich urządzeń, trybów i języków jednego konta. Powtórzone żądania i ponowne użycie gotowych wyników nie są liczone ponownie. Limity żądań i priorytetowe planowanie nie gwarantują szybkości wykonania ani stałego udziału w dostępnej mocy."
     },
     "priority": {
       "label": "Odpowiedź na zadanie tłumaczeniowe",
       "free": "Standardowy harmonogram",
       "lite": "Odpowiedź priorytetowa"
     },
+    "feedback": {
+      "label": "Opinie użytkowników",
+      "free": "Standardowa odpowiedź",
+      "lite": "Priorytetowa odpowiedź",
+      "detail": "Opinie członków są obsługiwane priorytetowo, bez gwarancji terminu odpowiedzi."
+    },
+    "requests": {
+      "label": "Propozycje funkcji",
+      "free": "Standardowa ocena",
+      "lite": "Priorytetowa ocena",
+      "detail": "Propozycje funkcji od członków są oceniane priorytetowo, bez gwarancji wdrożenia ani daty udostępnienia."
+    },
     "early": {
       "label": "Nowe funkcje",
       "free": "Na powszechnym wydaniu",
       "lite": "Wczesny dostęp do zaawansowanych funkcji"
     },
-    "note": "Ruchome okna czasowe są wspólne dla wszystkich urządzeń, trybów i języków jednego konta. Powtórzone żądania i ponowne użycie gotowych wyników nie są liczone ponownie. Limity żądań i priorytetowe planowanie nie gwarantują szybkości wykonania ani stałego udziału w dostępnej mocy. Nowe funkcje opisano w informacjach o wydaniach."
+    "note": "Nowe funkcje opisano w informacjach o wydaniach."
   },
   "billingCycle": [
     "Miesięcznie",

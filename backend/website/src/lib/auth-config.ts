@@ -12,7 +12,7 @@ export function oidcSettings(config: AuthConfig, origin: string): UserManagerSet
     client_id: config.client_id,
     redirect_uri: `${origin}/auth/callback/`,
     response_type: 'code',
-    scope: config.scopes || 'openid profile offline_access',
+    scope: [...new Set(['openid', 'profile', 'offline_access', ...config.scopes.split(/\s+/).filter(Boolean)])].join(' '),
     // Read endpoints from the same API config used by the extension; no new identity client.
     metadata: { issuer: config.issuer, authorization_endpoint: config.authorization_endpoint, token_endpoint: config.token_endpoint },
     loadUserInfo: false,
@@ -20,6 +20,7 @@ export function oidcSettings(config: AuthConfig, origin: string): UserManagerSet
     monitorSession: false,
     staleStateAgeInSeconds: 600,
     requestTimeoutInSeconds: 15,
+    fetchRequestCredentials: 'omit',
     extraQueryParams: { resource: config.audience, audience: config.audience },
     extraTokenParams: { resource: config.audience },
   };

@@ -1,6 +1,6 @@
 """Durable verified event inbox and independent payment channel reconciliation."""
 from datetime import timedelta
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from .billing_providers import BillingError, provider_enabled, provider_environment, remote_id, require
 from .billing_models import BillingCheckout, BillingEvent, BillingSubscription
 from .db import session_factory
@@ -62,8 +62,11 @@ def process_event(event_id):
                 transaction = creem.call('GET', '/transactions', params={'transaction_id': transaction_id})
                 creem.environment(transaction)
                 subscription_id = creem.object_id(transaction.get('subscription'))
-                require(subscription_id, 'CREEM_REFUND_UNBOUND')
-                sync_subscription(subscription_id, transaction_id, provider='creem', event_id=event_id)
+                if subscription_id:
+                    sync_subscription(subscription_id, transaction_id, provider='creem', event_id=event_id)
+                else:
+                    from .billing_purchases import sync_creem_purchase_reversal
+                    sync_creem_purchase_reversal(transaction_id, event_id)
     except BillingError as exc:
         error = exc.code
     except Exception:
@@ -89,7 +92,7 @@ def reconcile_once():
             .order_by(BillingEvent.received_at).limit(20)))
     for event_id in ids:
         process_event(event_id)
-    from .billing_checkout import sync_owner, PENDING, LIVE_SUBSCRIPTIONS
+    from .billing_checkout import sync_owner, pending_checkout_condition, LIVE_SUBSCRIPTIONS
     threshold = now() - timedelta(minutes=5)
     with session_factory()() as db:
         subscriptions = list(db.scalars(select(BillingSubscription).where(BillingSubscription.provider.in_(enabled),
@@ -97,10 +100,10 @@ def reconcile_once():
             or_(BillingSubscription.status.in_(LIVE_SUBSCRIPTIONS), BillingSubscription.paid_ends_at > now(),
                 BillingSubscription.trial_ends_at > now())).order_by(BillingSubscription.synced_at).limit(10)))
         owners = list(db.scalars(select(BillingCheckout.owner_id).where(BillingCheckout.provider.in_(enabled),
-            or_(BillingCheckout.status.in_(PENDING), (BillingCheckout.status == 'completed') & ~select(BillingSubscription.id)
-                .where(BillingSubscription.checkout_id == BillingCheckout.id).exists()),
+            pending_checkout_condition(),
             or_(BillingCheckout.last_checked_at.is_(None), BillingCheckout.last_checked_at < threshold))
-            .order_by(BillingCheckout.created_at).limit(10)))
+            .order_by(func.coalesce(BillingCheckout.last_checked_at, BillingCheckout.created_at),
+                BillingCheckout.created_at, BillingCheckout.id).limit(10)))
     for sub in subscriptions:
         with session_factory()() as db:
             claimed = db.execute(update(BillingSubscription).where(BillingSubscription.id == sub.id,
@@ -112,7 +115,7 @@ def reconcile_once():
             sync_subscription(sub.id, provider=sub.provider)
         except BillingError:
             pass
-    for owner in owners:
+    for owner in dict.fromkeys(owners):
         try:
             sync_owner(owner)
         except BillingError:

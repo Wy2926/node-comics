@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " and understand automatic renewal.",
     "继续原结账": "Resume checkout",
     "前往安全结账": "Continue to secure checkout",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Signing out clears this website tab’s session only. It does not cancel subscriptions or sign out the extension or other apps.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Signing out clears the website session across all tabs in this browser. It does not cancel subscriptions or sign out the extension or other apps.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Sign-in is not configured. Please retry later or contact support.",
     "暂时无法连接登录服务，请重试。": "Cannot reach the sign-in service. Please try again.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Session renewal failed. Check your connection, or sign in again if authorization expired.",

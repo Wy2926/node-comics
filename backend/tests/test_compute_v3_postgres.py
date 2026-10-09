@@ -13,7 +13,7 @@ from test_compute_v3 import (
     test_deadline_cannot_be_extended_by_heartbeats,
     test_version_languages_and_direct_input_access,
     test_result_written_before_lost_commit_is_recovered,
-    test_upload_is_scoped_frozen_and_validates_pixels,
+    test_upload_is_scoped_frozen_and_validates_container_metadata,
     test_late_direct_upload_cannot_publish_after_cancel_or_new_generation,
     test_cancellation_during_file_publish_never_settles,
     test_verification_finishing_after_deadline_is_never_recovered,

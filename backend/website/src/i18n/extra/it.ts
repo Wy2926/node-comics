@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Pagamento completato",
-  "description": "Il pagamento dell'abbonamento è completo. Torna all'estensione per continuare a leggere.",
   "heading": "Il tuo prossimo capitolo ti aspetta.",
   "body": "Grazie per aver scelto NodeLane Comics. Torna all'estensione e riprendi da dove avevi interrotto.",
-  "hint": "I vantaggi dell’abbonamento si aggiornano automaticamente. Se non sono ancora visibili, aggiorna Il mio account nell’estensione.",
+  "hint": 'I vantaggi o le pagine acquistate appaiono dopo la verifica del pagamento. Aggiorna il tuo account per controllare.',
   "home": "Torna alla home",
   "footer": "Puoi chiudere tranquillamente questa pagina."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Traduzione classica con limite orario sulle nuove richieste di traduzione.",
     "intro": "Scegli un piano di traduzione per utilizzare i vantaggi dell'abbonamento nell'estensione."
   },
-  "channel": "Fornitore di pagamenti",
   "manage": "Gestisci l'abbonamento",
   "statuses": [
     "Attivo",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Tutte le funzionalità di lettura principali"
     },
     "classic": {
-      "label": "Traduzione classica",
+      "label": "Traduzione nel cloud",
       "free": "30 pagine al giorno",
-      "lite": "Nessun limite totale giornaliero o mensile"
+      "lite": "Nessun limite totale giornaliero o mensile",
+      "detail": "Le pagine vengono scalate in base alle traduzioni effettivamente riuscite; riutilizzare i propri risultati esistenti non comporta ulteriori addebiti di pagine. «Illimitato» indica soltanto l’assenza di un limite cumulativo giornaliero o mensile; l’utilizzo resta soggetto ai limiti di accettazione delle richieste e alla capacità del servizio."
+    },
+    "local": {
+      "label": "Traduzione locale",
+      "free": "Supporto per MTU autogestito",
+      "lite": "Supporto per MTU autogestito",
+      "detail": "La traduzione locale richiede un’istanza MTU ospitata autonomamente; la necessità di una connessione Internet dipende dai modelli e dai fornitori utilizzati."
     },
     "rate": {
       "label": "Limite delle nuove richieste di traduzione",
       "free": "10 pagine in ogni finestra mobile di un minuto",
-      "lite": "100 pagine in ogni finestra mobile di un minuto; {n} pagine in ogni finestra mobile di un’ora"
+      "lite": "100 pagine in ogni finestra mobile di un minuto; {n} pagine in ogni finestra mobile di un’ora",
+      "detail": "Le finestre mobili sono condivise tra dispositivi, modalità e lingue dello stesso account. Le richieste duplicate e il riutilizzo di risultati completati non vengono conteggiati di nuovo. I limiti delle richieste e la priorità di elaborazione non garantiscono una velocità di completamento né una quota fissa della capacità."
     },
     "priority": {
       "label": "Risposta all'attività di traduzione",
       "free": "Pianificazione standard",
       "lite": "Risposta prioritaria"
     },
+    "feedback": {
+      "label": "Commenti degli utenti",
+      "free": "Risposta standard",
+      "lite": "Risposta prioritaria",
+      "detail": "I commenti dei membri vengono gestiti con priorità, senza garantire tempi di risposta."
+    },
+    "requests": {
+      "label": "Richieste di funzionalità",
+      "free": "Valutazione ordinaria",
+      "lite": "Valutazione prioritaria",
+      "detail": "Le richieste di funzionalità dei membri vengono valutate con priorità, senza garantire l’implementazione né una data di rilascio."
+    },
     "early": {
       "label": "Nuove funzionalità",
       "free": "Al rilascio generale",
       "lite": "Accesso anticipato alle funzionalità avanzate"
     },
-    "note": "Le finestre mobili sono condivise tra dispositivi, modalità e lingue dello stesso account. Le richieste duplicate e il riutilizzo di risultati completati non vengono conteggiati di nuovo. I limiti delle richieste e la priorità di elaborazione non garantiscono una velocità di completamento né una quota fissa della capacità. Consulta le note di rilascio per le nuove funzionalità."
+    "note": "Consulta le note di rilascio per le nuove funzionalità."
   },
   "billingCycle": [
     "Mensile",

@@ -31,6 +31,9 @@ class BillingPlanRevision(Base):
     name: Mapped[str] = mapped_column(String(100))
     monthly_redraw_pages: Mapped[int] = mapped_column(Integer)
     hourly_image_limit: Mapped[int | None] = mapped_column(Integer)
+    service_plan_id: Mapped[str | None] = mapped_column(String(64))
+    quota_pages: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    quota_validity_days: Mapped[int | None] = mapped_column(Integer)
     trial_days: Mapped[int] = mapped_column(Integer)
     trial_redraw_pages: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
@@ -39,7 +42,13 @@ class BillingPlanRevision(Base):
         CheckConstraint('hourly_image_limit IS NULL OR (hourly_image_limit > 0 AND hourly_image_limit <= 1000000)',
             name='ck_billing_revision_hourly_image_limit'),
         CheckConstraint('trial_days >= 0 AND trial_days <= 30'), CheckConstraint('trial_redraw_pages >= 0'),
-        CheckConstraint('trial_days > 0 OR trial_redraw_pages = 0'))
+        CheckConstraint('trial_days > 0 OR trial_redraw_pages = 0'),
+        CheckConstraint('quota_pages BETWEEN 0 AND 1000000', name='ck_billing_revision_quota_pages'),
+        CheckConstraint('quota_validity_days IS NULL OR quota_validity_days BETWEEN 1 AND 36500',
+            name='ck_billing_revision_quota_validity'),
+        CheckConstraint('(quota_pages = 0 AND quota_validity_days IS NULL AND service_plan_id IS NULL) OR '
+            '(quota_pages > 0 AND service_plan_id IS NOT NULL AND monthly_redraw_pages = 0 '
+            'AND trial_days = 0 AND trial_redraw_pages = 0)', name='ck_billing_revision_purchase'))
 
 
 class BillingPrice(Base):
@@ -56,7 +65,8 @@ class BillingPrice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (ForeignKeyConstraint(['plan_revision_id', 'plan_id'],
             ['billing_plan_revisions.id', 'billing_plan_revisions.plan_id']),
-        CheckConstraint("environment IN ('test', 'live')"), CheckConstraint("interval IN ('month', 'year')"),
+        CheckConstraint("environment IN ('test', 'live')"),
+        CheckConstraint("interval IN ('month', 'year', 'once')", name='ck_billing_price_interval'),
         CheckConstraint("status IN ('draft', 'active', 'archived')"), CheckConstraint('unit_amount > 0'),
         Index('uq_billing_active_offer', 'plan_id', 'environment', 'currency', 'interval', unique=True,
             sqlite_where=text("status = 'active'"), postgresql_where=text("status = 'active'")))
@@ -113,6 +123,7 @@ class BillingCheckout(Base):
     __tablename__ = 'billing_checkouts'
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128))
     environment: Mapped[str] = mapped_column(String(16))
     provider: Mapped[str] = mapped_column(String(16))
     price_id: Mapped[str] = mapped_column(ForeignKey('billing_prices.id'))
@@ -128,6 +139,7 @@ class BillingCheckout(Base):
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
     error_code: Mapped[str | None] = mapped_column(String(80))
     __table_args__ = (UniqueConstraint('provider', 'environment', 'session_id'),
+        UniqueConstraint('owner_id', 'idempotency_key', name='uq_billing_checkout_intent'),
         CheckConstraint("provider IN ('stripe', 'creem')"),
         CheckConstraint("environment IN ('test', 'live')"))
 
@@ -202,6 +214,9 @@ class BillingEvent(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_retry_key: Mapped[str | None] = mapped_column(String(64))
     last_retry_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (
+        Index('ix_billing_events_transaction', 'provider', 'environment', text("(payload ->> 'transaction_id')"), 'event_type'),
+        Index('ix_billing_events_resource', 'provider', 'environment', 'resource_id', 'event_type'))
 
 
 class BillingOrder(Base):

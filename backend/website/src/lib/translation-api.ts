@@ -1,4 +1,4 @@
-import { session } from './auth';
+import { ApiError, assertSession, authenticatedFetch, sessionIdentity } from './auth';
 import type { Snapshot } from './translation-store';
 export interface Guest {
   enabled: boolean;
@@ -12,6 +12,7 @@ export interface Account {
   id: string;
   subject: string;
   name: string;
+  sessionId: string;
 }
 export interface Capabilities {
   result_protocol: string;
@@ -43,14 +44,9 @@ export async function request(
 ): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set('X-Translation-Protocol', 'overlay-v1');
-  if (account) {
-    const auth = await session();
-    if (!auth || auth.profile.sub !== account.subject)
-      throw new TranslationError('AUTH_REQUIRED', 401);
-    headers.set('Authorization', 'Bearer ' + auth.access_token);
-  } else if (path.startsWith('/v1/guest/')) headers.set('X-Guest-Request', '1');
+  if (!account && path.startsWith('/v1/guest/')) headers.set('X-Guest-Request', '1');
   const timeout = AbortSignal.timeout(timeoutMs);
-  const response = await fetch(path, {
+  const init: RequestInit = {
     ...options,
     headers,
     cache: 'no-store',
@@ -58,7 +54,12 @@ export async function request(
     signal: options.signal
       ? AbortSignal.any([options.signal, timeout])
       : timeout,
-  });
+  };
+  const identity = account ? { id: account.sessionId, subject: account.subject } : undefined;
+  const response = await (account ? authenticatedFetch(path, init, identity).catch(error => {
+    if (error instanceof ApiError && error.status === 401) throw new TranslationError('AUTH_REQUIRED', 401);
+    throw error;
+  }) : fetch(path, init));
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new TranslationError(
@@ -74,24 +75,17 @@ export async function json<T>(
   options: RequestInit = {},
   account?: Account,
 ): Promise<T> {
-  return (await request(path, options, account)).json();
+  const result = await (await request(path, options, account)).json();
+  options.signal?.throwIfAborted();
+  if (account) await assertSession(account.sessionId);
+  return result as T;
 }
 export async function currentAccount(): Promise<Account | undefined> {
-  if (
-    !Object.keys(sessionStorage).some((key) => key.startsWith('nc-site-user:'))
-  )
-    return undefined;
-  const auth = await session();
-  if (!auth) throw new TranslationError('AUTH_REQUIRED', 401);
-  const response = await fetch('/v1/me', {
-    headers: { Authorization: 'Bearer ' + auth.access_token },
-    cache: 'no-store',
-    credentials: 'omit',
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!response.ok) throw new TranslationError('AUTH_REQUIRED', 401);
-  const { user } = await response.json();
-  return { id: user.id, name: user.name, subject: auth.profile.sub };
+  const identity = await sessionIdentity();
+  if (!identity) return undefined;
+  const account = { id: '', name: '', subject: identity.subject, sessionId: identity.id };
+  const { user } = await json<{ user: { id: string; name: string } }>('/v1/me', { signal: AbortSignal.timeout(15000) }, account);
+  return { ...account, id: user.id, name: user.name };
 }
 export async function watch(
   path: string,

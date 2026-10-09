@@ -13,8 +13,8 @@ def server_now(db):
     return now()
 
 
-def image_limit(db, user, *, benefits=None):
-    from .entitlements import membership_benefits
+def image_limit(db, user, *, policy=None):
+    from .entitlements import admission_policy
     from .system_settings import get_request_limits
     guest_operation = user.kind == 'guest' and bool(db.info.get('guest_network'))
     cfg = db.info.get('guest_limits') if guest_operation else None
@@ -22,8 +22,8 @@ def image_limit(db, user, *, benefits=None):
         cfg = get_request_limits(db)
         if guest_operation:
             db.info['guest_limits'] = cfg  # Shared only until this guest operation exits.
-    benefits = benefits if benefits is not None else membership_benefits(db, user)
-    return cfg.plus_images_per_minute if benefits['paid'] else cfg.free_images_per_minute
+    policy = policy or admission_policy(db, user)
+    return cfg.plus_images_per_minute if policy.priority else cfg.free_images_per_minute
 
 
 def image_budget(db, user, at=None):
@@ -31,10 +31,10 @@ def image_budget(db, user, at=None):
     return {key: budget[key] for key in ['window_seconds', 'limit', 'remaining', 'retry_after_seconds']}
 
 
-def admit_image(db, user, job_id, *, benefits=None):
-    from .entitlements import membership_benefits
-    benefits = benefits if benefits is not None else membership_benefits(db, user)
-    hourly_limit = benefits['hourly_image_limit']
+def admit_image(db, user, job_id, *, policy=None):
+    from .entitlements import admission_policy
+    policy = policy or admission_policy(db, user)
+    hourly_limit = policy.hourly_image_limit
     if hourly_limit is not None:
         budget = redis_state.window('image-hourly', user.id, hourly_limit, member=job_id, seconds=3600)
         retry = budget['retry_after_seconds']
@@ -44,7 +44,7 @@ def admit_image(db, user, job_id, *, benefits=None):
                 headers={'Retry-After': str(retry)})
         transaction = db.get_nested_transaction() or db.get_transaction()
         db.info.setdefault('hourly_image_reservations', {}).setdefault(transaction, []).append((user.id, job_id))
-    budget = redis_state.window('image', user.id, image_limit(db, user, benefits=benefits), member=job_id)
+    budget = redis_state.window('image', user.id, image_limit(db, user, policy=policy), member=job_id)
     retry = budget['retry_after_seconds']
     if retry:
         raise HTTPException(429, detail={'code': 'IMAGE_RATE_LIMITED', 'message': '本分钟新增翻译图片已达上限',

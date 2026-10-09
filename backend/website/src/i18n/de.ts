@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " und verstehen Sie die automatische Verlängerung.",
     "继续原结账": "Bestellvorgang fortsetzen",
     "前往安全结账": "Weiter zur sicheren Kaufabwicklung",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Durch das Abmelden wird nur die Sitzung dieser Website-Registerkarte gelöscht. Es werden weder Abonnements gekündigt noch die Erweiterung oder andere Apps abgemeldet.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Beim Abmelden wird die Website-Sitzung in allen Tabs dieses Browsers gelöscht. Abonnements werden nicht gekündigt und die Erweiterung oder andere Apps werden nicht abgemeldet.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Die Anmeldung ist nicht konfiguriert. Bitte versuchen Sie es später noch einmal oder wenden Sie sich an den Support.",
     "暂时无法连接登录服务，请重试。": "Der Anmeldedienst kann nicht erreicht werden. Bitte versuchen Sie es erneut.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Die Sitzungsverlängerung ist fehlgeschlagen. Überprüfen Sie Ihre Verbindung oder melden Sie sich erneut an, wenn die Autorisierung abgelaufen ist.",

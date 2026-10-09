@@ -31,7 +31,8 @@ class ReconcileRequest(RequestBody):
 
 def order_json(order, owner, price, revision):
     return {**{key: getattr(order, key) for key in ORDER_FIELDS},
-        'owner_name': owner.name, 'product_name': revision.name, 'interval': price.interval}
+        'owner_name': owner.name, 'product_name': revision.name, 'interval': price.interval,
+        'quota_review_required': price.interval == 'once' and order.status == 'partially_refunded'}
 
 
 def order_query():
@@ -114,7 +115,10 @@ def order_detail(order_id: str, db: Session = Depends(get_db)):
     known_total = sum(item.amount for item in successful if item.amount is not None and item.currency == order.currency)
     complete = (all(item.amount is not None and item.currency == order.currency and item.status != 'unknown' for item in refunds)
         and order.refunded_total is not None and order.refunded_total == known_total)
+    purchase_quota = db.scalar(select(QuotaPeriod).where(QuotaPeriod.billing_order_id == order.id))
     return {'order': order_json(order, owner, price, revision), 'price': price_json(db, price),
+        'purchase_quota': fields(purchase_quota, ('id', 'kind', 'starts_at', 'ends_at', 'granted', 'used',
+            'reserved', 'revoked_at')) if purchase_quota else None,
         'checkout': {key: getattr(checkout, key) for key in ('id', 'status', 'session_id', 'trial',
             'created_at', 'expires_at', 'error_code')} if checkout else None,
         'subscription': {key: getattr(subscription, key) for key in ('id', 'status', 'next_billed_at',
@@ -179,8 +183,11 @@ def reconcile_order(order_id: str, body: ReconcileRequest, db: Session = Depends
                 sync_session(checkout.session_id, provider=order.provider)
         db.refresh(order)
         if order.provider == 'stripe' and order.external_id:
-            from .stripe_refunds import sync_invoice_reversals
-            sync_invoice_reversals(order.external_id)
+            from .stripe_refunds import sync_invoice_reversals, sync_purchase_reversals
+            if db.get(BillingPrice, order.price_id).interval == 'once':
+                sync_purchase_reversals(order.external_id)
+            else:
+                sync_invoice_reversals(order.external_id)
     except BillingError as exc:
         db.rollback()
         record_audit(db, actor_id, 'billing.order.reconcile_failed', 'billing_order', order_id,
@@ -245,7 +252,7 @@ def events(provider: Literal['stripe', 'creem'] | None = None, environment: Lite
 def safe_event_references(event):
     import re
     return {key: value for key, value in event.payload.items() if key in (
-        'checkout_id', 'subscription_id', 'invoice_id', 'transaction_id', 'charge_id', 'refund_id', 'dispute_id')
+        'checkout_id', 'checkout_session_id', 'subscription_id', 'invoice_id', 'transaction_id', 'charge_id', 'refund_id', 'dispute_id')
         and isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,254}', value)}
 
 

@@ -6,7 +6,7 @@ Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作�
 
 翻译页支持文件选择、拖放和页面内图片粘贴；不拦截输入框中的文字粘贴。“清空本地缓存”确认后一次性移除当前历史列表的原图、送译副本、译图和记录，不影响其他账户、登录或服务器任务；导入、翻译同步和下载期间禁用。语言菜单支持内部 Tab 导航，焦点离开、点击外部或 Esc 时收起。
 
-定价页“开通”直接使用当前 API 报价发起托管结账；未登录时保留语言与报价，登录后一次性继续。已有订阅／赠送或不同的待处理报价转到账户管理，不自动更换报价。`tests/checkout-fixture.html` 使用账户隔离夹具（Vite 配置 `tests/account-fixture.config.ts`，端口 5193）检查按钮与模拟登录，不创建真实订单。
+订阅与一次性额度包都只在定价页购买，插件和账户页只保留权益、订阅管理与定价入口。`tests/checkout-fixture.html` 使用账户隔离夹具（Vite 配置 `tests/account-fixture.config.ts`，端口 5193）检查购买、原请求恢复与模拟登录，不创建真实订单。额度规则见[会员与额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)，独立额度订单、订阅结账与恢复规则统一维护在[支付规范](../../docs/STRIPE_BILLING.md)。
 
 需要 Node.js 22.12+，在本目录执行：
 
@@ -44,9 +44,11 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。插件与官网工作台均提供常规图片翻译；官网不提供其他模式的新任务入口，已有本地结果仍可读取、下载和恢复查询。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
 - 卸载反馈页 `/uninstall/` 提供17 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
-- [src/data/published-lite.ts](src/data/published-lite.ts)：官网静态公布的 Lite 价格与权益；首页静态预览与价格页共用月／年选择，醒目价格为对应周期的实付总额，币种缩小显示，年付另外标注月均价。年付优惠在周期选择下方保留固定空间，按同币种、同权益版本的月价对比计算；缺少可比报价时不展示折扣。首页突出无日／月累计上限、受理速率、模型和优先响应；对比页共同权益双方勾选，差异权益仅 Lite 勾选并加重文字。购买状态和正式结账报价来自账单 API，缺少当前周期报价时不自动跳到另一周期，也不生成购买链接；禁用 JavaScript 时保留月价和年总价。更新规则见[支付规则](../../docs/STRIPE_BILLING.md#已确认的产品规则)。
+- [src/data/published-lite.ts](src/data/published-lite.ts)：官网静态公布的 Lite 价格与权益；首页静态预览与价格页共用月／年选择，醒目价格为对应周期的实付总额，币种缩小显示，年付另外标注月均价。年付优惠在周期选择下方保留固定空间，按同币种、同权益版本的月价对比计算；缺少可比报价时不展示折扣。首页突出无日／月累计上限、受理速率、模型和优先响应；对比页展示九项权益：共同的本地翻译和阅读权益双方勾选，差异权益仅 Lite 勾选并加重文字；云端／本地名称及反馈、功能需求的支持边界见[会员权益](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网权益展示与支持)。购买状态和正式结账报价来自账单 API，缺少当前周期报价时不自动跳到另一周期，也不生成购买链接；禁用 JavaScript 时保留月价和年总价。更新规则见[支付规则](../../docs/STRIPE_BILLING.md#已确认的产品规则)。
 - [public/design-tokens.css](public/design-tokens.css) 维护基础视觉令牌，也供 Drive 连接页复用；[src/styles/marketing.css](src/styles/marketing.css) 为官网布局提供统一深色覆盖，不改变 Drive 令牌；[src/styles/controls.css](src/styles/controls.css) 统一全站按钮、选择器及其交互状态，页面 CSS 只安排控件布局。[ComicSymbol.astro](src/components/ComicSymbol.astro) 提供原创静态 SVG。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
 - 每页维护标题、正文、canonical、hreflang 和结构化数据；页面关键词分工、17 语用词与 FAQ 规则见 [SEO 规范](SEO.md)。账户、身份回调、支付返回与卸载反馈页不索引。构建检查站内链接、锚点、商店入口及 FAQ 正文与 SEO 数据一致性。
-- 账户使用同源 OIDC + PKCE，精确回调为 `/auth/callback/`；前端不存 client secret。会话限当前标签页，写请求不自动重放，支付返回页不发放权益。见[身份规范](../../docs/PRODUCTION_IDENTITY.md)和[支付规则](../../docs/STRIPE_BILLING.md)。
+- 账户使用同源 OIDC + PKCE，精确回调为 `/auth/callback/`；前端不存 client secret。官网在当前浏览器持久保存一份账户会话，跨标签页合并刷新、同步退出和换号；写请求不自动重放，支付返回页不发放权益。官网与插件复用身份服务的 SSO，不互传令牌，不同步本地退出。登录期限由身份服务实际刷新令牌与授权期限决定，持久化不延长这些期限。见[身份规范](../../docs/PRODUCTION_IDENTITY.md)和[支付规则](../../docs/STRIPE_BILLING.md)。
 
 浏览器检查入口见[脚本说明](../../scripts/README.md#官网验收)，覆盖17 语、加载与失败、图片切换、登录返回和订阅交互。
+
+定价对照表的长解释收在对应功能标题旁的信息图标中，支持悬停、键盘聚焦和点按；Esc、焦点离开或点击外部关闭。提示复用当前主题令牌，按视口定位以适配窄屏和 RTL，不增加请求或将说明复制到每个套餐单元格。

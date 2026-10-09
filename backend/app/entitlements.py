@@ -1,20 +1,22 @@
 """Account-locked admission and period-locked settlement; reads never grant quota."""
 from calendar import monthrange
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import case, func, or_, select, text, update
 from .config import settings
 from .entitlement_models import MembershipOperation, QuotaPeriod
 from .errors import problem
 from .models import Asset, Job, Ledger, User, now, uid
 from .providers import digest
-from .billing_access import active_benefits, active_terms
+from .billing_access import active_benefits, active_terms, first_purchase
 from .system_settings import get_request_limits
 from .admin_audit import record_audit
 
 DAILY = "classic_daily"
 MONTHLY = "redraw_monthly"
 UNLIMITED = "classic_unlimited"
+PURCHASE = "classic_purchase"
 GIFT_PERIOD = timedelta(days=30)
 
 
@@ -199,18 +201,87 @@ def entitlement_version(db, user, kind, at=None):
                    "membership": [user.membership_id, [t.id for t in active_terms(db, user.id, at)]] if kind in (MONTHLY, UNLIMITED) else None})
 
 
-def available_periods(db, user, mode, kind, at):
+def _period_query(user, mode, at):
     from .billing_models import BillingTerm
-    periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id,
+    return select(QuotaPeriod).where(QuotaPeriod.owner_id == user.id, QuotaPeriod.source != 'purchase',
         QuotaPeriod.mode == mode, or_(QuotaPeriod.source == "grant",
             (QuotaPeriod.source == 'subscription') & QuotaPeriod.billing_term_id.in_(
                 select(BillingTerm.id).where(BillingTerm.revoked_at.is_(None)))), QuotaPeriod.starts_at <= at,
-        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))))
+        QuotaPeriod.revoked_at.is_(None), or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))
+
+
+def _automatic_period(db, user, kind, at):
     spec = period_spec(user, kind, at, db=db)
-    if spec:
-        # Virtual automatic periods allow side-effect-free reads before first use.
-        periods.append(db.get(QuotaPeriod, spec["id"]) or QuotaPeriod(**spec, used=0, reserved=0))
+    # Virtual automatic periods allow side-effect-free reads before first use.
+    return (db.get(QuotaPeriod, spec['id']) or QuotaPeriod(**spec, used=0, reserved=0)) if spec else None
+
+
+def available_periods(db, user, mode, kind, at):
+    """Non-purchase bucket detail; never used to choose an admission."""
+    periods = list(db.scalars(_period_query(user, mode, at)))
+    automatic = _automatic_period(db, user, kind, at)
+    if automatic:
+        periods.append(automatic)
     return sorted(periods, key=lambda row: (row.ends_at or datetime.max, row.starts_at, row.id))
+
+
+def _first_period(db, user, mode, kind, at):
+    stored = db.scalar(_period_query(user, mode, at).where(
+        QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved)
+        .order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.starts_at, QuotaPeriod.id).limit(1))
+    automatic = _automatic_period(db, user, kind, at)
+    candidates = [period for period in (stored, automatic) if period is not None
+                  and period.granted > period.used + period.reserved]
+    return min(candidates, key=lambda row: (row.ends_at or datetime.max, row.starts_at, row.id), default=None)
+
+
+@dataclass(frozen=True)
+class AdmissionPolicy:
+    """One locked selection binds the model service and the page being charged."""
+    plan: str
+    service_plan: str
+    kind: str
+    hourly_image_limit: int | None
+    period: QuotaPeriod | None = None
+
+    @property
+    def priority(self):
+        return int(self.service_plan not in ('free', 'guest'))
+
+
+def admission_policy(db, user, mode='classic', at=None, *, benefits=None):
+    """Read-only until reserve; callers resolve UUID/cache reuse before enforcing it."""
+    at = at or now()
+    if user.kind == 'guest':
+        return AdmissionPolicy('guest', 'guest', 'guest_trial', None)
+    benefits = benefits if benefits is not None else membership_benefits(db, user, at)
+    kind = quota_kind(user, mode, at, db, benefits=benefits)
+    # An active subscription wins. Purchased service belongs only to its own
+    # classic pages, never to free daily pages or an independent redraw gift.
+    if mode == 'classic' and not benefits['paid']:
+        purchase = first_purchase(db, user.id, at)
+        if purchase:
+            period, revision = purchase
+            return AdmissionPolicy(benefits['plan'], revision.service_plan_id,
+                                   PURCHASE, revision.hourly_image_limit, period)
+    period = None if kind in (UNLIMITED, 'unavailable') else _first_period(db, user, mode, kind, at)
+    return AdmissionPolicy(benefits['plan'], benefits['plan'], kind, benefits['hourly_image_limit'], period)
+
+
+def _purchase_totals(db, user, at):
+    values = db.execute(select(*(func.coalesce(func.sum(getattr(QuotaPeriod, field)), 0)
+        for field in ('granted', 'used', 'reserved')), func.min(QuotaPeriod.starts_at),
+        func.min(case((QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved, QuotaPeriod.ends_at))))
+        .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.source == 'purchase',
+            QuotaPeriod.revoked_at.is_(None), QuotaPeriod.starts_at <= at,
+            or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))).one()
+    return dict(zip(('granted', 'used', 'reserved', 'starts_at', 'next_expiry_at'), values))
+
+
+def purchase_quota_json(totals):
+    return {field: totals[field] for field in ('granted', 'used', 'reserved')} | {
+        'available': totals['granted'] - totals['used'] - totals['reserved'],
+        'next_expiry_at': iso(totals['next_expiry_at'])}
 
 
 def period_json(period):
@@ -221,77 +292,89 @@ def period_json(period):
             "grants_access": bool(period.grants_access), "note": period.note or ""}
 
 
-def allowance_json(db, user, kind, at=None):
+def allowance_json(db, user, kind, at=None, *, purchase_totals=None):
     at = at or now()
     if kind in (UNLIMITED, "unavailable"):
         return None
-    mode = "classic" if kind == DAILY else "redraw"
-    periods = available_periods(db, user, mode, kind, at)
-    spec = period_spec(user, kind, at, db=db)
+    mode = "classic" if kind in (DAILY, PURCHASE) else "redraw"
+    base_kind = DAILY if kind == PURCHASE else kind
+    periods = available_periods(db, user, mode, base_kind, at)
+    spec = period_spec(user, base_kind, at, db=db)
     if not periods:
         return None
     totals = {field: sum(getattr(row, field) for row in periods) for field in ("granted", "used", "reserved")}
+    purchases = (purchase_totals if purchase_totals is not None else _purchase_totals(db, user, at)) if mode == 'classic' else None
+    if purchases:
+        for field in totals:
+            totals[field] += purchases[field]
+    starts = [row.starts_at for row in periods] + ([purchases['starts_at']] if purchases and purchases['starts_at'] else [])
+    expiries = [row.ends_at for row in periods if row.ends_at] + ([purchases['next_expiry_at']]
+        if purchases and purchases['next_expiry_at'] else [])
     return {"id": spec["id"] if spec else digest([row.id for row in periods]), "kind": kind, **totals,
             "available": totals["granted"] - totals["used"] - totals["reserved"],
-            "starts_at": iso(min(row.starts_at for row in periods)),
+            "starts_at": iso(min(starts)),
             "resets_at": iso(spec["ends_at"]) if spec else
                 (iso(min(row.ends_at for row in periods if row.source in ('membership', 'subscription')))
                  if any(row.source in ('membership', 'subscription') for row in periods) else None),
-            "next_expiry_at": iso(periods[0].ends_at), "buckets": [period_json(row) for row in periods]}
+            "next_expiry_at": iso(min(expiries)) if expiries else None,
+            "buckets": [period_json(row) for row in periods]}
 
 
 def entitlements_json(db, user, at=None):
     at = at or now()
     benefits = membership_benefits(db, user, at)
+    policy = admission_policy(db, user, at=at, benefits=benefits)
+    purchases = _purchase_totals(db, user, at)
     from .translation_limits import image_limit
     modes = {}
     for mode in ("classic", "redraw"):
-        kind = quota_kind(user, mode, at, db, benefits=benefits)
+        kind = policy.kind if mode == 'classic' else quota_kind(user, mode, at, db, benefits=benefits)
         modes[mode] = {"allowed": kind != "unavailable", "unlimited": kind == UNLIMITED,
                        "quota_kind": kind, "consent_version": entitlement_version(db, user, kind, at),
-                       "quota": allowance_json(db, user, kind, at)}
+                       "quota": allowance_json(db, user, kind, at, purchase_totals=purchases)}
     starts_at, expires_at = plus_dates(db, user, at)
-    return {"plan": benefits['plan'], "plus_started_at": iso(starts_at),
+    return {"plan": benefits['plan'], "service_plan": policy.service_plan,
+            "purchase_quota": purchase_quota_json(purchases), "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "gift": gift_json(user, at), "timezone": settings().quota_timezone,
-            "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user, benefits=benefits)},
-            "hourly_image_rate_limit": ({"window_seconds": 3600, "limit": benefits['hourly_image_limit']}
-                if benefits['hourly_image_limit'] is not None else None),
+            "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user, policy=policy)},
+            "hourly_image_rate_limit": ({"window_seconds": 3600, "limit": policy.hourly_image_limit}
+                if policy.hourly_image_limit is not None else None),
             "modes": modes, "generated_at": iso(at),
             "pending_previous_period_pages": db.scalar(select(func.coalesce(func.sum(QuotaPeriod.reserved), 0))
                 .where(QuotaPeriod.owner_id == user.id, QuotaPeriod.ends_at <= at))}
 
 
-def require_entitlement(user, mode, at=None, db=None, *, benefits=None):
+def require_entitlement(user, mode, *, db, policy):
     if user.kind == 'guest':
         if mode != 'classic' or db is None or not db.info.get('guest_network'):
             problem('GUEST_FORBIDDEN', '匿名体验仅支持已验证的常规图片翻译', 403)
         return 'guest_trial'
-    kind = quota_kind(user, mode, at, db, benefits=benefits)
+    kind = policy.kind
     if kind == "unavailable":
         problem("PLUS_REQUIRED", "AI 重绘需要包含重绘权益的有效会员或有效赠送额度；已有译图仍可查看", 403)
     return kind
 
 
-def reserve(db, user, job, at=None, *, benefits=None):
+def reserve(db, user, job, at=None, *, policy=None):
     """The caller holds the user lock and has resolved cache/in-flight reuse."""
     at = at or now()
     if user.kind == 'guest':
         from .guests import reserve_guest
         reserve_guest(db, user, job, at)
         return
-    benefits = benefits if benefits is not None else membership_benefits(db, user, at)
-    kind = require_entitlement(user, job.mode, at, db=db, benefits=benefits)
+    policy = policy or admission_policy(db, user, job.mode, at)
+    kind = require_entitlement(user, job.mode, db=db, policy=policy)
     job.quota_kind = kind
-    job.entitlement = {"plan": benefits['plan'], "accepted_at": iso(at),
-                       "hourly_image_limit": benefits['hourly_image_limit'],
+    job.entitlement = {"plan": policy.plan, "service_plan": policy.service_plan,
+                       "priority": policy.priority, "accepted_at": iso(at),
+                       "hourly_image_limit": policy.hourly_image_limit,
                        "membership_id": user.membership_id,
                        "billing_term_ids": [term.id for term in active_terms(db, user.id, at)],
                        "version": entitlement_version(db, user, kind, at)}
     if kind == UNLIMITED:
         job.quota_pages, job.settlement = 0, "included"
         return
-    periods = available_periods(db, user, job.mode, kind, at)
-    period = next((row for row in periods if row.granted - row.used - row.reserved >= 1), None)
+    period = policy.period
     if period is None:
         spec = period_spec(user, kind, at, db=db)
         problem("DAILY_QUOTA_EXHAUSTED" if job.mode == "classic" else "REDRAW_QUOTA_EXHAUSTED",
@@ -301,6 +384,8 @@ def reserve(db, user, job, at=None, *, benefits=None):
         db.add(period)
         db.flush()
     updated = db.execute(update(QuotaPeriod).where(QuotaPeriod.id == period.id,
+        QuotaPeriod.revoked_at.is_(None), QuotaPeriod.starts_at <= at,
+        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at),
         QuotaPeriod.granted - QuotaPeriod.used - QuotaPeriod.reserved >= 1)
         .values(reserved=QuotaPeriod.reserved + 1))
     if updated.rowcount != 1:

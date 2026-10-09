@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Pago completo",
-  "description": "El pago de su suscripción está completo. Regresa a la extensión para seguir leyendo.",
   "heading": "Tu próximo capítulo te espera.",
   "body": "Gracias por elegir NodeLane Comics. Vuelva a la extensión y continúe donde lo dejó.",
-  "hint": "Los beneficios de tu suscripción se actualizan automáticamente. Si aún no aparecen, actualiza Mi cuenta en la extensión.",
+  "hint": 'Las ventajas o páginas compradas aparecen tras verificar el pago. Actualiza tu cuenta para comprobarlo.',
   "home": "Volver al inicio",
   "footer": "Puede cerrar esta página de forma segura."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Traducción clásica con límite horario para nuevas solicitudes de traducción.",
     "intro": "Elija un plan de traducción para utilizar los beneficios de su suscripción en la extensión."
   },
-  "channel": "Proveedor de pago",
   "manage": "Administrar suscripción",
   "statuses": [
     "Activo",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Todas las funciones principales de lectura"
     },
     "classic": {
-      "label": "Traducción clásica",
+      "label": "Traducción en la nube",
       "free": "30 páginas/día",
-      "lite": "Sin límite total diario o mensual"
+      "lite": "Sin límite total diario o mensual",
+      "detail": "Las páginas se descuentan según las traducciones completadas con éxito; reutilizar tus propios resultados existentes no vuelve a descontarlas. «Sin límite» solo significa que no hay un tope acumulado diario o mensual; el uso sigue sujeto a los límites de admisión de solicitudes y a la capacidad del servicio."
+    },
+    "local": {
+      "label": "Traducción local",
+      "free": "Compatible con MTU autoalojado",
+      "lite": "Compatible con MTU autoalojado",
+      "detail": "La traducción local requiere alojar MTU por cuenta propia; la necesidad de conexión a Internet depende de los modelos y proveedores utilizados."
     },
     "rate": {
       "label": "Límite de nuevas solicitudes de traducción",
       "free": "10 páginas en cada período móvil de un minuto",
-      "lite": "100 páginas en cada período móvil de un minuto; {n} páginas en cada período móvil de una hora"
+      "lite": "100 páginas en cada período móvil de un minuto; {n} páginas en cada período móvil de una hora",
+      "detail": "Los períodos móviles se comparten entre los dispositivos, modos e idiomas de una misma cuenta. Las solicitudes duplicadas y la reutilización de resultados completados no vuelven a contar. Los límites de solicitudes y la prioridad de procesamiento no garantizan una velocidad de finalización ni una parte fija de la capacidad."
     },
     "priority": {
       "label": "Respuesta a la tarea de traducción",
       "free": "Programación estándar",
       "lite": "Respuesta prioritaria"
     },
+    "feedback": {
+      "label": "Comentarios de usuarios",
+      "free": "Respuesta normal",
+      "lite": "Respuesta prioritaria",
+      "detail": "Los comentarios de los miembros se atienden con prioridad, sin garantizar un plazo de respuesta."
+    },
+    "requests": {
+      "label": "Solicitudes de funciones",
+      "free": "Evaluación habitual",
+      "lite": "Evaluación prioritaria",
+      "detail": "Las solicitudes de funciones de los miembros se evalúan con prioridad, sin garantizar su implementación ni una fecha de lanzamiento."
+    },
     "early": {
       "label": "Nuevas características",
       "free": "En lanzamiento general",
       "lite": "Acceso temprano a funciones avanzadas"
     },
-    "note": "Los períodos móviles se comparten entre los dispositivos, modos e idiomas de una misma cuenta. Las solicitudes duplicadas y la reutilización de resultados completados no vuelven a contar. Los límites de solicitudes y la prioridad de procesamiento no garantizan una velocidad de finalización ni una parte fija de la capacidad. Consulta las notas de versión para conocer las nuevas funciones."
+    "note": "Consulta las notas de versión para conocer las nuevas funciones."
   },
   "billingCycle": [
     "Mensual",

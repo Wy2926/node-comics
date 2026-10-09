@@ -27,6 +27,14 @@
 .pricing-comparison .billing-plan-picker { margin-top: 16px; }
 .pricing-comparison .billing-plan-card { padding: 10px 12px; font-size: .8rem; }
 .pricing-comparison tbody th { background: transparent; color: var(--muted); font-size: .85rem; }
+.pricing-comparison .feature-info { display: inline-flex; margin-inline-start: 4px; vertical-align: middle; }
+.pricing-comparison .feature-info-trigger { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 4px; border: 0; border-radius: var(--comic-control-radius); background: transparent; color: var(--muted); cursor: help; }
+.pricing-comparison .feature-info-trigger:is(:hover, [aria-expanded='true']) { color: var(--accent); background: var(--accent-soft); }
+.pricing-comparison .feature-info-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pricing-comparison .feature-info-trigger svg { width: 16px; height: 16px; }
+.pricing-comparison .feature-info-tip { position: fixed; z-index: 20; inset: 0 auto auto 0; width: min(20rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding-block: 8px; overflow: auto; color: var(--ink); font-size: .78rem; font-weight: 400; line-height: 1.7; text-align: start; }
+.pricing-comparison .feature-info-tip[hidden] { display: none; }
+.pricing-comparison .feature-info-content { display: block; padding: 12px 14px; border: var(--comic-border); border-radius: var(--comic-card-radius); background: var(--surface-soft); box-shadow: var(--comic-shadow); }
 .pricing-comparison tbody td { color: var(--muted); }
 .pricing-comparison tbody strong { color: var(--ink); font-weight: 600; }
 .pricing-comparison tr[data-feature='classic'] strong { color: var(--accent); }

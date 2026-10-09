@@ -52,9 +52,14 @@ def billing_error(exc):
         'BILLING_GIFT_ACTIVE': '赠送会员期间不会扣款，请在赠送结束后开通订阅',
         'SUBSCRIPTION_NOT_FOUND': '没有可管理的订阅',
         'BILLING_CHECKOUT_UNCERTAIN': '正在核实原结账结果，请稍后刷新',
-        'CREEM_CHECKOUT_UNCERTAIN': '原结账请求结果待核实，为避免重复订阅暂不创建新结账，请联系支持',
+        'CREEM_CHECKOUT_UNCERTAIN': '此笔结账请求结果待核实，不会重复下单，请联系支持恢复原订单',
+        'BILLING_IDEMPOTENCY_KEY_REQUIRED': '购买额度需要原购买操作编号，请刷新后重试',
+        'BILLING_IDEMPOTENCY_KEY_INVALID': '购买操作编号无效，请刷新后重试',
+        'BILLING_PURCHASE_PROCESSING': '正在核实此笔支付，请稍后刷新，不会重复下单',
+        'BILLING_PAYMENT_TIME_PENDING': '正在核实原付款时间，请稍后刷新',
+        'BILLING_PURCHASE_RETRY_ALLOWED': '原购买已确认结束且未付款，可以手动重新购买',
         'BILLING_CHECKOUT_COMPLETED': '结账已完成，请刷新会员权益',
-        'BILLING_CHECKOUT_PRICE_CONFLICT': '已有待核实结账，请继续原价格与支付渠道',
+        'BILLING_CHECKOUT_PRICE_CONFLICT': '此购买意图已有待核实结账，请继续原价格与支付渠道',
         'BILLING_PLAN_UNAVAILABLE': '此价格尚未发布或已停售，请刷新套餐列表',
         'BILLING_CHANNEL_UNAVAILABLE': '此支付渠道暂不可用，请刷新套餐列表',
         'BILLING_CHECKOUT_EXPIRED': '结账链接已过期，请重新打开', 'BILLING_DISABLED': '订阅暂未开放'}
@@ -69,13 +74,16 @@ def status(user: User = Depends(identity), db: Session = Depends(get_db)):
 @router.get('/v1/billing/catalog')
 def public_catalog(db: Session = Depends(get_db)):
     enabled = any(provider_enabled(p) for p in ('stripe', 'creem'))
-    return {'enabled': enabled, 'offers': offers(db) if enabled else [], 'products': products_json(db, public=True) if enabled else []}
+    subscription_offers = offers(db) if enabled else []
+    return {'enabled': enabled, 'offers': subscription_offers,
+        'quota_offers': offers(db, interval='once') if enabled else [],
+        'products': products_json(db, public_offers=subscription_offers) if enabled else []}
 
 
 @router.post('/v1/billing/checkouts')
-def checkout(body: CheckoutRequest, user: User = Depends(identity)):
+def checkout(body: CheckoutRequest, request: Request, user: User = Depends(identity)):
     try:
-        return start_checkout(user.id, body.price_id, body.provider)
+        return start_checkout(user.id, body.price_id, body.provider, request.headers.get('Idempotency-Key'))
     except BillingError as exc:
         billing_error(exc)
 
@@ -151,9 +159,12 @@ def event_references(obj):
     parent = parent if isinstance(parent, dict) else {}
     details = parent.get('subscription_details')
     details = details if isinstance(details, dict) else {}
+    checkout = obj.get('checkout') if isinstance(obj.get('checkout'), dict) else {}
     values = {'checkout_id': metadata.get('checkout_intent_id') if metadata.get('app') == 'node_comics' else None,
         'subscription_id': obj.get('subscription') or details.get('subscription'),
-        'invoice_id': obj.get('invoice'), 'transaction_id': obj.get('transaction'),
+        'checkout_session_id': checkout.get('id'),
+        'invoice_id': obj.get('invoice'), 'transaction_id': obj.get('transaction') or obj.get('payment_intent') or (
+            obj.get('order', {}).get('transaction') if isinstance(obj.get('order'), dict) else None),
         'refund_id': obj.get('id') if obj.get('object') == 'refund' else None,
         'dispute_id': obj.get('id') if obj.get('object') == 'dispute' else None,
         'charge_id': obj.get('charge') or (obj.get('id') if obj.get('object') == 'charge' else None)}

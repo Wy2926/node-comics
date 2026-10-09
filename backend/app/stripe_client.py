@@ -53,10 +53,12 @@ def environment(resource):
 def approved_price(price, expected):
     environment(price)
     recurring = price.get('recurring') or {}
+    cadence = (not recurring and price.get('type') == 'one_time') if expected.interval == 'once' else (
+        recurring.get('interval') == expected.interval and recurring.get('interval_count') == 1
+        and recurring.get('usage_type') == 'licensed')
     require(expected.environment == settings().stripe_environment and price.get('id') == expected.stripe_price_id
         and price.get('product') == expected.stripe_product_id and price.get('currency') == expected.currency
-        and price.get('unit_amount') == expected.unit_amount and recurring.get('interval') == expected.interval
-        and recurring.get('interval_count') == 1 and recurring.get('usage_type') == 'licensed', 'STRIPE_PLAN_MISMATCH')
+        and price.get('unit_amount') == expected.unit_amount and cadence, 'STRIPE_PLAN_MISMATCH')
 
 
 def intent_id(resource):

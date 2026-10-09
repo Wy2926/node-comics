@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/billing.ts', import.meta.url), 'utf8');
 const {outputText} = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022}});
-const {minorAmount, priceAmount, money, billingStatus, billingDate} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const {minorAmount, priceAmount, money, billingStatus, billingDate, benefitsSummary, quotaValidity, intervalName, orderKind} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
 
 test('confirmed monthly and annual amounts round trip in currency minor units', () => {
   assert.equal(minorAmount('9.99', 'usd'), 999);
@@ -37,4 +37,15 @@ test('billing timestamps from the UTC database are never interpreted as browser-
   assert.equal(billingDate('2026-09-20T10:20:30').toISOString(), '2026-09-20T10:20:30.000Z');
   assert.equal(billingDate('2026-09-20T10:20:30Z').toISOString(), '2026-09-20T10:20:30.000Z');
   assert.equal(billingDate('2026-09-20T18:20:30+08:00').toISOString(), '2026-09-20T10:20:30.000Z');
+});
+
+test('purchased pages never display unlimited membership, monthly quotas or renewal', () => {
+  const pack = {quota_pages: 500, quota_validity_days: null, service_plan_id: 'lite', monthly_redraw_pages: 0, hourly_image_limit: 1200};
+  assert.match(benefitsSummary(pack), /500/);
+  assert.match(benefitsSummary(pack), /不过期/);
+  assert.doesNotMatch(benefitsSummary(pack), /无限|不限量|每月/);
+  assert.match(quotaValidity(30), /30/);
+  assert.equal(intervalName('once'), '一次性购买');
+  assert.equal(orderKind('initial', 'once'), '额度购买');
+  assert.match(benefitsSummary({monthly_redraw_pages: 300}), /300/);
 });

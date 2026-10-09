@@ -30,7 +30,8 @@ Settings.model_config['env_file'] = None
 from sqlalchemy import or_, select
 from fastapi.responses import JSONResponse
 from app import creem_client, stripe_client, billing_checkout
-from app.billing_models import BillingPrice, BillingPriceBinding, BillingCheckout, BillingSubscription, BillingOrder, BillingOrderTransition, BillingEvent
+from app.billing_models import BillingPlan, BillingPlanRevision, BillingPrice, BillingPriceBinding, BillingCheckout, BillingSubscription, BillingOrder, BillingOrderTransition, BillingEvent
+from app.entitlement_models import QuotaPeriod
 from app.billing_catalog import initialize_catalog
 from app.billing_providers import BillingError
 from app.db import session_factory
@@ -49,7 +50,8 @@ def synthetic_stripe(resource, action, *args, **kwargs):
         price = db.get(BillingPrice, binding.price_id)
         return {'id': binding.provider_price_id, 'product': binding.product_id, 'livemode': False,
             'active': True, 'unit_amount': price.unit_amount, 'currency': price.currency,
-            'recurring': {'interval': price.interval, 'interval_count': 1, 'usage_type': 'licensed'}}
+            'type': 'one_time' if price.interval == 'once' else 'recurring',
+            'recurring': None if price.interval == 'once' else {'interval': price.interval, 'interval_count': 1, 'usage_type': 'licensed'}}
 
 
 def synthetic_creem(method, path, **kwargs):
@@ -63,8 +65,8 @@ def synthetic_creem(method, path, **kwargs):
             raise BillingError('FIXTURE_PRODUCT_UNAVAILABLE')
         price = db.get(BillingPrice, binding.price_id)
         return {'id': product_id, 'mode': 'test', 'status': 'active', 'price': price.unit_amount,
-            'currency': price.currency, 'billing_type': 'recurring',
-            'billing_period': {'month': 'every-month', 'year': 'every-year'}[price.interval],
+            'currency': price.currency, 'billing_type': 'onetime' if price.interval == 'once' else 'recurring',
+            'billing_period': {'month': 'every-month', 'year': 'every-year', 'once': 'once'}[price.interval],
             'trial_period_days': 7 if product_id == binding.trial_product_id else 0}
 
 
@@ -157,6 +159,27 @@ with session_factory()() as db:
                 occurred_at=created + timedelta(minutes=3), received_at=created + timedelta(minutes=3),
                 next_attempt_at=created + timedelta(minutes=8), status='pending', attempts=2,
                 error_code='FIXTURE_TEMPORARY_FAILURE', payload={}))
+    db.add(BillingPlan(id='fixture-pages', name='隔离额度包'))
+    db.flush()
+    db.add(BillingPlanRevision(id='fixture-pages-v1', plan_id='fixture-pages', version=1,
+        name='隔离额度包', monthly_redraw_pages=0, trial_days=0, trial_redraw_pages=0,
+        quota_pages=500, quota_validity_days=None, service_plan_id='plus'))
+    db.flush()
+    db.add(BillingPrice(id='fixture-pages-price', plan_id='fixture-pages', plan_revision_id='fixture-pages-v1',
+        interval='once', currency='usd', unit_amount=100, environment='test', status='draft'))
+    db.flush()
+    db.add(BillingPriceBinding(id='fixture-pages-binding', price_id='fixture-pages-price',
+        provider='stripe', environment='test', product_id='prod_fixture_pages', provider_price_id='price_fixture_pages', status='draft'))
+    db.flush()
+    db.add(BillingOrder(id='fixture-purchase-order', owner_id='billing-demo-user', provider='stripe',
+        environment='test', price_id='fixture-pages-price', binding_id='fixture-pages-binding',
+        external_id='pi_fixture_pages', kind='initial', status='partially_refunded', currency='usd',
+        subtotal=100, total=100, refunded_total=10, paid_at=at, created_at=at))
+    db.flush()
+    db.add(QuotaPeriod(id='fixture-purchase-bucket', owner_id='billing-demo-user',
+        billing_order_id='fixture-purchase-order', kind='classic_purchase', mode='classic',
+        source='purchase', source_key='purchase:fixture-purchase-order:classic', starts_at=at,
+        ends_at=None, granted=500, used=17, reserved=2))
     db.commit()
 
 port = int(os.environ.get('BILLING_FIXTURE_PORT', '18091'))

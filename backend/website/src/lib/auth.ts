@@ -1,29 +1,53 @@
-import { UserManager, WebStorageStateStore, ErrorResponse, type User } from 'oidc-client-ts';
+import { OidcClient, User, WebStorageStateStore, type RefreshState } from 'oidc-client-ts';
 import { accountReturnPath, oidcSettings, type AuthConfig } from './auth-config';
-let managerPromise: Promise<UserManager> | undefined;
-let renewal: Promise<User | null> | undefined;
-let generation = 0;
-export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
+import { ApiError, SharedSession, changedSession, sessionPrefix, validUser } from './auth-session';
+export { ApiError } from './auth-session';
+export interface AuthIdentity { id: string; subject: string }
 
-export async function manager() {
-  if (!managerPromise) managerPromise = (async () => {
+const changes = new EventTarget();
+let connectionPromise: Promise<{ client: OidcClient; sessions: SharedSession }> | undefined;
+
+async function connection() {
+  if (!connectionPromise) connectionPromise = (async () => {
     const response = await fetch('/v1/auth/config', { cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw Error('暂时无法连接登录服务，请重试。');
     const config = await response.json() as AuthConfig;
-    const value = new UserManager({ ...oidcSettings(config, location.origin),
-      userStore: new WebStorageStateStore({ store: sessionStorage, prefix: 'nc-site-user:' }),
+    const client = new OidcClient({ ...oidcSettings(config, location.origin),
       stateStore: new WebStorageStateStore({ store: sessionStorage, prefix: 'nc-site-state:' }),
     });
-    await value.clearStaleState();
-    return value;
-  })().catch(error => { managerPromise = undefined; throw error; });
-  return managerPromise;
+    await client.clearStaleState();
+    const sessions = new SharedSession(localStorage, sessionPrefix + config.issuer + ':' + config.client_id,
+      navigator.locks, async user => {
+        const state: RefreshState = { ...user, refresh_token: user.refresh_token!, data: user.state };
+        return new User({ ...state, ...await client.useRefreshToken({ state, resource: config.audience, timeoutInSeconds: 15 }) });
+      }, () => changes.dispatchEvent(new Event('change')));
+    return { client, sessions };
+  })().catch(error => { connectionPromise = undefined; throw error; });
+  return connectionPromise;
+}
+
+export function subscribeAuth(listener: () => void) {
+  const storageChanged = (event: StorageEvent) => {
+    if (event.key === null) { listener(); return; }
+    if (!event.key.startsWith(sessionPrefix)) return;
+    // Rotation changes tokens, not the account. Do not reload every subscriber.
+    const identity = (raw: string | null) => {
+      try { const value = JSON.parse(raw ?? 'null'); return [value?.id, !!value?.user]; } catch { return []; }
+    };
+    if (JSON.stringify(identity(event.oldValue)) !== JSON.stringify(identity(event.newValue))) listener();
+  };
+  changes.addEventListener('change', listener);
+  window.addEventListener('storage', storageChanged);
+  return () => { changes.removeEventListener('change', listener); window.removeEventListener('storage', storageChanged); };
 }
 
 export async function signIn(returnPath = '/account/') {
-  const auth = await manager();
+  const { client, sessions } = await connection();
+  const login = await sessions.beginLogin();
   sessionStorage.setItem('nc-site-return', accountReturnPath(returnPath));
-  await auth.signinRedirect({ prompt: 'login consent' });
+  const request = await client.createSigninRequest({ state: { sessionId: login.id }, prompt: login.prompt });
+  sessions.assert(login.id);
+  location.assign(request.url);
 }
 
 export function loginReturnPath() {
@@ -32,72 +56,88 @@ export function loginReturnPath() {
   return accountReturnPath(path);
 }
 
-export async function signOut() {
-  generation++;
-  const auth = await manager();
-  await auth.removeUser();
-  // A token response already in flight must not restore the local session.
-  if (renewal) await renewal.catch(() => undefined);
-  await auth.removeUser();
+export async function signOut() { await (await connection()).sessions.signOut(); }
+
+function hasStoredSession() {
+  let present = false;
+  for (let index = 0; index < localStorage.length && !present; index++) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(sessionPrefix)) continue;
+    try { present = !!JSON.parse(localStorage.getItem(key) ?? 'null')?.user; } catch { /* Ignore invalid records. */ }
+  }
+  return present;
 }
 
-async function renew(auth: UserManager) {
-  if (!renewal) {
-    const started = generation;
-    renewal = auth.signinSilent().then(async user => {
-      if (started !== generation) { await auth.removeUser(); return null; }
-      return user;
-    }).catch(async error => {
-      if (error instanceof ErrorResponse && ['invalid_grant','login_required','interaction_required'].includes(error.error ?? '')) await auth.removeUser();
-      throw Error('登录续期未完成，请检查网络后重试；授权已失效时请重新登录。');
-    }).finally(() => { renewal = undefined; });
-  }
-  return renewal;
+export async function session() {
+  if (!hasStoredSession()) return null;
+  return (await (await connection()).sessions.get())?.user ?? null;
 }
 
-export async function session(forceRenew = false) {
-  const auth = await manager();
-  let user = await auth.getUser();
-  if (!user) return null;
-  if (forceRenew || user.expired || (user.expires_in ?? 0) < 60) {
-    if (!user.refresh_token) { await auth.removeUser(); return null; }
-    user = await renew(auth);
-  }
-  return user;
+export async function sessionIdentity(): Promise<AuthIdentity | null> {
+  if (!hasStoredSession()) return null;
+  const binding = await (await connection()).sessions.get();
+  return binding ? { id: binding.id, subject: binding.user.profile.sub } : null;
 }
+
+export async function assertSession(id: string) { (await connection()).sessions.assert(id); }
 
 export async function finishLogin() {
   const callback = location.href;
   // Remove the authorization code before any further navigation or account request.
   history.replaceState(null, '', '/auth/callback/');
-  const auth = await manager();
+  const { client, sessions } = await connection();
   try {
-    const user = await auth.signinRedirectCallback(callback);
-    if (!user.access_token || !user.refresh_token || user.token_type?.toLowerCase() !== 'bearer' || user.expired || !user.expires_at) throw Error('无效会话');
-    await api('/v1/me'); // Never use unverified browser claims as product identity.
-  } catch {
-    await auth.removeUser();
-    throw Error('登录未完成或授权已过期，请返回账户页重新登录。');
-  }
+    const user = new User(await client.processSigninResponse(callback));
+    const id = (user.state as { sessionId?: string } | undefined)?.sessionId;
+    if (!id || !validUser(user) || user.expired) throw changedSession();
+    sessions.assert(id);
+    // Verify the product identity before persisting anything from the callback.
+    const response = await fetch('/v1/me', { headers: { Authorization: 'Bearer ' + user.access_token },
+      credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw changedSession();
+    const product = await response.json();
+    if (typeof product.user?.id !== 'string' || !product.user.id) throw changedSession();
+    await sessions.finishLogin(id, user);
+  } catch { throw Error('登录未完成或授权已过期，请返回账户页重新登录。'); }
 }
 
-export async function api<T>(path: string, method: 'GET' | 'POST' = 'GET', body?:unknown): Promise<T> {
+export async function authenticatedFetch(path: string, options: RequestInit = {}, identity?: AuthIdentity): Promise<Response> {
   if (!path.startsWith('/v1/')) throw Error('无效的账户请求');
-  const started = generation;
-  let user = await session();
-  if (!user) throw new ApiError('请登录后查看账户。', 401);
-  const send = (token: string) => fetch(path, { method, credentials: 'omit', cache: 'no-store', headers: { Authorization: `Bearer ${token}`, ...(body?{'Content-Type':'application/json'}:{}) }, body:body?JSON.stringify(body):undefined, signal: AbortSignal.timeout(20000) });
-  let response = await send(user.access_token);
-  // Only read requests are replayed automatically; checkout mutations are explicit.
-  if (response.status === 401 && method === 'GET' && user.refresh_token && generation === started) {
-    user = await session(true);
-    if (user && generation === started) response = await send(user.access_token);
+  const { sessions } = await connection();
+  let binding = await sessions.get(undefined, identity?.id);
+  if (!binding || identity && binding.user.profile.sub !== identity.subject) throw new ApiError('请登录后查看账户。', 401);
+  const id = binding.id;
+  const send = (token: string) => {
+    sessions.assert(id);
+    const headers = new Headers(options.headers);
+    headers.set('Authorization', 'Bearer ' + token);
+    return fetch(path, { ...options, credentials: 'omit', cache: 'no-store', headers });
+  };
+  let response = await send(binding.user.access_token);
+  sessions.assert(id);
+  // Writes are never replayed. A late 401 reuses a token rotated by another tab.
+  if (response.status === 401 && ['GET', 'HEAD'].includes((options.method ?? 'GET').toUpperCase())) {
+    const renewed = await sessions.get(binding.user.access_token, id);
+    if (!renewed) throw changedSession();
+    binding = renewed;
+    response = await send(binding.user.access_token);
+    sessions.assert(id);
   }
-  if (started !== generation) throw new ApiError('账户已退出，请重新登录。', 401);
+  if (response.status === 401) await sessions.expire(binding);
+  return response;
+}
+
+export async function api<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown, headers?: Record<string,string>, identity?: AuthIdentity): Promise<T> {
+  const bound = identity ?? await sessionIdentity();
+  if (!bound) throw new ApiError('请登录后查看账户。', 401);
+  const response = await authenticatedFetch(path, { method,
+    headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20000),
+  }, bound);
+  const result = response.ok ? await response.json() : await response.json().catch(() => ({}));
+  if (response.status !== 401) await assertSession(bound.id);
   if (!response.ok) {
-    if (response.status === 401) await (await manager()).removeUser();
-    const body = await response.json().catch(() => ({}));
-    throw new ApiError(body.error?.message || '账户服务暂时不可用，请重试。', response.status);
+    throw new ApiError(result.error?.message || '账户服务暂时不可用，请重试。', response.status, result.error?.code);
   }
-  return response.json() as Promise<T>;
+  return result as T;
 }

@@ -1,0 +1,125 @@
+name: node-comics-creem-test
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "5m", max-file: "2"}
+
+# Dedicated local data only; never include the repository/production .env.
+x-backend: &backend
+  image: node-comics-backend:creem-test
+  build: ../backend
+  env_file: [.env.creem-test]
+  environment: &backend-env
+    APP_ENV: test
+    DEV_AUTH: "false"
+    DEV_AUTH_SECRET: ""
+    ADMIN_WEB_PATH: ""
+    DATABASE_URL: postgresql+psycopg://nodecomics:${POSTGRES_PASSWORD:?Set isolated password}@postgres:5432/nodecomics_creem_manual_test
+    REDIS_URL: redis://redis:6379/0
+    REDIS_NAMESPACE: node-comics-creem-test
+    STORAGE_PATH: /data/translation
+    TMPDIR: /data/translation/staging
+    STRIPE_ENABLED: "false"
+    CREEM_ENVIRONMENT: test
+    GUEST_ENABLED: "false"
+    GA4_ENABLED: "false"
+    CLASSIC_ENABLED: "false"
+  volumes:
+    - translation_files:/data/translation
+    - ../scripts:/app/scripts:ro
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: nodecomics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set isolated password}
+      POSTGRES_DB: nodecomics_creem_manual_test
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U nodecomics -d nodecomics_creem_manual_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+  redis:
+    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
+    command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+  migrate:
+    <<: *backend
+    command: [python, -m, app.migrate]
+    profiles: [migration]
+    restart: "no"
+  api:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      SERVE_STATIC: "true"
+    volumes:
+      - translation_files:/data/translation
+      - ../scripts:/app/scripts:ro
+      - ../backend/website/dist:/app/app/website_dist:ro
+      - ../backend/extension-release.json:/app/extension-release.json:ro
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+  control-worker:
+    <<: *backend
+    command: [python, -m, app.workers]
+    healthcheck:
+      test: [CMD, python, -m, app.health, control-worker]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  maintenance:
+    <<: *backend
+    command: [python, -m, app.dispatcher]
+    healthcheck:
+      test: [CMD, python, -m, app.health, maintenance]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  gateway:
+    image: nginx:stable-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    entrypoint: [nginx, -g, "daemon off;"]
+    user: "101:101"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:uid=101,gid=101,mode=0700", "/var/cache/nginx:uid=101,gid=101,mode=0700"]
+    volumes: [./creem-test.nginx.conf:/etc/nginx/nginx.conf:ro]
+    ports: ["127.0.0.1:28088:8080"]
+    restart: unless-stopped
+    logging: *logging
+  tunnel:
+    image: cloudflare/cloudflared:latest@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
+    command: [tunnel, --no-autoupdate, --protocol, http2, --url, "http://gateway:8080", --metrics, "0.0.0.0:2000"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on: [gateway]
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  postgres_data:
+  redis_data:
+  translation_files:

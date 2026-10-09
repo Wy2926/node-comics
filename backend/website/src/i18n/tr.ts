@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " ve otomatik yenileme kurallarını anladım.",
     "继续原结账": "Ödeme işlemini devam ettir",
     "前往安全结账": "Güvenli ödeme sayfasına git",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Oturumu kapatmak yalnızca bu web sitesi sekmesinin oturumunu temizler. Abonelikleri iptal etmez veya uzantıdan veya diğer uygulamalardan çıkış yapmaz.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Oturumu kapatmak, bu tarayıcının tüm sekmelerindeki site oturumunu temizler. Abonelikleri iptal etmez; uzantıdan veya diğer uygulamalardan çıkış yapmaz.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Oturum açma yapılandırılmadı. Lütfen daha sonra tekrar deneyin veya destek ekibiyle iletişime geçin.",
     "暂时无法连接登录服务，请重试。": "Oturum açma hizmetine ulaşılamıyor. Lütfen tekrar deneyin.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Oturum yenileme başarısız oldu. Bağlantınızı kontrol edin veya yetkilendirmenin süresi dolmuşsa tekrar oturum açın.",

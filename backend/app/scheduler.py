@@ -1,4 +1,4 @@
-"""Bounded oldest-first claims, with a simple PLUS preference and fenced leases."""
+"""Bounded oldest-first claims, frozen service preference and fenced leases."""
 from datetime import timedelta
 from dataclasses import dataclass
 import hmac
@@ -7,8 +7,7 @@ from sqlalchemy.orm import aliased
 from .assets import available
 from .config import settings
 from .errors import ProcessingError
-from .models import Asset, Attempt, ClassicState, Job, Provider, User, now, uid
-from .billing_access import access_exists
+from .models import Asset, Attempt, ClassicState, Job, Provider, now, uid
 from .queue_models import ComputeNode, ExecutionLease, JobStage, SchedulerMutex
 from .translation_models import TranslationProvider
 from .translation_provider_limits import unavailable_providers
@@ -110,14 +109,16 @@ def _candidate_rows(db, node, stages, at, *, stage_ids=None, materialize=True, b
     query = query.with_only_columns(*projection).order_by(JobStage.available_at, JobStage.id).limit(CANDIDATE_LIMIT)
     rows = db.execute(query.execution_options(populate_existing=True)).all()
     if materialize and rows:
-        # Prefer PLUS only inside the oldest bounded window. No global sort,
-        # service accounting, exact shares or per-owner membership queries.
-        owners = {job.owner_id for _, job in rows}
-        plus = set(db.scalars(select(User.id).where(User.id.in_(owners), or_(
-            and_(User.plus_pending.is_(False), User.plus_started_at <= at, User.plus_expires_at > at),
-            access_exists(at)))))
-        rows.sort(key=lambda row: row[1].owner_id not in plus)
+        # Service was purchased at admission, not at claim time. The last
+        # reserved page, expiry and later membership changes cannot change it.
+        # Legacy jobs already froze plan; no account/history lookup is needed.
+        rows.sort(key=lambda row: -job_priority(row[1]))
     return rows
+
+
+def job_priority(job):
+    entitlement = job.entitlement or {}
+    return int(entitlement.get('priority', entitlement.get('plan') not in (None, 'free', 'guest')))
 
 
 def _preselect(db, node, allowed_stages, blocked_providers=()):

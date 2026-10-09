@@ -14,7 +14,7 @@ docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 
 ## OIDC 必需项
 
-官网也使用同域名和现有客户端，新增精确回调 `https://comics.nodelane.net/auth/callback/`（含尾斜线）；五语页面共用此回调，登录后返回原语言账户页。保留已有插件和私有后台回调，身份端点允许官网 origin。官网使用 public client 的 PKCE 流程，不配置 client secret，运行与会话边界见[官网说明](../backend/website/README.md#内容与规范)。
+官网也使用同域名和现有客户端，精确回调为 `https://comics.nodelane.net/auth/callback/`（含尾斜线）；所有语言共用此回调，登录后返回原语言页面。保留已有插件和私有后台回调，身份端点允许官网 origin。官网使用 public client 的 PKCE 流程，不配置 client secret，运行与会话边界见[官网说明](../backend/website/README.md#内容与规范)。
 
 管理后台入口改为私有 `ADMIN_WEB_PATH`，为空时关闭页面。部署前须在 Logto 新增 `https://<服务域名><ADMIN_WEB_PATH>` 精确回调（含尾斜线）；保留插件及其他客户端回调，不改变现有身份端点、Client ID 或 Audience。新入口不会通过公开身份配置返回。迁移顺序见[后台入口与登录](ADMIN_CONSOLE.md#登录)。
 
@@ -42,7 +42,16 @@ Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR �
 
 标签页授权成功、取消、关闭、导航失败、发起页面卸载或十分钟超时后移除本次监听，仅关闭本次创建的标签页，不按 window ID 关闭浏览器。凭据和 PKCE verifier 留在原扩展上下文，网页内容脚本不参与换码；阅读页不会导航离开。缺少固定扩展 ID 或必要标签页／请求监听 API 时明确拒绝启动。普通网页阅读器仍使用原页面跳转；Orion 的完整授权与令牌请求能力需 iOS 真机单独验收。
 
-插件退出登录清除本机账户会话，身份服务的浏览器 SSO 会话仍可能存在。插件与网页阅读器主动登录统一请求 `openid profile offline_access` 和 `prompt=login consent`，允许输入其他账户并授权自动续期；不触发其他应用的全局退出。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
+官网、插件与网页阅读器使用相同 issuer、public client 和 API resource，通过身份服务的浏览器 SSO 复用已登录身份；各 origin 的本地令牌与会话仍然独立，不通过网页消息、查询参数或插件桥互传。主动登录统一请求 `openid profile offline_access`，默认 `prompt=consent`，不强制重新输入密码，但仍可能显示授权确认。显式本地退出后下一次登录使用 `prompt=login consent`，保留输入其他账户的能力。本地退出不撤销身份服务 SSO，也不退出其他端或其他应用。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
+
+### 官网持久会话
+
+- 官网使用现有 `oidc-client-ts` 协议层完成 PKCE、回调和刷新校验。授权 state/verifier 与返回路径只存当前标签页的 sessionStorage；通过 API 验证后，令牌存入按 issuer/client 隔离的单条 localStorage 会话记录，不保留第二份持久令牌库。刷新在读取账户或发送请求前按到期时间自动执行，不依赖后台常驻定时器。
+- 同 origin 的 Web Locks 串行刷新轮换；独立短写锁按会话 ID 与原令牌记录比较后提交。退出和换号不等待刷新网络请求，迟到的刷新、回调、401 或读取结果不能覆盖新会话。跨标签页通知只在登录身份变化时更新账户与翻译工作台，不因每次令牌轮换重新加载账单。
+- 401 最多刷新并重放一次 GET/HEAD；POST/PUT 等写请求不重放。支付流程从读取报价到创建订单绑定同一会话 ID，不能因中途换号把旧操作提交给新账户。翻译读取、下载与长轮询使用同一认证入口，身份变化时停止旧工作台操作；原图、本地分账户历史和服务端任务保留。
+- 断网、超时、身份服务 429/5xx 保留会话并共享 30 秒刷新冷却；仍有效令牌可使用，已过期或被 API 拒绝的令牌不会作为回退发出。身份服务明确撤销则只删除对应会话，业务 403 不登出。
+- 退出会清除当前浏览器所有官网标签页的持久会话，不清除插件会话或取消订阅。localStorage 令牌仍可被同 origin 的恶意脚本读取，持久化会扩大 XSS 的长期暴露面；继续保持严格脚本 CSP、精确 HTTPS 身份端点、PKCE 和刷新令牌轮换，不引入第三方脚本或放宽脚本策略。此 SPA 方案不具备 HttpOnly 服务端会话的隔离性。
+- 持久化和自动刷新不等于无限期登录。实际期限受 Logto 应用刷新令牌 TTL、app grant、撤销和 SSO 会话分别约束；SPA 的刷新令牌轮换不会延长原始 TTL。具体天数必须核对线上应用配置，不能采用客户端常量或把官方默认值当成当前设置。延长期限需另行授权修改身份服务，客户端实现不修改远端 TTL。参见[应用令牌设置](https://docs.logto.io/integrate-logto/application-data-structure)与[SSO 会话设置](https://docs.logto.io/sessions/session-configs)。
 
 ### 客户端会话与续期
 

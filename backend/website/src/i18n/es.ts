@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " y comprender la renovación automática.",
     "继续原结账": "Reanudar pago",
     "前往安全结账": "Continuar para asegurar el pago",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Al cerrar sesión, solo se borra la sesión de esta pestaña del sitio web. No cancela suscripciones ni cierra sesión en la extensión u otras aplicaciones.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Al cerrar sesión, se elimina la sesión del sitio en todas las pestañas de este navegador. No se cancelan suscripciones ni se cierra sesión en la extensión u otras aplicaciones.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "El inicio de sesión no está configurado. Vuelva a intentarlo más tarde o comuníquese con el soporte.",
     "暂时无法连接登录服务，请重试。": "No se puede acceder al servicio de inicio de sesión. Por favor inténtalo de nuevo.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "La renovación de la sesión falló. Verifique su conexión o inicie sesión nuevamente si la autorización expiró.",

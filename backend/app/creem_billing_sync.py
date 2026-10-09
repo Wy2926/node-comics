@@ -220,9 +220,21 @@ def sync_subscription(subscription_id, transaction_id=None, event_id=None):
 
 def sync_session(session_id):
     session = creem.call('GET', '/checkouts', params={'checkout_id': session_id})
-    checkout_id = creem.intent_id(session)
+    require(session.get('id') == session_id)
+    with session_factory()() as db:
+        # A known session stays bound to its original intent, even if the
+        # provider returns missing or conflicting correlation metadata.
+        checkout_id = db.scalar(select(BillingCheckout.id).where(BillingCheckout.provider == 'creem',
+            BillingCheckout.environment == settings().creem_environment, BillingCheckout.session_id == session_id))
+    checkout_id = checkout_id or creem.intent_id(session)
     if not checkout_id:
         return
     bind_session(checkout_id, session)
-    if session.get('status') == 'completed' and creem.object_id(session.get('subscription')):
+    with session_factory()() as db:
+        row = db.get(BillingCheckout, checkout_id)
+        purchase = db.get(BillingPrice, row.price_id).interval == 'once'
+    if purchase:
+        from .billing_purchases import sync_creem_purchase
+        sync_creem_purchase(checkout_id)
+    elif session.get('status') == 'completed' and creem.object_id(session.get('subscription')):
         sync_subscription(creem.object_id(session['subscription']))

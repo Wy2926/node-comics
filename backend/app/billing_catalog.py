@@ -1,4 +1,4 @@
-"""Products own immutable benefit revisions and monthly/yearly provider-neutral prices."""
+"""Immutable subscription and page-pack quotes share one provider-neutral catalog."""
 from typing import Literal
 from fastapi import APIRouter, Depends
 from pydantic import Field, model_validator
@@ -44,6 +44,9 @@ class BenefitsRequest(RequestBody):
     name: str = Field(min_length=1, max_length=100)
     monthly_redraw_pages: int = Field(ge=0, le=1_000_000)
     hourly_image_limit: int | None = Field(default=None, ge=1, le=1_000_000, strict=True)
+    service_plan_id: str | None = Field(default=None, pattern=r'^[a-z][a-z0-9_-]{0,63}$')
+    quota_pages: int = Field(default=0, ge=0, le=1_000_000, strict=True)
+    quota_validity_days: int | None = Field(default=None, ge=1, le=36500, strict=True)
     trial_days: int = Field(ge=0, le=30)
     trial_redraw_pages: int = Field(ge=0, le=1_000_000)
 
@@ -51,6 +54,11 @@ class BenefitsRequest(RequestBody):
     def trial(self):
         if self.trial_days == 0 and self.trial_redraw_pages != 0:
             raise ValueError('No trial pages without a trial')
+        if self.quota_pages:
+            if not self.service_plan_id or self.monthly_redraw_pages or self.trial_days or self.trial_redraw_pages:
+                raise ValueError('Page packs require a service plan and cannot include recurring or trial grants')
+        elif self.service_plan_id is not None or self.quota_validity_days is not None:
+            raise ValueError('Purchase service and validity apply only to page packs')
         return self
 
 
@@ -69,7 +77,7 @@ class PriceRequest(RequestBody):
     environment: Literal['test', 'live']
     currency: str = Field(pattern=r'^[a-z]{3}$')
     unit_amount: int = Field(gt=0, le=100_000_000)
-    interval: Literal['month', 'year']
+    interval: Literal['month', 'year', 'once']
 
 
 class BindingRequest(RequestBody):
@@ -106,7 +114,8 @@ def default_provider(db):
 
 def revision_json(revision):
     return {field: getattr(revision, field) for field in ('id', 'plan_id', 'version', 'name',
-        'monthly_redraw_pages', 'hourly_image_limit', 'trial_days', 'trial_redraw_pages')}
+        'monthly_redraw_pages', 'hourly_image_limit', 'trial_days', 'trial_redraw_pages',
+        'service_plan_id', 'quota_pages', 'quota_validity_days')}
 
 
 def binding_json(binding):
@@ -121,10 +130,13 @@ def price_json(db, price):
         'unit_amount': price.unit_amount, 'interval': price.interval,
         'monthly_redraw_pages': revision.monthly_redraw_pages,
         'hourly_image_limit': revision.hourly_image_limit,
+        'service_plan_id': revision.service_plan_id or revision.plan_id,
+        'quota_pages': revision.quota_pages, 'quota_validity_days': revision.quota_validity_days,
         'trial_days': revision.trial_days, 'trial_redraw_pages': revision.trial_redraw_pages}
 
 
-def offers(db):
+def offers(db, *, interval=None):
+    """Published quotes for one billing category; subscriptions are the default."""
     from .billing_providers import provider_enabled, provider_environment
     selected = default_provider(db)
     bindings = list(db.scalars(select(BillingPriceBinding).where(BillingPriceBinding.status == 'active',
@@ -135,7 +147,8 @@ def offers(db):
         if provider_enabled(binding.provider) and binding.environment == provider_environment(binding.provider):
             available.setdefault(binding.price_id, []).append(binding)
     result = []
-    for price in db.scalars(select(BillingPrice).where(BillingPrice.status == 'active')
+    period = BillingPrice.interval == interval if interval else BillingPrice.interval != 'once'
+    for price in db.scalars(select(BillingPrice).where(BillingPrice.status == 'active', period)
             .order_by(BillingPrice.plan_id, BillingPrice.interval, BillingPrice.currency)):
         channels = available.get(price.id, [])
         if channels:
@@ -146,9 +159,8 @@ def offers(db):
     return result
 
 
-def products_json(db, *, public=False):
-    if public:
-        public_offers = offers(db)
+def products_json(db, *, public_offers=None):
+    if public_offers is not None:
         return [{'id': plan.id, 'name': plan.name, 'prices': [p for p in public_offers if p['plan_id'] == plan.id]}
             for plan in db.scalars(select(BillingPlan).order_by(BillingPlan.id))
             if any(p['plan_id'] == plan.id for p in public_offers)]
@@ -196,6 +208,7 @@ def create_product(body: ProductRequest, db: Session = Depends(get_db), actor: U
                 getattr(revision, k) != v for k, v in benefits.items()):
             problem('CATALOG_CONFLICT', '产品或权益版本编号已存在，请刷新核实', 409)
         return {'id': existing.id, 'revision_id': revision.id}
+    validate_service_plan(db, body)
     db.add(BillingPlan(id=body.id, name=body.name))
     db.flush()
     db.add(BillingPlanRevision(id=body.revision_id, plan_id=body.id, version=1, **benefits))
@@ -214,6 +227,7 @@ def create_revision(product_id: str, body: RevisionRequest, db: Session = Depend
         if existing.plan_id != product_id or any(getattr(existing, k) != v for k, v in body.model_dump().items()):
             problem('CATALOG_CONFLICT', '此版本编号已用于其他内容，请刷新核实', 409)
         return {'id': existing.id}
+    validate_service_plan(db, body)
     version = (db.scalar(select(func.max(BillingPlanRevision.version)).where(
         BillingPlanRevision.plan_id == product_id)) or 0) + 1
     db.add(BillingPlanRevision(**body.model_dump(), plan_id=product_id, version=version))
@@ -234,10 +248,18 @@ def create_price(body: PriceRequest, db: Session = Depends(get_db), actor: User 
     revision = db.get(BillingPlanRevision, body.plan_revision_id)
     if not revision:
         problem('NOT_FOUND', '产品权益版本不存在', 404)
+    if (body.interval == 'once') != (revision.quota_pages > 0):
+        problem('BILLING_PRICE_INTERVAL_INVALID', '额度包只能使用一次性价格，订阅只能使用月付或年付价格', 422)
     db.add(BillingPrice(**body.model_dump(), plan_id=revision.plan_id))
     record_audit(db, actor.id, 'billing.price.create', 'billing_price', body.id, after=body.model_dump())
     db.commit()
     return {'id': body.id}
+
+
+def validate_service_plan(db, body):
+    if body.service_plan_id is not None and not db.scalar(select(BillingPlanRevision.id).where(
+            BillingPlanRevision.plan_id == body.service_plan_id, BillingPlanRevision.quota_pages == 0).limit(1)):
+        problem('BILLING_SERVICE_PLAN_INVALID', '额度包须使用已有会员套餐的服务档位', 422)
 
 
 @router.post('/prices/{price_id}/bindings')

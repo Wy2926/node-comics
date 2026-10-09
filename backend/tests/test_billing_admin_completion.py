@@ -244,7 +244,9 @@ def test_catalog_mutations_record_actor_and_exact_changes(client, administrator)
     from app.db import session_factory
     from app.admin_audit import AdminAudit
     body = {'id': 'audit-plan', 'revision_id': 'audit-plan-v1', 'name': 'Audit',
-        'monthly_redraw_pages': 20, 'trial_days': 0, 'trial_redraw_pages': 0}
+        'monthly_redraw_pages': 20, 'trial_days': 0, 'trial_redraw_pages': 0,
+        'hourly_image_limit': None, 'service_plan_id': None, 'quota_pages': 0,
+        'quota_validity_days': None}
     for _ in range(2):
         assert client.post('/v1/admin/billing/products', headers=administrator, json=body).status_code == 200
     with session_factory()() as db:

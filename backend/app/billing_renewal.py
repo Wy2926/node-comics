@@ -1,7 +1,7 @@
 """Gift periods suspend billing, while settled invoices retain their original dates."""
 from datetime import timedelta, timezone
 from sqlalchemy import or_, select
-from .billing_models import BillingCheckout, BillingOrderTransition, BillingSubscription, BillingTerm
+from .billing_models import BillingCheckout, BillingOrderTransition, BillingPrice, BillingSubscription, BillingTerm
 from .billing_providers import BillingError, provider_enabled, remote_id, require
 from .db import session_factory
 from .models import now
@@ -44,8 +44,9 @@ def schedule_gift(db, user, at):
         user.plus_pending = False
         return  # Revocation must never bring an agreed charge date forward.
     from .billing_checkout import pending_checkout_condition
-    if db.scalar(select(BillingCheckout.id).where(BillingCheckout.owner_id == user.id,
-            pending_checkout_condition()).limit(1)):
+    if db.scalar(select(BillingCheckout.id).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
+            .where(BillingCheckout.owner_id == user.id, BillingPrice.interval != 'once',
+                pending_checkout_condition()).limit(1)):
         problem('BILLING_CHECKOUT_PENDING', '请先核实当前结账，再安排赠送会员', 409)
     sub = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == user.id,
         BillingSubscription.status.in_(LIVE)).limit(1))

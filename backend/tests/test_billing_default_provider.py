@@ -47,8 +47,8 @@ def test_default_switch_keeps_pending_checkout_and_rejects_nondefault_purchase(c
     client, auth = state['client'], state['auth']
     assert client.put('/v1/admin/billing/default-provider', headers=auth, json={'provider':'stripe'}).status_code == 200
     status = client.get('/v1/billing/status', headers=auth).json()
-    assert status['checkout_provider'] == 'creem'
-    assert [c['provider'] for c in status['checkout_price']['channels']] == ['creem']
+    assert status['subscription_checkout']['provider'] == 'creem'
+    assert [c['provider'] for c in status['subscription_checkout']['price']['channels']] == ['creem']
     assert checkout(state)['checkout_url'] == original['checkout_url']
     other = login(client, 'new-route-buyer')
     rejected = client.post('/v1/billing/checkouts', headers=other,

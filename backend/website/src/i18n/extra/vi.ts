@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Thanh toán hoàn tất",
-  "description": "Quy trình thanh toán đăng ký đã hoàn tất. Quay lại tiện ích để tiếp tục đọc.",
   "heading": "Chương tiếp theo của bạn đang chờ đợi.",
   "body": "Cảm ơn bạn đã chọn NodeLane Comics. Chuyển trở lại tiện ích mở rộng và tiếp tục từ nơi bạn đã dừng lại.",
-  "hint": "Quyền lợi thành viên được cập nhật tự động. Nếu chưa thấy thay đổi, hãy làm mới mục Tài khoản của tôi trong tiện ích.",
+  "hint": 'Quyền lợi hoặc trang đã mua sẽ xuất hiện sau khi xác minh thanh toán. Làm mới tài khoản để kiểm tra.',
   "home": "Về trang chủ",
   "footer": "Bạn có thể đóng trang này một cách an toàn."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Dịch thông thường với giới hạn yêu cầu dịch mới theo giờ.",
     "intro": "Chọn một gói dịch để sử dụng quyền lợi đăng ký trong tiện ích."
   },
-  "channel": "Nhà cung cấp thanh toán",
   "manage": "Quản lý đăng ký",
   "statuses": [
     "Đang hoạt động",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Tất cả các tính năng đọc cốt lõi"
     },
     "classic": {
-      "label": "Dịch thông thường",
+      "label": "Dịch trên đám mây",
       "free": "30 trang / ngày",
-      "lite": "Không có tổng giới hạn hàng ngày hoặc hàng tháng"
+      "lite": "Không có tổng giới hạn hàng ngày hoặc hàng tháng",
+      "detail": "Số trang được trừ theo số trang thực sự dịch thành công; dùng lại kết quả đã có của chính bạn không bị trừ lần nữa. “Không giới hạn” chỉ có nghĩa là không đặt tổng giới hạn theo ngày hoặc tháng; việc sử dụng vẫn bị giới hạn bởi hạn mức tiếp nhận yêu cầu và năng lực phục vụ của hệ thống."
+    },
+    "local": {
+      "label": "Dịch cục bộ",
+      "free": "Hỗ trợ MTU tự triển khai",
+      "lite": "Hỗ trợ MTU tự triển khai",
+      "detail": "Dịch cục bộ cần tự triển khai MTU; nhu cầu kết nối Internet phụ thuộc vào mô hình và nhà cung cấp được sử dụng."
     },
     "rate": {
       "label": "Giới hạn yêu cầu dịch mới",
       "free": "10 trang trong mỗi khoảng 60 giây trượt",
-      "lite": "100 trang trong mỗi khoảng 60 giây trượt; {n} trang trong mỗi khoảng 60 phút trượt"
+      "lite": "100 trang trong mỗi khoảng 60 giây trượt; {n} trang trong mỗi khoảng 60 phút trượt",
+      "detail": "Giới hạn theo khoảng thời gian trượt được dùng chung giữa các thiết bị, chế độ và ngôn ngữ trong một tài khoản. Yêu cầu trùng lặp và việc dùng lại kết quả đã hoàn tất không bị tính thêm. Giới hạn yêu cầu và điều phối ưu tiên không bảo đảm tốc độ hoàn thành hoặc một phần công suất cố định."
     },
     "priority": {
       "label": "Phản hồi tác vụ dịch",
       "free": "Điều phối thông thường",
       "lite": "Phản hồi ưu tiên"
     },
+    "feedback": {
+      "label": "Phản hồi của người dùng",
+      "free": "Phản hồi thông thường",
+      "lite": "Phản hồi ưu tiên",
+      "detail": "Phản hồi của hội viên được ưu tiên xử lý, nhưng không bảo đảm thời hạn trả lời."
+    },
+    "requests": {
+      "label": "Yêu cầu tính năng",
+      "free": "Đánh giá thông thường",
+      "lite": "Ưu tiên đánh giá",
+      "detail": "Yêu cầu tính năng của hội viên được ưu tiên đánh giá, nhưng không bảo đảm sẽ triển khai hoặc thời điểm phát hành."
+    },
     "early": {
       "label": "Tính năng mới",
       "free": "Khi phát hành chung",
       "lite": "Quyền truy cập sớm vào các tính năng nâng cao"
     },
-    "note": "Giới hạn theo khoảng thời gian trượt được dùng chung giữa các thiết bị, chế độ và ngôn ngữ trong một tài khoản. Yêu cầu trùng lặp và việc dùng lại kết quả đã hoàn tất không bị tính thêm. Giới hạn yêu cầu và điều phối ưu tiên không bảo đảm tốc độ hoàn thành hoặc một phần công suất cố định. Xem nhật ký cập nhật để biết tính năng mới."
+    "note": "Xem nhật ký cập nhật để biết tính năng mới."
   },
   "billingCycle": [
     "Hàng tháng",

@@ -5,7 +5,7 @@ import { translationError } from '../i18n/translation-error';
 import type { TranslationCopy } from '../i18n/translate';
 import { translationCacheCopy } from '../i18n/translation-cache';
 import { localPath, type Locale } from '../i18n/locales';
-import { signIn } from '../lib/auth';
+import { signIn, subscribeAuth } from '../lib/auth';
 import {
   blobBytes,
   draftScope,
@@ -127,40 +127,53 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   ) {
     meta.updated = Date.now();
     setUsedBytes(await saveRecord(meta, data));
-    setRows((old) =>
-      [...old.filter((row) => row.id !== meta.id), { ...meta }].sort(recordOrder),
-    );
+    if (scopes.current.includes(meta.scope) || scopes.current.includes('guest:*') && meta.scope.startsWith('guest:'))
+      setRows((old) => [...old.filter((row) => row.id !== meta.id), { ...meta }].sort(recordOrder));
   }
   useEffect(() => {
-    let gone = false;
-    void (async () => {
+    let generation = 0;
+    const load = async () => {
+      const started = ++generation;
+      const gone = () => started !== generation;
       try {
         const identity = await currentAccount();
-        if (gone) return;
+        if (gone()) return;
         setAccount(identity);
         scopes.current = [
           draftScope(),
           identity ? 'user:' + identity.id : 'guest:*',
         ];
-        await refresh();
-        setHasGuestHistory((await listRecords(['guest:*'])).length > 0);
+        const [found, used, guestHistory] = await Promise.all([
+          listRecords(scopes.current), storageBytes(), listRecords(['guest:*']),
+        ]);
+        if (gone()) return;
+        setRows(found); setUsedBytes(used); setHasGuestHistory(guestHistory.length > 0);
         const [visitor, capabilities] = await Promise.all([
           json<Guest>('/v1/guest/session'),
           json<Capabilities>('/v1/capabilities', {}, identity),
         ]);
-        if (gone) return;
+        if (gone()) return;
         if (capabilities.result_protocol !== 'overlay-v1')
           throw Error('CLIENT_UPGRADE_REQUIRED');
         setGuest(visitor);
         guestRef.current = visitor;
         setCaps(capabilities);
-        if (!gone) setReady(true);
+        setReady(true);
       } catch (error) {
-        if (!gone) fail(error);
+        if (!gone()) fail(error);
       }
-    })();
+    };
+    void load();
+    const unsubscribe = subscribeAuth(() => {
+      controller.current?.abort(Error('AUTH_REQUIRED'));
+      resumeOnReturn.current = false;
+      verification.current?.reject(Error('AUTH_REQUIRED'));
+      setAccount(undefined); setCaps(undefined); setReady(false); setRows([]); setShowGuest(false);
+      void load();
+    });
     return () => {
-      gone = true;
+      generation++;
+      unsubscribe();
       resumeOnReturn.current = false;
       resumePending.current = () => undefined;
       controller.current?.abort();
@@ -421,6 +434,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         }
         setCheck(undefined);
         const receive = async (value: Snapshot) => {
+          abort.signal.throwIfAborted();
           snapshot = value;
           meta.snapshot = value;
           meta.state = localSnapshotState(value, !!data?.result);
@@ -527,17 +541,24 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           meta.state = 'succeeded';
           try {
             await commit(meta, data);
+            abort.signal.throwIfAborted();
             setVolatile(undefined);
           } catch {
+            abort.signal.throwIfAborted();
             setVolatile({ id: meta.id, blob: output });
             throw Error('RESULT_SAVE_FAILED');
           }
         }
         if (!useAccount) {
-          guestRef.current = await json<Guest>('/v1/guest/session');
+          const visitor = await json<Guest>('/v1/guest/session', { signal: abort.signal });
+          abort.signal.throwIfAborted();
+          guestRef.current = visitor;
           setGuest(guestRef.current);
-        } else
-          setCaps(await json<Capabilities>('/v1/capabilities', {}, useAccount));
+        } else {
+          const capabilities = await json<Capabilities>('/v1/capabilities', { signal: abort.signal }, useAccount);
+          abort.signal.throwIfAborted();
+          setCaps(capabilities);
+        }
       }
     } catch (error) {
       if (currentMeta &&
@@ -549,7 +570,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       if (error instanceof Error && error.message === 'RESULT_SAVE_FAILED')
         setError(t.saveDownload);
       else if (!abort.signal.aborted) fail(error);
-      else if (abort.signal.reason?.message !== 'BACKGROUND_PAUSED' &&
+      else if (abort.signal.reason?.message !== 'AUTH_REQUIRED' && abort.signal.reason?.message !== 'BACKGROUND_PAUSED' &&
                abort.signal.reason?.message !== 'USER_PAUSED') setError(t.network);
     } finally {
       verification.current?.reject(Error('NETWORK_ERROR'));

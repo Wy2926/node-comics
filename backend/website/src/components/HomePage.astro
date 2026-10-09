@@ -21,7 +21,7 @@ const t = dictionaries[locale].ui;
 const href = (path: string) => localPath(path, locale);
 const billing = billingCopy(locale);
 const published = publishedPricingCopy(locale);
-const rows = comparisonRows(locale, publishedLite.hourlyImageLimit).filter(row => row.key !== 'early');
+const rows = comparisonRows(locale, publishedLite.hourlyImageLimit).filter(row => ['classic', 'model', 'rate', 'priority', 'reading'].includes(row.key));
 const screenshot = locale.startsWith('zh') ? comparisonZh : comparisonEn;
 const previewWidths = [640, 1120, 1680];
 const previews = await Promise.all(previewWidths.map(width =>

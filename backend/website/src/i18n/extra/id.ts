@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Pembayaran selesai",
-  "description": "Pembayaran langganan Anda selesai. Kembali ke ekstensi untuk terus membaca.",
   "heading": "Bab Anda selanjutnya menunggu.",
   "body": "Terima kasih telah memilih NodeLane Comics. Beralih kembali ke ekstensi dan lanjutkan dari bagian terakhir yang Anda tinggalkan.",
-  "hint": "Keanggotaan Anda diperbarui secara otomatis. Jika belum muncul, segarkan Akun saya di ekstensi.",
+  "hint": 'Manfaat langganan atau halaman yang dibeli muncul setelah pembayaran diverifikasi. Segarkan akun untuk memeriksa.',
   "home": "Kembali ke beranda",
   "footer": "Anda dapat menutup halaman ini dengan aman."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Terjemahan standar dengan batas permintaan terjemahan baru per jam.",
     "intro": "Pilih paket terjemahan untuk menggunakan manfaat langganan Anda di ekstensi."
   },
-  "channel": "Penyedia pembayaran",
   "manage": "Kelola langganan",
   "statuses": [
     "Aktif",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Semua fitur membaca inti"
     },
     "classic": {
-      "label": "Terjemahan standar",
+      "label": "Terjemahan awan",
       "free": "30 halaman/hari",
-      "lite": "Tidak ada batas total harian atau bulanan"
+      "lite": "Tidak ada batas total harian atau bulanan",
+      "detail": "Kuota halaman dikurangi berdasarkan halaman yang benar-benar berhasil diterjemahkan; penggunaan ulang hasil milik Anda yang sudah ada tidak mengurangi kuota lagi. “Tanpa batas” hanya berarti tidak ada batas total harian atau bulanan; penggunaan tetap tunduk pada batas penerimaan permintaan dan kapasitas layanan."
+    },
+    "local": {
+      "label": "Terjemahan lokal",
+      "free": "Mendukung MTU yang dihosting sendiri",
+      "lite": "Mendukung MTU yang dihosting sendiri",
+      "detail": "Terjemahan lokal memerlukan MTU yang dihosting sendiri; kebutuhan koneksi Internet bergantung pada model dan penyedia yang digunakan."
     },
     "rate": {
       "label": "Batas permintaan terjemahan baru",
       "free": "10 halaman dalam setiap periode bergulir 60 detik",
-      "lite": "100 halaman dalam setiap periode bergulir 60 detik; {n} halaman dalam setiap periode bergulir 60 menit"
+      "lite": "100 halaman dalam setiap periode bergulir 60 detik; {n} halaman dalam setiap periode bergulir 60 menit",
+      "detail": "Batas periode bergulir berlaku bersama untuk semua perangkat, mode, dan bahasa dalam satu akun. Permintaan duplikat dan penggunaan kembali hasil yang sudah selesai tidak dihitung ulang. Batas permintaan dan penjadwalan prioritas tidak menjamin kecepatan penyelesaian atau bagian kapasitas yang tetap."
     },
     "priority": {
       "label": "Respons tugas terjemahan",
       "free": "Penjadwalan standar",
       "lite": "Respon prioritas"
     },
+    "feedback": {
+      "label": "Masukan pengguna",
+      "free": "Respons standar",
+      "lite": "Respons prioritas",
+      "detail": "Masukan anggota ditangani dengan prioritas, tanpa jaminan batas waktu respons."
+    },
+    "requests": {
+      "label": "Permintaan fitur",
+      "free": "Evaluasi biasa",
+      "lite": "Evaluasi prioritas",
+      "detail": "Permintaan fitur dari anggota dievaluasi dengan prioritas, tanpa jaminan penerapan atau tanggal peluncuran."
+    },
     "early": {
       "label": "Fitur baru",
       "free": "Pada rilis umum",
       "lite": "Akses awal ke fitur-fitur lanjutan"
     },
-    "note": "Batas periode bergulir berlaku bersama untuk semua perangkat, mode, dan bahasa dalam satu akun. Permintaan duplikat dan penggunaan kembali hasil yang sudah selesai tidak dihitung ulang. Batas permintaan dan penjadwalan prioritas tidak menjamin kecepatan penyelesaian atau bagian kapasitas yang tetap. Lihat catatan rilis untuk fitur baru."
+    "note": "Lihat catatan rilis untuk fitur baru."
   },
   "billingCycle": [
     "Bulanan",

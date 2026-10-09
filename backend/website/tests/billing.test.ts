@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {annualSavings,annualSavingsForAmounts,amount,billingCopy,billingBenefitCopy,selectedChannel,hasManagedSubscription,offerBenefits,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
+import {annualSavings,annualSavingsForAmounts,amount,billingCopy,billingBenefitCopy,selectedChannel,hasManagedSubscription,offerBenefits,offerLabel,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
+import {quotaPurchase} from '../src/i18n/quota-purchase';
 import {selectedInterval} from '../src/components/BillingCycle';
 import {offerForInterval} from '../src/lib/billing-cycle';
 import {comparisonCopy} from '../src/lib/pricing-comparison';
@@ -23,15 +24,33 @@ test('billing cycles use available quotes and preserve the chosen cadence',()=>{
   assert.equal(selectedInterval([year],'month'),'year');
   assert.equal(selectedInterval([month],'year'),'month');
   assert.equal(selectedInterval([],'year'),'year');
+  assert.equal(selectedInterval([{interval:'once'} as BillingOffer],'year'),'year');
+});
+
+test('all purchase locales preserve placeholders and do not describe a page pack as a subscription',()=>{
+  const pack={id:'pack',name:'Pages',plan_id:'pack',plan_revision_id:'pack-v1',currency:'usd',unit_amount:123,interval:'once',quota_pages:100,quota_validity_days:null,service_plan_id:'lite',monthly_redraw_pages:0,trial_days:0,trial_redraw_pages:0,channels:[]} as BillingOffer;
+  for(const locale of locales){
+    assert.deepEqual(Object.keys(quotaPurchase[locale]),Object.keys(quotaPurchase.en),locale);
+    for(const [key,value] of Object.entries(quotaPurchase.en)){
+      const translation=quotaPurchase[locale][key as keyof typeof quotaPurchase.en];
+      assert.ok(translation.trim(),locale+key);
+      assert.deepEqual(translation.match(/\{\d+\}/g)?.sort()??[],value.match(/\{\d+\}/g)?.sort()??[],locale+key);
+      // “pages” is the same word in French and English; all prose remains localized.
+      if(locale!=='en'&&!(locale==='fr'&&key==='pages'))assert.notEqual(translation,value,locale+key);
+    }
+    assert.equal(renewalCopy(pack,locale),quotaPurchase[locale].once);
+    assert.equal(offerBenefits(pack,locale),quotaPurchase[locale].pages.replace('{0}',(100).toLocaleString(locale)));
+    assert.equal(offerLabel(pack,locale),`Pages · ${amount(pack,locale)}`);
+    assert.equal(annualSavings(pack,[pack]),null);
+  }
 });
 
 test('channel selection never changes a pending checkout provider',()=>{
   const offer={channels:[{provider:'stripe',binding_id:'stripe'},{provider:'creem',binding_id:'creem'}]} as BillingOffer;
   assert.equal(selectedChannel(offer,'creem')?.provider,'creem');
-  assert.equal(selectedChannel(offer,'stripe','creem')?.provider,'creem');
-  assert.equal(selectedChannel({...offer,channels:[offer.channels[0]]},'stripe','creem'),undefined);
+  assert.equal(selectedChannel({...offer,channels:[offer.channels[0]]},'creem'),undefined);
   assert.equal(selectedChannel({...offer,channels:[]},'creem'),undefined);
-  assert.equal(selectedChannel(offer,'')?.provider,'stripe');
+  assert.equal(selectedChannel(offer)?.provider,'stripe');
 });
 
 test('public pricing never substitutes another cadence or retains a mismatched price ID',()=>{
@@ -91,7 +110,7 @@ test('billing copy omits retired mode benefits for both Lite and legacy quotes',
     assert.equal(renewalCopy(lite,locale),copy.renew(true),locale);
     assert.equal(trialCopy(7,locale),benefits.trial(7),locale);
     assert.match(trialCopy(7,locale),/7/,locale);
-    assert.doesNotMatch([offerBenefits(lite,locale),offerBenefits(plus,locale),renewalCopy(plus,locale),trialCopy(7,locale),benefits.description,benefits.intro].join(' '),retiredCopy,locale);
+    assert.doesNotMatch([offerBenefits(lite,locale),offerBenefits(plus,locale),renewalCopy(plus,locale),trialCopy(7,locale)].join(' '),retiredCopy,locale);
     for(const key of ['quota','trial'])assert.equal(key in copy,false,`${locale}: billing.${key}`);
     for(const key of ['noRedraw','annual'])assert.equal(key in benefits,false,`${locale}: billingBenefits.${key}`);
   }

@@ -2791,6 +2791,75 @@
         ]
       }
     },
+    "/v1/me/quota-purchases": {
+      "get": {
+        "tags": [
+          "quota grants"
+        ],
+        "summary": "My Purchases",
+        "description": "Private keyset history, including expired/depleted/revoked purchases.\n\nThe cursor is a previously returned bucket ID scoped to this account. No\ntotal/offset query or unbounded bucket array is needed in entitlements.",
+        "operationId": "my_purchases_v1_me_quota_purchases_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaPurchasesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/quota-campaigns/{campaign_id}": {
       "put": {
         "tags": [
@@ -8112,6 +8181,13 @@
             "type": "string",
             "title": "Plan"
           },
+          "service_plan": {
+            "type": "string",
+            "title": "Service Plan"
+          },
+          "purchase_quota": {
+            "$ref": "#/components/schemas/PurchaseQuotaResponse"
+          },
           "plus_started_at": {
             "anyOf": [
               {
@@ -8184,6 +8260,8 @@
         "type": "object",
         "required": [
           "plan",
+          "service_plan",
+          "purchase_quota",
           "plus_started_at",
           "plus_expires_at",
           "gift",
@@ -9193,7 +9271,8 @@
             "type": "string",
             "enum": [
               "month",
-              "year"
+              "year",
+              "once"
             ],
             "title": "Interval"
           }
@@ -9254,6 +9333,38 @@
               }
             ],
             "title": "Hourly Image Limit"
+          },
+          "service_plan_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Plan Id"
+          },
+          "quota_pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Quota Pages",
+            "default": 0
+          },
+          "quota_validity_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 36500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Validity Days"
           },
           "trial_days": {
             "type": "integer",
@@ -9531,6 +9642,46 @@
         ],
         "title": "ProviderWrite"
       },
+      "PurchaseQuotaResponse": {
+        "properties": {
+          "granted": {
+            "type": "integer",
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "next_expiry_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Expiry At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "next_expiry_at"
+        ],
+        "title": "PurchaseQuotaResponse"
+      },
       "QuotaBucketResponse": {
         "properties": {
           "id": {
@@ -9605,6 +9756,160 @@
           "note"
         ],
         "title": "QuotaBucketResponse"
+      },
+      "QuotaPurchaseResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "granted": {
+            "type": "integer",
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "starts_at": {
+            "type": "string",
+            "title": "Starts At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "grants_access": {
+            "type": "boolean",
+            "title": "Grants Access"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "order_id": {
+            "type": "string",
+            "title": "Order Id"
+          },
+          "service_plan": {
+            "type": "string",
+            "title": "Service Plan"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "hourly_image_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Image Limit"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "active",
+              "exhausted",
+              "expired",
+              "revoked"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "source",
+          "mode",
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "starts_at",
+          "expires_at",
+          "grants_access",
+          "note",
+          "order_id",
+          "service_plan",
+          "product_name",
+          "hourly_image_limit",
+          "revoked_at",
+          "state"
+        ],
+        "title": "QuotaPurchaseResponse"
+      },
+      "QuotaPurchasesResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaPurchaseResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "QuotaPurchasesResponse"
       },
       "Registration": {
         "properties": {
@@ -9859,6 +10164,38 @@
               }
             ],
             "title": "Hourly Image Limit"
+          },
+          "service_plan_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Plan Id"
+          },
+          "quota_pages": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Quota Pages",
+            "default": 0
+          },
+          "quota_validity_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 36500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Validity Days"
           },
           "trial_days": {
             "type": "integer",

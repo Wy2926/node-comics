@@ -1,20 +1,21 @@
 """Operator-issued page grants, optionally time-bounded."""
 from datetime import timezone
 from typing import Annotated, Literal
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import AwareDatetime, Field, model_validator
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 from .auth import admin, identity
 from .db import get_db
 from .entitlement_models import MembershipOperation, QuotaPeriod
-from .entitlements import entitlements_json, lock_operation, locked_user, period_json
+from .entitlements import entitlements_json, iso, lock_operation, locked_user, period_json
 from .errors import problem
 from .jobs import idem_key
 from .models import Ledger, User, now
 from .providers import digest
 from .request_models import RequestBody
 from .admin_audit import record_audit
+from .schemas import QuotaPurchasesResponse
 
 router = APIRouter(tags=["quota grants"])
 
@@ -86,3 +87,38 @@ def my_grants(user: User = Depends(identity), db: Session = Depends(get_db)):
         QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant",
         or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > now()))
         .order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.id))]}
+
+
+@router.get('/v1/me/quota-purchases', response_model=QuotaPurchasesResponse)
+def my_purchases(cursor: str | None = Query(None, min_length=1, max_length=64),
+                 limit: int = Query(20, ge=1, le=50),
+                 user: User = Depends(identity), db: Session = Depends(get_db)):
+    """Private keyset history, including expired/depleted/revoked purchases.
+
+    The cursor is a previously returned bucket ID scoped to this account. No
+    total/offset query or unbounded bucket array is needed in entitlements.
+    """
+    from .billing_models import BillingOrder, BillingPlanRevision, BillingPrice
+    query = select(QuotaPeriod, BillingPlanRevision).join(BillingOrder,
+        BillingOrder.id == QuotaPeriod.billing_order_id).join(BillingPrice,
+        BillingPrice.id == BillingOrder.price_id).join(BillingPlanRevision,
+        BillingPlanRevision.id == BillingPrice.plan_revision_id).where(
+            QuotaPeriod.owner_id == user.id, BillingOrder.owner_id == user.id, QuotaPeriod.source == 'purchase')
+    if cursor:
+        anchor = db.execute(select(QuotaPeriod.starts_at, QuotaPeriod.id).where(
+            QuotaPeriod.id == cursor, QuotaPeriod.owner_id == user.id, QuotaPeriod.source == 'purchase')).first()
+        if anchor is None:
+            problem('INVALID_CURSOR', '额度记录游标无效', 422)
+        query = query.where(or_(QuotaPeriod.starts_at < anchor.starts_at,
+            and_(QuotaPeriod.starts_at == anchor.starts_at, QuotaPeriod.id < anchor.id)))
+    rows = db.execute(query.order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id.desc()).limit(limit + 1)).all()
+    at, items = now(), []
+    for period, revision in rows[:limit]:
+        state = ('revoked' if period.revoked_at else 'scheduled' if period.starts_at > at else
+                 'expired' if period.ends_at and period.ends_at <= at else
+                 'exhausted' if period.granted <= period.used + period.reserved else 'active')
+        items.append({**period_json(period), 'order_id': period.billing_order_id,
+            'service_plan': revision.service_plan_id, 'product_name': revision.name,
+            'available': period.granted - period.used - period.reserved if state == 'active' else 0,
+            'hourly_image_limit': revision.hourly_image_limit, 'revoked_at': iso(period.revoked_at), 'state': state})
+    return {'items': items, 'next_cursor': rows[limit - 1][0].id if len(rows) > limit else None}

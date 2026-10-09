@@ -5,7 +5,7 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'text_plan_routing_0013'})
+SUPPORTED_SCHEMAS = frozenset({'quota_purchases_0014'})
 
 
 def check_schema(connection):

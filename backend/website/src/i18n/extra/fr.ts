@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Paiement terminé",
-  "description": "Le paiement de votre abonnement est terminé. Revenez à l’extension pour continuer la lecture.",
   "heading": "Votre prochain chapitre vous attend.",
   "body": "Merci d'avoir choisi NodeLane Comics. Revenez à l’extension et reprenez là où vous vous étiez arrêté.",
-  "hint": "Vos droits sont mis à jour automatiquement. S’ils n’apparaissent pas encore, actualisez Mon compte dans l’extension.",
+  "hint": 'Les avantages ou pages achetées sont ajoutés après vérification du paiement. Actualisez votre compte pour vérifier.',
   "home": "Retour à l’accueil",
   "footer": "Vous pouvez fermer cette page en toute sécurité."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Traduction classique avec une limite horaire pour les nouvelles demandes de traduction.",
     "intro": "Choisissez un plan de traduction pour utiliser les avantages de votre abonnement dans l'extension."
   },
-  "channel": "Fournisseur de paiement",
   "manage": "Gérer l'abonnement",
   "statuses": [
     "Actif",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Toutes les fonctionnalités de lecture de base"
     },
     "classic": {
-      "label": "Traduction classique",
+      "label": "Traduction dans le cloud",
       "free": "30 pages / jour",
-      "lite": "Pas de plafond total quotidien ou mensuel"
+      "lite": "Pas de plafond total quotidien ou mensuel",
+      "detail": "Les pages sont décomptées selon les traductions effectivement réussies ; réutiliser vos propres résultats existants n’entraîne aucun nouveau décompte. « Illimité » signifie uniquement l’absence de plafond cumulé quotidien ou mensuel ; l’utilisation reste soumise aux limites de prise en charge des demandes et à la capacité du service."
+    },
+    "local": {
+      "label": "Traduction locale",
+      "free": "MTU auto-hébergé pris en charge",
+      "lite": "MTU auto-hébergé pris en charge",
+      "detail": "La traduction locale nécessite une instance MTU auto-hébergée ; l’accès à Internet dépend des modèles et fournisseurs utilisés."
     },
     "rate": {
       "label": "Limite de nouvelles demandes de traduction",
       "free": "10 pages par minute glissante",
-      "lite": "100 pages par minute glissante ; {n} pages par heure glissante"
+      "lite": "100 pages par minute glissante ; {n} pages par heure glissante",
+      "detail": "Les fenêtres glissantes sont partagées entre les appareils, modes et langues d’un même compte. Les doublons et la réutilisation de résultats terminés ne sont pas comptés à nouveau. Les limites de demandes et la priorité de traitement ne garantissent ni délai de réalisation ni part fixe de la capacité."
     },
     "priority": {
       "label": "Réponse à la tâche de traduction",
       "free": "Planification standard",
       "lite": "Réponse prioritaire"
     },
+    "feedback": {
+      "label": "Retours des utilisateurs",
+      "free": "Réponse standard",
+      "lite": "Réponse prioritaire",
+      "detail": "Les retours des membres sont traités en priorité, sans garantie de délai de réponse."
+    },
+    "requests": {
+      "label": "Demandes de fonctionnalités",
+      "free": "Évaluation standard",
+      "lite": "Évaluation prioritaire",
+      "detail": "Les demandes de fonctionnalités des membres sont évaluées en priorité, sans garantie de réalisation ni de date de mise à disposition."
+    },
     "early": {
       "label": "Nouvelles fonctionnalités",
       "free": "À la sortie générale",
       "lite": "Accès anticipé aux fonctionnalités avancées"
     },
-    "note": "Les fenêtres glissantes sont partagées entre les appareils, modes et langues d’un même compte. Les doublons et la réutilisation de résultats terminés ne sont pas comptés à nouveau. Les limites de demandes et la priorité de traitement ne garantissent ni délai de réalisation ni part fixe de la capacité. Consultez les notes de version pour les nouvelles fonctionnalités."
+    "note": "Consultez les notes de version pour les nouvelles fonctionnalités."
   },
   "billingCycle": [
     "Mensuel",

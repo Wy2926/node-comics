@@ -98,10 +98,9 @@ export const uninstall = {
 
 export const paymentSuccess = {
   "title": "Ödeme tamamlandı",
-  "description": "Abonelik ödemeniz tamamlandı. Okumaya devam etmek için uzantıya dönün.",
   "heading": "Bir sonraki bölümünüz sizi bekliyor.",
   "body": "NodeLane Comics’i seçtiğiniz için teşekkür ederiz. Uzantıya dönerek kaldığınız yerden okumaya devam edin.",
-  "hint": "Üyeliğiniz otomatik olarak güncellenir. Henüz görünmediyse uzantıdaki Hesabım'ı yenileyin.",
+  "hint": 'Abonelik hakları veya satın alınan sayfalar ödeme doğrulandıktan sonra görünür. Kontrol için hesabı yenileyin.',
   "home": "Ana sayfaya dön",
   "footer": "Bu sayfayı güvenle kapatabilirsiniz."
 };
@@ -168,7 +167,6 @@ export const commerce = {
     "description": "Yeni çeviri istekleri için saatlik sınırı olan standart çeviri.",
     "intro": "Uzantıdaki abonelik avantajlarınızdan yararlanmak için bir çeviri planı seçin."
   },
-  "channel": "Ödeme sağlayıcısı",
   "manage": "Aboneliği yönet",
   "statuses": [
     "Etkin",
@@ -194,26 +192,46 @@ export const commerce = {
       "lite": "Tüm temel okuma özellikleri"
     },
     "classic": {
-      "label": "Standart çeviri",
+      "label": "Bulut çevirisi",
       "free": "30 sayfa / gün",
-      "lite": "Günlük veya aylık toplam sınır yok"
+      "lite": "Günlük veya aylık toplam sınır yok",
+      "detail": "Sayfa kotası yalnızca başarıyla çevrilen sayfalar için azalır; size ait mevcut sonuçları yeniden kullanmak kotayı tekrar azaltmaz. “Sınırsız” yalnızca günlük veya aylık toplam sayfa sınırı olmadığı anlamına gelir; kullanım hâlâ istek kabul sınırlarına ve hizmet kapasitesine tabidir."
+    },
+    "local": {
+      "label": "Yerel çeviri",
+      "free": "Kendi MTU kurulumunuz desteklenir",
+      "lite": "Kendi MTU kurulumunuz desteklenir",
+      "detail": "Yerel çeviri için MTU’yu kendiniz kurup barındırmanız gerekir; İnternet bağlantısı gereksinimi kullanılan model ve sağlayıcılara bağlıdır."
     },
     "rate": {
       "label": "Yeni çeviri isteği sınırı",
       "free": "Her kayan 60 saniyelik dönemde 10 sayfa",
-      "lite": "Her kayan 60 saniyelik dönemde 100 sayfa; her kayan bir saatlik dönemde {n} sayfa"
+      "lite": "Her kayan 60 saniyelik dönemde 100 sayfa; her kayan bir saatlik dönemde {n} sayfa",
+      "detail": "Kayan süre sınırları, bir hesabın tüm cihazları, modları ve dilleri için ortak uygulanır. Yinelenen istekler ve tamamlanmış sonuçların yeniden kullanılması tekrar sayılmaz. İstek sınırları ve öncelikli planlama, tamamlanma hızını veya kapasiteden sabit bir payı garanti etmez."
     },
     "priority": {
       "label": "Çeviri görevi yanıtı",
       "free": "Standart planlama",
       "lite": "Öncelikli yanıt"
     },
+    "feedback": {
+      "label": "Kullanıcı geri bildirimi",
+      "free": "Standart yanıt",
+      "lite": "Öncelikli yanıt",
+      "detail": "Üyelerin geri bildirimleri öncelikli olarak ele alınır; yanıt süresi garanti edilmez."
+    },
+    "requests": {
+      "label": "Özellik talepleri",
+      "free": "Normal değerlendirme",
+      "lite": "Öncelikli değerlendirme",
+      "detail": "Üyelerin özellik talepleri öncelikli olarak değerlendirilir; uygulanmaları veya yayımlanma tarihleri garanti edilmez."
+    },
     "early": {
       "label": "Yeni özellikler",
       "free": "Genel sürümde",
       "lite": "Gelişmiş özelliklere erken erişim"
     },
-    "note": "Kayan süre sınırları, bir hesabın tüm cihazları, modları ve dilleri için ortak uygulanır. Yinelenen istekler ve tamamlanmış sonuçların yeniden kullanılması tekrar sayılmaz. İstek sınırları ve öncelikli planlama, tamamlanma hızını veya kapasiteden sabit bir payı garanti etmez. Yeni özellikler için sürüm notlarına bakın."
+    "note": "Yeni özellikler için sürüm notlarına bakın."
   },
   "billingCycle": [
     "Aylık",

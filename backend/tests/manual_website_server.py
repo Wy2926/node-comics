@@ -120,7 +120,7 @@ def me(request: Request):
 def billing(request: Request):
     if not authorized(request):
         return JSONResponse({},status_code=401)
-    return {'enabled':True,'trial_eligible':True,'checkout_pending':False,'subscription':
+    return {'enabled':True,'trial_eligible':True,'subscription_checkout':None,'subscription':
         {'status':'active','next_billed_at':'2026-10-20T00:00:00Z','cancel_at':state['cancel_at']} if state['subscribed'] else None}
 
 

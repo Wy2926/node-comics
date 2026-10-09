@@ -853,7 +853,7 @@ export default {
     "，了解自动续费规则。": " dan memahami perpanjangan otomatis.",
     "继续原结账": "Lanjutkan pembayaran",
     "前往安全结账": "Lanjutkan ke pembayaran aman",
-    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Keluar hanya akan menghapus sesi tab situs web ini. Itu tidak membatalkan langganan atau keluar dari ekstensi atau aplikasi lain.",
+    "退出仅清除官网当前标签页的账户会话，不会取消订阅，也不会退出插件或身份服务中的其他应用。": "Keluar akan menghapus sesi situs di semua tab pada browser ini. Tindakan ini tidak membatalkan langganan atau mengeluarkan Anda dari ekstensi maupun aplikasi lain.",
     "正式登录服务尚未配置，请稍后重试或联系支持。": "Proses masuk tidak dikonfigurasi. Silakan coba lagi nanti atau hubungi dukungan.",
     "暂时无法连接登录服务，请重试。": "Tidak dapat menjangkau layanan masuk. Silakan coba lagi.",
     "登录续期未完成，请检查网络后重试；授权已失效时请重新登录。": "Perpanjangan sesi gagal. Periksa koneksi Anda, atau masuk lagi jika otorisasi telah habis masa berlakunya.",

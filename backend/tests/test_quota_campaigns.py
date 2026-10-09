@@ -235,31 +235,34 @@ def verify_quota_upgrade(database):
         # Seed the historical schema through reflection, not the current User mapper.
         from sqlalchemy import Table, MetaData
         legacy_users = Table('users', MetaData(), autoload_with=db.connection())
+        legacy_quota = Table('quota_periods', MetaData(), autoload_with=db.connection())
         db.execute(legacy_users.insert().values(id='preserve', subject='preserve', name='Preserved',
             role='user', plus_pending=False, created_at=now()))
         db.flush()
-        db.add(QuotaPeriod(id='preserved-quota', owner_id='preserve', kind='classic_grant',
+        db.execute(legacy_quota.insert().values(id='preserved-quota', owner_id='preserve', kind='classic_grant',
             mode='classic', source='grant', source_key='original', starts_at=now(),
-            ends_at=now() + timedelta(days=30), granted=500, used=17, reserved=2))
+            ends_at=now() + timedelta(days=30), granted=500, used=17, reserved=2, note='', grants_access=False))
         db.flush()
         db.add(Ledger(owner_id='preserve', period_id='preserved-quota', quota_kind='classic_grant',
                       transaction_key='preserved-ledger', kind='grant', amount=500))
         db.commit()
     with database.begin() as connection:
-        before = {table: connection.execute(text('SELECT * FROM ' + table)).all()
-                  for table in ('quota_periods', 'usage_ledger')}
+        columns = {table: ', '.join(column['name'] for column in inspect(connection).get_columns(table))
+                   for table in ('quota_periods', 'usage_ledger')}
+        before = {table: connection.execute(text(f'SELECT {fields} FROM {table}')).all()
+                  for table, fields in columns.items()}
         config.attributes['connection'] = connection
         command.upgrade(config, 'head')
         command.upgrade(config, 'head')
         for table, rows in before.items():
-            assert connection.execute(text('SELECT * FROM ' + table)).all() == rows
+            assert connection.execute(text(f'SELECT {columns[table]} FROM {table}')).all() == rows
     with Session(database) as db:
         period = db.get(QuotaPeriod, 'preserved-quota')
         assert (period.granted, period.used, period.reserved) == (500, 17, 2)
         assert db.scalar(select(func.count()).select_from(Ledger)
                          .where(Ledger.transaction_key == 'preserved-ledger')) == 1
         checks = inspect(db.connection()).get_check_constraints('quota_periods')
-        assert len(checks) == 8
+        assert len(checks) == 9
 
 
 def test_upgrade_keeps_referenced_quota_and_ledger(isolated_migration_database):

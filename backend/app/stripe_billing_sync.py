@@ -105,5 +105,8 @@ def sync_session(session_id):
     with session_factory()() as db:
         stripe.require(checkout_id and db.get(BillingCheckout, checkout_id), 'STRIPE_ACCOUNT_UNBOUND')
     bind_session(checkout_id, session)
-    if session.get('status') == 'complete' and session.get('subscription'):
+    if session.get('mode') == 'payment':
+        from .billing_purchases import sync_stripe_purchase
+        sync_stripe_purchase(checkout_id)
+    elif session.get('status') == 'complete' and session.get('subscription'):
         sync_subscription(session['subscription'])

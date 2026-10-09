@@ -11,6 +11,7 @@
 | 入口 | 用途 |
 | --- | --- |
 | `bootstrap.ps1` | 本地控制服务初始化与启动，见[后端](../backend/README.md) |
+| `seed_creem_test_catalog.py` | 仅在专用 Docker 手测库发布四个已核验 Creem test 商品；不创建支付、不发令牌，见[本地支付手测环境](../docs/DEPLOYMENT.md#本地-creem-手动验收) |
 | `switch_release.py` / `retire_release.py` | OpenResty 事务式 API／静态切换、失败回退及旧进程安全排空，见[部署规范](../docs/DEPLOYMENT.md) |
 | `prepare_static_release.py` | 准备独立官网／后台的不可变目录、安全头与资源保留池，不自动激活 |
 | `submit_indexnow.py <公开 URL>... [--submit]` | 官网新增或实质更新页面的 IndexNow 通知；默认干运行并检查线上 key 与 sitemap，`--submit` 才发送，见[官网 SEO 规范](../backend/website/SEO.md#indexnow-变更通知) |
@@ -106,11 +107,11 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 | --- | --- |
 | `verify_website_languages.mjs` | 17 语公开页面、桌面／手机布局、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；不调用真实身份、计费或模型服务 |
 | `verify_website_download.mjs` | 17 语下载页；指向公开服务时真实下载并核对摘要 |
-| `verify_website_pricing.mjs` | 17 语无 JavaScript 公示月价与年总价、Free／Lite 三列六项权益对照、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
+| `verify_website_pricing.mjs` | 17 语无 JavaScript 公示月价与年总价、Free／Lite 三列九项权益对照及可聚焦／悬停／点按的信息提示、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 17 语首页单张真实对照图、锚点和三浏览器入口，原生月／年套餐预览与语言链接；桌面和手机布局 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |
 | `verify_website_translation_tiles.mjs` | 先构建官网并启动上述夹具 `--port 4323`；验证单边 100000 的长／宽图、分块跨边界文字像素、完整下载、本地历史恢复、同 UUID 重放、能力缺失及普通翻译；仅允许本机回环地址 |
-| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、结账与退出，覆盖 17 语及窄屏 |
+| `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、定价入口、并行首屏与手动同步、退出／换号，覆盖 17 语及窄屏 |
 
 完整同源账户流程见[官网 README](../backend/website/README.md)。模拟响应验证交互，真实身份、付款和模型效果分别验证。
 

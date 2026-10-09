@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `text_plan_routing_0013`，供应商支持正文套餐范围，资产 MIME 列保留 128 字符以保存分块格式。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `quota_purchases_0014`，支持独立购买页数与套餐服务档位，资产 MIME 列保留 128 字符以保存分块格式。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 发布边界
 
@@ -20,11 +20,49 @@
 
 所有控制进程挂载同一外部图片卷，`TRANSLATION_VOLUME` 必须填写实际在用的 Docker 卷名；不要将升级变成新建空卷。UID 10001 可写，输入、结果和接收暂存均在 `/data/translation`。部署负责磁盘容量，备份同时覆盖数据库和结果目录，见[存储规范](OBJECT_STORAGE.md)。首次安装才由运维预建网络、专用空库和文件卷。
 
+## 本地 Creem 手动验收
+
+[独立测试 Compose](../deploy/compose.creem-test.yaml) 提供官网/API、后台处理进程、PostgreSQL、Redis、受限网关和 Cloudflare Quick Tunnel；不使用根 `.env`、已有沙盒、线上数据库或供应商凭据。配置从 [测试模板](../deploy/creem-test.env.example) 复制到忽略的 `deploy/.env.creem-test`，文件限本机运行账号读取。`APP_ENV=test`、`DEV_AUTH=false`、Creem test、禁用 Stripe/匿名体验/分析/管理入口均在 Compose 固定。只有网关绑定 `127.0.0.1:28088`，数据库、API和隧道 metrics 不发布宿主端口；公网关闭开发认证、管理/计算接口、健康详情及 API 文档，关闭访问日志并加 noindex。
+
+此环境用于真实 OIDC 和 **Creem 测试付款**，不接入正式 GPU 或文本供应商。不能把购买到账验收等同于真实翻译扣减验收；后者需另外接入专用计算节点。Quick Tunnel 不支持 SSE、重启后地址变化，适用于本次支付/账户手测，不作为长期环境。限制见 [Cloudflare 官方说明](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)。
+
+从仓库根目录运行，保留原有沙盒：
+
+```powershell
+$testCompose = @('compose', '--env-file', 'deploy/.env.creem-test', '-f', 'deploy/compose.creem-test.yaml')
+npm --prefix backend/website run build
+docker @testCompose build api
+docker @testCompose up -d postgres redis gateway tunnel
+docker @testCompose logs tunnel
+docker @testCompose run --rm migrate
+```
+
+取得当前 HTTPS 隧道 origin 后，完成以下配置再启用付款：
+
+- Logto 现有应用只追加精确 `<origin>/auth/callback/` Redirect URI 和 `<origin>` CORS allowed origin；保留已有回调，不修改刷新期限或退出策略。
+- 在 **Creem test API** 创建本环境独立的 `POST /webhooks/creem` 地址，订阅服务端 `CREEM_EVENTS` 中的事件，将返回的签名密钥只存 `CREEM_WEBHOOK_SECRET`。不修改其他环境的 Webhook。远端创建结果不明时先按名称/URL查询，不能盲目重试。参见 [Creem Webhook API](https://docs.creem.io/api-reference/endpoint/create-webhook)。
+- `CORS_ORIGINS` 加入该 origin；`CREEM_RETURN_URL=<origin>/payment/success/`。核对测试 API key、签名密钥和回调后设置 `CREEM_ENABLED=true`。
+- 准备四个无试用、USD 商品：Lite 月付599美分、年付5999美分，100页永久包和50页30天包各599美分。两个额度包为 `onetime/once`；页数、有效期、Lite档位和每小时1200页在本地目录定义，不从远端商品名称推断。四个 ID 填入模板对应项。
+
+```powershell
+docker @testCompose up -d --no-build api control-worker maintenance
+docker @testCompose exec -T api python /app/scripts/seed_creem_test_catalog.py
+docker @testCompose ps
+```
+
+初始化脚本仅接受 `nodecomics_creem_manual_test` 专库，先核对四个真实测试商品，再复用正式目录接口发布；本地写入原子提交，重复运行不发额度、不创建付款、不修改已有订单。测试价格只在此库可见。每次更换隧道地址须同步 Logto、Webhook URL 和本地返回地址，并重建三个后端进程；不要重启仍在手测的 tunnel。只改静态页面时重建官网并刷新浏览器，无需换隧道。
+
+手测从 `<origin>/pricing/` 开始：登录 → 购买永久或限期额度包 → 在托管页面确认 Test Mode 后使用 [Creem 官方测试卡](https://docs.creem.io/api-reference/introduction#test-cards) → 返回账户刷新 → 核对页数、档位和有效期 → 重复刷新不重复到账；另测取消/失败恢复、月/年订阅、会员期间再次购包及退出重开登录。不要使用真实银行卡。真实签名支付回调与人工发送的签名连通探针须分开记录，不能以探针代替付款验收。
+
+暂停使用 `docker @testCompose stop`（保留测试数据）；不执行 `down -v`。重开 tunnel 会换地址，须重新核对上述回调。停用时可在 Creem 关闭本环境独立 Webhook，不影响其他测试或正式回调。
+
 ## 迁移与兼容性
 
 运行进程只检查结构、支付环境、文件目录权限和 Redis 连通性，不改表、不写默认配置。显式迁移命令同时初始化缺失的供应商、控制池、系统设置和计费目录；不重置已配置值。PostgreSQL 迁移保留 advisory lock，锁等待超过 5 秒失败，禁止无限阻塞线上请求。
 
-当前运行代码仅接受 `text_plan_routing_0013`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。分块产物的 MIME 超过旧列上限，不能通过缩短字段或截断值回退；回滚需恢复一致的代码、数据库和文件备份。
+当前运行代码仅接受 `quota_purchases_0014`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。分块产物的 MIME 超过旧列上限，不能通过缩短字段或截断值回退；回滚需恢复一致的代码、数据库和文件备份。
+
+购买额度升级采用维护窗口，不增加旧支付数据转换、双写或混跑桥接。先备份、阻止新受理并排空旧控制进程，再迁移并更新 API、maintenance、dispatcher；购买记录、原预占和账本必须一起保留。客户端读取新增购买字段，已安装旧插件仍只看到订阅报价；完整购买和余额展示需要新版插件。即使没有正式生产订单，也不清空用户、任务、赠送或全库；测试支付数据如需重置，必须另行核定环境、精确订单及引用关系，迁移本身不执行清空。
 
 套餐路由迁移为 `translation_providers` 新增可空的 `text_plan_ids`，已有供应商仍适用于全部套餐，不改模型版本、任务快照或缓存。隔离备份库验证迁移后，停止新受理、排空并停止旧控制进程，再显式迁移、更新全部 API／worker／maintenance 和管理后台，最后设置各模型适用套餐。旧代码不执行套餐筛选，启用限制后不能与新版混跑；不提供删除限制字段的 downgrade，回退须恢复经审核的一致备份。
 

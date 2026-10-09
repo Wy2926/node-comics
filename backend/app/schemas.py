@@ -51,8 +51,32 @@ class GiftMembershipResponse(BaseModel):
     state: Literal['pending', 'scheduled', 'active', 'expired']
 
 
+class PurchaseQuotaResponse(BaseModel):
+    granted: int
+    used: int
+    reserved: int
+    available: int
+    next_expiry_at: str | None
+
+
+class QuotaPurchaseResponse(QuotaBucketResponse):
+    order_id: str
+    service_plan: str
+    product_name: str
+    hourly_image_limit: int | None
+    revoked_at: str | None
+    state: Literal['scheduled', 'active', 'exhausted', 'expired', 'revoked']
+
+
+class QuotaPurchasesResponse(BaseModel):
+    items: list[QuotaPurchaseResponse]
+    next_cursor: str | None
+
+
 class EntitlementsResponse(BaseModel):
     plan: str
+    service_plan: str
+    purchase_quota: PurchaseQuotaResponse
     plus_started_at: str | None
     plus_expires_at: str | None
     gift: GiftMembershipResponse | None
