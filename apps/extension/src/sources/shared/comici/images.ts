@@ -1,10 +1,10 @@
 export function parseProcessing(value: string) {
   const match = /^comici-v1:(\d+):(\d+):([\d,]+)$/.exec(value);
-  if (!match) throw Error('Comic PASH 图片还原协议无效。');
+  if (!match) throw Error('Comici 图片还原协议无效。');
   const width = Number(match[1]), height = Number(match[2]), order = match[3].split(',').map(Number);
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 4 || height < 4 ||
     order.length !== 16 || new Set(order).size !== 16 || order.some(n => !Number.isInteger(n) || n < 0 || n > 15))
-    throw Error('Comic PASH 图片还原参数无效。');
+    throw Error('Comici 图片还原参数无效。');
   return {width, height, order};
 }
 /** Comici's 4×4 permutation enumerates both source and destination tiles column-first. */
@@ -15,7 +15,7 @@ export async function decodeImage(blob: Blob, _headers: Headers, processing?: st
   const bitmap = await createImageBitmap(blob, {colorSpaceConversion: 'none'});
   try {
     signal?.throwIfAborted();
-    if (bitmap.width !== width || bitmap.height !== height) throw Error('Comic PASH 原图尺寸与清单不符。');
+    if (bitmap.width !== width || bitmap.height !== height) throw Error('Comici 原图尺寸与清单不符。');
     const canvas = new OffscreenCanvas(width, height), ctx = canvas.getContext('2d');
     if (!ctx) throw Error('图片还原不可用。');
     // Match the source viewer: only complete tiles are painted; remainder pixels stay transparent.

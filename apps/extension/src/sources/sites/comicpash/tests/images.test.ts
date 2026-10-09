@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {decodeImage, parseProcessing} from '../images';
+import {decodeImage, parseProcessing} from '../../../shared/comici/images';
 const processing = 'comici-v1:720:1024:' + Array.from({length: 16}, (_, i) => 15 - i).join(',');
 afterEach(() => vi.unstubAllGlobals());
 it('rejects malformed permutations before decoding', async () => {

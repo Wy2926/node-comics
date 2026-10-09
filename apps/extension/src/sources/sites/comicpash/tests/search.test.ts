@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {parseSearch, search, searchUrl} from '../search';
+import {parseSearch, search, searchUrl} from '../network';
 import {definition} from '../definition';
 import {validateSearchPage} from '../../../core/search';
 

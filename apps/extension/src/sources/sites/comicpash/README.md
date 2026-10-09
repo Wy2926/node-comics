@@ -11,13 +11,13 @@
 
 作品页可作为跨语言查找起点：`describeWork` 核对 canonical 的系列身份后读取 `og:title`；章节标题不代替作品名。
 
-名称搜索由 `search.ts` 读取 `GET /api/search?q=<名称>&page=<页码>&size=12`。仅解析 `searchResult.series` 的名称匹配作品，不混入 `seriesByAuthor` 作者匹配或 `episode` 章节结果；按该集合总数分页，返回稳定系列 ID、作者和作品封面，不获取候选目录或推断内容语言。协议依据[搜索页](https://comicpash.jp/search)的公开前端模块与 HTTP 响应；请求限定本站，取消、结构变化或不完整页均拒绝发布。
+名称搜索由 `network.ts` 显式接入共享 Comici 搜索器，读取 `GET /api/search?q=<名称>&page=<页码>&size=12`。仅解析 `searchResult.series` 的名称匹配作品，不混入 `seriesByAuthor` 作者匹配或 `episode` 章节结果；按该集合总数分页，返回稳定系列 ID、作者和作品封面，不获取候选目录或推断内容语言。协议依据[搜索页](https://comicpash.jp/search)的公开前端模块与 HTTP 响应；请求限定本站，取消、结构变化或不完整页均拒绝发布。
 
 ## 来源协议
 
 章节 HTML 提供 `data-comici-viewer-id`、`data-series-id` 与 `/api`；目录生成的章节地址使用本地 `#nodelane-comicpash=<series>` 绑定作品，读取时核对实际归属。`GET /api/book/contentsInfo` 的公开请求带空 `user-id`，先读页数，再读取完整范围，核对总数、sort 连续页序、尺寸、正文主机和 `/book/<viewer-id>/` 归属。签名地址只随来源清单使用，不写入仓库样本或验证报告。
 
-图片使用 4×4、按列枚举的 tile permutation；`image.ts` 经公共图片管线还原为 PNG，匹配网页 viewer 的余边处理。实现依据 [源站 viewer.js](https://comicpash.jp/js/viewer/viewer.js)，参考脚本 SHA-256：`ba9199d3996e4e8feca4d36bfd82e9d185aa7b2310f7b4f3273290bda68fc06a`。只独立实现已观察的协议，不执行或分发源站脚本；无新增第三方解码组件、模型、字体或权重。
+目录、搜索、canvas 生命周期与图片还原显式复用 [Comici 共享实现](../../shared/comici/README.md)，本站的主机和作品／图片归属校验仍在 `definition.ts`／`protocol.ts`。图片使用 4×4、按列枚举的 tile permutation；`image.ts` 经公共图片管线还原为 PNG，匹配网页 viewer 的余边处理，并保留已有 `comici-v1` 清单标记。实现依据 [源站 viewer.js](https://comicpash.jp/js/viewer/viewer.js)，参考脚本 SHA-256：`ba9199d3996e4e8feca4d36bfd82e9d185aa7b2310f7b4f3273290bda68fc06a`。只独立实现已观察的协议，不执行或分发源站脚本；无新增第三方解码组件、模型、字体或权重。
 
 目录可列出付费／待免费章节，但不保证可读取。仅处理源站公开提供的完整正文，缺少访问权或协议不符时明确失败，不处理购买、登录或等待解锁。过期图片地址需要重新从源站获取清单；已物化图片按公共缓存策略复用。
 
