@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 
 export async function verifyInline({browser, page, activate, button, source, out, check}) {
-  const origin = 'https://klmanga.zone', cdn = 'https://klmanga-inline-fixture.test/images/';
+  const origin = 'https://klmanga.toys', cdn = 'https://klmanga-inline-fixture.test/images/';
   const catalog = origin + '/manga-raw/fixture-raw-free/', reader = catalog + 'chapter-1/';
   const worker = browser.serviceWorkers()[0];
   await worker.evaluate(({cdn, bytes}) => {

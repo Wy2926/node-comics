@@ -11,7 +11,7 @@ import '../src/redesign.css';
 import '../src/ui/theme/surfaces.css';
 
 if(location.origin!=='http://127.0.0.1:5181')throw Error('Use the isolated http://127.0.0.1:5181 fixture origin.');
-const shownJob:Job={id:'reader-tools-fixture-result',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true};
+const shownJob:Job={id:'reader-tools-fixture-result',mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true,model:{id:'model-fixture',name:'Claude Haiku 5.5'}};
 
 function Fixture(){
   const root=useRef<HTMLDivElement>(null);

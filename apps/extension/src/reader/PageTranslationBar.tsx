@@ -17,10 +17,9 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,onRe
   }
   const views:('original'|'classic')[]=['original',...(modes===undefined||modes.includes('classic')?['classic' as const]:[])];
   const showRetry=!!onRetry&&canRetry,showFeedback=!!allowsFeedback&&!!shownJob,showTranslation=modes===undefined||modes.length>0;
-  return <ReaderTools label={msg("翻译与阅读工具")} above={views.length+Number(!!contentLanguageControl)+Number(showRetry)+Number(!!shownJob?.model)} below={1+Number(showTranslation)+Number(showFeedback)}>
+  return <ReaderTools label={msg("翻译与阅读工具")} above={views.length+Number(!!contentLanguageControl)+Number(showRetry)} below={1+Number(showTranslation)+Number(showFeedback)}>
     <div className="nc-reader-tool-group" data-scrollbar-mode="overlay">
     {contentLanguageControl}
-    {shownJob?.model&&<span className="nc-reader-model" title={msg('实际模型：{0}',{'0':shownJob.model.name})}>{shownJob.model.name}</span>}
     {showRetry&&<button data-reader-retry-trigger="true" aria-label={msg('重新翻译此页')} title={msg('重新翻译此页')} disabled={retrying} aria-busy={retrying||undefined} onClick={()=>void retry()}><Icon name="refresh"/><span>{retrying?msg('重试中…'):msg('重新翻译')}</span></button>}
     <div className="nc-page-versions" role="group" aria-label={msg("漫画查看方式")} data-shown-job={shownJob?.id??'original'}>
       {views.map(value=><button key={value} aria-label={{original:msg("原图"),classic:msg("常规翻译")}[value]} title={{original:msg("查看原图"),classic:msg("查看常规译图")}[value]} aria-pressed={selectedView===value} onClick={()=>onView(value)}><Icon name={{original:'image',classic:'translate'}[value]}/><span>{{original:msg("原图"),classic:msg("常规")}[value]}</span></button>)}

@@ -1791,19 +1791,6 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
   flex-direction: column;
   gap: var(--reader-tool-gap);
 }
-.nc-reader-model {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  flex: none;
-  height: var(--reader-tool-size);
-  font-size: 10px;
-  line-height: 1.4;
-  text-align: center;
-  color: var(--muted);
-}
 .nc-reader-rail .nc-reader-tool-group>button {
   flex: none;
   height: var(--reader-tool-size);

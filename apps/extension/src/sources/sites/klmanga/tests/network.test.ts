@@ -17,9 +17,29 @@ describe('KLManga source contract', () => {
     expect(definition.inlineRecognition).toBe('generic'); expect(definition.embeddedEntry).toBe('floating');
     expect(definition.catalogSync).toEqual({intervalMinutes: 720});
     expect(definition.sites![0].primaryLanguages).toEqual(['ja']);
-    expect(definition.installation.optionalContentMatches).toEqual([origin + '/*']);
+    expect(definition.installation.optionalContentMatches).toEqual([origin + '/*', 'https://klmanga.zone/*']);
     expect(definition.sites![0].search).toBe(true);
   });
+  it('lists only the new domain and preserves identities for legacy links', async () => {
+    expect(origin).toBe('https://klmanga.toys');
+    expect(definition.sites).toHaveLength(1);
+    expect(definition.sites![0]).toMatchObject({id: 'klmanga', url: origin + '/'});
+    const legacyUrl = url.replace(origin, 'https://klmanga.zone');
+    const legacyReader = reader.replace(origin, 'https://klmanga.zone');
+    expect(definition.identify(new URL(legacyUrl))?.catalog).toEqual({key: catalogKey(slug), url});
+    expect(definition.identify(new URL(legacyReader))?.pageKey).toBe(definition.identify(new URL(reader))?.pageKey);
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(readerHtml()).mockResolvedValueOnce(batch());
+    const catalog = validateCatalog(await network.catalog(legacyUrl, {request}), [definition]);
+    expect(catalog.id).toBe(catalogKey(slug));
+    expect(catalog.url).toBe(url);
+    expect(catalog.entries[0].url).toBe(reader);
+    const pages = validatePages(await network.pages(legacyReader, {request}), definition.identify(new URL(legacyReader))!);
+    expect(pages.knownTotal).toBe(1);
+    expect(request.mock.calls.map(([target]) => target)).toEqual([url, reader, origin + '/wp-admin/admin-ajax.php']);
+    expect(coverUrl(cover.replace(origin, 'https://klmanga.zone'))).toEqual({url: cover.replace(origin, 'https://klmanga.zone')});
+  });
+  it.each(['http://klmanga.toys', 'https://klmanga.toys.evil.test', 'https://klmanga.toys:444', 'https://user:pass@klmanga.toys', 'ftp://klmanga.toys'])
+    ('rejects forged new origin %s', host => expect(definition.identify(new URL(host + '/manga-raw/work/'))).toBeNull());
   it.each(['http://klmanga.zone', 'https://klmanga.zone.evil.test', 'https://klmanga.zone:444', 'https://user:pass@klmanga.zone', 'ftp://klmanga.zone'])
     ('rejects forged origin %s', host => expect(definition.identify(new URL(host + '/manga-raw/work/'))).toBeNull());
   it.each(['/manga-raw/work%2fother/', '/manga-raw/work%5cother/', '/manga-raw/work%252fother/', '/manga-raw/%FF/',

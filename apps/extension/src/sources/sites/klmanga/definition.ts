@@ -2,11 +2,12 @@ import type {SourceDefinition} from '../../contracts/definition';
 import installation from './installation.json';
 import icon from './icon.svg?inline';
 
-export const origin = 'https://klmanga.zone';
+export const origin = 'https://klmanga.toys';
+export const isKlOrigin = (url: URL) => [origin, 'https://klmanga.zone'].includes(url.origin) && !url.username && !url.password;
 export interface KlLocation {slug: string; chapter?: string}
 const validSlug = (value: string) => value.length > 0 && value.length <= 512 && !/[\u0000-\u0020\u007f/%?#\\]/u.test(value);
 export function klLocation(url: URL): KlLocation | null {
-  if (url.origin !== origin || url.username || url.password || url.search || url.hash) return null;
+  if (!isKlOrigin(url) || url.search || url.hash) return null;
   let path: string;
   try {path = decodeURIComponent(url.pathname);} catch {return null;}
   const match = /^\/manga-raw\/([^/]+)(?:\/(chapter-\d+(?:-\d+)*))?\/?$/.exec(path);
@@ -24,7 +25,7 @@ export const definition: SourceDefinition = {
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {
-    if (url.origin !== origin || url.username || url.password) return null;
+    if (!isKlOrigin(url)) return null;
     const loc = klLocation(url);
     if (!loc) return {sourceId: this.id, pageKey: this.id + ':' + url.href, kind: 'other', url: url.href};
     return {sourceId: this.id, pageKey: loc.chapter ? chapterKey(loc) : catalogKey(loc.slug),

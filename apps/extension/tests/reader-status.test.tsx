@@ -40,6 +40,14 @@ function fixture(status:Job['status']):Page{
  const delivered:Job={id:'delivered',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
  return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader','overlay-v1']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
+it('hides the actual model without reserving toolbar space or removing feedback',()=>{
+ const job={...fixture('succeeded').jobs[0],model:{id:'model-fixture',name:'Claude Haiku 5.5'}};
+ const controls=(shownJob:Job)=>renderToStaticMarkup(<PageTranslationBar selectedView="classic" shownJob={shownJob} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const html=controls(job);
+ expect(html).not.toContain('Claude Haiku 5.5');expect(html).not.toContain('nc-reader-model');
+ expect(html).toContain('aria-label="译图有问题"');expect(html).toContain('nc-translation-trigger');
+ expect(html).toBe(controls({...job,model:undefined}));
+});
 describe('explicit page rerun eligibility',()=>{
  const eligible=(page:Page,state?:TranslationState,scope=page.translationScope)=>canRetryPage(pageTranslation(page,'classic','zh-Hans',scope),state);
  it.each(['no_text','failed','cancelled'] as const)('allows explicit %s recovery without any translated image',status=>{

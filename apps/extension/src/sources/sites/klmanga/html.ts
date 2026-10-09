@@ -1,5 +1,5 @@
 import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
-import {catalogUrl, chapterKey, chapterUrl, klLocation, origin} from './definition';
+import {catalogUrl, chapterKey, chapterUrl, isKlOrigin, klLocation, origin} from './definition';
 
 export function one<T>(values: T[], label: string): T {
   if (values.length !== 1) throw Error(`KLManga ${label}缺失或重复。`);
@@ -37,7 +37,7 @@ export function coverUrl(value: unknown): {url: string} | undefined {
   if (typeof value !== 'string') return;
   try {
     const url = new URL(value, origin);
-    if (url.origin !== origin || url.username || url.password || url.hash || url.search ||
+    if (!isKlOrigin(url) || url.hash || url.search ||
       !/^\/wp-content\/uploads\/\d{4}\/\d{2}\/[^/]+\.(?:webp|png|jpe?g|avif)$/i.test(url.pathname)) return;
     return {url: url.href};
   } catch {return;}

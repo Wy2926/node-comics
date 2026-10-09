@@ -22,7 +22,6 @@
   "可用": "Available",
   "不可用": "Unavailable",
   "更换模型仅影响新任务；已有译图需手动重新翻译。": "Changing models affects new tasks only. Retranslate existing results manually.",
-  "实际模型：{0}": "Actual model: {0}",
   "前往定价页面": "View pricing",
   "购买额度": "Page packs",
   "不过期": "No expiry",

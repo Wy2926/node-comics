@@ -49,7 +49,7 @@ async function readHttp(url, {referer, form, timeout = 30} = {}) {
   } finally {reader.releaseLock();}
 }
 const request = async (url, options) => {
-  assert.equal(new URL(url).origin, 'https://klmanga.zone');
+  assert.equal(new URL(url).origin, 'https://klmanga.toys');
   requests++; if (options?.form) formRequests++;
   return (await readHttp(url, options)).toString('utf8');
 };
@@ -59,10 +59,10 @@ async function readImage(url, referer) {
   assert(bytes.length > 1000 && mime, 'Source body is not a recognized image');
   return {host: new URL(url).host, mime, bytes: bytes.length};
 }
-const onePieceCatalog = 'https://klmanga.zone/manga-raw/' + encodeURIComponent('ワンピース-raw-free') + '/';
+const onePieceCatalog = 'https://klmanga.toys/manga-raw/' + encodeURIComponent('ワンピース-raw-free') + '/';
 const samples = process.env.KLMANGA_CATALOG_URL ? [process.env.KLMANGA_CATALOG_URL] : [
-  'https://klmanga.zone/manga-raw/hunter-x-hunter-raw-free/',
-  'https://klmanga.zone/manga-raw/御子神かれんの隠しごと-raw-free/',
+  'https://klmanga.toys/manga-raw/hunter-x-hunter-raw-free/',
+  'https://klmanga.toys/manga-raw/御子神かれんの隠しごと-raw-free/',
   onePieceCatalog,
 ];
 const started = Date.now(), works = [], failures = [];
