@@ -1,39 +1,68 @@
-import {Fragment} from 'react';
-import {msg} from '../i18n/runtime';
+import {useEffect,useRef,useState} from 'react';
+import {msg,getLocale} from '../i18n/runtime';
 import type {Api} from '../api';
 import type {Session} from '../auth/model';
 import type {Entitlements} from '../types';
+import {pricingUrl} from '../billing';
 import {Icon} from '../icons';
-import {MembershipCard} from './MembershipCard';
 import {EntitlementCards} from './Entitlements';
 import {AccountUsage} from './Usage';
 import {FeedbackInbox} from './Feedback';
 import './account.css';
 
-export type AccountTab='overview'|'subscription';
-export function AccountPage({api,account,rights,testing,tab,onTabChange,onLogin,onLogout,onEntitlements,notify}:{api:Api;account:Session|null;rights?:Entitlements;testing:boolean;tab:AccountTab;onTabChange:(tab:AccountTab)=>void;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void;notify:(message:string)=>void}) {
-  const member=!!account&&!!rights&&rights.plan!=='free';
-  return <div className="nc-account-page">
+type AccountProps={api:Api;account:Session|null;rights?:Entitlements;testing:boolean;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void};
+
+function AccountContent({api,account,rights,testing,onLogout,onEntitlements,onLogin}:AccountProps&{account:Session}){
+  const member=!!rights&&rights.plan!=='free';
+  const [refreshing,setRefreshing]=useState(false),[error,setError]=useState(false),[activity,setActivity]=useState(false);
+  const [revision,setRevision]=useState(0);
+  const pending=useRef(false),generation=useRef(0),fromPricing=useRef(false);
+  async function refresh(){
+    if(pending.current)return;
+    const current=generation.current;
+    pending.current=true;setRefreshing(true);setError(false);
+    try{
+      const value=await api.entitlements(true);
+      if(current===generation.current&&api.isCurrent()){onEntitlements(value);setRevision(value=>value+1);}
+    }catch{if(current===generation.current&&api.isCurrent())setError(true);}
+    finally{if(current===generation.current){pending.current=false;setRefreshing(false);}}
+  }
+  useEffect(()=>{
+    const returned=()=>{if(fromPricing.current&&!document.hidden){fromPricing.current=false;void refresh();}};
+    window.addEventListener('focus',returned);document.addEventListener('visibilitychange',returned);
+    return()=>{generation.current++;pending.current=false;window.removeEventListener('focus',returned);document.removeEventListener('visibilitychange',returned);};
+  },[api,onEntitlements]);
+  return <>
     <header className="page-title nc-account-heading">
-      <div><span className="eyebrow muted">{msg("YOUR READING SPACE")}</span><h1>{msg("我的账户")}</h1><p>{msg("会员权益、翻译用量与反馈，在这里一目了然。")}</p></div>
-      {!account&&<Icon name="user" size={48}/>}
-      {account&&<div className="nc-account-identity">
+      <h1>{msg('我的账户')}</h1>
+      <div className="nc-account-identity">
         <span className="nc-profile-avatar" aria-hidden="true">{account.user.name.slice(0,1).toUpperCase()}</span>
-        <div className="nc-account-user"><strong>{account.user.name}</strong><div className="nc-account-meta"><span className="nc-plan-badge"><Icon name={member?'crown':'user'} size={14}/>{rights?(rights.plan==='lite'?msg('Lite 会员'):member?msg('会员'):msg("普通用户")):msg("权益读取中")}</span>{testing&&<span className="nc-muted">{msg("本地测试账户")}</span>}</div></div>
-        <button className="button quiet small" onClick={onLogout}><Icon name="logout" size={16}/>{msg("退出登录")}</button>
-      </div>}
+        <div className="nc-account-user"><strong>{account.user.name}</strong><div className="nc-account-meta">
+          <span className="nc-plan-badge"><Icon name={member?'crown':'user'} size={14}/>{rights?(member?rights.plan_name??rights.plan:msg('普通用户')):msg('权益读取中')}</span>
+          {member&&rights?.plus_expires_at&&<span>{msg('有效至 {0}',{'0':new Date(rights.plus_expires_at).toLocaleString(getLocale(),{timeZone:rights.timezone})})} · {rights.timezone}</span>}
+          {testing&&<span>{msg('本地测试账户')}</span>}
+        </div></div>
+        <button className="button quiet small" onClick={onLogout}><Icon name="logout" size={16}/>{msg('退出登录')}</button>
+      </div>
+      <div className="nc-account-toolbar">
+        <button className="icon-button" aria-label={msg('刷新权益')} title={refreshing?msg('处理中…'):msg('刷新权益')} aria-busy={refreshing} disabled={refreshing} onClick={()=>void refresh()}><Icon name="refresh" size={24} style={{stroke:'currentColor'}}/></button>
+        <a className="icon-button" href={pricingUrl(getLocale())} target="_blank" rel="noopener noreferrer" aria-label={msg('前往定价页面')} title={msg('前往定价页面')} onClick={()=>{fromPricing.current=true;}}><Icon name="pricing" size={28}/></a>
+      </div>
     </header>
-    {account?<Fragment key={account.id}>
-      <div className="nc-work-tabs nc-account-tabs" role="tablist" aria-label={msg("我的账户")}>
-        {(['overview','subscription'] as const).map(value=><button key={value} id={`account-tab-${value}`} role="tab" aria-selected={tab===value} aria-controls={`account-panel-${value}`} tabIndex={tab===value?0:-1} onClick={()=>onTabChange(value)} onKeyDown={event=>{
-          if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-          event.preventDefault();const next=event.key==='Home'?'overview':event.key==='End'?'subscription':value==='overview'?'subscription':'overview';
-          onTabChange(next);document.getElementById(`account-tab-${next}`)?.focus();
-        }}>{value==='overview'?msg('账户概览'):<>{msg('订阅')} · {msg('购买额度')}</>}</button>)}
-      </div>
-      <div className="nc-account-panel" id={`account-panel-${tab}`} role="tabpanel" aria-labelledby={`account-tab-${tab}`} tabIndex={0}>
-        {tab==='overview'?<><EntitlementCards data={rights}/><section className="nc-account-activity" aria-label={msg("翻译用量")}><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/></section><FeedbackInbox api={api}/></>:<MembershipCard api={api} loggedIn rights={rights} onEntitlements={onEntitlements} notify={notify}/>}
-      </div>
-    </Fragment>:<section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg("你的阅读足迹，即将在这里展开")}</h2><p>{msg('登录后查看翻译额度、每日交付和反馈进展。')}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}<Icon name="arrow" size={17}/></button></section>}
+    {error&&<p className="nc-error" role="alert">{msg('暂时无法读取权益，请重试。')}</p>}
+    <EntitlementCards api={api} data={rights} revision={revision}/>
+    <details className="nc-account-activity" onToggle={event=>setActivity(event.currentTarget.open)}>
+      <summary>{msg('用量与反馈')}</summary>
+      {activity&&<><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/><FeedbackInbox api={api}/></>}
+    </details>
+  </>;
+}
+
+export function AccountPage({account,...props}:AccountProps){
+  return <div className="nc-account-page">
+    {account?<AccountContent key={account.id} account={account} {...props}/>:<>
+      <header className="page-title nc-account-heading"><h1>{msg('我的账户')}</h1></header>
+      <section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg('你的阅读足迹，即将在这里展开')}</h2><p>{msg('登录后查看翻译额度、每日交付和反馈进展。')}</p><button className="button primary" onClick={props.onLogin}>{msg('登录账户')}<Icon name="arrow" size={17}/></button></section>
+    </>}
   </div>;
 }

@@ -64,12 +64,12 @@ def is_plus(db, user, at=None):
 def membership_choices(db, user, at=None):
     at = at or now()
     benefits = active_benefits(db, user.id, at)
-    choices = [{'plan': revision.plan_id, 'service_plan': revision.service_plan_id or revision.plan_id,
+    choices = [{'plan': revision.plan_id, 'name': revision.name, 'service_plan': revision.service_plan_id or revision.plan_id,
         'paid': True, 'hourly_image_limit': revision.hourly_image_limit,
         'unlimited': (revision.trial_classic_pages if kind == 'trial' else revision.monthly_classic_pages) is None}
         for revision, kind in benefits]
     if is_operator_plus(user, at):
-        choices.append({'plan': 'plus', 'service_plan': 'plus', 'paid': True,
+        choices.append({'plan': 'plus', 'name': 'PLUS', 'service_plan': 'plus', 'paid': True,
                         'hourly_image_limit': None, 'unlimited': user.plus_monthly_pages is None})
     return choices
 
@@ -78,7 +78,7 @@ def membership_benefits(db, user, at=None, *, choices=None):
     choices = membership_choices(db, user, at) if choices is None else choices
     return max(choices, key=lambda value: (value['unlimited'], value['hourly_image_limit'] is None,
         value['hourly_image_limit'] or 0, value['plan']), default={
-            'plan': 'free', 'service_plan': 'free', 'paid': False, 'hourly_image_limit': None, 'unlimited': False})
+            'plan': 'free', 'name': 'free', 'service_plan': 'free', 'paid': False, 'hourly_image_limit': None, 'unlimited': False})
 
 
 def plus_dates(db, user, at=None):
@@ -352,10 +352,12 @@ def entitlements_json(db, user, at=None):
     policy = admission_policy(db, user, at=at, benefits=benefits)
     purchases = _purchase_totals(db, user, at)
     periods = available_periods(db, user, 'classic', policy.kind, at)
-    def balance(sources):
+    def balance(sources, periodic_sources):
         buckets = [row for row in periods if row.source in sources]
         return {field: sum(getattr(row, field) for row in buckets) for field in ('granted', 'used', 'reserved')} | {
             'available': sum(row.granted - row.used - row.reserved for row in buckets),
+            'resets_at': iso(min((row.ends_at for row in buckets
+                if row.source in periodic_sources and row.ends_at), default=None)),
             'next_expiry_at': iso(min((row.ends_at for row in buckets
                 if row.ends_at and row.granted > row.used + row.reserved), default=None))}
     from .translation_limits import image_limit
@@ -366,9 +368,10 @@ def entitlements_json(db, user, at=None):
                        "quota_kind": kind, "consent_version": entitlement_version(db, user, kind, at),
                        "quota": allowance_json(db, user, kind, at, purchase_totals=purchases, periods=periods)}
     starts_at, expires_at = plus_dates(db, user, at)
-    return {"plan": benefits['plan'], "service_plan": policy.service_plan,
-            "free_quota": balance({'daily', 'grant'}),
-            "subscription_quota": {**balance({'membership', 'subscription'}), 'unlimited': benefits['unlimited']},
+    return {"plan": benefits['plan'], "plan_name": benefits['name'], "service_plan": policy.service_plan,
+            "free_quota": balance({'daily', 'grant'}, {'daily'}),
+            "subscription_quota": {**balance({'membership', 'subscription'}, {'membership', 'subscription'}),
+                                   'unlimited': benefits['unlimited']},
             "purchase_quota": purchase_quota_json(purchases), "plus_started_at": iso(starts_at),
             "plus_expires_at": iso(expires_at), "gift": gift_json(user, at), "timezone": settings().quota_timezone,
             "image_rate_limit": {"window_seconds": 60, "limit": image_limit(db, user, policy=policy)},

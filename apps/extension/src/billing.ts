@@ -1,48 +1,11 @@
-import {msg} from './i18n/runtime';
-import type {MembershipGift} from './types';
 import type {UiLocale} from './i18n/locales';
-
-export interface BillingPrice {
-  id:string;plan_id:string;plan_revision_id:string;name:string;version:number;
-  currency:string;unit_amount:number;interval:'month'|'quarter'|'year'|'once';trial_days:number;
-  service_plan_id?:string;quota_pages?:number;quota_validity_days?:number|null;
-  hourly_image_limit?:number|null;
-}
-export interface BillingOffer extends BillingPrice {channels:BillingChannel[]}
-export type BillingProvider='stripe'|'creem';
-export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number}
-export interface BillingCheckout {id:string;provider:BillingProvider;price:BillingOffer;idempotency_key:string|null;error:string|null}
-export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';
-export function hasManagedSubscription(status:string|undefined,entitlementExpiresAt:string|null|undefined,now=Date.now()){
-  return !!status&&(['active','trialing','past_due','unpaid','paused','incomplete','scheduled_cancel'].includes(status)||!!entitlementExpiresAt&&Date.parse(entitlementExpiresAt)>now);
-}
-
-export function offerAmount(offer:BillingPrice,locale:string){
-  const format=new Intl.NumberFormat(locale,{style:'currency',currency:offer.currency});
-  // Stripe minor units differ from ISO display precision for ISK and UGX.
-  const digits=['isk','ugx'].includes(offer.currency)?2:format.resolvedOptions().maximumFractionDigits??2;
-  return format.format(offer.unit_amount/10**digits);
-}
-
-export interface BillingStatus {
-  enabled:boolean; providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];provider:BillingProvider|null; environment:'test'|'live'; trial_eligible:boolean;
-  offers:BillingOffer[];quota_offers?:BillingOffer[];
-  subscription_checkout:BillingCheckout|null;
-  entitlement_expires_at:string|null;
-  gift:MembershipGift|null;
-  subscription:null|{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;trial_ends_at:string|null;paid_ends_at:string|null;auto_renew:boolean;can_cancel:boolean;renewal_state:'normal'|'deferring'|'deferred'|'resuming'|'canceling'|'canceled'|'attention';resume_at:string|null};
-}
+import {getLocale} from './i18n/runtime';
 
 export function pricingUrl(locale:UiLocale){
   const prefix=locale==='zh-CN'?'':`/${locale.toLowerCase()}`;
   return `https://comics.nodelane.net${prefix}/pricing/`;
 }
 
-export function paymentUrl(value:string,provider:BillingProvider,portal=false) {
-  const url=new URL(value);
-  const allowed=provider==='stripe'?url.hostname===(portal?'billing.stripe.com':'checkout.stripe.com'):
-    provider==='creem'&&['creem.io','www.creem.io'].includes(url.hostname)&&(portal?/^\/(?:test\/)?my-orders\/login\/[^/]+/.test(url.pathname):/^\/(?:test\/)?checkout\/[^/]+/.test(url.pathname));
-  if(url.protocol!=='https:'||!allowed||url.username||url.password||url.port)
-    throw new Error(msg('支付链接无效，请重试。'));
-  return url.href;
+export function openPricing(){
+  window.open(pricingUrl(getLocale()),'_blank','noopener,noreferrer');
 }

@@ -67,10 +67,10 @@
 .nc-heading-star { position: absolute; right: 32px; top: 28px; color: var(--accent); transform: rotate(12deg); }
 .nc-title-count { align-self: center; color: var(--ink); background: var(--surface); border: var(--comic-border); border-radius: 2px; transform: rotate(-5deg); padding: 4px 10px; font-size: .875rem; }
 .nc-section-heading h2, .nc-shelf-heading h2 { font-weight: 800; letter-spacing: -.02em; }
-.nc-shelf-heading, .nc-recent-reading>.nc-section-heading { padding-bottom: 14px; border-bottom: var(--comic-perforation); }
+.nc-shelf-heading, .nc-recent-reading>.nc-section-heading, .nc-purchases>.nc-section-heading { padding-bottom: 14px; border-bottom: var(--comic-perforation); }
 
 /* Panels and covers retain their existing image geometry and reading metadata. */
-.nc-app :is(.nc-book, .nc-content-card, .nc-copy-card, .nc-related-card, .nc-recent-card, .nc-capture-card, .nc-translation-card, .nc-catalog-card, .nc-stat, .nc-chart-card, .nc-rights-card) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background-color: var(--surface); }
+.nc-app :is(.nc-book, .nc-content-card, .nc-copy-card, .nc-related-card, .nc-recent-card, .nc-capture-card, .nc-translation-card, .nc-catalog-card, .nc-stat, .nc-chart-card, .nc-rights-card, .nc-purchase-card) { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background-color: var(--surface); }
 .nc-app :is(.nc-book, .nc-content-card, .nc-copy-card, .nc-related-card):hover { border-color: var(--ink); box-shadow: var(--comic-shadow); }
 .nc-app :is(.nc-book.is-selected, .nc-content-card.is-selected, .nc-catalog-card.is-selected) { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
 .nc-book-cover { border-radius: var(--comic-cover-radius); border-bottom: var(--comic-border); }
@@ -111,7 +111,8 @@
 
 /* Settings and account use the passport's paper panels and perforated sections. */
 .nc-preferences { max-width: 1120px; margin: 0 auto; counter-reset: preference; }
-.nc-app .settings-card { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow); padding: var(--comic-panel-padding); margin-bottom: 24px; background: var(--surface); }
+.nc-app :is(.settings-card, .nc-purchases) { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow); padding: var(--comic-panel-padding); background: var(--surface); }
+.nc-app .settings-card { margin-bottom: 24px; }
 .nc-preferences>.settings-card { counter-increment: preference; }
 .nc-preferences>.settings-card>h3 { padding-bottom: 18px; border-bottom: var(--comic-perforation); font-size: 1.0625rem; font-weight: 800; }
 .nc-preferences>.settings-card>h3::after { content: '0' counter(preference); margin-left: auto; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; border: 1px solid var(--ink); padding: 3px 7px; transform: rotate(4deg); }
@@ -119,11 +120,7 @@
 .nc-app .setting-row>div:first-child { min-width: 0; }
 .nc-app .setting-row p { max-width: 42em; }
 .nc-app .privacy-note { border: var(--comic-perforation); border-radius: var(--comic-control-radius); background: var(--accent-soft); }
-.nc-app .nc-membership-card { border: var(--comic-border); border-radius: var(--comic-panel-radius); padding: var(--comic-panel-padding); box-shadow: var(--comic-shadow); }
-.nc-app .nc-membership-card { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
 .nc-app .nc-profile-avatar { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow); transform: rotate(-4deg); }
-.nc-app .nc-membership-card h2 { font-size: 1.5rem; font-weight: 850; letter-spacing: -.04em; }
-.nc-app .nc-icon-tile { border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); transform: rotate(-5deg); flex-shrink: 0; }
 .nc-app .nc-account-activity { border-top: var(--comic-perforation); }
 .nc-app .nc-rights-card strong { font-variant-numeric: tabular-nums; }
 .nc-app .nc-chart-bar { border: 1px solid var(--ink); border-bottom: 0; border-radius: 3px 3px 0 0; opacity: 1; }
@@ -192,7 +189,8 @@
   .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) { padding: 0; margin-bottom: 16px; border: 0; background: none; box-shadow: none; }
   .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) :is(.eyebrow, p, .nc-heading-star) { display: none; }
   .nc-app :is(.nc-preferences > .page-title, .nc-account-page > .page-title) h1 { font-size: 1.25rem; margin: 0; line-height: 1.4; }
-  .nc-app .settings-card { padding: 16px; margin-bottom: 16px; min-width: 0; }
+  .nc-app :is(.settings-card, .nc-purchases) { padding: 16px; min-width: 0; }
+  .nc-app .settings-card { margin-bottom: 16px; }
   .nc-preferences > .settings-card > h3 { gap: 8px; padding-bottom: 12px; font-size: 1rem; overflow-wrap: anywhere; }
   .nc-preferences > .settings-card > h3::after { display: none; }
   .nc-app .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 14px; }

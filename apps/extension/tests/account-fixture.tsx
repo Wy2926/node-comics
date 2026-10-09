@@ -1,72 +1,73 @@
-import {billingOffer} from './billing-fixture-data';
-import {saveSession,readAuth} from '../src/auth/storage';
-import {initializeUiLanguage} from '../src/i18n/load';
-import type {Session} from '../src/auth/model';
-/** Isolated UI fixture: synthetic account and responses; no external requests. */
+/** Isolated UI fixture: synthetic identity and responses; no external requests. */
 import {createRoot} from 'react-dom/client';
 import {useState} from 'react';
 import {App} from '../src/App';
+import {saveSession,readAuth} from '../src/auth/storage';
+import type {Session} from '../src/auth/model';
+import {initializeUiLanguage} from '../src/i18n/load';
+import {saveSettings} from '../src/comics/application/preferences';
 import {API_ORIGIN} from '../src/service';
-import type {Entitlements} from '../src/types';
+import {defaults,type Entitlements,type Settings} from '../src/types';
+import {purchaseFixtures} from './quota-purchases-fixture-data';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
-if(location.port!=='5186')throw Error('Use isolated port 5186 for this fixture.');
-await initializeUiLanguage();
+
+if(location.origin!=='http://127.0.0.1:5186')throw Error('Use isolated port 5186.');
 const params=new URLSearchParams(location.search);
-let scenario=params.get('scenario')??'lite';
-let failSync=params.get('syncError')==='1';
+let scenario=params.get('scenario')??'member';
+let failPurchases=params.get('purchaseError')==='1',failEntitlements=false;
+const requests:string[]=[];
 const session:Session={id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'synthetic-fixture',apiOrigin:API_ORIGIN,user:{id:'fixture-reader',name:'星野 · 漫画爱好者',role:'reader'}};
 if((await readAuth()).session&&!localStorage.getItem('nc-account-fixture'))throw Error('Existing session: refusing to seed.');
 localStorage.setItem('nc-account-fixture','true');
+await saveSettings({...defaults,uiLanguage:(params.get('locale')??'zh-CN') as Settings['uiLanguage'],appearance:params.get('theme')==='dark'?'dark':'light',accentTheme:(params.get('accent')??'sky') as Settings['accentTheme'],textScale:params.has('largeText')?1.25:1});
+await initializeUiLanguage();
 await saveSession(scenario==='guest'?null:session);
-function rights():Entitlements {
- const member=!['free','exhausted','grants'].includes(scenario);
- const data:Entitlements={plan:member?'lite':'free',plus_started_at:null,plus_expires_at:member?'2026-10-20T00:00:00Z':null,timezone:'Asia/Shanghai',image_rate_limit:{limit:member?100:10,window_seconds:60},hourly_image_rate_limit:member?{limit:1200,window_seconds:3600}:null,pending_previous_period_pages:0,generated_at:new Date().toISOString(),modes:{classic:{allowed:true,unlimited:member,quota_kind:member?'classic_unlimited':'classic_daily',consent_version:'1',quota:member?null:{id:'fixture-classic',kind:'classic_daily',granted:30,available:scenario==='exhausted'?0:6,used:scenario==='exhausted'?30:22,reserved:scenario==='exhausted'?0:2,starts_at:'2026-09-19T16:00:00Z',resets_at:'2026-09-20T16:00:00Z',next_expiry_at:'2026-09-20T16:00:00Z',buckets:[]}}}};
- if(scenario==='grants'){
-  const quota=data.modes.classic.quota!;
-  quota.granted+=305;quota.available+=305;
-  quota.buckets=[{id:'permanent',kind:'classic_grant',mode:'classic',source:'grant',granted:300,available:300,used:0,reserved:0,starts_at:'2026-09-20T00:00:00Z',expires_at:null,grants_access:false,note:'Synthetic campaign'},
-   {id:'dated',kind:'classic_grant',mode:'classic',source:'grant',granted:5,available:5,used:0,reserved:0,starts_at:'2026-09-20T00:00:00Z',expires_at:'2026-10-20T00:00:00Z',grants_access:false,note:'Synthetic dated grant'}];
- }
- return data;
+Object.assign(window,{accountFixture:{requests,setPurchaseError:(value:boolean)=>{failPurchases=value;},setEntitlementError:(value:boolean)=>{failEntitlements=value;}}});
+function rights():Entitlements{
+  const member=scenario==='member';
+  return {plan:member?'fixture-paid':'free',plan_name:member?'示例会员':'free',service_plan:member?'fixture-paid':'free',
+    plus_started_at:member?'2026-10-01T00:00:00Z':null,plus_expires_at:member?'2027-01-01T00:00:00Z':null,
+    timezone:'Asia/Shanghai',generated_at:new Date().toISOString(),pending_previous_period_pages:0,image_rate_limit:{limit:member?100:10,window_seconds:60},
+    free_quota:{granted:30,used:22,reserved:2,available:6,resets_at:'2026-10-09T16:00:00Z',next_expiry_at:'2026-10-09T16:00:00Z'},
+    subscription_quota:{granted:member?4000:0,used:member?420:0,reserved:member?3:0,available:member?3577:0,unlimited:false,resets_at:member?'2026-11-01T00:00:00Z':null,next_expiry_at:member?'2026-11-01T00:00:00Z':null},
+    purchase_quota:scenario==='empty'?{granted:0,used:0,reserved:0,available:0,next_expiry_at:null}:{granted:4500,used:540,reserved:15,available:3945,next_expiry_at:'2026-10-31T03:00:00Z'},
+    modes:{classic:{allowed:true,unlimited:false,quota_kind:member?'classic_monthly':'classic_daily',consent_version:'fixture',quota:null}}};
 }
-const monthly={...billingOffer,channels:billingOffer.channels.filter(c=>c.provider==='stripe')};
-const annual={...monthly,id:'fixture-annual',interval:'year' as const,unit_amount:5999};
-window.fetch=async(input)=>{
- const url=new URL(String(input),location.href),path=url.pathname;
- if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
- if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
- if(path==='/v1/capabilities')return Response.json({modes:[],languages:[{id:'zh-Hans',label:'简体中文'}],limits:{},entitlements:rights()});
- const billing={offers:[monthly,annual],subscription_checkout:null,enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:['free','exhausted','grants'].includes(scenario)?null:'stripe',environment:'test',trial_eligible:['free','exhausted','grants'].includes(scenario),gift:null,entitlement_expires_at:null,subscription:['free','exhausted','grants'].includes(scenario)?null:{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',paid_ends_at:'2026-10-20T00:00:00Z',trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,cancel_at:null}};
- if(path==='/v1/billing/catalog')return Response.json({enabled:true,offers:billing.offers});
- if(path==='/v1/billing/status')return Response.json(billing);
- if(path==='/v1/billing/sync')return failSync?Response.json({error:{message:'模拟刷新失败'}},{status:503}):Response.json({billing,entitlements:rights()});
- if(path==='/v1/billing/checkouts')return Response.json({checkout_url:'https://checkout.stripe.com/c/pay/cs_test_fixture',trial:true,environment:'test',provider:'stripe'});
- if(path==='/v1/billing/portal')return Response.json({url:'https://billing.stripe.com/p/session/fixture',provider:'stripe'});
- if(path==='/v1/me/entitlements')return Response.json(rights());
- if(path==='/v1/me/usage/summary'){
-  if(scenario==='error')return Response.json({error:{message:'模拟网络失败，请重试'}},{status:503});
-  if(scenario==='loading')await new Promise(resolve=>setTimeout(resolve,4000));
-  const count=Number(url.searchParams.get('days')??7),empty=scenario==='empty';
-  const days=Array.from({length:count},(_,n)=>({date:new Date(Date.UTC(2026,8,20-count+n+1)).toISOString().slice(0,10),classic:empty?0:n%4+2,delivered:empty?0:n%4+2}));
-  return Response.json({entitlements:rights(),days,start_date:days[0].date,end_date:days.at(-1)!.date,timezone:'Asia/Shanghai',delivered:days.reduce((n,d)=>n+d.delivered,0),by_mode:{classic:days.reduce((n,d)=>n+d.classic,0)},included_delivered:empty?0:12,free_delivered:0,quota_used:{classic:empty?0:6}});
- }
- if(path==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
- throw Error('Unexpected fixture request: '+path);
+window.fetch=async(input,init)=>{
+  const url=new URL(String(input),location.href),path=url.pathname;
+  if(url.origin!==API_ORIGIN)throw Error('External requests disabled in fixture.');
+  requests.push(path+url.search);
+  if(path==='/v1/auth/config')return Response.json({mode:'oidc',dev_auth:false});
+  if(path==='/v1/capabilities')return Response.json({result_protocol:'overlay-v1',modes:[],languages:[],limits:{},entitlements:rights()});
+  if(path==='/v1/me/entitlements')return failEntitlements?Response.json({error:{message:'Synthetic entitlement failure'}},{status:503}):Response.json(rights());
+  if(path==='/v1/me/quota-purchases'){
+    await new Promise<void>((resolve,reject)=>{
+      const abort=()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));};
+      const timer=setTimeout(()=>{init?.signal?.removeEventListener('abort',abort);resolve();},params.has('slowPurchases')?1500:120);
+      if(init?.signal?.aborted)abort();else init?.signal?.addEventListener('abort',abort,{once:true});
+    });
+    if(failPurchases)return Response.json({error:{message:'Synthetic purchase history failure'}},{status:503});
+    const items=scenario==='empty'?[]:purchaseFixtures;
+    const cursor=url.searchParams.get('cursor'),start=cursor?items.findIndex(item=>item.id===cursor)+1:0;
+    const rows=items.slice(start,start+20);
+    return Response.json({items:rows,next_cursor:start+20<items.length?rows.at(-1)!.id:null});
+  }
+  if(path==='/v1/me/usage/summary')return Response.json({entitlements:rights(),days:[],start_date:'2026-10-03',end_date:'2026-10-09',timezone:'Asia/Shanghai',delivered:420,by_mode:{classic:420},included_delivered:420,free_delivered:0,quota_used:{classic:420}});
+  if(path==='/v1/me/feedback')return Response.json({items:[],total:0,next_offset:null});
+  throw Error('Unexpected fixture request: '+path);
 };
 if(!location.hash)location.hash='account';
 function Fixture(){
- const [version,setVersion]=useState(0),[syncError,setSyncError]=useState(false),[narrow,setNarrow]=useState(false);
- return <>
-  <div style={{padding:8,display:'flex',flexWrap:'wrap',gap:12,background:'#edf2fc',color:'#202d43'}}>
-   <b>隔离验收 · 模拟数据</b>
-   {[['lite','Lite'],['free','普通'],['exhausted','额度耗尽'],['grants','赠送额度'],['error','失败'],['loading','加载'],['empty','零用量'],['guest','未登录']].map(([value,label])=><button key={value} onClick={async()=>{scenario=value;await saveSession(value==='guest'?null:session);location.hash='account';setVersion(v=>v+1);}}>{label}</button>)}
-   <button onClick={()=>{failSync=!failSync;setSyncError(failSync);}}>权益刷新：{syncError?'失败':'成功'}</button>
-   <button onClick={()=>setNarrow(v=>!v)}>{narrow?'宽屏':'窄屏'}</button>
-  </div>
-  {narrow?<iframe key={version+':'+syncError} title="窄屏账户验收" src={'?embedded=1&scenario='+scenario+'&syncError='+(syncError?'1':'0')} style={{width:390,height:850,border:0,display:'block',margin:'0 auto'}}/>:<App key={version}/>}
- </>;
+  const [version,setVersion]=useState(0);
+  return <>
+    <div style={{padding:8,display:'flex',flexWrap:'wrap',gap:12,background:'#edf2fc',color:'#202d43'}}>
+      <b>隔离验收 · 模拟数据</b>
+      {[['member','示例会员'],['packs','仅额度包'],['empty','无额度包'],['guest','未登录']].map(([value,label])=><button key={value} onClick={async()=>{scenario=value;await saveSession(value==='guest'?null:session);location.hash='account';setVersion(v=>v+1);}}>{label}</button>)}
+    </div>
+    <App key={version}/>
+  </>;
 }
-createRoot(document.getElementById('root')!).render(location.search.includes('embedded=1')?<App/>:<Fixture/>);
+createRoot(document.getElementById('root')!).render(<Fixture/>);

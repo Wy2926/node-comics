@@ -1,6 +1,5 @@
-import type {BillingStatus,BillingProvider} from './billing';
 import {msg} from './i18n/runtime';
-import type { Capabilities, Entitlements, Usage, User, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationInput, TranslationSnapshot, TranslationBatch } from './types';
+import type { Capabilities, Entitlements, QuotaPurchases, Usage, User, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationInput, TranslationSnapshot, TranslationBatch } from './types';
 import type { AuthConfig } from './auth/oidc';
 import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
 import type {Authorization} from './auth/session';
@@ -73,14 +72,11 @@ export class Api {
     return result;
   }
   entitlements(force=false) { return this.cached<Entitlements>('/v1/me/entitlements',force); }
+  quotaPurchases(cursor:string|null=null,signal?:AbortSignal) { return this.request<QuotaPurchases>(`/v1/me/quota-purchases?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`,{signal}); }
   usage(offset=0) { return this.request<Usage>(`/v1/me/usage?offset=${offset}&limit=20`); }
   usageSummary(days:number,timezone:string,force=false) {return this.cached<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`,force);}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;},key:string) {return this.request<FeedbackRecord>(`/v1/translations/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/me/feedback?offset=${offset}&limit=20`);}
-  billingStatus(force=false){return this.cached<BillingStatus>('/v1/billing/status',force);}
-  billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}
-  async cancelRenewal(provider:BillingProvider){const result=await this.request<BillingStatus>('/v1/billing/cancel-renewal',{method:'POST',body:JSON.stringify({provider})});cacheValue(this.cacheKey('/v1/billing/status'),result);return result;}
-  async syncBilling(){const result=await this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});this.rememberEntitlements(result.entitlements);cacheValue(this.cacheKey('/v1/billing/status'),result.billing);return result;}
   private snapshotKey(id:string){return this.cacheKey('/v1/translations/'+id);}
   private remember(snapshot:TranslationSnapshot){
     const key=this.snapshotKey(snapshot.id);Api.snapshots.delete(key);Api.snapshots.set(key,snapshot);

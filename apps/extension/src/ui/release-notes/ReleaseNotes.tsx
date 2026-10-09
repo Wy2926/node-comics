@@ -2,7 +2,7 @@ import {useCallback, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
-import {ReleaseFeatureArtwork} from './ReleaseFeatureArtwork';
+import {ReleaseFeatureArtwork, type ReleaseFeatureKind} from './ReleaseFeatureArtwork';
 import {hasUnseenReleaseNotes, markReleaseNotesSeen, releaseNotes, releaseNotesStorageKey} from './content';
 import {useDialogViewport} from '../visual-viewport';
 import './release-notes.css';
@@ -78,28 +78,26 @@ function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShow
   </dialog>;
 }
 
-type FeatureKind = 'remote' | 'ocr' | 'prefetch';
-
-function ReleaseFeatureFrame({kind}: {kind: FeatureKind}) {
+function ReleaseFeatureFrame({kind}: {kind: ReleaseFeatureKind}) {
   const shape = {
-    remote: 'M16 6H557L594 34V137L581 152H18L6 139V20Z',
-    ocr: 'M20 7H560L593 33V137L574 152H20L7 134V23Z',
-    prefetch: 'M24 7H572L594 26V55L584 67L594 79V134L572 152H19L7 134V25Z',
+    models: 'M16 6H557L594 34V137L581 152H18L6 139V20Z',
+    subscription: 'M20 7H560L593 33V137L574 152H20L7 134V23Z',
+    packs: 'M24 7H572L594 26V55L584 67L594 79V134L572 152H19L7 134V25Z',
   }[kind];
   return <svg className="nc-release-panel-frame" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <path d={shape} fill="var(--comic-shadow-color)" transform="translate(3 4)"/>
     <path d={shape} fill="var(--release-panel-paper)" stroke="var(--comic-stroke)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
-    {kind === 'remote' && <path d="M557 7v27h35" fill="var(--surface)" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
-    {kind === 'ocr' && <path d="M18 46V18h90m474 87v37h-88" fill="none" stroke="var(--release-panel-color)" strokeWidth="4" vectorEffect="non-scaling-stroke"/>}
-    {kind === 'prefetch' && <path d="m15 104 11-3m-10 12 18-4m-18 14 26-5" fill="none" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity=".45"/>}
+    {kind === 'models' && <path d="M557 7v27h35" fill="var(--surface)" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
+    {kind === 'subscription' && <path d="M18 46V18h90m474 87v37h-88" fill="none" stroke="var(--release-panel-color)" strokeWidth="4" vectorEffect="non-scaling-stroke"/>}
+    {kind === 'packs' && <path d="m15 104 11-3m-10 12 18-4m-18 14 26-5" fill="none" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity=".45"/>}
   </svg>;
 }
 
-function ReleaseFeatureBadge({kind, number, icon}: {kind: FeatureKind; number: number; icon: string}) {
+function ReleaseFeatureBadge({kind, number, icon}: {kind: ReleaseFeatureKind; number: number; icon: string}) {
   const shape = {
-    remote: 'M8 6h55l8 8-5 8 5 8-8 9H8l-5-8 5-9-5-8Z',
-    ocr: 'M10 5h47l14 13v13L58 41H11L3 32V15Z',
-    prefetch: 'm10 4 10 5 10-5 10 5 13-5 8 10 11 5-5 10 3 10-15 1-9 6-11-5-13 3-8-8-11-4 5-12-6-7Z',
+    models: 'M8 6h55l8 8-5 8 5 8-8 9H8l-5-8 5-9-5-8Z',
+    subscription: 'M10 5h47l14 13v13L58 41H11L3 32V15Z',
+    packs: 'm10 4 10 5 10-5 10 5 13-5 8 10 11 5-5 10 3 10-15 1-9 6-11-5-13 3-8-8-11-4 5-12-6-7Z',
   }[kind];
   return <div className="nc-release-feature-badge" aria-hidden="true">
     <svg viewBox="0 0 80 48" focusable="false">

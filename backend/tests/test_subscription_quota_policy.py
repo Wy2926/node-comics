@@ -33,6 +33,10 @@ def test_free_models_spend_free_then_subscription_then_stop(client, png):
     assert create(client, auth, assets[2], key='2').json()['id'] == jobs[2]['id']
     rights = entitlement(client, auth)
     assert rights['free_quota']['available'] == rights['subscription_quota']['available'] == 0
+    assert rights['free_quota']['resets_at'] is not None
+    assert rights['subscription_quota']['resets_at'] is not None
+    assert rights['free_quota']['next_expiry_at'] is None
+    assert rights['subscription_quota']['next_expiry_at'] is None
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'reserve')) == 3
         for response in jobs:
@@ -174,3 +178,42 @@ def test_subscription_selection_stays_indexed_with_ten_thousand_expired_buckets(
             plan = connection.exec_driver_sql('EXPLAIN QUERY PLAN ' + statements[0][0], statements[0][1]).all()
             assert any('SEARCH quota_periods USING INDEX' in row[3] for row in plan)
         print(f'subscription selector median: empty history {before:.3f} ms; 10,000 expired buckets {after:.3f} ms')
+
+
+def test_period_boundaries_exclude_grant_expiry_and_survive_unlimited_membership(client):
+    from app.entitlements import entitlements_json, iso, period_spec, DAILY
+    from datetime import datetime
+    auth = login(client)
+    owner = client.get('/v1/me', headers=auth).json()['user']['id']
+    at = datetime(2026, 10, 9, 8)
+    with session_factory()() as db:
+        user = db.get(User, owner)
+        early = at + timedelta(hours=1)
+        db.add(QuotaPeriod(id='expiring-gift',owner_id=owner,kind='classic_grant',mode='classic',source='grant',
+            source_key='display-gift',granted=5,used=0,reserved=0,starts_at=at,ends_at=early))
+        db.flush()
+        rights = entitlements_json(db, user, at)
+        assert rights['free_quota']['next_expiry_at'] == iso(early)
+        assert rights['free_quota']['resets_at'] == iso(period_spec(user, DAILY, at, db=db)['ends_at'])
+        assert rights['free_quota']['resets_at'] != iso(early)
+        assert rights['subscription_quota']['resets_at'] is None
+        user.membership_id = 'unlimited-display'
+        user.plus_started_at, user.plus_expires_at = at, at + timedelta(days=30)
+        user.plus_monthly_pages = None
+        db.flush()
+        unlimited = entitlements_json(db, user, at)
+        assert unlimited['subscription_quota']['unlimited']
+        assert unlimited['subscription_quota']['resets_at'] is None
+        assert unlimited['free_quota']['resets_at'] == rights['free_quota']['resets_at']
+
+
+def test_account_plan_name_comes_from_the_entitlement_revision(billing):
+    from app.billing_models import BillingPlanRevision
+    from test_stripe_billing import complete_trial
+    complete_trial(billing)
+    with session_factory()() as db:
+        revision = db.scalar(select(BillingPlanRevision))
+        revision.name = 'Server-configured membership name'
+        db.commit()
+    rights = entitlement(billing['client'], billing['auth'])
+    assert rights['plan_name'] == 'Server-configured membership name'

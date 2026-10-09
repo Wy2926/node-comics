@@ -1,172 +1,96 @@
-import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+import {beforeEach,expect,it,vi} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {Api} from '../src/api';
 import type {Session} from '../src/auth/model';
-import type {BillingCheckout,BillingOffer,BillingStatus} from '../src/billing';
-import type {Entitlements,UsageSummary} from '../src/types';
+import type {Entitlements} from '../src/types';
 import {installDictionary} from '../src/i18n/runtime';
 import {AccountPage} from '../src/ui/Account';
 import {EntitlementCards} from '../src/ui/Entitlements';
-import {MembershipCard} from '../src/ui/MembershipCard';
-import {AccountUsage} from '../src/ui/Usage';
-import {billingOffer} from './billing-fixture-data';
+import {QuotaPurchaseCard} from '../src/ui/QuotaPurchases';
+import {purchaseFixtures} from './quota-purchases-fixture-data';
 
-// Render the loaded API snapshot without running browser effects or making requests.
-// Subsequent state (errors and management controls) keeps its ordinary initial value.
-const view=vi.hoisted(()=>({states:undefined as unknown[]|undefined}));
-vi.mock('react',async importOriginal=>{
-  const react=await importOriginal<typeof import('react')>();
-  return {...react,useState:(initial:unknown)=>react.useState(view.states?.length?view.states.shift():initial)};
-});
-beforeEach(()=>{installDictionary('zh-CN',{});view.states=undefined;});
-afterEach(()=>{view.states=undefined;});
+beforeEach(()=>installDictionary('zh-CN',{}));
 const noop=()=>{};
 const api=new Api('https://membership.fixture.test','synthetic');
-const rights=(plan:Entitlements['plan']='lite'):Entitlements=>({
-  plan,plus_started_at:null,plus_expires_at:null,timezone:'UTC',generated_at:'2026-10-02',pending_previous_period_pages:0,
-  image_rate_limit:{limit:37,window_seconds:60},hourly_image_rate_limit:{limit:741,window_seconds:3600},
-  modes:{classic:{allowed:true,unlimited:plan!=='free',quota_kind:plan==='free'?'classic_daily':'classic_unlimited',consent_version:'fixture',quota:null}},
-});
-const status=(extra:Partial<BillingStatus>={}):BillingStatus=>({
-  enabled:true,offers:[billingOffer],providers:[{id:'creem',label:'Creem',environment:'test'}],provider:null,
-  environment:'test',trial_eligible:true,subscription_checkout:null,
-  entitlement_expires_at:null,gift:null,subscription:null,...extra,
-});
-const pack={...billingOffer,id:'pack-100',plan_id:'pages',interval:'once' as const,quota_pages:100,quota_validity_days:null,service_plan_id:'lite',trial_days:0};
-const checkout=(price:BillingOffer,provider:BillingCheckout['provider']='creem'):BillingCheckout=>({
-  id:'checkout-'+price.id,provider,price,idempotency_key:null,error:null,
-});
-function membership(billing:BillingStatus){
-  view.states=[billing];
-  return renderToStaticMarkup(<MembershipCard api={api} loggedIn rights={rights()} onEntitlements={noop} notify={noop}/>);
-}
+const balance=(available:number)=>({granted:available,used:0,reserved:0,available,next_expiry_at:null,resets_at:null});
+const rights:Entitlements={plan:'custom',plan_name:'后台配置的套餐',plus_started_at:null,plus_expires_at:'2026-10-20T00:00:00Z',timezone:'Asia/Shanghai',generated_at:'2026-10-09',pending_previous_period_pages:0,
+  image_rate_limit:{limit:37,window_seconds:60},free_quota:balance(6),subscription_quota:{...balance(2457),unlimited:false},purchase_quota:balance(3195),
+  modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_monthly',consent_version:'fixture',quota:null}}};
+const account:Session={id:'fixture',token:'synthetic',expiresAt:1,refreshAt:0,credential:{kind:'development'},apiOrigin:api.base,user:{id:'fixture',name:'Reader',role:'reader'}};
+const renderAccount=(data=rights,session:Session|null=account)=>renderToStaticMarkup(<AccountPage api={api} account={session} rights={data} testing={false} onLogin={noop} onLogout={noop} onEntitlements={noop}/>);
 
-it('shows the returned minute and hourly limits without hardcoded membership allowances',()=>{
-  const html=renderToStaticMarkup(<EntitlementCards data={rights()}/>);
-  expect(html).toContain('<strong>37<small>张 / 60 秒</small>');
-  expect(html).toContain('<strong>741<small>张 / 3600 秒</small>');
-  expect(html).toContain('常规翻译不设日／月累计上限');
-  expect(html.match(/class="nc-rights-card /g)).toHaveLength(2);
-  expect(html).not.toMatch(/重绘|1200|PLUS/);
-});
-
-it('does not invent an hourly allowance when the API omits that field',()=>{
-  const data=rights();delete data.hourly_image_rate_limit;
-  const html=renderToStaticMarkup(<EntitlementCards data={data}/>);
-  expect(html).toContain('<strong>37<small>');
-  expect(html).not.toMatch(/3600|741|1200/);
-});
-
-it.each([[2,5,false],[0,0,false],[0,0,true]] as const)('separates free %i and subscription %i pages without treating free models as unmetered', (free,subscription,unlimited)=>{
-  const balance=(available:number)=>({granted:available,used:0,reserved:0,available,next_expiry_at:null});
-  const data={...rights(),free_quota:balance(free),subscription_quota:{...balance(subscription),unlimited},purchase_quota:balance(0)};
-  const html=renderToStaticMarkup(<EntitlementCards data={data}/>);
-  const cards=html.split('<article').slice(1);
-  expect(cards).toHaveLength(4);
-  const freeCard=cards.find(card=>card.includes('免费额度</div>'))!;
-  const subscriptionCard=cards.find(card=>card.includes('订阅额度</div>'))!;
-  expect(freeCard).toContain(`<strong>${free}<small>页可用</small>`);
-  expect(freeCard).not.toContain('不限量');
-  expect(subscriptionCard).toContain(unlimited?'<strong>不限量</strong>':`<strong>${subscription}<small>页可用</small>`);
-  expect(html).toContain('免费模型先扣免费额度，用完后扣订阅额度，再扣购买额度；高级模型不能扣免费额度。');
-});
-
-it('identifies Lite as a member and keeps existing paid accounts out of the free badge',()=>{
-  const account:Session={id:'fixture',token:'synthetic',expiresAt:1,refreshAt:0,credential:{kind:'development'},apiOrigin:api.base,user:{id:'fixture',name:'Reader',role:'reader'}};
-  for(const [plan,label] of [['lite','Lite 会员'],['plus','会员'],['free','普通用户']] as const){
-    const html=renderToStaticMarkup(<AccountPage api={api} account={account} rights={rights(plan)} testing={false} tab="subscription" onTabChange={noop} onLogin={noop} onLogout={noop} onEntitlements={noop} notify={noop}/>);
-    const badge=html.match(/<span class="nc-plan-badge">(.*?)<\/span>/)?.[1];
-    expect(badge).toContain(label);
-    if(plan!=='free')expect(badge).not.toContain('普通用户');
-  }
-});
-
-it('routes all new purchases to pricing without duplicating live quotes or checkout controls',()=>{
-  const legacy={...billingOffer,id:'legacy-price',plan_id:'plus',name:'PLUS',unit_amount:999};
-  const lite={...billingOffer,hourly_image_limit:741};
-  const html=membership(status({offers:[legacy,lite]}));
-  expect(html).toContain('前往定价页面');
-  expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
-  expect(html).not.toMatch(/US\$|首次试用|付款周期|PLUS|每滚动小时/);
-});
-
-it('keeps the original subscription name and price for managing an existing paid contract',()=>{
-  const price={...billingOffer,id:'legacy-contract',plan_id:'plus',name:'Existing subscription',unit_amount:999,hourly_image_limit:null};
-  const html=membership(status({trial_eligible:false,subscription:{provider:'creem',price,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,paid_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null}}));
-  expect(html).toContain('NODELANE COMICS Existing subscription');
-  expect(html).toContain('US$9.99');
-  expect(html).toContain('管理订阅');
-  expect(html).not.toMatch(/每滚动小时|重绘|首次试用/);
-});
-
-it('does not force a pending subscription onto the shared pricing destination',()=>{
-  const pending={...billingOffer,id:'original-price',plan_id:'plus',name:'Original quote',unit_amount:799};
-  const html=membership(status({subscription_checkout:checkout(pending)}));
-  expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
-  expect(html).toContain('前往定价页面');
-  expect(html).not.toMatch(/Original quote|US\$/);
-});
-
-it('keeps subscription management while using the same pricing link for buying page packs',()=>{
-  const html=membership(status({quota_offers:[pack],trial_eligible:false,subscription:{provider:'creem',price:billingOffer,status:'active',next_billed_at:null,cancel_at:null,trial_ends_at:null,paid_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null}}));
-  expect(html).toContain('管理订阅');
-  expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
-  expect(html).not.toMatch(/100 页常规翻译|aria-label="购买额度"|首次试用/);
-});
-
-it('leaves each page pack selection to the website without selecting a quote in navigation',()=>{
-  const expiring={...pack,name:'Expiring page pack',quota_validity_days:30};
-  const html=membership(status({quota_offers:[pack,expiring]}));
-  expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
-  expect(html).not.toMatch(/Expiring page pack|30 天内有效|不限|按月自动续费|首次试用/);
-});
-
-it('keeps pending subscription independent of page packs and current service rights',()=>{
-  const data={...rights('free'),service_plan:'lite',purchase_quota:{granted:100,used:10,reserved:1,available:89,next_expiry_at:null}};
-  const render=(billing:BillingStatus)=>{
-    view.states=[billing];
-    return renderToStaticMarkup(<><MembershipCard api={api} loggedIn rights={data} onEntitlements={noop} notify={noop}/><EntitlementCards data={data}/></>);
-  };
-  const pending=status({subscription_checkout:checkout({...billingOffer,id:'pending-month'},'stripe'),quota_offers:[pack]});
-  const html=render(pending);
-  expect(html).toBe(render(status()));
-  expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
-  expect(html).toContain('购买额度剩余 89 页 · 处理中 1 页');
-  expect(html).toContain('当前服务档位：lite');
-  expect(html).not.toMatch(/\?price=|pending-month|pack-100|checkout-|purchase-/);
-});
-
-it('offers the same pricing destination when signed out, without reading a private catalog',()=>{
-  const html=renderToStaticMarkup(<MembershipCard api={api} loggedIn={false} onEntitlements={noop} notify={noop}/>);
+it('uses server names and expiry, with one pricing link and no old subscription layout or billing operations',()=>{
+  const html=renderAccount();
+  for(const text of ['后台配置的套餐','有效至 2026/10/20 08:00:00','前往定价页面','刷新权益'])expect(html).toContain(text);
   expect(html).toContain('href="https://comics.nodelane.net/pricing/"');
   expect(html).toContain('target="_blank" rel="noopener noreferrer"');
-  expect(html).not.toMatch(/US\$|首次试用|付款周期|重新购买/);
+  expect(html).not.toMatch(/PLUS|Pro|Lite|US\$|自动续费|管理订阅|role="tab"|nc-membership|翻译请求频率/);
+  expect(html).toContain('用量与反馈');
+  expect(html).not.toContain('nc-bar-chart');
 });
 
-it('keeps membership identity, effective service and purchased balance independent',()=>{
-  const data={...rights('free'),service_plan:'lite',purchase_quota:{granted:100,used:10,reserved:1,available:89,next_expiry_at:null}};
-  let html=renderToStaticMarkup(<EntitlementCards data={data}/>);
-  expect(html).toContain('购买额度剩余 89 页 · 处理中 1 页');
-  expect(html).toContain('当前服务档位：lite');
-  expect(html).not.toContain('不限量');
-  html=renderToStaticMarkup(<EntitlementCards data={{...data,...rights('lite')}}/>);
-  expect(html).toContain('不限量');
-  expect(html).toContain('购买额度剩余 89 页');
-  html=renderToStaticMarkup(<EntitlementCards data={{...data,service_plan:'free',purchase_quota:{...data.purchase_quota,used:100,reserved:0,available:0}}}/>);
-  expect(html).toContain('购买额度剩余 0 页');
-  expect(html).toContain('当前服务档位：普通用户');
-  expect(html).not.toMatch(/不限量|不过期/);
+it('does not promote a pack-only account to membership or show another membership expiry',()=>{
+  const html=renderAccount({...rights,plan:'free',plan_name:'free',plus_expires_at:null,service_plan:'custom'});
+  expect(html).toContain('普通用户');
+  expect(html).toContain('3,195');
+  expect(html).not.toContain('有效至');
 });
 
-it('uses the server totals and daily totals without rebuilding them from one mode',()=>{
-  const data:UsageSummary={entitlements:rights(),timezone:'UTC',start_date:'2026-10-01',end_date:'2026-10-02',generated_at:'2026-10-02',delivered:42,free_delivered:3,included_delivered:11,by_mode:{classic:20},quota_used:{classic:9},days:[{date:'2026-10-01',classic:7,delivered:17}]};
-  view.states=[7,data];
-  const html=renderToStaticMarkup(<AccountUsage api={api} onLogin={noop} onEntitlements={noop}/>);
-  expect(html).toContain('<b>42<small>页</small>');
-  expect(html).toContain('<b>20<small>页</small>');
-  expect(html).toContain('其中会员权益内交付 11 页');
-  expect(html).toContain('2026-10-01：交付 17 页');
-  expect(html).toContain('<td>2026-10-01</td><td>7</td><td>17</td>');
-  expect(html.match(/class="nc-stat"/g)).toHaveLength(3);
-  expect(html).not.toMatch(/重绘|翻译方式分布/);
+it('keeps named SVG pricing and refresh controls in the account header without a standalone action row',()=>{
+  const html=renderAccount(),heading=html.split('</header>')[0];
+  expect(heading).toContain('class="nc-account-toolbar"');
+  expect(heading).toContain('aria-label="前往定价页面" title="前往定价页面"');
+  expect(heading).toContain('#pricing');
+  expect(heading).toContain('aria-label="刷新权益" title="刷新权益" aria-busy="false"');
+  expect(heading).toContain('#refresh');
+  expect(html).not.toContain('nc-account-actions');
+});
+
+it('shows only login guidance before login',()=>{
+  const html=renderAccount(rights,null);
+  expect(html).toContain('登录账户');
+  expect(html).not.toMatch(/前往定价页面|后台配置的套餐|nc-rights-card/);
+});
+
+it.each([[2,5,false],[0,0,false],[0,0,true]] as const)('separates three balances %i %i unlimited %s without a combined legacy quota', (free,subscription,unlimited)=>{
+  const html=renderToStaticMarkup(<EntitlementCards data={{...rights,free_quota:balance(free),subscription_quota:{...balance(subscription),unlimited}}}/>);
+  const cards=html.split('<article').slice(1);
+  expect(cards).toHaveLength(3);
+  expect(cards[0]).toContain(`<strong>${free}<small>页可用</small>`);
+  expect(cards[1]).toContain(unlimited?'<strong>不限量</strong>':`<strong>${subscription}<small>页可用</small>`);
+  expect(html.match(/免费模型先扣免费额度/g)).toHaveLength(1);
+});
+
+it('keeps exhausted periodic boundaries separate from grant expiry without promising renewal',()=>{
+  const html=renderToStaticMarkup(<EntitlementCards data={{...rights,
+    free_quota:{...balance(0),next_expiry_at:'2026-10-09T12:00:00Z',resets_at:'2026-10-09T16:00:00Z'},
+    subscription_quota:{...balance(0),unlimited:false,resets_at:'2026-10-20T00:00:00Z'}}}/>);
+  expect(html).toContain('下次恢复 2026/10/10 00:00:00');
+  expect(html).toContain('本期结束 2026/10/20 08:00:00');
+  expect(html).not.toContain('2026/10/9 20:00:00');
+});
+
+it('shows server-supplied pack name, pages, dates without internal fields or product assumptions',()=>{
+  const item={...purchaseFixtures[0],product_name:'任意后台商品名',granted:4321,available:4016,note:'private operator note'};
+  const html=renderToStaticMarkup(<QuotaPurchaseCard item={item} timezone="Asia/Shanghai"/>);
+  for(const text of ['任意后台商品名','4,016','共 4,321 页','已用 300 页 · 处理中 5 页','2026/10/8 16:30:00','不过期'])expect(html).toContain(text);
+  expect(html).not.toMatch(/private operator note|synthetic-order|自动续费|PLUS|US\$/);
+});
+
+it.each([['scheduled','待生效'],['exhausted','无可用额度'],['expired','已到期'],['revoked','已撤销']] as const)('shows server %s state with zero spendable balance', (state,label)=>{
+  const html=renderToStaticMarkup(<QuotaPurchaseCard item={{...purchaseFixtures[0],state,available:0,expires_at:'2026-10-20T00:00:00Z'}} timezone="Asia/Shanghai"/>);
+  expect(html).toContain(label);
+  expect(html).toContain('<strong>0</strong>');
+  expect(html).toContain('2026/10/20 08:00:00');
+  expect(html).not.toContain('不过期');
+});
+
+it('does not request history before expanding it, even with zero remaining balance',()=>{
+  const request=vi.spyOn(api,'quotaPurchases');
+  const html=renderToStaticMarkup(<EntitlementCards api={api} data={{...rights,purchase_quota:balance(0)}}/>);
+  expect(html).toContain('查看额度包');
+  expect(html).toContain('aria-expanded="false"');
+  expect(html).not.toContain('class="nc-purchases"');
+  expect(request).not.toHaveBeenCalled();
+  request.mockRestore();
 });

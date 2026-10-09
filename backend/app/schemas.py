@@ -59,7 +59,11 @@ class PurchaseQuotaResponse(BaseModel):
     next_expiry_at: str | None
 
 
-class SubscriptionQuotaResponse(PurchaseQuotaResponse):
+class PeriodicQuotaResponse(PurchaseQuotaResponse):
+    resets_at: str | None
+
+
+class SubscriptionQuotaResponse(PeriodicQuotaResponse):
     unlimited: bool
 
 
@@ -79,9 +83,10 @@ class QuotaPurchasesResponse(BaseModel):
 
 class EntitlementsResponse(BaseModel):
     plan: str
+    plan_name: str
     service_plan: str
     purchase_quota: PurchaseQuotaResponse
-    free_quota: PurchaseQuotaResponse
+    free_quota: PeriodicQuotaResponse
     subscription_quota: SubscriptionQuotaResponse
     plus_started_at: str | None
     plus_expires_at: str | None

@@ -4,13 +4,11 @@ import {version} from '../../../package.json';
 export const releaseNotes = {
   version,
   highlights: [
-    {icon: 'cloud', title: 'releaseNotes.remote.title', artwork: 'remote'},
-    {icon: 'comic-search', title: 'releaseNotes.ocr.title', artwork: 'ocr'},
-    {icon: 'translate', title: 'releaseNotes.prefetch.title', artwork: 'prefetch'},
-    {icon: 'book', title: 'releaseNotes.epub.title'},
-    {icon: 'expand', title: 'releaseNotes.region.title'},
-    {icon: 'keyboard', title: 'releaseNotes.shortcuts.title'},
-    {icon: 'globe', title: 'releaseNotes.sources.title', sites: ['MangaPill', 'MangaDNA', 'KLManga', 'RawLazy', 'Comic DAYS', 'Manga One']},
+    {icon: 'translate', title: 'releaseNotes.models.title', artwork: 'models'},
+    {icon: 'crown', title: 'releaseNotes.subscription.title', artwork: 'subscription'},
+    {icon: 'pricing', title: 'releaseNotes.packs.title', artwork: 'packs'},
+    {icon: 'user', title: 'releaseNotes.account.title'},
+    {icon: 'globe', title: 'releaseNotes.sources.title', sites: ['ComicK (comickz)', 'ComicWalker', "HERO'S Web"]},
   ],
 } as const;
 

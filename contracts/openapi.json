@@ -7838,6 +7838,10 @@
             "type": "string",
             "title": "Plan"
           },
+          "plan_name": {
+            "type": "string",
+            "title": "Plan Name"
+          },
           "service_plan": {
             "type": "string",
             "title": "Service Plan"
@@ -7846,7 +7850,7 @@
             "$ref": "#/components/schemas/PurchaseQuotaResponse"
           },
           "free_quota": {
-            "$ref": "#/components/schemas/PurchaseQuotaResponse"
+            "$ref": "#/components/schemas/PeriodicQuotaResponse"
           },
           "subscription_quota": {
             "$ref": "#/components/schemas/SubscriptionQuotaResponse"
@@ -7923,6 +7927,7 @@
         "type": "object",
         "required": [
           "plan",
+          "plan_name",
           "service_plan",
           "purchase_quota",
           "free_quota",
@@ -8726,6 +8731,58 @@
           "buckets"
         ],
         "title": "PeriodResponse"
+      },
+      "PeriodicQuotaResponse": {
+        "properties": {
+          "granted": {
+            "type": "integer",
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "next_expiry_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Expiry At"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "next_expiry_at",
+          "resets_at"
+        ],
+        "title": "PeriodicQuotaResponse"
       },
       "PortalRequest": {
         "properties": {
@@ -9688,6 +9745,17 @@
             ],
             "title": "Next Expiry At"
           },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
           "unlimited": {
             "type": "boolean",
             "title": "Unlimited"
@@ -9700,6 +9768,7 @@
           "reserved",
           "available",
           "next_expiry_at",
+          "resets_at",
           "unlimited"
         ],
         "title": "SubscriptionQuotaResponse"

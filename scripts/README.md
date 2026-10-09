@@ -76,14 +76,14 @@ node scripts/verify_simple_reading.mjs
 | `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试及同 CFI 续读。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网。WebKit 段内像素级恢复精度单列严格 TODO，不等同真机通过 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
-| `verify_membership_renewal.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5192 --strictPort`；模拟赠送顺延、续费取消与回执丢失后刷新、无订阅赠送期间禁止即时购买及窄屏布局 |
+| `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明、首次提示、焦点恢复和 16 语大字号布局。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |
 | `verify_translation_overlay.mjs` | 真实 Chromium 像素、透明度、EXIF/ICC/首帧规范化、摘要与 bbox 校验；可使用实际 LLM 产物验证合成和导出 |
 | `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取；另以自制 800×30000 漫画比较旧 PNG／新 JPEG 的体积、单次耗时、文字像素误差及截图。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
 | `verify_overlay_live.py` | 隔离 Docker 中心 + 本机 GPU + 真实文本 LLM；支持静态规范图片或整章目录，逐页保存 UUID、结果与统计，检查结果鉴权和 UUID 重放 |
 | `verify_overlay_chapter.mjs <运行目录>` | Vite 5176 + 真实 Chromium 逐页合成真实批次产物，走产品导入与流式 CBZ 导出，独立解包校验全部页面 SHA；不调用 API/LLM |
 | `smoke_api.py` | API／计算服务；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
 
-Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；授权页、Google 与 Drive 均由本机 TLS 模拟，真实 Google 授权另验。登录生命周期夹具使用 Vite 5187 的 `auth-lifecycle-fixture.html`；订阅焦点夹具使用 Vite 5192 的 `billing-focus-fixture.html`。
+Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；授权页、Google 与 Drive 均由本机 TLS 模拟，真实 Google 授权另验。登录生命周期夹具使用 Vite 5187 的 `auth-lifecycle-fixture.html`；账户权益夹具使用 Vite 5186 的 `account-fixture.html`。
 
 OPDS 界面验收可在插件目录执行 `npx vite --config tests/opds-live-ui.config.ts`，使用独立的 `127.0.0.1:5197` 来源。公开 Komga 拒绝普通网页 Origin，测试配置转发该演示站的真实目录／图片／文件响应，并仅允许已声明 progression 路由的有界 PUT，其余外部请求阻断。不存在模拟目录或图片，不代表 MV3 网络权限已验证。正式扩展网络以 `verify_opds_live.mjs` 为准。转发只监听回环，不随构建发布，不用于私有书库。EPUB 需在支持沙箱 Blob 文档的桌面浏览器验收正文、目录、字号及重开续读；不以索引或下载成功代替实际阅读。
 
