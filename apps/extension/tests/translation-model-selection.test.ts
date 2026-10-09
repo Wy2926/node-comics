@@ -89,7 +89,7 @@ describe('model selection',()=>{
   });
   it('anchors the model menu to its trigger width without a larger minimum',()=>{
     const source=readFileSync(new URL('../src/ui/TranslationModelPicker.tsx',import.meta.url),'utf8');
-    expect(source).toContain('Math.min(rect.width,viewport.width-16)');
-    expect(source).toContain('menuPosition(rect,viewport,rect.width,');
+    expect(source).toMatch(/Math\.min\(rect\.width,\s*viewport\.width\s*-\s*16\)/);
+    expect(source).toMatch(/menuPosition\(rect,\s*viewport,\s*rect\.width,/);
   });
 });

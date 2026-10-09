@@ -185,6 +185,30 @@ def test_openrouter_requires_parameter_support_and_allows_larger_output(profile,
 
 
 @pytest.mark.parametrize('protocol', ['chat_completions', 'responses'])
+@pytest.mark.parametrize('providers', [None, [], ['deepinfra', 'together', 'google-vertex/us-east5']])
+@pytest.mark.parametrize('structured', [False, True])
+def test_openrouter_provider_order_stays_within_selected_upstreams(profile, monkeypatch, protocol, providers, structured):
+    import json
+    config = {**profile, 'base_url': 'https://openrouter.ai/api/v1', 'protocol': protocol}
+    if providers is not None:
+        config['openrouter_providers'] = providers
+    expected = {'order': providers, 'allow_fallbacks': False} if providers else {}
+    if structured:
+        expected['require_parameters'] = True
+
+    def handler(request):
+        payload = json.loads(request.content)
+        assert payload.get('provider', {}) == expected
+        result = {'choices': [{'message': {'content': '{}'}, 'finish_reason': 'stop'}]} if protocol == 'chat_completions' else {
+            'status': 'completed', 'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': '{}'}]}]}
+        return httpx.Response(200, json=result)
+
+    install(monkeypatch, handler)
+    assert openai_text.call_messages([], config, 'isolated-key',
+                                    json_schema=text.response_schema([]) if structured else None).content == '{}'
+
+
+@pytest.mark.parametrize('protocol', ['chat_completions', 'responses'])
 def test_explicit_refusal_keeps_cost_and_does_not_retry(profile, monkeypatch, protocol):
     config = {**profile, 'protocol': protocol}
     reply = {'choices': [{'message': {'content': None, 'refusal': 'private refusal'}, 'finish_reason': 'stop'}]} if protocol == 'chat_completions' else {

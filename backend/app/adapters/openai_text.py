@@ -2,16 +2,17 @@
 import json
 import time
 from email.utils import parsedate_to_datetime
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 import httpx
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from ..errors import ProcessingError
 from .transport import read_bounded
 from .transport import CheckedTransport
 from .llm import LLMConfig, Message, TextError, TextResponse
 
 MAX_RESPONSE_BYTES = 1024 * 1024
+OPENROUTER_HOSTS = {'openrouter.ai', 'eu.openrouter.ai', 'us.openrouter.ai'}
 
 
 class OpenAITextConfig(LLMConfig):
@@ -19,6 +20,17 @@ class OpenAITextConfig(LLMConfig):
     protocol: Literal['chat_completions', 'responses'] = 'chat_completions'
     reasoning_effort: Literal['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'provider_default'] = 'none'
     user_agent: str = Field(default='NodeComics/0.1', min_length=1, max_length=200)
+    openrouter_providers: list[Annotated[str, Field(
+        min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', strict=True
+    )]] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode='after')
+    def valid_provider_routing(self):
+        if self.openrouter_providers and urlsplit(self.base_url).hostname not in OPENROUTER_HOSTS:
+            raise ValueError('Provider routing requires an OpenRouter base URL')
+        if len(set(self.openrouter_providers)) != len(self.openrouter_providers):
+            raise ValueError('Provider slugs must be unique')
+        return self
 
     @field_validator('base_url')
     @classmethod
@@ -50,8 +62,14 @@ def call_messages(messages: list[Message], profile: dict, api_key: str, *,
             payload['response_format'] = {'type': 'json_schema', 'json_schema': json_schema}
         else:
             payload['text'] = {'format': {'type': 'json_schema', **json_schema}}
-        if urlsplit(profile['base_url']).hostname == 'openrouter.ai':
-            payload['provider'] = {'require_parameters': True}
+    if urlsplit(profile['base_url']).hostname in OPENROUTER_HOSTS:
+        routing = {}
+        if providers := profile.get('openrouter_providers'):
+            routing.update(order=providers, allow_fallbacks=False)
+        if json_schema is not None:
+            routing['require_parameters'] = True
+        if routing:
+            payload['provider'] = routing
     # Previously saved revisions omit this setting; keep their original request
     # behavior until the administrator saves a new immutable revision.
     effort = profile.get('reasoning_effort', 'provider_default')

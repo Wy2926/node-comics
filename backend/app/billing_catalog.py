@@ -258,7 +258,7 @@ def create_price(body: PriceRequest, db: Session = Depends(get_db), actor: User 
     if not revision:
         problem('NOT_FOUND', '产品权益版本不存在', 404)
     if (body.interval == 'once') != (revision.quota_pages > 0):
-        problem('BILLING_PRICE_INTERVAL_INVALID', '额度包只能使用一次性价格，订阅只能使用月付或年付价格', 422)
+        problem('BILLING_PRICE_INTERVAL_INVALID', '额度包只能使用一次性价格，订阅只能使用月付、季付或年付价格', 422)
     db.add(BillingPrice(**body.model_dump(), plan_id=revision.plan_id))
     record_audit(db, actor.id, 'billing.price.create', 'billing_price', body.id, after=body.model_dump())
     db.commit()

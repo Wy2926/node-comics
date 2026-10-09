@@ -312,7 +312,7 @@ test('cards distinguish included free models from paid additions in every langua
     assert.deepEqual($('ul').last().find('bdi').toArray().map(el=>$(el).text()),publishedModels.paid_extra,locale);
     assert.equal($('ul').last().attr('data-included'),String(paid),locale);
     assert.equal($('h3').last().text(),paid?copy.paidModels:copy.paidOnly,locale);
-    assert.equal($('.icon-check').length,paid?4:2,locale);
+    assert.equal($('.icon-check').length,publishedModels.free.length+(paid?publishedModels.paid_extra.length:0),locale);
   }
 });
 

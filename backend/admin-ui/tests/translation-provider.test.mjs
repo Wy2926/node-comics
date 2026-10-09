@@ -39,6 +39,22 @@ test('plan restrictions round-trip outside model config and cannot save an empty
   assert.equal(providerInput({...draft(), text_plan_ids: null}).text_plan_ids, null);
 });
 
+test('OpenRouter upstream list preserves priority, validates and clears to default routing', () => {
+  const input = {...draft(), base_url: 'https://openrouter.ai/api/v1', openrouter_providers: 'deepinfra, together\ngoogle-vertex/us-east5'};
+  assert.deepEqual(validateProvider(input, channels, true), {});
+  const saved = providerInput(input);
+  assert.deepEqual(saved.config.openrouter_providers, ['deepinfra', 'together', 'google-vertex/us-east5']);
+  assert.equal(providerDraft(saved).openrouter_providers, 'deepinfra\ntogether\ngoogle-vertex/us-east5');
+  assert.deepEqual(providerInput({...input, openrouter_providers: ''}).config.openrouter_providers, []);
+  for (const value of ['same,same', 'bad slug', 'a'.repeat(101), Array.from({length: 21}, (_, n) => `p-${n}`).join(',')]) {
+    assert.ok(validateProvider({...input, openrouter_providers: value}, channels, true).openrouter_providers);
+  }
+  for (const base_url of ['https://api.openai.com/v1', 'https://openrouter.ai.example/v1']) {
+    assert.ok(validateProvider({...input, base_url}, channels, true).openrouter_providers);
+  }
+  assert.deepEqual(providerInput(draft()).config.openrouter_providers, []);
+});
+
 test('independent routing weights accept zero and reject invalid or fractional values', () => {
   for (const key of ['text_weight', 'title_weight']) {
     for (const value of ['0', '1', '10000']) assert.ok(!validateProvider({...draft(), [key]: value}, channels, true)[key]);

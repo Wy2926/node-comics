@@ -101,6 +101,26 @@ def test_admin_only_and_secret_validation(admin_case):
     assert client.get(PATH, headers=auth).json()['items'] == []
 
 
+def test_openrouter_provider_list_validation_and_immutable_revisions(admin_case):
+    client, auth = admin_case
+    base = {'base_url': 'https://openrouter.ai/api/v1'}
+    first = create(admin_case, body(**base, openrouter_providers=['deepinfra', 'together']))
+    updated = client.put(PATH + '/' + first['id'], headers=auth,
+                         json=body(**base, openrouter_providers=['together', 'deepinfra']))
+    assert updated.status_code == 200
+    assert updated.json()['revision_id'] != first['revision_id']
+    with session_factory()() as db:
+        assert db.get(TranslationProviderRevision, first['revision_id']).config['openrouter_providers'] == ['deepinfra', 'together']
+    for invalid in ['deepinfra', [1], [''], ['bad slug'], ['https://example.com'], ['a' * 101],
+                    ['same', 'same'], [f'provider-{n}' for n in range(21)]]:
+        assert client.post(PATH, headers=auth, json=body(**base, openrouter_providers=invalid)).status_code == 422
+    assert client.post(PATH, headers=auth, json=body(openrouter_providers=['deepinfra'])).status_code == 422
+    cleared = client.put(PATH + '/' + first['id'], headers=auth, json=body(**base, openrouter_providers=[]))
+    assert cleared.status_code == 200 and cleared.json()['config']['openrouter_providers'] == []
+    regional = create(admin_case, body(base_url='https://eu.openrouter.ai/api/v1', openrouter_providers=['google-vertex/us-east5']))
+    assert regional['config']['openrouter_providers'] == ['google-vertex/us-east5']
+
+
 def test_connection_config_excludes_body_policy_and_preserves_existing_versions(admin_case):
     from pydantic import ValidationError
     from app.adapters.text import TextPolicy

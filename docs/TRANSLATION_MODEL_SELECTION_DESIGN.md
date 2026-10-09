@@ -11,6 +11,7 @@
 | GPT 6 Luna | 支持 | 支持 | 支持 | 支持 |
 | Claude Haiku 5.5 | 支持 | 支持 | 支持 | 支持 |
 | DeepSeekv4 Pro | 不支持 | 支持 | 支持 | 支持 |
+| DeepSeek V4.1 Flash | 不支持 | 支持 | 支持 | 支持 |
 | Gemini 3.8 Flash | 不支持 | 支持 | 支持 | 支持 |
 
 PLUS 与 Pro 的模型集合相同，区别来自套餐实际页数等权益；不宣称 Pro 有独占模型、更好的译文或固定速度。模型名称为产品展示名，不是可以猜测的供应商 API model 参数。

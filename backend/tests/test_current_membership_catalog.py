@@ -83,7 +83,7 @@ def test_models_are_restricted_to_the_confirmed_tiers(client):
             selected = {resolve(f'catalog-acceptance-{index}')['model'] for index in range(200)}
             expected = {'GPT 6 Luna', 'Claude Haiku 5.5'}
             if plan in ('plus', 'pro'):
-                expected |= {'DeepSeekv4 Pro', 'Gemini 3.8 Flash'}
+                expected |= {'DeepSeekv4 Pro', 'DeepSeek V4.1 Flash', 'Gemini 3.8 Flash'}
             assert selected == expected
 
 

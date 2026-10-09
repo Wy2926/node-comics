@@ -1,6 +1,6 @@
 {
   "currency": "usd",
-  "models": {"free": ["GPT 6 Luna", "Claude Haiku 5.5"], "paid_extra": ["DeepSeekv4 Pro", "Gemini 3.8 Flash"]},
+  "models": {"free": ["GPT 6 Luna", "Claude Haiku 5.5"], "paid_extra": ["DeepSeekv4 Pro", "DeepSeek V4.1 Flash", "Gemini 3.8 Flash"]},
   "products": [
     {"id": "plus", "name": "PLUS", "monthly_classic_pages": 2500, "service_plan_id": "plus", "quota_pages": 0, "prices": {"quarter": 666, "year": 2399}},
     {"id": "pro", "name": "Pro", "monthly_classic_pages": 4000, "service_plan_id": "pro", "quota_pages": 0, "prices": {"quarter": 999, "year": 3599}},

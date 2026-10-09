@@ -12,7 +12,8 @@ _table = import_module('migrations.versions.0014_quota_purchases')._table
 
 def upgrade():
     connection = op.get_bind()
-    with _table('billing_prices', (lambda sql: 'interval IN' in sql,)) as batch:
+    # PostgreSQL reflects IN checks as "= ANY (ARRAY[...])", unlike SQLite.
+    with _table('billing_prices', (lambda sql: 'interval' in sql and "'month'" in sql,)) as batch:
         batch.create_check_constraint('ck_billing_price_interval', "interval IN ('month', 'quarter', 'year', 'once')")
     # New benefit columns deliberately do not interpret old image-edit allowances.
     # No sold subscription needs an entitlement conversion.
@@ -40,7 +41,7 @@ def upgrade():
         "granted=used+reserved, grants_access=false WHERE mode='redraw'"))
     connection.execute(sa.text("UPDATE quota_campaigns SET mode='classic', enabled=false WHERE mode='redraw'"))
     for name in ('quota_periods', 'quota_campaigns'):
-        with _table(name, (lambda sql: 'mode IN' in sql,)) as batch:
+        with _table(name, (lambda sql: 'mode' in sql and "'redraw'" in sql,)) as batch:
             batch.create_check_constraint('ck_' + name + '_classic', "mode = 'classic'")
     # Operator gifts now explicitly choose null (unlimited) or monthly pages.
     connection.execute(sa.text('UPDATE users SET plus_monthly_pages=NULL WHERE membership_id IS NOT NULL'))

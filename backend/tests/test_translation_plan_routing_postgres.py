@@ -23,6 +23,7 @@ from test_translation_plan_routing import (
     test_explicit_retry_is_a_new_admission_using_current_plan,
 )
 from test_translation_plan_routing_migration import test_existing_providers_remain_unrestricted
+from test_classic_quotas_migration import test_classic_upgrade_replaces_reflected_interval_and_mode_checks  # noqa: F401
 
 
 @pytest.fixture

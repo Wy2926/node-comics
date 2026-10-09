@@ -4,6 +4,7 @@ export type TranslationReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' |
 export type TranslationProviderConfig = {
   base_url: string; model: string; protocol: TranslationProtocol; user_agent: string;
   reasoning_effort?: TranslationReasoningEffort;
+  openrouter_providers?: string[];
   timeout_seconds: number; max_attempts: number; max_output_tokens: number; group_bytes: number;
   input_rate: number; output_rate: number; pricing_version: string;
 };

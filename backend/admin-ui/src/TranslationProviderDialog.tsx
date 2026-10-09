@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState, type InputHTMLAttributes} from 'react';
 import {ApiError, authError, errorText, sendRequest} from './api';
 import type {TranslationChannel, TranslationPlan, TranslationProvider} from './types';
-import {channelProtocols, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
+import {channelProtocols, isOpenRouterUrl, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
 import {time} from './ui';
 
 export function TranslationProviderDialog({provider, channels, plans, onClose, onSaved, onRefresh, onUnauthorized}: {
@@ -119,6 +119,13 @@ export function TranslationProviderDialog({provider, channels, plans, onClose, o
                 </select>{hint('channel', '当前支持 OpenAI 渠道，可为不同兼容服务分别创建供应商。')}</div>
               {field('base_url', 'API 基础地址', '填写包含版本路径的 HTTPS 基础地址，例如 https://api.openai.com/v1。密钥请填写在下方独立字段。', {type: 'url', spellCheck: false})}
               {field('model', '模型', '填写该供应商实际提供的文本模型标识。', {placeholder: '填写模型 ID', spellCheck: false})}
+              {(isOpenRouterUrl(draft.base_url) || draft.openrouter_providers) && <div className="settings-field">
+                <label htmlFor="provider-openrouter_providers">OpenRouter 上游供应商（可选）</label>
+                <textarea {...accessibility('openrouter_providers')} rows={3} maxLength={2039} spellCheck={false}
+                  value={draft.openrouter_providers} onChange={event => update('openrouter_providers', event.target.value)}
+                  placeholder={'例如：deepinfra\ntogether'}/>
+                {hint('openrouter_providers', '填写模型页面中的供应商 ID，每行一个或用英文逗号分隔。按顺序尝试，仅在指定列表内切换；留空由 OpenRouter 默认路由。支持带区域的完整 ID，最多 20 个。')}
+              </div>}
               <div className="settings-field"><label htmlFor="provider-reasoning_effort">思考程度 <span className="provider-required">必填</span></label>
                 <select required {...accessibility('reasoning_effort')} value={draft.reasoning_effort} onChange={event => update('reasoning_effort', event.target.value)}>
                   {Object.entries(reasoningLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}

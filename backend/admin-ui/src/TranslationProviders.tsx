@@ -106,6 +106,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
                   <small>ID <code>{provider.id}</code></small></td>
                 <td><b>{provider.config.model}</b><small>{protocolLabels[provider.config.protocol] ?? provider.config.protocol}</small>
                   <small>思考：{reasoningLabels[provider.config.reasoning_effort ?? 'provider_default']}</small>
+                  {!!provider.config.openrouter_providers?.length && <small>上游顺序：{provider.config.openrouter_providers.join(' → ')}</small>}
                   <small>{provider.config.base_url}</small></td>
                 <td><span className={`badge ${provider.enabled ? 'good' : 'warn'}`}>{provider.enabled ? '已启用' : '已停用'}</span>
                   <small>{provider.credential_configured ? '密钥已配置' : '密钥未配置'}</small>

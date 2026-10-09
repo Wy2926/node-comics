@@ -53,8 +53,17 @@ def catalog_products():
         trial_classic_pages=None, prices={'month': 999, 'year': 9999})]
 
 
+@pytest.fixture(autouse=True)
+def isolated_catalog(monkeypatch, catalog_products):
+    # SQLite and PostgreSQL protocol fixtures use the same sample catalog.
+    # Public-catalog tests opt out by returning None from catalog_products.
+    if catalog_products is not None:
+        from app import billing_catalog
+        monkeypatch.setattr(billing_catalog, 'DEFAULT_CATALOG', {'currency': 'usd', 'products': catalog_products})
+
+
 @pytest.fixture
-def client(tmp_path, monkeypatch, catalog_products):
+def client(tmp_path, monkeypatch):
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "objects"))
@@ -72,10 +81,6 @@ def client(tmp_path, monkeypatch, catalog_products):
     from app.db import session_factory
     from translation_fixtures import configure_text_provider
     from app.migrate import migrate
-    # Billing protocol tests use their own explicit sample catalog, not public pricing.
-    if catalog_products is not None:
-        from app import billing_catalog
-        monkeypatch.setattr(billing_catalog, 'DEFAULT_CATALOG', {'currency': 'usd', 'products': catalog_products})
     migrate()
     with TestClient(app, headers={'X-Translation-Protocol': 'overlay-v1'}) as test_client:
         with session_factory()() as db:

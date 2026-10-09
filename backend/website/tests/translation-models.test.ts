@@ -38,7 +38,7 @@ test('missing capability supports legacy automatic requests but not stale explic
 });
 test('dropdown panel uses the existing menu radius separately from its control radius',()=>{
   const css=readFileSync(new URL('../src/styles/translate.css',import.meta.url),'utf8');
-  const panel=css.match(/\.translation-model-options\{([^}]+)\}/)![1];
-  assert.ok(panel.includes('border-radius:var(--comic-card-radius)'));
-  assert.ok(!panel.includes('border-radius:var(--comic-control-radius)'));
+  const panel=css.match(/\.translation-model-options\s*\{([^}]+)\}/)![1];
+  assert.match(panel,/border-radius:\s*var\(--comic-card-radius\)/);
+  assert.doesNotMatch(panel,/border-radius:\s*var\(--comic-control-radius\)/);
 });

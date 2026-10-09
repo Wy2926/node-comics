@@ -25,6 +25,7 @@ const defaults: TranslationProviderConfig = {
   base_url: 'https://api.openai.com/v1', model: '', protocol: 'chat_completions', reasoning_effort: 'none', user_agent: 'NodeComics/0.1',
   timeout_seconds: 60, max_attempts: 3, max_output_tokens: 1024, group_bytes: 1800,
   input_rate: 5, output_rate: 30, pricing_version: 'operator-estimate-v1',
+  openrouter_providers: [],
 };
 export type ProviderDraft = Record<keyof TranslationProviderConfig | 'name' | 'channel' | 'api_key' | 'text_weight' | 'title_weight' | 'requests_per_minute', string> & {enabled: boolean; text_plan_ids: string[] | null};
 export type ProviderField = Exclude<keyof ProviderDraft, 'enabled' | 'text_plan_ids'>;
@@ -34,6 +35,7 @@ export function providerDraft(provider?: TranslationProvider): ProviderDraft {
   const config = {...defaults, ...provider?.config};
   return {
     ...Object.fromEntries(Object.keys(defaults).map(key => [key, String(config[key as keyof TranslationProviderConfig])])) as Record<keyof TranslationProviderConfig, string>,
+    openrouter_providers: (config.openrouter_providers ?? []).join('\n'),
     name: provider?.name ?? '', channel: provider?.channel ?? 'openai', enabled: provider?.enabled ?? true, api_key: '',
     text_weight: String(provider?.text_weight ?? 1),
     text_plan_ids: provider?.text_plan_ids ?? null,
@@ -46,6 +48,15 @@ export const channelProtocols = (channels: TranslationChannel[], channel: string
   channel === 'openai' ? (channels.find(item => item.id === channel)?.protocols ?? [])
     .filter((protocol): protocol is TranslationProtocol => Object.hasOwn(protocolLabels, protocol)) : [];
 
+export function isOpenRouterUrl(address: string): boolean {
+  try {return ['openrouter.ai', 'eu.openrouter.ai', 'us.openrouter.ai'].includes(new URL(address.trim()).hostname);}
+  catch {return false;}
+}
+
+function providerSlugs(value: string): string[] {
+  return value.split(/[,\n]/).map(slug => slug.trim()).filter(Boolean);
+}
+
 export function validateProvider(draft: ProviderDraft, channels: TranslationChannel[], creating: boolean): ProviderErrors {
   const errors: ProviderErrors = {};
   for (const [key, title] of [['name', '供应商名称'], ['model', '模型'], ['user_agent', 'User-Agent'], ['pricing_version', '计价版本']] as const) {
@@ -56,6 +67,10 @@ export function validateProvider(draft: ProviderDraft, channels: TranslationChan
   if (!channelProtocols(channels, draft.channel).includes(draft.protocol as TranslationProtocol)) errors.protocol = '请选择此渠道支持的接口协议。';
   if (!Object.hasOwn(reasoningLabels, draft.reasoning_effort)) errors.reasoning_effort = '请选择有效的思考程度。';
   if (draft.text_plan_ids !== null && !draft.text_plan_ids.length) errors.text_plan_ids = '请至少选择一个正文适用套餐，或改为全部套餐。';
+  const slugs = providerSlugs(draft.openrouter_providers);
+  if (slugs.length && !isOpenRouterUrl(draft.base_url)) errors.openrouter_providers = '指定上游供应商需要使用 OpenRouter API 地址；其他服务请清空此项。';
+  else if (slugs.length > 20 || slugs.some(slug => !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$/.test(slug))) errors.openrouter_providers = '最多填写 20 个供应商 ID，每个不超过 100 字符；只支持字母、数字、点、短横线、下划线和斜线。';
+  else if (new Set(slugs).size !== slugs.length) errors.openrouter_providers = '供应商 ID 不能重复，请保留需要的优先顺序。';
   for (const {key} of routingFields) {
     const weight = Number(draft[key]);
     if (!draft[key].trim() || !Number.isInteger(weight) || weight < 0 || weight > 10000) errors[key] = '请输入 0–10000 范围内的整数，0 表示不参与此用途分流。';
@@ -89,6 +104,7 @@ export function providerInput(draft: ProviderDraft): TranslationProviderInput {
     config: {
       base_url: draft.base_url.trim(), model: draft.model.trim(), protocol: draft.protocol as TranslationProtocol,
       reasoning_effort: draft.reasoning_effort as TranslationReasoningEffort,
+      openrouter_providers: providerSlugs(draft.openrouter_providers),
       user_agent: draft.user_agent.trim(), pricing_version: draft.pricing_version.trim(),
       ...Object.fromEntries(numericFields.map(field => [field.key, Number(draft[field.key])])) as Pick<TranslationProviderConfig, typeof numericFields[number]['key']>,
     },

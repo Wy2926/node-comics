@@ -157,10 +157,10 @@ for (const file of htmlFiles) {
         const row = card.find(`[data-feature="${feature.key}"]`);
         if (row.length !== 1 || row.find('strong').text() !== feature[tier as 'free' | 'lite']) errors.push(`${label}: missing localized card benefit ${tier}/${feature.key}`);
       }
-      if (card.find('.plan-models .icon-check').length !== (index === 0 ? 2 : 4)) errors.push(`${label}: incorrect free/paid model access`);
+      if (card.find('.plan-models .icon-check').length !== publishedModels.free.length + (index === 0 ? 0 : publishedModels.paid_extra.length)) errors.push(`${label}: incorrect free/paid model access`);
     }
     const table = comparison.find('.plan-comparison');
-    if (table.find('thead th').length !== 4 || table.find('tr[data-model]').length !== 4) errors.push(`${label}: missing Free/PLUS/Pro model comparison`);
+    if (table.find('thead th').length !== 4 || table.find('tr[data-model]').length !== publishedModels.free.length + publishedModels.paid_extra.length) errors.push(`${label}: missing Free/PLUS/Pro model comparison`);
     if (!comparison.find('[data-plan="pro"] .plan-difference').text().includes((1500).toLocaleString(locale))) errors.push(`${label}: missing catalog-driven paid quota difference`);
     for (const feature of expectedRows.filter(row => row.detail)) {
       const row = table.find(`[data-feature="${feature.key}"]`), trigger = row.find('.feature-info-trigger'), tip = row.find('[role="tooltip"]');
