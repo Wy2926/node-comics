@@ -1,7 +1,8 @@
 import {useEffect,useState} from 'react';
 import {amount,annualSavings,billingCopy,billingBenefitCopy,offerBenefits,renewalCopy,trialCopy,hasManagedSubscription,manageLabel,type BillingOffer,type Billing} from '../lib/billing';
 import {pricingCopy,publishedPricingCopy} from '../lib/pricing';
-import {comparisonCopy,comparisonRows} from '../lib/pricing-comparison';
+import {comparisonCopy,comparisonRows,extraPagesCopy,paidComparisonValue} from '../lib/pricing-comparison';
+import {pricingHighlightsCopy} from '../i18n/pricing-highlights';
 import {checkoutStatusCopy} from '../i18n/commerce';
 import {publishedSubscriptions,publishedPacks} from '../data/published-plans';
 import BillingCycle,{type BillingInterval} from './BillingCycle';
@@ -10,7 +11,8 @@ import {PlanPrice,PublishedPurchaseAvailability,publishedAmountParts,publishedAn
 import PriceAmount from './PriceAmount';
 import CheckoutButton, { type CheckoutCopy } from './CheckoutButton';
 import QuotaOffers from './QuotaOffers';
-import FeatureInfo from './FeatureInfo';
+import PlanModels from './PlanModels';
+import PlanComparison from './PlanComparison';
 import {quotaPurchaseCopy} from '../i18n/quota-purchase';
 import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
 import '../styles/pricing.css';
@@ -32,6 +34,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
   const [selectedPrice,setSelectedPrice]=useState('');
   const copy=billingCopy(locale),benefits=billingBenefitCopy(locale),text=pricingCopy(locale),comparison=comparisonCopy(locale);
   const quota=subscriptionQuotaCopy(locale);
+  const highlights=pricingHighlightsCopy(locale);
   const buttonCopy={...checkoutCopy,...checkoutStatusCopy(locale)};
   useEffect(()=>{
     setSelectedPrice(new URLSearchParams(location.search).get('price')??'');
@@ -71,34 +74,37 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
     offerForInterval(display.filter(offer=>offer.plan_id===plan),interval,selectedPrice)).filter((offer):offer is BillingOffer=>!!offer);
   const recoverSelected=!!billing&&/^[\w-]{1,36}$/.test(selectedPrice)&&
     ![pending,...billing.offers,...billing.quota_offers??[]].some(quote=>quote?.id===selectedPrice);
-  const rows=comparisonRows(locale,0);
+  const rows=comparisonRows(locale,0).filter(row=>row.key==='rate'||row.key==='priority');
   const annual=offerForInterval(available,'year',selectedPrice);
   const discount=annual?annualSavings(annual,available)?.percent??0:available.length?0:publishedAnnualDiscount;
   return <div className="pricing-comparison">
     <BillingCycle offers={available.length?available:publishedSubscriptions} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale} preview disabled={!!pending} annualDiscount={discount}/>
     <div className="subscription-grid">
       <article className="subscription-card free">
-        <div className="membership-heading">{comparison.reading.label}</div>
-        <h2>{free.name}</h2><p>{free.description}</p>
-        <p className="price"><PriceAmount parts={publishedAmountParts('free',locale)}/><small className="price-unit">/ {free.priceLabel}</small></p>
-        <strong className="subscription-allowance">{comparison.classic.free}</strong>
-        <a className="button secondary" data-install-extension href={downloadHref}>{free.action}<span className="ui-icon icon-arrow" aria-hidden="true"/></a>
-        <p className="trial-note">{free.note}</p>
-        <ul className="subscription-features">{rows.filter(row=>row.key!=='classic').map(row=><li key={row.key} data-feature={row.key}><span className="feature-label">{row.label}{row.detail&&<FeatureInfo label={row.label} detail={row.detail}/>}</span><strong>{row.free}</strong></li>)}</ul>
+        <header><p className="membership-heading">{highlights.free}</p><h2>{free.name}</h2></header>
+        <div><p className="price"><PriceAmount parts={publishedAmountParts('free',locale)}/><small className="price-unit">/ {free.priceLabel}</small></p><p className="price-terms">{free.description}</p></div>
+        <div className="plan-allowance"><span>{quota.free}</span><strong className="subscription-allowance">{comparison.classic.free}</strong></div>
+        <div className="subscription-purchase"><a className="button secondary" data-install-extension href={downloadHref}>{free.action}<span className="ui-icon icon-arrow" aria-hidden="true"/></a><p className="trial-note">{free.note}</p></div>
+        <PlanModels locale={locale} paid={false}/>
+        <ul className="subscription-features">{rows.map(row=><li key={row.key} data-feature={row.key}><span>{row.label}</span><strong>{row.free}</strong></li>)}</ul>
       </article>
-      {plans.map(offer=><article className="subscription-card paid" key={offer?.id??'preview'}>
-        <div className="membership-heading">{copy.plan}</div>
-        <h2>{offer.name}</h2>
-        <div aria-live="polite"><PlanPrice locale={locale} interval={interval} offer={offer}/></div>
-        <noscript><p className="billing-total">{publishedPricingCopy(locale).yearly}: {text.billed(amount((available.length?available:publishedSubscriptions).find(p=>p.plan_id===offer.plan_id&&p.interval==='year')??offer,locale))}</p></noscript>
-        <strong className="subscription-allowance">{offer?offerBenefits(offer,locale):copy.classic}</strong>
+      {plans.map(offer=>{const extra=extraPagesCopy(offer,plans,locale);return <article className="subscription-card paid" data-plan={offer.plan_id} data-more-pages={!!extra} key={offer.id}>
+        <header><p className="membership-heading">{extra?highlights.pro:highlights.plus}</p><h2>{offer.name}</h2></header>
+        <div aria-live="polite"><PlanPrice locale={locale} interval={interval} offer={offer} offers={display}/>
+          <noscript><p className="billing-total">{publishedPricingCopy(locale).yearly}: {text.billed(amount((available.length?available:publishedSubscriptions).find(p=>p.plan_id===offer.plan_id&&p.interval==='year')??offer,locale))}</p></noscript>
+        </div>
+        <div className="plan-allowance"><span>{quota.subscription}</span><strong className="subscription-allowance">{offerBenefits(offer,locale)}</strong>{extra&&<p className="plan-difference">{extra}</p>}</div>
+        <div className="subscription-purchase">
         {offer.channels.length>0?<>
         {managed&&!pending?<a className="button" href={accountHref}>{manageLabel(locale)} ↗</a>:<CheckoutButton priceId={offer.id} accountHref={accountHref} label={pending?.id===offer.id?checkoutCopy.resume??benefits.subscribe(offer.name):benefits.subscribe(offer.name)} copy={buttonCopy} disabled={billing===undefined||!!pending&&pending.id!==offer.id}/>}
         <p className="trial-note">{offer.trial_days>0&&`${trialCopy(offer.trial_days,locale)} · ${offer.trial_classic_pages===null?copy.classic:quotaPurchaseCopy(locale).pages.replace('{0}',offer.trial_classic_pages.toLocaleString(locale))}`} {renewalCopy(offer,locale)} {text.cancel} {publishedPricingCopy(locale).tax}</p>
-        </>:<PublishedPurchaseAvailability locale={locale} name={offer.name} state={error?'error':offers?'unavailable':'loading'}/>}
-        <ul className="subscription-features">{rows.filter(row=>row.key!=='classic').map(row=><li key={row.key} data-feature={row.key}><span className="feature-label">{row.label}{row.detail&&<FeatureInfo label={row.label} detail={row.detail}/>}</span><strong>{row.key==='rate'&&offer?(offer.hourly_image_limit?benefits.hourly(offer.hourly_image_limit):quota.paidRate):row.lite}</strong></li>)}</ul>
-      </article>)}
+        </>:<PublishedPurchaseAvailability locale={locale} name={offer.name} interval={interval} state={error?'error':offers?'unavailable':'loading'}/>}
+        </div>
+        <PlanModels locale={locale} paid/>
+        <ul className="subscription-features">{rows.map(row=><li key={row.key} data-feature={row.key}><span>{row.label}</span><strong>{paidComparisonValue(row,offer,locale)}</strong></li>)}</ul>
+      </article>;})}
     </div>
+    <PlanComparison locale={locale} plans={plans} freeName={free.name}/>
     <p className="comparison-note">{quota.rule}</p>
     <p className="comparison-note">{quota.renewal}</p>
     <p className="comparison-note">{comparison.note}</p>

@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/vi';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với ${publishedModels.free.join(' · ')}. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai bao gồm mô hình miễn phí và bổ sung ${publishedModels.paid_extra.join(' · ')}. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Kênh NodeLane và hạn mức",
       "paragraphs": [
         "Chọn NodeLane và đăng nhập để dịch qua dịch vụ chính thức. Kết quả hiển thị từng ảnh, lỗi được xử lý riêng và vị trí đọc không đổi.",
-        "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Lợi ích và đăng ký",
             "paragraphs": [
-              "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán.",
+              membershipSummary,
               "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Bản dịch manga có miễn phí không và PLUS / Pro bao gồm những gì?",
-        "answer": "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

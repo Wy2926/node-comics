@@ -180,9 +180,7 @@ export const commerce = {
   ],
   "comparison": {
     "model": {
-      "label": "Моделі перекладу",
-      "free": "GPT 6 Luna та аналогічні моделі",
-      "lite": "Haiku 5.5 та аналогічні моделі"
+      "label": "Моделі перекладу"
     },
     "feature": "Особливості та переваги",
     "highlights": "ПЕРЕКЛАДАТИ З PLUS / Pro",

@@ -180,9 +180,7 @@ export const commerce = {
   ],
   "comparison": {
     "model": {
-      "label": "Modelli di traduzione",
-      "free": "GPT 6 Luna e modelli simili",
-      "lite": "Haiku 5.5 e modelli simili"
+      "label": "Modelli di traduzione"
     },
     "feature": "Caratteristiche e vantaggi",
     "highlights": "TRADUCI CON PLUS / Pro",

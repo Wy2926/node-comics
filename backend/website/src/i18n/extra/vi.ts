@@ -180,9 +180,7 @@ export const commerce = {
   ],
   "comparison": {
     "model": {
-      "label": "Mô hình dịch",
-      "free": "GPT 6 Luna và các mô hình tương tự",
-      "lite": "Haiku 5.5 và các mô hình tương tự"
+      "label": "Mô hình dịch"
     },
     "feature": "Tính năng và lợi ích",
     "highlights": "DỊCH VỚI PLUS / Pro",

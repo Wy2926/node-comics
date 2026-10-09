@@ -11,11 +11,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def seed_models(db):
+    from app.billing_catalog import DEFAULT_CATALOG
     from app.scheduler import lock_scheduler
     from app.translation_providers import ProviderWrite, write_provider
     lock_scheduler(db)
     # Deliberately non-operational upstream IDs/URL, for local routing acceptance only.
-    for name, scopes in [('GPT 6 Luna', ['guest', 'free']), ('Haiku 5.5', ['plus', 'pro'])]:
+    models = DEFAULT_CATALOG['models']
+    for name, scopes in [(name, None) for name in models['free']] + [
+            (name, ['plus', 'pro']) for name in models['paid_extra']]:
         write_provider(db, ProviderWrite(name=name, channel='openai', text_plan_ids=scopes,
             title_weight=0, config={'model': name, 'base_url': 'https://membership-preview.invalid/v1'},
             api_key='local-preview-placeholder-not-a-real-key'))

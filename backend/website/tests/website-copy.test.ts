@@ -5,10 +5,25 @@ import { dictionaries, locales } from '../src/i18n';
 import { homeCopy } from '../src/i18n/home';
 import { translationCopy } from '../src/i18n/translate';
 import { commerceCopy } from '../src/i18n/commerce';
+import { publishedModels } from '../src/data/published-plans';
 import { billingCopy, billingBenefitCopy, offerBenefits, renewalCopy, trialCopy } from '../src/lib/billing';
 
 const retiredFeature = /redraw|重[绘繪]|再描画|다시\s*그리|neuzeich|redessin|redibuj|redesenh|ridisegn|przerys|перерис|перемал|yeniden\s*çiz|gambar\s+ulang|vẽ\s+lại/iu;
 const clean = (text: string, label: string) => assert.equal(retiredFeature.exec(text)?.[0], undefined, label);
+
+test('membership FAQ and policy copy share the complete current model catalog in every locale', () => {
+  for (const locale of locales) {
+    const { faqs, policies } = dictionaries[locale].documents;
+    const summary = faqs.find(item => item.answer.includes(publishedModels.free[0]))?.answer;
+    assert.ok(summary, `${locale}: membership FAQ`);
+    const paragraphs = Object.values(policies).flatMap(policy => policy.sections.flatMap(section => section.paragraphs));
+    for (const text of [summary, ...paragraphs.filter(text => text.includes(publishedModels.free[0]))]) {
+      for (const model of [...publishedModels.free, ...publishedModels.paid_extra]) {
+        assert.ok(text.includes(model), `${locale}: missing ${model}`);
+      }
+    }
+  }
+});
 
 test('privacy, FAQ and guides agree on installation-wide HTTP/HTTPS access in every locale', () => {
   const manifest = readFileSync(new URL('../../../apps/extension/wxt.config.ts', import.meta.url), 'utf8');

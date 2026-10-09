@@ -73,14 +73,18 @@ def test_paid_periods_grant_monthly_without_early_access_or_duplicates(client, p
 
 def test_models_are_restricted_to_the_confirmed_tiers(client):
     from app.translation_models import TranslationProvider
-    from app.translation_providers import provider_profile
+    from app.translation_providers import provider_resolver
     from manual_membership_server import seed_models
     with session_factory()() as db:
         db.execute(update(TranslationProvider).values(enabled=False))
         seed_models(db)
         for plan in ('guest', 'free', 'plus', 'pro'):
-            profile = provider_profile(db, plan_id=plan, routing_key='catalog-acceptance')
-            assert profile['model'] == ('GPT 6 Luna' if plan in ('guest', 'free') else 'Haiku 5.5')
+            resolve = provider_resolver(db, plan_id=plan)
+            selected = {resolve(f'catalog-acceptance-{index}')['model'] for index in range(200)}
+            expected = {'GPT 6 Luna', 'Claude Haiku 5.5'}
+            if plan in ('plus', 'pro'):
+                expected |= {'DeepSeekv4 Pro', 'Gemini 3.8 Flash'}
+            assert selected == expected
 
 
 @pytest.mark.parametrize('provider', ['stripe', 'creem'])

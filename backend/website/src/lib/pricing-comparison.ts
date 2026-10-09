@@ -1,6 +1,8 @@
 import {publishedModels} from '../data/published-plans';
 import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
 import { commerceCopy, formatCopy } from '../i18n/commerce';
+import {pricingHighlightsCopy} from '../i18n/pricing-highlights';
+import {billingBenefitCopy,offerBenefits,type BillingOffer} from './billing';
 
 interface ComparisonRow {label:string;free:string;lite:string;detail?:string}
 export interface PricingComparisonCopy {
@@ -9,10 +11,10 @@ export interface PricingComparisonCopy {
   rate:Omit<ComparisonRow,'lite'>&{lite:(hourly:number)=>string};
   priority:ComparisonRow;feedback:ComparisonRow;requests:ComparisonRow;early:ComparisonRow;note:string;
 }
-const labels:Record<string,PricingComparisonCopy>={
+const labels:Record<string,Omit<PricingComparisonCopy,'model'>&{model:{label:string}}>={
   'zh-CN':{
     feature:'功能与权益',highlights:'PLUS / Pro 翻译权益',
-    model:{label:'翻译模型',free:'GPT 6 Luna 等系列',lite:'Haiku 5.5 等系列'},
+    model:{label:'翻译模型'},
     reading:{label:'阅读功能',free:'全部基础阅读功能',lite:'全部基础阅读功能'},
     classic:{label:'云端翻译',free:'30 页 / 天',lite:'不设日／月累计上限',detail:'页数按实际成功翻译结算，复用本人已有结果不重复扣减。无限仅指不设日／月累计页数上限，仍受受理限额与服务容量约束。'},
     local:{label:'本地翻译',free:'支持自建 MTU',lite:'支持自建 MTU',detail:'本地翻译需自建 MTU；联网需求取决于所用模型和供应商。'},
@@ -25,7 +27,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   'zh-TW':{
     feature:'功能與權益',highlights:'PLUS / Pro 翻譯權益',
-    model:{label:'翻譯模型',free:'GPT 6 Luna 等系列',lite:'Haiku 5.5 等系列'},
+    model:{label:'翻譯模型'},
     reading:{label:'閱讀功能',free:'全部基本閱讀功能',lite:'全部基本閱讀功能'},
     classic:{label:'雲端翻譯',free:'30 頁 / 天',lite:'不設日／月累計上限',detail:'頁數按實際成功翻譯結算，重用本人已有結果不重複扣減。無限僅指不設日／月累計頁數上限，仍受受理上限與服務容量限制。'},
     local:{label:'本機翻譯',free:'支援自架 MTU',lite:'支援自架 MTU',detail:'本機翻譯需自架 MTU；是否需要連網取決於使用的模型與供應商。'},
@@ -38,7 +40,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   en:{
     feature:'Features and benefits',highlights:'TRANSLATE WITH PLUS / Pro',
-    model:{label:'Translation models',free:'GPT 6 Luna and similar models',lite:'Haiku 5.5 and similar models'},
+    model:{label:'Translation models'},
     reading:{label:'Reading',free:'All core reading features',lite:'All core reading features'},
     classic:{label:'Cloud translation',free:'30 pages / day',lite:'No daily or monthly total cap',detail:'Pages are deducted for successful translations; reusing your completed results does not deduct them again. Unlimited means no daily or monthly total page cap. Request limits and service capacity still apply.'},
     local:{label:'Local translation',free:'Self-hosted MTU supported',lite:'Self-hosted MTU supported',detail:'Local translation requires a self-hosted MTU service; connectivity depends on your models and providers.'},
@@ -51,7 +53,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   ja:{
     feature:'機能と特典',highlights:'PLUS / Pro の翻訳特典',
-    model:{label:'翻訳モデル',free:'GPT 6 Luna などのモデル',lite:'Haiku 5.5 などのモデル'},
+    model:{label:'翻訳モデル'},
     reading:{label:'読書機能',free:'すべての基本読書機能',lite:'すべての基本読書機能'},
     classic:{label:'クラウド翻訳',free:'30 ページ / 日',lite:'日・月の累計上限なし',detail:'翻訳に成功したページ数を消費し、自分の完了結果を再利用しても再消費しません。無制限とは日・月の累計ページ数に上限がないことです。受付上限とサービス全体の処理容量は引き続き適用されます。'},
     local:{label:'ローカル翻訳',free:'自前の MTU に対応',lite:'自前の MTU に対応',detail:'ローカル翻訳には自前の MTU が必要です。ネット接続の要否はモデルと提供元によって異なります。'},
@@ -64,7 +66,7 @@ const labels:Record<string,PricingComparisonCopy>={
   },
   ko:{
     feature:'기능과 혜택',highlights:'PLUS / Pro 번역 혜택',
-    model:{label:'번역 모델',free:'GPT 6 Luna 등 모델',lite:'Haiku 5.5 등 모델'},
+    model:{label:'번역 모델'},
     reading:{label:'읽기 기능',free:'모든 기본 읽기 기능',lite:'모든 기본 읽기 기능'},
     classic:{label:'클라우드 번역',free:'30페이지 / 일',lite:'일일·월간 총 페이지 제한 없음',detail:'번역에 성공한 페이지를 차감하며, 본인의 완료된 결과를 재사용하면 다시 차감하지 않습니다. 무제한은 일일·월간 총 페이지 수에 상한이 없다는 뜻입니다. 요청 한도와 서비스 처리 용량은 계속 적용됩니다.'},
     local:{label:'로컬 번역',free:'직접 호스팅한 MTU 지원',lite:'직접 호스팅한 MTU 지원',detail:'로컬 번역에는 직접 호스팅한 MTU가 필요하며, 인터넷 연결 여부는 모델과 제공업체에 따라 다릅니다.'},
@@ -79,8 +81,24 @@ const labels:Record<string,PricingComparisonCopy>={
 export function comparisonCopy(locale:string):PricingComparisonCopy {
  const copy=commerceCopy(locale)?.comparison;
  const value=copy ? {...copy,rate:{...copy.rate,lite:(n:number)=>formatCopy(copy.rate.lite,{n:n.toLocaleString(locale)})}} : labels[locale]??labels.en;
- return {...value,model:{...value.model,free:publishedModels.free,lite:publishedModels.paid},
+ return {...value,model:{...value.model,free:publishedModels.free.join(' · '),lite:[...publishedModels.free,...publishedModels.paid_extra].join(' · ')},
    classic:{...value.classic,lite:subscriptionQuotaCopy(locale).monthly.replace('{0}',(2500).toLocaleString(locale)),detail:subscriptionQuotaCopy(locale).rule}};
+}
+
+export function paidComparisonValue(row:ReturnType<typeof comparisonRows>[number],offer:BillingOffer,locale:string){
+ if(row.key==='classic')return offerBenefits(offer,locale);
+ if(row.key==='rate')return offer.hourly_image_limit
+   ?`${subscriptionQuotaCopy(locale).paidRate} · ${billingBenefitCopy(locale).hourly(offer.hourly_image_limit)}`
+   :subscriptionQuotaCopy(locale).paidRate;
+ return row.lite;
+}
+
+export function extraPagesCopy(offer:BillingOffer,plans:BillingOffer[],locale:string){
+ if(offer.monthly_classic_pages==null||offer.monthly_classic_pages<=0)return '';
+ const smaller=plans.filter(plan=>plan.monthly_classic_pages!=null&&plan.monthly_classic_pages>0&&plan.monthly_classic_pages<offer.monthly_classic_pages!)
+   .sort((a,b)=>b.monthly_classic_pages!-a.monthly_classic_pages!)[0];
+ return smaller?pricingHighlightsCopy(locale).morePages.replace('{plan}',smaller.name)
+   .replace('{pages}',(offer.monthly_classic_pages-smaller.monthly_classic_pages!).toLocaleString(locale)):'';
 }
 export function comparisonRows(locale:string,hourly:number){
  const copy=comparisonCopy(locale);

@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/en';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Local reading is free. Free accounts get 30 pages daily with ${publishedModels.free.join(' · ')}. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both retain the free models and add ${publishedModels.paid_extra.join(' · ')}. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
             "title": "Use the NodeLane official channel",
             "paragraphs": [
               "Sign in and choose a target language. The official service persists tasks and valid results; a missing local translation cache can be restored from an available result rather than submitting the image again.",
-              "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout."
+              membershipSummary
             ]
           },
           {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Benefits and subscriptions",
             "paragraphs": [
-              "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout.",
+              membershipSummary,
               "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Is manga translation free, and what does PLUS / Pro include?",
-        "answer": "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

@@ -6,6 +6,7 @@ import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
 import { publishedAmount } from '../src/components/PublishedPlanPricing';
 import { comparisonRows } from '../src/lib/pricing-comparison';
+import { publishedModels } from '../src/data/published-plans';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
 async function files(dir: string): Promise<string[]> { return (await Promise.all((await readdir(dir, { withFileTypes: true })).map(entry => entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir,entry.name)]))).flat(); }
@@ -86,6 +87,11 @@ for (const file of htmlFiles) {
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
     if ($('.home-hero .button').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
     if (!$(`.home-service a[href="${localPath('/pricing/',locale)}"]`).length || $('.home-plan').length !== 3) errors.push(`${label}: missing Free/PLUS/Pro plan entrance`);
+    $('.home-plan').each((index, card) => {
+      const expected = index === 0 ? publishedModels.free : [...publishedModels.free, ...publishedModels.paid_extra];
+      const models = $(card).find('[data-feature="model"] .home-model-list > bdi').toArray().map(item => $(item).text());
+      if (JSON.stringify(models) !== JSON.stringify(expected)) errors.push(`${label}: homepage models must be complete and on separate lines`);
+    });
     for (const store of browserStores) {
       const entrance = $(`.hero-store[data-browser="${store.id}"]`);
       const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
@@ -138,7 +144,7 @@ for (const file of htmlFiles) {
   }
   if (basePath(route) === '/pricing/') {
     const published = $('.published-plan-pricing');
-    if (published.length !== 2 || published.attr('data-billing-interval') !== 'quarter' || published.first().find('.price-value').text() !== publishedAmount('quarter',locale)) errors.push(`${label}: initial static pricing must show the actual published monthly total`);
+    if (published.length !== 2 || published.attr('data-billing-interval') !== 'quarter' || published.first().find('.price .price-value').text() !== publishedAmount('quarter',locale)) errors.push(`${label}: initial static pricing must show the actual published quarterly total`);
     if ($('.pricing-comparison .billing-cycle input[type=radio]').length !== 2) errors.push(`${label}: quarterly/yearly preview must be available without an API quote`);
     const comparison = $('.pricing-comparison');
     const cards = comparison.find('.subscription-card');
@@ -147,13 +153,18 @@ for (const file of htmlFiles) {
     for (const [index, tier] of ['free', 'lite', 'lite'].entries()) {
       const card = cards.eq(index);
       if (card.find('.subscription-allowance').length !== 1) errors.push(`${label}: missing prominent page allowance`);
-      for (const feature of expectedRows.filter(row => row.key !== 'classic')) {
+      for (const feature of expectedRows.filter(row => row.key === 'rate' || row.key === 'priority')) {
         const row = card.find(`[data-feature="${feature.key}"]`);
         if (row.length !== 1 || row.find('strong').text() !== feature[tier as 'free' | 'lite']) errors.push(`${label}: missing localized card benefit ${tier}/${feature.key}`);
-        const trigger = row.find('.feature-info-trigger'), tip = row.find('[role="tooltip"]');
-        if (trigger.length !== (feature.detail ? 1 : 0)) errors.push(`${label}: incorrect accessible tip ${feature.key}`);
-        if (feature.detail && (trigger.attr('aria-label') !== feature.label || trigger.attr('aria-describedby') !== tip.attr('id') || tip.text() !== feature.detail || !tip.is('[hidden]'))) errors.push(`${label}: missing accessible localized feature tip ${feature.key}`);
       }
+      if (card.find('.plan-models .icon-check').length !== (index === 0 ? 2 : 4)) errors.push(`${label}: incorrect free/paid model access`);
+    }
+    const table = comparison.find('.plan-comparison');
+    if (table.find('thead th').length !== 4 || table.find('tr[data-model]').length !== 4) errors.push(`${label}: missing Free/PLUS/Pro model comparison`);
+    if (!comparison.find('[data-plan="pro"] .plan-difference').text().includes((1500).toLocaleString(locale))) errors.push(`${label}: missing catalog-driven paid quota difference`);
+    for (const feature of expectedRows.filter(row => row.detail)) {
+      const row = table.find(`[data-feature="${feature.key}"]`), trigger = row.find('.feature-info-trigger'), tip = row.find('[role="tooltip"]');
+      if (trigger.length !== 1 || trigger.attr('aria-label') !== feature.label || trigger.attr('aria-describedby') !== tip.attr('id') || tip.text() !== feature.detail || !tip.is('[hidden]')) errors.push(`${label}: missing accessible localized feature tip ${feature.key}`);
     }
     if (comparison.find('.price .price-currency').length !== 3 || comparison.find('.billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: pricing needs currency typography and annual discount`);
     if (comparison.find('.comparison-note').length < 2) errors.push(`${label}: missing quota consumption and renewal disclosures`);

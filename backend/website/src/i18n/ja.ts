@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/ja';
 import type { Dictionary } from './types';
+
+const membershipSummary = `ローカル読書は無料。無料アカウントは ${publishedModels.free.join(' · ')} で1日30ページ。PLUS は月2,500ページ、3か月 US$6.66 または年 US$23.99。Pro は月4,000ページ、3か月 US$9.99 または年 US$35.99。両プランは無料モデルに加え ${publishedModels.paid_extra.join(' · ')} に対応。毎月付与、繰越なし、試用なし。無期限パックは3,500ページ US$5.99、7,000ページ US$9.99。税と最終金額は決済時に表示。`;
 
 export default {
   "ui": {
@@ -479,7 +482,7 @@ export default {
           {
             "title": "利用枠と購読",
             "paragraphs": [
-              "ローカル読書は無料。無料アカウントは GPT 6 Luna で1日30ページ。PLUS は月2,500ページ、3か月 US$6.66 または年 US$23.99。Pro は月4,000ページ、3か月 US$9.99 または年 US$35.99。両プランは Haiku 5.5 を使用。毎月付与、繰越なし、試用なし。無期限パックは3,500ページ US$5.99、7,000ページ US$9.99。税と最終金額は決済時に表示。",
+              membershipSummary,
               "月払いと年払いに対応しています。料金、試用、ページ数は選択したプランに従い、その周期で自動更新されます。料金変更は新規購読に適用され、既存の購読は元の料金と特典を維持します。更新前に解約できます。"
             ]
           },
@@ -548,7 +551,7 @@ export default {
       {
         "id": "free-plan",
         "question": "漫画翻訳は無料ですか？PLUS / Pro との違いは？",
-        "answer": "ローカル読書は無料。無料アカウントは GPT 6 Luna で1日30ページ。PLUS は月2,500ページ、3か月 US$6.66 または年 US$23.99。Pro は月4,000ページ、3か月 US$9.99 または年 US$35.99。両プランは Haiku 5.5 を使用。毎月付与、繰越なし、試用なし。無期限パックは3,500ページ US$5.99、7,000ページ US$9.99。税と最終金額は決済時に表示。",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

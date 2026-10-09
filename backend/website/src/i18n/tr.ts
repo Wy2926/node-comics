@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/tr';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Yerel okuma ücretsizdir. Free, ${publishedModels.free.join(' · ')} ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de ücretsiz modellere ek olarak ${publishedModels.paid_extra.join(' · ')} sunar. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "NodeLane resmî kanalı",
       "paragraphs": [
         "NodeLane hesabınıza girin, dili seçin ve çeviriyi açın. Hizmet seçilen görselleri işler; erişim ve kota hesabınıza bağlıdır. Geçerli sonucu yeniden kullanmak kotadan tekrar düşmez.",
-        "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Avantajlar ve abonelikler",
             "paragraphs": [
-              "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir.",
+              membershipSummary,
               "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Manga çevirisi ücretsiz mi ve PLUS / Pro neler içeriyor?",
-        "answer": "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

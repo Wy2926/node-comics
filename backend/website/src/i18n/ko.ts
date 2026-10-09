@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/ko';
 import type { Dictionary } from './types';
+
+const membershipSummary = `로컬 읽기는 무료입니다. 무료 계정은 ${publishedModels.free.join(' · ')}로 하루 30페이지를 이용합니다. PLUS는 월 2,500페이지, 분기 US$6.66 또는 연 US$23.99입니다. Pro는 월 4,000페이지, 분기 US$9.99 또는 연 US$35.99입니다. 두 요금제 모두 무료 모델에 더해 ${publishedModels.paid_extra.join(' · ')}도 지원합니다. 매월 지급되며 이월이나 구독 체험은 없습니다. 무기한 팩은 3,500페이지 US$5.99, 7,000페이지 US$9.99입니다. 세금과 최종 금액은 결제 시 표시됩니다.`;
 
 export default {
   "ui": {
@@ -479,7 +482,7 @@ export default {
           {
             "title": "이용량과 구독",
             "paragraphs": [
-              "로컬 읽기는 무료입니다. 무료 계정은 GPT 6 Luna로 하루 30페이지를 이용합니다. PLUS는 월 2,500페이지, 분기 US$6.66 또는 연 US$23.99입니다. Pro는 월 4,000페이지, 분기 US$9.99 또는 연 US$35.99입니다. 두 요금제 모두 Haiku 5.5를 사용합니다. 매월 지급되며 이월이나 구독 체험은 없습니다. 무기한 팩은 3,500페이지 US$5.99, 7,000페이지 US$9.99입니다. 세금과 최종 금액은 결제 시 표시됩니다.",
+              membershipSummary,
               "월간 또는 연간 결제를 지원합니다. 가격, 체험 및 페이지 수는 선택한 요금제를 따르며 해당 주기로 자동 갱신됩니다. 가격 변경은 신규 구독에 적용되며 기존 구독은 원래 가격과 혜택을 유지합니다. 갱신 전에 취소할 수 있습니다."
             ]
           },
@@ -548,7 +551,7 @@ export default {
       {
         "id": "free-plan",
         "question": "만화 번역은 무료인가요? PLUS / Pro와는 어떻게 다른가요?",
-        "answer": "로컬 읽기는 무료입니다. 무료 계정은 GPT 6 Luna로 하루 30페이지를 이용합니다. PLUS는 월 2,500페이지, 분기 US$6.66 또는 연 US$23.99입니다. Pro는 월 4,000페이지, 분기 US$9.99 또는 연 US$35.99입니다. 두 요금제 모두 Haiku 5.5를 사용합니다. 매월 지급되며 이월이나 구독 체험은 없습니다. 무기한 팩은 3,500페이지 US$5.99, 7,000페이지 US$9.99입니다. 세금과 최종 금액은 결제 시 표시됩니다.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/de';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Lokales Lesen ist kostenlos. Free bietet täglich 30 Seiten mit ${publishedModels.free.join(' · ')}. PLUS: 2.500 Seiten pro Monat für 6,66 USD pro Quartal oder 23,99 USD pro Jahr. Pro: 4.000 Seiten pro Monat für 9,99 USD pro Quartal oder 35,99 USD pro Jahr. Beide bieten die kostenlosen Modelle sowie zusätzlich ${publishedModels.paid_extra.join(' · ')}. Monatliche Zuteilung ohne Übertrag und ohne Probeabo. Unbefristete Pakete: 3.500 Seiten für 5,99 USD oder 7.000 für 9,99 USD. Steuern und Endbetrag beim Bezahlen.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Offizieller NodeLane-Dienst",
       "paragraphs": [
         "Melde dich bei NodeLane an, um den offiziellen Dienst zu nutzen. Ausgewählte Bilder werden auf dem Server entsprechend den in deinem Konto angezeigten Leistungen und Grenzen verarbeitet. Gültige Ergebnisse können gemäß den Aufbewahrungsregeln wiederverwendet werden.",
-        "Lokales Lesen ist kostenlos. Free bietet täglich 30 Seiten mit GPT 6 Luna. PLUS: 2.500 Seiten pro Monat für 6,66 USD pro Quartal oder 23,99 USD pro Jahr. Pro: 4.000 Seiten pro Monat für 9,99 USD pro Quartal oder 35,99 USD pro Jahr. Beide nutzen Haiku 5.5. Monatliche Zuteilung ohne Übertrag und ohne Probeabo. Unbefristete Pakete: 3.500 Seiten für 5,99 USD oder 7.000 für 9,99 USD. Steuern und Endbetrag beim Bezahlen."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Vorteile und Abonnements",
             "paragraphs": [
-              "Lokales Lesen ist kostenlos. Free bietet täglich 30 Seiten mit GPT 6 Luna. PLUS: 2.500 Seiten pro Monat für 6,66 USD pro Quartal oder 23,99 USD pro Jahr. Pro: 4.000 Seiten pro Monat für 9,99 USD pro Quartal oder 35,99 USD pro Jahr. Beide nutzen Haiku 5.5. Monatliche Zuteilung ohne Übertrag und ohne Probeabo. Unbefristete Pakete: 3.500 Seiten für 5,99 USD oder 7.000 für 9,99 USD. Steuern und Endbetrag beim Bezahlen.",
+              membershipSummary,
               "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Ist die Manga-Übersetzung kostenlos und was beinhaltet PLUS / Pro?",
-        "answer": "Lokales Lesen ist kostenlos. Free bietet täglich 30 Seiten mit GPT 6 Luna. PLUS: 2.500 Seiten pro Monat für 6,66 USD pro Quartal oder 23,99 USD pro Jahr. Pro: 4.000 Seiten pro Monat für 9,99 USD pro Quartal oder 35,99 USD pro Jahr. Beide nutzen Haiku 5.5. Monatliche Zuteilung ohne Übertrag und ohne Probeabo. Unbefristete Pakete: 3.500 Seiten für 5,99 USD oder 7.000 für 9,99 USD. Steuern und Endbetrag beim Bezahlen.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

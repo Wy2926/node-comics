@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/pl';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Czytanie lokalne jest bezpłatne. Free: 30 stron dziennie z ${publishedModels.free.join(' · ')}. PLUS: 2500 stron miesięcznie za 6,66 USD kwartalnie lub 23,99 USD rocznie. Pro: 4000 stron miesięcznie za 9,99 USD kwartalnie lub 35,99 USD rocznie. Oba obejmują darmowe modele oraz dodatkowo ${publishedModels.paid_extra.join(' · ')}. Miesięczne limity bez przenoszenia i okresu próbnego. Bezterminowe pakiety: 3500 stron za 5,99 USD lub 7000 za 9,99 USD. Podatki i suma przy płatności.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Oficjalny kanał NodeLane",
       "paragraphs": [
         "Zaloguj się do NodeLane, wybierz język i włącz tłumaczenie. Usługa przetwarza wybrane obrazy; konto określa dostęp i limity. Ponowne użycie ważnego wyniku nie pobiera limitu drugi raz.",
-        "Czytanie lokalne jest bezpłatne. Free: 30 stron dziennie z GPT 6 Luna. PLUS: 2500 stron miesięcznie za 6,66 USD kwartalnie lub 23,99 USD rocznie. Pro: 4000 stron miesięcznie za 9,99 USD kwartalnie lub 35,99 USD rocznie. Oba używają Haiku 5.5. Miesięczne limity bez przenoszenia i okresu próbnego. Bezterminowe pakiety: 3500 stron za 5,99 USD lub 7000 za 9,99 USD. Podatki i suma przy płatności."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Korzyści i subskrypcje",
             "paragraphs": [
-              "Czytanie lokalne jest bezpłatne. Free: 30 stron dziennie z GPT 6 Luna. PLUS: 2500 stron miesięcznie za 6,66 USD kwartalnie lub 23,99 USD rocznie. Pro: 4000 stron miesięcznie za 9,99 USD kwartalnie lub 35,99 USD rocznie. Oba używają Haiku 5.5. Miesięczne limity bez przenoszenia i okresu próbnego. Bezterminowe pakiety: 3500 stron za 5,99 USD lub 7000 za 9,99 USD. Podatki i suma przy płatności.",
+              membershipSummary,
               "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Czy tłumaczenie mangi jest bezpłatne i co obejmuje PLUS / Pro?",
-        "answer": "Czytanie lokalne jest bezpłatne. Free: 30 stron dziennie z GPT 6 Luna. PLUS: 2500 stron miesięcznie za 6,66 USD kwartalnie lub 23,99 USD rocznie. Pro: 4000 stron miesięcznie za 9,99 USD kwartalnie lub 35,99 USD rocznie. Oba używają Haiku 5.5. Miesięczne limity bez przenoszenia i okresu próbnego. Bezterminowe pakiety: 3500 stron za 5,99 USD lub 7000 za 9,99 USD. Podatki i suma przy płatności.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

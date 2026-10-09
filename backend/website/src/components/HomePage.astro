@@ -1,7 +1,7 @@
 ---
 import { getImage } from 'astro:assets';
 import BrowserStores from './BrowserStores.astro';
-import {publishedSubscriptions} from '../data/published-plans';
+import {publishedSubscriptions,publishedModels} from '../data/published-plans';
 import {quarterlyCopy} from '../i18n/billing-cadence';
 import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
 import {amountParts,offerBenefits} from '../lib/billing';
@@ -72,13 +72,13 @@ const previews = await Promise.all(previewWidths.map(width =>
         <article class="home-plan">
           <h3>{t.freePlan}</h3>
           <p class="home-price"><PriceAmount parts={publishedAmountParts('free', locale)} /></p>
-          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}>{row.shared && <span class="ui-icon icon-check" aria-hidden="true"></span>}<span>{row.free}</span></li>)}</ul>
+          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}>{row.shared && <span class="ui-icon icon-check" aria-hidden="true"></span>}{row.key==='model'?<span class="home-model-list">{publishedModels.free.map(model=><bdi>{model}</bdi>)}</span>:<span>{row.free}</span>}</li>)}</ul>
           <a class="button secondary" data-install-extension href={href('/download/')}>{h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
         </article>
         {['plus','pro'].map(planId=><article class="home-plan home-plan-paid">
           <h3>{planId==='plus'?'PLUS':'Pro'}</h3>
           {(['quarter','year'] as const).map(interval => <p class="home-price" data-home-price={interval} hidden={interval !== 'quarter'}><PriceAmount parts={amountParts(publishedSubscriptions.find(offer=>offer.plan_id===planId&&offer.interval===interval)!,locale)} /><small>/ {interval === 'quarter' ? quarterlyCopy(locale).unit : billing.year}</small></p>)}
-          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}><span class="ui-icon icon-check" aria-hidden="true"></span>{row.shared ? <span>{row.lite}</span> : <strong>{row.key==='classic'?offerBenefits(publishedSubscriptions.find(offer=>offer.plan_id===planId)!,locale):row.lite}</strong>}</li>)}</ul>
+          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}><span class="ui-icon icon-check" aria-hidden="true"></span>{row.key==='model'?<strong class="home-model-list">{[...publishedModels.free,...publishedModels.paid_extra].map(model=><bdi>{model}</bdi>)}</strong>:row.shared ? <span>{row.lite}</span> : <strong>{row.key==='classic'?offerBenefits(publishedSubscriptions.find(offer=>offer.plan_id===planId)!,locale):row.lite}</strong>}</li>)}</ul>
           <a class="button" href={href('/pricing/')}>{t.pricing}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
         </article>)}
       </div>

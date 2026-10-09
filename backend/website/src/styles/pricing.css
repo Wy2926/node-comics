@@ -1,45 +1,64 @@
-/* Shared pricing tokens cover both homepage comparison and catalog cards. */
-.pricing-comparison .subscription-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 20px;}
-.pricing-comparison .subscription-card {min-width: 0; padding: 28px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface-soft); display: flex; flex-direction: column; gap: 14px;}
-.pricing-comparison .subscription-card.paid {border-color: var(--accent);}
-.pricing-comparison .subscription-card h2 {font-size: 1.8rem; margin: 0;}
-.pricing-comparison .subscription-card .price {display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 2.5rem; font-variant-numeric: tabular-nums; margin: 10px 0;}
-.pricing-comparison .subscription-card .price-unit {font-size: .8rem; color: var(--muted);}
-.pricing-comparison .subscription-allowance {font-size: 1.15rem; color: var(--accent); min-height: 3em;}
-.pricing-comparison .subscription-card .button {width: 100%; justify-content: center; white-space: normal; text-align: center;}
-.pricing-comparison .subscription-card .trial-note {color: var(--muted); font-size: .76rem; min-height: 4em; line-height: 1.7;}
-.pricing-comparison .subscription-features {list-style: none; margin: auto 0 0; padding: 0;}
-.pricing-comparison .subscription-features li {padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; font-size: .85rem;}
-.pricing-comparison .subscription-features li>span {color: var(--muted);}
-.pricing-comparison .subscription-features strong {font-weight: 500;}
+/* Cards surface the differences; the single comparison owns detailed explanations. */
 .pricing-comparison { max-width: 1180px; margin: 0 auto 48px; }
-.pricing-comparison > .billing-cycle-picker { margin: 0 auto 24px; }
-.pricing-comparison .plan-comparison { width: 100%; table-layout: fixed; border-collapse: collapse; background: transparent; font-size: .9rem; line-height: 1.6; }
-.pricing-comparison .feature-column { width: 26%; }
-.pricing-comparison col:not(.feature-column) { width: 37%; }
-.pricing-comparison :is(th, td) { padding: 24px 28px; border: 0; border-bottom: 1px solid var(--line); text-align: start; vertical-align: middle; overflow-wrap: anywhere; hyphens: auto; font-weight: 400; }
-.pricing-comparison thead th { padding: 0; vertical-align: top; background: transparent; }
-.pricing-comparison thead .comparison-heading { padding: 34px 28px; }
-.pricing-comparison .comparison-heading > span { font-size: .76rem; color: var(--muted); }
-.pricing-comparison .comparison-heading h2 { margin-top: 16px; font-family: Georgia, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif; font-size: clamp(1.6rem, 2.5vw, 2.15rem); font-weight: 400; line-height: 1.3; text-wrap: balance; }
-.pricing-comparison .price-card { padding: 32px 28px; min-width: 0; }
-.pricing-comparison :is(.paid-column, tbody td:last-child, .paid-action) { background: #101e2f; }
-.pricing-comparison .paid-column { border-radius: 18px 18px 0 0; }
-.pricing-comparison .paid-action { border-radius: 0 0 18px 18px; }
-.pricing-comparison .membership-heading { min-height: 22px; margin-bottom: 16px; color: var(--accent); font-size: .75rem; line-height: 1.5; }
-.pricing-comparison .price-card h2 { font-size: 1.8rem; font-weight: 500; }
-.pricing-comparison .price-card > p:not(.price) { margin-top: 12px; min-height: 3.4em; color: var(--muted); font-size: .86rem; line-height: 1.7; }
-.pricing-comparison .price-card.paid > p:not(.price) { color: var(--accent); font-weight: 600; }
-.pricing-comparison .price-card .price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 28px 0 12px; color: var(--ink); font-size: clamp(2.3rem, 3.5vw, 3.4rem); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.05em; line-height: 1.1; }
+.pricing-comparison > .billing-cycle-picker { margin: 0 auto 28px; }
+.pricing-comparison .subscription-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+.pricing-comparison .subscription-card { min-width: 0; display: grid; grid-template-rows: subgrid; grid-row: span 6; gap: 20px; padding: 28px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface); }
+.pricing-comparison .subscription-card.paid { background: var(--surface-soft); }
+.pricing-comparison .subscription-card[data-more-pages='true'] { border-color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+.pricing-comparison .membership-heading { margin: 0 0 12px; color: var(--muted); font-size: .78rem; }
+.pricing-comparison .subscription-card[data-more-pages='true'] .membership-heading { color: var(--accent); }
+.pricing-comparison .subscription-card h2 { margin: 0; font-size: 1.8rem; }
+.pricing-comparison .price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0 0 12px; color: var(--ink); font-size: clamp(2.4rem, 3.5vw, 3.2rem); font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -.04em; }
 .pricing-comparison .price .price-value { font: inherit; color: inherit; letter-spacing: inherit; }
-.pricing-comparison .price .price-unit { color: var(--muted); font-size: .8rem; font-weight: 400; letter-spacing: 0; }
-.pricing-comparison :is(.billing-total, .monthly-equivalent, .published-pricing-label) { font-size: .75rem; line-height: 1.7; color: var(--muted); }
-.pricing-comparison .price-terms { min-height: 5.1em; font-size: .75rem; line-height: 1.7; }
-.pricing-comparison .monthly-equivalent { color: var(--ink); }
+.pricing-comparison .price .price-unit { padding: 5px 9px; border: 1px solid var(--line); border-radius: var(--comic-badge-radius); color: var(--muted); font-size: .75rem; font-weight: 400; letter-spacing: 0; line-height: 1.4; }
+.pricing-comparison .price .price-currency { margin-inline-end: 3px; font-size: .38em; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.pricing-comparison :is(.price-terms, .billing-total) { color: var(--muted); font-size: .75rem; line-height: 1.7; }
+.pricing-comparison .price-terms { display: grid; gap: 10px; }
+.pricing-comparison .monthly-equivalent { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface); }
+.pricing-comparison .monthly-equivalent svg { width: 22px; height: 22px; flex: none; color: var(--accent); }
+.pricing-comparison .monthly-equivalent strong { display: block; color: var(--ink); font-size: 1.1rem; font-variant-numeric: tabular-nums; line-height: 1.5; }
+.pricing-comparison .monthly-equivalent small { font-size: .72rem; font-weight: 400; color: var(--muted); }
+.pricing-comparison .price-discount { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: .76rem; font-weight: 600; }
+.pricing-comparison .price-discount svg { width: 17px; height: 17px; flex: none; }
 .pricing-comparison .billing-offer { padding: 0; border: 0; background: transparent; }
-.pricing-comparison .billing-plan-picker { margin-top: 16px; }
-.pricing-comparison .billing-plan-card { padding: 10px 12px; font-size: .8rem; }
-.pricing-comparison tbody th { background: transparent; color: var(--muted); font-size: .85rem; }
+.pricing-comparison .plan-allowance { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.pricing-comparison .plan-allowance > span { font-size: .75rem; color: var(--muted); }
+.pricing-comparison .subscription-allowance { font-size: 1.6rem; color: var(--accent); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.pricing-comparison .plan-difference { padding: 4px 9px; border-radius: var(--comic-badge-radius); background: var(--accent-soft); color: var(--accent); font-size: .72rem; line-height: 1.7; }
+.pricing-comparison .subscription-card .button { width: 100%; justify-content: center; white-space: normal; text-align: center; }
+.pricing-comparison .subscription-card :is(.trial-note, .billing-status) { margin: 10px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.7; }
+.pricing-comparison .subscription-card .billing-status { color: var(--ink); }
+.pricing-comparison .plan-models { border-top: 1px solid var(--line); padding-top: 18px; }
+.pricing-comparison .plan-models h3 { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.pricing-comparison .plan-models h3:not(:first-child) { margin-top: 18px; }
+.pricing-comparison .plan-models ul { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; font-size: .9rem; line-height: 1.6; }
+.pricing-comparison .plan-models li { display: flex; align-items: center; gap: 9px; }
+.pricing-comparison .plan-models [data-included='false'] { color: var(--muted); }
+.pricing-comparison .ui-icon { width: 18px; height: 20px; }
+.pricing-comparison .model-unavailable { display: inline-block; width: 18px; color: var(--muted); text-align: center; }
+.pricing-comparison .subscription-features { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.pricing-comparison .subscription-features li { padding-top: 14px; display: grid; gap: 5px; font-size: .8rem; line-height: 1.7; }
+.pricing-comparison .subscription-features li > span { color: var(--muted); }
+.pricing-comparison .subscription-features strong { font-weight: 500; }
+.pricing-comparison .comparison-scroll { margin-top: 48px; overflow-x: auto; border-radius: var(--comic-card-radius); }
+.pricing-comparison .comparison-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.pricing-comparison .plan-comparison { width: 100%; min-width: 660px; table-layout: fixed; border-collapse: collapse; background: transparent; font-size: .85rem; line-height: 1.7; }
+.pricing-comparison .plan-comparison caption { padding: 0 0 24px; text-align: start; font-size: 1.6rem; font-weight: 600; color: var(--ink); }
+.pricing-comparison .feature-column { width: 28%; }
+.pricing-comparison :is(th, td) { padding: 18px 22px; border: 0; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; overflow-wrap: anywhere; font-weight: 400; }
+.pricing-comparison thead th { background: var(--surface-soft); font-size: 1rem; font-weight: 600; }
+.pricing-comparison tr > th:first-child { text-align: start; }
+.pricing-comparison tbody th { color: var(--muted); }
+.pricing-comparison tbody strong { font-weight: 500; }
+.pricing-comparison tr[data-feature='classic'] strong { color: var(--accent); font-size: 1rem; }
+.pricing-comparison .model-access { display: inline-flex; align-items: center; }
+.pricing-comparison td[data-advantage='true'] { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.pricing-comparison td[data-advantage='true'] > strong { display: inline-block; padding: 5px 10px; border-radius: var(--comic-badge-radius); background: var(--accent-soft); color: var(--accent); }
+.pricing-comparison td[data-advantage='true'] .model-access { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%; background: var(--accent-soft); }
+.pricing-comparison td[data-more-pages='true'] > strong { outline: 1px solid var(--accent); font-weight: 650; }
+.pricing-comparison :is(.comparison-delta, .comparison-model-tier) { display: block; margin-top: 7px; color: var(--accent); font-size: .7rem; font-weight: 400; line-height: 1.6; }
+.pricing-comparison td[data-unavailable='true'] { color: var(--muted); }
+.pricing-comparison .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pricing-comparison .feature-info { display: inline-flex; margin-inline-start: 4px; vertical-align: middle; }
 .pricing-comparison .feature-info-trigger { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 4px; border: 0; border-radius: var(--comic-control-radius); background: transparent; color: var(--muted); cursor: help; }
 .pricing-comparison .feature-info-trigger:is(:hover, [aria-expanded='true']) { color: var(--accent); background: var(--accent-soft); }
@@ -48,49 +67,12 @@
 .pricing-comparison .feature-info-tip { position: fixed; z-index: 20; inset: 0 auto auto 0; width: min(20rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding-block: 8px; overflow: auto; color: var(--ink); font-size: .78rem; font-weight: 400; line-height: 1.7; text-align: start; }
 .pricing-comparison .feature-info-tip[hidden] { display: none; }
 .pricing-comparison .feature-info-content { display: block; padding: 12px 14px; border: var(--comic-border); border-radius: var(--comic-card-radius); background: var(--surface-soft); box-shadow: var(--comic-shadow); }
-.pricing-comparison tbody td { color: var(--muted); }
-.pricing-comparison tbody strong { color: var(--ink); font-weight: 600; }
-.pricing-comparison tr[data-feature='classic'] strong { color: var(--accent); }
-.pricing-comparison .feature-value { display: flex; align-items: flex-start; gap: 12px; }
-.pricing-comparison .feature-value .ui-icon { width: 18px; height: 25px; color: var(--accent); }
-.pricing-comparison .pricing-actions td { padding: 30px 28px; vertical-align: top; border-bottom: 0; }
-.pricing-comparison .pricing-actions .button { width: 100%; margin: 0; justify-content: space-between; white-space: normal; overflow-wrap: anywhere; gap: 12px; }
-.pricing-comparison .pricing-actions :is(.trial-note, .billing-status) { margin: 16px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.8; }
-.pricing-comparison .pricing-actions .billing-status { color: var(--ink); }
-.pricing-comparison > .comparison-note { max-width: 840px; margin: 30px auto 0; color: var(--muted); font-size: .76rem; line-height: 1.8; text-align: center; }
-@media (max-width: 950px) {
-  .pricing-comparison :is(th, td) { padding: 20px 18px; }
-  .pricing-comparison thead th { padding: 0; }
-  .pricing-comparison thead .comparison-heading { padding: 30px 18px; }
-  .pricing-comparison .price-card { padding: 30px 18px; }
-  .pricing-comparison .pricing-actions td { padding: 24px 18px; }
-}
-@media (max-width: 580px) {
-  .pricing-comparison > .billing-cycle-picker { margin-bottom: 18px; }
-  .pricing-comparison .feature-column { width: 24%; }
-  .pricing-comparison col:not(.feature-column) { width: 38%; }
-  .pricing-comparison :is(th, td) { padding: 17px 12px; font-size: .75rem; line-height: 1.6; }
-  .pricing-comparison thead th { padding: 0; }
-  .pricing-comparison thead .comparison-heading { padding: 22px 12px; }
-  .pricing-comparison .comparison-heading > span { font-size: .62rem; }
-  .pricing-comparison .comparison-heading h2 { font-size: .96rem; }
-  .pricing-comparison .price-card { padding: 22px 12px; }
-  .pricing-comparison .membership-heading { font-size: .62rem; min-height: 36px; margin-bottom: 10px; }
-  .pricing-comparison .price-card h2 { min-height: 2.6em; font-size: 1.3rem; }
-  .pricing-comparison .price-card > p:not(.price) { display: none; }
-  .pricing-comparison .price-card .price { margin-top: 16px; min-height: 52px; align-content: start; gap: 5px; font-size: clamp(1.55rem, 6.8vw, 2rem); }
-  .pricing-comparison .price .price-unit { flex-basis: 100%; font-size: .66rem; }
-  .pricing-comparison :is(.billing-total, .monthly-equivalent, .published-pricing-label) { font-size: .65rem; }
-  .pricing-comparison .price-terms { min-height: 8.5em; font-size: .65rem; }
-  .pricing-comparison tbody th { font-size: .68rem; }
-  .pricing-comparison .feature-value { gap: 5px; text-wrap: balance; }
-  .pricing-comparison .feature-value .ui-icon { width: 12px; height: 19px; }
-  .pricing-comparison .pricing-actions td { padding: 22px 12px; }
-  .pricing-comparison .pricing-actions .button { font-size: .7rem; padding: 10px 8px; gap: 5px; }
-  .pricing-comparison .pricing-actions .button .ui-icon { display: none; }
-  .pricing-comparison .pricing-actions :is(.trial-note, .billing-status) { font-size: .65rem; }
-  .pricing-comparison > .comparison-note { font-size: .7rem; text-align: start; }
-}
-@media (max-width: 350px) {
-  .pricing-comparison .price-terms { min-height: 11.9em; }
+.pricing-comparison > .comparison-note { max-width: 920px; margin: 20px auto 0; color: var(--muted); font-size: .76rem; line-height: 1.8; text-align: start; }
+@media (max-width: 640px) {
+  .pricing-comparison .subscription-grid { grid-template-columns: 1fr; gap: 20px; }
+  .pricing-comparison .subscription-card { grid-row: auto; grid-template-rows: auto; padding: 24px; gap: 20px; }
+  .pricing-comparison .comparison-scroll { margin-top: 36px; }
+  .pricing-comparison :is(th, td) { padding: 15px 14px; font-size: .78rem; }
+  .pricing-comparison tr > th:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--surface); }
+  .pricing-comparison .plan-comparison caption { font-size: 1.35rem; }
 }

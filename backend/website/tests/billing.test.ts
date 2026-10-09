@@ -13,9 +13,9 @@ test('all pricing locales distinguish ordinary and subscription translation mode
     const copy=comparisonCopy(locale);
     assert.ok(copy.model.label.trim(),locale);
     assert.match(copy.model.free,/GPT 6 Luna/,locale);
-    assert.match(copy.model.lite,/Haiku 5\.5/,locale);
-    assert.doesNotMatch(copy.model.free,/Gemini/,locale);
-    assert.doesNotMatch(copy.model.lite,/GPT/,locale);
+    assert.match(copy.model.free,/Haiku 5\.5/,locale);
+    for(const model of ['GPT 6 Luna','Claude Haiku 5.5','DeepSeekv4 Pro','Gemini 3.8 Flash'])assert.ok(copy.model.lite.includes(model),locale);
+    assert.doesNotMatch(copy.model.free,/Gemini|DeepSeek/,locale);
   }
 });
 

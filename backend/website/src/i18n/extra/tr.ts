@@ -180,9 +180,7 @@ export const commerce = {
   ],
   "comparison": {
     "model": {
-      "label": "Çeviri modelleri",
-      "free": "GPT 6 Luna ve benzeri modeller",
-      "lite": "Haiku 5.5 ve benzeri modeller"
+      "label": "Çeviri modelleri"
     },
     "feature": "Özellikler ve faydalar",
     "highlights": "PLUS / Pro İLE ÇEVİR",

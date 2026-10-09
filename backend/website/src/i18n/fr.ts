@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/fr';
 import type { Dictionary } from './types';
+
+const membershipSummary = `La lecture locale est gratuite. Free offre 30 pages par jour avec ${publishedModels.free.join(' · ')}. PLUS : 2 500 pages par mois, 6,66 USD par trimestre ou 23,99 USD par an. Pro : 4 000 pages par mois, 9,99 USD par trimestre ou 35,99 USD par an. Les deux incluent les modèles gratuits et ajoutent ${publishedModels.paid_extra.join(' · ')}. Crédit mensuel sans report ni essai. Packs sans expiration : 3 500 pages à 5,99 USD, 7 000 à 9,99 USD. Taxes et total au paiement.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Service officiel NodeLane",
       "paragraphs": [
         "Connectez votre compte NodeLane pour utiliser le service officiel. Les images sélectionnées sont traitées à distance selon les droits et les limites affichés dans votre compte. Les résultats valides peuvent être réutilisés selon les règles de conservation.",
-        "La lecture locale est gratuite. Free offre 30 pages par jour avec GPT 6 Luna. PLUS : 2 500 pages par mois, 6,66 USD par trimestre ou 23,99 USD par an. Pro : 4 000 pages par mois, 9,99 USD par trimestre ou 35,99 USD par an. Les deux utilisent Haiku 5.5. Crédit mensuel sans report ni essai. Packs sans expiration : 3 500 pages à 5,99 USD, 7 000 à 9,99 USD. Taxes et total au paiement."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Avantages et abonnements",
             "paragraphs": [
-              "La lecture locale est gratuite. Free offre 30 pages par jour avec GPT 6 Luna. PLUS : 2 500 pages par mois, 6,66 USD par trimestre ou 23,99 USD par an. Pro : 4 000 pages par mois, 9,99 USD par trimestre ou 35,99 USD par an. Les deux utilisent Haiku 5.5. Crédit mensuel sans report ni essai. Packs sans expiration : 3 500 pages à 5,99 USD, 7 000 à 9,99 USD. Taxes et total au paiement.",
+              membershipSummary,
               "Les abonnements proposent une facturation mensuelle ou annuelle. Les prix, les essais et les allocations de pages suivent l'offre sélectionnée, qui se renouvelle automatiquement à cet intervalle. Les modifications de prix s'appliquent aux nouveaux abonnements ; les abonnements existants conservent leur prix et leur version d'avantages d'origine. Annuler avant le renouvellement."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "La traduction de mangas est-elle gratuite et que comprend PLUS / Pro ?",
-        "answer": "La lecture locale est gratuite. Free offre 30 pages par jour avec GPT 6 Luna. PLUS : 2 500 pages par mois, 6,66 USD par trimestre ou 23,99 USD par an. Pro : 4 000 pages par mois, 9,99 USD par trimestre ou 35,99 USD par an. Les deux utilisent Haiku 5.5. Crédit mensuel sans report ni essai. Packs sans expiration : 3 500 pages à 5,99 USD, 7 000 à 9,99 USD. Taxes et total au paiement.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

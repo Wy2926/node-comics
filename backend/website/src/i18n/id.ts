@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/id';
 import type { Dictionary } from './types';
+
+const membershipSummary = `Membaca lokal gratis. Free mendapat 30 halaman per hari dengan ${publishedModels.free.join(' · ')}. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya mencakup model gratis dan menambahkan ${publishedModels.paid_extra.join(' · ')}. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Saluran resmi NodeLane",
       "paragraphs": [
         "Masuk ke akun NodeLane, pilih bahasa, lalu aktifkan terjemahan. Layanan memproses gambar pilihan; akun menentukan akses dan kuota. Menggunakan kembali hasil yang masih berlaku tidak memotong kuota lagi.",
-        "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Manfaat dan langganan",
             "paragraphs": [
-              "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran.",
+              membershipSummary,
               "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "Apakah terjemahan manga gratis, dan apa saja yang termasuk dalam PLUS / Pro?",
-        "answer": "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

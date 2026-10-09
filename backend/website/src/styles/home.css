@@ -42,6 +42,8 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
 .home-plan ul { display: grid; grid-template-rows: subgrid; grid-row: span 5; padding: 0; margin: 0 0 12px; list-style: none; font-size: .85rem; line-height: 1.65; color: var(--muted); }
 .home-plan li { display: flex; align-items: flex-start; gap: 10px; }
 .home-plan li strong { font-weight: 600; color: var(--ink); }
+.home-model-list { display: grid; gap: 4px; min-width: 0; }
+.home-model-list bdi { display: block; overflow-wrap: anywhere; }
 .home-plan-paid li[data-feature='classic'] strong { color: var(--accent); }
 .home-plan .icon-check { width: 17px; height: 22px; }
 .home-plan .button { width: 100%; justify-content: space-between; font-size: .84rem; }

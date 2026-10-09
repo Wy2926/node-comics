@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/pt-BR';
 import type { Dictionary } from './types';
+
+const membershipSummary = `A leitura local é gratuita. Free inclui 30 páginas diárias com ${publishedModels.free.join(' · ')}. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos incluem os modelos gratuitos e acrescentam ${publishedModels.paid_extra.join(' · ')}. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento.`;
 
 export default {
   "ui": {
@@ -206,7 +209,7 @@ export default {
       "title": "Serviço oficial NodeLane",
       "paragraphs": [
         "Entre na sua conta NodeLane para usar o serviço oficial. As imagens selecionadas são processadas remotamente conforme os direitos e limites mostrados na conta. Resultados válidos podem ser reutilizados segundo as regras de retenção.",
-        "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento."
+        membershipSummary
       ]
     },
     {
@@ -491,7 +494,7 @@ export default {
           {
             "title": "Benefícios e assinaturas",
             "paragraphs": [
-              "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento.",
+              membershipSummary,
               "As assinaturas oferecem faturamento mensal ou anual. Preços, avaliações e franquias de páginas seguem a oferta selecionada, que é renovada automaticamente nesse intervalo. As alterações de preço aplicam-se a novas assinaturas; as assinaturas existentes mantêm o preço original e a versão de benefícios. Cancele antes da renovação."
             ]
           },
@@ -560,7 +563,7 @@ export default {
       {
         "id": "free-plan",
         "question": "A tradução de mangá é gratuita e o que PLUS / Pro inclui?",
-        "answer": "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento.",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {

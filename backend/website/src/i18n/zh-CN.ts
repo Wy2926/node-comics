@@ -1,5 +1,8 @@
+import { publishedModels } from '../data/published-plans';
 import { localTranslationGuides } from './guides/zh-CN';
 import type { Dictionary } from './types';
+
+const membershipSummary = `本地阅读免费。免费账户每日 30 页，使用 ${publishedModels.free.join(' · ')}。PLUS 每月 2,500 页，季付 US$6.66 或年付 US$23.99；Pro 每月 4,000 页，季付 US$9.99 或年付 US$35.99。付费保留免费模型，额外支持 ${publishedModels.paid_extra.join(' · ')}。订阅按月发放，未用额度不结转，无试用。永久额度包：3,500 页 US$5.99，7,000 页 US$9.99。税费及最终金额以结账页为准。`;
 
 export default {
   "ui": {
@@ -653,7 +656,7 @@ export default {
       {
         "id": "free-plan",
         "question": "漫画翻译免费吗？免费版和 PLUS / Pro 有什么区别？",
-        "answer": "本地阅读免费。免费账户每日 30 页，使用 GPT 6 Luna。PLUS 每月 2,500 页，季付 US$6.66 或年付 US$23.99；Pro 每月 4,000 页，季付 US$9.99 或年付 US$35.99，均使用 Haiku 5.5。订阅按月发放，未用额度不结转，无试用。永久额度包：3,500 页 US$5.99，7,000 页 US$9.99。税费及最终金额以结账页为准。",
+        "answer": membershipSummary,
         "relatedPath": "/pricing/"
       },
       {
