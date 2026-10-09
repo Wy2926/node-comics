@@ -13,9 +13,9 @@ function QuotaIcon({kind}:{kind:keyof typeof iconPaths}){
   return <svg className="quota-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={iconPaths[kind]}/></svg>;
 }
 
-export default function QuotaOffers({locale,offers,blocked=false,accountHref,checkoutCopy}:{locale:string;offers:BillingOffer[];blocked?:boolean;accountHref:string;checkoutCopy:CheckoutCopy}){
+export default function QuotaOffers({locale,offers,blocked=false,preview=false,accountHref,checkoutCopy}:{locale:string;offers:BillingOffer[];blocked?:boolean;preview?:boolean;accountHref:string;checkoutCopy:CheckoutCopy}){
   const copy=quotaPurchaseCopy(locale);
-  const visible=offers.filter(offer=>offer.interval==='once'&&offer.channels.length>0);
+  const visible=offers.filter(offer=>offer.interval==='once'&&(preview||offer.channels.length>0));
   if(!visible.length)return null;
   const [beforePages,afterPages]=copy.pages.split('{0}');
   return <section className="quota-offers" aria-label={copy.title}>
@@ -25,11 +25,11 @@ export default function QuotaOffers({locale,offers,blocked=false,accountHref,che
       <div className="quota-offer-quantity">{beforePages&&<span>{beforePages}</span>}<strong>{(offer.quota_pages??0).toLocaleString(locale)}</strong><span>{afterPages}</span></div>
       <div className="quota-offer-price"><bdi><PriceAmount parts={amountParts(offer,locale)}/></bdi><span className="quota-purchase-kind">{copy.oneTime}</span></div>
       <ul className="quota-offer-features">
-        {offer.service_plan_id&&<li className="quota-tier"><QuotaIcon kind="tier"/><span>{copy.service.replace('{0}',offer.service_plan_id==='lite'?'Lite':offer.service_plan_id==='plus'?'PLUS':offer.service_plan_id)}</span></li>}
+        {offer.service_plan_id&&<li className="quota-tier"><QuotaIcon kind="tier"/><span>{copy.service.replace('{0}',offer.service_plan_id==='lite'?'Lite':offer.service_plan_id==='plus'?'PLUS':offer.service_plan_id==='pro'?'Pro':offer.service_plan_id)}</span></li>}
         <li><QuotaIcon kind="clock"/><span>{offer.quota_validity_days==null?copy.noExpiry:copy.validity.replace('{0}',offer.quota_validity_days.toLocaleString(locale))}</span></li>
         {offer.hourly_image_limit!=null&&<li><QuotaIcon kind="bolt"/><span>{copy.hourly.replace('{0}',offer.hourly_image_limit.toLocaleString(locale))}</span></li>}
       </ul>
-      <div className="quota-offer-action"><CheckoutButton priceId={offer.id} accountHref={accountHref} disabled={blocked} showDisclosure={false} label={copy.action} copy={{...checkoutCopy,renewal:copy.terms,retry:copy.retry,retryHint:copy.retryHint}}/></div>
+      <div className="quota-offer-action">{offer.channels.length?<CheckoutButton priceId={offer.id} accountHref={accountHref} disabled={blocked} showDisclosure={false} label={copy.action} copy={{...checkoutCopy,renewal:copy.terms,retry:copy.retry,retryHint:copy.retryHint}}/>:<button className="button" disabled>{copy.action}</button>}</div>
     </article>)}</div>
     <div className="quota-offer-policy">
       <ul className="quota-offer-notes">{[copy.usage,copy.subscription,copy.validityStart].map(note=><li key={note}><span className="ui-icon icon-check" aria-hidden="true"/><span>{note}</span></li>)}</ul>

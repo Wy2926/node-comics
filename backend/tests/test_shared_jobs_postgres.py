@@ -21,7 +21,7 @@ def submit_existing(pg, key, asset_ids=None):
     for index, asset_id in enumerate(asset_ids or [pg['asset_id']]):
         with session_factory()() as db:
             user, asset = db.get(User, pg['owner_id']), db.get(Asset, asset_id)
-            body = TranslationInput(mode='redraw',target_language='zh-Hans',image={
+            body = TranslationInput(mode='classic',target_language='zh-Hans',image={
                 'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime})
             identifier = request_id(key if not asset_ids else f'{key}:{index}')
             response = translate(UUID(identifier),body,Request({'type':'http','headers':[(b'x-translation-protocol',b'overlay-v1')]}),user=user,db=db)
@@ -31,7 +31,7 @@ def submit_existing(pg, key, asset_ids=None):
 
 
 def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     from app import workers
     barrier = threading.Barrier(2)
     def confirmation(index):
@@ -62,8 +62,8 @@ def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
     calls = []
     def provider(*args):
         calls.append(1)
-        return TranslationOutput(pg["png"], usage={"total_tokens": 7})
-    monkeypatch.setattr(workers, "redraw", provider)
+        return pg["png"]
+    monkeypatch.setattr("conftest.fixture_output", provider)
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(run_job, job_id) for _ in range(2)]
         for future in futures:
@@ -73,7 +73,7 @@ def test_two_devices_submit_identical_page_share_one_paid_job(pg, monkeypatch):
 
 
 def test_completion_and_new_receipt_serialize_without_fk_deadlock(pg, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     from app import workers
     job_id = new_job(pg)
     finalizing, resume, request_waiting = threading.Event(), threading.Event(), threading.Event()
@@ -86,7 +86,7 @@ def test_completion_and_new_receipt_serialize_without_fk_deadlock(pg, monkeypatc
         if threading.current_thread().name.startswith("new-submission") and "pg_advisory_xact_lock" in statement:
             request_waiting.set()
     monkeypatch.setattr(workers, "create_asset", held_finalize)
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(pg["png"]))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: pg["png"])
     event.listen(engine(), "before_cursor_execute", observe)
     try:
         with ThreadPoolExecutor(max_workers=1) as execution, ThreadPoolExecutor(max_workers=1, thread_name_prefix="new-submission") as admission:
@@ -118,7 +118,7 @@ def test_single_and_multi_page_submission_keep_both_receipts(pg):
         with session_factory()() as db:
             user, asset = db.get(User, pg["owner_id"]), db.get(Asset, pg["asset_id"])
             barrier.wait(timeout=10)
-            job = create_job(db, user, asset, "redraw", "zh-Hans", "single-device")
+            job = create_job(db, user, asset, "classic", "zh-Hans", "single-device")
             db.commit()
             return job.id
     def multi():

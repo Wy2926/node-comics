@@ -5,8 +5,8 @@ from test_postgres_concurrency import pg_scope
 from test_compute_v3_postgres import client
 from test_hourly_image_limit import (
     billing, lite,
-    test_lite_seven_day_zero_redraw_trial_and_paid_version,
-    test_annual_lite_grants_full_year_without_empty_redraw_buckets,
+    test_lite_seven_day_unlimited_trial_and_paid_version,
+    test_annual_lite_grants_full_year_without_finite_buckets,
     test_admin_monitor_identifies_and_filters_effective_lite_plan,
     test_rolling_hour_counts_new_jobs_across_modes_languages_and_devices,
     test_hourly_concurrent_last_slot_and_owner_isolation,

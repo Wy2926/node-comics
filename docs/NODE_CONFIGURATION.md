@@ -59,11 +59,11 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 分发与进程恢复由 [Node Comics Node](../services/compute-node/README.md) 原生宿主管理，使用随包运行时、模型和固定字体；支持初始化、离线诊断、原生 Windows 服务、独立进程看门狗和人工停机。诊断日志在 10 MiB 时轮转，保留当前文件及最多 5 份备份，与保存未确认任务的恢复数据库分开管理。私有数据可放在独立目录；新电脑需要独立身份，搬移旧身份必须先停止旧宿主并排空租约。v2 切换先用旧程序排空，再在新目录初始化 v3 配置，不复制旧配置或恢复数据库。网络重试、进程恢复与服务账户环境分别验收，不能用进程存活推断中心在线。
 
-文本、重绘、上传恢复各有独立控制资源池。其执行位是所有工作进程共享的数据库容量，扩大池容量不会绕过供应商限制或用户分钟准入限制。
+文本与上传恢复各有独立控制资源池。其执行位是所有工作进程共享的数据库容量，扩大池容量不会绕过供应商限制或用户分钟准入限制。
 
 ## 目标语言与节点能力
 
-产品的常规翻译目标项来自 [backend/app/languages.py](../backend/app/languages.py)：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`，共 16 项。AI 重绘只开放前五项。
+产品的常规翻译目标项来自 [backend/app/languages.py](../backend/app/languages.py)：`zh-Hans`、`zh-Hant`、`ja`、`en`、`ko`、`fr`、`es`、`pt-BR`、`de`、`it`、`ru`、`pl`、`uk`、`tr`、`vi`、`id`，共 16 项。
 
 节点注册时报告 `supported_languages`，节点启动时依据字体覆盖自动检测目标语言，中心直接使用注册能力；不配置目标语言白名单或默认引擎指纹。来源 OCR 按段分流到 PP-OCRv5 或 Manga OCR，不要求客户端传来源语言；具体组合见[引擎支持范围](../services/classic-engine/ENGINE.md#支持范围)。未知或该模式未开放的目标语言返回 `LANGUAGE_UNSUPPORTED`。
 

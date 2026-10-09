@@ -13,8 +13,7 @@ os.environ.update(DATABASE_URL=f"sqlite:///{(directory / 'test.sqlite').as_posix
     REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE=directory.name,
     STORAGE_PATH=str(directory / "objects"), APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="admin-ui-isolated-signing-secret-0001",
     DEV_ADMIN_USERNAME="admin", CLASSIC_ENABLED="false",
-    ADMIN_WEB_PATH="/console-test/",
-    OPENAI_API_KEY="", PROVIDERS_JSON="")
+    ADMIN_WEB_PATH="/console-test/")
 from app.config import Settings
 Settings.model_config["env_file"] = None
 from app.main import app

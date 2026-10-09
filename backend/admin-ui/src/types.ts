@@ -1,4 +1,4 @@
-export type Mode = 'classic' | 'redraw';
+export type Mode = 'classic';
 export type TranslationProtocol = 'chat_completions' | 'responses';
 export type TranslationReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'provider_default';
 export type TranslationProviderConfig = {

@@ -1,9 +1,10 @@
+import {quarterlyCopy} from '../i18n/billing-cadence';
 import { commerceCopy, formatCopy } from '../i18n/commerce';
 import {quotaPurchaseCopy} from '../i18n/quota-purchase';
+import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
 export type BillingProvider='stripe'|'creem';
-// Legacy quota fields remain part of the billing API shape, not website copy.
-export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number;trial_redraw_pages:number}
-export interface BillingPrice {id:string;name:string;currency:string;unit_amount:number;interval:'month'|'year'|'once';service_plan_id?:string;quota_pages?:number;quota_validity_days?:number|null;monthly_redraw_pages:number;trial_days:number;trial_redraw_pages:number;plan_id?:string;hourly_image_limit?:number|null}
+export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number;trial_classic_pages:number|null}
+export interface BillingPrice {id:string;name:string;currency:string;unit_amount:number;interval:'month'|'quarter'|'year'|'once';service_plan_id?:string;quota_pages?:number;quota_validity_days?:number|null;monthly_classic_pages:number|null;trial_days:number;trial_classic_pages:number|null;plan_id?:string;hourly_image_limit?:number|null}
 export interface BillingOffer extends BillingPrice {plan_id:string;plan_revision_id:string;channels:BillingChannel[]}
 export interface MembershipGift {starts_at:string|null;ends_at:string|null;days:number;state:'pending'|'scheduled'|'active'|'expired'}
 export interface PurchaseQuota {granted:number;used:number;reserved:number;available:number;next_expiry_at:string|null}
@@ -56,13 +57,13 @@ export function billingBenefitCopy(locale:string) {
  const copy=commerceCopy(locale)?.billingBenefits;
  return copy ? {...copy,hourly:(n:number)=>formatCopy(copy.hourly,{n:n.toLocaleString(locale)}),trial:(d:number)=>formatCopy(copy.trial,{d}),subscribe:(name:string)=>formatCopy(copy.subscribe,{name})} : benefitLabels[locale as keyof typeof benefitLabels]??benefitLabels.en;
 }
-export function offerBenefits(offer:Pick<BillingPrice,'hourly_image_limit'> & Partial<Pick<BillingPrice,'interval'|'quota_pages'>>,locale:string){
+export function offerBenefits(offer:Pick<BillingPrice,'hourly_image_limit'> & Partial<Pick<BillingPrice,'interval'|'quota_pages'|'monthly_classic_pages'>>,locale:string){
   if(offer.interval==='once')return quotaPurchaseCopy(locale).pages.replace('{0}',(offer.quota_pages??0).toLocaleString(locale));
-  return offer.hourly_image_limit?billingBenefitCopy(locale).hourly(offer.hourly_image_limit):billingCopy(locale).classic;
+  return offer.monthly_classic_pages!=null?subscriptionQuotaCopy(locale).monthly.replace('{0}',offer.monthly_classic_pages.toLocaleString(locale)):billingCopy(locale).classic;
 }
 export function renewalCopy(offer:Pick<BillingPrice,'interval'>,locale:string){
   if(offer.interval==='once')return quotaPurchaseCopy(locale).once;
-  return billingCopy(locale).renew(offer.interval==='year');
+  return offer.interval==='quarter'?quarterlyCopy(locale).renewal:billingCopy(locale).renew(offer.interval==='year');
 }
 export function trialCopy(days:number,locale:string){
   return billingBenefitCopy(locale).trial(days);
@@ -73,14 +74,14 @@ export function amountParts(offer:Pick<BillingPrice,'currency'|'unit_amount'>,lo
   return formatter.formatToParts(offer.unit_amount/10**digits);
 }
 export function amount(offer:Pick<BillingPrice,'currency'|'unit_amount'>,locale:string){return amountParts(offer,locale).map(part=>part.value).join('');}
-export const offerLabel=(offer:BillingPrice,locale:string)=>`${offer.name} · ${amount(offer,locale)}${offer.interval==='once'?'':` / ${offer.interval==='year'?billingCopy(locale).year:billingCopy(locale).month}`}`;
+export const offerLabel=(offer:BillingPrice,locale:string)=>`${offer.name} · ${amount(offer,locale)}${offer.interval==='once'?'':` / ${offer.interval==='quarter'?quarterlyCopy(locale).unit:offer.interval==='year'?billingCopy(locale).year:billingCopy(locale).month}`}`;
 
 // Compare published quotes only when they buy the same benefits in the same currency.
 export function annualSavings(offer:BillingOffer,offers:BillingOffer[]){
   if(offer.interval!=='year')return null;
-  const monthly=offers.filter(p=>p.interval==='month'&&p.plan_id===offer.plan_id&&p.plan_revision_id===offer.plan_revision_id&&p.currency===offer.currency&&p.unit_amount>0);
+  const monthly=offers.filter(p=>(p.interval==='month'||p.interval==='quarter')&&p.plan_id===offer.plan_id&&p.plan_revision_id===offer.plan_revision_id&&p.currency===offer.currency&&p.unit_amount>0);
   if(!monthly.length)return null;
-  return annualSavingsForAmounts(Math.min(...monthly.map(p=>p.unit_amount)),offer.unit_amount);
+  return annualSavingsForAmounts(Math.min(...monthly.map(p=>p.unit_amount/(p.interval==='quarter'?3:1))),offer.unit_amount);
 }
 export function annualSavingsForAmounts(monthly:number,yearly:number){
   const regular=monthly*12,saved=regular-yearly;

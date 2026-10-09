@@ -65,7 +65,7 @@ const copy: HomeCopy = {
     ],
     controlNote: "새 만화는 원본으로 열립니다. 채널과 언어를 선택해 일반 번역을 시작하세요. 리더와 웹 번역은 같은 채널을 사용합니다.",
     privacyTitle: "읽기는 무료. 번역 요금제는 필요에 맞게.", privacyBody: "NodeLane Comics는 무료 확장 프로그램과 계정 기반 클라우드 번역을 제공합니다. 요청 빈도와 서비스 용량 제한이 적용됩니다. 구독 전에 현재 구매 가능 여부, 전체 혜택과 결제 조건을 확인하세요.",
-    privacy: '개인정보 처리방침', pricing: "Free와 Lite 비교", ctaTitle: "다음 페이지를 더 쉽게 이해하세요.", ctaBody: "데스크톱 Chrome, Edge 또는 Firefox에 NodeLane Comics를 설치하세요.",
+    privacy: '개인정보 처리방침', pricing: "Free와 PLUS / Pro 비교", ctaTitle: "다음 페이지를 더 쉽게 이해하세요.", ctaBody: "데스크톱 Chrome, Edge 또는 Firefox에 NodeLane Comics를 설치하세요.",
   };
 
 export default copy;

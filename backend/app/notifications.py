@@ -111,7 +111,7 @@ def publish(db, topic):
 @event.listens_for(Session, 'before_flush')
 def policy_wakeups(db, flush_context, instances):
     """Wake after policy/capacity commits; snapshots remain the source of truth."""
-    from .models import Provider, User
+    from .models import User
     from .entitlement_models import QuotaPeriod
     from .billing_models import BillingTerm
     from .queue_models import ComputeNode
@@ -131,7 +131,7 @@ def policy_wakeups(db, flush_context, instances):
             if row in db.new or any(state.attrs[name].history.has_changes()
                     for name in ('granted', 'starts_at', 'ends_at', 'grants_access')):
                 topics.add('user:' + row.owner_id)
-        elif isinstance(row, (ComputeNode, Provider, TranslationProvider)):
+        elif isinstance(row, (ComputeNode, TranslationProvider)):
             state = inspect(row)
             fields = ('enabled', 'capacity', 'desired_config', 'config_version', 'credential_hash',
                 'capabilities', 'supported_languages', 'engine_version', 'config', 'requests_per_minute', 'revision_id')

@@ -29,10 +29,10 @@ export function AccountPage({api,account,rights,testing,tab,onTabChange,onLogin,
           if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
           event.preventDefault();const next=event.key==='Home'?'overview':event.key==='End'?'subscription':value==='overview'?'subscription':'overview';
           onTabChange(next);document.getElementById(`account-tab-${next}`)?.focus();
-        }}>{value==='overview'?msg('账户概览'):msg('订阅')}</button>)}
+        }}>{value==='overview'?msg('账户概览'):<>{msg('订阅')} · {msg('购买额度')}</>}</button>)}
       </div>
       <div className="nc-account-panel" id={`account-panel-${tab}`} role="tabpanel" aria-labelledby={`account-tab-${tab}`} tabIndex={0}>
-        {tab==='overview'?<><EntitlementCards data={rights}/><section className="nc-account-activity" aria-label={msg("翻译用量")}><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/></section><FeedbackInbox api={api}/></>:<MembershipCard api={api} loggedIn rights={rights} onLogin={onLogin} onEntitlements={onEntitlements} notify={notify}/>}
+        {tab==='overview'?<><EntitlementCards data={rights}/><section className="nc-account-activity" aria-label={msg("翻译用量")}><AccountUsage api={api} onLogin={onLogin} onEntitlements={onEntitlements}/></section><FeedbackInbox api={api}/></>:<MembershipCard api={api} loggedIn rights={rights} onEntitlements={onEntitlements} notify={notify}/>}
       </div>
     </Fragment>:<section className="nc-account-empty"><Icon name="chart" size={32}/><h2>{msg("你的阅读足迹，即将在这里展开")}</h2><p>{msg('登录后查看翻译额度、每日交付和反馈进展。')}</p><button className="button primary" onClick={onLogin}>{msg("登录账户")}<Icon name="arrow" size={17}/></button></section>}
   </div>;

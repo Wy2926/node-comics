@@ -4,7 +4,7 @@ import { load } from 'cheerio';
 import { browserStores, site } from '../src/data/site';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
-import { publishedAmount } from '../src/components/PublishedLitePricing';
+import { publishedAmount } from '../src/components/PublishedPlanPricing';
 import { comparisonRows } from '../src/lib/pricing-comparison';
 import { dictionaries, locales, localeFromPath, basePath, localPath, publicPaths } from '../src/i18n';
 const root = resolve('dist');
@@ -85,7 +85,7 @@ for (const file of htmlFiles) {
       errors.push(`${label}: desktop browsers must be grouped above the mobile tutorials`);
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
     if ($('.home-hero .button').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
-    if (!$(`.home-service a[href="${localPath('/pricing/',locale)}"]`).length || $('.home-plan').length !== 2) errors.push(`${label}: missing Free/Lite plan entrance`);
+    if (!$(`.home-service a[href="${localPath('/pricing/',locale)}"]`).length || $('.home-plan').length !== 3) errors.push(`${label}: missing Free/PLUS/Pro plan entrance`);
     for (const store of browserStores) {
       const entrance = $(`.hero-store[data-browser="${store.id}"]`);
       const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
@@ -97,12 +97,12 @@ for (const file of htmlFiles) {
         || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(platform.id === 'ios' ? mobileCopy[locale].iosStatus : mobileCopy[locale].label))
         errors.push(`${label}: mobile entrance must be a localized tutorial or compatibility status ${platform.id}`);
     }
-    if ($('.home-faq, .home-cta, .home-steps').length || $('.home-cycle input[type=radio]').length !== 2) errors.push(`${label}: keep one focused hero and a static monthly/yearly plan preview`);
+    if ($('.home-faq, .home-cta, .home-steps').length || $('.home-cycle input[type=radio]').length !== 2) errors.push(`${label}: keep one focused hero and a static quarterly/yearly plan preview`);
     for (const feature of ['classic', 'model', 'rate', 'priority', 'reading']) {
-      if ($(`.home-plan li[data-feature="${feature}"]`).length !== 2) errors.push(`${label}: homepage must compare ${feature}`);
+      if ($(`.home-plan li[data-feature="${feature}"]`).length !== 3) errors.push(`${label}: homepage must compare ${feature}`);
     }
-    if ($('.home-plan').first().find('.icon-check').length !== 1 || $('.home-plan-lite .icon-check').length !== 5 || $('.home-plan-lite li strong').length !== 4) errors.push(`${label}: homepage must distinguish shared benefits from Lite advantages`);
-    if ($('.home-price .price-currency').length !== 3 || $('.home-cycle-picker .billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: homepage needs separated currency typography and a stable annual discount slot`);
+    if ($('.home-plan').first().find('.icon-check').length !== 1 || $('.home-plan-paid .icon-check').length !== 10 || $('.home-plan-paid li strong').length !== 8) errors.push(`${label}: homepage must distinguish shared benefits from Lite advantages`);
+    if ($('.home-price .price-currency').length !== 5 || $('.home-cycle-picker .billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: homepage needs separated currency typography and a stable annual discount slot`);
     const preview = $('.home-screenshot img').attr('src');
     if (!preview || $('.home-screenshot img').length !== 1 || !$('.home-screenshot img').attr('srcset')) errors.push(`${label}: expected one responsive real product screenshot`);
     else homePreviews.set(locale, preview);
@@ -137,31 +137,27 @@ for (const file of htmlFiles) {
     if ($('.translation-workbench img, .translation-viewer, .translation-canvas, .translation-workbench input[type=range]').length) errors.push(`${label}: translator must not include image previews, comparison or zoom controls`);
   }
   if (basePath(route) === '/pricing/') {
-    const published = $('.published-lite-pricing');
-    if (published.length !== 1 || published.attr('data-billing-interval') !== 'month' || published.find('.price-value').text() !== publishedAmount('month',locale)) errors.push(`${label}: initial static pricing must show the actual published monthly total`);
-    if ($('.pricing-comparison .billing-cycle input[type=radio]').length !== 2) errors.push(`${label}: monthly/yearly preview must be available without an API quote`);
+    const published = $('.published-plan-pricing');
+    if (published.length !== 2 || published.attr('data-billing-interval') !== 'quarter' || published.first().find('.price-value').text() !== publishedAmount('quarter',locale)) errors.push(`${label}: initial static pricing must show the actual published monthly total`);
+    if ($('.pricing-comparison .billing-cycle input[type=radio]').length !== 2) errors.push(`${label}: quarterly/yearly preview must be available without an API quote`);
     const comparison = $('.pricing-comparison');
-    const table = comparison.find('table.plan-comparison');
-    if (comparison.length !== 1 || comparison.find('.pricing-grid .price-card').length !== 2 || table.length !== 1) errors.push(`${label}: pricing cards and feature comparison must share one connected frame`);
-    const expectedRows = comparisonRows(locale, 1200);
-    if (table.find('thead th').length !== 3 || table.find('tbody tr').length !== 9) errors.push(`${label}: expected a three-column comparison with nine feature rows`);
-    for (const { key: feature, label: heading, free, lite, shared, detail } of expectedRows) {
-      const row = table.find(`tbody tr[data-feature="${feature}"]`);
-      if (row.length !== 1 || row.children('th,td').length !== 3) errors.push(`${label}: missing aligned feature comparison ${feature}`);
-      const values = row.children('td');
-      if (row.find('.feature-label').text() !== heading || values.eq(0).text() !== free || values.eq(1).text() !== lite) errors.push(`${label}: comparison copy must match localized benefits for ${feature}`);
-      const trigger = row.find('th .feature-info-trigger'), tip = row.find('th [role="tooltip"]');
-      if (trigger.length !== (detail ? 1 : 0) || tip.length !== (detail ? 1 : 0) || row.find('td .feature-info').length) errors.push(`${label}: explanatory tips belong only on detailed feature headings for ${feature}`);
-      if (detail && (trigger.attr('type') !== 'button' || trigger.attr('aria-label') !== heading || trigger.attr('aria-describedby') !== tip.attr('id') || tip.text() !== detail || !tip.is('[hidden]'))) errors.push(`${label}: missing accessible localized feature tip for ${feature}`);
-      if (values.eq(0).find('.icon-check').length !== (shared ? 1 : 0) || values.eq(1).find('.icon-check').length !== 1) errors.push(`${label}: checkmarks must distinguish shared and paid benefits for ${feature}`);
-      if (values.eq(1).find('strong').length !== (shared ? 0 : 1)) errors.push(`${label}: paid advantages must have stronger typography for ${feature}`);
+    const cards = comparison.find('.subscription-card');
+    if (comparison.length !== 1 || cards.length !== 3) errors.push(`${label}: expected Free and preview subscription cards`);
+    const expectedRows = comparisonRows(locale, 0);
+    for (const [index, tier] of ['free', 'lite', 'lite'].entries()) {
+      const card = cards.eq(index);
+      if (card.find('.subscription-allowance').length !== 1) errors.push(`${label}: missing prominent page allowance`);
+      for (const feature of expectedRows.filter(row => row.key !== 'classic')) {
+        const row = card.find(`[data-feature="${feature.key}"]`);
+        if (row.length !== 1 || row.find('strong').text() !== feature[tier as 'free' | 'lite']) errors.push(`${label}: missing localized card benefit ${tier}/${feature.key}`);
+        const trigger = row.find('.feature-info-trigger'), tip = row.find('[role="tooltip"]');
+        if (trigger.length !== (feature.detail ? 1 : 0)) errors.push(`${label}: incorrect accessible tip ${feature.key}`);
+        if (feature.detail && (trigger.attr('aria-label') !== feature.label || trigger.attr('aria-describedby') !== tip.attr('id') || tip.text() !== feature.detail || !tip.is('[hidden]'))) errors.push(`${label}: missing accessible localized feature tip ${feature.key}`);
+      }
     }
-    if (comparison.find('.price .price-currency').length !== 2 || comparison.find('.billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: pricing needs separated currency typography and an annual discount slot`);
-    if (!table.find('[data-feature="rate"] td').last().text().replace(/\D/g,'').includes('1200')) errors.push(`${label}: missing Lite rolling hourly request limit`);
-    const models = table.find('[data-feature="model"] td');
-    if (!models.eq(0).text().includes('GPT 6 Luna') || !models.eq(1).text().includes('Gemini 3.8 Flash')) errors.push(`${label}: missing plan-specific translation models`);
-    if (/PLUS|\b300\b/.test(comparison.text())) errors.push(`${label}: retired PLUS must not be advertised for new purchase`);
-    if (comparison.find('.billing-availability button[disabled]').length !== 1 || $('.billing-availability[data-state="loading"]').length !== 1) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
+    if (comparison.find('.price .price-currency').length !== 3 || comparison.find('.billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: pricing needs currency typography and annual discount`);
+    if (comparison.find('.comparison-note').length < 2) errors.push(`${label}: missing quota consumption and renewal disclosures`);
+    if (comparison.find('.billing-availability button[disabled]').length !== 2 || $('.billing-availability[data-state="loading"]').length !== 2) errors.push(`${label}: static pricing must explain purchase availability with a disabled action`);
     if ($('a[href*="price="]').length || $('[data-billing-catalog="live"]').length) errors.push(`${label}: static pricing must not fabricate a purchasable API offer`);
   }
   $('img').each((_,node) => {
@@ -206,4 +202,4 @@ for(const path of publicPaths) for(const locale of locales) if(!sitemap.includes
 for (const forbidden of ['/account/','/auth/','/payment/','/uninstall/','/manga-translator/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
 for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/','/payment/success/','/uninstall/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
 if (errors.length) throw Error(errors.join('\n'));
-console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published Lite pricing, links/anchors, images and index boundaries.`);
+console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published PLUS/Pro pricing, links/anchors, images and index boundaries.`);

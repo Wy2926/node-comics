@@ -262,7 +262,6 @@ class UsageDay(BaseModel):
     date: str
     delivered: int
     classic: int
-    redraw: int
 
 
 class UsageSummary(BaseModel):
@@ -290,9 +289,9 @@ def usage_summary(days: int = Query(7, ge=1, le=90), timezone_name: str = Query(
     start_day = end_day - timedelta(days=days - 1)
     start = datetime.combine(start_day, time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
     end = datetime.combine(end_day + timedelta(days=1), time.min, zone).astimezone(timezone.utc).replace(tzinfo=None)
-    daily = {(start_day + timedelta(days=i)).isoformat(): {"delivered": 0, "classic": 0, "redraw": 0} for i in range(days)}
-    totals = {"classic": 0, "redraw": 0}
-    consumed = {"classic": 0, "redraw": 0}
+    daily = {(start_day + timedelta(days=i)).isoformat(): {"delivered": 0, "classic": 0} for i in range(days)}
+    totals = {"classic": 0}
+    consumed = {"classic": 0}
     # Stream the whole interval, never just the account ledger's first page.
     # Local dates are derived via IANA timezone rules, including DST transitions.
     entries = select(Ledger.created_at, Ledger.amount, Job.mode).outerjoin(Job, Job.id == Ledger.job_id).where(

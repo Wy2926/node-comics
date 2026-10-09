@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Kostenlos lesen. Den passenden Übersetzungstarif wählen.",
   "privacyBody": "NodeLane Comics bietet eine kostenlose Erweiterung und kontobasierte Cloud-Übersetzung. Anfrage- und Kapazitätslimits gelten. Prüfe vor dem Abonnement die aktuelle Verfügbarkeit, Leistungen und Abrechnungsbedingungen.",
   "privacy": "Datenschutzrichtlinie",
-  "pricing": "Free und Lite vergleichen",
+  "pricing": "Free und PLUS / Pro vergleichen",
   "ctaTitle": "Verstehe deine nächste Seite.",
   "ctaBody": "Installiere NodeLane Comics für Chrome, Edge oder Firefox am Computer."
 };

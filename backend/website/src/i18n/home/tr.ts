@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Ücretsiz okuyun. Çeviri planınızı seçin.",
   "privacyBody": "NodeLane Comics, ücretsiz bir uzantı ve hesaba bağlı bulut çevirisi sunar. İstek sıklığı ve hizmet kapasitesi sınırları geçerlidir. Abone olmadan önce güncel kullanılabilirliği, özellikleri ve faturalandırma koşullarını inceleyin.",
   "privacy": "Gizlilik politikası",
-  "pricing": "Free ve Lite’ı karşılaştırın",
+  "pricing": "Free ve PLUS / Pro’ı karşılaştırın",
   "ctaTitle": "Bir sonraki sayfanızı anlayın.",
   "ctaBody": "Masaüstü Chrome, Edge veya Firefox için NodeLane Comics’i yükleyin."
 };

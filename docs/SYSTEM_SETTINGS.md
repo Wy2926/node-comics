@@ -7,7 +7,6 @@
 | 分组 | 参数 | 初始值 | 含义 |
 | --- | --- | --- | --- |
 | 页数权益 | 普通每日页数 `free_daily_pages` | 30 张 | 新建每日额度桶的授予页数，已有桶不回写 |
-| 页数权益 | 运营会员默认月重绘 `plus_monthly_redraw_pages` | 300 张 | 新开通运营会员未指定自定义额度时使用；续期保留原会员段快照 |
 | 匿名体验 | 每游客每日受理 `guest_daily_limit` | 5 张 | 同一游客身份的新受理常规翻译；整数范围 1–100 |
 | 匿名体验 | 每网络每日受理 `guest_network_daily_limit` | 100 张 | 同一 IPv4 地址或 IPv6 /64 前缀的共享预算；整数范围 1–1,000 |
 | 匿名体验 | 全站每日受理 `guest_global_daily_limit` | 10,000 张 | 全站匿名访客的新受理常规翻译合计；整数范围 1–100,000 |
@@ -30,7 +29,7 @@
 
 反馈设置变化不清零已使用的每日计数，也不重新填满令牌桶。相同幂等键与相同内容返回原回执，不重复创建、不消耗新反馈预算；相同键与不同内容仍为 409。不同键即使反馈内容相同，也必须消耗预算。超限返回 429，包含 `Retry-After` 和 JSON 的 `retry_after_seconds`。
 
-环境变量 `FREE_DAILY_PAGES`、`PLUS_MONTHLY_REDRAW_PAGES`、`GUEST_DAILY_LIMIT`、`GUEST_NETWORK_DAILY_LIMIT`、`GUEST_GLOBAL_DAILY_LIMIT`、`FREE_IMAGES_PER_MINUTE`、`PLUS_IMAGES_PER_MINUTE`、`UPLOAD_USER_CONCURRENCY`、`UPLOAD_GLOBAL_CONCURRENCY`、`UPLOAD_IDLE_TIMEOUT_SECONDS`、`UPLOAD_BODY_TIMEOUT_SECONDS`、`UPLOAD_INGRESS_LEASE_SECONDS`、`FEEDBACK_REQUESTS_PER_MINUTE`、`FEEDBACK_REQUEST_BURST`、`FEEDBACK_RECEIPTS_PER_DAY` 仅用于首次初始化。系统配置创建后，以数据库为准；重启或不同副本的环境值不会覆盖管理员保存的设置。
+环境变量 `FREE_DAILY_PAGES`、`GUEST_DAILY_LIMIT`、`GUEST_NETWORK_DAILY_LIMIT`、`GUEST_GLOBAL_DAILY_LIMIT`、`FREE_IMAGES_PER_MINUTE`、`PLUS_IMAGES_PER_MINUTE`、`UPLOAD_USER_CONCURRENCY`、`UPLOAD_GLOBAL_CONCURRENCY`、`UPLOAD_IDLE_TIMEOUT_SECONDS`、`UPLOAD_BODY_TIMEOUT_SECONDS`、`UPLOAD_INGRESS_LEASE_SECONDS`、`FEEDBACK_REQUESTS_PER_MINUTE`、`FEEDBACK_REQUEST_BURST`、`FEEDBACK_RECEIPTS_PER_DAY` 仅用于首次初始化。系统配置创建后，以数据库为准；重启或不同副本的环境值不会覆盖管理员保存的设置。
 
 ## 管理接口
 

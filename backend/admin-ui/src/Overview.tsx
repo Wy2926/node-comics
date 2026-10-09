@@ -22,7 +22,7 @@ export function Overview({data}: {data: OverviewData}) {
       {!!inactiveNodes && <Jump view="nodes">{inactiveNodes} 个节点或资源池离线 / 停用</Jump>}
     </div>}
     <div className="section-heading"><div><h2>翻译队列</h2><p>按模式查看当前积压，点击数量追踪对应任务。</p></div><Jump view="tasks" params={{status: 'active'}}>查看全部在途 ↗</Jump></div>
-    <div className="queue-grid">{(['classic', 'redraw'] as Mode[]).map(mode => {
+    <div className="queue-grid">{(['classic'] as Mode[]).map(mode => {
       const rows = queues.filter(q => q.mode === mode);
       const total = rows.reduce((s, r) => s + r.count, 0);
       const sum = (test: (row: typeof rows[number]) => boolean) => rows.filter(test).reduce((s, r) => s + r.count, 0);
@@ -34,7 +34,7 @@ export function Overview({data}: {data: OverviewData}) {
       </section>;
     })}</div>
     <div className="bottom-grid"><section className="panel"><div className="panel-heading"><div><h2>阶段积压</h2><p className="muted">待执行包含暂不可调度阶段；阶段数可多于页数。</p></div></div>
-      <Table heads={['阶段', '待执行', '执行中', '等待依赖']}>{['validate_upload', 'page', 'analyze', 'text', 'inpaint', 'render', 'redraw'].map(name => <tr key={name}><td>{label(name)}</td>
+      <Table heads={['阶段', '待执行', '执行中', '等待依赖']}>{['validate_upload', 'page', 'analyze', 'text', 'inpaint', 'render'].map(name => <tr key={name}><td>{label(name)}</td>
         {['ready', 'running', 'waiting'].map(status => <td key={status} className="numeric">{number(data.stages.filter(s => s.name === name && s.status === status).reduce((n, s) => n + s.count, 0))}</td>)}</tr>)}</Table>
     </section><section className="panel account-overview"><h2>用户与资源</h2>
       <div className="mini-stat"><span>注册用户</span><strong>{number(data.users.total)}</strong></div>
@@ -42,7 +42,7 @@ export function Overview({data}: {data: OverviewData}) {
       <div className="mini-stat"><span>24 小时内提交用户</span><b>{number(data.users.submitted_24h)}</b></div>
       <div className="mini-stat"><span>24 小时内提交页数</span><b>{number(data.submitted_24h)}</b></div>
       <div className="mini-stat"><span>在线且启用的节点 / 资源池</span><Jump view="nodes">{data.nodes.online_enabled} / {data.nodes.total}</Jump></div>
-      <p className="panel-note">图像节点代表计算设备，控制资源池代表上传、文本和重绘的共享执行容量。</p>
+      <p className="panel-note">图像节点代表计算设备，控制资源池代表上传和文本的共享执行容量。</p>
     </section></div>
     <section className="panel completion-panel"><div className="panel-heading"><h2>近 24 小时交付表现</h2><span className="muted">总耗时包含等待与缓存命中任务。</span></div>
       {data.completed_24h.length ? <Table heads={['模式', '结果', '页数', '平均总耗时']}>{data.completed_24h.map(s => <tr key={`${s.mode}-${s.status}`}><td>{label(s.mode)}</td><td><Badge value={s.status}/></td><td>{number(s.count)}</td><td>{duration(s.avg_elapsed_seconds)}</td></tr>)}</Table> : <Empty>近 24 小时暂无结束的任务</Empty>}

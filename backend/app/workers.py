@@ -1,5 +1,4 @@
-"""Fenced stage completion and bounded control-side upload/text/redraw executors."""
-import base64
+"""Fenced stage completion and bounded control-side upload/text executors."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from fastapi import HTTPException
@@ -11,8 +10,6 @@ import socket
 from threading import Event, Thread
 import time
 from sqlalchemy import select
-from .adapters.images import redraw
-from .assets import available, asset_storage_key, create_asset, inspect_image, read_asset
 from .classic import run_text_stage
 from .config import settings
 from .db import session_factory
@@ -20,12 +17,12 @@ from .runtime import check_runtime
 from .errors import ProcessingError, problem
 from .health import log_failure, report_failure, report_progress
 from .jobs import settle
-from .models import Asset, Attempt, Job, Provider, now
+from .models import Attempt, Job, now
 from .providers import digest
 from .queue_models import ExecutionLease, JobStage
 from .scheduler import (claim_batch, current_lease, has_claimable_work, heartbeat_lease, lock_scheduler,
                         next_control_delay, release_lease, touch_job)
-from .storage import StorageError, get_store
+from .storage import StorageError
 
 
 def _scoped(lease, token, node_id):
@@ -68,47 +65,7 @@ def complete_stage(lease_id, result, *, token=None, node_id=None):
         if lease.result_hash is not None and lease.result_hash != result_hash:
             raise ProcessingError("COMPLETION_CONFLICT", "此执行代次已经接收了另一份阶段结果")
         lease.result_hash = result_hash
-        name, owner_id, input_id, attempt_id, mode = stage.name, job.owner_id, job.input_asset_id, job.attempt_id, job.mode
-        source = db.get(Asset, input_id) if input_id else None
-        db.commit()
-    # Only center-owned redraw results carry image bytes. Page results are
-    # committed directly by compute_v3 after durable local result publication.
-    image = base64.b64decode(result["image"], validate=True) if name == "redraw" else None
-    info = None
-    if image is not None:
-        info = inspect_image(image, output=True)
-        ratio = (info["width"] / info["height"]) / (source.width / source.height)
-        if not .8 <= ratio <= 1.25:
-            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "结果尺寸或宽高比不符合原图")
-        # Persist the immutable content key before PUT so a crashed worker can
-        # recover its exact bytes. A late generation cannot overwrite a result.
-        output_key = asset_storage_key(lease_id, mode)
-        with session_factory()() as db:
-            lock_scheduler(db)
-            lease, _, _ = current_lease(db, lease_id, token)
-            lease.output_key = output_key
-            lease.limits = {**lease.limits, "output_info": info}
-            db.commit()
-        get_store().put(output_key, image, info["mime"], kind=mode)
-    with session_factory()() as db:
-        lock_scheduler(db)
-        if _finished(db, lease_id, token, node_id, result_hash):
-            return
-        lease, stage, job = current_lease(db, lease_id, token)
-        if name == "redraw":
-            if not available(db.get(Asset, input_id)):
-                raise ProcessingError("ASSET_EXPIRED", "输入原图已失效")
-            output = db.get(Asset, lease_id) or create_asset(db, owner_id, image, kind=mode, parent_id=input_id,
-                stable_id=lease_id, prewritten=True, verified_info=info, representation="full-image-v1")
-            job.output_asset_id = output.id
-            job.result_description = {"representation": "full-image-v1", "input_hash": source.sha256, "normalization_version": source.normalization_version, "width": info["width"], "height": info["height"]}
-            job.quality_flags = result.get("quality_flags", [])
-            if abs(ratio - 1) > .03:
-                job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]
-            finish_job(db, job, "succeeded")
-            provider = db.get(Provider, job.config["provider"]["id"])
-            if provider and provider.config == job.config["provider"]:
-                provider.validated_at, provider.validation_job_id = now(), job.id
+        name = stage.name
         stage.status, stage.completed_at = "succeeded", now()
         lease.result_hash = result_hash
         release_lease(db, lease, "succeeded")
@@ -136,23 +93,12 @@ def fail_stage(lease_id, error, *, token=None, node_id=None, recovering=False):
             return
         if not recovering and not job.cancel_requested and not job.discard_output:
             current_lease(db, lease_id, token)
-        attempt = db.get(Attempt, job.attempt_id)
-        if recovering and stage.name == "redraw" and attempt.call_started_at is not None:
-            # Re-read the call intent under the scheduler lock; a maintenance
-            # snapshot taken before its commit cannot authorize another request.
-            error = ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "图片调用已开始，等待核实供应商结果", unknown=True)
         retryable = stage.name in {"page", "validate_upload", "text"} and error.code in {
             "CLASSIC_ENGINE_UNAVAILABLE", "CLASSIC_ANALYZE_FAILED", "CLASSIC_INPAINT_FAILED", "CLASSIC_RENDER_FAILED",
             "STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED", "ENGINE_UNAVAILABLE"}
-        if stage.name == "redraw" and attempt.call_started_at is None:
-            retryable = error.code in {"STORAGE_UNAVAILABLE", "WORKER_LEASE_EXPIRED", "CLASSIC_LOCAL_INTERRUPTED"}
         if job.cancel_requested or job.discard_output:
             finish_job(db, job, "cancelled")
             stage.status = "cancelled"
-        elif error.unknown and stage.name == "redraw":
-            job.status, job.phase, job.unknown_since = "outcome_unknown", "reconciliation", now()
-            job.error_code, job.error_message = error.code, error.message
-            stage.status = "unknown"
         elif stage.name == 'text' and error.code in {'TEXT_PROVIDER_DISABLED', 'TEXT_RATE_LIMITED', 'ADMISSION_UNAVAILABLE'}:
             # Pauses and rate waits release the shared execution slot without
             # consuming a stage attempt. Per-call limits remain durable.
@@ -232,27 +178,6 @@ def run_control_stage(lease_id):
         elif name == "text":
             result = run_text_stage(job_id, lease_id)
             complete_stage(lease_id, result or {}, token=token)
-        elif name == "redraw":
-            with session_factory()() as db:
-                _, _, job = current_lease(db, lease_id, token)
-                source = db.get(Asset, job.input_asset_id)
-                data, mime, config, language, attempt_id = read_asset(source), source.mime, job.config, job.target_language, job.attempt_id
-            with session_factory()() as db:
-                lock_scheduler(db)
-                current_lease(db, lease_id, token)
-                attempt = db.get(Attempt, attempt_id)
-                if attempt.call_started_at:
-                    raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "此调用已开始，不能自动重发", unknown=True)
-                attempt.call_started_at = now()
-                db.commit()
-            result = redraw(data, mime, language, config)
-            with session_factory()() as db:
-                lock_scheduler(db)
-                attempt = db.get(Attempt, attempt_id)
-                attempt.request_id, attempt.usage = result.request_id, result.usage
-                attempt.cost_state = "reported" if result.usage is not None else "unknown"
-                db.commit()
-            complete_stage(lease_id, {"image": base64.b64encode(result.image).decode(), "quality_flags": result.quality_flags or []}, token=token)
     except HTTPException as error:
         detail = error.detail if isinstance(error.detail, dict) else {}
         code = detail.get("code", "STAGE_REQUEST_REJECTED")
@@ -270,25 +195,11 @@ def run_control_stage(lease_id):
         if error.code == "LEASE_EXPIRED":
             finish_stopped_lease(lease_id, token)
         elif error.code != "COMPLETION_CONFLICT":
-            if name == "redraw":
-                with session_factory()() as db:
-                    lock_scheduler(db)
-                    job = db.get(Job, job_id)
-                    attempt = db.get(Attempt, job.attempt_id)
-                    if error.usage is not None:
-                        attempt.usage, attempt.cost_state = error.usage, "reported"
-                    attempt.request_id, attempt.error_code = error.request_id, error.code
-                    db.commit()
             fail_stage(lease_id, error, token=token)
     except Exception as error:
         log_failure("control-stage", error, job_id=job_id, stage=name, lease_id=lease_id)
-        unknown = False
-        if name == "redraw":
-            with session_factory()() as db:
-                attempt = db.get(Attempt, db.get(Job, job_id).attempt_id)
-                unknown = attempt.call_started_at is not None
-        fail_stage(lease_id, ProcessingError("UPSTREAM_OUTCOME_UNKNOWN" if unknown else "CLASSIC_LOCAL_INTERRUPTED",
-            "执行中断，已保存检查点供恢复", unknown=unknown), token=token)
+        fail_stage(lease_id, ProcessingError("CLASSIC_LOCAL_INTERRUPTED",
+            "执行中断，已保存检查点供恢复"), token=token)
     finally:
         stopped.set()
         thread.join(timeout=1)

@@ -26,7 +26,7 @@ CampaignId = Annotated[str, Path(min_length=1, max_length=64, pattern=r'^[a-z0-9
 
 class CampaignRequest(RequestBody):
     name: str = Field(min_length=1, max_length=100)
-    mode: Literal['classic', 'redraw']
+    mode: Literal['classic']
     pages: int = Field(ge=1, le=1_000_000, strict=True)
     audience: Literal['all', 'existing', 'new'] = 'all'
     starts_at: AwareDatetime | None = None
@@ -203,7 +203,7 @@ def award_campaigns(db, user, at=None):
         key = f'campaign:{campaign.id}:{user.id}'
         period = QuotaPeriod(id=digest(key), owner_id=user.id, kind=campaign.mode + '_grant',
             mode=campaign.mode, source='grant', source_key=key, note=campaign.name,
-            grants_access=campaign.mode == 'redraw', starts_at=at,
+            grants_access=False, starts_at=at,
             ends_at=at + timedelta(days=campaign.validity_days) if campaign.validity_days else None,
             granted=campaign.pages, used=0, reserved=0)
         db.add(period)

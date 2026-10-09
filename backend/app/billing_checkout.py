@@ -63,7 +63,7 @@ def billing_status(db, user):
         quote = price_json(db, price)
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
         quote['channels'] = [{'provider': row.provider, 'binding_id': row.binding_id,
-            'trial_days': revision.trial_days, 'trial_redraw_pages': revision.trial_redraw_pages}]
+            'trial_days': revision.trial_days, 'trial_classic_pages': revision.trial_classic_pages}]
         pending = {'id': row.id, 'provider': row.provider, 'price': quote,
             'idempotency_key': row.idempotency_key, 'error': row.error_code}
     providers = [provider_config_json(p) for p in ('stripe', 'creem') if provider_enabled(p)]
@@ -300,7 +300,7 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             revision = db.get(BillingPlanRevision, price.plan_revision_id)
             if price.interval == 'once':
                 require(revision.quota_pages > 0 and revision.service_plan_id and not revision.trial_days
-                    and not revision.trial_redraw_pages and not revision.monthly_redraw_pages, 'BILLING_PLAN_UNAVAILABLE')
+                    and revision.trial_classic_pages == 0 and revision.monthly_classic_pages == 0, 'BILLING_PLAN_UNAVAILABLE')
             row = BillingCheckout(id=uid(), owner_id=owner_id, provider=provider, binding_id=binding.id,
                 environment=price.environment, price_id=price.id, customer_id=customer.customer_id if customer else None,
                 idempotency_key=idempotency_key, return_url=getattr(settings(), provider + '_return_url'),

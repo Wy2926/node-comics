@@ -1,14 +1,17 @@
 ---
 import { getImage } from 'astro:assets';
 import BrowserStores from './BrowserStores.astro';
-import { publishedLite } from '../data/published-lite';
+import {publishedSubscriptions} from '../data/published-plans';
+import {quarterlyCopy} from '../i18n/billing-cadence';
+import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
+import {amountParts,offerBenefits} from '../lib/billing';
 import { dictionaries, localPath, type Locale } from '../i18n';
 import { homeCopy } from '../i18n/home';
 import { translationCopy } from '../i18n/translate';
 import { billingCopy } from '../lib/billing';
 import { pricingCopy, publishedPricingCopy } from '../lib/pricing';
 import { comparisonRows } from '../lib/pricing-comparison';
-import { publishedAmountParts, publishedAnnualDiscount } from './PublishedLitePricing';
+import { publishedAmountParts, publishedAnnualDiscount } from './PublishedPlanPricing';
 import PriceAmount from './PriceAmount';
 import comparisonZh from '../../../../docs/images/translation-comparison.png';
 import comparisonEn from '../../../../docs/images/en/translation-comparison.png';
@@ -21,7 +24,7 @@ const t = dictionaries[locale].ui;
 const href = (path: string) => localPath(path, locale);
 const billing = billingCopy(locale);
 const published = publishedPricingCopy(locale);
-const rows = comparisonRows(locale, publishedLite.hourlyImageLimit).filter(row => ['classic', 'model', 'rate', 'priority', 'reading'].includes(row.key));
+const rows = comparisonRows(locale, 0).filter(row => ['classic', 'model', 'rate', 'priority', 'reading'].includes(row.key));
 const screenshot = locale.startsWith('zh') ? comparisonZh : comparisonEn;
 const previewWidths = [640, 1120, 1680];
 const previews = await Promise.all(previewWidths.map(width =>
@@ -58,9 +61,9 @@ const previews = await Promise.all(previewWidths.map(width =>
       <div class="billing-cycle-picker home-cycle-picker">
       <fieldset class="billing-cycle billing-cycle-segmented home-cycle">
         <legend>{billing.plan}</legend>
-        {(['month','year'] as const).map((interval,index) => <label class="billing-cycle-card" data-selected={index === 0}>
+        {(['quarter','year'] as const).map((interval,index) => <label class="billing-cycle-card" data-selected={index === 0}>
           <input type="radio" name="home-billing-cycle" value={interval} checked={index === 0} />
-          <strong>{index === 0 ? published.monthly : published.yearly}</strong>
+          <strong>{index === 0 ? quarterlyCopy(locale).label : published.yearly}</strong>
         </label>)}
       </fieldset>
       <p class="billing-cycle-saving"><span class="annual-badge">{pricingCopy(locale).save(publishedAnnualDiscount)}</span></p>
@@ -72,15 +75,16 @@ const previews = await Promise.all(previewWidths.map(width =>
           <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}>{row.shared && <span class="ui-icon icon-check" aria-hidden="true"></span>}<span>{row.free}</span></li>)}</ul>
           <a class="button secondary" data-install-extension href={href('/download/')}>{h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
         </article>
-        <article class="home-plan home-plan-lite">
-          <h3>Lite</h3>
-          {(['month','year'] as const).map(interval => <p class="home-price" data-home-price={interval} hidden={interval !== 'month'}><PriceAmount parts={publishedAmountParts(interval, locale)} /><small>/ {interval === 'month' ? billing.month : billing.year}</small></p>)}
-          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}><span class="ui-icon icon-check" aria-hidden="true"></span>{row.shared ? <span>{row.lite}</span> : <strong>{row.lite}</strong>}</li>)}</ul>
+        {['plus','pro'].map(planId=><article class="home-plan home-plan-paid">
+          <h3>{planId==='plus'?'PLUS':'Pro'}</h3>
+          {(['quarter','year'] as const).map(interval => <p class="home-price" data-home-price={interval} hidden={interval !== 'quarter'}><PriceAmount parts={amountParts(publishedSubscriptions.find(offer=>offer.plan_id===planId&&offer.interval===interval)!,locale)} /><small>/ {interval === 'quarter' ? quarterlyCopy(locale).unit : billing.year}</small></p>)}
+          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}><span class="ui-icon icon-check" aria-hidden="true"></span>{row.shared ? <span>{row.lite}</span> : <strong>{row.key==='classic'?offerBenefits(publishedSubscriptions.find(offer=>offer.plan_id===planId)!,locale):row.lite}</strong>}</li>)}</ul>
           <a class="button" href={href('/pricing/')}>{t.pricing}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
-        </article>
+        </article>)}
       </div>
-      <p class="home-billing-note" data-home-price="month">{billing.renew(false)} {published.tax}</p>
+      <p class="home-billing-note" data-home-price="quarter">{quarterlyCopy(locale).renewal} {published.tax}</p>
       <p class="home-billing-note" data-home-price="year" hidden>{billing.renew(true)} {published.tax}</p>
+      <p class="home-billing-note">{subscriptionQuotaCopy(locale).renewal}</p>
     </div>
   </section>
 </div>

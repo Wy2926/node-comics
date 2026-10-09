@@ -22,7 +22,7 @@ def category_buyer(purchase, monkeypatch):
             db.add(BillingPlan(id=name, name=name))
             db.flush()
             db.add(BillingPlanRevision(id=name + '-v1', plan_id=name, version=1, name=name,
-                monthly_redraw_pages=0, hourly_image_limit=1200, trial_days=0, trial_redraw_pages=0,
+                monthly_classic_pages=0, hourly_image_limit=1200, trial_days=0, trial_classic_pages=0,
                 quota_pages=pages, service_plan_id='lite' if pages else None))
             db.flush()
             price_id = 'large-price' if pages else 'lite-month'

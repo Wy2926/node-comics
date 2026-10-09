@@ -148,16 +148,16 @@ try {
   await fault({}); await refresh();
   await campaignRow(first.name).getByRole('button', {name: '复制新活动'}).click();
   assert.equal(await dialog().getByLabel('每人赠送页数').inputValue(), '300');
-  await dialog().getByLabel('活动名称', {exact: true}).fill('限时重绘赠送');
+  await dialog().getByLabel('活动名称', {exact: true}).fill('限时常规赠送');
   await dialog().getByLabel('每人赠送页数').fill('125');
-  await dialog().getByLabel('翻译模式').selectOption('redraw');
+  await dialog().getByLabel('翻译模式').selectOption('classic');
   await dialog().getByLabel('适用用户').selectOption('new');
   await dialog().getByLabel('额度有效天数').fill('45');
   await dialog().getByRole('button', {name: '保存为暂停活动'}).click();
-  await visible(campaignRow('限时重绘赠送'));
-  const copied = (await read()).items.find(row => row.name === '限时重绘赠送');
+  await visible(campaignRow('限时常规赠送'));
+  const copied = (await read()).items.find(row => row.name === '限时常规赠送');
   assert.notEqual(copied.id, first.id); assert.equal(copied.enabled, false); assert.equal(copied.pages, 125);
-  assert.equal(copied.mode, 'redraw'); assert.equal(copied.audience, 'new'); assert.equal(copied.validity_days, 45);
+  assert.equal(copied.mode, 'classic'); assert.equal(copied.audience, 'new'); assert.equal(copied.validity_days, 45);
   checks.push('Read failure blocks mutation, and copying creates distinct configurable rules while original receipts stay intact');
 
   await page.setViewportSize({width: 390, height: 844});

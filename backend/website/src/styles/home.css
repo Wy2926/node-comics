@@ -32,7 +32,7 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
 .home-pricing-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; font-size: .87rem; font-weight: 500; }
 .home-membership { min-width: 0; }
 .home-cycle-picker { width: fit-content; max-width: 100%; margin-block: 0 16px; margin-inline: auto 0; }
-.home-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+.home-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 16px; }
 .home-plan { display: grid; grid-template-rows: subgrid; grid-row: span 8; align-items: start; min-width: 0; padding-block: 16px 0; padding-inline: 0 28px; }
 .home-plan + .home-plan { border-inline-start: 1px solid var(--line); padding-inline: 32px 0; }
 .home-plan h3 { font-size: 1.15rem; font-weight: 500; }
@@ -42,7 +42,7 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
 .home-plan ul { display: grid; grid-template-rows: subgrid; grid-row: span 5; padding: 0; margin: 0 0 12px; list-style: none; font-size: .85rem; line-height: 1.65; color: var(--muted); }
 .home-plan li { display: flex; align-items: flex-start; gap: 10px; }
 .home-plan li strong { font-weight: 600; color: var(--ink); }
-.home-plan-lite li[data-feature='classic'] strong { color: var(--accent); }
+.home-plan-paid li[data-feature='classic'] strong { color: var(--accent); }
 .home-plan .icon-check { width: 17px; height: 22px; }
 .home-plan .button { width: 100%; justify-content: space-between; font-size: .84rem; }
 .home-plan .button.secondary { --control-bg: #f3f6fc; --control-ink: #0b1725; --control-hover-bg: #d9e9ff; }
@@ -88,4 +88,11 @@ html:is([lang^=zh], [lang=ja], [lang=ko]) .home-hero h1 span { font-style: norma
   .home-plan li { gap: 6px; }
   .home-plan .icon-check { width: 14px; }
   .home-plan .button { font-size: .75rem; padding: 11px 13px; gap: 6px; }
+}
+
+@media (max-width: 640px) {
+  .home-plans { grid-template-columns: 1fr; }
+  .home-plan { grid-template-rows: auto; grid-row: auto; padding: 24px 0; }
+  .home-plan + .home-plan { border-inline-start: 0; border-top: 1px solid var(--line); padding-inline: 0; }
+  .home-plan ul { grid-template-rows: none; grid-row: auto; gap: 10px; }
 }

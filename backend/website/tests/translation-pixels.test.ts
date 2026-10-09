@@ -123,7 +123,7 @@ test('rechecks decoded dimensions and releases the bitmap when a header understa
   assert.equal(state.bitmaps.length, 3); assert.ok(state.bitmaps.every(bitmap => bitmap.closed)); assert.equal(state.canvases.length, 0);
 }));
 
-test('materializes full redraw output without decoding or reading the unused original', async () => withWorker(async state => {
+test('materializes full-image output without decoding or reading the unused original', async () => withWorker(async state => {
   const original = new Blob(['unused original']), artifact = png(100, 100);
   Object.defineProperty(original, 'slice', { value() { throw Error('Redraw must not read the input'); } });
   const reply = await state.send({ source: original, artifact, result: {

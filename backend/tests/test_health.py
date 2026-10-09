@@ -11,6 +11,11 @@ def mark_ready():
     report_progress("control-worker", instance="test-worker")
     report_progress("maintenance", instance="test-maintenance")
     with session_factory()() as db:
+        from conftest import control_node
+        from app.queue_models import ComputeNode
+        node = db.get(ComputeNode, control_node(db))
+        node.runtime_report = {"protocol_version": 3, "ready": True}
+        node.heartbeat_at = now()
         report_pools(db)
 
 
@@ -58,7 +63,7 @@ def test_failure_logs_diagnostic_locations_without_exception_values(client, capl
     try:
         raise ValueError("private-image-words and signed-url-secret")
     except ValueError as error:
-        log_failure("maintenance", error, job_id="synthetic-job", stage="redraw", lease_id="synthetic-lease")
+        log_failure("maintenance", error, job_id="synthetic-job", stage="classic", lease_id="synthetic-lease")
     assert "ValueError" in caplog.text
     assert "test_health.py" in caplog.text
     assert "job_id=synthetic-job" in caplog.text and "lease_id=synthetic-lease" in caplog.text
@@ -91,7 +96,7 @@ def test_unknown_and_overdue_task_alerts_are_safe_without_reading_session(client
     mark_ready()
     with session_factory()() as db:
         job = db.get(Job, job_id)
-        stage = db.scalar(select(JobStage).where(JobStage.job_id == job_id, JobStage.name == "redraw"))
+        stage = db.scalar(select(JobStage).where(JobStage.job_id == job_id, JobStage.name == "page"))
         stage.available_at = now() - timedelta(days=1)
         db.commit()
         payload, ready = readiness()

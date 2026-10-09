@@ -1,7 +1,7 @@
 """Admin history remains scoped, paginated, append-only and replay safe."""
 from datetime import timedelta
 from sqlalchemy import func, select
-from conftest import login, upload, create
+from conftest import login, upload, create, configure_system_limits
 
 
 def test_user_histories_require_admin_and_scope_to_user(client):
@@ -38,6 +38,7 @@ def test_user_histories_require_admin_and_scope_to_user(client):
 
 
 def test_expire_and_compensation_have_one_receipt_and_keep_reserved_bucket(client, png):
+    configure_system_limits(free_daily_pages=0)
     from app.admin_audit import AdminAudit
     from app.db import session_factory
     from app.entitlement_models import MembershipOperation, QuotaPeriod
@@ -50,7 +51,7 @@ def test_expire_and_compensation_have_one_receipt_and_keep_reserved_bucket(clien
         json={'days': 30, 'monthly_pages': 3, 'note': 'test'}).status_code == 200
     job = create(client, reader, upload(client, reader, png)).json()
     assert job['settlement'] == 'reserved'
-    compensation = {'kind': 'redraw_monthly', 'pages': 2, 'note': 'delivery compensation'}
+    compensation = {'kind': 'classic_monthly', 'pages': 2, 'note': 'delivery compensation'}
     first = client.post(base + '/quota-compensations', headers={**admin, 'Idempotency-Key': 'compensate'}, json=compensation)
     assert first.status_code == 200, first.text
     assert client.post(base + '/quota-compensations', headers={**admin, 'Idempotency-Key': 'compensate'}, json=compensation).json() == first.json()
@@ -94,26 +95,24 @@ def test_quota_grant_audit_is_atomic_and_idempotent(client):
         assert db.scalar(select(func.count()).select_from(AdminAudit).where(AdminAudit.action == 'quota.grant')) == 1
 
 
-def test_membership_form_default_uses_database_and_renewal_keeps_original_terms(client):
+def test_finite_membership_override_and_renewal_keep_original_terms(client):
     from conftest import configure_system_limits
     admin, reader = login(client, 'admin'), login(client)
     owner = client.get('/v1/me', headers=reader).json()['user']['id']
-    configure_system_limits(plus_monthly_redraw_pages=600)
-    # The form omits monthly_pages when the optional override is left empty.
-    payload = {'action': 'extend', 'days': 30, 'note': 'use configured default'}
+    # Explicit finite allowances are frozen for the entire operator gift segment.
+    payload = {'action': 'extend', 'days': 30, 'monthly_pages': 600, 'note': 'explicit finite allowance'}
     initial = client.post(f'/v1/admin/users/{owner}/membership',
         headers={**admin, 'Idempotency-Key': 'default-open'}, json=payload)
     assert initial.status_code == 200
-    assert initial.json()['entitlements']['modes']['redraw']['quota']['granted'] == 600
-    configure_system_limits(plus_monthly_redraw_pages=900)
+    assert initial.json()['entitlements']['subscription_quota']['granted'] == 600
     renewed = client.post(f'/v1/admin/users/{owner}/membership',
         headers={**admin, 'Idempotency-Key': 'default-renew'}, json=payload)
     assert renewed.status_code == 200
-    assert renewed.json()['entitlements']['modes']['redraw']['quota']['granted'] == 600
+    assert renewed.json()['entitlements']['subscription_quota']['granted'] == 600
     assert client.post(f'/v1/admin/users/{owner}/membership',
         headers={**admin, 'Idempotency-Key': 'default-open'}, json=payload).json() == initial.json()
     newcomer = client.get('/v1/me', headers=login(client, 'newcomer')).json()['user']['id']
     fresh = client.post(f'/v1/admin/users/{newcomer}/membership',
-        headers={**admin, 'Idempotency-Key': 'new-default-open'}, json=payload)
+        headers={**admin, 'Idempotency-Key': 'new-default-open'}, json={**payload, 'monthly_pages': 900})
     assert fresh.status_code == 200
-    assert fresh.json()['entitlements']['modes']['redraw']['quota']['granted'] == 900
+    assert fresh.json()['entitlements']['subscription_quota']['granted'] == 900

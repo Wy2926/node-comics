@@ -22,7 +22,6 @@ class RequestLimits(RequestBody):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, allow_inf_nan=False)
 
     free_daily_pages: int = Field(ge=0, le=1000000)
-    plus_monthly_redraw_pages: int = Field(ge=0, le=1000000)
 
     free_images_per_minute: int = Field(ge=1, le=10000)
     plus_images_per_minute: int = Field(ge=1, le=10000)

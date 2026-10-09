@@ -29,26 +29,27 @@ class BillingPlanRevision(Base):
     plan_id: Mapped[str] = mapped_column(ForeignKey('billing_plans.id'), index=True)
     version: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(100))
-    monthly_redraw_pages: Mapped[int] = mapped_column(Integer)
+    monthly_classic_pages: Mapped[int | None] = mapped_column(Integer)
     hourly_image_limit: Mapped[int | None] = mapped_column(Integer)
     service_plan_id: Mapped[str | None] = mapped_column(String(64))
     quota_pages: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     quota_validity_days: Mapped[int | None] = mapped_column(Integer)
     trial_days: Mapped[int] = mapped_column(Integer)
-    trial_redraw_pages: Mapped[int] = mapped_column(Integer)
+    trial_classic_pages: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (UniqueConstraint('plan_id', 'version'), UniqueConstraint('id', 'plan_id'),
-        CheckConstraint('version > 0'), CheckConstraint('monthly_redraw_pages >= 0'),
+        CheckConstraint('version > 0'), CheckConstraint('monthly_classic_pages IS NULL OR monthly_classic_pages BETWEEN 0 AND 1000000', name='ck_billing_monthly_classic'),
         CheckConstraint('hourly_image_limit IS NULL OR (hourly_image_limit > 0 AND hourly_image_limit <= 1000000)',
             name='ck_billing_revision_hourly_image_limit'),
-        CheckConstraint('trial_days >= 0 AND trial_days <= 30'), CheckConstraint('trial_redraw_pages >= 0'),
-        CheckConstraint('trial_days > 0 OR trial_redraw_pages = 0'),
+        CheckConstraint('trial_days >= 0 AND trial_days <= 30'),
+        CheckConstraint('trial_classic_pages IS NULL OR trial_classic_pages BETWEEN 0 AND 1000000', name='ck_billing_trial_classic'),
+        CheckConstraint('trial_days > 0 OR (trial_classic_pages IS NOT NULL AND trial_classic_pages = 0)', name='ck_billing_classic_trial_days'),
         CheckConstraint('quota_pages BETWEEN 0 AND 1000000', name='ck_billing_revision_quota_pages'),
         CheckConstraint('quota_validity_days IS NULL OR quota_validity_days BETWEEN 1 AND 36500',
             name='ck_billing_revision_quota_validity'),
-        CheckConstraint('(quota_pages = 0 AND quota_validity_days IS NULL AND service_plan_id IS NULL) OR '
-            '(quota_pages > 0 AND service_plan_id IS NOT NULL AND monthly_redraw_pages = 0 '
-            'AND trial_days = 0 AND trial_redraw_pages = 0)', name='ck_billing_revision_purchase'))
+        CheckConstraint('(quota_pages = 0 AND quota_validity_days IS NULL) OR '
+            '(quota_pages > 0 AND service_plan_id IS NOT NULL AND monthly_classic_pages IS NOT NULL AND monthly_classic_pages = 0 '
+            'AND trial_days = 0 AND trial_classic_pages IS NOT NULL AND trial_classic_pages = 0)', name='ck_billing_revision_purchase'))
 
 
 class BillingPrice(Base):
@@ -66,7 +67,7 @@ class BillingPrice(Base):
     __table_args__ = (ForeignKeyConstraint(['plan_revision_id', 'plan_id'],
             ['billing_plan_revisions.id', 'billing_plan_revisions.plan_id']),
         CheckConstraint("environment IN ('test', 'live')"),
-        CheckConstraint("interval IN ('month', 'year', 'once')", name='ck_billing_price_interval'),
+        CheckConstraint("interval IN ('month', 'quarter', 'year', 'once')", name='ck_billing_price_interval'),
         CheckConstraint("status IN ('draft', 'active', 'archived')"), CheckConstraint('unit_amount > 0'),
         Index('uq_billing_active_offer', 'plan_id', 'environment', 'currency', 'interval', unique=True,
             sqlite_where=text("status = 'active'"), postgresql_where=text("status = 'active'")))

@@ -25,8 +25,8 @@ def seed(db):
         engine_version="fixture-engine-v1", capabilities=["page"], capacity=1, heartbeat_at=at-timedelta(minutes=8)),
         ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-text", name="control-text", resource_id="control-text", device="network",
         engine_version="control", capabilities=["text"], capacity=4, heartbeat_at=at),
-        ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-redraw", name="control-redraw", resource_id="control-redraw", device="network",
-        engine_version="control", capabilities=["redraw"], capacity=4, heartbeat_at=at)]
+        ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id="control-classic", name="control-classic", resource_id="control-classic", device="network",
+        engine_version="control", capabilities=["classic"], capacity=4, heartbeat_at=at)]
     for node in nodes:
         node.desired_config = ({'execution_slots': node.capacity} if node.engine_version == 'control'
                                else NodeConfig(execution_slots=node.capacity).model_dump(exclude_none=True))
@@ -76,7 +76,7 @@ def seed(db):
     execution(expired,"page","gpu-b",10,None,expiry=expired.created_at+timedelta(seconds=50))
     for i in range(5,46):
         status=["queued","queued","queued","awaiting_upload","validating_upload","failed","no_text","outcome_unknown"][i%8]
-        row=job(i,status,mode="classic" if i%2 else "redraw",owner=i%4,age=800+i*10)
-        if status=="queued": db.add(JobStage(job_id=row.id,name="page" if row.mode=="classic" else "redraw",status="ready"))
+        row=job(i,status,mode="classic" if i%2 else "classic",owner=i%4,age=800+i*10)
+        if status=="queued": db.add(JobStage(job_id=row.id,name="page" if row.mode=="classic" else "classic",status="ready"))
     db.commit()
     return {"at": at, "readers": [r.id for r in readers]}

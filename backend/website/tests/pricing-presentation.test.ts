@@ -10,23 +10,22 @@ import ts from 'typescript';
 import QuotaOffers from '../src/components/QuotaOffers';
 import {quotaPurchaseCopy} from '../src/i18n/quota-purchase';
 import CheckoutButton,{type CheckoutCopy} from '../src/components/CheckoutButton';
-import PublishedLitePricing,{LitePrice,PublishedPurchaseAvailability,publishedAmount,publishedAmountParts,publishedAnnualDiscount} from '../src/components/PublishedLitePricing';
+import PublishedPlanPricing,{PlanPrice,PublishedPurchaseAvailability,publishedAmount,publishedAmountParts,publishedAnnualDiscount} from '../src/components/PublishedPlanPricing';
 import PriceAmount from '../src/components/PriceAmount';
 import BillingCycle from '../src/components/BillingCycle';
 import FeatureInfo,{tooltipPosition} from '../src/components/FeatureInfo';
-import {publishedLite} from '../src/data/published-lite';
 import {pricingCopy,publishedPricingCopy} from '../src/lib/pricing';
 import {amount,amountParts,billingCopy,trialCopy,type Billing,type BillingOffer,type PendingCheckout} from '../src/lib/billing';
 import {comparisonCopy,comparisonRows} from '../src/lib/pricing-comparison';
 import {locales,localPath} from '../src/i18n/locales';
 
-test('published Lite prices remain readable without fabricating a purchasable offer',()=>{
-  for(const locale of locales)for(const interval of ['month','year'] as const){
-    const $=load(renderToStaticMarkup(createElement(PublishedLitePricing,{locale,interval})));
-    assert.equal($('.published-lite-pricing').attr('data-billing-interval'),interval,locale);
+test('published subscription prices remain readable without fabricating a purchasable offer',()=>{
+  for(const locale of locales)for(const interval of ['quarter','year'] as const){
+    const $=load(renderToStaticMarkup(createElement(PublishedPlanPricing,{locale,interval})));
+    assert.equal($('.published-plan-pricing').attr('data-billing-interval'),interval,locale);
     assert.equal($('.price-value').text(),publishedAmount(interval,locale),locale);
     assert.equal($('.price-currency').text(),'US$',locale);
-    assert.equal($('.monthly-equivalent').length,interval==='year'?1:0,locale);
+    assert.equal($('.monthly-equivalent').length,1,locale);
     if(interval==='year')assert.ok($('.monthly-equivalent').text().includes(publishedAmount(interval,locale,true)),locale);
     assert.equal($('a,button,[data-purchase-link],[data-billing-catalog="live"]').length,0,locale);
     assert.equal($('.published-pricing-label').text(),publishedPricingCopy(locale).label,locale);
@@ -119,8 +118,8 @@ test('feature tips stay inside narrow LTR and RTL viewports and flip above near 
 });
 
 test('annual discount has a dedicated stable slot in either public billing cadence',()=>{
-  assert.equal(publishedAnnualDiscount,16.5);
-  for(const locale of locales)for(const value of ['month','year'] as const)for(const annualDiscount of [0,publishedAnnualDiscount]){
+  assert.equal(publishedAnnualDiscount,9.9);
+  for(const locale of locales)for(const value of ['quarter','year'] as const)for(const annualDiscount of [0,publishedAnnualDiscount]){
     const $=load(renderToStaticMarkup(createElement(BillingCycle,{offers:[],value,onChange:()=>{},locale,preview:true,annualDiscount})));
     assert.equal($('.billing-cycle-picker > .billing-cycle-saving').length,1,locale);
     assert.equal($('.billing-cycle .annual-badge').length,0,locale);
@@ -133,7 +132,7 @@ test('annual discount has a dedicated stable slot in either public billing caden
 test('live annual quotes show the full charge before the monthly equivalent',()=>{
   const offer={unit_amount:7199,currency:'USD',interval:'year'} as BillingOffer;
   for(const locale of locales){
-    const $=load(renderToStaticMarkup(createElement(LitePrice,{locale,interval:'year',offer})));
+    const $=load(renderToStaticMarkup(createElement(PlanPrice,{locale,interval:'year',offer})));
     assert.equal($('.price-value').text(),amount(offer,locale),locale);
     assert.ok($('.billing-total').text().includes(amount(offer,locale)),locale);
     assert.ok($('.monthly-equivalent').text().includes(amount({...offer,unit_amount:7199/12},locale)),locale);
@@ -141,7 +140,7 @@ test('live annual quotes show the full charge before the monthly equivalent',()=
   }
 });
 
-test('every unavailable purchase state keeps the card-backed trial and a disabled action',()=>{
+test('every unavailable purchase state does not advertise a trial and a disabled action',()=>{
   for(const locale of locales)for(const state of ['loading','unavailable','error'] as const){
     const $=load(renderToStaticMarkup(createElement(PublishedPurchaseAvailability,{locale,state})));
     const copy=publishedPricingCopy(locale);
@@ -150,7 +149,7 @@ test('every unavailable purchase state keeps the card-backed trial and a disable
     assert.equal($('.billing-status').attr('role'),state==='error'?'alert':'status',locale);
     assert.equal($('button[disabled]').length,1,locale);
     assert.equal($('a,[data-purchase-link]').length,0,locale);
-    assert.ok($.text().includes(trialCopy(publishedLite.trialDays,locale)),locale);
+    assert.ok(!$.text().includes(trialCopy(7,locale)),locale);
     assert.ok($.text().includes(copy.tax),locale);
   }
 });
@@ -169,9 +168,9 @@ test('pricing presentation rules stay scoped and do not duplicate the former glo
   assert.match(css,/\.pricing-comparison\s+\.feature-column\s*\{/);
 });
 
-const pack:BillingOffer={id:'synthetic-pack',name:'Lite',plan_id:'pages',plan_revision_id:'pack-v1',currency:'usd',unit_amount:700,interval:'once',monthly_redraw_pages:0,trial_days:0,trial_redraw_pages:0,service_plan_id:'lite',quota_pages:100,quota_validity_days:null,hourly_image_limit:1200,channels:[{provider:'creem',binding_id:'synthetic',trial_days:0,trial_redraw_pages:0}]};
+const pack:BillingOffer={id:'synthetic-pack',name:'Lite',plan_id:'pages',plan_revision_id:'pack-v1',currency:'usd',unit_amount:700,interval:'once',monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,service_plan_id:'lite',quota_pages:100,quota_validity_days:null,hourly_image_limit:1200,channels:[{provider:'creem',binding_id:'synthetic',trial_days:0,trial_classic_pages:0}]};
 const checkoutCopy:CheckoutCopy={busy:'busy',error:'error',before:'before',refund:'refund',renewal:'subscription renewal',resume:'resume original'};
-const subscription={...pack,id:'subscription-month',name:'Lite',plan_id:'lite',interval:'month' as const};
+const subscription={...pack,id:'subscription-month',name:'Lite',plan_id:'lite',quota_pages:0,monthly_classic_pages:500,trial_days:7,trial_classic_pages:30,interval:'month' as const};
 const original=(price:BillingOffer):PendingCheckout=>({id:'checkout-'+price.id,provider:'creem',price,idempotency_key:price.interval==='once'?'quota-key':null,error:null});
 const emptyBilling:Billing={enabled:true,providers:[],provider:null,environment:'test',trial_eligible:true,
   subscription_checkout:null,offers:[subscription],quota_offers:[pack,{...pack,id:'second-pack'}],
@@ -253,14 +252,14 @@ test('no invented pack is rendered without a sellable quote; all sellable packs 
 test('subscription recovery does not hide or disable any quota purchase action',()=>{
   for(const subscription_checkout of [null,original(subscription)]){
     const $=pricingSnapshot({...emptyBilling,subscription_checkout});
-    assert.equal($('.paid-action [data-purchase-link]').attr('aria-disabled'),undefined);
+    assert.equal($('.subscription-card.paid [data-purchase-link]').attr('aria-disabled'),undefined);
     for(const link of $('.quota-offer [data-purchase-link]').toArray())assert.equal($(link).attr('aria-disabled'),undefined);
     assert.equal($('.quota-offer').length,2);
     assert.ok(!$('.quota-offer [data-purchase-link]').text().includes('resume original'));
     if(!subscription_checkout){
       assert.equal($('.billing-cycle[disabled]').length,0);
-      assert.ok(!$('.paid-action [data-purchase-link]').text().includes('resume original'));
-    }else assert.ok($('.paid-action [data-purchase-link]').text().includes('resume original'));
+      assert.ok(!$('.subscription-card.paid [data-purchase-link]').text().includes('resume original'));
+    }else assert.ok($('.subscription-card.paid [data-purchase-link]').text().includes('resume original'));
   }
 });
 
@@ -268,7 +267,7 @@ test('every locale keeps original subscription recovery separate from every new 
   const sub={...subscription,id:'retired-year',interval:'year' as const};
   for(const locale of locales){
     const $=pricingSnapshot({...emptyBilling,subscription_checkout:original(sub)},locale,pack.id);
-    const subscriptionButton=$('.paid-action [data-purchase-link]'),quotaButton=$('.quota-offer [data-purchase-link]');
+    const subscriptionButton=$('.subscription-card.paid [data-purchase-link]'),quotaButton=$('.quota-offer [data-purchase-link]');
     assert.equal(subscriptionButton.attr('href'),localPath('/pricing/?price=retired-year',locale));
     assert.equal(quotaButton.attr('href'),localPath('/pricing/?price=synthetic-pack',locale));
     assert.ok(subscriptionButton.text().includes('resume original'));assert.ok(!quotaButton.text().includes('resume original'));
@@ -288,4 +287,15 @@ test('a retired selected quote gets one manual recovery action only for a signed
   for(const selected of ['',pack.id,subscription.id,'../invalid'])assert.equal(pricingSnapshot(emptyBilling,'en',selected)('.billing-recovery').length,0);
   assert.equal(pricingSnapshot(null,'en','retired-pack')('.billing-recovery').length,0);
   assert.match(readFileSync(pricingFile,'utf8'),/className="billing-recovery"[^\n]*continueAfterLogin=\{false\}/);
+});
+
+
+test('finite and unlimited subscription cards use the catalog rather than product names',()=>{
+  const unlimited={...subscription,id:'pro-month',plan_id:'pro',name:'Pro',monthly_classic_pages:null,trial_classic_pages:null};
+  const $=pricingSnapshot({...emptyBilling,offers:[subscription,unlimited]});
+  assert.equal($('.subscription-card').length,3);
+  assert.match($('.subscription-card.paid').eq(0).find('.subscription-allowance').text(),/500/);
+  assert.ok($('.subscription-card.paid').eq(1).find('.subscription-allowance').text().includes(billingCopy('en').classic));
+  assert.match($('.subscription-card.paid').eq(0).find('.trial-note').text(),/30/);
+  assert.equal($('.subscription-card.paid [data-purchase-link]').length,2);
 });

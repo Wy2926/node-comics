@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from admission_test_utils import window_count, window_members, state_keys, freeze_clock, milliseconds
 from app import redis_state
 from conftest import configure_system_limits, login, login_plus, submit_asset, upload, request_id, request_record
-from test_cluster_submissions import cluster, descriptor, grant_redraw, manifest, snapshot, submit
+from test_cluster_submissions import cluster, descriptor, grant_free, manifest, snapshot, submit
 
 
 def counts():
@@ -35,20 +35,20 @@ def test_exact_rolling_limit_combines_devices_modes_and_languages(cluster, plus,
     client, _ = cluster
     auth = (login_plus if plus else login)(client)
     if not plus:
-        grant_redraw(client, auth, 100)
+        grant_free(client, auth, 100)
     high_control_budget()
     clock = [now()]
     freeze_clock(monkeypatch, clock)
     for index in range(limit):
         response = submit(client, auth, manifest(1, f'input-{index}')[0], key=f'op-{index}',
-            mode='classic' if index % 2 else 'redraw', target_language='en' if index % 3 else 'zh-Hans')
+            mode='classic' if index % 2 else 'classic', target_language='en' if index % 3 else 'zh-Hans')
         assert response.status_code == 202, response.text
     before = counts()
     denied = submit(client, auth, manifest(1, 'last')[0], key='last')
     assert denied.status_code == 429 and denied.json()['error']['code'] == 'IMAGE_RATE_LIMITED'
     assert denied.headers['Retry-After'] == '60'
     assert counts() == before
-    replay = submit(client, auth, manifest(1, 'input-0')[0], key='another-key', mode='redraw')
+    replay = submit(client, auth, manifest(1, 'input-0')[0], key='another-key', mode='classic')
     assert replay.status_code == 202 and replay.json()['state'] == 'needs_input'
     assert counts()['ImageAdmission'] == limit
     clock[0] += timedelta(seconds=59, milliseconds=999)
@@ -91,7 +91,7 @@ def test_existing_original_still_counts_when_translation_is_new(cluster, png):
     assert counts()['ImageAdmission'] == counts()['Job'] == 1
 
 
-@pytest.mark.parametrize('mode', ['classic', 'redraw'])
+@pytest.mark.parametrize('mode', ['classic', 'classic'])
 @pytest.mark.parametrize('initial', [{}, {'priority': 'current'}, {'priority': 'prefetch'}])
 def test_legacy_priority_is_ignored_without_repeating_admission(cluster, png, mode, initial):
     from app.providers import digest

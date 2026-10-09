@@ -7,7 +7,7 @@ from test_billing_catalog import administrator
 
 def pack(**changes):
     return dict(id='pages', revision_id='pages-v1', name='Page pack',
-        monthly_redraw_pages=0, trial_days=0, trial_redraw_pages=0,
+        monthly_classic_pages=0, trial_days=0, trial_classic_pages=0,
         service_plan_id='plus', quota_pages=500, quota_validity_days=None,
         hourly_image_limit=1200) | changes
 
@@ -15,9 +15,9 @@ def pack(**changes):
 @pytest.mark.parametrize('changes', [
     {'quota_pages': True}, {'quota_pages': -1}, {'quota_pages': 1_000_001},
     {'quota_validity_days': 0}, {'quota_validity_days': 36501},
-    {'service_plan_id': None}, {'monthly_redraw_pages': 1},
-    {'trial_days': 7}, {'trial_redraw_pages': 1},
-    {'quota_pages': 0},
+    {'service_plan_id': None}, {'monthly_classic_pages': 1},
+    {'trial_days': 7}, {'trial_classic_pages': 1},
+    {'monthly_classic_pages': None}, {'trial_classic_pages': None},
 ])
 def test_pack_cannot_mix_subscription_trial_or_invalid_quantity(changes):
     from app.billing_catalog import ProductRequest

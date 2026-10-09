@@ -70,7 +70,7 @@ def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
 
 
 def test_postgres_concurrent_grant_receipt_issues_only_one_bucket(pg):
-    request = GrantRequest(mode='redraw', pages=7,
+    request = GrantRequest(mode='classic', pages=7,
         expires_at=(now() + timedelta(days=2)).replace(tzinfo=timezone.utc), note='concurrent receipt')
     barrier = Barrier(6)
     def issue(_):
@@ -91,7 +91,7 @@ def test_postgres_same_grant_key_for_different_users_is_a_conflict(pg):
         db.add(other)
         db.commit()
         owners = [pg['owner_id'], other.id]
-    request = GrantRequest(mode='redraw', pages=1,
+    request = GrantRequest(mode='classic', pages=1,
         expires_at=(now() + timedelta(days=1)).replace(tzinfo=timezone.utc), note='scope contention')
     barrier = Barrier(2)
     def issue(owner):

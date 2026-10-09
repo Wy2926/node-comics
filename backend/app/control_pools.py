@@ -4,13 +4,13 @@ from .models import now
 from .queue_models import ComputeNode
 from .scheduler import lock_scheduler
 
-POOL_LIMITS = {'text': 100, 'redraw': 100, 'validate_upload': 32}
-POOL_LABELS = {'text': '文本翻译', 'redraw': 'AI 重绘', 'validate_upload': '上传校验'}
+POOL_LIMITS = {'text': 100, 'validate_upload': 32}
+POOL_LABELS = {'text': '文本翻译', 'validate_upload': '上传校验'}
 
 
 def initialize_pools(db):
     cfg = settings()
-    defaults = {'text': cfg.cluster_text_slots, 'redraw': cfg.cluster_redraw_slots,
+    defaults = {'text': cfg.cluster_text_slots,
                 'validate_upload': cfg.cluster_upload_slots}
     lock_scheduler(db)
     for stage, slots in defaults.items():

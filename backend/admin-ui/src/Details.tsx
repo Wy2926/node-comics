@@ -1,12 +1,11 @@
 import type {Mode, TaskDetail as TaskData, UserDetail as UserData} from './types';
 import {Badge, duration, Empty, Jump, label, number, Stat, Table, time} from './ui';
 import {MembershipActions} from './MembershipActions';
-import {TaskActions} from './TaskActions';
 import {TaskAttempts} from './TaskAttempts';
 import {UserHistory} from './UserHistory';
 import {taskTimingRows} from './timings';
 
-export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
+export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
   return <>
     <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {j.target_language}</p></div><Badge value={j.status}/></div>
@@ -19,7 +18,6 @@ export function TaskDetail({job: j, onChanged, onUnauthorized}: {job: TaskData; 
       <dt>交付执行机 / 进程</dt><dd>{final ? final.executor_id || '未记录' : '—'}</dd>
       <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.id || '—'}</dd></dl>
     {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
-    <TaskActions job={j} onChanged={onChanged} onUnauthorized={onUnauthorized}/>
     {j.expired_leases > 0 && <p className="attention">{j.expired_leases} 个租约已过期，等待回收。</p>}
     <h3 className="detail-heading">阶段进度</h3><div className="stage-flow">{j.stages.length ? j.stages.map(s =>
       <div key={s.name}><b>{label(s.name)}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
@@ -49,7 +47,7 @@ export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData
     {e.hourly_image_rate_limit && <p className="muted">每滚动 60 分钟最多新受理 {e.hourly_image_rate_limit.limit} 页，跨模式、语言和设备合计。</p>}
     <dl className="detail-meta"><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
       <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>
-    <div className="queue-grid">{(['classic', 'redraw'] as Mode[]).map(mode => {
+    <div className="queue-grid">{(['classic'] as Mode[]).map(mode => {
       const m = e.modes[mode], q = m.quota;
       return <section className="panel" key={mode}><h3>{label(mode)}</h3><p>{m.unlimited ? '不限量' : !m.allowed ? '当前无使用权益' : `可用 ${number(q?.available)} 页`}</p>
         {q && <dl className="node-info"><dt>本期已用</dt><dd>{number(q.used)} 页</dd><dt>在途预占</dt><dd>{number(q.reserved)} 页</dd>

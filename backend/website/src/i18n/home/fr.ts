@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Lisez gratuitement. Choisissez votre offre de traduction.",
   "privacyBody": "NodeLane Comics propose une extension gratuite et un service de traduction cloud lié à votre compte. Des limites de fréquence et de capacité s’appliquent. Consultez la disponibilité, les avantages et les conditions de facturation avant de vous abonner.",
   "privacy": "Politique de confidentialité",
-  "pricing": "Comparer Free et Lite",
+  "pricing": "Comparer Free et PLUS / Pro",
   "ctaTitle": "Comprenez votre prochaine page.",
   "ctaBody": "Installez NodeLane Comics sur Chrome, Edge ou Firefox pour ordinateur."
 };

@@ -84,10 +84,6 @@ def pg_scope(tmp_path, monkeypatch):
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "images"))
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-postgres-test-auth-key-not-used-for-product")
-    monkeypatch.setenv("OPENAI_API_KEY", "postgres-test-placeholder-no-paid-access")
-    monkeypatch.setenv("OPENAI_BASE_URL", "https://provider.invalid/v1")
-    monkeypatch.setenv("OPENAI_MODEL", "contract-image-model")
-    monkeypatch.setenv("PROVIDERS_JSON", "")
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     from app.config import settings
     from app.db import engine
@@ -100,7 +96,7 @@ def pg_scope(tmp_path, monkeypatch):
     def prohibited(*args, **kwargs):
         raise AssertionError("Real provider calls are prohibited in PostgreSQL concurrency tests")
 
-    monkeypatch.setattr(workers, "redraw", prohibited)
+    monkeypatch.setattr("conftest.fixture_output", prohibited)
     from app import classic
     monkeypatch.setattr(classic, 'call_text', prohibited)
     yield {"schema": schema, "application_name": app_name, "administration": administration}
@@ -133,7 +129,7 @@ def pg(pg_scope):
         db.flush()
         asset = create_asset(db, user.id, raw)
         from conftest import control_node
-        control_node(db, "redraw")
+        control_node(db, "classic")
         control_node(db, "text")
         db.commit()
         return {**pg_scope, "owner_id": user.id, "asset_id": asset.id, "png": raw}
@@ -144,7 +140,7 @@ def new_job(pg, key="same-operation"):
     from app.jobs import create_job
     from app.models import Asset, User
     with session_factory()() as db:
-        job = create_job(db, db.get(User, pg["owner_id"]), db.get(Asset, pg["asset_id"]), "redraw", "zh-Hans", key)
+        job = create_job(db, db.get(User, pg["owner_id"]), db.get(Asset, pg["asset_id"]), "classic", "zh-Hans", key)
         db.commit()
         return job.id
 
@@ -186,7 +182,7 @@ def test_postgres_concurrent_idempotent_creation_reserves_once(pg):
 
 def test_postgres_concurrent_duplicate_workers_call_and_settle_once(pg, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
+
     from app.db import session_factory
     from app.models import Attempt
     job_id = new_job(pg)
@@ -199,9 +195,9 @@ def test_postgres_concurrent_duplicate_workers_call_and_settle_once(pg, monkeypa
             calls.append(1)
         provider_entered.set()
         assert release_provider.wait(10)
-        return TranslationOutput(pg["png"], request_id="pg-test-once", usage={"total_tokens": 10})
+        return pg["png"]
 
-    monkeypatch.setattr(workers, "redraw", provider)
+    monkeypatch.setattr("conftest.fixture_output", provider)
     barrier = threading.Barrier(2)
 
     def run():
@@ -225,7 +221,7 @@ def test_postgres_concurrent_duplicate_workers_call_and_settle_once(pg, monkeypa
 
 def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
+
     from app.db import session_factory
     from app.dispatcher import recover_lease
     from app.errors import ProcessingError
@@ -248,8 +244,8 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
     calls, barrier = [], threading.Barrier(2)
     def provider(*args):
         calls.append(1)
-        return TranslationOutput(pg["png"], usage={"total_tokens": 7})
-    monkeypatch.setattr(workers, "redraw", provider)
+        return pg["png"]
+    monkeypatch.setattr("conftest.fixture_output", provider)
     def stale():
         barrier.wait(timeout=10)
         with pytest.raises(ProcessingError, match="LEASE_EXPIRED"):
@@ -270,7 +266,7 @@ def test_postgres_stale_worker_before_intent_cannot_call_after_recovery(pg, monk
 
 def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
+
     from app.assets import object_path, owned_asset
     from app.db import engine, session_factory
     from app.jobs import job_json
@@ -298,7 +294,7 @@ def test_postgres_delete_during_finalize_revokes_newly_committed_result(pg, monk
             return translation_delete(UUID(receipt.id), user=db.get(User, pg["owner_id"]), db=db)
 
     monkeypatch.setattr(workers, "create_asset", pause_finalization)
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(pg["png"], usage={"total_tokens": 9}))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: pg["png"])
     event.listen(engine(), "before_cursor_execute", observe_delete_lock)
     try:
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="finalize-result") as worker_pool, ThreadPoolExecutor(max_workers=1, thread_name_prefix="delete-original") as delete_pool:

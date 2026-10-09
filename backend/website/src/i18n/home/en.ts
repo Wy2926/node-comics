@@ -64,7 +64,7 @@ const copy: HomeCopy = {
   controlNote: "New comics open as originals. The extension uses standard translation for comic images; choose a channel when you need it.",
   privacyTitle: "Read for free. Choose your translation plan.",
   privacyBody: "NodeLane Comics offers a free extension and account-based cloud translation. Rate and service-capacity limits apply. Check current availability, full benefits and billing terms before subscribing.",
-  privacy: 'Privacy policy', pricing: "Compare Free and Lite",
+  privacy: 'Privacy policy', pricing: "Compare Free and PLUS / Pro",
   ctaTitle: "Make sense of your next page.", ctaBody: "Install NodeLane Comics for desktop Chrome, Edge or Firefox.",
 };
 

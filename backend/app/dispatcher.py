@@ -5,14 +5,14 @@ import signal
 from threading import Event
 import time
 from sqlalchemy import and_, or_, select
-from .assets import available, asset_storage_key, create_asset, inspect_image
+from .assets import available, asset_storage_key
 from .config import settings
 from .db import session_factory
 from .runtime import check_runtime
 from .errors import ProcessingError
 from .health import log_failure, probe_oidc, report_failure, report_progress
 from .jobs import settle
-from .models import Asset, Attempt, ClassicState, Job, Provider, now
+from .models import Asset, Job, now
 from .queue_models import ExecutionLease, JobStage
 from .redis_state import AdmissionUnavailable
 from .scheduler import lock_scheduler, release_lease, touch_job
@@ -30,16 +30,6 @@ def recover_lease(lease_id):
         if not lease or lease.completed_at or lease.expires_at > now():
             return
         job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
-        attempt = db.get(Attempt, job.attempt_id)
-        image = None
-        if stage.name == "redraw":
-            store = get_store()
-            key = lease.output_key
-            try:
-                image = store.read(key) if key and store.exists(key) else None
-            except StorageError:
-                return  # An unavailable object store is not evidence of absent output.
-        unknown = stage.name == "redraw" and attempt.call_started_at is not None
         expired_page = False
         invalid_source = False
         if stage.name == 'page':
@@ -60,57 +50,9 @@ def recover_lease(lease_id):
                 pause_missing_input(db, job)
                 db.commit()
                 return
-    if image is None:
-        code = ('ASSET_EXPIRED' if invalid_source else 'PAGE_DEADLINE_EXCEEDED' if expired_page
-                else 'UPSTREAM_OUTCOME_UNKNOWN' if unknown else 'WORKER_LEASE_EXPIRED')
-        fail_stage(lease_id, ProcessingError(code,
-            "计算节点失联，保留调用记录并恢复可重复阶段", unknown=unknown), recovering=True)
-        return
-    try:
-        info = inspect_image(image, output=True)
-        if info["sha256"] != (lease.limits.get("output_info") or {}).get("sha256"):
-            raise ProcessingError("INVALID_PROVIDER_OUTPUT", "已存结果与租约内容摘要不一致")
-    except ProcessingError as error:
-        fail_stage(lease_id, error, recovering=True)
-        return
-    with session_factory()() as db:
-        lock_scheduler(db)
-        lease = db.get(ExecutionLease, lease_id)
-        if lease.completed_at or lease.expires_at > now():
-            return
-        job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
-        source = db.get(Asset, job.input_asset_id)
-        if stage.generation != lease.generation:
-            release_lease(db, lease, "cancelled")
-        elif job.status not in {"running", "outcome_unknown"}:
-            stage.status = "cancelled"
-            release_lease(db, lease, "cancelled")
-        elif job.cancel_requested or job.discard_output or not available(source):
-            finish_job(db, job, "cancelled")
-            stage.status = "cancelled"
-            release_lease(db, lease, "cancelled")
-        else:
-            ratio = (info["width"] / info["height"]) / (source.width / source.height)
-            if not .8 <= ratio <= 1.25:
-                finish_job(db, job, "failed", error=ProcessingError("INVALID_PROVIDER_OUTPUT", "已存结果尺寸不合格"))
-                release_lease(db, lease, "failed")
-            else:
-                attempt = db.get(Attempt, job.attempt_id)
-                output = db.get(Asset, lease_id) or create_asset(db, job.owner_id, image, kind=job.mode, parent_id=source.id,
-                    stable_id=lease_id, prewritten=True, verified_info=info)
-                job.output_asset_id = output.id
-                job.result_description = {'representation': 'full-image-v1', 'input_hash': source.sha256,
-                    'normalization_version': source.normalization_version, 'width': output.width, 'height': output.height}
-                state = db.get(ClassicState, job.id)
-                job.quality_flags = (state.analysis or {}).get("quality_flags", []) if state else []
-                if abs(ratio - 1) > .03:
-                    job.quality_flags = [*job.quality_flags, "aspect_ratio_changed"]
-                stage.status, stage.completed_at = "succeeded", now()
-                finish_job(db, job, "succeeded")
-                attempt.recovered = True
-                release_lease(db, lease, "succeeded")
-        touch_job(db, job)
-        db.commit()
+    code = ('ASSET_EXPIRED' if invalid_source else 'PAGE_DEADLINE_EXCEEDED' if expired_page else 'WORKER_LEASE_EXPIRED')
+    fail_stage(lease_id, ProcessingError(code, '计算节点失联，保留检查点并恢复可重复阶段'), recovering=True)
+
 
 
 _input_scan_cursor = None
@@ -162,25 +104,11 @@ def recover_once():
         except (StorageError, ProcessingError) as error:
             log_failure("lease-recovery", error, lease_id=lease_id)
             continue
-    deadline = now() - timedelta(seconds=settings().unknown_release_seconds)
-    unknown_filter = (Job.status == "outcome_unknown", Job.unknown_since <= deadline)
-    provider_join = Provider.id == Job.config["provider"]["id"].as_string()
-    disabled_filter = (Job.status == "queued", Job.mode == "redraw", or_(Provider.id.is_(None), Provider.enabled.is_(False)))
-    # Select bounded candidate IDs without blocking claims. Their eligibility is
-    # rechecked under the scheduler lock before any settlement/status mutation.
-    with session_factory()() as db:
-        unknown_ids = list(db.scalars(select(Job.id).where(*unknown_filter).order_by(Job.unknown_since, Job.id).limit(100)))
-        disabled_ids = list(db.scalars(select(Job.id).outerjoin(Provider, provider_join).where(*disabled_filter)
-            .order_by(Job.created_at, Job.id).limit(100)))
     with session_factory()() as db:
         lock_scheduler(db)
-        for job in db.scalars(select(Job).where(Job.id.in_(unknown_ids), *unknown_filter)):
-            job.status, job.phase, job.completed_at = "unknown_released", "reconciliation_required", now()
-            settle(db, job, success=False)
         expire_uploads(db)
-        for job in db.scalars(select(Job).outerjoin(Provider, provider_join).where(Job.id.in_(disabled_ids), *disabled_filter)):
-            finish_job(db, job, "failed", error=ProcessingError("PROVIDER_DISABLED", "图片服务已停用"))
         db.commit()
+
 
 
 _lease_cleanup_cursor = None
@@ -199,9 +127,7 @@ def cleanup(db):
     expire_guests(db)
     orphan_results = list(db.scalars(select(Asset).outerjoin(Job, Job.output_asset_id == Asset.id).where(
         Asset.kind != "original", Asset.deleted_at.is_(None), Asset.created_at <= orphan_cutoff,
-        Job.id.is_(None), or_(Asset.parent_id.is_(None), Asset.parent_id.not_in(
-            select(Job.input_asset_id).where(Job.mode == 'redraw', Job.input_asset_id.is_not(None),
-                Job.status.in_(['outcome_unknown', 'unknown_released'])).correlate(None)))).limit(100)))
+        Job.id.is_(None)).limit(100)))
     for asset in orphan_results:
         asset.deleted_at = now()
     db.flush()
@@ -228,7 +154,7 @@ def cleanup(db):
     cutoff = now() - timedelta(seconds=settings().upload_body_timeout_seconds + 60)
     rows = db.execute(select(ExecutionLease.id, ExecutionLease.output_key).join(JobStage, JobStage.id == ExecutionLease.stage_id)
         .join(Job, Job.id == ExecutionLease.job_id).outerjoin(Asset, Asset.id == ExecutionLease.id).where(
-            or_(JobStage.name == 'page', and_(JobStage.name == 'redraw', Job.status.in_(['failed', 'cancelled']))),
+            JobStage.name == 'page',
             ExecutionLease.completed_at.is_not(None), ExecutionLease.completed_at <= cutoff,
             ExecutionLease.output_key.is_not(None), Asset.id.is_(None),
             ExecutionLease.id > _lease_cleanup_cursor if _lease_cleanup_cursor else True)

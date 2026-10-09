@@ -3,7 +3,7 @@ import pytest
 from fastapi import HTTPException
 from app.config import settings
 from app.db import session_factory
-from app.languages import LANGUAGES, REDRAW_LANGUAGES
+from app.languages import LANGUAGES
 from app.models import Job
 from app.providers import configuration, digest
 from app.queue_models import ComputeNode
@@ -18,8 +18,8 @@ def test_unknown_language_has_specific_code_before_admission(client):
     from test_cluster_submissions import submit, manifest
     response = submit(client, auth, manifest(1)[0], key='unknown-language', target_language='xx')
     assert response.status_code == 422
-    response = submit(client, auth, manifest(1)[0], key='mode-language', mode='redraw', target_language='pl')
-    assert response.status_code == 422 and response.json()['error']['code'] == 'LANGUAGE_UNSUPPORTED'
+    response = submit(client, auth, manifest(1)[0], key='mode-language', mode='removed-mode', target_language='pl')
+    assert response.status_code == 422 and response.json()['error']['code'] == 'INVALID_REQUEST'
     response = client.post('/v1/admin/compute-nodes', headers=login(client,'admin'),
         json={'name':'invalid language','resource_id':'invalid:language','config':{'allowed_languages':['xx']}})
     assert response.status_code == 422 and response.json()['error']['code'] == 'NODE_CONFIG_INVALID'
@@ -31,7 +31,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
     reply = client.get('/v1/capabilities').json()
     assert len(reply['languages']) == 17
     assert set(reply['modes'][0]['languages']) == set(LANGUAGES)
-    assert reply['modes'][1]['languages'] == REDRAW_LANGUAGES
+    assert len(reply['modes']) == 1
     with session_factory()() as db:
         for language in LANGUAGES:
             config = configuration(db, 'classic', language)
@@ -39,7 +39,7 @@ def test_capabilities_and_config_accept_every_classic_target(client, monkeypatch
         with pytest.raises(HTTPException):
             configuration(db, 'classic', 'xx')
         with pytest.raises(HTTPException):
-            configuration(db, 'redraw', 'pl')
+            configuration(db, 'removed-mode', 'pl')
         old = {**config, 'engine': {'version': 'different-engine-version'}}
         assert digest(old) != digest(config)
 

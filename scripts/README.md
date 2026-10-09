@@ -81,7 +81,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取；另以自制 800×30000 漫画比较旧 PNG／新 JPEG 的体积、单次耗时、文字像素误差及截图。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
 | `verify_overlay_live.py` | 隔离 Docker 中心 + 本机 GPU + 真实文本 LLM；支持静态规范图片或整章目录，逐页保存 UUID、结果与统计，检查结果鉴权和 UUID 重放 |
 | `verify_overlay_chapter.mjs <运行目录>` | Vite 5176 + 真实 Chromium 逐页合成真实批次产物，走产品导入与流式 CBZ 导出，独立解包校验全部页面 SHA；不调用 API/LLM |
-| `smoke_api.py` / `verify_image_provider_live.py` | API／真实图片供应商；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
+| `smoke_api.py` | API／计算服务；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
 
 Drive 可用 `TEST_EXTENSION_DIR` 指向 Edge 构建并配套 `TEST_CHROMIUM`；授权页、Google 与 Drive 均由本机 TLS 模拟，真实 Google 授权另验。登录生命周期夹具使用 Vite 5187 的 `auth-lifecycle-fixture.html`；订阅焦点夹具使用 Vite 5192 的 `billing-focus-fixture.html`。
 
@@ -150,3 +150,5 @@ services/classic-engine/.venv-lama/Scripts/python.exe scripts/verify_overlay_liv
 脚本隔离安全检查：`python scripts/tests/test_overlay_live.py`。产物和凭据不提交仓库。验收后仅清理该 Compose 项目及其专用卷；其他 Docker 环境不受影响。
 
 `translation_client.py`、`local_import_helpers.mjs` 是脚本共享模块；`generate_import_fixtures.py` 只生成自制样本。脚本使用的数据、profile 和结果不提交仓库。
+
+新套餐本地验收：构建 `backend/website` 和 `backend/admin-ui`，从仓库根目录执行 `backend/.venv/Scripts/python.exe backend/tests/manual_membership_server.py`。页面 `http://127.0.0.1:4322/pricing/`，后台 `/console-preview/` 用户名 `admin`；临时数据库、内存 Redis，不调用真实支付或模型。

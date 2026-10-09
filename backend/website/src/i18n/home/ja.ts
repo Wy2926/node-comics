@@ -65,7 +65,7 @@ const copy: HomeCopy = {
     ],
     controlNote: "新しい漫画は原画で開きます。チャンネルと言語を選んで通常翻訳を開始。リーダーとウェブ翻訳は同じ選択を使います。",
     privacyTitle: "読書は無料。翻訳プランは用途に合わせて。", privacyBody: "NodeLane Comics は無料の拡張機能とアカウント単位のクラウド翻訳を提供します。リクエスト頻度やサービス容量に制限があります。契約前に購入受付状況、特典と請求条件をご確認ください。",
-    privacy: 'プライバシー', pricing: "Free と Lite を比較", ctaTitle: "次のページを、もっとわかるものに。", ctaBody: "デスクトップ版 Chrome・Edge・Firefox に NodeLane Comics をインストール。",
+    privacy: 'プライバシー', pricing: "Free と PLUS / Pro を比較", ctaTitle: "次のページを、もっとわかるものに。", ctaBody: "デスクトップ版 Chrome・Edge・Firefox に NodeLane Comics をインストール。",
   };
 
 export default copy;

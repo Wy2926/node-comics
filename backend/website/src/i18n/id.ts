@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Serahkan terjemahannya ke NodeLane Comics. Simpan perhatian Anda untuk halaman berikutnya.",
     "ctaButton": "Mulailah perjalanan membaca Anda",
     "pricingTitle": "Baca secara gratis. Pilih paket terjemahan Anda.",
-    "pricingDescription": "Bandingkan paket Gratis dan Lite: halaman gratis harian, 1.200 permintaan baru dalam setiap periode bergulir 60 menit, serta pembayaran bulanan atau tahunan. Akun baru yang memenuhi syarat mendapat uji coba 7 hari.",
+    "pricingDescription": "PLUS / Pro dan paket halaman tanpa kedaluwarsa. Bayar triwulanan atau tahunan, halaman diberikan bulanan. Tanpa uji coba langganan.",
     "freePlan": "Gratis",
     "freePlanDescription": "Untuk sedikit membaca setiap hari",
     "free": "gratis",
@@ -93,7 +93,7 @@ export default {
       "Hingga 10 gambar terjemahan baru dalam setiap periode bergulir 60 detik"
     ],
     "freeNote": "Kuota harian diatur ulang menurut zona waktu Asia/Shanghai dan sisanya tidak diakumulasi.",
-    "quotaNote": "Satu versi gambar yang berhasil dibuat dalam mode dan bahasa yang dipilih dihitung sebagai satu halaman. Permintaan duplikat dan penggunaan kembali hasil yang valid tidak dikenakan biaya dua kali. Terjemahan baru yang eksplisit menggunakan hak saat ini. Jumlah total yang tidak terbatas tetap tunduk pada batasan tarif, gambar, dan kapasitas layanan jangka pendek; tidak ada kecepatan penyelesaian yang dijamin.",
+    "quotaNote": "Satu versi gambar yang berhasil dibuat dalam mode dan bahasa yang dipilih dihitung sebagai satu halaman. Permintaan duplikat dan penggunaan kembali hasil yang valid tidak dikenakan biaya dua kali. Terjemahan baru yang eksplisit menggunakan hak saat ini. Batas frekuensi permintaan, ukuran gambar, dan kapasitas layanan tetap berlaku; kecepatan penyelesaian tidak dijamin.",
     "downloadTitle": "Instal ekstensi penerjemah manga Anda",
     "downloadDescription": "Dapatkan NodeLane Comics untuk Chrome, Edge, atau Firefox. Buka Chrome Web Store, Edge Add-ons, atau Firefox Add-ons, atau unduh paket yang sesuai dengan browser Anda.",
     "storeDescription": "Buka cerita Anda berikutnya di browser yang Anda sukai.",
@@ -144,7 +144,7 @@ export default {
       "Ke dalam cerita."
     ],
     "seoFeaturesTitle": "Fitur Terjemahan Manga & Pembaca Komik",
-    "seoPricingTitle": "Terjemahan Manga Gratis & Paket Lite",
+    "seoPricingTitle": "Terjemahan Manga Gratis & Paket PLUS / Pro",
     "seoDownloadTitle": "Penerjemah Manga untuk Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "Satu halaman terlalu jauh.",
@@ -206,7 +206,7 @@ export default {
       "title": "Saluran resmi NodeLane",
       "paragraphs": [
         "Masuk ke akun NodeLane, pilih bahasa, lalu aktifkan terjemahan. Layanan memproses gambar pilihan; akun menentukan akses dan kuota. Menggunakan kembali hasil yang masih berlaku tidak memotong kuota lagi.",
-        "Membaca gambar asli tidak membutuhkan akun. Paket Gratis dan Lite mengikuti aturan yang dipublikasikan: periksa hak akses di halaman akun dan harga di halaman paket. Batas frekuensi serta kapasitas tidak menjamin kecepatan penyelesaian."
+        "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran."
       ]
     },
     {
@@ -491,7 +491,7 @@ export default {
           {
             "title": "Manfaat dan langganan",
             "paragraphs": [
-              "Gratis, Lite, PLUS yang ada, manfaat uji coba dan bonus mengikuti aturan masa berlaku dan halaman masing-masing yang ditampilkan di akun Anda. Lite menerima hingga 1.200 halaman baru per jam bergulir. Tidak adanya batasan total harian atau bulanan tidak menghapus batas laju permintaan, gambar, atau kapasitas layanan jangka pendek.",
+              "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran.",
               "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan."
             ]
           },
@@ -559,8 +559,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "Apakah terjemahan manga gratis, dan apa saja yang termasuk dalam Lite?",
-        "answer": "Membaca dokumen asli lokal gratis dan tidak memerlukan akun. Terjemahan resmi memerlukan proses masuk; Gratis termasuk 30 halaman standar per hari. Lite berharga US$5,99 per bulan atau US$59,99 per tahun, tanpa batas total standar harian atau bulanan dan hingga 1.200 halaman baru per jam bergulir. Batas laju permintaan dan kapasitas berlaku. Akun pertama kali yang memenuhi syarat mendapatkan uji coba yang didukung kartu selama 7 hari. PLUS ditutup untuk pembelian baru; langganan yang ada tetap mempertahankan manfaat yang ditampilkan. Pajak dan jumlah akhir ditampilkan saat checkout.",
+        "question": "Apakah terjemahan manga gratis, dan apa saja yang termasuk dalam PLUS / Pro?",
+        "answer": "Membaca lokal gratis. Free mendapat 30 halaman per hari dengan GPT 6 Luna. PLUS: 2.500 halaman per bulan, US$6,66 per triwulan atau US$23,99 per tahun. Pro: 4.000 halaman per bulan, US$9,99 per triwulan atau US$35,99 per tahun. Keduanya memakai Haiku 5.5. Kuota diberikan bulanan tanpa akumulasi atau uji coba. Paket tanpa kedaluwarsa: 3.500 halaman US$5,99 atau 7.000 halaman US$9,99. Pajak dan total ditampilkan saat pembayaran.",
         "relatedPath": "/pricing/"
       },
       {
@@ -595,7 +595,7 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "Bagaimana cara kerja batas terjemahan Lite?",
+        "question": "Bagaimana cara kerja batas terjemahan PLUS / Pro?",
         "answer": "Satu akun berbagi batas 100 gambar terjemahan baru dalam setiap periode bergulir 60 detik dan 1.200 gambar dalam setiap periode bergulir 3.600 detik untuk semua perangkat, mode, dan bahasa. Paket Gratis mengizinkan 10 gambar dalam setiap periode bergulir 60 detik. Pengiriman ulang permintaan yang sama dan penggunaan kembali hasil yang masih berlaku tidak dihitung lagi. Tugas yang sudah diterima tetap dihitung meskipun gagal, dibatalkan, atau tidak berisi teks. Permintaan yang ditolak atau transaksi basis data yang dibatalkan akan melepaskan slot kuota per jam yang dicadangkan. Percobaan ulang mengikuti aturan penerimaan tugas baru yang berlaku. Batas ini tidak menjamin kecepatan penyelesaian.",
         "relatedPath": "/pricing/"
       },

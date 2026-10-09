@@ -52,7 +52,7 @@ def approved_product(value, product_id, price, trial_days, *, active=True):
     require(value.get('id') == product_id and value.get('price') == price.unit_amount
         and str(value.get('currency', '')).lower() == price.currency
         and value.get('billing_type') == ('onetime' if price.interval == 'once' else 'recurring')
-        and value.get('billing_period') == {'month': 'every-month', 'year': 'every-year', 'once': 'once'}[price.interval]
+        and value.get('billing_period') == {'month': 'every-month', 'quarter': 'every-three-months', 'year': 'every-year', 'once': 'once'}[price.interval]
         and (value.get('trial_period_days') or 0) == trial_days and not value.get('trial_price')
         and (not active or value.get('status') == 'active'), 'CREEM_PLAN_MISMATCH')
 

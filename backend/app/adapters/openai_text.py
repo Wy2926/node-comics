@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import Field, field_validator
 from ..errors import ProcessingError
-from .images import read_bounded
+from .transport import read_bounded
 from .transport import CheckedTransport
 from .llm import LLMConfig, Message, TextError, TextResponse
 

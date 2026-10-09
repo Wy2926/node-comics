@@ -25,12 +25,16 @@ def creem_billing(monkeypatch, request):
         monkeypatch.setenv(key, value)
     client = request.getfixturevalue('client')
     from app.db import session_factory
-    from app.billing_models import BillingPrice, BillingPriceBinding
+    from app.billing_models import BillingPrice, BillingPriceBinding, BillingPlanRevision
     from app.models import now
     state = {'client': client, 'products': {}, 'sessions': {}, 'subscriptions': {}, 'transactions': {},
         'requests': [], 'posts': [], 'lost_create': False, 'fail_page': False, 'reject_create': False,
         'at': now().replace(microsecond=0) - timedelta(minutes=1), 'price_id': 'creem-month'}
     with session_factory()() as db:
+        from conftest import configure_system_limits
+        configure_system_limits(free_daily_pages=0)
+        revision = db.get(BillingPlanRevision, "plus-v1")
+        revision.monthly_classic_pages, revision.trial_classic_pages = 300, 30
         for interval, amount in [('month', 999), ('year', 9999)]:
             price_id, product_id = 'creem-' + interval, 'prod_' + interval
             db.add(BillingPrice(id=price_id, plan_id='plus', plan_revision_id='plus-v1',
@@ -261,10 +265,10 @@ def test_settled_period_grants_only_once_and_annual_quota_is_monthly(creem_billi
     buckets = sorted(periods(), key=lambda item: item.starts_at)
     assert len(buckets) == (12 if interval == 'year' else 1)
     assert all(item.granted == 300 for item in buckets)
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
     if interval == 'year':
         assert buckets[0].ends_at == buckets[1].starts_at
-        assert rights(state, buckets[1].starts_at)['modes']['redraw']['quota']['available'] == 300
+        assert rights(state, buckets[1].starts_at)['modes']['classic']['quota']['available'] == 300
     from app.db import session_factory
     from app.billing_models import BillingOrder, BillingInvoice
     with session_factory()() as db:
@@ -275,13 +279,13 @@ def test_settled_period_grants_only_once_and_annual_quota_is_monthly(creem_billi
 def test_trial_conversion_closes_trial_quota_and_preserves_order_history(creem_billing):
     state = creem_billing
     complete(state)
-    assert rights(state)['modes']['redraw']['quota']['available'] == 30
+    assert rights(state)['modes']['classic']['quota']['available'] == 30
     state['subscriptions']['sub_fixture']['status'] = 'active'
     transaction(state)
     from app.creem_billing_sync import sync_subscription
     sync_subscription('sub_fixture')
     sync_subscription('sub_fixture')
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
     from app.db import session_factory
     from app.billing_models import BillingOrder, BillingOrderTransition
     with session_factory()() as db:
@@ -485,7 +489,7 @@ def test_real_zero_paid_trial_invoice_is_receipted_without_paid_grant_or_audit_c
     for _ in range(2):
         sync_subscription('sub_fixture', value['id'])
     assert [period.granted for period in periods()] == [30]
-    assert rights(state)['modes']['redraw']['quota']['available'] == 30
+    assert rights(state)['modes']['classic']['quota']['available'] == 30
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(BillingInvoice)) == 1
         assert db.scalar(select(BillingInvoice)).total == 0
@@ -520,7 +524,7 @@ def test_late_first_paid_callback_recovers_expired_trial_before_current_paid_ter
     assert len(buckets) == (13 if interval == 'year' else 2)
     assert buckets[0].granted == 30 and buckets[0].ends_at == paid_start
     assert all(bucket.granted == 300 for bucket in buckets[1:])
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
     with session_factory()() as db:
         assert db.get(BillingAccount, state['owner']).trial_used_at is not None
         assert db.scalar(select(func.count()).select_from(BillingInvoice)) == 2
@@ -537,7 +541,7 @@ def test_full_annual_zero_paid_discount_still_grants_paid_monthly_quotas(creem_b
     sync_subscription('sub_fixture')
     sync_subscription('sub_fixture')
     assert len(periods()) == 12 and all(period.granted == 300 for period in periods())
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
     from app.db import session_factory
     from app.billing_models import BillingOrder, BillingTerm
     with session_factory()() as db:

@@ -24,7 +24,7 @@ os.environ.update(APP_ENV='test', DEV_AUTH='true', DEV_ADMIN_USERNAME='admin',
     STRIPE_RETURN_URL='https://comics.example/account/', CREEM_ENABLED='true', CREEM_ENVIRONMENT='test',
     CREEM_API_KEY='creem_test_synthetic', CREEM_WEBHOOK_SECRET='synthetic-webhook',
     CREEM_RETURN_URL='https://comics.example/account/', ADMIN_WEB_PATH='/console-test/',
-    OPENAI_API_KEY='', PROVIDERS_JSON='', CLASSIC_ENABLED='false')
+    CLASSIC_ENABLED='false')
 from app.config import Settings
 Settings.model_config['env_file'] = None
 from sqlalchemy import or_, select
@@ -101,7 +101,7 @@ with session_factory()() as db:
     initialize_catalog(db)
     db.add(User(id='billing-demo-user', subject='fixture:billing-reader', name='测试读者小岚'))
     db.flush()
-    for interval in ('month', 'year'):
+    for interval in ('quarter', 'year'):
         price = db.get(BillingPrice, f'plus-{interval}-v1')
         price.status = 'active'
         for provider in ('stripe', 'creem'):
@@ -114,12 +114,12 @@ with session_factory()() as db:
     states = ['paid', 'trialing', 'pending', 'failed', 'refunded', 'unknown', 'canceled', 'expired']
     for index in range(34):
         provider = 'creem' if index % 2 == 0 else 'stripe'
-        interval = 'year' if index % 3 == 0 else 'month'
+        interval = 'year' if index % 3 == 0 else 'quarter'
         status = states[index % len(states)]
         created = at - timedelta(hours=index)
         checkout_id, order_id = f'fixture-checkout-{index:02}', f'fixture-order-{index:02}'
         price_id, binding_id = f'plus-{interval}-v1', f'fixture-{provider}-{interval}'
-        total = 9999 if interval == 'year' else 999
+        total = 2399 if interval == 'year' else 666
         db.add(BillingCheckout(id=checkout_id, owner_id='billing-demo-user', provider=provider,
             environment='test', price_id=price_id, binding_id=binding_id, return_url='https://comics.example/account/',
             trial=status == 'trialing', status='completed' if status in ('paid', 'trialing', 'refunded') else status,
@@ -134,8 +134,8 @@ with session_factory()() as db:
                 trial_starts_at=created if status == 'trialing' else None,
                 trial_ends_at=created + timedelta(days=7) if status == 'trialing' else None,
                 paid_starts_at=created if status != 'trialing' else None,
-                paid_ends_at=created + timedelta(days=365 if interval == 'year' else 30) if status != 'trialing' else None,
-                next_billed_at=created + timedelta(days=7 if status == 'trialing' else 365 if interval == 'year' else 30)))
+                paid_ends_at=created + timedelta(days=365 if interval == 'year' else 90) if status != 'trialing' else None,
+                next_billed_at=created + timedelta(days=7 if status == 'trialing' else 365 if interval == 'year' else 90)))
             db.flush()
         db.add(BillingOrder(id=order_id, owner_id='billing-demo-user', provider=provider, environment='test',
             checkout_id=checkout_id, subscription_id=subscription_id, price_id=price_id, binding_id=binding_id,
@@ -162,7 +162,7 @@ with session_factory()() as db:
     db.add(BillingPlan(id='fixture-pages', name='隔离额度包'))
     db.flush()
     db.add(BillingPlanRevision(id='fixture-pages-v1', plan_id='fixture-pages', version=1,
-        name='隔离额度包', monthly_redraw_pages=0, trial_days=0, trial_redraw_pages=0,
+        name='隔离额度包', monthly_classic_pages=0, trial_days=0, trial_classic_pages=0,
         quota_pages=500, quota_validity_days=None, service_plan_id='plus'))
     db.flush()
     db.add(BillingPrice(id='fixture-pages-price', plan_id='fixture-pages', plan_revision_id='fixture-pages-v1',

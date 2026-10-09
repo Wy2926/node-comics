@@ -69,7 +69,7 @@ def paid(state, interval='month'):
 def gift(state, days=30, key='activity-reward'):
     response = state['client'].post(f"/v1/admin/users/{state['owner']}/membership",
         headers={**login(state['client'], 'admin'), 'Idempotency-Key': key},
-        json={'days': days, 'note': 'isolated activity reward'})
+        json={'days': days, 'monthly_pages': 300, 'note': 'isolated activity reward'})
     assert response.status_code == 200, response.text
     return response.json()['entitlements']
 
@@ -105,11 +105,11 @@ def test_creem_paid_then_gift_then_resume_requires_a_new_paid_receipt(renewal, i
     state['clock'] = state['paid_end']
     active = sync(state)
     assert active['entitlements']['gift']['state'] == 'active'
-    assert active['entitlements']['modes']['redraw']['quota']['granted'] == 300
+    assert active['entitlements']['modes']['classic']['quota']['granted'] == 300
     assert len(state['renewal_posts']) == 1
     if days == 60:
         state['clock'] += timedelta(days=30)
-        assert rights(state)['modes']['redraw']['quota']['granted'] == 300
+        assert rights(state)['modes']['classic']['quota']['granted'] == 300
     state['clock'] = state['paid_end'] + timedelta(days=days)
     resumed = sync(state)
     assert state['renewal_posts'][-1] == ('resume', {})
@@ -185,21 +185,21 @@ def test_creem_repeated_gift_extends_only_resume_date_and_preserves_reserved_quo
     gift(state)
     sync(state)
     state['clock'] = state['paid_end'] + timedelta(days=1)
-    active = sync(state)['entitlements']['modes']['redraw']['quota']
+    active = sync(state)['entitlements']['modes']['classic']['quota']
     with session_factory()() as db:
         period = db.get(QuotaPeriod, active['id'])
         period.used, period.reserved = 3, 2
         db.commit()
     extended = gift(state, 30, 'second-activity-reward')
     assert extended['gift']['days'] == 60
-    assert extended['modes']['redraw']['quota']['id'] == active['id']
-    assert extended['modes']['redraw']['quota']['used'] == 3
-    assert extended['modes']['redraw']['quota']['reserved'] == 2
+    assert extended['modes']['classic']['quota']['id'] == active['id']
+    assert extended['modes']['classic']['quota']['used'] == 3
+    assert extended['modes']['classic']['quota']['reserved'] == 2
     assert stored_subscription().resume_at == state['paid_end'] + timedelta(days=60)
     state['clock'] = state['paid_end'] + timedelta(days=30)
     sync(state)
     assert len(state['renewal_posts']) == 1
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
 
 
 def test_gift_blocks_new_checkout_until_its_expiry(renewal):
@@ -296,7 +296,7 @@ def test_creem_initial_trial_then_gift_does_not_repeat_trial_or_pregrant_payment
     complete(state, trial=True)
     state['paid_end'] = max(period.ends_at for period in periods())
     assert state['paid_end'] == state['at'] + timedelta(days=7)
-    assert rights(state)['modes']['redraw']['quota']['granted'] == 30
+    assert rights(state)['modes']['classic']['quota']['granted'] == 30
     with session_factory()() as db:
         trial_used_at = db.get(BillingAccount, state['owner']).trial_used_at
     issued = gift(state, 30)
@@ -307,7 +307,7 @@ def test_creem_initial_trial_then_gift_does_not_repeat_trial_or_pregrant_payment
     state['clock'] = state['paid_end']
     active = sync(state)
     assert active['entitlements']['gift']['state'] == 'active'
-    assert active['entitlements']['modes']['redraw']['quota']['granted'] == 300
+    assert active['entitlements']['modes']['classic']['quota']['granted'] == 300
     state['clock'] += timedelta(days=30)
     for _ in range(2):
         finished = sync(state)

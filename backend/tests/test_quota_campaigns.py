@@ -46,7 +46,7 @@ def test_backfill_existing_and_registration_share_once_only_receipts(client):
         rights = entitlement(client, auth)
         assert rights['plan'] == 'free'
         assert rights['modes']['classic']['quota']['available'] == 330
-        assert not rights['modes']['redraw']['allowed']
+        assert rights['modes']['classic']['allowed']
     login(client, 'new')
     assert backfill_campaigns() == 0
     listing = client.get('/v1/admin/quota-campaigns', headers=operator).json()
@@ -159,17 +159,17 @@ def test_independent_campaigns_and_users_preserve_quota_settlement(client, png):
         + '/quota-periods', headers=operator).status_code == 200
     grant(client, auth)
     result = submit(client, auth, upload(client, auth, png_variant(png, 10)), key='plus').json()
-    assert result['settlement'] == 'included' and grants(client, auth)[0]['available'] == 1
+    assert result['quota_kind'] == 'classic_grant' and grants(client, auth)[0]['available'] == 0
     campaign(client, 'separate', pages=7)
     backfill_campaigns()
     assert sorted(item['granted'] for item in grants(client, other)) == [2, 7]
 
 
-def test_permanent_redraw_grant_has_nullable_expiry_contract(client):
-    campaign(client, mode='redraw', pages=1)
+def test_permanent_free_grant_has_nullable_expiry_contract(client):
+    campaign(client, mode='classic', pages=1)
     auth = login(client)
-    quota = entitlement(client, auth)['modes']['redraw']['quota']
-    assert quota['available'] == 1 and quota['next_expiry_at'] is None
+    quota = entitlement(client, auth)['free_quota']
+    assert quota['available'] == 31 and grants(client, auth)[0]['expires_at'] is None
 
 
 def test_concurrent_delivery_is_exactly_once(client):

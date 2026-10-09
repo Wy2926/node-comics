@@ -83,7 +83,7 @@ def seed_catalog(db, ids):
     elif actor.kind != 'registered' or actor.role != 'user':
         raise SeedError('CREEM_TEST_AUDIT_ACTOR_CONFLICT')
 
-    benefits = dict(monthly_redraw_pages=0, hourly_image_limit=1200, trial_days=0, trial_redraw_pages=0)
+    benefits = dict(monthly_classic_pages=None, hourly_image_limit=1200, trial_days=0, trial_classic_pages=0)
     for product in (
         dict(id='lite', revision_id='creem-test-lite-v1', name='Lite'),
         dict(id='creem-test-permanent', revision_id='creem-test-permanent-v1', name='100 页额度包（不过期）',
@@ -91,7 +91,8 @@ def seed_catalog(db, ids):
         dict(id='creem-test-expiring', revision_id='creem-test-expiring-v1', name='50 页额度包（30 天）',
              service_plan_id='lite', quota_pages=50, quota_validity_days=30),
     ):
-        catalog.create_product(catalog.ProductRequest(**benefits, **product), db=db, actor=actor)
+        catalog.create_product(catalog.ProductRequest(**{**benefits, **product,
+            "monthly_classic_pages": 0 if product.get("quota_pages") else None}), db=db, actor=actor)
 
     for key, (price_id, revision_id, interval, amount) in QUOTES.items():
         binding_id = 'creem-test-' + key.lower() + '-binding-v1'

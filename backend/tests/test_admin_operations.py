@@ -135,7 +135,7 @@ def test_filters_pagination_and_reuse_relationships(operations):
     assert get('/results?q=done-job')['items'][0]['request_count'] == 2
     assert get(f'/results?owner_id={case["b"]}')['total'] == 0
     assert get('/results?q=done-job&mode=classic')['total'] == 1
-    assert get('/results?mode=redraw')['total'] == 0
+    assert get('/results?mode=classic')['total'] == 3
     assert case['client'].get(ROOT + '/assets?limit=101', headers=case['admin']).status_code == 422
 
 
@@ -191,7 +191,7 @@ def test_payment_statistics_do_not_merge_test_and_live_orders(operations):
     with session_factory()() as db:
         db.add(BillingPlan(id='stats-plan', name='Isolated statistics'))
         db.flush()
-        revision = BillingPlanRevision(plan_id='stats-plan', version=1, name='v1', monthly_redraw_pages=300, trial_days=0, trial_redraw_pages=0)
+        revision = BillingPlanRevision(plan_id='stats-plan', version=1, name='v1', monthly_classic_pages=300, trial_days=0, trial_classic_pages=0)
         db.add(revision); db.flush()
         for environment, amount in [('test', 999), ('live', 1999)]:
             price = BillingPrice(plan_id='stats-plan', plan_revision_id=revision.id, environment=environment, currency='usd', unit_amount=amount, interval='month')

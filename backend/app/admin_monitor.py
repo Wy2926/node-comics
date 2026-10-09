@@ -19,10 +19,10 @@ from .queue_models import ComputeNode, ExecutionLease, JobStage
 from .scheduler import ACTIVE
 
 router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
-Mode = Literal["classic", "redraw"]
+Mode = Literal["classic"]
 Status = Literal["active", "attention", "awaiting_upload", "validating_upload", "queued", "running",
                  "outcome_unknown", "unknown_released", "succeeded", "no_text", "failed", "cancelled"]
-STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "text", "redraw"])}
+STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "text"])}
 
 
 def seconds(start, end):
@@ -77,8 +77,8 @@ def timing(job, leases, at):
 def task_json(job, owner_name, leases, at):
     live = [r for r in leases if not r.completed_at and r.expires_at > at]
     final = [r for r in leases if r.outcome == "succeeded" and (
-        r.stage in {"redraw", "page"} if job.status == "succeeded" else
-        job.status == "no_text" and r.stage in {"page", "redraw"})]
+        r.stage in {"page"} if job.status == "succeeded" else
+        job.status == "no_text" and r.stage in {"page"})]
     completed_by = final[-1] if final else None
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,

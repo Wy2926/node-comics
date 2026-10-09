@@ -8,7 +8,6 @@ import {SystemSettingsPage} from './SystemSettings';
 import {TranslationProvidersPage} from './TranslationProviders';
 import {BillingCatalogPage} from './BillingCatalog';
 import {BillingOrdersPage} from './BillingOrders';
-import {ImageProvidersPage} from './ImageProviders';
 import {FeedbackPage} from './FeedbackPage';
 import {SupportRequestsPage} from './SupportRequestsPage';
 import {BillingEventsPage} from './BillingEvents';
@@ -26,7 +25,6 @@ const views = {
   tasks: ['翻译任务', 'TRANSLATION TASKS', '逐页查看执行状态、等待时间与节点履历。', '≡'],
   nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
   'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
-  'image-providers': ['图片供应商', 'IMAGE PROVIDERS', '管理 AI 重绘供应商与图片测试。', '▧'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
   'quota-campaigns': ['额度活动', 'QUOTA CAMPAIGNS', '配置自动赠送规则与发放范围。', '◇'],
   billing: ['产品与价格', 'PRODUCTS & PRICES', '管理套餐产品、月付／年付价格与支付渠道。', '◇'],
@@ -46,7 +44,7 @@ type View = keyof typeof views;
 const navigationGroups: {name: string; pages: View[]}[] = [
   {name: '翻译与运行', pages: ['overview', 'tasks', 'nodes', 'operations', 'statistics']},
   {name: '用户与交易', pages: ['users', 'quota-campaigns', 'feedback', 'plugin-feedback', 'uninstall-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
-  {name: '配置与审计', pages: ['translation-providers', 'image-providers', 'settings', 'audit']},
+  {name: '配置与审计', pages: ['translation-providers', 'settings', 'audit']},
 ];
 type Target = {kind: 'tasks' | 'users'; id: string};
 
@@ -88,7 +86,7 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
     onChange(next);
   }}>
     <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '任务 ID / 用户名称' : '用户名称 / ID'}/></label>
-    {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic', 'redraw'])}
+    {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic'])}
       {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
       </> :
       <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="lite">Lite</option><option value="plus">PLUS</option></select></label>}
@@ -204,7 +202,6 @@ export function App() {
     {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
       view === 'quota-campaigns' ? <QuotaCampaignsPage onUnauthorized={logout}/> :
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
-      view === 'image-providers' ? <ImageProvidersPage onUnauthorized={logout}/> :
       view === 'feedback' ? <FeedbackPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       view === 'site-requests' || view === 'plugin-feedback' || view === 'uninstall-feedback' ? <SupportRequestsPage key={view} kind={view === 'site-requests' ? 'website' : view === 'uninstall-feedback' ? 'uninstall' : 'plugin'} onUnauthorized={logout}/> :
       view === 'billing-events' ? <BillingEventsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :

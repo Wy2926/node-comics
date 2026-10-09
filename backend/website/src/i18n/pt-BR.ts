@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Abra uma história que você tenha o direito de ler. Traduza quando quiser e mantenha o original por perto.",
     "ctaButton": "Comece sua jornada de leitura",
     "pricingTitle": "Leia de graça. Escolha seu plano de tradução.",
-    "pricingDescription": "Compare os planos Grátis e Lite: páginas gratuitas por dia, até 1.200 novas solicitações em cada janela móvel de uma hora e cobrança mensal ou anual. Contas novas elegíveis recebem um teste de 7 dias.",
+    "pricingDescription": "PLUS / Pro e pacotes sem validade. Pagamento trimestral ou anual, páginas mensais. Sem teste da assinatura.",
     "freePlan": "Grátis",
     "freePlanDescription": "Para ler um pouco todos os dias",
     "free": "grátis",
@@ -93,7 +93,7 @@ export default {
       "Até 10 novas imagens de tradução por 60 segundos contínuos"
     ],
     "freeNote": "As páginas diárias são renovadas no fuso Asia/Shanghai, sem acumular as que não foram usadas.",
-    "quotaNote": "Cada versão de uma imagem gerada com sucesso no modo e idioma escolhidos conta como uma página. Solicitações duplicadas e reutilização de resultados válidos não são cobradas duas vezes. Uma nova tradução solicitada explicitamente usa os benefícios atuais. Totais ilimitados continuam sujeitos a limites de frequência, imagem e capacidade do serviço; não há garantia de velocidade de conclusão.",
+    "quotaNote": "Cada versão de uma imagem gerada com sucesso no modo e idioma escolhidos conta como uma página. Solicitações duplicadas e reutilização de resultados válidos não são cobradas duas vezes. Uma nova tradução solicitada explicitamente usa os benefícios atuais. Aplicam-se limites de frequência, dimensões das imagens e capacidade do serviço; não há garantia de velocidade de conclusão.",
     "downloadTitle": "Instale sua extensão de tradutor de mangá",
     "downloadDescription": "Obtenha NodeLane Comics para Chrome, Edge ou Firefox. Abra Chrome Web Store, Edge Add-ons ou Firefox Add-ons, ou baixe o pacote correspondente ao seu navegador.",
     "storeDescription": "Abra sua próxima história no navegador que você já gosta.",
@@ -144,7 +144,7 @@ export default {
       "Seu idioma."
     ],
     "seoFeaturesTitle": "Recursos de tradução de mangá e leitor de quadrinhos",
-    "seoPricingTitle": "Tradução gratuita de mangá e planos Lite",
+    "seoPricingTitle": "Tradução gratuita de mangá e planos PLUS / Pro",
     "seoDownloadTitle": "Tradutor de mangá para Chrome, Edge e Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "Uma página longe demais.",
@@ -206,7 +206,7 @@ export default {
       "title": "Serviço oficial NodeLane",
       "paragraphs": [
         "Entre na sua conta NodeLane para usar o serviço oficial. As imagens selecionadas são processadas remotamente conforme os direitos e limites mostrados na conta. Resultados válidos podem ser reutilizados segundo as regras de retenção.",
-        "Grátis inclui 30 páginas clássicas por dia. Lite não tem limite total diário ou mensal, com até 1.200 novas páginas por janela móvel de uma hora. Ainda se aplicam limites de frequência de curto prazo, imagem e capacidade de serviço."
+        "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento."
       ]
     },
     {
@@ -491,7 +491,7 @@ export default {
           {
             "title": "Benefícios e assinaturas",
             "paragraphs": [
-              "Os planos Grátis e Lite, assinaturas PLUS existentes, testes e bônus seguem seus próprios prazos e regras de páginas, exibidos na sua conta. O Lite aceita até 1.200 novas páginas em cada janela móvel de uma hora. A ausência de limite total diário ou mensal não elimina limites de frequência, imagem ou capacidade do serviço.",
+              "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento.",
               "As assinaturas oferecem faturamento mensal ou anual. Preços, avaliações e franquias de páginas seguem a oferta selecionada, que é renovada automaticamente nesse intervalo. As alterações de preço aplicam-se a novas assinaturas; as assinaturas existentes mantêm o preço original e a versão de benefícios. Cancele antes da renovação."
             ]
           },
@@ -559,8 +559,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "A tradução de mangá é gratuita e o que Lite inclui?",
-        "answer": "Ler os originais locais é grátis e não exige uma conta. A tradução oficial exige login; o plano Grátis inclui 30 páginas clássicas por dia. O Lite custa US$ 5,99 por mês ou US$ 59,99 por ano, sem limite total diário ou mensal para a tradução clássica e com até 1.200 novas páginas em cada janela móvel de uma hora. Há limites de frequência e capacidade. Contas novas elegíveis recebem um teste de 7 dias com cartão. O PLUS não está disponível para novas compras; assinaturas existentes mantêm os benefícios exibidos. Impostos e o valor final são mostrados no pagamento.",
+        "question": "A tradução de mangá é gratuita e o que PLUS / Pro inclui?",
+        "answer": "A leitura local é gratuita. Free inclui 30 páginas diárias com GPT 6 Luna. PLUS: 2.500 páginas por mês, US$6,66 por trimestre ou US$23,99 por ano. Pro: 4.000 páginas por mês, US$9,99 por trimestre ou US$35,99 por ano. Ambos usam Haiku 5.5. Crédito mensal sem acúmulo nem teste. Pacotes sem validade: 3.500 páginas por US$5,99 ou 7.000 por US$9,99. Impostos e total no pagamento.",
         "relatedPath": "/pricing/"
       },
       {
@@ -595,7 +595,7 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "Como funcionam os limites de tradução Lite?",
+        "question": "Como funcionam os limites de tradução PLUS / Pro?",
         "answer": "A mesma conta compartilha um limite de 100 novas imagens para traduzir em cada janela móvel de 60 segundos e 1.200 em cada janela móvel de 3.600 segundos, entre todos os dispositivos, modos e idiomas. O plano Grátis permite 10 em cada janela móvel de 60 segundos. Repetir a mesma solicitação ou reutilizar resultados válidos não conta novamente. Tarefas aceitas contam mesmo se falharem, forem canceladas ou não tiverem texto. Solicitações rejeitadas e transações de banco de dados revertidas liberam a vaga reservada na cota horária. Novas tentativas seguem as regras reais de admissão de novas tarefas. Esses limites não garantem velocidade de conclusão.",
         "relatedPath": "/pricing/"
       },

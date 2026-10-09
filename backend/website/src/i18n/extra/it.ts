@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Annulla prima del prossimo rinnovo."
   },
   "publishedPricing": {
-    "label": "Prezzi pubblicati Lite · Dollari statunitensi (USD)",
+    "label": "Prezzi pubblicati PLUS / Pro · Dollari statunitensi (USD)",
     "monthly": "Mensile",
     "yearly": "Annuale",
     "annualPayment": "Un pagamento annuale. Si rinnova automaticamente.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Modelli di traduzione",
       "free": "GPT 6 Luna e modelli simili",
-      "lite": "Gemini 3.8 Flash e modelli simili"
+      "lite": "Haiku 5.5 e modelli simili"
     },
     "feature": "Caratteristiche e vantaggi",
-    "highlights": "TRADUCI CON Lite",
+    "highlights": "TRADUCI CON PLUS / Pro",
     "reading": {
       "label": "Lettura",
       "free": "Tutte le funzionalità di lettura principali",

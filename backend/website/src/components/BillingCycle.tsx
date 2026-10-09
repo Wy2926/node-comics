@@ -1,3 +1,4 @@
+import {quarterlyCopy} from '../i18n/billing-cadence';
 import {commerceCopy} from '../i18n/commerce';
 import {useId} from 'react';
 import {billingCopy,annualSavings,type BillingOffer} from '../lib/billing';
@@ -16,11 +17,12 @@ export default function BillingCycle({offers,value,onChange,locale,disabled=fals
   const id=useId(),copy=billingCopy(locale),text=commerceCopy(locale)?.billingCycle??labels[locale]??labels.en;
   const annualOffers=offers.filter(p=>p.interval==='year');
   const discount=annualDiscount??(annualOffers.length?Math.min(...annualOffers.map(p=>annualSavings(p,offers)?.percent??0)):0);
-  const control=<fieldset className={`billing-cycle${preview?' billing-cycle-segmented':''}`} disabled={disabled}><legend>{copy.plan}</legend>{(['month','year'] as const).map((cycle,index)=>{
+  const cycles:BillingInterval[]=offers.some(p=>p.interval==='month')?['month',...(offers.some(p=>p.interval==='quarter')?['quarter' as const]:[]),'year']:['quarter','year'];
+  const control=<fieldset className={`billing-cycle${preview?' billing-cycle-segmented':''}`} disabled={disabled}><legend>{copy.plan}</legend>{cycles.map(cycle=>{
     const available=preview||offers.some(p=>p.interval===cycle);
     return <label className="billing-cycle-card" key={cycle} data-selected={value===cycle} data-disabled={!available}>
       <input type="radio" name={id} value={cycle} checked={value===cycle} disabled={!available} onChange={()=>onChange(cycle)}/>
-      <strong>{text[index]}</strong>{!preview&&cycle==='year'&&discount>0&&<span className="annual-badge">{pricingCopy(locale).save(discount)}</span>}{!preview&&<small>{available?text[index+2]:copy.unavailable}</small>}
+      <strong>{cycle==='quarter'?quarterlyCopy(locale).label:text[cycle==='year'?1:0]}</strong>{!preview&&cycle==='year'&&discount>0&&<span className="annual-badge">{pricingCopy(locale).save(discount)}</span>}{!preview&&<small>{available?(cycle==='quarter'?quarterlyCopy(locale).renewal:text[cycle==='year'?3:2]):copy.unavailable}</small>}
     </label>;
   })}</fieldset>;
   return preview?<div className="billing-cycle-picker">{control}<p className="billing-cycle-saving">{discount>0&&<span className="annual-badge">{pricingCopy(locale).save(discount)}</span>}</p></div>:control;

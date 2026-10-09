@@ -2,7 +2,7 @@ import type { TranslationResult } from '../../../shared/translation-images/types
 import { probeImageMetadata } from '../../../shared/translation-images/image-metadata';
 import { TRANSLATION_MAX_DIMENSION } from '../../../shared/translation-images/limits';
 export const SOURCE_MAX_DIMENSION = TRANSLATION_MAX_DIMENSION;
-export type Mode = 'classic' | 'redraw';
+export type Mode = 'classic';
 export interface Snapshot {
   id: string;
   state:

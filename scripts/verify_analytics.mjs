@@ -61,7 +61,7 @@ globalThis.fetch = async (input, options) => {
   });
   await context.route(/^https?:/, route => route.fulfill({json:
     route.request().url().includes('/capabilities') ? {
-      modes: [{id: 'classic', enabled: true}, {id: 'redraw', enabled: true}],
+      modes: [{id: 'classic', enabled: true}],
       languages: [{id: 'zh-Hans', label: '简体中文'}],
       limits: {max_bytes: 10000000, max_pixels: 10000000}, entitlements: null,
     } : route.request().url().includes('/auth/config') ? {dev_auth: true} : {},

@@ -20,7 +20,7 @@ from app.system_settings import (RequestLimits, SystemSettings, SystemSettingsUp
 from test_classic import text_database
 
 DEFAULTS = {
-    "free_daily_pages": 30, "plus_monthly_redraw_pages": 300,
+    "free_daily_pages": 30,
     "free_images_per_minute": 10, "plus_images_per_minute": 100,
     "upload_user_concurrency": 10, "upload_global_concurrency": 16,
     "upload_idle_timeout_seconds": 15, "upload_body_timeout_seconds": 120,

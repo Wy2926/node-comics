@@ -7,8 +7,7 @@ const actions: Record<string, string> = {
   'system_settings.update': '修改系统设置', 'text_provider.create': '添加文本供应商',
   'text_provider.update': '修改文本供应商', 'text_provider.toggle': '启停文本供应商', 'text_provider.default': '切换正文供应商',
   'text_provider.title_default': '切换漫画名供应商',
-  'image_provider.save': '保存图片供应商', 'image_provider.toggle': '启停图片供应商', 'image_provider.test': '提交图片测试',
-  'job.reconcile': '核实翻译结果', 'feedback.review': '处理翻译反馈',
+  'feedback.review': '处理翻译反馈',
   'membership.extend': '开通或续期运营会员', 'membership.expire': '提前结束运营会员',
   'quota.compensate': '补偿当前额度', 'quota.grant': '赠送翻译额度',
   'quota_campaign.create': '创建额度活动', 'quota_campaign.status': '启停额度活动',
@@ -19,13 +18,13 @@ const actions: Record<string, string> = {
   'billing.price.create': '创建价格', 'billing.price.status': '发布或停售价格',
   'billing.binding.create': '创建渠道绑定', 'billing.binding.status': '启停渠道绑定',
 };
-const targets: Record<string, string> = {user: '用户', feedback: '翻译反馈', job: '翻译任务', image_provider: '图片供应商',
+const targets: Record<string, string> = {user: '用户', feedback: '翻译反馈', job: '翻译任务',
   translation_provider: '文本供应商', compute_node: '计算节点', system_settings: '系统设置', quota_period: '额度周期', quota_campaign: '额度活动',
   billing_order: '订单', billing_event: '支付事件', billing_settings: '支付设置', billing_plan: '会员产品',
   billing_plan_revision: '权益版本', billing_price: '价格', billing_price_binding: '渠道绑定'};
 const fieldNames: Record<string, string> = {status: '状态', enabled: '启用', name: '名称', label: '显示名称',
   version: '版本', revision_id: '配置版本', model: '模型', base_url: '服务地址', attempts: '处理次数',
-  free_daily_pages: '普通每日常规页数', plus_monthly_redraw_pages: '会员默认月重绘页数',
+  free_daily_pages: '普通每日常规页数',
   granted: '授予页数',
   used: '已使用', reserved: '预占', plus_expires_at: '会员到期', default_provider: '默认渠道',
   validity_days: '到账后有效天数', starts_at: '开始时间', ends_at: '结束时间', expires_at: '额度到期', pages: '赠送页数', audience: '适用用户', mode: '翻译模式'};

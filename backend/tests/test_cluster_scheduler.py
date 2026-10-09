@@ -376,34 +376,6 @@ def test_missing_local_head_releases_reservation_once_and_unblocks_later_page(sc
         assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'release')) == 1
 
 
-@pytest.mark.parametrize('mutation', ['disabled', 'unknown_slot'])
-def test_provider_capacity_is_rechecked_after_snapshot(scheduler_case, monkeypatch, mutation):
-    from app.models import Provider
-    config = {**scheduler_case, 'provider': {'id': 'isolated-redraw'}}
-    add_job(config, stage='redraw')
-    occupied = add_job(config, 'plus-user', stage='redraw')
-    with session_factory()() as db:
-        for job in db.scalars(select(Job)):
-            job.mode = 'redraw'
-        db.add(Provider(id='isolated-redraw', config={'concurrency': 1}, enabled=True))
-        node = db.get(ComputeNode, 'node-0')
-        node.capabilities, node.engine_version = ['redraw'], 'control'
-        db.commit()
-    original = scheduler._preselect
-    def changed(db, node, stages, blocked=()):
-        result = original(db, node, stages, blocked)
-        assert result
-        with session_factory()() as writer:
-            if mutation == 'disabled':
-                writer.get(Provider, 'isolated-redraw').enabled = False
-            else:
-                writer.get(Job, occupied).status = 'outcome_unknown'
-            writer.commit()
-        return result
-    monkeypatch.setattr(scheduler, '_preselect', changed)
-    assert claim() is None
-
-
 def test_concurrent_claims_cannot_exceed_one_node_capacity(scheduler_case):
     for _ in range(4):
         add_job(scheduler_case)
@@ -477,7 +449,7 @@ def test_saved_late_output_recovery_preserves_existing_terminal_failure(schedule
     _, reply = render_reply('fixture-build', 10)
     from app.assets import asset_storage_key
     image = base64.b64decode(reply['image'])
-    output_key = asset_storage_key(lease.id, "redraw")
+    output_key = asset_storage_key(lease.id, "classic")
     LocalStore().put(output_key, image, 'image/png', kind='classic')
     with session_factory()() as db:
         job = db.get(Job, job_id)

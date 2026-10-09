@@ -8,13 +8,13 @@ from test_cluster_submissions import descriptor, submit
 
 
 def request_result(client, auth, png, key='cache'):
-    return submit(client, auth, descriptor(png), key=key, mode='redraw')
+    return submit(client, auth, descriptor(png), key=key, mode='classic')
 
 
 def completed(client, png, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png_variant(png, 1)))
+
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png_variant(png, 1))
     auth = login(client)
     job = create(client, auth, upload(client, auth, png)).json()
     run_job(job['id'])
@@ -36,7 +36,7 @@ def test_same_owner_cache_aliases_do_not_duplicate_work_or_billing(client, png, 
         counts = {model.__name__: db.scalar(select(func.count()).select_from(model))
             for model in (Job, JobStage, Asset, Ledger, TranslationRequest)}
         assert window_count('image') == 1
-        assert counts == {'Job':1, 'JobStage':1,
+        assert counts == {'Job':1, 'JobStage':2,
                           'Asset':3, 'Ledger':2, 'TranslationRequest':9}
 
 

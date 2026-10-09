@@ -16,4 +16,3 @@ LANGUAGES = {'zh-Hans': '简体中文', 'zh-Hant': '繁體中文', 'en': 'Englis
              'fr': 'Français', 'es': 'Español', 'pt-BR': 'Português (Brasil)', 'de': 'Deutsch',
              'it': 'Italiano', 'ru': 'Русский', 'pl': 'Polski', 'uk': 'Українська',
              'tr': 'Türkçe', 'vi': 'Tiếng Việt', 'id': 'Bahasa Indonesia', 'ar': 'العربية'}
-REDRAW_LANGUAGES = ['zh-Hans', 'zh-Hant', 'en', 'ja', 'ko']

@@ -33,7 +33,7 @@ class QuotaPeriod(Base):
                            sqlite_where=text("source = 'purchase'"), postgresql_where=text("source = 'purchase'")),
                      Index('ix_quota_nonpurchase', 'owner_id', 'mode', 'ends_at', 'starts_at', 'id',
                            sqlite_where=text("source != 'purchase'"), postgresql_where=text("source != 'purchase'")),
-                     CheckConstraint("mode IN ('classic', 'redraw')"),
+                     CheckConstraint("mode = 'classic'", name='ck_quota_periods_classic'),
                      CheckConstraint("source IN ('daily', 'membership', 'grant', 'subscription', 'purchase')", name='ck_quota_source'),
                      CheckConstraint("(source = 'subscription' AND billing_term_id IS NOT NULL) OR (source != 'subscription' AND billing_term_id IS NULL)"),
                      CheckConstraint("(source = 'purchase' AND billing_order_id IS NOT NULL AND mode = 'classic') OR "

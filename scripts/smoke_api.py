@@ -28,7 +28,7 @@ def checked(response, statuses=(200,)):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--api", default="http://127.0.0.1:18088")
-    parser.add_argument("--mode", choices=("redraw",), default="redraw")
+    parser.add_argument("--mode", choices=("classic",), default="classic")
     parser.add_argument("--translate", action="store_true")
     parser.add_argument("--grant-plus", action="store_true", help="Explicitly grant this isolated local test account one PLUS month")
     parser.add_argument("--wait", action="store_true")
@@ -69,7 +69,7 @@ def main():
             print(json.dumps({"status": "api_ready", "mode": args.mode}, ensure_ascii=False))
             return
         if not record.get("accepted") and not record["capabilities"]["entitlements"]["modes"][args.mode]["allowed"]:
-            raise RuntimeError("Test account requires PLUS or a valid redraw gift; explicitly use --grant-plus for a local test membership")
+            raise RuntimeError("Test account has no available pages; explicitly use --grant-plus for an isolated test membership")
         sample = (ROOT / "samples" / "starlight-bookshop.png").read_bytes()
         record["input_sha256"] = hashlib.sha256(sample).hexdigest()
         result = submit_page(client, sample, record["translation_id"], args.mode)

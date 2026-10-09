@@ -54,7 +54,8 @@ def approved_price(price, expected):
     environment(price)
     recurring = price.get('recurring') or {}
     cadence = (not recurring and price.get('type') == 'one_time') if expected.interval == 'once' else (
-        recurring.get('interval') == expected.interval and recurring.get('interval_count') == 1
+        recurring.get('interval') == ('month' if expected.interval == 'quarter' else expected.interval)
+        and recurring.get('interval_count') == (3 if expected.interval == 'quarter' else 1)
         and recurring.get('usage_type') == 'licensed')
     require(expected.environment == settings().stripe_environment and price.get('id') == expected.stripe_price_id
         and price.get('product') == expected.stripe_product_id and price.get('currency') == expected.currency

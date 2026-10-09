@@ -99,7 +99,7 @@ def test_users_plan_search_and_read_only_entitlements(monitor):
     with session_factory()() as db:
         before = [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod,)]
     detail = client.get("/v1/admin/monitor/users/"+plus["items"][0]["id"], headers=auth).json()
-    assert detail["entitlements"]["modes"]["classic"]["unlimited"]
+    assert not detail["entitlements"]["modes"]["classic"]["unlimited"]
     with session_factory()() as db:
         assert before == [db.scalar(select(func.count()).select_from(t)) for t in (QuotaPeriod,)]
     assert client.get("/v1/admin/monitor/users/missing", headers=auth).status_code == 404

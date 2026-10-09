@@ -89,7 +89,7 @@ def probe_oidc():
 
 def queue_alerts(db):
     cfg, at = settings(), now()
-    threshold = max(cfg.classic_timeout_seconds, cfg.provider_timeout_seconds, cfg.cluster_node_timeout_seconds * 3)
+    threshold = max(cfg.classic_timeout_seconds, cfg.cluster_node_timeout_seconds * 3)
     cutoff = at - timedelta(seconds=threshold)
 
     def count(statement):
@@ -144,8 +144,8 @@ def readiness(*, role=None, instance=None):
                 # Pool configuration can intentionally disable a mode; it does
                 # not remove the requirement for a live control executor.
                 pools = db.scalars(select(ComputeNode).where(ComputeNode.id.in_(
-                    ["control-text", "control-redraw", "control-validate_upload"]))).all()
-                checks["control-pools"] = "ready" if len(pools) == 3 and all(
+                    ["control-text", "control-validate_upload"]))).all()
+                checks["control-pools"] = "ready" if len(pools) == 2 and all(
                     node.heartbeat_at and node.heartbeat_at > deadline for node in pools) else "unavailable"
                 if settings().classic_enabled:
                     online = db.scalar(select(ComputeNode.id).where(ComputeNode.enabled.is_(True),

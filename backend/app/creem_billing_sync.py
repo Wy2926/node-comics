@@ -117,7 +117,7 @@ def apply_transaction(db, user, sub, value, event_id=None):
         return
     if state not in ('paid', 'partially_refunded'):
         return
-    low, high = (27, 32) if price.interval == 'month' else (364, 367)
+    low, high = {'month': (27, 32), 'quarter': (89, 93), 'year': (364, 367)}[price.interval]
     require(timedelta(days=low) <= end-start <= timedelta(days=high), 'CREEM_TRANSACTION_PERIOD_INVALID')
     # Creem transaction amount is the base price; tax is carried separately.
     require(value['amount'] == price.unit_amount, 'CREEM_TRANSACTION_AMOUNT_MISMATCH')

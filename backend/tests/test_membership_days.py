@@ -2,37 +2,43 @@
 from datetime import datetime, timedelta
 import pytest
 from sqlalchemy import func, select
-from conftest import login, upload
+from conftest import login, upload, configure_system_limits
 from test_membership import entitlement, freeze, submit
+
+
+@pytest.fixture(autouse=True)
+def finite_gift_budget(client):
+    configure_system_limits(free_daily_pages=0)
 
 
 def issue(client, auth, body, key='gift-days', operator=None):
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     return client.post(f'/v1/admin/users/{owner}/membership',
         headers={**(operator or login(client, 'admin')), 'Idempotency-Key': key},
-        json={'note': 'isolated admin gift', **body})
+        json={'monthly_pages': 300, 'note': 'isolated admin gift', **body})
 
 
 def test_exact_days_replay_and_extension_preserve_short_period(client, png, monkeypatch):
+    configure_system_limits(free_daily_pages=0)
     at = datetime(2026, 1, 31, 8)
     freeze(monkeypatch, at)
     auth = login(client)
     first = issue(client, auth, {'days': 7, 'monthly_pages': 30})
     assert first.status_code == 200, first.text
     assert first.json()['entitlements']['plus_expires_at'] == '2026-02-07T08:00:00Z'
-    job = submit(client, auth, upload(client, auth, png), 'redraw').json()
-    before = entitlement(client, auth)['modes']['redraw']['quota']
+    job = submit(client, auth, upload(client, auth, png), 'classic').json()
+    before = entitlement(client, auth)['modes']['classic']['quota']
     assert before['reserved'] == 1 and before['granted'] == 30
     freeze(monkeypatch, at + timedelta(days=1))
-    renewed = issue(client, auth, {'days': 30}, 'extend-days')
+    renewed = issue(client, auth, {'days': 30, 'monthly_pages': 30}, 'extend-days')
     assert renewed.status_code == 200, renewed.text
     assert renewed.json()['entitlements']['plus_expires_at'] == '2026-03-09T08:00:00Z'
-    after = entitlement(client, auth)['modes']['redraw']['quota']
+    after = entitlement(client, auth)['modes']['classic']['quota']
     assert after['id'] == before['id'] == job['quota_period_id']
     assert after['granted'] == 30 and after['reserved'] == 1
     assert after['resets_at'] == '2026-03-02T08:00:00Z'
-    assert issue(client, auth, {'days': 30}, 'extend-days').json() == renewed.json()
-    assert issue(client, auth, {'days': 31}, 'extend-days').status_code == 409
+    assert issue(client, auth, {'days': 30, 'monthly_pages': 30}, 'extend-days').json() == renewed.json()
+    assert issue(client, auth, {'days': 31, 'monthly_pages': 30}, 'extend-days').status_code == 409
     # Replaying an earlier gift returns its original receipt and never shortens the account.
     assert issue(client, auth, {'days': 7, 'monthly_pages': 30}).json() == first.json()
     assert entitlement(client, auth)['plus_expires_at'] == '2026-03-09T08:00:00Z'
@@ -45,16 +51,16 @@ def test_invalid_duration_is_rejected_without_membership(client, body):
     assert entitlement(client, auth)['plan'] == 'free'
 
 
-def test_gift_requires_admin_and_can_exclude_redraw(client):
+def test_gift_requires_admin_and_can_exclude_subscription_pages(client):
     auth = login(client)
     assert issue(client, auth, {'days': 7}, operator=auth).status_code == 403
     assert issue(client, auth, {'days': 7, 'monthly_pages': 0}).status_code == 200
     rights = entitlement(client, auth)
-    assert rights['modes']['classic']['unlimited']
-    assert rights['modes']['redraw']['quota']['available'] == 0
+    assert not rights['modes']['classic']['unlimited']
+    assert rights['subscription_quota']['available'] == 0
 
 
-@pytest.mark.parametrize('mode', ['redraw', 'classic'])
+@pytest.mark.parametrize('mode', ['classic'])
 def test_new_requests_use_server_membership_after_upgrade(client, png, mode):
     from app.config import settings
     settings().classic_enabled = True
@@ -77,7 +83,7 @@ def test_admin_detail_shows_scheduled_grants_without_affecting_current_entitleme
     auth, admin = login(client), login(client, 'admin')
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     route = f'/v1/admin/users/{owner}/quota-grants'
-    payload = {'mode': 'redraw', 'pages': 25, 'starts_at': (now()+timedelta(days=1)).isoformat()+'Z',
+    payload = {'mode': 'classic', 'pages': 25, 'starts_at': (now()+timedelta(days=1)).isoformat()+'Z',
         'expires_at': (now()+timedelta(days=3)).isoformat()+'Z', 'note': 'future gift'}
     headers = {**admin, 'Idempotency-Key': 'scheduled-admin-gift'}
     first = client.post(route, headers=headers, json=payload)
@@ -88,7 +94,7 @@ def test_admin_detail_shows_scheduled_grants_without_affecting_current_entitleme
     data = client.get(detail_route, headers=admin).json()
     assert data['grants'][0]['note'] == 'future gift'
     assert data['grants'][0]['granted'] == 25
-    assert not data['entitlements']['modes']['redraw']['allowed']
+    assert not data['entitlements']['modes']['classic']['allowed']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(MembershipOperation)) == 1
         assert db.scalar(select(func.count()).select_from(QuotaPeriod)) == 1
@@ -103,13 +109,13 @@ def test_gift_duration_has_exactly_thirty_day_allowance_periods(client, monkeypa
     first = entitlement(client, auth)
     assert first['gift'] == {'starts_at': '2026-02-01T08:00:00Z',
         'ends_at': (at + timedelta(days=days)).isoformat() + 'Z', 'days': days, 'state': 'active'}
-    assert first['modes']['redraw']['quota']['resets_at'] == '2026-03-03T08:00:00Z'
+    assert first['modes']['classic']['quota']['resets_at'] == '2026-03-03T08:00:00Z'
     freeze(monkeypatch, at + timedelta(days=30))
     second = entitlement(client, auth)
     assert second['plan'] == ('plus' if days == 60 else 'free')
     if days == 60:
-        assert second['modes']['redraw']['quota']['granted'] == 300
-        assert second['modes']['redraw']['quota']['resets_at'] == '2026-04-02T08:00:00Z'
+        assert second['modes']['classic']['quota']['granted'] == 300
+        assert second['modes']['classic']['quota']['resets_at'] == '2026-04-02T08:00:00Z'
     freeze(monkeypatch, at + timedelta(days=days))
     assert entitlement(client, auth)['gift']['state'] == 'expired'
 
@@ -132,7 +138,7 @@ def test_pending_gift_is_not_access_and_activation_preserves_bucket_identity(cli
         db.commit()
     rights = entitlement(client, auth)
     assert rights['gift']['state'] == 'pending' and rights['plan'] == 'free'
-    assert rights['plus_expires_at'] is None and not rights['modes']['redraw']['allowed']
+    assert rights['plus_expires_at'] is None and not rights['modes']['classic']['allowed']
     assert client.get('/v1/admin/monitor/overview', headers=admin).json()['users']['plus'] == 0
     assert client.get('/v1/admin/monitor/users?plan=plus', headers=admin).json()['total'] == 0
     with session_factory()() as db:
@@ -146,7 +152,7 @@ def test_pending_gift_is_not_access_and_activation_preserves_bucket_identity(cli
     scheduled = entitlement(client, auth)
     assert scheduled['gift']['state'] == 'scheduled' and scheduled['plan'] == 'free'
     freeze(monkeypatch, at + timedelta(days=5))
-    assert entitlement(client, auth)['modes']['redraw']['quota']['id'] == period_id
+    assert entitlement(client, auth)['modes']['classic']['quota']['id'] == period_id
 
 
 def test_future_gift_extension_and_expiry_preserve_a_single_segment(client, monkeypatch):
@@ -236,31 +242,31 @@ def test_existing_calendar_gift_keeps_bucket_and_settlement_on_extension(client,
         user.membership_id, user.plus_timezone = 'existing-calendar-gift', 'Asia/Shanghai'
         user.plus_started_at, user.plus_expires_at = at, at + timedelta(days=7)
         user.plus_monthly_pages = 300
-        db.add(QuotaPeriod(id=period_id, owner_id=owner, kind=MONTHLY, mode='redraw',
+        db.add(QuotaPeriod(id=period_id, owner_id=owner, kind=MONTHLY, mode='classic',
             source='membership', source_key=f'{MONTHLY}:{iso(at)}', starts_at=at,
             ends_at=user.plus_expires_at, granted=300, used=125, reserved=0))
         db.commit()
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 175
-    job = submit(client, auth, upload(client, auth, png), 'redraw').json()
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 175
+    job = submit(client, auth, upload(client, auth, png), 'classic').json()
     assert job['quota_period_id'] == period_id
     response = issue(client, auth, {'days': 30}, 'extend-calendar')
     assert response.status_code == 200, response.text
-    quota = response.json()['entitlements']['modes']['redraw']['quota']
+    quota = response.json()['entitlements']['modes']['classic']['quota']
     assert quota['id'] == period_id and (quota['used'], quota['reserved']) == (125, 1)
     assert quota['resets_at'] == '2026-02-28T08:00:00Z'
     freeze(monkeypatch, datetime(2026, 2, 28, 8))
-    next_quota = entitlement(client, auth)['modes']['redraw']['quota']
+    next_quota = entitlement(client, auth)['modes']['classic']['quota']
     assert next_quota['resets_at'] == '2026-03-09T08:00:00Z'
     finish(job['id'])
     with session_factory()() as db:
         period = db.get(QuotaPeriod, period_id)
         assert (period.used, period.reserved) == (126, 0)
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 300
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 300
     freeze(monkeypatch, datetime(2026, 3, 10, 8))
     assert issue(client, auth, {'days': 30}, 'new-thirty-day-segment').status_code == 200
     with session_factory()() as db:
         assert db.get(User, owner).plus_timezone is None
-    assert entitlement(client, auth)['modes']['redraw']['quota']['resets_at'] == '2026-04-09T08:00:00Z'
+    assert entitlement(client, auth)['modes']['classic']['quota']['resets_at'] == '2026-04-09T08:00:00Z'
 
 
 @pytest.mark.parametrize('pending', [False, True])
@@ -303,7 +309,7 @@ def test_revoke_never_deletes_used_or_referenced_future_period(client, png, monk
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     job_id = None
     if retained == 'job':
-        job_id = submit(client, auth, upload(client, auth, png), 'redraw').json()['id']
+        job_id = submit(client, auth, upload(client, auth, png), 'classic').json()['id']
         finish(job_id, success=False)
     with session_factory()() as db:
         user = db.get(User, owner)

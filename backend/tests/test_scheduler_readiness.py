@@ -6,7 +6,7 @@ from sqlalchemy import event, select
 
 from app import scheduler
 from app.db import engine, session_factory
-from app.models import Asset, Job, Provider, now
+from app.models import Asset, Job, now
 from app.queue_models import ComputeNode, JobStage
 from app.storage import LocalStore
 from test_classic import text_database
@@ -82,25 +82,8 @@ def test_readiness_is_advisory_without_scanning_local_files(scheduler_case):
 
 
 def test_control_readiness_respects_supplier_limits_and_upload_without_source(scheduler_case):
-    config = {**scheduler_case, 'provider': {'id': 'readiness-provider'}}
-    key = add_job(config, stage='redraw')
+    key = add_job(scheduler_case, stage='validate_upload')
     with session_factory()() as db:
-        db.get(Job, key).mode = 'redraw'
-        node = db.get(ComputeNode, 'node-0')
-        node.capabilities, node.engine_version = ['redraw'], 'control'
-        db.add(Provider(id='readiness-provider', enabled=False, config={'concurrency': 1}))
-        db.commit()
-        assert not scheduler.has_claimable_work(db, node.id)
-        db.get(Provider, 'readiness-provider').enabled = True
-        db.commit()
-        assert scheduler.has_claimable_work(db, node.id)
-        # Unknown provider outcomes consume its capacity even without a live lease.
-    unknown = add_job(config, stage='redraw')
-    with session_factory()() as db:
-        job = db.get(Job, unknown)
-        job.mode, job.status = 'redraw', 'outcome_unknown'
-        db.commit()
-        assert not scheduler.has_claimable_work(db, 'node-0')
         stage = db.scalar(select(JobStage).where(JobStage.job_id == key))
         stage.name = 'validate_upload'
         db.get(Job, key).input_asset_id = None

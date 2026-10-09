@@ -26,7 +26,7 @@ def reader(pg):
 def request(pg, owner_id, key, language='zh-Hans'):
     with session_factory()() as db:
         asset = db.get(Asset, pg['asset_id'])
-        body = TranslationInput(mode='redraw',target_language=language,image={
+        body = TranslationInput(mode='classic',target_language=language,image={
             'sha256':asset.sha256,'byte_size':asset.byte_size,'content_type':asset.mime})
         return json.loads(translate(UUID(request_id(key)),body,Request({'type':'http','headers':[(b'x-translation-protocol',b'overlay-v1')]}),user=db.get(User,owner_id),db=db).body)
 
@@ -34,8 +34,8 @@ def request(pg, owner_id, key, language='zh-Hans'):
 
 def publish(pg, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(pg['png']))
+
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: pg['png'])
     job_id = new_job(pg)
     run_job(job_id)
     return job_id
@@ -62,16 +62,16 @@ def test_concurrent_cache_requests_create_one_grant_and_no_alias_job(pg, monkeyp
 
 def test_opposite_snapshot_orders_share_source_without_deadlock(pg, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
+
     from app.translation_api import read_snapshot
-    monkeypatch.setattr(workers,'redraw',lambda *args:TranslationOutput(pg['png']))
+    monkeypatch.setattr(workers,'classic',lambda *args:pg['png'])
     accepted = []
     for key, language in [('first','zh-Hans'),('second','en')]:
         from app.assets import create_asset
         from app.jobs import create_job
         with session_factory()() as db:
             asset = create_asset(db, pg['owner_id'], pg['png'])
-            job = create_job(db, db.get(User,pg['owner_id']), asset, 'redraw', language, request_id(key))
+            job = create_job(db, db.get(User,pg['owner_id']), asset, 'classic', language, request_id(key))
             db.commit()
             job_id = job.id
         run_job(job_id)

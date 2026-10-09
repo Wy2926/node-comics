@@ -17,7 +17,7 @@ if __name__ == '__main__':
             STORAGE_PATH=str(Path(directory) / 'objects'),
             DEV_AUTH='true', DEV_AUTH_SECRET='isolated-support-preview-secret-not-for-production',
             DEV_ADMIN_USERNAME='admin', ADMIN_WEB_PATH='/console-fixture/',
-            CORS_ORIGINS='http://127.0.0.1:5191', OPENAI_API_KEY='', PROVIDERS_JSON='[]',
+            CORS_ORIGINS='http://127.0.0.1:5191',
             STRIPE_ENABLED='false', CREEM_ENABLED='false', CLASSIC_ENABLED='false')
         from app.config import Settings
         Settings.model_config['env_file'] = None

@@ -82,7 +82,6 @@ class Settings(BaseSettings):
     ga4_extension_measurement_id: str = Field(default="", pattern=r"^(G-[A-Z0-9]{4,20})?$")
     ga4_extension_api_secret: SecretStr = SecretStr("")
     free_daily_pages: int = Field(default=30, ge=0, le=1_000_000)
-    plus_monthly_redraw_pages: int = Field(default=300, ge=0, le=1_000_000)
     stripe_enabled: bool = False
     stripe_environment: Literal['test', 'live'] = 'test'
     stripe_secret_key: SecretStr = SecretStr('')
@@ -119,17 +118,10 @@ class Settings(BaseSettings):
     cluster_stage_attempts: int = Field(default=3, ge=1, le=10)
     cluster_text_slots: int = Field(default=4, ge=1, le=100)
     cluster_upload_slots: int = Field(default=2, ge=1, le=32)
-    cluster_redraw_slots: int = Field(default=4, ge=1, le=100)
     cluster_result_ingress_concurrency: int = Field(default=4, ge=1, le=64)
     cluster_max_result_bytes: int = Field(default=88 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
     unknown_release_seconds: int = 3600
     dispatch_interval_seconds: int = 2
-    openai_base_url: str = "https://api.openai.com/v1"
-    openai_api_key: str = ""
-    openai_model: str = "gpt-image-2"
-    openai_user_agent: str = "NodeComics/0.1"
-    providers_json: str = ""
-    provider_timeout_seconds: int = 600
     allow_private_providers: bool = False
     classic_enabled: bool = False
     classic_timeout_seconds: int = Field(default=900, ge=30, le=3600)

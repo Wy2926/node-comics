@@ -5,7 +5,15 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/billing.ts', import.meta.url), 'utf8');
 const {outputText} = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022}});
-const {minorAmount, priceAmount, money, billingStatus, billingDate, benefitsSummary, quotaValidity, intervalName, orderKind} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const {minorAmount, priceAmount, money, billingStatus, billingDate, benefitsSummary, quotaValidity, intervalName, orderKind, pageAllowance} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+
+test('blank monthly or trial allowance means unlimited, while explicit zero grants no pages', () => {
+  assert.equal(pageAllowance(''), null);
+  assert.equal(pageAllowance('0'), 0);
+  assert.equal(pageAllowance('500'), 500);
+  assert.match(benefitsSummary({monthly_classic_pages: null}), /不限量/);
+  assert.match(benefitsSummary({monthly_classic_pages: 0}), /0/);
+});
 
 test('confirmed monthly and annual amounts round trip in currency minor units', () => {
   assert.equal(minorAmount('9.99', 'usd'), 999);
@@ -40,12 +48,12 @@ test('billing timestamps from the UTC database are never interpreted as browser-
 });
 
 test('purchased pages never display unlimited membership, monthly quotas or renewal', () => {
-  const pack = {quota_pages: 500, quota_validity_days: null, service_plan_id: 'lite', monthly_redraw_pages: 0, hourly_image_limit: 1200};
+  const pack = {quota_pages: 500, quota_validity_days: null, service_plan_id: 'lite', monthly_classic_pages: 0, hourly_image_limit: 1200};
   assert.match(benefitsSummary(pack), /500/);
   assert.match(benefitsSummary(pack), /不过期/);
   assert.doesNotMatch(benefitsSummary(pack), /无限|不限量|每月/);
   assert.match(quotaValidity(30), /30/);
   assert.equal(intervalName('once'), '一次性购买');
   assert.equal(orderKind('initial', 'once'), '额度购买');
-  assert.match(benefitsSummary({monthly_redraw_pages: 300}), /300/);
+  assert.match(benefitsSummary({monthly_classic_pages: 300}), /300/);
 });

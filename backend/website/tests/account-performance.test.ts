@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import * as subscriptionQuota from '../src/i18n/subscription-quota';
 import {test} from 'node:test';
 import {isValidElement,type ReactElement,type ReactNode} from 'react';
 import * as jsx from 'react/jsx-runtime';
@@ -19,7 +20,7 @@ const entitlement=(available=100)=>({plan:'lite',service_plan:'lite',plus_expire
   purchase_quota:{granted:100,used:100-available,reserved:0,available,next_expiry_at:null}});
 const account=(name='Reader A',available=100)=>({user:{id:name,name},entitlements:entitlement(available)});
 const price:billingModule.BillingOffer={id:'month',name:'Lite',plan_id:'lite',plan_revision_id:'v1',currency:'usd',
-  unit_amount:599,interval:'month',monthly_redraw_pages:0,trial_days:0,trial_redraw_pages:0,channels:[]};
+  unit_amount:599,interval:'month',monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,channels:[]};
 const billing:billingModule.Billing={enabled:true,providers:[],provider:'creem',environment:'test',trial_eligible:false,
   subscription_checkout:null,offers:[],gift:null,entitlement_expires_at:null,
   subscription:{provider:'creem',status:'active',price,paid_ends_at:null,auto_renew:true,cancel_at:null,trial_ends_at:null,
@@ -51,7 +52,7 @@ function mount(){
   };
   const modules:Record<string,unknown>={
     react:{useState:state,useRef:<T,>(value:T)=>state({current:value})[0],useEffect:(effect:()=>void|(()=>void))=>{const index=cursor++;if(index===cells.length){cells.push(true);effects.push(effect);}}},
-    'react/jsx-runtime':jsx,'../lib/auth-config':authConfig,'../lib/billing':billingModule,'../i18n/quota-purchase':quotaCopy,
+    'react/jsx-runtime':jsx,'../lib/auth-config':authConfig,'../lib/billing':billingModule,'../i18n/subscription-quota':subscriptionQuota,'../i18n/quota-purchase':quotaCopy,
     '../lib/auth':{ApiError,sessionIdentity:async()=>currentIdentity,subscribeAuth:(next:()=>void)=>{listener=next;return()=>{listener=()=>{};};},
       signOut:async()=>{currentIdentity=null;listener();},api:(path:string,method='GET',_body?:unknown,_headers?:unknown,boundIdentity?:unknown)=>{
         const pending=deferred();calls.push({path,method,identity:boundIdentity,pending});return pending.promise;

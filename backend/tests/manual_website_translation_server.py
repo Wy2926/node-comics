@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from PIL import Image, ImageDraw
 import manual_website_server as base_fixture
 from manual_website_server import app, authorized, me, state, website
-from app.languages import LANGUAGES, REDRAW_LANGUAGES
+from app.languages import LANGUAGES
 
 app.router.routes.pop()  # Replace this fixture's final static mount only.
 tasks = {}
@@ -85,7 +85,7 @@ def capabilities(request: Request):
             **({'representations': ['overlay-v1', 'overlay-tiles-v1', 'full-image-v1', 'original']} if state['tiles_enabled'] else {}),
             'limits': {'max_bytes': 134217728, 'max_pixels': state['max_dimension']**2, 'max_dimension': state['max_dimension']},
             'languages': [{'id':key,'label':label} for key,label in LANGUAGES.items()],
-            'modes': [{'id':'classic','enabled':True,'languages':list(LANGUAGES)}, {'id':'redraw','enabled':True,'languages':REDRAW_LANGUAGES}],
+            'modes': [{'id':'classic','enabled':True,'languages':list(LANGUAGES)}],
             'entitlements': me(request)['entitlements'] if authorized(request) else None}
 
 
@@ -208,7 +208,7 @@ def synthetic_result(source, body, input_sha, path):
         with source.copy() as complete:
             complete.paste(overlay, (0, 0), overlay)
             expected = encoded(complete, 'PNG')
-            if body.get('mode') == 'redraw':
+            if body.get('mode') == 'classic':
                 artifact = encoded(complete, 'WEBP')
                 representation, mime, bbox = 'full-image-v1', 'image/webp', None
             elif long and body.get('result_format') == 'overlay-tiles-v1':

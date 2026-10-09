@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Скасуйте перед наступним поновленням."
   },
   "publishedPricing": {
-    "label": "Опубліковано Lite ціни · Долари США (USD)",
+    "label": "Опубліковано PLUS / Pro ціни · Долари США (USD)",
     "monthly": "Щомісяця",
     "yearly": "щорічно",
     "annualPayment": "Один річний платіж. Поновлюється автоматично.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Моделі перекладу",
       "free": "GPT 6 Luna та аналогічні моделі",
-      "lite": "Gemini 3.8 Flash та аналогічні моделі"
+      "lite": "Haiku 5.5 та аналогічні моделі"
     },
     "feature": "Особливості та переваги",
-    "highlights": "ПЕРЕКЛАДАТИ З Lite",
+    "highlights": "ПЕРЕКЛАДАТИ З PLUS / Pro",
     "reading": {
       "label": "Читання",
       "free": "Усі основні функції читання",

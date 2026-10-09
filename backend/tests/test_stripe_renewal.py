@@ -53,7 +53,7 @@ def test_stripe_gift_defers_billing_and_repeated_sync_ignores_promotional_trial(
     assert any(row['total'] == 0 and row['billing_reason'] == 'subscription_update' for row in state['invoices'].values())
     state['clock'] = state['paid_end']
     assert rights(state)['gift']['state'] == 'active'
-    assert rights(state)['modes']['redraw']['quota']['available'] == 300
+    assert rights(state)['modes']['classic']['quota']['available'] == 300
     finish_gift(state)
     for _ in range(3):
         finished = sync(state)

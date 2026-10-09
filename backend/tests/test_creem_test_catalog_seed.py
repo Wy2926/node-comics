@@ -112,7 +112,7 @@ def test_seed_is_idempotent_and_keeps_order_history(catalog_fixture):
         assert {(item['interval'], item['unit_amount']) for item in subscriptions} == {('month', 599), ('year', 5999)}
         assert {(item['quota_pages'], item['quota_validity_days']) for item in packs} == {(100, None), (50, 30)}
         assert all(item['service_plan_id'] == 'lite' and item['unit_amount'] == 599 for item in packs)
-        assert all(item['hourly_image_limit'] == 1200 and not item['trial_days'] and not item['monthly_redraw_pages']
+        assert all(item['hourly_image_limit'] == 1200 and not item['trial_days'] and not item['monthly_classic_pages']
             for item in subscriptions + packs)
         order = BillingOrder(id='existing-order', owner_id=actor.id, provider='creem', environment='test',
             kind='initial', status='paid', price_id=seed.QUOTES['PERMANENT'][0],

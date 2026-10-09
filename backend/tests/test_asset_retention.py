@@ -11,9 +11,9 @@ from app.assets import object_path
 
 
 def finished(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     import app.workers as workers
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     auth = login(client)
     source = upload(client, auth, png)
     response = create(client, auth, source)
@@ -69,7 +69,7 @@ def test_another_account_cannot_claim_known_hash(client, png, monkeypatch):
     import hashlib
     response = client.put('/v1/translations/' + str(uuid4()), headers=other, json={
         'image': {'sha256': hashlib.sha256(png).hexdigest(), 'byte_size': len(png), 'content_type': 'image/png'},
-        'mode': 'redraw', 'target_language': 'zh-Hans'})
+        'mode': 'classic', 'target_language': 'zh-Hans'})
     assert response.status_code == 202
     assert response.json()['state'] == 'needs_input'
 
@@ -108,16 +108,16 @@ def test_old_client_cannot_start_paid_work(client, png):
     import hashlib
     response = client.put('/v1/translations/' + str(uuid4()), headers=auth, json={
         'image': {'sha256': hashlib.sha256(png).hexdigest(), 'byte_size': len(png), 'content_type': 'image/png'},
-        'mode': 'redraw', 'target_language': 'zh-Hans'})
+        'mode': 'classic', 'target_language': 'zh-Hans'})
     assert response.status_code == 409 and response.json()['error']['code'] == 'CLIENT_UPGRADE_REQUIRED'
 
 
 def test_full_image_dimensions_follow_actual_output_not_input(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     from app import workers
     output = BytesIO()
     Image.open(BytesIO(png)).resize((160, 240)).save(output, 'PNG')
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(output.getvalue()))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: output.getvalue())
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()['id']
     run_job(job_id)
@@ -142,25 +142,3 @@ def test_open_result_stream_survives_concurrent_unlink(client, png, monkeypatch)
     response = client.get('/v1/translations/' + request + '/result', headers=auth)
     assert response.status_code == 200 and response.content == png
     assert not path.exists()
-
-
-def test_orphan_cleanup_preserves_unknown_paid_recovery_then_reclaims_terminal_file(client, png, monkeypatch):
-    from datetime import timedelta
-    from app.assets import create_asset
-    from app.dispatcher import cleanup
-    from app.models import now
-    auth, _, job_id, _ = finished(client, png, monkeypatch)
-    with session_factory()() as db:
-        job = db.get(Job, job_id)
-        orphan = create_asset(db, job.owner_id, png, kind='redraw', parent_id=job.input_asset_id)
-        orphan.created_at = now() - timedelta(days=1)
-        job.status = 'outcome_unknown'
-        orphan_id = orphan.id
-        path = object_path(orphan.storage_key)
-        db.commit()
-        cleanup(db)
-        assert path.exists() and not db.get(Asset, orphan_id).deleted_at
-        job.status = 'failed'
-        db.commit()
-        cleanup(db)
-        assert not path.exists() and db.get(Asset, orphan_id).purged_at

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, finishLogin, sessionIdentity, signIn, signOut, loginReturnPath, subscribeAuth, type AuthIdentity } from '../lib/auth';
 import { checkoutUrl } from '../lib/auth-config';
-import {billingBenefitCopy,offerLabel,offerBenefits,providerLabel,manageLabel,hasManagedSubscription,subscriptionStatusLabel,type Billing,type BillingProvider,type MembershipGift,type PurchaseQuota} from '../lib/billing';
+import {billingCopy,billingBenefitCopy,offerLabel,offerBenefits,providerLabel,manageLabel,hasManagedSubscription,subscriptionStatusLabel,type Billing,type BillingProvider,type MembershipGift,type PurchaseQuota} from '../lib/billing';
 import {quotaPurchaseCopy} from '../i18n/quota-purchase';
-interface Entitlements {plan:string;service_plan?:string;purchase_quota?:PurchaseQuota|null;plus_expires_at:string|null;gift?:MembershipGift|null;hourly_image_rate_limit?:{window_seconds:number;limit:number}|null}
+import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
+interface Entitlements {plan:string;free_quota?:PurchaseQuota;subscription_quota?:PurchaseQuota&{unlimited:boolean};service_plan?:string;purchase_quota?:PurchaseQuota|null;plus_expires_at:string|null;gift?:MembershipGift|null;hourly_image_rate_limit?:{window_seconds:number;limit:number}|null}
 interface Me { user: { id: string; name: string }; entitlements: Entitlements }
 interface SyncedAccount {billing:Billing;entitlements:Entitlements}
 const date = (value: string | null, locale: string) => value ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Shanghai' }).format(new Date(value)) : '—';
@@ -22,7 +23,7 @@ export default function Account({ callback = false, locale = 'zh-CN', copy = {},
   const gift=billing?billing.gift:me?.entitlements.gift;
   const subscription=billing?.subscription;
   const benefitText=billingBenefitCopy(locale);
-  const quotaText=quotaPurchaseCopy(locale);
+  const quotaText=quotaPurchaseCopy(locale),quotaCopy=subscriptionQuotaCopy(locale);
   const epoch = useRef(0);
   const accountIdentity=useRef<AuthIdentity|null>(null);
   const billingRevision=useRef(0),billingOperation=useRef(0),syncFlight=useRef<{id:string}|null>(null),actionFlight=useRef(false);
@@ -118,6 +119,8 @@ export default function Account({ callback = false, locale = 'zh-CN', copy = {},
         {me.entitlements.plan!=='free'&&me.entitlements.plus_expires_at&&<p className="account-expiry">{t("会员有效期至")}{date(me.entitlements.plus_expires_at,locale)}{t("（北京时间）")}</p>}
         {me.entitlements.hourly_image_rate_limit&&<p className="account-rate-limit">{benefitText.hourly(me.entitlements.hourly_image_rate_limit.limit)}</p>}
         {me.entitlements.service_plan&&<p>{quotaText.currentService.replace('{0}',me.entitlements.service_plan==='free'?t('普通账户'):me.entitlements.service_plan)}</p>}
+        {([['free_quota',quotaCopy.free],['subscription_quota',quotaCopy.subscription]] as const).map(([key,title])=>{const balance=me.entitlements[key];return balance&&<div className="account-gift" key={key}><strong>{title}</strong><p>{'unlimited' in balance&&balance.unlimited?billingCopy(locale).classic:quotaText.pages.replace('{0}',balance.available.toLocaleString(locale))}</p></div>;})}
+        <p className="muted">{quotaCopy.rule}</p>
         {me.entitlements.purchase_quota&&<div className="account-gift"><strong>{quotaText.title}</strong><p>{quotaText.remaining.replace('{0}',me.entitlements.purchase_quota.available.toLocaleString(locale)).replace('{1}',me.entitlements.purchase_quota.reserved.toLocaleString(locale))}</p>{me.entitlements.purchase_quota.next_expiry_at?<p>{quotaText.nextExpiry.replace('{0}',date(me.entitlements.purchase_quota.next_expiry_at,locale))}{t('（北京时间）')}</p>:me.entitlements.purchase_quota.available>0&&<p>{quotaText.noExpiry}</p>}<p>{quotaText.subscription}</p></div>}
         {gift&&gift.state!=='expired'&&<div className="account-gift"><strong>{t('赠送 PLUS {0} 天').replace('{0}',String(gift.days))}</strong>{gift.state==='pending'?<p role="status">{t('赠送安排处理中，请刷新查看。')}</p>:<>{gift.starts_at&&<p>{t('赠送生效：{0}').replace('{0}',date(gift.starts_at,locale))}{t('（北京时间）')}</p>}{gift.ends_at&&<p>{t('赠送结束：{0}').replace('{0}',date(gift.ends_at,locale))}{t('（北京时间）')}</p>}</>}</div>}
         <div className="account-reading-note"><p>{t("阅读、翻译和用量查看，请前往浏览器插件。")}</p><a className="text-link" data-install-extension href={local('/download/')}>{t("下载插件")} ↗</a></div>

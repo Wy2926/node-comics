@@ -262,7 +262,7 @@ def test_live_slow_transport_renews_lease_and_cannot_be_claimed_twice(client, mo
     from datetime import datetime
     from types import SimpleNamespace
     import httpx
-    from app.adapters import images, openai_text
+    from app.adapters import transport, openai_text
     from app.translation_providers import provider_profile
     from translation_fixtures import configure_text_provider
     auth = login(client)
@@ -272,7 +272,7 @@ def test_live_slow_transport_renews_lease_and_cannot_be_claimed_twice(client, mo
     monkeypatch.setattr(cache, 'server_now', lambda db: base + timedelta(seconds=clock[0]))
     monkeypatch.setattr(cache, 'HEARTBEAT_SECONDS', 0.01)
     monkeypatch.setattr(cache, 'WAIT_SECONDS', 0)
-    for module in (images, openai_text):
+    for module in (transport, openai_text):
         monkeypatch.setattr(module, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
     renewed, reading, release = threading.Event(), threading.Event(), threading.Event()
     original_renew = cache.renew_claim

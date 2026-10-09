@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Czytaj za darmo. Wybierz plan tłumaczenia.",
   "privacyBody": "NodeLane Comics oferuje bezpłatne rozszerzenie i tłumaczenie w chmurze powiązane z kontem. Obowiązują limity żądań i wydajności usługi. Przed subskrypcją sprawdź dostępność, korzyści i warunki rozliczeń.",
   "privacy": "Polityka prywatności",
-  "pricing": "Porównaj Free i Lite",
+  "pricing": "Porównaj Free i PLUS / Pro",
   "ctaTitle": "Zrozum swoją następną stronę.",
   "ctaBody": "Zainstaluj NodeLane Comics w Chrome, Edge lub Firefox na komputerze."
 };

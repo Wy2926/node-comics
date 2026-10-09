@@ -101,17 +101,17 @@ def test_summary_full_interval_local_day_and_no_reserve_double_count(client, png
         owner = db.get(Job, done["id"]).owner_id
         for row in db.scalars(select(Ledger).where(Ledger.owner_id == owner)):row.created_at = start - timedelta(seconds=1)
         for i in range(45):
-            db.add(Ledger(owner_id=owner,job_id=done["id"],transaction_key=f"fixture-{i}",quota_kind="redraw_monthly",kind="settle",amount=2,created_at=start+timedelta(minutes=i)))
+            db.add(Ledger(owner_id=owner,job_id=done["id"],transaction_key=f"fixture-{i}",quota_kind="classic_monthly",kind="settle",amount=2,created_at=start+timedelta(minutes=i)))
         for kind in ("reserve","release","grant"):
-            db.add(Ledger(owner_id=owner,transaction_key=f"fixture-{kind}",quota_kind="redraw_monthly",kind=kind,amount=900,created_at=now()))
-        db.add(Ledger(owner_id=owner,transaction_key="outside-day",quota_kind="redraw_monthly",kind="settle",amount=300,created_at=start+timedelta(days=1)))
+            db.add(Ledger(owner_id=owner,transaction_key=f"fixture-{kind}",quota_kind="classic_monthly",kind=kind,amount=900,created_at=now()))
+        db.add(Ledger(owner_id=owner,transaction_key="outside-day",quota_kind="classic_monthly",kind="settle",amount=300,created_at=start+timedelta(days=1)))
         db.commit()
     response = client.get("/v1/me/usage/summary?days=1&timezone=Asia%2FShanghai", headers=auth)
     assert response.status_code == 200, response.text
     data = response.json()
-    assert data["quota_used"]["redraw"] == 90
-    assert data["by_mode"]["redraw"] == 1
-    assert len(data["days"]) == 1 and data["days"][0]["redraw"] == 1
+    assert data["quota_used"]["classic"] == 90
+    assert data["by_mode"]["classic"] == 1
+    assert len(data["days"]) == 1 and data["days"][0]["classic"] == 1
     assert data["delivered"] == 1
     assert len(client.get("/v1/me/usage?limit=20", headers=auth).json()["items"]) == 20
     assert client.get("/v1/me/usage/summary?timezone=bad-zone", headers=auth).status_code == 422

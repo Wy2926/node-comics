@@ -30,14 +30,14 @@ def test_seed_products_have_monthly_and_annual_prices(client, administrator):
 
 
 def test_products_revisions_and_prices_are_immutable(client, administrator):
-    product = {'id': 'light', 'revision_id': 'light-v1', 'name': 'Light', 'monthly_redraw_pages': 100,
-        'trial_days': 0, 'trial_redraw_pages': 0}
+    product = {'id': 'light', 'revision_id': 'light-v1', 'name': 'Light', 'monthly_classic_pages': 100,
+        'trial_days': 0, 'trial_classic_pages': 0}
     response = client.post('/v1/admin/billing/products', headers=administrator, json=product)
     assert response.status_code == 200, response.text
     assert client.post('/v1/admin/billing/products', headers=administrator, json=product).status_code == 200
     assert client.post('/v1/admin/billing/products', headers=administrator,
-        json={**product, 'monthly_redraw_pages': 200}).status_code == 409
-    revision = {'id': 'light-v2', 'name': 'Light', 'monthly_redraw_pages': 200, 'trial_days': 0, 'trial_redraw_pages': 0}
+        json={**product, 'monthly_classic_pages': 200}).status_code == 409
+    revision = {'id': 'light-v2', 'name': 'Light', 'monthly_classic_pages': 200, 'trial_days': 0, 'trial_classic_pages': 0}
     assert client.post('/v1/admin/billing/products/light/revisions', headers=administrator, json=revision).status_code == 200
     assert client.post('/v1/admin/billing/products/missing/revisions', headers=administrator, json=revision).status_code == 404
     price = {'id': 'light-month', 'plan_revision_id': 'light-v1', 'environment': 'test',

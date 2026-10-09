@@ -5,8 +5,6 @@ import {time} from './ui';
 const fields = [
   {key: 'free_daily_pages', group: 'entitlements', title: '普通用户每日常规页数', unit: '页 / 天', min: 0, max: 1000000, integer: true,
     help: '仅新建的每日额度周期采用新值，已生效周期的已用、预占和总额保持不变。'},
-  {key: 'plus_monthly_redraw_pages', group: 'entitlements', title: '运营会员默认月重绘页数', unit: '页 / 会员月', min: 0, max: 1000000, integer: true,
-    help: '仅新开通的运营会员段采用此默认值；已有会员续期和付费产品权益版本保持原规则。'},
   {key: 'guest_daily_limit', group: 'guest', title: '每位匿名访客每日受理上限', unit: '张 / 天', min: 1, max: 100, integer: true,
     help: '同一游客身份的新受理常规翻译张数；已受理任务失败、取消、无字或部分完成仍计次。'},
   {key: 'guest_network_daily_limit', group: 'guest', title: '同一网络每日匿名受理上限', unit: '张 / 天', min: 1, max: 1000, integer: true,

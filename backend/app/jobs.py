@@ -4,8 +4,8 @@ from .assets import available, descriptor_available
 from .translation_requests import TranslationRequest
 from .errors import problem
 from .models import Asset, Job, now, uid
-from .entitlements import admission_policy, locked_user, require_entitlement, reserve, settle
-from .providers import configuration, digest, validate_input
+from .entitlements import admission_policy, free_model_policy, locked_user, require_entitlement, reserve, settle
+from .providers import configuration, digest
 from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
 
 TERMINAL = {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}
@@ -77,12 +77,6 @@ def content_key(asset, mode, language, config):
 
 def find_reusable(db, user, asset, mode, language, config):
     sha = asset.sha256 if hasattr(asset, 'sha256') else asset
-    if mode == 'redraw':
-        unresolved = db.scalar(select(Job).where(Job.owner_id == user.id, Job.mode == mode,
-            Job.target_language == language, Job.source_sha256 == sha,
-            Job.status.in_(['outcome_unknown', 'unknown_released'])).order_by(Job.created_at).limit(1))
-        if unresolved:
-            return unresolved
     candidates = db.scalars(select(Job).where(Job.owner_id == user.id,
         Job.cache_key == content_key(sha, mode, language, config),
         Job.status.in_(ACTIVE | {'succeeded', 'no_text'}), Job.cancel_requested.is_(False),
@@ -124,8 +118,6 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         plan_id=policy.service_plan)
     if result_format == 'overlay-tiles-v1':
         config = {**config, 'result_format': result_format, 'version': digest([config['version'], result_format])}
-    if asset:
-        validate_input(asset, config)
     cached = None if force else find_reusable(db, user, sha, mode, language, config)
     if cached:
         return remember_request(db, user.id, key, request_hash, cached)
@@ -137,6 +129,12 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         if last and (last.status in {'failed', 'cancelled', 'unknown_released'} or
                 (last.status in ACTIVE and (last.cancel_requested or last.discard_output))):
             return remember_request(db, user.id, key, request_hash, last)
+    # Model access is verified server-side. A free model still costs a page:
+    # free allowances first, then the selected subscription/purchased allowance.
+    from .translation_models import TranslationProvider
+    provider = db.get(TranslationProvider, config['text']['provider_id'])
+    if provider and (provider.text_plan_ids is None or 'free' in provider.text_plan_ids):
+        policy = free_model_policy(db, user, policy, at)
     kind = require_entitlement(user, mode, db=db, policy=policy)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,

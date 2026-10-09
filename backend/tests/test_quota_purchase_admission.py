@@ -14,7 +14,7 @@ from app.entitlement_models import QuotaPeriod
 from app.entitlements import admission_policy, entitlements_json, settle
 from app.models import Job, Ledger, User, now, uid
 from conftest import configure_system_limits, login, login_plus, request_record
-from test_cluster_submissions import cluster, grant_redraw, manifest, submit  # noqa: F401
+from test_cluster_submissions import cluster, grant_free, manifest, submit  # noqa: F401
 from test_translation_requests import high_control_budget
 from test_translation_providers import admin_case, body, create  # noqa: F401
 from test_hourly_image_limit import billing, lite  # noqa: F401
@@ -28,8 +28,8 @@ def seed_purchase(db, owner, *, pages=3, start=None, end=None, hourly=1200, serv
     product = BillingPlan(id='pack-' + key, name='Page pack')
     db.add(product)
     db.flush()
-    revision = BillingPlanRevision(plan_id=product.id, version=1, name='Page pack', monthly_redraw_pages=0,
-        hourly_image_limit=hourly, service_plan_id=service, quota_pages=pages, trial_days=0, trial_redraw_pages=0)
+    revision = BillingPlanRevision(plan_id=product.id, version=1, name='Page pack', monthly_classic_pages=0,
+        hourly_image_limit=hourly, service_plan_id=service, quota_pages=pages, trial_days=0, trial_classic_pages=0)
     db.add(revision)
     db.flush()
     price = BillingPrice(plan_id=product.id, plan_revision_id=revision.id, environment='test', currency='usd',
@@ -59,6 +59,7 @@ def account(cluster):
     auth = login(client)
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     high_control_budget()
+    configure_system_limits(free_daily_pages=0)
     return client, auth, owner
 
 
@@ -93,14 +94,14 @@ def test_purchase_preserves_free_identity_and_has_separate_permanent_balance(acc
     assert value['purchase_quota'] == {'granted': 5, 'used': 0, 'reserved': 0, 'available': 5, 'next_expiry_at': None}
     classic = value['modes']['classic']
     assert not classic['unlimited'] and classic['quota_kind'] == 'classic_purchase'
-    assert classic['quota']['available'] == 35 and all(p['source'] != 'purchase' for p in classic['quota']['buckets'])
-    assert not value['modes']['redraw']['allowed']
+    assert classic['quota']['available'] == 5 and all(p['source'] != 'purchase' for p in classic['quota']['buckets'])
+    assert value['modes']['classic']['allowed']
     items = account[0].get('/v1/me/quota-purchases', headers=account[1]).json()
     assert items['next_cursor'] is None and items['items'][0]['id'] == period_id
     assert items['items'][0]['expires_at'] is None and items['items'][0]['state'] == 'active'
 
 
-def test_purchases_are_spent_before_free_pages_and_earliest_expiry_wins(account):
+def test_free_pages_then_purchases_follow_earliest_expiry(account):
     configure_system_limits(free_daily_pages=1)
     permanent = purchase(account, pages=1)
     late = purchase(account, pages=1, end=now() + timedelta(hours=2))
@@ -109,9 +110,9 @@ def test_purchases_are_spent_before_free_pages_and_earliest_expiry_wins(account)
     purchase(account, pages=100, start=at - timedelta(days=2), end=at - timedelta(days=1))
     purchase(account, pages=100, start=at + timedelta(days=1), end=at + timedelta(days=2))
     jobs = [accept(account, str(index)) for index in range(4)]
-    assert [job.quota_period_id for job in jobs[:3]] == [early, late, permanent]
-    assert [job.entitlement['service_plan'] for job in jobs] == ['lite', 'lite', 'lite', 'free']
-    assert jobs[-1].quota_kind == 'classic_daily'
+    assert [job.quota_period_id for job in jobs[1:]] == [early, late, permanent]
+    assert [job.entitlement['service_plan'] for job in jobs] == ['free', 'free', 'free', 'free']
+    assert jobs[0].quota_kind == 'classic_daily'
     value = rights(account)
     assert value['plan'] == value['service_plan'] == 'free'
     assert value['image_rate_limit']['limit'] == 10
@@ -195,11 +196,11 @@ def test_subscription_uses_no_purchase_and_original_expiry_keeps_running(account
     assert accept(account, 'after-subscription').quota_period_id == period_id
 
 
-def test_independent_redraw_gift_does_not_inherit_purchase_service(account):
+def test_independent_free_gift_does_not_inherit_purchase_service(account):
     period_id = purchase(account, pages=2, hourly=1)
-    grant_redraw(account[0], account[1], 2)
-    job = accept(account, 'redraw-gift', mode='redraw')
-    assert job.quota_kind == 'redraw_grant' and job.entitlement['service_plan'] == 'free'
+    grant_free(account[0], account[1], 1)
+    job = accept(account, 'classic-gift', mode='classic')
+    assert job.quota_kind == 'classic_grant' and job.entitlement['service_plan'] == 'free'
     assert job.entitlement['hourly_image_limit'] is None and job.entitlement['priority'] == 0
     assert window_count('image-hourly') == 0
     assert accept(account, 'classic-pack').quota_period_id == period_id
@@ -218,7 +219,7 @@ def test_purchase_changes_share_account_rate_keys_and_do_not_reset_hour_window(a
 
 
 def test_purchase_upgrade_does_not_reset_existing_free_minute_usage(account):
-    configure_system_limits(free_images_per_minute=1, plus_images_per_minute=2)
+    configure_system_limits(free_daily_pages=1, free_images_per_minute=1, plus_images_per_minute=2)
     accept(account, 'free-counted')
     purchase(account, pages=2)
     accept(account, 'purchased-counted')
@@ -231,6 +232,7 @@ def test_purchase_upgrade_does_not_reset_existing_free_minute_usage(account):
 def test_last_reserved_page_retains_scheduler_priority_after_expiry(account):
     from app.queue_models import JobStage
     from app.scheduler import _candidate_rows
+    configure_system_limits(free_daily_pages=1)
     free = accept(account, 'free-older')
     at = now()
     period_id = purchase(account, pages=1, start=at - timedelta(hours=1), end=at + timedelta(minutes=1))
@@ -320,7 +322,7 @@ def test_same_model_reuse_survives_purchase_exhaustion_without_rebilling(account
     assert request_record(account[0], account[1], 'free-same-model').job_id == first.id
     assert window_count('image') == 1
     value = rights(account)
-    assert value['modes']['classic']['quota']['available'] == 30
+    assert value['modes']['classic']['quota']['available'] == 0
     assert value['purchase_quota']['reserved'] == 1
 
 
@@ -329,7 +331,7 @@ def test_lite_paid_term_takes_precedence_over_purchase_hourly_terms(lite):
     account = lite['client'], lite['auth'], lite['owner']
     period_id = purchase(account, pages=2, hourly=1)
     job = accept(account, 'active-lite')
-    assert job.settlement == 'included' and job.entitlement['service_plan'] == 'lite'
+    assert job.settlement == 'included' and job.entitlement['service_plan'] == 'free'
     assert job.entitlement['hourly_image_limit'] == 3
     with session_factory()() as db:
         assert db.get(QuotaPeriod, period_id).reserved == 0

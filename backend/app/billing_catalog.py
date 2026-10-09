@@ -1,4 +1,6 @@
 """Immutable subscription and page-pack quotes share one provider-neutral catalog."""
+import json
+from pathlib import Path
 from typing import Literal
 from fastapi import APIRouter, Depends
 from pydantic import Field, model_validator
@@ -15,6 +17,7 @@ from .request_models import RequestBody
 
 router = APIRouter(prefix='/v1/admin/billing', dependencies=[Depends(admin)])
 PROVIDERS = ('stripe', 'creem')
+DEFAULT_CATALOG = json.loads(Path(__file__).with_name('catalog_defaults.json').read_text(encoding='utf-8'))
 
 
 def lock_catalog(db):
@@ -28,37 +31,43 @@ def initialize_catalog(db):
     lock_catalog(db)
     if db.get(BillingSettings, 1) is None:
         db.add(BillingSettings(id=1, default_provider=next((p for p in PROVIDERS if provider_enabled(p)), None)))
-    if db.get(BillingPlan, 'plus') is None:
-        db.add(BillingPlan(id='plus', name='PLUS'))
+    environment = provider_environment('creem' if provider_enabled('creem') else 'stripe')
+    for product in DEFAULT_CATALOG['products']:
+        if db.get(BillingPlan, product['id']) is not None:
+            continue
+        plan_id, name = product['id'], product['name']
+        db.add(BillingPlan(id=plan_id, name=name))
         db.flush()
-        db.add(BillingPlanRevision(id='plus-v1', plan_id='plus', version=1, name='PLUS',
-            monthly_redraw_pages=300, trial_days=7, trial_redraw_pages=30))
+        db.add(BillingPlanRevision(id=f'{plan_id}-v1', plan_id=plan_id, version=1, name=name,
+            monthly_classic_pages=product['monthly_classic_pages'], service_plan_id=product.get('service_plan_id'),
+            quota_pages=product.get('quota_pages', 0), quota_validity_days=None,
+            trial_days=product.get('trial_days', 0), trial_classic_pages=product.get('trial_classic_pages', 0)))
         db.flush()
-        environment = provider_environment('creem' if provider_enabled('creem') else 'stripe')
-        for interval, amount in (('month', 999), ('year', 9999)):
-            db.add(BillingPrice(id=f'plus-{interval}-v1', plan_id='plus', plan_revision_id='plus-v1',
-                environment=environment, currency='usd', unit_amount=amount, interval=interval, status='draft'))
+        for interval, amount in product['prices'].items():
+            db.add(BillingPrice(id=f'{plan_id}-{interval}-v1', plan_id=plan_id, plan_revision_id=f'{plan_id}-v1',
+                environment=environment, currency=DEFAULT_CATALOG['currency'], unit_amount=amount,
+                interval=interval, status='draft'))
 
 
 class BenefitsRequest(RequestBody):
     name: str = Field(min_length=1, max_length=100)
-    monthly_redraw_pages: int = Field(ge=0, le=1_000_000)
+    monthly_classic_pages: int | None = Field(default=None, ge=0, le=1_000_000, strict=True)
     hourly_image_limit: int | None = Field(default=None, ge=1, le=1_000_000, strict=True)
     service_plan_id: str | None = Field(default=None, pattern=r'^[a-z][a-z0-9_-]{0,63}$')
     quota_pages: int = Field(default=0, ge=0, le=1_000_000, strict=True)
     quota_validity_days: int | None = Field(default=None, ge=1, le=36500, strict=True)
     trial_days: int = Field(ge=0, le=30)
-    trial_redraw_pages: int = Field(ge=0, le=1_000_000)
+    trial_classic_pages: int | None = Field(default=0, ge=0, le=1_000_000, strict=True)
 
     @model_validator(mode='after')
     def trial(self):
-        if self.trial_days == 0 and self.trial_redraw_pages != 0:
+        if self.trial_days == 0 and self.trial_classic_pages != 0:
             raise ValueError('No trial pages without a trial')
         if self.quota_pages:
-            if not self.service_plan_id or self.monthly_redraw_pages or self.trial_days or self.trial_redraw_pages:
+            if not self.service_plan_id or self.monthly_classic_pages != 0 or self.trial_days or self.trial_classic_pages != 0:
                 raise ValueError('Page packs require a service plan and cannot include recurring or trial grants')
-        elif self.service_plan_id is not None or self.quota_validity_days is not None:
-            raise ValueError('Purchase service and validity apply only to page packs')
+        elif self.quota_validity_days is not None:
+            raise ValueError('Purchase validity applies only to page packs')
         return self
 
 
@@ -77,7 +86,7 @@ class PriceRequest(RequestBody):
     environment: Literal['test', 'live']
     currency: str = Field(pattern=r'^[a-z]{3}$')
     unit_amount: int = Field(gt=0, le=100_000_000)
-    interval: Literal['month', 'year', 'once']
+    interval: Literal['month', 'quarter', 'year', 'once']
 
 
 class BindingRequest(RequestBody):
@@ -114,7 +123,7 @@ def default_provider(db):
 
 def revision_json(revision):
     return {field: getattr(revision, field) for field in ('id', 'plan_id', 'version', 'name',
-        'monthly_redraw_pages', 'hourly_image_limit', 'trial_days', 'trial_redraw_pages',
+        'monthly_classic_pages', 'hourly_image_limit', 'trial_days', 'trial_classic_pages',
         'service_plan_id', 'quota_pages', 'quota_validity_days')}
 
 
@@ -128,11 +137,11 @@ def price_json(db, price):
     return {'id': price.id, 'plan_id': price.plan_id, 'plan_revision_id': revision.id,
         'name': revision.name, 'version': revision.version, 'currency': price.currency,
         'unit_amount': price.unit_amount, 'interval': price.interval,
-        'monthly_redraw_pages': revision.monthly_redraw_pages,
+        'monthly_classic_pages': revision.monthly_classic_pages,
         'hourly_image_limit': revision.hourly_image_limit,
         'service_plan_id': revision.service_plan_id or revision.plan_id,
         'quota_pages': revision.quota_pages, 'quota_validity_days': revision.quota_validity_days,
-        'trial_days': revision.trial_days, 'trial_redraw_pages': revision.trial_redraw_pages}
+        'trial_days': revision.trial_days, 'trial_classic_pages': revision.trial_classic_pages}
 
 
 def offers(db, *, interval=None):
@@ -154,7 +163,7 @@ def offers(db, *, interval=None):
         if channels:
             value = price_json(db, price)
             result.append({**value, 'channels': [{'provider': b.provider, 'binding_id': b.id,
-                'trial_days': value['trial_days'], 'trial_redraw_pages': value['trial_redraw_pages']}
+                'trial_days': value['trial_days'], 'trial_classic_pages': value['trial_classic_pages']}
                 for b in channels]})
     return result
 

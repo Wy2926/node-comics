@@ -51,7 +51,7 @@ def test_control_worker_sigterm_drains_an_active_stage(tmp_path):
         workers.run_control_stage = run
         workers.report_progress = lambda *args: None
         workers.report_failure = lambda *args: None
-        control_pools.POOL_LIMITS = {"text": 1, "redraw": 1}
+        control_pools.POOL_LIMITS = {"text": 1, "classic": 1}
         control_pools.report_pools = lambda db: None
         notifications.hub = lambda: notices
         notifications.close_hub = notices.close

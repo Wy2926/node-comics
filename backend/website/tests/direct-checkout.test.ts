@@ -14,7 +14,7 @@ import { accountReturnPath } from '../src/lib/auth-config';
 import {ApiError,type api} from '../src/lib/auth';
 import { locales, localPath } from '../src/i18n/locales';
 import type { Billing, BillingOffer, PendingCheckout, BillingProvider } from '../src/lib/billing';
-const month: BillingOffer = { id:'lite-month',name:'Lite',plan_id:'lite',plan_revision_id:'v1',currency:'usd',unit_amount:599,interval:'month',monthly_redraw_pages:0,trial_days:7,trial_redraw_pages:0,channels:[{provider:'creem',binding_id:'binding',trial_days:7,trial_redraw_pages:0}] };
+const month: BillingOffer = { id:'lite-month',name:'Lite',plan_id:'lite',plan_revision_id:'v1',currency:'usd',unit_amount:599,interval:'month',monthly_classic_pages:0,trial_days:7,trial_classic_pages:0,channels:[{provider:'creem',binding_id:'binding',trial_days:7,trial_classic_pages:0}] };
 const year: BillingOffer = {...month,id:'lite-year',unit_amount:5999,interval:'year'};
 const pack:BillingOffer={...month,id:'pack',plan_id:'pages',interval:'once',quota_pages:100,quota_validity_days:null,service_plan_id:'lite',trial_days:0};
 const billing: Billing = {enabled:true,providers:[],provider:null,environment:'test',trial_eligible:true,subscription_checkout:null,offers:[month,year],entitlement_expires_at:null,gift:null,subscription:null};

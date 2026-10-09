@@ -1,0 +1,10 @@
+{
+  "currency": "usd",
+  "models": {"free": "GPT 6 Luna", "paid": "Haiku 5.5"},
+  "products": [
+    {"id": "plus", "name": "PLUS", "monthly_classic_pages": 2500, "service_plan_id": "plus", "quota_pages": 0, "prices": {"quarter": 666, "year": 2399}},
+    {"id": "pro", "name": "Pro", "monthly_classic_pages": 4000, "service_plan_id": "pro", "quota_pages": 0, "prices": {"quarter": 999, "year": 3599}},
+    {"id": "pages-3500", "name": "3500", "monthly_classic_pages": 0, "service_plan_id": "plus", "quota_pages": 3500, "prices": {"once": 599}},
+    {"id": "pages-7000", "name": "7000", "monthly_classic_pages": 0, "service_plan_id": "plus", "quota_pages": 7000, "prices": {"once": 999}}
+  ]
+}

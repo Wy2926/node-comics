@@ -7,7 +7,7 @@ from conftest import create, login_plus as login, png_variant, run_job, upload, 
 from app.config import settings
 from app.db import session_factory
 from app.entitlement_models import QuotaPeriod
-from app.models import Asset, Job, Ledger, Provider, now
+from app.models import Asset, Job, Ledger, now
 from app.translation_requests import TranslationRequest
 from test_cluster_submissions import snapshot
 
@@ -44,9 +44,9 @@ def test_accepted_uuid_keeps_terminal_result_and_frozen_config(client, png, term
     original = create(client, auth, source, key='original').json()
     assert create(client, auth, source, key='alias').json()['id'] == original['id']
     if terminal == 'succeeded':
-        from app.adapters.images import TranslationOutput
+
         import app.workers as workers
-        monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+        monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
         run_job(original['id'])
     else:
         from app.workers import finish_job
@@ -56,8 +56,10 @@ def test_accepted_uuid_keeps_terminal_result_and_frozen_config(client, png, term
             finish_job(db, db.get(Job, original['id']), terminal)
             db.commit()
     with session_factory()() as db:
-        provider = db.get(Provider, 'default')
-        provider.config = {**provider.config, 'model': 'changed-model'}
+        from app.translation_models import TranslationProvider
+        from translation_fixtures import configure_text_provider
+        provider = db.scalar(select(TranslationProvider))
+        configure_text_provider(db, provider.id, model='changed-model')
         db.commit()
     repeat = create(client, auth, source, key='alias')
     assert repeat.status_code == 200 and repeat.json()['id'] == original['id']
@@ -88,9 +90,9 @@ def test_snapshot_restores_aliases_and_cancellation_without_cursor(client, png):
 
 
 def test_success_cache_remains_free_with_zero_spare_quota(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     import app.workers as workers
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     auth = login(client)
     source = upload(client, auth, png)
     first = create(client, auth, source).json()
@@ -136,32 +138,6 @@ def test_active_pin_keeps_expired_original_available_for_reuse(client, png):
     assert create(client, auth, source, key='other-device').json()['id'] == first['id']
 
 
-def test_unknown_redraw_cannot_automatically_restart_even_after_config_change(client, png):
-    auth = login(client)
-    source = upload(client, auth, png)
-    original = submit_asset(client, auth, source, key='original').json()
-    record = request_record(client, auth, original['id'])
-    with session_factory()() as db:
-        job = db.get(Job, record.job_id)
-        job.status, job.unknown_since = 'outcome_unknown', now()
-        provider = db.get(Provider, 'default')
-        provider.config = {**provider.config, 'model': 'changed-model'}
-        db.commit()
-    auto = submit_asset(client, auth, source, key='other-device')
-    assert auto.status_code == 202 and auto.json()['state'] == 'needs_attention'
-    assert request_record(client, auth, auto.json()['id']).job_id == record.job_id
-    retry = client.put('/v1/translations/' + request_id('retry'), headers=auth,
-        json={'retry_of': original['id'], 'priority': 'current'})
-    assert retry.status_code == 409
-    regenerate = client.put('/v1/translations/' + request_id('regenerate'), headers=auth,
-        json={'regenerate_of': original['id'], 'priority': 'current'})
-    assert regenerate.status_code == 409 and regenerate.json()['error']['code'] == 'UNKNOWN_COST_ACK_REQUIRED'
-    accepted = client.put('/v1/translations/' + request_id('regenerate'), headers=auth,
-        json={'regenerate_of': original['id'], 'acknowledge_unknown_cost': True})
-    assert accepted.status_code == 202
-    assert request_record(client, auth, accepted.json()['id']).job_id != record.job_id
-
-
 def test_explicit_retry_only_accepts_failed_intent_and_new_uuid(client, png):
     from app.workers import finish_job
     from app.scheduler import lock_scheduler
@@ -185,18 +161,18 @@ def test_explicit_retry_only_accepts_failed_intent_and_new_uuid(client, png):
 
 
 def test_failed_retranslation_does_not_hide_previous_result(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     from app.errors import ProcessingError
     import app.workers as workers
     auth = login(client)
     source = upload(client, auth, png)
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     original = create(client, auth, source, key='delivered').json()
     run_job(original['id'])
     replacement = create(client, auth, source, key='explicit-new', regenerate=True, rerun_job_id=original['id']).json()
     def rejected(*args):
         raise ProcessingError('PROVIDER_REJECTED', 'isolated rejection')
-    monkeypatch.setattr(workers, 'redraw', rejected)
+    monkeypatch.setattr("conftest.fixture_output", rejected)
     run_job(replacement['id'])
     before = quota_usage(client, auth)
     restored = submit_asset(client, auth, source, key='new-device')

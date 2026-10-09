@@ -3,11 +3,10 @@ from datetime import timedelta
 from dataclasses import dataclass
 import hmac
 from sqlalchemy import and_, func, or_, select, text, update
-from sqlalchemy.orm import aliased
 from .assets import available
 from .config import settings
 from .errors import ProcessingError
-from .models import Asset, Attempt, ClassicState, Job, Provider, now, uid
+from .models import Asset, Attempt, ClassicState, Job, now, uid
 from .queue_models import ComputeNode, ExecutionLease, JobStage, SchedulerMutex
 from .translation_models import TranslationProvider
 from .translation_provider_limits import unavailable_providers
@@ -40,7 +39,7 @@ def touch_job(db, job):
 def ensure_stages(db, job):
     if not job.input_asset_id or job.status not in {"queued", "running"}:
         return
-    names = ["page", "text"] if job.mode == "classic" else ["redraw"]
+    names = ["page", "text"]
     existing = {s.name for s in db.scalars(select(JobStage).where(JobStage.job_id == job.id))}
     for name in names:
         if name not in existing:
@@ -88,16 +87,6 @@ def _eligible_stages(node, stages, at, *, stage_ids=None, blocked_providers=()):
         eligible = (eligible.outerjoin(TranslationProvider, TranslationProvider.id == Job.config['text']['provider_id'].as_string())
             .where(or_(JobStage.name != 'text', and_(TranslationProvider.enabled.is_(True),
                 TranslationProvider.id.not_in(blocked_providers)))))
-    if "redraw" in stages:
-        running_job, unknown_job = aliased(Job), aliased(Job)
-        provider_id = Job.config["provider"]["id"].as_string()
-        running = (select(func.count()).select_from(ExecutionLease).join(running_job, running_job.id == ExecutionLease.job_id)
-            .where(ExecutionLease.resource_pool == "redraw", ExecutionLease.completed_at.is_(None),
-                running_job.config["provider"]["id"].as_string() == Provider.id).correlate(Provider).scalar_subquery())
-        unknown = select(func.count()).select_from(unknown_job).where(unknown_job.mode == "redraw",
-            unknown_job.status == "outcome_unknown", unknown_job.config["provider"]["id"].as_string() == Provider.id).correlate(Provider).scalar_subquery()
-        eligible = eligible.outerjoin(Provider, Provider.id == provider_id).where(or_(JobStage.name != "redraw",
-            and_(Provider.enabled.is_(True), running + unknown < Provider.config["concurrency"].as_integer())))
     return eligible
 
 
@@ -165,7 +154,7 @@ def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None)
 def next_control_delay(db, maximum=5):
     """Bound idle reconciliation by retry deadlines and shared supplier RPM."""
     at = now()
-    stages = ('text', 'redraw', 'validate_upload')
+    stages = ('text', 'validate_upload')
     pending = (select(JobStage.available_at).join(Job, Job.id == JobStage.job_id)
         .where(JobStage.name.in_(stages), JobStage.status == 'ready', JobStage.available_at > at,
             Job.status.in_(['queued', 'running', 'validating_upload']),
@@ -252,12 +241,6 @@ def claim_batch(db, node_id, allowed_stages=None, *, limit=CLAIM_BATCH_LIMIT, ex
     for stage, job in _claimable_candidates(db, node, allowed_stages, at, candidates_before_lock, blocked):
         if len(leases) == limit:
             break
-        # Only supplier concurrency can change eligibility as this transaction
-        # adds leases; recheck that one stage instead of reloading every job,
-        # membership and source file for every page of the same batch.
-        if stage.name == 'redraw' and leases and not db.scalar(select(
-                _eligible_stages(node, {'redraw'}, at, stage_ids=[stage.id]).exists())):
-            continue
         leases.append(_start_lease(db, node, stage, job, at, executor_id))
     return leases
 

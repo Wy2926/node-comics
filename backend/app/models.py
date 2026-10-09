@@ -133,15 +133,6 @@ class Ledger(Base):
     __table_args__ = (Index("ix_ledger_owner_created", "owner_id", "created_at"),)
 
 
-class Provider(Base):
-    __tablename__ = "providers"
-    id: Mapped[str] = mapped_column(String(80), primary_key=True)
-    config: Mapped[dict] = mapped_column(JSON)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    validated_at: Mapped[datetime | None] = mapped_column(DateTime)
-    validation_job_id: Mapped[str | None] = mapped_column(String(36))
-
-
 class ClassicState(Base):
     __tablename__ = "classic_states"
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), primary_key=True)

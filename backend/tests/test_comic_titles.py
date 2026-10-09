@@ -31,7 +31,7 @@ def test_login_and_free_translation_without_quota(client, model):
     assert response.json() == {'name': 'Attack on Titan', 'target_language': 'en'}
     after = client.get('/v1/me/usage', headers=auth).json()
     assert after['items'] == before['items'] == []
-    for mode in ('classic', 'redraw'):
+    for mode in ('classic', 'classic'):
         assert after['entitlements']['modes'][mode]['quota'] == before['entitlements']['modes'][mode]['quota']
     assert json.loads(model[0][0][1]['content']) == BODY
     assert 'comic title' in model[0][0][0]['content']

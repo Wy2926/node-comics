@@ -23,7 +23,6 @@ x-center: &center
     TMPDIR: /data/translation/staging
     CLASSIC_ENABLED: "true"
     ADMIN_WEB_PATH: /console-overlay-test/
-    OPENAI_API_KEY: ""
     STRIPE_ENABLED: "false"
     CREEM_ENABLED: "false"
   volumes:

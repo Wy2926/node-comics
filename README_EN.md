@@ -25,7 +25,7 @@
 
 A comic reading and library extension for Chrome, Edge, and Firefox. Bring comics from local files, Google Drive, and supported websites into your library, find your next read, and cache chapters for offline reading.
 
-When you need translation, enable standard translation or AI redraw and compare with the original. You can also connect to a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
+When you need translation, enable standard translation and compare with the original. You can also connect to a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
 
 ## Features
 
@@ -34,7 +34,7 @@ When you need translation, enable standard translation or AI redraw and compare 
 - **Discover and search**: Browse trending, popular, top-rated, and new manga on AniList, then search supported websites by title, alternative title, or translated title.
 - **Read offline**: Cache every directory and chapter of a website comic, select multiple source languages, track progress, pause and resume, and retry missing pages.
 - **Read your way**: Choose continuous scrolling or single-page reading, reading direction, zoom, and a separate reading background.
-- **Translate when needed**: Use standard translation or AI redraw, switch between originals and translations, compare them side by side, and restore your reading position.
+- **Translate when needed**: Use standard translation, switch between originals and translations, compare them side by side, and restore your reading position.
 - **Choose your translation service**: Use the official service or connect to a local manga-translator-ui instance. Local services do not require a NodeLane account.
 - **Personalize the interface**: Choose from 16 interface languages, six accent colors, light and dark modes, and adjustable text sizes.
 

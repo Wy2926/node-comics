@@ -56,7 +56,7 @@ const copy: HomeCopy = {
     modes: [["NodeLane 官方服务", "登录后使用账户额度，由官方服务处理图片。本地译图缓存缺失时，可取回仍有效的已有结果。"], ["自己的 manga-translator-ui", "填写 MTU 服务地址与凭据，无需 NodeLane 账号，不消耗官方额度；处理方式和 API 费用由你的配置决定。"]],
     controlNote: "新漫画默认显示原图。插件使用常规方式翻译漫画图片，需要时再选择渠道。",
     privacyTitle: "免费阅读，按需选择翻译套餐。", privacyBody: "NodeLane Comics 提供免费插件与按账户计量的云端翻译服务。套餐受速率与服务容量限制；订阅前可查看实时购买状态、完整权益和账单规则。",
-    privacy: '隐私政策', pricing: "对比 Free 与 Lite", ctaTitle: "从下一页，读懂更多。", ctaBody: "为桌面 Chrome、Edge 或 Firefox 安装 NodeLane Comics。",
+    privacy: '隐私政策', pricing: "对比 Free 与 PLUS / Pro", ctaTitle: "从下一页，读懂更多。", ctaBody: "为桌面 Chrome、Edge 或 Firefox 安装 NodeLane Comics。",
   };
 
 export default copy;

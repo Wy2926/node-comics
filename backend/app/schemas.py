@@ -59,6 +59,10 @@ class PurchaseQuotaResponse(BaseModel):
     next_expiry_at: str | None
 
 
+class SubscriptionQuotaResponse(PurchaseQuotaResponse):
+    unlimited: bool
+
+
 class QuotaPurchaseResponse(QuotaBucketResponse):
     order_id: str
     service_plan: str
@@ -77,6 +81,8 @@ class EntitlementsResponse(BaseModel):
     plan: str
     service_plan: str
     purchase_quota: PurchaseQuotaResponse
+    free_quota: PurchaseQuotaResponse
+    subscription_quota: SubscriptionQuotaResponse
     plus_started_at: str | None
     plus_expires_at: str | None
     gift: GiftMembershipResponse | None
@@ -199,7 +205,7 @@ class TranslationResponse(BaseModel):
     id: str
     state: Literal['needs_input', 'queued', 'running', 'succeeded', 'failed', 'needs_attention']
     execution_resolved: bool = False
-    mode: Literal['classic', 'redraw']
+    mode: Literal['classic']
     target_language: str
     image_sha256: str
     input_expires_at: str | None

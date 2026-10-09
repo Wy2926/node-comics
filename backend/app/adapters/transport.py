@@ -1,11 +1,27 @@
 """HTTPX transport that connects only to an address checked at the socket boundary."""
 import ipaddress
 import socket
+import time
 import ssl
 from contextlib import contextmanager
 import httpcore
 import httpx
 from ..errors import ProcessingError
+
+
+def read_bounded(response, limit, deadline=None):
+    """Bound upstream response bytes and elapsed time before parsing JSON."""
+    declared = response.headers.get('content-length')
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise ProcessingError('INVALID_PROVIDER_OUTPUT', '供应商响应过大')
+    data = bytearray()
+    for chunk in response.iter_bytes():
+        if deadline and time.monotonic() > deadline:
+            raise ProcessingError('UPSTREAM_OUTCOME_UNKNOWN', '请求超过最长处理时限，结果待核实', unknown=True)
+        data.extend(chunk)
+        if len(data) > limit:
+            raise ProcessingError('INVALID_PROVIDER_OUTPUT', '供应商响应过大')
+    return bytes(data)
 
 
 @contextmanager

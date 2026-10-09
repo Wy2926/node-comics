@@ -32,19 +32,19 @@ def grant_term(db, user, sub, price, kind, start, end, invoice_id=None):
     db.add(BillingTerm(id=term_id, owner_id=user.id, subscription_id=sub.id, price_id=price.id,
         invoice_id=invoice_id, kind=kind, starts_at=start, ends_at=end))
     db.flush()
-    count = 12 if kind == 'paid' and price.interval == 'year' else 1
-    pages = revision.trial_redraw_pages if kind == 'trial' else revision.monthly_redraw_pages
-    if pages == 0:
-        return  # The granted term provides classic access without empty quota buckets.
+    count = {'month': 1, 'quarter': 3, 'year': 12}[price.interval] if kind == 'paid' else 1
+    pages = revision.trial_classic_pages if kind == 'trial' else revision.monthly_classic_pages
+    if pages is None or pages == 0:
+        return  # Unlimited access and zero-page terms do not need a quota bucket.
     # Compute every boundary from the original anchor: Jan 31 -> Feb 28 -> Mar 31.
     # Future buckets exist durably but cannot be spent before their starts_at.
     for index in range(count):
         period_start = month_boundary(start, index, 'UTC')
         period_end = end if index == count-1 else month_boundary(start, index+1, 'UTC')
         stripe.require(period_start < period_end <= end, 'STRIPE_PERIOD_MISSING')
-        key = f'term:{term_id}:{index}'
+        key = f'term:{term_id}:classic:{index}'
         db.add(QuotaPeriod(id=digest([user.id, key]), owner_id=user.id, billing_term_id=term_id,
-            kind=MONTHLY, mode='redraw', source='subscription', source_key=key,
+            kind=MONTHLY, mode='classic', source='subscription', source_key=key,
             starts_at=period_start, ends_at=period_end, granted=pages, used=0, reserved=0,
             grants_access=False, note=f'{revision.name} · ' + ('试用' if kind == 'trial' else f'月额度 {index+1}/{count}')))
     db.flush()
@@ -91,7 +91,7 @@ def apply_invoice(db, user, sub, invoice):
         if (invoice.get('billing_reason') == 'subscription_create' and invoice['total'] == 0
                 and start == sub.trial_starts_at and end == sub.trial_ends_at):
             continue  # A 27-30 day trial must not be mistaken for a paid month.
-        low, high = (27, 32) if price.interval == 'month' else (364, 367)
+        low, high = {'month': (27, 32), 'quarter': (89, 93), 'year': (364, 367)}[price.interval]
         if timedelta(days=low) <= end-start <= timedelta(days=high):
             candidates.append((start, end))
         else:

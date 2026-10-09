@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Hủy trước lần gia hạn tiếp theo."
   },
   "publishedPricing": {
-    "label": "Giá Lite niêm yết · Đô la Mỹ (USD)",
+    "label": "Giá PLUS / Pro niêm yết · Đô la Mỹ (USD)",
     "monthly": "Hàng tháng",
     "yearly": "Hàng năm",
     "annualPayment": "Thanh toán một lần mỗi năm. Tự động gia hạn.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Mô hình dịch",
       "free": "GPT 6 Luna và các mô hình tương tự",
-      "lite": "Gemini 3.8 Flash và các mô hình tương tự"
+      "lite": "Haiku 5.5 và các mô hình tương tự"
     },
     "feature": "Tính năng và lợi ích",
-    "highlights": "DỊCH VỚI Lite",
+    "highlights": "DỊCH VỚI PLUS / Pro",
     "reading": {
       "label": "Đọc",
       "free": "Tất cả các tính năng đọc cốt lõi",

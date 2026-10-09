@@ -75,12 +75,12 @@ def validate_next():
     return lease.id
 
 
-def grant_redraw(client, auth, pages):
+def grant_free(client, auth, pages):
     from app.models import now
     user_id = client.get('/v1/me', headers=auth).json()['user']['id']
     response = client.post(f'/v1/admin/users/{user_id}/quota-grants',
         headers={**login(client, 'admin'), 'Idempotency-Key': f'grant-{user_id}'},
-        json={'mode': 'redraw', 'pages': pages, 'expires_at': (now() + timedelta(days=2)).isoformat() + 'Z', 'note': 'isolated grant'})
+        json={'mode': 'classic', 'pages': pages, 'expires_at': (now() + timedelta(days=2)).isoformat() + 'Z', 'note': 'isolated grant'})
     assert response.status_code == 201, response.text
 
 

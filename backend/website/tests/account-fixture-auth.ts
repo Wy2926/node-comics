@@ -1,12 +1,12 @@
 import type {Billing,BillingOffer} from '../src/lib/billing';
 import {ApiError} from '../src/lib/auth-session';
 export {ApiError};
-const plusMonth:BillingOffer={id:'old-plus-month',name:'PLUS 示例',plan_id:'plus',plan_revision_id:'plus-v1',currency:'usd',unit_amount:999,interval:'month',monthly_redraw_pages:300,trial_days:7,trial_redraw_pages:30,channels:[{provider:'stripe',binding_id:'stripe-fixture',trial_days:7,trial_redraw_pages:30},{provider:'creem',binding_id:'creem-fixture',trial_days:7,trial_redraw_pages:30}]};
+const plusMonth:BillingOffer={id:'old-plus-month',name:'PLUS 示例',plan_id:'plus',plan_revision_id:'plus-v1',currency:'usd',unit_amount:999,interval:'month',monthly_classic_pages:300,trial_days:7,trial_classic_pages:30,channels:[{provider:'stripe',binding_id:'stripe-fixture',trial_days:7,trial_classic_pages:30},{provider:'creem',binding_id:'creem-fixture',trial_days:7,trial_classic_pages:30}]};
 const plusAnnual:BillingOffer={...plusMonth,id:'old-plus-year',unit_amount:9999,interval:'year'};
-const month:BillingOffer={...plusMonth,id:'fixture-month',name:'Lite',plan_id:'lite',plan_revision_id:'lite-v1',unit_amount:599,monthly_redraw_pages:0,hourly_image_limit:1200,trial_redraw_pages:0,channels:plusMonth.channels.map(channel=>({...channel,trial_redraw_pages:0}))};
+const month:BillingOffer={...plusMonth,id:'fixture-month',name:'Lite',plan_id:'lite',plan_revision_id:'lite-v1',unit_amount:599,monthly_classic_pages:null,hourly_image_limit:1200,trial_classic_pages:null,channels:plusMonth.channels.map(channel=>({...channel,trial_classic_pages:null}))};
 const annual:BillingOffer={...month,id:'fixture-year',unit_amount:5999,interval:'year'};
-const pack:BillingOffer={...month,id:'fixture-pack',name:'Lite 100 页',plan_id:'pages',service_plan_id:'lite',interval:'once',quota_pages:100,quota_validity_days:null,trial_days:0,channels:month.channels.map(channel=>({...channel,trial_days:0}))};
-const entitlements={plan:'free',plus_expires_at:null,image_rate_limit:{limit:10},modes:{classic:{unlimited:false,allowed:true,quota:{available:30,granted:30,reserved:0}},redraw:{unlimited:false,allowed:false,quota:null}}};
+const pack:BillingOffer={...month,id:'fixture-pack',name:'Lite 100 页',plan_id:'pages',service_plan_id:'lite',interval:'once',quota_pages:100,quota_validity_days:null,monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,channels:month.channels.map(channel=>({...channel,trial_days:0,trial_classic_pages:0}))};
+const entitlements={plan:'free',plus_expires_at:null,image_rate_limit:{limit:10},modes:{classic:{unlimited:false,allowed:true,quota:{available:30,granted:30,reserved:0}}}};
 const parameters=new URLSearchParams(location.search);
 const scenario=parameters.get('scenario');
 const pending=parameters.has('pending')||scenario==='subscription-pending';

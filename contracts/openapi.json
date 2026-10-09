@@ -3609,7 +3609,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__billing_admin__ReconcileRequest"
+                "$ref": "#/components/schemas/ReconcileRequest"
               }
             }
           }
@@ -4815,10 +4815,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "classic",
-                    "redraw"
-                  ],
+                  "const": "classic",
                   "type": "string"
                 },
                 {
@@ -5907,10 +5904,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "classic",
-                    "redraw"
-                  ],
+                  "const": "classic",
                   "type": "string"
                 },
                 {
@@ -6785,199 +6779,6 @@
         }
       }
     },
-    "/v1/admin/providers": {
-      "get": {
-        "summary": "Provider List",
-        "operationId": "provider_list_v1_admin_providers_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/admin/providers/{provider_id}": {
-      "put": {
-        "summary": "Provider Put",
-        "operationId": "provider_put_v1_admin_providers__provider_id__put",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProviderConfig"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "summary": "Provider Toggle",
-        "operationId": "provider_toggle_v1_admin_providers__provider_id__patch",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProviderToggle"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/providers/{provider_id}/test": {
-      "post": {
-        "summary": "Provider Test",
-        "operationId": "provider_test_v1_admin_providers__provider_id__test_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          },
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_provider_test_v1_admin_providers__provider_id__test_post"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/admin/jobs": {
       "get": {
         "summary": "Admin Jobs",
@@ -7292,114 +7093,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/jobs/{job_id}/reconcile": {
-      "post": {
-        "summary": "Reconcile",
-        "operationId": "reconcile_v1_admin_jobs__job_id__reconcile_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/app__admin_api__ReconcileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/jobs/{job_id}/reconcile-image": {
-      "post": {
-        "summary": "Reconcile Image",
-        "operationId": "reconcile_image_v1_admin_jobs__job_id__reconcile_image_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_reconcile_image_v1_admin_jobs__job_id__reconcile_image_post"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
               }
             }
           },
@@ -7747,46 +7440,6 @@
         ],
         "title": "BindingRequest"
       },
-      "Body_provider_test_v1_admin_providers__provider_id__test_post": {
-        "properties": {
-          "image": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "Image"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language",
-            "default": "zh-Hans"
-          }
-        },
-        "type": "object",
-        "required": [
-          "image"
-        ],
-        "title": "Body_provider_test_v1_admin_providers__provider_id__test_post"
-      },
-      "Body_reconcile_image_v1_admin_jobs__job_id__reconcile_image_post": {
-        "properties": {
-          "image": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "Image"
-          },
-          "note": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "image",
-          "note"
-        ],
-        "title": "Body_reconcile_image_v1_admin_jobs__job_id__reconcile_image_post"
-      },
       "CampaignDurationRequest": {
         "properties": {
           "ends_at": {
@@ -7851,10 +7504,7 @@
           },
           "mode": {
             "type": "string",
-            "enum": [
-              "classic",
-              "redraw"
-            ],
+            "const": "classic",
             "title": "Mode"
           },
           "pages": {
@@ -8062,7 +7712,7 @@
             "type": "string",
             "enum": [
               "classic_daily",
-              "redraw_monthly"
+              "classic_monthly"
             ],
             "title": "Kind"
           },
@@ -8188,6 +7838,12 @@
           "purchase_quota": {
             "$ref": "#/components/schemas/PurchaseQuotaResponse"
           },
+          "free_quota": {
+            "$ref": "#/components/schemas/PurchaseQuotaResponse"
+          },
+          "subscription_quota": {
+            "$ref": "#/components/schemas/SubscriptionQuotaResponse"
+          },
           "plus_started_at": {
             "anyOf": [
               {
@@ -8262,6 +7918,8 @@
           "plan",
           "service_plan",
           "purchase_quota",
+          "free_quota",
+          "subscription_quota",
           "plus_started_at",
           "plus_expires_at",
           "gift",
@@ -8495,10 +8153,7 @@
         "properties": {
           "mode": {
             "type": "string",
-            "enum": [
-              "classic",
-              "redraw"
-            ],
+            "const": "classic",
             "title": "Mode"
           },
           "pages": {
@@ -8671,156 +8326,6 @@
           "content_type"
         ],
         "title": "ImageDescriptor"
-      },
-      "JobResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "input_asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input Asset Id"
-          },
-          "image_sha256": {
-            "type": "string",
-            "title": "Image Sha256"
-          },
-          "output_asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output Asset Id"
-          },
-          "result_available": {
-            "type": "boolean",
-            "title": "Result Available"
-          },
-          "result_expired": {
-            "type": "boolean",
-            "title": "Result Expired"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "phase": {
-            "type": "string",
-            "title": "Phase"
-          },
-          "quota_pages": {
-            "type": "integer",
-            "title": "Quota Pages"
-          },
-          "quota_kind": {
-            "type": "string",
-            "title": "Quota Kind"
-          },
-          "quota_period_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quota Period Id"
-          },
-          "settlement": {
-            "type": "string",
-            "title": "Settlement"
-          },
-          "version": {
-            "type": "integer",
-            "title": "Version"
-          },
-          "reused": {
-            "type": "boolean",
-            "title": "Reused",
-            "default": false
-          },
-          "cancel_requested": {
-            "type": "boolean",
-            "title": "Cancel Requested"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ErrorInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "quality_flags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Quality Flags"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At"
-          },
-          "completed_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "input_asset_id",
-          "image_sha256",
-          "output_asset_id",
-          "result_available",
-          "result_expired",
-          "mode",
-          "target_language",
-          "status",
-          "phase",
-          "quota_pages",
-          "quota_kind",
-          "quota_period_id",
-          "settlement",
-          "version",
-          "cancel_requested",
-          "error",
-          "quality_flags",
-          "created_at",
-          "completed_at"
-        ],
-        "title": "JobResponse"
       },
       "LanguageCapability": {
         "properties": {
@@ -9271,6 +8776,7 @@
             "type": "string",
             "enum": [
               "month",
+              "quarter",
               "year",
               "once"
             ],
@@ -9315,11 +8821,18 @@
             "minLength": 1,
             "title": "Name"
           },
-          "monthly_redraw_pages": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Monthly Redraw Pages"
+          "monthly_classic_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Classic Pages"
           },
           "hourly_image_limit": {
             "anyOf": [
@@ -9372,11 +8885,19 @@
             "minimum": 0.0,
             "title": "Trial Days"
           },
-          "trial_redraw_pages": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Trial Redraw Pages"
+          "trial_classic_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial Classic Pages",
+            "default": 0
           },
           "id": {
             "type": "string",
@@ -9397,151 +8918,11 @@
         "type": "object",
         "required": [
           "name",
-          "monthly_redraw_pages",
           "trial_days",
-          "trial_redraw_pages",
           "id",
           "revision_id"
         ],
         "title": "ProductRequest"
-      },
-      "ProviderConfig": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 100,
-            "title": "Label",
-            "default": "图片编辑服务"
-          },
-          "protocol": {
-            "type": "string",
-            "title": "Protocol",
-            "default": "openai_images"
-          },
-          "base_url": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Base Url"
-          },
-          "credential_ref": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]{0,100}$",
-            "title": "Credential Ref",
-            "default": "OPENAI_API_KEY"
-          },
-          "model": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Model"
-          },
-          "image_field": {
-            "type": "string",
-            "title": "Image Field",
-            "default": "image"
-          },
-          "user_agent": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "User Agent",
-            "default": "NodeComics/0.1"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            },
-            "type": "object",
-            "title": "Parameters"
-          },
-          "allowed_parameters": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Allowed Parameters"
-          },
-          "timeout_seconds": {
-            "type": "integer",
-            "maximum": 1800.0,
-            "minimum": 10.0,
-            "title": "Timeout Seconds",
-            "default": 600
-          },
-          "max_bytes": {
-            "type": "integer",
-            "maximum": 52428800.0,
-            "minimum": 1024.0,
-            "title": "Max Bytes",
-            "default": 20971520
-          },
-          "max_pixels": {
-            "type": "integer",
-            "maximum": 100000000.0,
-            "minimum": 1.0,
-            "title": "Max Pixels",
-            "default": 24000000
-          },
-          "max_dimension": {
-            "type": "integer",
-            "maximum": 32768.0,
-            "minimum": 32.0,
-            "title": "Max Dimension",
-            "default": 8192
-          },
-          "input_formats": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Input Formats"
-          },
-          "download_hosts": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Download Hosts"
-          },
-          "concurrency": {
-            "type": "integer",
-            "maximum": 32.0,
-            "minimum": 1.0,
-            "title": "Concurrency",
-            "default": 2
-          },
-          "enabled": {
-            "type": "boolean",
-            "title": "Enabled",
-            "default": true
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "base_url",
-          "model"
-        ],
-        "title": "ProviderConfig"
       },
       "ProviderToggle": {
         "properties": {
@@ -9911,6 +9292,27 @@
         ],
         "title": "QuotaPurchasesResponse"
       },
+      "ReconcileRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1,
+                "pattern": "^[A-Za-z][A-Za-z0-9_]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReconcileRequest"
+      },
       "Registration": {
         "properties": {
           "protocol_version": {
@@ -10001,12 +9403,6 @@
             "minimum": 0.0,
             "title": "Free Daily Pages"
           },
-          "plus_monthly_redraw_pages": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Plus Monthly Redraw Pages"
-          },
           "free_images_per_minute": {
             "type": "integer",
             "maximum": 10000.0,
@@ -10090,7 +9486,6 @@
         "type": "object",
         "required": [
           "free_daily_pages",
-          "plus_monthly_redraw_pages",
           "free_images_per_minute",
           "plus_images_per_minute",
           "upload_user_concurrency",
@@ -10146,11 +9541,18 @@
             "minLength": 1,
             "title": "Name"
           },
-          "monthly_redraw_pages": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Monthly Redraw Pages"
+          "monthly_classic_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Classic Pages"
           },
           "hourly_image_limit": {
             "anyOf": [
@@ -10203,11 +9605,19 @@
             "minimum": 0.0,
             "title": "Trial Days"
           },
-          "trial_redraw_pages": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Trial Redraw Pages"
+          "trial_classic_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial Classic Pages",
+            "default": 0
           },
           "id": {
             "type": "string",
@@ -10221,9 +9631,7 @@
         "type": "object",
         "required": [
           "name",
-          "monthly_redraw_pages",
           "trial_days",
-          "trial_redraw_pages",
           "id"
         ],
         "title": "RevisionRequest"
@@ -10243,6 +9651,51 @@
           "token"
         ],
         "title": "SessionInput"
+      },
+      "SubscriptionQuotaResponse": {
+        "properties": {
+          "granted": {
+            "type": "integer",
+            "title": "Granted"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "next_expiry_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Expiry At"
+          },
+          "unlimited": {
+            "type": "boolean",
+            "title": "Unlimited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "granted",
+          "used",
+          "reserved",
+          "available",
+          "next_expiry_at",
+          "unlimited"
+        ],
+        "title": "SubscriptionQuotaResponse"
       },
       "SupportRequestBody": {
         "properties": {
@@ -10466,10 +9919,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": [
-                  "classic",
-                  "redraw"
-                ]
+                "const": "classic"
               },
               {
                 "type": "null"
@@ -10586,10 +10036,7 @@
           },
           "mode": {
             "type": "string",
-            "enum": [
-              "classic",
-              "redraw"
-            ],
+            "const": "classic",
             "title": "Mode"
           },
           "target_language": {
@@ -10862,18 +10309,13 @@
           "classic": {
             "type": "integer",
             "title": "Classic"
-          },
-          "redraw": {
-            "type": "integer",
-            "title": "Redraw"
           }
         },
         "type": "object",
         "required": [
           "date",
           "delivered",
-          "classic",
-          "redraw"
+          "classic"
         ],
         "title": "UsageDay"
       },
@@ -11116,63 +10558,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "app__admin_api__ReconcileRequest": {
-        "properties": {
-          "resolution": {
-            "type": "string",
-            "enum": [
-              "failed",
-              "succeeded"
-            ],
-            "title": "Resolution"
-          },
-          "output_asset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output Asset Id"
-          },
-          "note": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Note"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "resolution",
-          "note"
-        ],
-        "title": "ReconcileRequest"
-      },
-      "app__billing_admin__ReconcileRequest": {
-        "properties": {
-          "session_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1,
-                "pattern": "^[A-Za-z][A-Za-z0-9_]+$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Session Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "ReconcileRequest"
       }
     },
     "securitySchemes": {

@@ -48,17 +48,19 @@ def redis_client(monkeypatch, isolated_identity_environment):
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
+def catalog_products():
+    return [dict(id='plus', name='PLUS', monthly_classic_pages=None, trial_days=7,
+        trial_classic_pages=None, prices={'month': 999, 'year': 9999})]
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch, catalog_products):
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "objects"))
     monkeypatch.setenv("DEV_AUTH", "true")
     monkeypatch.setenv("DEV_AUTH_SECRET", "isolated-tests-signing-key-never-used-in-production")
-    monkeypatch.setenv("OPENAI_API_KEY", "isolated-test-provider-key")
-    monkeypatch.setenv("OPENAI_BASE_URL", "https://provider.example/v1")
-    monkeypatch.setenv("OPENAI_MODEL", "gpt-image-2")
-    monkeypatch.setenv("PROVIDERS_JSON", "")
-    monkeypatch.setenv("CLASSIC_ENABLED", "false")
+    monkeypatch.setenv("CLASSIC_ENABLED", "true")
     from app.config import settings
     from app.db import engine
     settings.cache_clear()
@@ -70,6 +72,10 @@ def client(tmp_path, monkeypatch):
     from app.db import session_factory
     from translation_fixtures import configure_text_provider
     from app.migrate import migrate
+    # Billing protocol tests use their own explicit sample catalog, not public pricing.
+    if catalog_products is not None:
+        from app import billing_catalog
+        monkeypatch.setattr(billing_catalog, 'DEFAULT_CATALOG', {'currency': 'usd', 'products': catalog_products})
     migrate()
     with TestClient(app, headers={'X-Translation-Protocol': 'overlay-v1'}) as test_client:
         with session_factory()() as db:
@@ -94,7 +100,7 @@ def login(client, name="alice"):
     return {"Authorization": f"Bearer {response.json()['access_token']}", "X-Translation-Protocol": "overlay-v1"}
 
 
-def login_plus(client, name="alice"):
+def login_plus(client, name="alice", *, pages=None):
     """Explicit PLUS fixture for supplier/lifecycle tests, without unrelated audit rows."""
     from sqlalchemy import select
     from app.db import session_factory
@@ -107,14 +113,15 @@ def login_plus(client, name="alice"):
             user.membership_id = uid()
             user.plus_started_at = now()
             user.plus_expires_at = user.plus_started_at + timedelta(days=360)
-            user.plus_monthly_pages = 300
+            user.plus_monthly_pages = pages
             db.commit()
     return auth
 
 
-def quota_usage(client, auth, mode="redraw"):
+def quota_usage(client, auth, mode="classic"):
     data = client.get("/v1/me/usage", headers=auth).json()
-    return {**data["entitlements"]["modes"][mode]["quota"], "items": data["items"]}
+    quota = data['entitlements']['modes'][mode]['quota'] or data['entitlements']['free_quota']
+    return {**quota, "items": data["items"]}
 
 
 def upload(client, headers, png):
@@ -160,7 +167,7 @@ def request_for_job(client, headers, job_id):
             TranslationRequest.job_id == job_id))
 
 
-def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="redraw", **fields):
+def submit_asset(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="classic", **fields):
     from app.db import session_factory
     from app.models import Asset
     with session_factory()() as db:
@@ -210,7 +217,7 @@ def internal_job_response(client, headers, response):
     return httpx.Response(response.status_code, json=data)
 
 
-def create(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="redraw", **fields):
+def create(client, headers, asset_id, key="operation-1", language="zh-Hans", mode="classic", **fields):
     return internal_job_response(client, headers,
         submit_asset(client, headers, asset_id, key, language, mode, **fields))
 
@@ -224,12 +231,12 @@ def inspect_job(job_id):
         return job_json(db, db.get(Job, job_id))
 
 
-def control_node(db, stage="redraw"):
+def control_node(db, stage="page"):
     from app.queue_models import ComputeNode
     node_id = "test-control-" + stage
     if not db.get(ComputeNode, node_id):
         db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id=node_id, name=node_id, resource_id=node_id, capabilities=[stage], capacity=1,
-                           engine_version="control", device="network"))
+                           engine_version="test-v3" if stage == "page" else "control", device="fixture"))
         db.flush()
     return node_id
 
@@ -240,17 +247,53 @@ def claim_job(job_id):
     from app.scheduler import claim_stage
     with session_factory()() as db:
         job = db.get(Job, job_id)
-        node_id = control_node(db, "redraw" if job.mode == "redraw" else "text")
+        node_id = control_node(db, "page")
         lease = claim_stage(db, node_id)
         db.commit()
         return lease.id if lease else None
 
 
+def fixture_output(original):
+    """Replaceable artifact bytes for isolated storage/access test setup."""
+    return original
+
+
 def run_job(job_id):
-    from app.workers import run_control_stage
-    lease_id = claim_job(job_id)
-    if lease_id:
-        run_control_stage(lease_id)
+    """Seed an isolated completed classic artifact for access/storage tests.
+
+    This is not a compute/provider integration test. test_compute_v3 exercises
+    the actual analysis, text, delivery, fencing and recovery protocol.
+    """
+    from app.assets import create_asset, read_asset
+    from app.db import session_factory
+    from app.models import Asset, Job
+    from app.scheduler import lock_scheduler, release_lease
+    from app.queue_models import ExecutionLease, JobStage
+    from app.workers import finish_job
+    from app.errors import ProcessingError
+    from sqlalchemy import select
+    with session_factory()() as db:
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if job.status not in {'queued', 'running'}:
+            return
+        if not job.cancel_requested and not job.discard_output:
+            source = db.get(Asset, job.input_asset_id)
+            try:
+                data = fixture_output(read_asset(source))
+            except ProcessingError as error:
+                finish_job(db, job, 'failed', error=error)
+                db.commit()
+                return
+            output = create_asset(db, job.owner_id, data, kind='classic', parent_id=source.id)
+            job.output_asset_id = output.id
+        for stage in db.scalars(select(JobStage).where(JobStage.job_id == job_id)):
+            stage.status = 'succeeded'
+        for lease in db.scalars(select(ExecutionLease).where(
+                ExecutionLease.job_id == job_id, ExecutionLease.completed_at.is_(None))):
+            release_lease(db, lease, 'succeeded')
+        finish_job(db, job, 'cancelled' if job.cancel_requested or job.discard_output else 'succeeded')
+        db.commit()
 
 
 def png_variant(png, index):
@@ -276,10 +319,7 @@ def configure_system_limits(**values):
 
 
 def complete(client, auth, asset, png, monkeypatch, key="first"):
-    """Complete one isolated redraw generation for result/feedback tests."""
-    import app.workers as workers
-    from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+    """Seed one isolated classic artifact for result/feedback tests."""
     job = create(client, auth, asset, key=key).json()
     run_job(job['id'])
     return inspect_job(job['id'])

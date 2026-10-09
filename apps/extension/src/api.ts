@@ -1,4 +1,4 @@
-import type {BillingStatus,BillingProvider,BillingCatalog} from './billing';
+import type {BillingStatus,BillingProvider} from './billing';
 import {msg} from './i18n/runtime';
 import type { Capabilities, Entitlements, Usage, User, UsageSummary, Paginated, FeedbackIssue, FeedbackRecord, TranslationInput, TranslationSnapshot, TranslationBatch } from './types';
 import type { AuthConfig } from './auth/oidc';
@@ -77,9 +77,7 @@ export class Api {
   usageSummary(days:number,timezone:string,force=false) {return this.cached<UsageSummary>(`/v1/me/usage/summary?days=${days}&timezone=${encodeURIComponent(timezone)}`,force);}
   feedback(jobId:string,body:{issues:FeedbackIssue[];comment:string;},key:string) {return this.request<FeedbackRecord>(`/v1/translations/${encodeURIComponent(jobId)}/feedback`,{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify(body)});}
   feedbackList(offset=0) {return this.request<Paginated<FeedbackRecord>>(`/v1/me/feedback?offset=${offset}&limit=20`);}
-  billingCatalog(force=false){return this.cached<BillingCatalog>('/v1/billing/catalog',force);}
   billingStatus(force=false){return this.cached<BillingStatus>('/v1/billing/status',force);}
-  startCheckout(priceId:string,provider:BillingProvider){return this.request<{checkout_url:string;trial:boolean;environment:'test'|'live';provider:BillingProvider}>('/v1/billing/checkouts',{method:'POST',body:JSON.stringify({price_id:priceId,provider})});}
   billingPortal(provider:BillingProvider){return this.request<{url:string;provider:BillingProvider}>('/v1/billing/portal',{method:'POST',body:JSON.stringify({provider})});}
   async cancelRenewal(provider:BillingProvider){const result=await this.request<BillingStatus>('/v1/billing/cancel-renewal',{method:'POST',body:JSON.stringify({provider})});cacheValue(this.cacheKey('/v1/billing/status'),result);return result;}
   async syncBilling(){const result=await this.request<{billing:BillingStatus;entitlements:Entitlements}>('/v1/billing/sync',{method:'POST'});this.rememberEntitlements(result.entitlements);cacheValue(this.cacheKey('/v1/billing/status'),result.billing);return result;}

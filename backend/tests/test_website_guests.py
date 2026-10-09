@@ -81,7 +81,7 @@ def test_origin_protocol_and_proof_are_all_required(visitor):
     url = '/v1/guest/translations/' + str(uuid4())
     assert client.put(url, json=payload, headers={**headers,'X-Translation-Protocol':'wrong'}).status_code == 409
     assert client.put(url, json=payload, headers={**headers,'X-Turnstile-Token':'bad'}).status_code == 403
-    assert submit(visitor, mode='redraw').status_code == 403
+    assert submit(visitor, mode='removed-mode').status_code == 422
 
 
 def test_durable_five_attempts_replay_conflict_and_cancel(visitor):

@@ -22,7 +22,7 @@ class QuotaCampaign(Base):
     created_by: Mapped[str] = mapped_column(ForeignKey('users.id'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (
-        CheckConstraint("mode IN ('classic', 'redraw')"),
+        CheckConstraint("mode = 'classic'", name='ck_quota_campaigns_classic'),
         CheckConstraint("audience IN ('all', 'existing', 'new')"),
         CheckConstraint('pages BETWEEN 1 AND 1000000'),
         CheckConstraint('validity_days IS NULL OR validity_days BETWEEN 1 AND 36500'),

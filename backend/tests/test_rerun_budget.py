@@ -7,8 +7,8 @@ from conftest import create, login_plus as login, upload, submit_asset, quota_us
 
 def done(client, auth, png, monkeypatch):
     from app import workers
-    from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     original = submit_asset(client, auth, upload(client, auth, png)).json()
     run_job(request_record(client, auth, original['id']).job_id)
     return client.get('/v1/translations/' + original['id'], headers=auth).json()
@@ -21,7 +21,8 @@ def regenerate(client, auth, previous, key='new', **fields):
 
 def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client, png, monkeypatch):
     from app.db import session_factory
-    from app.models import Job, Ledger, Provider, User, now
+    from app.models import Job, Ledger, User, now
+    from app.translation_models import TranslationProvider
     auth = login(client)
     original = done(client, auth, png, monkeypatch)
     first = regenerate(client, auth, original, priority='prefetch')
@@ -31,7 +32,7 @@ def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client,
     with session_factory()() as db:
         assert db.get(Job,revised_job).version > db.get(Job,original_job).version
         db.get(User,db.get(Job,original_job).owner_id).plus_expires_at = now()-timedelta(seconds=1)
-        db.get(Provider,'default').enabled = False
+        db.scalar(select(TranslationProvider)).enabled = False
         db.commit()
     repeat = regenerate(client,auth,original,priority='current')
     assert repeat.status_code == 202 and repeat.json()['id'] == first.json()['id']
@@ -43,6 +44,8 @@ def test_regeneration_uses_current_quota_and_replay_preserves_acceptance(client,
 def test_regeneration_checks_membership_before_creating_work(client, png, monkeypatch):
     from app.db import session_factory
     from app.models import User, now
+    from conftest import configure_system_limits
+    configure_system_limits(free_daily_pages=1)
     auth = login(client)
     original = done(client, auth, png, monkeypatch)
     owner = client.get('/v1/me',headers=auth).json()['user']['id']
@@ -50,13 +53,13 @@ def test_regeneration_checks_membership_before_creating_work(client, png, monkey
         db.get(User,owner).plus_expires_at = now()-timedelta(seconds=1)
         db.commit()
     response = regenerate(client,auth,original)
-    assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
+    assert response.status_code == 403 and response.json()['error']['code'] == 'DAILY_QUOTA_EXHAUSTED'
     assert client.get('/v1/translations/'+original['id'],headers=auth).json()['state']=='succeeded'
 
 
 @pytest.mark.parametrize('extra', [
     {'mode':'classic'}, {'target_language':'en'}, {'image':{'sha256':'a'*64,'byte_size':1,'content_type':'image/png'}},
-    {'retry_of':'11111111-1111-4111-8111-111111111111'}, {'max_quota_pages':0}, {'expected_kind':'redraw_grant'}])
+    {'retry_of':'11111111-1111-4111-8111-111111111111'}, {'max_quota_pages':0}, {'expected_kind':'classic_grant'}])
 def test_regeneration_rejects_mixed_intent_and_removed_controls(client,png,monkeypatch,extra):
     auth = login(client)
     original = done(client,auth,png,monkeypatch)

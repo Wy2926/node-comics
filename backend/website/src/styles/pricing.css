@@ -1,4 +1,17 @@
-/* A single semantic table keeps benefit rows aligned across both plans. */
+/* Shared pricing tokens cover both homepage comparison and catalog cards. */
+.pricing-comparison .subscription-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 20px;}
+.pricing-comparison .subscription-card {min-width: 0; padding: 28px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface-soft); display: flex; flex-direction: column; gap: 14px;}
+.pricing-comparison .subscription-card.paid {border-color: var(--accent);}
+.pricing-comparison .subscription-card h2 {font-size: 1.8rem; margin: 0;}
+.pricing-comparison .subscription-card .price {display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 2.5rem; font-variant-numeric: tabular-nums; margin: 10px 0;}
+.pricing-comparison .subscription-card .price-unit {font-size: .8rem; color: var(--muted);}
+.pricing-comparison .subscription-allowance {font-size: 1.15rem; color: var(--accent); min-height: 3em;}
+.pricing-comparison .subscription-card .button {width: 100%; justify-content: center; white-space: normal; text-align: center;}
+.pricing-comparison .subscription-card .trial-note {color: var(--muted); font-size: .76rem; min-height: 4em; line-height: 1.7;}
+.pricing-comparison .subscription-features {list-style: none; margin: auto 0 0; padding: 0;}
+.pricing-comparison .subscription-features li {padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; font-size: .85rem;}
+.pricing-comparison .subscription-features li>span {color: var(--muted);}
+.pricing-comparison .subscription-features strong {font-weight: 500;}
 .pricing-comparison { max-width: 1180px; margin: 0 auto 48px; }
 .pricing-comparison > .billing-cycle-picker { margin: 0 auto 24px; }
 .pricing-comparison .plan-comparison { width: 100%; table-layout: fixed; border-collapse: collapse; background: transparent; font-size: .9rem; line-height: 1.6; }

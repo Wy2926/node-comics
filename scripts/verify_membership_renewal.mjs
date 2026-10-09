@@ -49,12 +49,12 @@ try{
   await page.getByRole('alert').waitFor();assert(await page.getByRole('button',{name:'取消自动续费',exact:true}).isEnabled());await screenshot('gift-cancel-lost');
   await page.getByRole('button',{name:'刷新权益',exact:true}).click();await page.getByText('已关闭自动续费，已付款及赠送权益保留。',{exact:true}).waitFor();
   await visit('gift-only');
-  await page.getByText('赠送结束后可开通订阅。',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'前往定价页面',exact:true}).getAttribute('href'),'https://comics.nodelane.net/pricing/');
   assert.equal(await page.getByRole('button',{name:'前往安全结账',exact:true}).count(),0);
   assert.equal(await page.getByRole('button',{name:'管理订阅',exact:true}).count(),0);
   await screenshot('gift-only');
   await page.setViewportSize({width:390,height:844});await visit('gift-active');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await screenshot('gift-mobile');
   assert.deepEqual(errors,[]);
-  console.log('PASS: pending/scheduled/active gift, deferred billing date, cancellation confirmation and refresh, gift-only checkout block, narrow viewport; no external payment requests. Screenshots: '+output);
+  console.log('PASS: pending/scheduled/active gift, deferred billing date, cancellation confirmation and refresh, shared pricing destination, narrow viewport; no external payment requests. Screenshots: '+output);
 }finally{await browser.close();}

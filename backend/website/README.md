@@ -1,6 +1,6 @@
 # NodeLane 官网
 
-Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，用深色左右分栏、单一主安装按钮、真实阅读对照与 Free／Lite 突出产品重点；完整功能、FAQ 与条款留在独立页面。网页图片翻译由首屏和页脚次级链接进入 `/translate/`，流程为批量上传（每次最多 10 张）、选择目标语言、翻译、下载。文件列表显示进度、失败重试与恢复；支持逐张下载及将当前列表已完成译图打包为 ZIP，不提供预览、缩放或原译对照。本地记录按账户隔离，存储说明折叠展示。ZIP 库按需加载，逐张读取结果并直接打包，不重复压缩图片。
+Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，用深色左右分栏、单一主安装按钮、真实阅读对照与 Free／PLUS／Pro 突出产品重点；完整功能、FAQ 与条款留在独立页面。网页图片翻译由首屏和页脚次级链接进入 `/translate/`，流程为批量上传（每次最多 10 张）、选择目标语言、翻译、下载。文件列表显示进度、失败重试与恢复；支持逐张下载及将当前列表已完成译图打包为 ZIP，不提供预览、缩放或原译对照。本地记录按账户隔离，存储说明折叠展示。ZIP 库按需加载，逐张读取结果并直接打包，不重复压缩图片。
 
 ## 运行
 
@@ -44,7 +44,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。插件与官网工作台均提供常规图片翻译；官网不提供其他模式的新任务入口，已有本地结果仍可读取、下载和恢复查询。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
 - 卸载反馈页 `/uninstall/` 提供17 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
-- [src/data/published-lite.ts](src/data/published-lite.ts)：官网静态公布的 Lite 价格与权益；首页静态预览与价格页共用月／年选择，醒目价格为对应周期的实付总额，币种缩小显示，年付另外标注月均价。年付优惠在周期选择下方保留固定空间，按同币种、同权益版本的月价对比计算；缺少可比报价时不展示折扣。首页突出无日／月累计上限、受理速率、模型和优先响应；对比页展示九项权益：共同的本地翻译和阅读权益双方勾选，差异权益仅 Lite 勾选并加重文字；云端／本地名称及反馈、功能需求的支持边界见[会员权益](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网权益展示与支持)。购买状态和正式结账报价来自账单 API，缺少当前周期报价时不自动跳到另一周期，也不生成购买链接；禁用 JavaScript 时保留月价和年总价。更新规则见[支付规则](../../docs/STRIPE_BILLING.md#已确认的产品规则)。
+- [公开套餐](../app/catalog_defaults.json) 是初始化草稿和网站展示的共同数据源；首页、定价页显示 PLUS／Pro 的季付与年付总价、每月额度、免费／付费模型及永久额度包。新套餐无试用。实时购买仍以账单 API 的有效渠道为准，静态价格不会生成支付链接。季度和年度均按原始账期锚点逐月发放，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)。
 - [public/design-tokens.css](public/design-tokens.css) 维护基础视觉令牌，也供 Drive 连接页复用；[src/styles/marketing.css](src/styles/marketing.css) 为官网布局提供统一深色覆盖，不改变 Drive 令牌；[src/styles/controls.css](src/styles/controls.css) 统一全站按钮、选择器及其交互状态，页面 CSS 只安排控件布局。[ComicSymbol.astro](src/components/ComicSymbol.astro) 提供原创静态 SVG。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
 - 每页维护标题、正文、canonical、hreflang 和结构化数据；页面关键词分工、17 语用词与 FAQ 规则见 [SEO 规范](SEO.md)。账户、身份回调、支付返回与卸载反馈页不索引。构建检查站内链接、锚点、商店入口及 FAQ 正文与 SEO 数据一致性。
 - 账户使用同源 OIDC + PKCE，精确回调为 `/auth/callback/`；前端不存 client secret。官网在当前浏览器持久保存一份账户会话，跨标签页合并刷新、同步退出和换号；写请求不自动重放，支付返回页不发放权益。官网与插件复用身份服务的 SSO，不互传令牌，不同步本地退出。登录期限由身份服务实际刷新令牌与授权期限决定，持久化不延长这些期限。见[身份规范](../../docs/PRODUCTION_IDENTITY.md)和[支付规则](../../docs/STRIPE_BILLING.md)。
@@ -52,3 +52,5 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 浏览器检查入口见[脚本说明](../../scripts/README.md#官网验收)，覆盖17 语、加载与失败、图片切换、登录返回和订阅交互。
 
 定价对照表的长解释收在对应功能标题旁的信息图标中，支持悬停、键盘聚焦和点按；Esc、焦点离开或点击外部关闭。提示复用当前主题令牌，按视口定位以适配窄屏和 RTL，不增加请求或将说明复制到每个套餐单元格。
+
+本地新套餐验收：先构建官网和后台，再运行 `backend/.venv/Scripts/python.exe backend/tests/manual_membership_server.py`（仓库根目录）。定价页 `http://127.0.0.1:4322/pricing/`；后台 `/console-preview/`，本地用户名 `admin`。使用独立 SQLite 和内存 Redis，付款与真实模型调用关闭；显示价格可验收，真实支付与模型另行验证。

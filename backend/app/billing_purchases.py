@@ -48,8 +48,8 @@ def grant_purchase(db, row, order, paid_at):
     price = db.get(BillingPrice, row.price_id)
     revision = db.get(BillingPlanRevision, price.plan_revision_id)
     require(price.interval == 'once' and not row.trial and revision.quota_pages > 0
-        and revision.service_plan_id and not revision.trial_days and not revision.trial_redraw_pages
-        and not revision.monthly_redraw_pages, 'BILLING_PURCHASE_INVALID')
+        and revision.service_plan_id and not revision.trial_days and not revision.trial_classic_pages
+        and revision.monthly_classic_pages == 0, 'BILLING_PURCHASE_INVALID')
     key = 'purchase:' + order.id + ':classic'
     bucket = db.get(QuotaPeriod, digest([row.owner_id, key]))
     if order.status in REVERSED:

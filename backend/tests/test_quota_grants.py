@@ -11,7 +11,7 @@ from test_membership import entitlement, finish, freeze, grant, submit
 AT = datetime(2026, 9, 15, 8)
 
 
-def gift(client, auth, *, mode='redraw', pages=2, key='gift', start=None, end=None, operator=None):
+def gift(client, auth, *, mode='classic', pages=2, key='gift', start=None, end=None, operator=None):
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     admin = operator or login(client, 'admin')
     body = {'mode': mode, 'pages': pages, 'expires_at': (end or AT + timedelta(hours=1)).isoformat() + 'Z',
@@ -26,52 +26,53 @@ def gift(client, auth, *, mode='redraw', pages=2, key='gift', start=None, end=No
 def configured(client, monkeypatch):
     from app.config import settings
     settings().classic_enabled = True
+    configure_system_limits(free_daily_pages=0)
     freeze(monkeypatch, AT)
 
 
-def test_ordinary_redraw_gift_is_temporary_and_exhaustion_creates_no_job(client, png, monkeypatch):
+def test_ordinary_free_gift_is_temporary_and_exhaustion_creates_no_job(client, png, monkeypatch):
     auth = login(client)
-    assert not entitlement(client, auth)['modes']['redraw']['allowed']
+    assert not entitlement(client, auth)['modes']['classic']['allowed']
     result = gift(client, auth, pages=1)
     assert result.status_code == 201, result.text
     rights = entitlement(client, auth)
     assert rights['plan'] == 'free' and rights['image_rate_limit']['limit'] == 10
-    assert rights['modes']['redraw']['allowed'] and rights['modes']['redraw']['quota']['available'] == 1
-    job = submit(client, auth, upload(client, auth, png), 'redraw').json()
-    assert job['quota_kind'] == 'redraw_grant' and job['quota_period_id'] == result.json()['grant']['id']
-    denied = submit(client, auth, upload(client, auth, png_variant(png, 2)), 'redraw', 'extra')
-    assert denied.status_code == 403 and denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
+    assert rights['modes']['classic']['allowed'] and rights['modes']['classic']['quota']['available'] == 1
+    job = submit(client, auth, upload(client, auth, png), 'classic').json()
+    assert job['quota_kind'] == 'classic_grant' and job['quota_period_id'] == result.json()['grant']['id']
+    denied = submit(client, auth, upload(client, auth, png_variant(png, 2)), 'classic', 'extra')
+    assert denied.status_code == 403 and denied.json()['error']['code'] == 'DAILY_QUOTA_EXHAUSTED'
     freeze(monkeypatch, AT + timedelta(hours=1))
-    assert not entitlement(client, auth)['modes']['redraw']['allowed']
-    assert submit(client, auth, job['input_asset_id'], 'redraw').json()['id'] == job['id']
+    assert not entitlement(client, auth)['modes']['classic']['allowed']
+    assert submit(client, auth, job['input_asset_id'], 'classic').json()['id'] == job['id']
     finish(job['id'])
     assert client.get('/v1/translations', headers=auth).json()['total'] == 1
 
 
-@pytest.mark.parametrize('mode', ['classic', 'redraw'])
+@pytest.mark.parametrize('mode', ['classic'])
 def test_scheduled_grant_starts_at_inclusive_boundary(client, monkeypatch, mode):
     auth = login(client)
     start = AT + timedelta(minutes=10)
     response = gift(client, auth, mode=mode, start=start)
     assert response.status_code == 201, response.text
     benefit = entitlement(client, auth)['modes'][mode]
-    assert (benefit['quota']['available'] if benefit['quota'] else 0) == (30 if mode == 'classic' else 0)
+    assert (benefit['quota']['available'] if benefit['quota'] else 0) == 0
     assert len(client.get('/v1/me/quota-grants', headers=auth).json()['items']) == 1
     freeze(monkeypatch, start)
-    assert entitlement(client, auth)['modes'][mode]['quota']['available'] == (32 if mode == 'classic' else 2)
+    assert entitlement(client, auth)['modes'][mode]['quota']['available'] == 2
 
 
 @pytest.mark.parametrize('success', [True, False])
 def test_expired_gift_settles_only_original_bucket(client, png, monkeypatch, success):
     auth = login(client)
     first = gift(client, auth, pages=1).json()['grant']
-    job = submit(client, auth, upload(client, auth, png), 'redraw').json()
+    job = submit(client, auth, upload(client, auth, png), 'classic').json()
     freeze(monkeypatch, AT + timedelta(hours=1))
     second = gift(client, auth, pages=4, key='later', end=AT + timedelta(hours=2)).json()['grant']
     assert entitlement(client, auth)['pending_previous_period_pages'] == 1
     finish(job['id'], success)
     finish(job['id'], success)
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 4
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 4
     from app.db import session_factory
     from app.entitlement_models import QuotaPeriod
     with session_factory()() as db:
@@ -90,7 +91,7 @@ def test_finite_allowances_use_earliest_expiry_and_plus_classic_uses_no_gift(cli
     jobs = [submit(client, auth, upload(client, auth, png_variant(png, n)), key=str(n)).json() for n in range(3)]
     assert [job['quota_kind'] for job in jobs] == ['classic_grant', 'classic_daily', 'classic_grant']
     assert [jobs[0]['quota_period_id'], jobs[2]['quota_period_id']] == [early['id'], late['id']]
-    assert grant(client, auth).status_code == 200
+    assert grant(client, auth, pages=None).status_code == 200
     included = submit(client, auth, upload(client, auth, png_variant(png, 7)), key='plus').json()
     assert included['settlement'] == 'included' and included['quota_period_id'] is None
     buckets = client.get('/v1/me/quota-grants', headers=auth).json()['items']

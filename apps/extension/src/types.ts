@@ -27,11 +27,12 @@ export interface ReadingEntry {
   document?:EpubIndex; documentLocation?:EpubLocation;
 }
 export interface User { id: string; name: string; role: string; }
-export type QuotaKind='classic_daily'|'classic_unlimited'|'classic_grant'|'unavailable';
-export interface QuotaBucket {id:string;kind:QuotaKind;mode:Mode;source:'daily'|'membership'|'grant'|'subscription';granted:number;used:number;reserved:number;available:number;starts_at:string;expires_at:string|null;grants_access:boolean;note:string;}
+export type QuotaKind='classic_monthly'|'classic_daily'|'classic_unlimited'|'classic_grant'|'classic_purchase'|'unavailable';
+export interface QuotaBucket {id:string;kind:QuotaKind;mode:Mode;source:'daily'|'membership'|'grant'|'subscription'|'purchase';granted:number;used:number;reserved:number;available:number;starts_at:string;expires_at:string|null;grants_access:boolean;note:string;}
 export interface QuotaSummary {id:string;kind:QuotaKind;granted:number;used:number;reserved:number;available:number;starts_at:string;resets_at:string|null;next_expiry_at:string|null;buckets:QuotaBucket[];}
 export interface ModeEntitlement {allowed:boolean;unlimited:boolean;quota_kind:QuotaKind;consent_version:string;quota:QuotaSummary|null;}
-export interface Entitlements {plan:'free'|'lite'|'plus';plus_started_at:string|null;plus_expires_at:string|null;gift?:MembershipGift|null;timezone:string;image_rate_limit:ImageRateLimit;hourly_image_rate_limit?:ImageRateLimit|null;modes:Record<Mode,ModeEntitlement>;generated_at:string;pending_previous_period_pages:number;}
+export interface PurchaseQuota {granted:number;used:number;reserved:number;available:number;next_expiry_at:string|null;}
+export interface Entitlements {plan:string;free_quota?:PurchaseQuota;subscription_quota?:PurchaseQuota&{unlimited:boolean};service_plan?:string;purchase_quota?:PurchaseQuota|null;plus_started_at:string|null;plus_expires_at:string|null;gift?:MembershipGift|null;timezone:string;image_rate_limit:ImageRateLimit;hourly_image_rate_limit?:ImageRateLimit|null;modes:Record<Mode,ModeEntitlement>;generated_at:string;pending_previous_period_pages:number;}
 export interface Capabilities { result_protocol?:'overlay-v1'; representations?:string[]; modes: { id: Mode; label: string; enabled: boolean; languages?:string[] }[]; languages: { id: string; label: string }[]; limits: { max_bytes: number; max_pixels: number; max_dimension: number; max_translation_ids: number }; entitlements:Entitlements|null; }
 export interface Usage { entitlements:Entitlements; items: { id: string; job_id: string|null;period_id:string|null;quota_kind:QuotaKind|null;kind: string; pages: number; created_at: string; note?:string }[]; total: number; next_offset?:number|null; }
 export interface Settings { uiLanguage: UiLanguage; autoTranslateTabs:boolean; discoveryTextTranslation:boolean; language: string; direction: 'ltr' | 'rtl'; layout: 'continuous' | 'single'; fit: 'width' | 'window'; cacheLimitMb: number; appearance:'system'|'light'|'dark'; accentTheme:'sky'|'rose'|'mint'|'iris'|'amber'|'slate'; readerBackground:'gray'|'paper'|'night'; textScale:number; }

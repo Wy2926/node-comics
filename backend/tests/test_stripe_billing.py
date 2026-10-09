@@ -57,8 +57,12 @@ def billing(monkeypatch, request):
     state['prices'] = {price['id']: price}
     state['price_id'] = 'fixture-price'
     from app.db import session_factory
-    from app.billing_models import BillingPrice, BillingPriceBinding
+    from app.billing_models import BillingPrice, BillingPriceBinding, BillingPlanRevision
     with session_factory()() as db:
+        from conftest import configure_system_limits
+        configure_system_limits(free_daily_pages=0)
+        revision = db.get(BillingPlanRevision, "plus-v1")
+        revision.monthly_classic_pages, revision.trial_classic_pages = 300, 30
         db.add(BillingPrice(id=state['price_id'], plan_id='plus', plan_revision_id='plus-v1',
             environment='test', currency='usd', unit_amount=999, interval='month',
             status='active'))
@@ -250,7 +254,7 @@ def test_trial_conversion_and_replay_never_double_grant(billing):
     sync_subscription('sub_fixture')
     sync_subscription('sub_fixture')
     assert sorted(p.granted for p in periods()) == [30,300]
-    assert rights(billing)['modes']['redraw']['quota']['available'] == 300
+    assert rights(billing)['modes']['classic']['quota']['available'] == 300
     assert billing['client'].post('/v1/billing/checkouts', headers=billing['auth'], json={'provider':'stripe', 'price_id':billing['price_id']}).status_code == 409
 
 
@@ -428,7 +432,7 @@ def test_late_first_notification_after_trial_converts_once(billing):
     billing['sub']['status']='active'
     sync_subscription('sub_fixture')
     sync_subscription('sub_fixture')
-    assert rights(billing)['modes']['redraw']['quota']['available']==300
+    assert rights(billing)['modes']['classic']['quota']['available']==300
     assert sorted(p.granted for p in periods())==[30,300]
 
 

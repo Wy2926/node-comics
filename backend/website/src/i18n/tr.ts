@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Çeviriyi NodeLane Comics'a bırakın. Dikkatinizi bir sonraki sayfaya saklayın.",
     "ctaButton": "Okuma yolculuğunuza başlayın",
     "pricingTitle": "Ücretsiz okuyun. Çeviri planınızı seçin.",
-    "pricingDescription": "Ücretsiz ve Lite manga çevirisi planlarını karşılaştırın: günlük ücretsiz sayfalar, kayan bir saatlik dönemde 1.200 yeni istek ve aylık ya da yıllık ödeme. Koşulları sağlayan ilk kez kullanıcılar 7 gün deneyebilir.",
+    "pricingDescription": "PLUS / Pro ve süresiz sayfa paketleri. Üç aylık veya yıllık ödeme, aylık sayfa kotası. Abonelik denemesi yok.",
     "freePlan": "Ücretsiz",
     "freePlanDescription": "Her gün biraz okumak için",
     "free": "ücretsiz",
@@ -93,7 +93,7 @@ export default {
       "Her kayan 60 saniyelik dönemde en fazla 10 yeni çeviri görseli"
     ],
     "freeNote": "Günlük sayfalar Asia/Shanghai saat dilimine göre sıfırlanır; kullanılmayanlar devretmez.",
-    "quotaNote": "Bir görüntünün seçilen mod ve dilde başarıyla oluşturulmuş bir versiyonu bir sayfa olarak sayılır. Tekrarlanan istekler ve geçerli sonuçların yeniden kullanımı için iki kez ücret alınmaz. Açıkça yeni bir çeviri, mevcut yetkiyi kullanır. Sınırsız toplamlar, kısa vadeli oran, görüntü ve hizmet kapasitesi sınırlarına tabi olmaya devam eder; tamamlanma hızı garanti edilmez.",
+    "quotaNote": "Bir görüntünün seçilen mod ve dilde başarıyla oluşturulmuş bir versiyonu bir sayfa olarak sayılır. Tekrarlanan istekler ve geçerli sonuçların yeniden kullanımı için iki kez ücret alınmaz. Açıkça yeni bir çeviri, mevcut yetkiyi kullanır. İstek sıklığı, görüntü boyutları ve hizmet kapasitesi sınırları geçerlidir; tamamlanma hızı garanti edilmez.",
     "downloadTitle": "Manga çevirmen uzantınızı yükleyin",
     "downloadDescription": "Chrome, Edge veya Firefox için NodeLane Comics edinin. Chrome Web Store, Edge Add-ons veya Firefox Add-ons mağazasını açın ya da tarayıcınıza uygun paketi indirin.",
     "storeDescription": "Bir sonraki hikayenizi halihazırda kullandığınız tarayıcıda açın.",
@@ -144,7 +144,7 @@ export default {
       "Hikayenin içine."
     ],
     "seoFeaturesTitle": "Manga Çevirisi ve Çizgi Roman Okuyucu Özellikleri",
-    "seoPricingTitle": "Ücretsiz Manga Çevirisi ve Lite Planları",
+    "seoPricingTitle": "Ücretsiz Manga Çevirisi ve PLUS / Pro Planları",
     "seoDownloadTitle": "Chrome, Edge ve Firefox için Manga Çevirmeni",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "Bir sayfa çok uzakta.",
@@ -206,7 +206,7 @@ export default {
       "title": "NodeLane resmî kanalı",
       "paragraphs": [
         "NodeLane hesabınıza girin, dili seçin ve çeviriyi açın. Hizmet seçilen görselleri işler; erişim ve kota hesabınıza bağlıdır. Geçerli sonucu yeniden kullanmak kotadan tekrar düşmez.",
-        "Orijinalleri okumak için hesap gerekmez. Ücretsiz plan ve Lite yayımlanan kurallarını korur: güncel haklarınızı hesap sayfasında, fiyatları planlar sayfasında kontrol edin. İstek sıklığı ve kapasite sınırları tamamlanma hızını garanti etmez."
+        "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir."
       ]
     },
     {
@@ -491,7 +491,7 @@ export default {
           {
             "title": "Avantajlar ve abonelikler",
             "paragraphs": [
-              "Ücretsiz, Lite, mevcut PLUS, deneme ve bonus avantajları, hesabınızda gösterilen ilgili son kullanma tarihi ve sayfa kurallarına tabidir. Lite, her kayan bir saatlik dönemde 1.200'e kadar yeni sayfayı kabul eder. Günlük veya aylık toplam üst sınırın olmaması, kısa süreli istek hızı, resim veya hizmet kapasitesi sınırlarını ortadan kaldırmaz.",
+              "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir.",
               "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin."
             ]
           },
@@ -559,8 +559,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "Manga çevirisi ücretsiz mi ve Lite neler içeriyor?",
-        "answer": "Yerel orijinalleri okumak ücretsizdir ve hesap gerektirmez. Resmi çeviri oturum açmayı gerektirir; Ücretsiz, günde 30 standart çeviri sayfası içerir. Lite'nin maliyeti aylık 5,99 ABD Doları veya yıllık 59,99 ABD Dolarıdır; günlük veya aylık standart çeviri toplamı üst sınır yoktur ve her kayan bir saatlik dönemde 1.200'e kadar yeni sayfa bulunur. Oran ve kapasite sınırları geçerlidir. İlk kez uygun hesaplara 7 günlük kart destekli deneme süresi sunulur. PLUS yeni alımlara kapalı; mevcut abonelikler görüntülenen avantajları korur. Vergiler ve nihai tutarlar ödeme sırasında gösterilir.",
+        "question": "Manga çevirisi ücretsiz mi ve PLUS / Pro neler içeriyor?",
+        "answer": "Yerel okuma ücretsizdir. Free, GPT 6 Luna ile günde 30 sayfa sunar. PLUS: ayda 2.500 sayfa, üç ay için US$6,66 veya yıl için US$23,99. Pro: ayda 4.000 sayfa, üç ay için US$9,99 veya yıl için US$35,99. İkisi de Haiku 5.5 kullanır. Sayfalar her ay verilir, devretmez; deneme yoktur. Süresiz paketler: 3.500 sayfa US$5,99, 7.000 sayfa US$9,99. Vergiler ve toplam ödeme sırasında gösterilir.",
         "relatedPath": "/pricing/"
       },
       {
@@ -595,7 +595,7 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "Lite çeviri sınırları nasıl çalışır?",
+        "question": "PLUS / Pro çeviri sınırları nasıl çalışır?",
         "answer": "Bir hesabın tüm cihazları, modları ve dilleri, her kayan 60 saniyelik dönemde 100 ve her kayan 3.600 saniyelik dönemde 1.200 yeni çeviri görseli sınırını paylaşır. Ücretsiz planda kayan 60 saniyelik dönemde 10 görsele izin verilir. Aynı isteğin tekrar gönderilmesi ve geçerli sonuçların yeniden kullanılması tekrar sayılmaz. Kabul edilen görevler başarısız olsa, iptal edilse veya metin içermese de sayılır. Reddedilen istekler veya geri alınan veritabanı işlemleri, ayrılan saatlik yeri serbest bırakır. Yeniden denemeler yeni görev kabul kurallarına tabidir. Bu sınırlar tamamlanma hızını garanti etmez.",
         "relatedPath": "/pricing/"
       },

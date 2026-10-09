@@ -65,7 +65,7 @@ const copy: HomeCopy = {
     ],
     controlNote: "新漫畫預設顯示原圖。選擇管道與目標語言，再開啟常規翻譯；閱讀器與網頁共用目前管道。",
     privacyTitle: "免費閱讀，按需選擇翻譯方案。", privacyBody: "NodeLane Comics 提供免費擴充功能與按帳戶計量的雲端翻譯服務。方案受速率與服務容量限制；訂閱前可查看即時購買狀態、完整權益和帳單規則。",
-    privacy: '隱私政策', pricing: "比較 Free 與 Lite", ctaTitle: "從下一頁，讀懂更多。", ctaBody: "為桌面 Chrome、Edge 或 Firefox 安裝 NodeLane Comics。",
+    privacy: '隱私政策', pricing: "比較 Free 與 PLUS / Pro", ctaTitle: "從下一頁，讀懂更多。", ctaBody: "為桌面 Chrome、Edge 或 Firefox 安裝 NodeLane Comics。",
   };
 
 export default copy;

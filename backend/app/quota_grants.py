@@ -21,7 +21,7 @@ router = APIRouter(tags=["quota grants"])
 
 
 class GrantRequest(RequestBody):
-    mode: Literal["classic", "redraw"]
+    mode: Literal["classic"]
     pages: int = Field(ge=1, le=1_000_000, strict=True)
     starts_at: AwareDatetime | None = None
     expires_at: AwareDatetime | None = None
@@ -60,7 +60,7 @@ def grant_pages(db, owner_id, operator_id, key, request):
         problem("INVALID_GRANT_WINDOW", "赠送额度的到期时间必须晚于现在和生效时间", 422)
     period = QuotaPeriod(id=digest(transaction_key), owner_id=user.id, kind=f"{request.mode}_grant",
         mode=request.mode, source="grant", source_key=transaction_key, starts_at=start, ends_at=end,
-        granted=request.pages, used=0, reserved=0, note=request.note, grants_access=request.mode == "redraw")
+        granted=request.pages, used=0, reserved=0, note=request.note, grants_access=False)
     db.add(period)
     db.flush()
     db.add(Ledger(owner_id=user.id, period_id=period.id, quota_kind=period.kind,

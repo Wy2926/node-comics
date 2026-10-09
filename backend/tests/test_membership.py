@@ -14,7 +14,7 @@ def entitlement(client, auth):
     return response.json()
 
 
-def grant(client, auth, *, months=1, pages=None, key='open-plus'):
+def grant(client, auth, *, months=1, pages=300, key='open-plus'):
     user_id = client.get('/v1/me', headers=auth).json()['user']['id']
     admin = login(client, 'admin')
     return client.post(f'/v1/admin/users/{user_id}/membership',
@@ -51,15 +51,15 @@ def test_defaults_and_admin_role_do_not_grant_plus(client):
         assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 10}
         assert 'queue_capacity' not in rights and 'realtime_slots' not in rights
         assert rights['modes']['classic']['quota']['available'] == 30
-        assert rights['modes']['redraw']['allowed'] is False
-        assert rights['modes']['redraw']['quota'] is None
+        assert rights['modes']['classic']['allowed'] is True
+        assert rights['subscription_quota']['available'] == 0
 
 
-def test_free_cannot_create_redraw_operation_or_consume_rate(client, png):
+def test_free_cannot_create_retired_mode_or_consume_rate(client, png):
     auth = login(client)
     asset = upload(client, auth, png)
-    response = submit(client, auth, asset, 'redraw')
-    assert response.status_code == 403 and response.json()['error']['code'] == 'PLUS_REQUIRED'
+    response = submit(client, auth, asset, 'removed-mode')
+    assert response.status_code == 422
     from app.db import session_factory
     from app.models import Job
     from app.translation_requests import TranslationRequest
@@ -69,34 +69,14 @@ def test_free_cannot_create_redraw_operation_or_consume_rate(client, png):
         assert window_count('image') == 0
 
 
-def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
-    auth = login(client)
-    first = grant(client, auth, months=12)
-    assert first.status_code == 200, first.text
-    rights = entitlement(client, auth)
-    assert rights['plan'] == 'plus' and rights['modes']['classic']['unlimited']
-    assert rights['image_rate_limit'] == {'window_seconds': 60, 'limit': 100}
-    assert rights['modes']['classic']['quota'] is None
-    assert rights['modes']['redraw']['quota']['granted'] == 300
-    assert grant(client, auth, months=12).json() == first.json()
-    asset = upload(client, auth, png)
-    job = submit(client, auth, asset).json()
-    assert job['quota_pages'] == 0 and job['settlement'] == 'included'
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 300
-    redraw = submit(client, auth, asset, 'redraw').json()
-    assert redraw['quota_pages'] == 1
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 299
-    finish(redraw['id'])
-    finish(redraw['id'])
-    assert entitlement(client, auth)['modes']['redraw']['quota']['used'] == 1
-
-
-@pytest.mark.parametrize('mode', ['classic', 'redraw'])
-def test_period_quota_limit_reservations_and_release(client, png, mode):
+@pytest.mark.parametrize('source', ['free', 'subscription'])
+def test_period_quota_limit_reservations_and_release(client, png, source):
+    mode = 'classic'
     from app.config import settings
     configure_system_limits(free_daily_pages=1)
     auth = login(client)
-    if mode == 'redraw':
+    if source == 'subscription':
+        configure_system_limits(free_daily_pages=0)
         assert grant(client, auth, pages=1).status_code == 200
     first_asset = upload(client, auth, png)
     second_asset = upload(client, auth, png_variant(png, 9))
@@ -104,7 +84,7 @@ def test_period_quota_limit_reservations_and_release(client, png, mode):
     assert submit(client, auth, first_asset, mode, 'another-device').json()['id'] == first['id']
     rejection = submit(client, auth, second_asset, mode, 'second')
     assert rejection.status_code == 403
-    assert rejection.json()['error']['code'] in {'DAILY_QUOTA_EXHAUSTED', 'REDRAW_QUOTA_EXHAUSTED'}
+    assert rejection.json()['error']['code'] in {'DAILY_QUOTA_EXHAUSTED', 'DAILY_QUOTA_EXHAUSTED'}
     finish(first['id'], False)
     assert entitlement(client, auth)['modes'][mode]['quota']['available'] == 1
     assert submit(client, auth, second_asset, mode, 'second').status_code == 202
@@ -139,32 +119,34 @@ def test_old_day_settlement_never_changes_new_day(client, png, monkeypatch, succ
 def test_gifts_use_thirty_day_periods_and_preserve_old_settlements(client, png, monkeypatch):
     freeze(monkeypatch, datetime(2026, 1, 31, 2, 0, 0))
     auth = login(client)
+    configure_system_limits(free_daily_pages=0)
     assert grant(client, auth, months=12).status_code == 200
-    job = submit(client, auth, upload(client, auth, png), 'redraw').json()
-    first = entitlement(client, auth)['modes']['redraw']['quota']
+    job = submit(client, auth, upload(client, auth, png), 'classic').json()
+    first = entitlement(client, auth)['modes']['classic']['quota']
     assert first['resets_at'] == '2026-03-02T02:00:00Z'
     freeze(monkeypatch, datetime(2026, 3, 2, 2, 0, 0))
-    second = entitlement(client, auth)['modes']['redraw']['quota']
+    second = entitlement(client, auth)['modes']['classic']['quota']
     assert second['resets_at'] == '2026-04-01T02:00:00Z' and second['available'] == 300
     finish(job['id'])
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 300
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 300
 
 
 def test_expiry_honors_accepted_job_and_rejects_new_work(client, png, monkeypatch):
+    configure_system_limits(free_daily_pages=0)
     start = datetime(2026, 1, 10, 3)
     freeze(monkeypatch, start)
     auth = login(client)
     grant(client, auth)
     asset = upload(client, auth, png)
-    job = submit(client, auth, asset, 'redraw').json()
+    job = submit(client, auth, asset, 'classic').json()
     freeze(monkeypatch, datetime(2026, 2, 10, 3))
     assert entitlement(client, auth)['plan'] == 'free'
-    refused = submit(client, auth, upload(client, auth, png_variant(png, 7)), 'redraw', 'after-expiry')
-    assert refused.status_code == 403 and refused.json()['error']['code'] == 'PLUS_REQUIRED'
+    refused = submit(client, auth, upload(client, auth, png_variant(png, 7)), 'classic', 'after-expiry')
+    assert refused.status_code == 403 and refused.json()['error']['code'] == 'DAILY_QUOTA_EXHAUSTED'
     # Replaying an accepted operation remains legal after expiration.
-    assert submit(client, auth, asset, 'redraw').json()['id'] == job['id']
+    assert submit(client, auth, asset, 'classic').json()['id'] == job['id']
     finish(job['id'])
-    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 30
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 0
 
 
 def test_independent_pages_keep_current_when_neighbor_exhausts_allowance(client, png):
@@ -180,6 +162,7 @@ def test_independent_pages_keep_current_when_neighbor_exhausts_allowance(client,
 
 
 def test_membership_and_compensation_are_private_and_idempotent(client):
+    configure_system_limits(free_daily_pages=0)
     auth = login(client)
     owner = client.get('/v1/me', headers=auth).json()['user']['id']
     path = f'/v1/admin/users/{owner}/membership'
@@ -188,11 +171,11 @@ def test_membership_and_compensation_are_private_and_idempotent(client):
     assert grant(client, auth, months=2).status_code == 409
     admin = login(client, 'admin')
     path = f'/v1/admin/users/{owner}/quota-compensations'
-    data = {'kind': 'redraw_monthly', 'pages': 7, 'note': 'service compensation'}
+    data = {'kind': 'classic_monthly', 'pages': 7, 'note': 'service compensation'}
     headers = {**admin, 'Idempotency-Key': 'compensate-once'}
     assert client.post(path, headers=headers, json=data).status_code == 200
     assert client.post(path, headers=headers, json=data).status_code == 200
-    assert entitlement(client, auth)['modes']['redraw']['quota']['available'] == 307
+    assert entitlement(client, auth)['modes']['classic']['quota']['available'] == 307
     assert entitlement(client, auth)['image_rate_limit']['limit'] == 100
 
 
@@ -211,3 +194,19 @@ def test_simultaneous_last_page_admission(client, png):
     assert sorted(code for code, _ in results) == [202, 403]
     assert [body['error']['code'] for code, body in results if code == 403] == ['DAILY_QUOTA_EXHAUSTED']
     assert entitlement(client, auth)['modes']['classic']['quota']['reserved'] == 1
+
+
+def test_plus_unlimited_and_monthly_300_and_idempotent_renewal(client, png):
+    configure_system_limits(free_daily_pages=0)
+    auth = login(client)
+    first = grant(client, auth, months=12, pages=None)
+    assert first.status_code == 200
+    assert grant(client, auth, months=12, pages=None).json() == first.json()
+    rights = entitlement(client, auth)
+    assert rights['subscription_quota']['unlimited']
+    assert rights['modes']['classic']['quota'] is None
+    job = submit(client, auth, upload(client, auth, png)).json()
+    assert job['quota_pages'] == 0 and job['settlement'] == 'included'
+    finish(job['id'])
+    finish(job['id'])
+    assert entitlement(client, auth)['subscription_quota']['unlimited']

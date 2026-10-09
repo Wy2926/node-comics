@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Baca gratis. Pilih paket terjemahan Anda.",
   "privacyBody": "NodeLane Comics menyediakan ekstensi gratis dan terjemahan cloud berbasis akun. Batas permintaan dan kapasitas layanan berlaku. Periksa ketersediaan, manfaat, dan ketentuan penagihan sebelum berlangganan.",
   "privacy": "Kebijakan privasi",
-  "pricing": "Bandingkan Free dan Lite",
+  "pricing": "Bandingkan Free dan PLUS / Pro",
   "ctaTitle": "Pahami halaman Anda berikutnya.",
   "ctaBody": "Pasang NodeLane Comics untuk Chrome, Edge, atau Firefox di komputer."
 };

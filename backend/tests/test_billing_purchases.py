@@ -27,8 +27,8 @@ def purchase(request, monkeypatch):
         db.add(BillingPlan(id='pages100', name='100 pages'))
         db.flush()
         db.add(BillingPlanRevision(id='pages100-v1', plan_id='pages100', version=1, name='100 pages',
-            service_plan_id='lite', quota_pages=100, quota_validity_days=None, monthly_redraw_pages=0,
-            trial_days=0, trial_redraw_pages=0, hourly_image_limit=1200))
+            service_plan_id='lite', quota_pages=100, quota_validity_days=None, monthly_classic_pages=0,
+            trial_days=0, trial_classic_pages=0, hourly_image_limit=1200))
         db.flush()
         db.add(BillingPrice(id='purchase-price', plan_id='pages100', plan_revision_id='pages100-v1',
             environment='test', currency='usd', unit_amount=399, interval='once', status='active'))
@@ -877,7 +877,7 @@ def returning_creem_buyer(purchase, monkeypatch):
         db.add(BillingPlan(id='lite', name='Lite'))
         db.flush()
         db.add(BillingPlanRevision(id='lite-v1', plan_id='lite', version=1, name='Lite',
-            monthly_redraw_pages=0, hourly_image_limit=1200, trial_days=0, trial_redraw_pages=0))
+            monthly_classic_pages=0, hourly_image_limit=1200, trial_days=0, trial_classic_pages=0))
         db.flush()
         db.add(BillingPrice(id='lite-month', plan_id='lite', plan_revision_id='lite-v1',
             environment='test', currency='usd', unit_amount=599, interval='month', status='active'))

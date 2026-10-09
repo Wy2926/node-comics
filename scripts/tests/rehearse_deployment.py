@@ -76,7 +76,7 @@ def main():
     containers = [name + suffix for suffix in ('-postgres', '-redis', '-proxy', '-worker-next')]
     postgres, redis, proxy, next_worker = containers
     network, volume = name + '-infra', name + '-files'
-    report = {'scope': 'local Docker, real PostgreSQL/Redis/OpenResty, synthetic image supplier', 'checks': []}
+    report = {'scope': 'local Docker, real PostgreSQL/Redis/OpenResty, synthetic page engine', 'checks': []}
     compose_file = run / 'compose.server.yaml'
     shutil.copyfile(ROOT / 'deploy/compose.server.yaml', compose_file)
     env = {'BLUE_IMAGE': 'node-comics-backend:deploy-blue', 'GREEN_IMAGE': 'node-comics-backend:deploy-green',
@@ -87,8 +87,7 @@ def main():
     env_path.write_text(''.join(f'{key}={value}\n' for key, value in env.items()), encoding='utf-8')
     application = {'DATABASE_URL': 'postgresql+psycopg://rehearsal:isolated-local-only@postgres:5432/rehearsal',
                    'REDIS_URL': 'redis://shared-redis:6379/0', 'REDIS_NAMESPACE': 'deploy-rehearsal-' + uuid4().hex,
-                   'OPENAI_API_KEY': 'synthetic-only-no-network', 'OPENAI_BASE_URL': 'https://supplier.invalid/v1',
-                   'CLASSIC_ENABLED': 'false', 'ADMIN_WEB_PATH': '/console-rehearsal/', 'STRIPE_ENABLED': 'false', 'CREEM_ENABLED': 'false'}
+                   'CLASSIC_ENABLED': 'true', 'ADMIN_WEB_PATH': '/console-rehearsal/', 'STRIPE_ENABLED': 'false', 'CREEM_ENABLED': 'false'}
     (run / '.env.server').write_text(''.join(f'{key}={value}\n' for key, value in application.items()), encoding='utf-8')
     services = {}
     for service in ('api-blue', 'api-green', 'control-worker', 'maintenance', 'migrate'):
@@ -254,7 +253,7 @@ http {
                 ids.append(str(uuid4()))
                 bodies.append({'image': {'sha256': hashlib.sha256(images[-1]).hexdigest(),
                                          'byte_size': len(images[-1]), 'content_type': 'image/png'},
-                               'mode': 'redraw', 'target_language': 'zh-Hans'})
+                               'mode': 'classic', 'target_language': 'zh-Hans'})
                 response = client.put('/v1/translations/' + ids[-1], headers=auth, json=bodies[-1])
                 assert response.status_code < 300, response.text
             response = client.put(f'/v1/translations/{ids[0]}/input', headers={**auth, 'Content-Type': 'image/png'}, content=images[0])

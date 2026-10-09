@@ -209,6 +209,8 @@ def test_lite_routes_from_granted_terms_not_subscription_or_pending_gifts(lite, 
         invoice(lite, total=599)
         sync_subscription('sub_fixture')
     elif state in {'expired', 'revoked', 'scheduled'}:
+        from conftest import configure_system_limits
+        configure_system_limits(free_daily_pages=30)
         with session_factory()() as db:
             for term in db.scalars(select(BillingTerm).where(BillingTerm.owner_id == lite['owner'])):
                 if state == 'expired':

@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Bir sonraki yenilemenizden önce iptal edin."
   },
   "publishedPricing": {
-    "label": "Yayınlanan Lite fiyatları · ABD doları (USD)",
+    "label": "Yayınlanan PLUS / Pro fiyatları · ABD doları (USD)",
     "monthly": "Aylık",
     "yearly": "Yıllık",
     "annualPayment": "Yılda tek ödeme. Otomatik yenilenir.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Çeviri modelleri",
       "free": "GPT 6 Luna ve benzeri modeller",
-      "lite": "Gemini 3.8 Flash ve benzeri modeller"
+      "lite": "Haiku 5.5 ve benzeri modeller"
     },
     "feature": "Özellikler ve faydalar",
-    "highlights": "Lite İLE ÇEVİR",
+    "highlights": "PLUS / Pro İLE ÇEVİR",
     "reading": {
       "label": "Okuma",
       "free": "Tüm temel okuma özellikleri",

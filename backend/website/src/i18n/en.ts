@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Open a comic, connect your library, and translate the images you want to understand.",
     "ctaButton": "Start your reading journey",
     "pricingTitle": "Read for free. Choose your translation plan.",
-    "pricingDescription": "Compare Free and Lite manga translation: daily free pages, 1,200 new requests per rolling hour, and monthly or annual billing. Eligible first-time accounts get a 7-day trial.",
+    "pricingDescription": "PLUS / Pro subscriptions and permanent page packs. Pay quarterly or yearly; pages renew monthly. No subscription trial.",
     "freePlan": "Free",
     "freePlanDescription": "For a little reading every day",
     "free": "free",
@@ -93,7 +93,7 @@ export default {
       "Up to 10 new translation images per rolling 60 seconds"
     ],
     "freeNote": "The extension and website image workspace use standard translation. Daily pages reset in Asia/Shanghai time and do not roll over.",
-    "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Unlimited totals remain subject to short-term rate, image and service-capacity limits; no completion speed is guaranteed.",
+    "quotaNote": "One successfully generated version of an image in a chosen mode and language counts as one page. Duplicate requests and valid result reuse are not charged twice. An explicit new translation uses the current entitlement. Request frequency, image specifications and service capacity limits still apply; no completion speed is guaranteed.",
     "downloadTitle": "Install your manga translator extension",
     "downloadDescription": "Get NodeLane Comics for desktop Chrome, Edge or Firefox. Install from the available official store or download the package for your browser; features depend on the installed version.",
     "storeDescription": "Open your next story in the browser you already enjoy.",
@@ -144,7 +144,7 @@ export default {
       "Into the story."
     ],
     "seoFeaturesTitle": "Manga Translation, EPUB Reading & OPDS Libraries",
-    "seoPricingTitle": "Free Manga Translation & Lite Plans",
+    "seoPricingTitle": "Free Manga Translation & PLUS / Pro Plans",
     "seoDownloadTitle": "Manga Translator for Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "One page too far.",
@@ -206,7 +206,7 @@ export default {
             "title": "Use the NodeLane official channel",
             "paragraphs": [
               "Sign in and choose a target language. The official service persists tasks and valid results; a missing local translation cache can be restored from an available result rather than submitting the image again.",
-              "Free accounts receive 30 standard pages daily. Lite has no daily or monthly total cap, accepts up to 1,200 pages per rolling hour and remains subject to short-term rate and capacity limits. The extension provides standard translation only."
+              "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout."
             ]
           },
           {
@@ -491,7 +491,7 @@ export default {
           {
             "title": "Benefits and subscriptions",
             "paragraphs": [
-              "Free, Lite, existing PLUS, trial and bonus benefits follow their respective expiry and page rules shown in your account. Lite accepts up to 1,200 new pages per rolling hour. No daily or monthly total cap does not remove short-term rate, image or service-capacity limits.",
+              "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout.",
               "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
             ]
           },
@@ -559,8 +559,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "Is manga translation free, and what does Lite include?",
-        "answer": "Reading local originals is free and needs no account. Official translation requires sign-in; Free includes 30 classic pages per day. Lite costs US$5.99 monthly or US$59.99 yearly, with no daily or monthly classic total cap and up to 1,200 new pages per rolling hour. Rate and capacity limits apply. Eligible first-time accounts get a 7-day card-backed trial. PLUS is closed to new purchases; existing subscriptions keep their displayed benefits. Taxes and final amounts are shown at checkout.",
+        "question": "Is manga translation free, and what does PLUS / Pro include?",
+        "answer": "Local reading is free. Free accounts get 30 pages daily with GPT 6 Luna. PLUS includes 2,500 pages per month for US$6.66 per quarter or US$23.99 per year. Pro includes 4,000 pages per month for US$9.99 per quarter or US$35.99 per year. Both use Haiku 5.5. Pages are granted monthly without rollover; no subscription trial. Non-expiring packs: 3,500 pages for US$5.99 or 7,000 for US$9.99. Taxes and final totals appear at checkout.",
         "relatedPath": "/pricing/"
       },
       {
@@ -595,7 +595,7 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "How do Lite translation limits work?",
+        "question": "How do PLUS / Pro translation limits work?",
         "answer": "One account shares a limit of 100 new translation images per rolling 60 seconds and 1,200 per rolling 3,600 seconds across devices, modes and languages. Free allows 10 per rolling 60 seconds. Replaying the same request and reusing valid results are not counted again. Accepted tasks still count if they fail, are canceled or contain no text. Rejected requests or rolled-back database transactions release the reserved hourly slot. Retries follow the actual new-task admission rules. These limits do not guarantee completion speed.",
         "relatedPath": "/pricing/"
       },

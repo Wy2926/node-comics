@@ -52,7 +52,7 @@ test('all website locales omit the retired image feature from prose, metadata an
     clean(JSON.stringify(billingCopy(locale)), `${locale}: billing labels`);
     clean(JSON.stringify(billingBenefitCopy(locale)), `${locale}: billing benefits`);
     for (const pages of [0, 300]) {
-      const offer = { hourly_image_limit: 1200, monthly_redraw_pages: pages, interval: 'year' as const };
+      const offer = { hourly_image_limit: 1200, monthly_classic_pages: pages, interval: 'year' as const };
       clean(offerBenefits(offer, locale), `${locale}: offer benefits`);
       clean(renewalCopy(offer, locale), `${locale}: renewal`);
     }

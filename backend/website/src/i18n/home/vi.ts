@@ -140,7 +140,7 @@ const copy: HomeCopy = {
   "privacyTitle": "Đọc miễn phí. Chọn gói dịch phù hợp.",
   "privacyBody": "NodeLane Comics cung cấp tiện ích miễn phí và dịch đám mây theo tài khoản. Có giới hạn tần suất yêu cầu và năng lực dịch vụ. Hãy xem tình trạng cung cấp, quyền lợi và điều kiện thanh toán trước khi đăng ký.",
   "privacy": "Chính sách quyền riêng tư",
-  "pricing": "So sánh Free và Lite",
+  "pricing": "So sánh Free và PLUS / Pro",
   "ctaTitle": "Hiểu trang truyện tiếp theo.",
   "ctaBody": "Cài NodeLane Comics cho Chrome, Edge hoặc Firefox trên máy tính."
 };

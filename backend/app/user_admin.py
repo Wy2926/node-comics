@@ -27,7 +27,7 @@ def page(db, query, offset, limit, serialize):
 
 @router.get("/{user_id}/quota-periods")
 def quota_history(user_id: str, offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
-                  mode: Literal["classic", "redraw"] | None = None,
+                  mode: Literal["classic"] | None = None,
                   source: Literal["daily", "membership", "grant", "subscription"] | None = None,
                   db: Session = Depends(get_db)):
     require_user(db, user_id)

@@ -18,7 +18,7 @@ from test_quota_campaigns import (
     test_delivery_windows_expiry_and_registration_recovery,
     test_rollback_does_not_leave_receipt_or_partial_registration,
     test_independent_campaigns_and_users_preserve_quota_settlement,
-    test_permanent_redraw_grant_has_nullable_expiry_contract,
+    test_permanent_free_grant_has_nullable_expiry_contract,
     test_concurrent_delivery_is_exactly_once,
     test_oidc_concurrent_first_requests_get_one_user_and_award,
 )

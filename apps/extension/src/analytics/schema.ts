@@ -8,7 +8,7 @@ export const parameterValues = {
   method:['manual','automatic'],
   outcome:['success','failed','duplicate','cancelled','empty','partial','blocked','no_text'],
   channel:['official','local'],
-  mode:['original','classic','redraw','compare'],
+  mode:['original','classic','compare'],
   layout:['continuous','single'],
   search_mode:['direct','translated'],
   error_code:['network','permission','auth','quota','rate_limit','timeout','source_unavailable','unsupported','cancelled','unknown'],

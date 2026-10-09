@@ -1,4 +1,4 @@
-// Isolated real APIs + Chrome. Synthetic image provider; no payment or production data.
+// Isolated real APIs + Chrome. Synthetic page engine; no payment or production data.
 import assert from 'node:assert/strict';
 import {selectOption} from './select_helpers.mjs';
 import {createRequire} from 'node:module';
@@ -27,7 +27,7 @@ try {
   await adminPage.getByRole('link',{name:'用户管理'}).click();
   await adminPage.getByLabel('搜索',{exact:true}).fill(target.user.name);await adminPage.getByRole('button',{name:'筛选',exact:true}).click();
   await adminPage.getByRole('button',{name:'查看权益',exact:true}).click();
-  await adminPage.getByLabel('会员天数',{exact:true}).fill('7');await adminPage.getByLabel('每会员月重绘页数').fill('30');
+  await adminPage.getByLabel('会员天数',{exact:true}).fill('7');await adminPage.getByLabel('每 30 天翻译页数（可选）').fill('30');
   await adminPage.getByLabel('赠送备注').fill('Browser isolated seven-day operator gift');
   let originalExpiry;
   await adminPage.route('**/v1/admin/users/*/membership',async route=>{
@@ -42,7 +42,7 @@ try {
   await adminPage.getByRole('button',{name:'重试并核实原操作'}).click();
   await adminPage.getByText('赠送成功，权益已更新。',{exact:true}).waitFor();
   let detail=await request(adminApi,`/v1/admin/monitor/users/${target.user.id}`,operator);
-  assert.equal(detail.entitlements.plus_expires_at,originalExpiry);assert.equal(detail.entitlements.modes.redraw.quota.granted,30);
+  assert.equal(detail.entitlements.plus_expires_at,originalExpiry);assert.equal(detail.entitlements.subscription_quota.granted,30);
   check('Custom seven-day PLUS gift recovers a lost response after reopening, without duplicate extension or quota');
   await adminPage.getByRole('button',{name:'创建另一笔赠送'}).click();
   await selectOption(adminPage.getByLabel('赠送类型',{exact:true}),'quota');
@@ -50,12 +50,12 @@ try {
   const localDate=delta=>{const d=new Date(Date.now()+delta);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
   await adminPage.getByLabel('生效时间（留空立即生效）').fill(localDate(86400000));
   await adminPage.getByLabel('到期时间',{exact:true}).fill(localDate(3*86400000));
-  await adminPage.getByLabel('赠送备注').fill('Browser scheduled redraw grant');
+  await adminPage.getByLabel('赠送备注').fill('Browser scheduled page grant');
   await adminPage.getByRole('button',{name:'确认赠送',exact:true}).click();
   await adminPage.getByText('赠送成功，权益已更新。',{exact:true}).waitFor();
-  await adminPage.getByRole('cell',{name:'AI 重绘 Browser scheduled redraw grant'}).waitFor();
+  await adminPage.getByRole('cell',{name:'常规翻译 Browser scheduled page grant'}).waitFor();
   detail=await request(adminApi,`/v1/admin/monitor/users/${target.user.id}`,operator);
-  assert.equal(detail.grants.length,1);assert.equal(detail.grants[0].granted,12);assert.equal(detail.entitlements.modes.redraw.quota.available,30);
+  assert.equal(detail.grants.length,1);assert.equal(detail.grants[0].granted,12);assert.equal(detail.entitlements.subscription_quota.available,30);
   await screenshot(adminPage,'admin-gift-result');
   await adminPage.setViewportSize({width:390,height:844});await screenshot(adminPage,'admin-gift-narrow');
   assert(await adminPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

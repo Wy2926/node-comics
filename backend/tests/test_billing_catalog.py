@@ -17,10 +17,10 @@ def administrator(state):
 
 
 def quote(state, *, key='annual', plan='plus', pages=300, amount=9990, interval='year', trial_days=7,
-          trial_pages=None, hourly_image_limit=None, publish=True):
+          trial_pages=..., hourly_image_limit=None, publish=True):
     client, auth = state['client'], administrator(state)
-    revision = {'id':key+'-revision', 'name':plan.upper(), 'monthly_redraw_pages':pages,
-        'trial_days':trial_days, 'trial_redraw_pages': (30 if trial_days else 0) if trial_pages is None else trial_pages,
+    revision = {'id':key+'-revision', 'name':plan.upper(), 'monthly_classic_pages':pages,
+        'trial_days':trial_days, 'trial_classic_pages': (30 if trial_days else 0) if trial_pages is ... else trial_pages,
         'hourly_image_limit': hourly_image_limit}
     products = client.get('/v1/admin/billing/catalog', headers=auth).json()['products']
     if any(p['id'] == plan for p in products):
@@ -126,9 +126,9 @@ def test_annual_payment_grants_twelve_calendar_months_without_rollover(billing,s
         row=db.get(QuotaPeriod,paid[0].id)
         row.used,row.reserved=120,3
         db.commit()
-    assert at_rights(billing,start)['modes']['redraw']['quota']['available']==677
+    assert at_rights(billing,start)['modes']['classic']['quota']['available']==677
     second=at_rights(billing,paid[1].starts_at)
-    assert second['modes']['redraw']['quota']['available']==800
+    assert second['modes']['classic']['quota']['available']==800
     assert second['pending_previous_period_pages']==3
     assert at_rights(billing,end)['plan']=='free'
 
@@ -143,7 +143,7 @@ def test_annual_cancel_retains_year_and_failed_renewal_does_not_pregrant(billing
     billing['sub'].update(status='active',cancel_at_period_end=True)
     billing['sub']['items']['data'][0]['current_period_end']=end
     sync_subscription('sub_fixture')
-    assert rights(billing)['modes']['redraw']['quota']['available']==300
+    assert rights(billing)['modes']['classic']['quota']['available']==300
     assert at_rights(billing,timestamp(end)-timedelta(seconds=1))['plan']=='plus'
     invoice(billing,index=2,start=end,end=end+365*86400,status='open',total=9990)
     billing['sub']['status']='past_due'
@@ -169,7 +169,7 @@ def test_new_price_and_benefits_do_not_change_existing_subscription(billing):
     assert sorted(p.granted for p in periods())==[30,300,300]
     status=c.get('/v1/billing/status',headers=billing['auth']).json()
     assert status['subscription']['price']['unit_amount']==999
-    assert status['subscription']['price']['monthly_redraw_pages']==300
+    assert status['subscription']['price']['monthly_classic_pages']==300
     other=login(c,'new-customer')
     assert c.post('/v1/billing/checkouts',headers=other,json={'provider':'stripe', 'price_id':'fixture-price'}).status_code==409
     assert c.post('/v1/billing/checkouts',headers=other,json={'provider':'stripe', 'price_id':'newmonthly'}).status_code==200
@@ -197,8 +197,8 @@ def test_multiple_plans_custom_trial_and_zero_quota_keep_classic_access(billing)
     invoice(billing,total=499)
     sync_subscription('sub_fixture')
     value=rights(billing)
-    assert value['plan']=='light' and value['modes']['classic']['unlimited']
-    assert value['modes']['redraw']['allowed'] is False and value['modes']['redraw']['quota'] is None
+    assert value['plan']=='light' and not value['modes']['classic']['unlimited']
+    assert value['modes']['classic']['allowed'] is False and value['subscription_quota']['available'] == 0
     assert {p['plan_id'] for p in billing['client'].get('/v1/billing/catalog').json()['offers']}=={'plus','light'}
 
 
@@ -240,4 +240,4 @@ def test_historical_paid_invoice_does_not_expire_current_trial(billing):
     invoice(billing,start=billing['at']-90*86400)
     sync_subscription('sub_fixture')
     assert rights(billing)['plan']=='plus'
-    assert rights(billing)['modes']['redraw']['quota']['available']==30
+    assert rights(billing)['modes']['classic']['quota']['available']==30

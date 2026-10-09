@@ -1,11 +1,21 @@
 from conftest import inspect_job
 from conftest import quota_usage
 from conftest import run_job, claim_job
+import pytest
 from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import func, select
-from conftest import create, login_plus as login, upload, submit_asset, png_variant, request_for_job, configure_system_limits
+from conftest import create, login_plus, upload, submit_asset, png_variant, request_for_job, configure_system_limits
+
+
+@pytest.fixture(autouse=True)
+def finite_budget(client):
+    configure_system_limits(free_daily_pages=0)
+
+
+def login(client, name="alice"):
+    return login_plus(client, name, pages=300)
 
 
 def test_auth_private_assets_and_admin_boundaries(client, png):
@@ -14,9 +24,9 @@ def test_auth_private_assets_and_admin_boundaries(client, png):
     assert client.get(f"/v1/images/{asset}/content").status_code == 404
     assert client.get(f"/v1/images/{asset}/access", headers=bob).status_code == 404
     assert client.delete(f"/v1/images/{asset}", headers=bob).status_code == 404
-    assert client.get("/v1/admin/providers", headers=alice).status_code == 403
+    assert client.get("/v1/admin/translation-providers", headers=alice).status_code == 403
     assert client.get(f"/v1/images/{asset}/content", headers=alice).status_code == 404
-    assert {mode['id'] for mode in client.get('/v1/capabilities').json()['modes']} == {'classic', 'redraw'}
+    assert {mode['id'] for mode in client.get('/v1/capabilities').json()['modes']} == {'classic'}
 
 
 def test_idempotency_binds_input_and_parameters(client, png):
@@ -33,18 +43,18 @@ def test_idempotency_binds_input_and_parameters(client, png):
     assert quota_usage(client, auth)["reserved"] == 1
     with session_factory()() as db:
         for model in (Job, Ledger, JobStage):
-            assert db.scalar(select(func.count()).select_from(model)) == 1
+            assert db.scalar(select(func.count()).select_from(model)) == (2 if model is JobStage else 1)
 
 
 def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatch):
-    from app.adapters.images import TranslationOutput
+
     from conftest import run_job as process_job
     import app.workers as workers
     calls = []
     def fake_adapter(*args):
         calls.append(1)
-        return TranslationOutput(png, request_id="req-test", usage={"total_tokens": 45})
-    monkeypatch.setattr(workers, "redraw", fake_adapter)
+        return png
+    monkeypatch.setattr("conftest.fixture_output", fake_adapter)
     auth = login(client)
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
@@ -65,37 +75,10 @@ def test_duplicate_worker_settles_once_and_cache_is_free(client, png, monkeypatc
     assert quota_usage(client, auth)["reserved"] == 1
 
 
-def test_known_failure_releases_and_unknown_never_replays(client, png, monkeypatch):
-    import app.workers as workers
-    from app.errors import ProcessingError
-    from conftest import run_job as process_job
-    auth = login(client)
-    asset = upload(client, auth, png)
-    calls = []
-    def unknown(*args):
-        calls.append(1)
-        raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "待核实", unknown=True)
-    monkeypatch.setattr(workers, "redraw", unknown)
-    job_id = create(client, auth, asset).json()["id"]
-    process_job(job_id)
-    process_job(job_id)
-    assert calls == [1]
-    assert inspect_job(job_id)["status"] == "outcome_unknown"
-    assert quota_usage(client, auth)["reserved"] == 1
-    assert submit_asset(client, auth, asset, key="retry", regenerate=True, rerun_job_id=job_id).json()["error"]["code"] == "UNKNOWN_COST_ACK_REQUIRED"
-    def rejected(*args):
-        raise ProcessingError("PROVIDER_REJECTED", "请求被拒绝")
-    monkeypatch.setattr(workers, "redraw", rejected)
-    next_id = create(client, auth, upload(client, auth, png_variant(png, 3)), key="known-failure").json()["id"]
-    process_job(next_id)
-    usage = quota_usage(client, auth)
-    assert usage["used"] == 0 and usage["reserved"] == 1
-
-
 def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypatch):
     from conftest import run_job as process_job
     import app.workers as workers
-    monkeypatch.setattr(workers, "redraw", lambda *args: (_ for _ in ()).throw(AssertionError("must not call")))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: (_ for _ in ()).throw(AssertionError("must not call")))
     auth = login(client)
     job_id = create(client, auth, upload(client, auth, png)).json()["id"]
     for _ in range(2):
@@ -107,30 +90,12 @@ def test_cancel_queued_is_idempotent_and_no_upstream_call(client, png, monkeypat
     assert sum(item["kind"] == "release" for item in usage["items"]) == 1
 
 
-def test_running_cancel_or_delete_discards_output_without_charge(client, png, monkeypatch):
-    import app.workers as workers
-    from app.adapters.images import TranslationOutput
-    auth = login(client)
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
-    def cancel_during_provider(*args):
-        response = client.delete("/v1/translations/" + request_for_job(client, auth, job_id), headers=auth)
-        assert response.status_code == 200
-        return TranslationOutput(png)
-    monkeypatch.setattr(workers, "redraw", cancel_during_provider)
-    run_job(job_id)
-    job = inspect_job(job_id)
-    assert job["status"] == "cancelled" and job["output_asset_id"] is None
-    assert quota_usage(client, auth)["used"] == 0
-    assert client.get(f"/v1/images/{asset}/content", headers=auth).status_code == 404
-
-
 def test_missing_output_does_not_silently_create_paid_work(client, png, monkeypatch):
     import app.workers as workers
-    from app.adapters.images import TranslationOutput
+
     from app.db import session_factory
     from app.models import Asset, now
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(png))
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     auth = login(client)
     asset = upload(client, auth, png)
     job_id = create(client, auth, asset).json()["id"]
@@ -150,8 +115,8 @@ def test_missing_output_does_not_silently_create_paid_work(client, png, monkeypa
 
 def test_cross_user_translation_ids_and_completed_bytes_are_private(client, png, monkeypatch):
     import app.workers as workers
-    from app.adapters.images import TranslationOutput
-    monkeypatch.setattr(workers, 'redraw', lambda *args: TranslationOutput(png))
+
+    monkeypatch.setattr("conftest.fixture_output", lambda *args: png)
     alice, bob = login(client), login(client, 'bob')
     source = upload(client, alice, png)
     job_id = create(client, alice, source).json()['id']
@@ -177,58 +142,12 @@ def test_independent_page_quota_and_cancellation_are_atomic(client, png):
     second = create(client,auth,assets[1],key='page-1')
     denied = create(client,auth,assets[2],key='page-2')
     assert second.status_code == 202 and denied.status_code == 403
-    assert denied.json()['error']['code'] == 'REDRAW_QUOTA_EXHAUSTED'
+    assert denied.json()['error']['code'] == 'DAILY_QUOTA_EXHAUSTED'
     assert quota_usage(client,auth)['reserved'] == 2
     for item in [first, second.json()]:
         path = '/v1/translations/' + request_for_job(client,auth,item['id']) + '/cancel'
         assert client.post(path,headers=auth).json()['state'] == 'failed'
     assert quota_usage(client,auth)['reserved'] == 0
-
-
-def test_unknown_reservation_deadline_and_late_reconciliation_no_debit(client, png, monkeypatch):
-    import app.workers as workers
-    from app.db import session_factory
-    from app.models import Job, now
-    from app.dispatcher import recover_once
-    from app.errors import ProcessingError
-    def timeout(*args):
-        raise ProcessingError("UPSTREAM_OUTCOME_UNKNOWN", "待核实", unknown=True)
-    monkeypatch.setattr(workers, "redraw", timeout)
-    auth, admin = login(client), login(client, "admin")
-    asset = upload(client, auth, png)
-    job_id = create(client, auth, asset).json()["id"]
-    run_job(job_id)
-    with session_factory()() as db:
-        db.get(Job, job_id).unknown_since = now() - timedelta(hours=2)
-        db.commit()
-    recover_once()
-    recover_once()
-    assert quota_usage(client, auth)["reserved"] == 0
-    output = upload(client, auth, png)
-    response = client.post(f"/v1/admin/jobs/{job_id}/reconcile", headers=admin, json={"resolution": "succeeded", "output_asset_id": output, "note": "已向供应商核实"})
-    assert response.status_code == 200
-    assert response.json()["status"] == "succeeded" and response.json()["settlement"] == "released"
-    assert quota_usage(client, auth)["used"] == 0
-
-
-def test_worker_lease_loss_after_intent_never_requeues(client, png):
-    from app.db import session_factory
-    from app.models import Attempt, Job, now
-    from app.queue_models import ExecutionLease
-    from conftest import claim_job as claim
-    from app.dispatcher import recover_lease
-    auth = login(client)
-    job_id = create(client, auth, upload(client, auth, png)).json()["id"]
-    lease_id = claim(job_id)
-    with session_factory()() as db:
-        attempt = db.get(Attempt, db.get(Job, job_id).attempt_id)
-        attempt.call_started_at = now() - timedelta(hours=1)
-        db.get(ExecutionLease, lease_id).expires_at = now() - timedelta(seconds=1)
-        db.commit()
-    recover_lease(lease_id)
-    with session_factory()() as db:
-        assert db.get(Job, job_id).status == "outcome_unknown"
-    assert claim(job_id) is None
 
 
 def test_worker_lease_before_intent_is_safe_to_requeue(client, png):
@@ -252,21 +171,6 @@ def test_worker_lease_before_intent_is_safe_to_requeue(client, png):
     assert claim(job_id) != lease_id
 
 
-def test_invalid_output_and_aspect_ratio_are_not_delivered(client, png, monkeypatch):
-    import app.workers as workers
-    from app.adapters.images import TranslationOutput
-    auth = login(client)
-    asset = upload(client, auth, png)
-    buffer = BytesIO()
-    Image.new("RGB", (800, 100)).save(buffer, "PNG")
-    monkeypatch.setattr(workers, "redraw", lambda *args: TranslationOutput(buffer.getvalue()))
-    job_id = create(client, auth, asset).json()["id"]
-    run_job(job_id)
-    job = inspect_job(job_id)
-    assert job["status"] == "failed" and job["error"]["code"] == "INVALID_PROVIDER_OUTPUT"
-    assert quota_usage(client, auth)["available"] == 300
-
-
 def test_insufficient_quota_creates_no_job(client, png):
     auth = login(client)
     from app.db import session_factory
@@ -279,7 +183,7 @@ def test_insufficient_quota_creates_no_job(client, png):
         assert create(client, auth, asset, key=f"job-{i}").status_code == 202
     asset = upload(client, auth, png_variant(png, 2))
     rejected = create(client, auth, asset, key="no-credit")
-    assert rejected.status_code == 403 and rejected.json()["error"]["code"] == "REDRAW_QUOTA_EXHAUSTED"
+    assert rejected.status_code == 403 and rejected.json()["error"]["code"] == "DAILY_QUOTA_EXHAUSTED"
     assert client.get("/v1/translations", headers=auth).json()["total"] == 2
     assert quota_usage(client, auth)["reserved"] == 2
 
@@ -289,9 +193,9 @@ def test_admin_quota_adjustment_idempotent_and_private_provider_list(client):
     user_id = client.get("/v1/me", headers=auth).json()["user"]["id"]
     headers = {**admin, "Idempotency-Key": "grant-10"}
     for _ in range(2):
-        assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "redraw_monthly", "pages": 10, "note": "test"}).json()["entitlements"]["modes"]["redraw"]["quota"]["available"] == 310
-    assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "redraw_monthly", "pages": 11, "note": "test"}).status_code == 409
-    providers = client.get("/v1/admin/providers", headers=admin)
+        assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "classic_monthly", "pages": 10, "note": "test"}).json()["entitlements"]["modes"]["classic"]["quota"]["available"] == 310
+    assert client.post(f"/v1/admin/users/{user_id}/quota-compensations", headers=headers, json={"kind": "classic_monthly", "pages": 11, "note": "test"}).status_code == 409
+    providers = client.get("/v1/admin/translation-providers", headers=admin)
     assert "isolated-test-provider-key" not in providers.text
     assert providers.json()["items"][0]["credential_configured"]
 

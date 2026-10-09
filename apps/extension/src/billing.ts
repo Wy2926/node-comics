@@ -1,19 +1,18 @@
 import {msg} from './i18n/runtime';
 import type {MembershipGift} from './types';
+import type {UiLocale} from './i18n/locales';
 
 export interface BillingPrice {
   id:string;plan_id:string;plan_revision_id:string;name:string;version:number;
-  currency:string;unit_amount:number;interval:'month'|'year';trial_days:number;
+  currency:string;unit_amount:number;interval:'month'|'quarter'|'year'|'once';trial_days:number;
+  service_plan_id?:string;quota_pages?:number;quota_validity_days?:number|null;
   hourly_image_limit?:number|null;
 }
 export interface BillingOffer extends BillingPrice {channels:BillingChannel[]}
-export interface BillingCatalog {enabled:boolean;offers:BillingOffer[]}
 export type BillingProvider='stripe'|'creem';
 export interface BillingChannel {provider:BillingProvider;binding_id:string;trial_days:number}
+export interface BillingCheckout {id:string;provider:BillingProvider;price:BillingOffer;idempotency_key:string|null;error:string|null}
 export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';
-export function selectedChannel(offer:BillingOffer|undefined,preferred:BillingProvider|'',pending:BillingProvider|null=null){
-  return offer?.channels.find(channel=>channel.provider===(pending??preferred))??(pending?undefined:offer?.channels[0]);
-}
 export function hasManagedSubscription(status:string|undefined,entitlementExpiresAt:string|null|undefined,now=Date.now()){
   return !!status&&(['active','trialing','past_due','unpaid','paused','incomplete','scheduled_cancel'].includes(status)||!!entitlementExpiresAt&&Date.parse(entitlementExpiresAt)>now);
 }
@@ -26,11 +25,17 @@ export function offerAmount(offer:BillingPrice,locale:string){
 }
 
 export interface BillingStatus {
-  enabled:boolean; providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];provider:BillingProvider|null; environment:'test'|'live'; trial_eligible:boolean; checkout_pending:boolean;
-  offers:BillingOffer[];checkout_price:BillingOffer|null;checkout_provider:BillingProvider|null;
+  enabled:boolean; providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];provider:BillingProvider|null; environment:'test'|'live'; trial_eligible:boolean;
+  offers:BillingOffer[];quota_offers?:BillingOffer[];
+  subscription_checkout:BillingCheckout|null;
   entitlement_expires_at:string|null;
   gift:MembershipGift|null;
   subscription:null|{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;trial_ends_at:string|null;paid_ends_at:string|null;auto_renew:boolean;can_cancel:boolean;renewal_state:'normal'|'deferring'|'deferred'|'resuming'|'canceling'|'canceled'|'attention';resume_at:string|null};
+}
+
+export function pricingUrl(locale:UiLocale){
+  const prefix=locale==='zh-CN'?'':`/${locale.toLowerCase()}`;
+  return `https://comics.nodelane.net${prefix}/pricing/`;
 }
 
 export function paymentUrl(value:string,provider:BillingProvider,portal=false) {

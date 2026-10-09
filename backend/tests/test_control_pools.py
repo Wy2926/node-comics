@@ -1,13 +1,13 @@
 """Live shared capacities, persistence, authorization and lease-safe shrink."""
 import pytest
-from conftest import login, login_plus, upload, create
+from conftest import login, login_plus, upload, create, png_variant
 from app.control_pools import initialize_pools, report_pools
 from app.db import session_factory
 from app.queue_models import ComputeNode, ExecutionLease
 from app.scheduler import claim_stage
 
 
-@pytest.mark.parametrize('stage,slots', [('text', 17), ('redraw', 21), ('validate_upload', 7)])
+@pytest.mark.parametrize('stage,slots', [('text', 17), ('validate_upload', 7)])
 def test_capacity_is_editable_and_worker_restart_preserves_it(client, stage, slots):
     path = f'/v1/admin/compute-nodes/control-{stage}/config'
     admin = login(client, 'admin')
@@ -24,7 +24,7 @@ def test_capacity_is_editable_and_worker_restart_preserves_it(client, stage, slo
     assert client.get(path, headers=admin).json()['config'] == {'execution_slots': slots}
 
 
-@pytest.mark.parametrize('stage,config', [('text', {'execution_slots': True}), ('redraw', {'execution_slots': 101}),
+@pytest.mark.parametrize('stage,config', [('text', {'execution_slots': True}), ('text', {'execution_slots': 101}),
     ('validate_upload', {'execution_slots': 33}), ('text', {'execution_slots': 0}),
     ('text', {'execution_slots': 2, 'engine': {}})])
 def test_pool_schema_rejects_invalid_or_image_only_configuration(client, stage, config):
@@ -37,24 +37,29 @@ def test_shrink_keeps_inflight_lease_and_blocks_new_claims(client, png):
     auth, admin = login_plus(client), login(client,'admin')
     asset = upload(client,auth,png)
     create(client,auth,asset,key='first')
-    second = create(client,auth,upload(client,auth,png+b' '),key='second').json()['id']
+    second = create(client,auth,upload(client,auth,png_variant(png,1)),key='second').json()['id']
     with session_factory()() as db:
-        first = claim_stage(db,'control-redraw')
+        from app.queue_models import JobStage
+        from sqlalchemy import select
+        for stage in db.scalars(select(JobStage).where(JobStage.name == 'page')):
+            stage.name = 'validate_upload'
+        db.flush()
+        first = claim_stage(db,'control-validate_upload')
         db.commit()
         assert first
         lease_id = first.id
-    result = client.put('/v1/admin/compute-nodes/control-redraw/config',headers=admin,
-        json={'name':'redraw','enabled':True,'expected_version':1,'config':{'execution_slots':1}})
+    result = client.put('/v1/admin/compute-nodes/control-validate_upload/config',headers=admin,
+        json={'name':'validate_upload','enabled':True,'expected_version':1,'config':{'execution_slots':1}})
     assert result.status_code == 200
     with session_factory()() as db:
         assert db.get(ExecutionLease,lease_id).completed_at is None
-        assert claim_stage(db,'control-redraw') is None
+        assert claim_stage(db,'control-validate_upload') is None
         db.commit()
     # Growing the same live pool allows the waiting page without a restart.
-    assert client.put('/v1/admin/compute-nodes/control-redraw/config',headers=admin,
-        json={'name':'redraw','enabled':True,'expected_version':2,'config':{'execution_slots':2}}).status_code == 200
+    assert client.put('/v1/admin/compute-nodes/control-validate_upload/config',headers=admin,
+        json={'name':'validate_upload','enabled':True,'expected_version':2,'config':{'execution_slots':2}}).status_code == 200
     with session_factory()() as db:
-        next_lease = claim_stage(db,'control-redraw')
+        next_lease = claim_stage(db,'control-validate_upload')
         assert next_lease and next_lease.job_id == second
         db.commit()
 
@@ -63,4 +68,4 @@ def test_node_schema_has_server_defaults_without_language_whitelist(client):
     result = client.get('/v1/admin/compute-nodes/config-schema',headers=login(client,'admin')).json()
     assert 'languages' not in result
     assert 'allowed_languages' not in result['defaults']
-    assert result['pool_limits'] == {'text':100,'redraw':100,'validate_upload':32}
+    assert result['pool_limits'] == {'text':100,'validate_upload':32}

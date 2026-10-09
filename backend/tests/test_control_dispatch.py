@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app import scheduler, workers
 from app.db import session_factory
-from app.models import Job, Provider, now
+from app.models import Job, now
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from test_cluster_scheduler import add_job, scheduler_case  # noqa: F401
 from test_classic import text_database  # noqa: F401
@@ -84,23 +84,6 @@ def test_concurrent_batches_never_overbook_or_duplicate(scheduler_case):
         assert db.scalar(select(func.count()).select_from(ExecutionLease)) == len(stages)
 
 
-def test_batch_rechecks_supplier_concurrency_after_each_pick(scheduler_case):
-    config = {**scheduler_case, 'provider': {'id': 'batch-redraw'}}
-    for _ in range(5):
-        add_job(config, stage='redraw')
-    with session_factory()() as db:
-        node = db.get(ComputeNode, 'node-0')
-        node.capacity, node.capabilities, node.engine_version = 8, ['redraw'], 'control'
-        db.add(Provider(id='batch-redraw', enabled=True, config={'concurrency': 1}))
-        for job in db.scalars(select(Job)):
-            job.mode = 'redraw'
-        db.commit()
-        leases = scheduler.claim_batch(db, node.id)
-        db.commit()
-        assert len(leases) == 1
-        assert not scheduler.claim_batch(db, node.id)
-
-
 def test_prepared_batch_revalidates_and_does_not_repeat_full_election(scheduler_case, monkeypatch):
     jobs = [add_job(scheduler_case) for _ in range(5)]
     set_capacity(4)
@@ -162,18 +145,18 @@ def test_dispatch_refills_without_prefetch_and_rotates_pools(monkeypatch):
     monkeypatch.setattr(workers, 'session_factory', lambda: lambda: nullcontext(SimpleNamespace(commit=lambda: None)))
     monkeypatch.setattr(workers, 'claim_batch', claim)
     wake, stopping = Event(), Event()
-    dispatch = workers.ControlDispatcher(Executor(), 'test-worker', {'text': 8, 'redraw': 8, 'validate_upload': 4}, wake)
-    assert dispatch.dispatch(stopping) == 12
-    assert order == ['text', 'redraw', 'validate_upload']
+    dispatch = workers.ControlDispatcher(Executor(), 'test-worker', {'text': 8, 'validate_upload': 4}, wake)
     assert dispatch.dispatch(stopping) == 8
-    assert order[3:] == ['redraw', 'validate_upload']
+    assert order == ['text', 'validate_upload']
+    assert dispatch.dispatch(stopping) == 4
+    assert order[2:] == ['validate_upload']
     assert dispatch.dispatch(stopping) == 0
-    assert len(pending) == len(dispatch.futures) == 20
+    assert len(pending) == len(dispatch.futures) == 12
     pending[0].set_result(None)
     assert wake.is_set()
     dispatch.reap()
     assert dispatch.dispatch(stopping) == 1
-    assert len(dispatch.futures) == 20
+    assert len(dispatch.futures) == 12
 
 
 def test_idle_delay_tracks_retry_deadline(scheduler_case):

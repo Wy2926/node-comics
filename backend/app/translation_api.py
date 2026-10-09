@@ -16,7 +16,7 @@ from .db import get_db, session_factory
 from .errors import problem
 from .jobs import cancel_job, create_job
 from .languages import Language
-from .models import Asset, Attempt, ClassicState, Job, Ledger, TextCall, User, now
+from .models import Asset, Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ExecutionLease
 from .providers import digest
 from .request_models import RequestBody
@@ -39,7 +39,7 @@ class ImageDescriptor(RequestBody):
 
 class TranslationInput(RequestBody):
     image: ImageDescriptor | None = None
-    mode: Literal['classic', 'redraw'] | None = None
+    mode: Literal['classic'] | None = None
     target_language: Language | None = None
     retry_of: UUID | None = None
     regenerate_of: UUID | None = None
@@ -101,22 +101,18 @@ def resolved_execution_ids(db, entries):
     """A withdrawn result may expose only its owner's verified terminal verdict."""
     candidates = {key for key, entry in entries.items() if entry.status in
         {'succeeded', 'no_text', 'failed', 'cancelled'} and entry.completed_at and
-        entry.settlement in {'settled', 'released'}}
+        entry.settlement in {'settled', 'released', 'included'}}
     if not candidates:
         return set()
-    reconciled = select(Ledger.id).where(Ledger.job_id == Job.id, Ledger.owner_id == Job.owner_id,
-        Ledger.kind == 'reconcile', Ledger.transaction_key == Job.id + ':reconcile').exists()
     live_lease = select(ExecutionLease.id).where(ExecutionLease.job_id == Job.id,
         ExecutionLease.completed_at.is_(None)).exists()
     live_text = select(TextCall.id).where(TextCall.job_id == Job.id, TextCall.completed_at.is_(None)).exists()
-    unknown_image = select(Attempt.id).where(Attempt.job_id == Job.id, Attempt.call_started_at.is_not(None),
-        or_(Attempt.completed_at.is_(None), Attempt.cost_state.not_in({'reported', 'estimated'}))).exists()
     unknown_text = select(TextCall.id).where(TextCall.job_id == Job.id,
         TextCall.cost_state.not_in({'reported', 'estimated'})).exists()
     attempt_exists = select(Attempt.id).where(Attempt.job_id == Job.id, Attempt.id == Job.attempt_id).exists()
     never_started = and_(Job.attempt_id.is_(None), Job.status.in_({'failed', 'cancelled', 'no_text'}))
     return set(db.scalars(select(Job.id).where(Job.id.in_(candidates), ~live_lease, ~live_text,
-        or_(reconciled, and_(~unknown_image, ~unknown_text, or_(attempt_exists, never_started))))))
+        ~unknown_text, or_(attempt_exists, never_started))))
 
 
 def translation_page(db, rows):

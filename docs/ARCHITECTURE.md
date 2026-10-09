@@ -2,7 +2,7 @@
 
 本文描述当前实现。[翻译集群](TRANSLATION_CLUSTER_DESIGN.md)使用临时输入与稀疏覆盖层，[文件存储](OBJECT_STORAGE.md)规定终态清理和结果交付。
 
-客户端为 WXT + React + TypeScript；控制服务为 FastAPI + SQLAlchemy/Alembic，API、control-worker、maintenance 独立运行。PostgreSQL 持久化任务、租约、权益和检查点，中心共享磁盘暂存原图、持久保存覆盖层和重绘结果。数据库升级至当前迁移版本，不读取旧远端翻译结果；切换规则见[部署规范](DEPLOYMENT.md)，运行配置见[后端说明](../backend/README.md)。
+客户端为 WXT + React + TypeScript；控制服务为 FastAPI + SQLAlchemy/Alembic，API、control-worker、maintenance 独立运行。PostgreSQL 持久化任务、租约、权益和检查点，中心共享磁盘暂存原图、持久保存覆盖层结果。数据库升级至当前迁移版本，不读取旧远端翻译结果；切换规则见[部署规范](DEPLOYMENT.md)，运行配置见[后端说明](../backend/README.md)。
 
 ## 插件与来源
 
@@ -17,7 +17,6 @@
 公开入口为 `PUT /v1/translations/{id}`。客户端保存 36 字符请求 UUID 与固定 64 字符本地页面键，按快照补传缺失原图，上传自动排队；批量快照与 ETag 恢复未知提交，不维护阅读会话。当前页仅提供短时优先提示，长期任务不依赖插件后台常驻。分钟准入、请求保护、调度容量和计费额度独立，接口见[翻译接口契约](READING_TRANSLATION_CONTRACT.md)。
 
 - **常规翻译**：图像节点领取整页租约，从中心按当前租约取图，执行检测、OCR、抹字和嵌字；中心调用文本供应商并持久化分析／译文。节点一次提交裁剪的无损 RGBA WebP 覆盖层，中心核对租约、版本、摘要并落盘后结算，终态提交后删除原图。见[计算协议](COMPUTE_PROTOCOL.md)。
-- **AI 重绘**：中心独立执行池调用兼容 `POST /v1/images/edits` 的供应商，仅传图片与目标语言，后端构造提示词。输出经过地址安全、解码、归属与持久化验证后交付；未知上游结果先核实，不能盲目重发。
 - **文本供应商**：独立的供应商及不可变配置版本，任务固定配置；按供应商限流、统一重试与计量，见[供应商契约](TRANSLATION_PROVIDERS.md)。
 
 节点不连接数据库，不持有对象存储或 LLM 密钥。租约代次、处理时限与停止回执保护取消和跨节点恢复；缓存不提供执行授权。任务领取见[集群设计](TRANSLATION_CLUSTER_DESIGN.md)。

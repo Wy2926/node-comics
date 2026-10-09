@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Отмените подписку до следующего продления."
   },
   "publishedPricing": {
-    "label": "Опубликованные цены Lite · Доллары США (USD)",
+    "label": "Опубликованные цены PLUS / Pro · Доллары США (USD)",
     "monthly": "Ежемесячно",
     "yearly": "Ежегодно",
     "annualPayment": "Один ежегодный платеж. Обновляется автоматически.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Модели перевода",
       "free": "GPT 6 Luna и аналогичные модели",
-      "lite": "Gemini 3.8 Flash и аналогичные модели"
+      "lite": "Haiku 5.5 и аналогичные модели"
     },
     "feature": "Особенности и преимущества",
-    "highlights": "ПЕРЕВОД С ПОМОЩЬЮ Lite",
+    "highlights": "ПЕРЕВОД С ПОМОЩЬЮ PLUS / Pro",
     "reading": {
       "label": "Чтение",
       "free": "Все основные функции чтения",

@@ -22,9 +22,8 @@ from .db import get_db, session_factory
 from .runtime import check_runtime
 from .errors import problem
 from .entitlements import entitlements_json
-from .models import Ledger, Provider, User
-from .providers import LANGUAGES, credential
-from .languages import REDRAW_LANGUAGES
+from .models import Ledger, User
+from .providers import LANGUAGES
 from .middleware import BodyLimitMiddleware
 from .admin_api import router as admin_router
 from .node_admin import router as node_admin_router
@@ -207,7 +206,6 @@ def my_entitlements(user: User = Depends(identity), db: Session = Depends(get_db
 @app.get("/v1/capabilities", response_model=CapabilitiesResponse)
 def capabilities(db: Session = Depends(get_db), user: User | None = Depends(optional_identity)):
     cfg = settings()
-    redraw_enabled = any(credential(provider.config) for provider in db.scalars(select(Provider).where(Provider.enabled.is_(True))))
     from .classic_config import enabled as classic_enabled
     entitlements = entitlements_json(db, user) if user else None
     from datetime import timedelta
@@ -217,8 +215,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
         ComputeNode.heartbeat_at > now() - timedelta(seconds=cfg.cluster_node_timeout_seconds),
         ComputeNode.runtime_report['overlay_tiles'].as_boolean().is_(True)).limit(1))
     return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db,
-                plan_id=entitlements['service_plan'] if entitlements else 'guest'), "languages": list(LANGUAGES)},
-                      {"id": "redraw", "label": "AI 重绘翻译", "enabled": redraw_enabled, "languages": REDRAW_LANGUAGES}],
+                plan_id=entitlements['service_plan'] if entitlements else 'guest'), "languages": list(LANGUAGES)}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "representations": ['overlay-v1', 'full-image-v1', 'original'] + (['overlay-tiles-v1'] if tiled else []),
             # Retain the numeric field for existing clients; area is derived from the sole dimension ceiling.

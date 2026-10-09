@@ -184,7 +184,7 @@ def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_ex
         db.add(QuotaPeriod(**spec, used=2, reserved=0))
         db.commit()
     old = client.get('/v1/admin/system-settings', headers=admin).json()
-    values = {**old['values'], 'free_daily_pages': 17, 'plus_monthly_redraw_pages': 77}
+    values = {**old['values'], 'free_daily_pages': 17}
     changed = client.put('/v1/admin/system-settings', headers=admin, json={'expected_version': old['version'], 'values': values})
     assert changed.status_code == 200, changed.text
     with session_factory()() as db:
@@ -192,12 +192,12 @@ def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_ex
         assert allowance_json(db, user, DAILY)['granted'] == previous_pages
         assert allowance_json(db, db.get(User, fresh_id), DAILY)['granted'] == 17
         assert period_spec(user, DAILY, now() + timedelta(days=1), db=db)['granted'] == 17
-        assert db.get(User, plus_id).plus_monthly_pages == 300
+        assert db.get(User, plus_id).plus_monthly_pages is None
     membership = client.post(f'/v1/admin/users/{fresh_id}/membership', headers={**admin, 'Idempotency-Key': 'new-default-membership'},
         json={'action': 'extend', 'days': 30, 'note': 'isolated new default'})
     assert membership.status_code == 200, membership.text
     with session_factory()() as db:
-        assert db.get(User, fresh_id).plus_monthly_pages == 77
+        assert db.get(User, fresh_id).plus_monthly_pages is None
     audit = client.get('/v1/admin/audit?action=system_settings.update', headers=admin).json()
     assert audit['total'] == 1
     assert audit['items'][0]['before']['values']['free_daily_pages'] == old['values']['free_daily_pages']

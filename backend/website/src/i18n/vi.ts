@@ -80,7 +80,7 @@ export default {
     "ctaDescription": "Để lại bản dịch cho NodeLane Comics. Lưu sự chú ý của bạn cho trang tiếp theo.",
     "ctaButton": "Bắt đầu hành trình đọc của bạn",
     "pricingTitle": "Đọc miễn phí. Chọn gói dịch của bạn.",
-    "pricingDescription": "So sánh gói Miễn phí và Lite: trang miễn phí hằng ngày, 1.200 yêu cầu mới trong mỗi khoảng 60 phút trượt và thanh toán theo tháng hoặc năm. Tài khoản mới đủ điều kiện được dùng thử 7 ngày.",
+    "pricingDescription": "PLUS / Pro và gói trang không hết hạn. Thanh toán theo quý hoặc năm, cấp trang hàng tháng. Không có dùng thử thuê bao.",
     "freePlan": "Miễn phí",
     "freePlanDescription": "Để đọc một chút mỗi ngày",
     "free": "miễn phí",
@@ -93,7 +93,7 @@ export default {
       "Tối đa 10 ảnh dịch mới trong mỗi khoảng 60 giây trượt"
     ],
     "freeNote": "Hạn mức ngày đặt lại theo giờ Asia/Shanghai, không cộng dồn. Tiện ích cung cấp dịch thông thường; chế độ khác trong công cụ dịch ảnh website tùy quyền thực tế của tài khoản.",
-    "quotaNote": "Một phiên bản hình ảnh được tạo thành công ở chế độ và ngôn ngữ đã chọn được tính là một trang. Yêu cầu trùng lặp và sử dụng lại kết quả hợp lệ không bị tính phí hai lần. Một bản dịch mới rõ ràng sử dụng quyền hiện tại. Tổng số không giới hạn vẫn phải tuân theo các giới hạn về tốc độ, hình ảnh và dung lượng dịch vụ ngắn hạn; không có tốc độ hoàn thành được đảm bảo.",
+    "quotaNote": "Một phiên bản hình ảnh được tạo thành công ở chế độ và ngôn ngữ đã chọn được tính là một trang. Yêu cầu trùng lặp và sử dụng lại kết quả hợp lệ không bị tính phí hai lần. Một bản dịch mới rõ ràng sử dụng quyền hiện tại. Vẫn áp dụng giới hạn tần suất, kích thước hình ảnh và năng lực dịch vụ; không đảm bảo tốc độ hoàn thành.",
     "downloadTitle": "Cài đặt tiện ích mở rộng dịch truyện tranh manga của bạn",
     "downloadDescription": "Tải NodeLane Comics cho Chrome, Edge hoặc Firefox. Mở Chrome Web Store, Edge Add-ons hoặc Firefox Add-ons, hoặc tải gói phù hợp với trình duyệt.",
     "storeDescription": "Mở câu chuyện tiếp theo của bạn trong trình duyệt mà bạn đã thích.",
@@ -144,7 +144,7 @@ export default {
       "Vào câu chuyện."
     ],
     "seoFeaturesTitle": "Tính năng đọc truyện, EPUB, OPDS và dịch ảnh web",
-    "seoPricingTitle": "Dịch truyện tranh miễn phí và các gói Lite",
+    "seoPricingTitle": "Dịch truyện tranh miễn phí và các gói PLUS / Pro",
     "seoDownloadTitle": "Dịch truyện tranh cho Chrome, Edge & Firefox",
     "brandName": "NodeLane Comics",
     "notFoundTitle": "Một trang quá xa.",
@@ -206,7 +206,7 @@ export default {
       "title": "Kênh NodeLane và hạn mức",
       "paragraphs": [
         "Chọn NodeLane và đăng nhập để dịch qua dịch vụ chính thức. Kết quả hiển thị từng ảnh, lỗi được xử lý riêng và vị trí đọc không đổi.",
-        "Tài khoản thường có 30 trang dịch thông thường mỗi ngày. Lite không có tổng trần ngày/tháng, tối đa 1.200 yêu cầu mới trong một giờ liên tục. Vẫn có giới hạn tần suất, ảnh và năng lực dịch vụ; không bảo đảm tốc độ hoàn thành."
+        "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán."
       ]
     },
     {
@@ -491,7 +491,7 @@ export default {
           {
             "title": "Lợi ích và đăng ký",
             "paragraphs": [
-              "Gói Miễn phí, Lite, các gói PLUS hiện có, bản dùng thử và ưu đãi tuân theo thời hạn và quy tắc hiển thị trong tài khoản. Lite tiếp nhận tối đa 1.200 trang mới trong mỗi khoảng 60 phút trượt. Không giới hạn tổng số trang theo ngày hoặc tháng không có nghĩa là bỏ giới hạn tần suất yêu cầu, kích thước ảnh hoặc năng lực xử lý của dịch vụ.",
+              "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán.",
               "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn."
             ]
           },
@@ -559,8 +559,8 @@ export default {
       },
       {
         "id": "free-plan",
-        "question": "Bản dịch manga có miễn phí không và Lite bao gồm những gì?",
-        "answer": "Đọc bản gốc cục bộ là miễn phí và không cần tài khoản. Bản dịch chính thức yêu cầu đăng nhập; Miễn phí bao gồm 30 trang dịch thông thường mỗi ngày. Lite có giá 5,99 đô la Mỹ hàng tháng hoặc 59,99 đô la Mỹ hàng năm, không có tổng giới hạn thông thường hàng ngày hoặc hàng tháng và lên tới 1.200 trang mới mỗi giờ. Áp dụng giới hạn tốc độ và dung lượng. Những tài khoản lần đầu đủ điều kiện sẽ được dùng thử 7 ngày dựa trên thẻ. PLUS không nhận mua hàng mới; đăng ký hiện có giữ lợi ích được hiển thị của họ. Thuế và số tiền cuối cùng được hiển thị khi thanh toán.",
+        "question": "Bản dịch manga có miễn phí không và PLUS / Pro bao gồm những gì?",
+        "answer": "Đọc cục bộ miễn phí. Free có 30 trang mỗi ngày với GPT 6 Luna. PLUS: 2.500 trang/tháng, US$6,66/quý hoặc US$23,99/năm. Pro: 4.000 trang/tháng, US$9,99/quý hoặc US$35,99/năm. Cả hai dùng Haiku 5.5. Cấp hàng tháng, không cộng dồn và không dùng thử. Gói không hết hạn: 3.500 trang US$5,99 hoặc 7.000 trang US$9,99. Thuế và tổng tiền hiển thị khi thanh toán.",
         "relatedPath": "/pricing/"
       },
       {
@@ -595,7 +595,7 @@ export default {
       },
       {
         "id": "plus-limits",
-        "question": "Giới hạn dịch thuật Lite hoạt động như thế nào?",
+        "question": "Giới hạn dịch thuật PLUS / Pro hoạt động như thế nào?",
         "answer": "Một tài khoản dùng chung giới hạn 100 ảnh dịch mới trong mỗi khoảng 60 giây trượt và 1.200 ảnh trong mỗi khoảng 3.600 giây trượt giữa mọi thiết bị, chế độ và ngôn ngữ. Gói Miễn phí cho phép 10 ảnh trong mỗi khoảng 60 giây trượt. Gửi lại cùng yêu cầu và dùng lại kết quả hợp lệ không bị tính thêm. Tác vụ đã tiếp nhận vẫn được tính nếu thất bại, bị hủy hoặc không có chữ. Yêu cầu bị từ chối hay giao dịch cơ sở dữ liệu bị hoàn tác sẽ trả lại suất đã giữ trong hạn mức theo giờ. Việc thử lại tuân theo quy tắc tiếp nhận tác vụ mới thực tế. Các giới hạn này không bảo đảm tốc độ hoàn thành.",
         "relatedPath": "/pricing/"
       },

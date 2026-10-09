@@ -3,9 +3,8 @@
 Run: .venv/Scripts/python.exe tests/manual_ui_server.py
 Connect the reader at http://localhost:5173 to http://127.0.0.1:18089.
 Requires Redis 8 (TEST_REDIS_URL or localhost:6379), with a fresh private namespace.
-Only the supplier adapter is synthetic; jobs, receipts, storage and accounting are real.
+The page engine is synthetic; claims, storage, cancellation and accounting are real.
 """
-from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import json
 import os
@@ -25,8 +24,7 @@ directory = Path(tempfile.mkdtemp(prefix="nc-reader-ui-", dir=fixture_root))
 port = int(os.environ.get("READER_FIXTURE_PORT", "18089"))
 os.environ.update(DATABASE_URL=f"sqlite:///{(directory/'test.sqlite').as_posix()}", STORAGE_PATH=str(directory/'objects'),
     REDIS_URL=os.environ.get('TEST_REDIS_URL', 'redis://127.0.0.1:6379/0'), REDIS_NAMESPACE=directory.name,
-    APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="30", PLUS_MONTHLY_REDRAW_PAGES="300", CLASSIC_ENABLED="false",
-    OPENAI_API_KEY="isolated-ui-image", OPENAI_BASE_URL="https://provider.example/v1", OPENAI_MODEL="gpt-image-2", PROVIDERS_JSON="",
+    APP_ENV="test", DEV_AUTH="true", DEV_AUTH_SECRET="isolated-ui-signing-key-not-production", FREE_DAILY_PAGES="30", CLASSIC_ENABLED="true",
     CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5176")
 from app.config import Settings
 Settings.model_config["env_file"] = None
@@ -34,11 +32,9 @@ from app.main import app
 from app.db import session_factory
 from app.migrate import migrate
 from translation_fixtures import configure_text_provider
-from app.models import Job
-from app.adapters.images import TranslationOutput
+
 from app.errors import ProcessingError
 import app.workers as workers
-from sqlalchemy import select
 from PIL import Image, ImageDraw, ImageFont
 
 controls = directory / "controls.json"
@@ -48,13 +44,14 @@ def output(data):
     time.sleep(control.get("delay",6))
     if control.get("outcome")=="failed":raise ProcessingError("UI_FIXTURE_FAILED","交互测试：这一页处理失败，请重试。")
     if control.get("outcome")=="unknown":raise ProcessingError("UI_FIXTURE_UNKNOWN","交互测试：上游结果待核实。",unknown=True)
-    if control.get("outcome")=="no_text":return TranslationOutput(None,no_text=True,usage={"fixture":True})
+    if control.get("outcome")=="no_text":return None
     image=Image.open(BytesIO(data)).convert("RGB")
     draw=ImageDraw.Draw(image);draw.rectangle((0,0,image.width,74),fill="#e8f2ff")
     draw.text((24,20),"INTERACTION TEST RESULT - NOT A TRANSLATION",fill="#185b9c",font=ImageFont.truetype("C:/Windows/Fonts/arial.ttf",max(12,int(image.width/35))))
     stream=BytesIO();image.save(stream,"PNG")
-    return TranslationOutput(stream.getvalue(),usage={"fixture":True},quality_flags=["unrecognized_regions"] if control.get("outcome")=="partial" else [])
-workers.redraw=lambda data,*args:output(data)
+    return stream.getvalue()
+sys.path.insert(0, str(root.parent / 'scripts' / 'tests'))
+from classic_fixture_worker import SyntheticPageWorker
 # The fixture embeds the control loop in a background thread; uvicorn owns the
 # process signals. Production workers still install their normal drain handlers.
 workers.signal = SimpleNamespace(SIGTERM=workers.signal.SIGTERM, SIGINT=workers.signal.SIGINT, signal=lambda *_: None)
@@ -62,8 +59,8 @@ migrate()
 with session_factory()() as db:
     configure_text_provider(db)
 threading.Thread(target=workers.main,daemon=True).start()
-# Classic stages are exercised by cluster tests; this fixture uses the real
-# redraw/control protocol with a synthetic image provider.
+page_worker = SyntheticPageWorker(output)
+threading.Thread(target=page_worker.run, daemon=True).start()
 # Small numbered synthetic pages support directory-window and page-failure checks.
 samples=directory/'pages';samples.mkdir()
 for i in range(1,25):
@@ -79,7 +76,7 @@ with zipfile.ZipFile(directory/'cluster-eight.cbz', 'w') as archive:
     for i in range(1,9):
         archive.write(samples/f'page-{i:02}.png', f'page-{i:02}.png')
 print(f'UI_FIXTURE_DIRECTORY={directory}',flush=True)
-print(f'Synthetic supplier only; API http://127.0.0.1:{port}',flush=True)
+print(f'Synthetic page engine only; API http://127.0.0.1:{port}',flush=True)
 if __name__=='__main__':
     import uvicorn
     uvicorn.run(app,host='127.0.0.1',port=port,log_level='warning',access_log=False)

@@ -137,7 +137,7 @@ export const commerce = {
     "cancel": "Batalkan sebelum perpanjangan berikutnya."
   },
   "publishedPricing": {
-    "label": "Harga Lite yang dipublikasikan · dolar AS (USD)",
+    "label": "Harga PLUS / Pro yang dipublikasikan · dolar AS (USD)",
     "monthly": "Bulanan",
     "yearly": "Tahunan",
     "annualPayment": "Satu pembayaran setiap tahun. Diperpanjang otomatis.",
@@ -182,10 +182,10 @@ export const commerce = {
     "model": {
       "label": "Model terjemahan",
       "free": "GPT 6 Luna dan model sejenis",
-      "lite": "Gemini 3.8 Flash dan model sejenis"
+      "lite": "Haiku 5.5 dan model sejenis"
     },
     "feature": "Fitur dan manfaat",
-    "highlights": "TERJEMAHKAN DENGAN Lite",
+    "highlights": "TERJEMAHKAN DENGAN PLUS / Pro",
     "reading": {
       "label": "Membaca",
       "free": "Semua fitur membaca inti",

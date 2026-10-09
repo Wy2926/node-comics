@@ -14,8 +14,7 @@ from datetime import timedelta
 from io import BytesIO
 from PIL import Image
 from sqlalchemy import select
-from app.models import User, Asset, Job, Provider, now
-from app.providers import ProviderConfig
+from app.models import User, Asset, Job, now
 from app.assets import create_asset
 from app.reader_api import Feedback
 from app.billing_catalog import initialize_catalog
@@ -52,7 +51,6 @@ from app.config import settings
 # Permit local event requeue while every provider network operation stays blocked.
 settings().creem_enabled = True
 settings().creem_environment = 'test'
-os.environ['NC_FIXTURE_IMAGE_KEY'] = 'isolated-image-fixture-key'
 with session_factory()() as db:
     at = now()
     initialize_catalog(db)
@@ -61,9 +59,6 @@ with session_factory()() as db:
         plus_expires_at=at + timedelta(days=29), plus_monthly_pages=300)
     db.add(admin)
     reader = db.get(User, '20000000-0000-4000-8000-000000000000')
-    config = ProviderConfig(id='fixture-image', label='隔离图片供应商', base_url='https://provider.example/v1',
-        model='fixture-image-model', credential_ref='NC_FIXTURE_IMAGE_KEY')
-    db.add(Provider(id=config.id, config=config.model_dump(), enabled=True))
     db.flush()
     image = BytesIO()
     Image.new('RGB', (320, 480), '#ded9ef').save(image, 'PNG')
@@ -77,7 +72,7 @@ with session_factory()() as db:
         idempotency_key='fixture-complete', operation='fixture', request_hash='1' * 64, cache_key='1' * 64,
         config={}, quota_pages=0, quota_kind='classic_unlimited', settlement='included', completed_at=at)
     unknown = Job(id='fixture-unknown-job', owner_id=reader.id, input_asset_id=source.id,
-        source_sha256=source.sha256, mode='redraw', target_language='zh-Hans', status='outcome_unknown', phase='outcome_unknown',
+        source_sha256=source.sha256, mode='classic', target_language='zh-Hans', status='outcome_unknown', phase='outcome_unknown',
         idempotency_key='fixture-unknown', operation='fixture', request_hash='2' * 64, cache_key='2' * 64,
         config={}, quota_pages=0, quota_kind='classic_unlimited', settlement='included', unknown_since=at)
     db.add_all([job, unknown])
@@ -87,23 +82,23 @@ with session_factory()() as db:
     db.flush()
     db.add(Feedback(id='fixture-feedback', owner_id=reader.id, job_id=job.id, translation_id='11111111-1111-4111-8111-111111111111', output_asset_id=output.id,
         issues=['typesetting'], comment='隔离样例：气泡文字需要调整字号。', idempotency_key='fixture-feedback', request_hash='3' * 64))
-    db.add(UploadReservation(id='fixture-upload', job_id=unknown.id, owner_id=reader.id, mode='redraw',
+    db.add(UploadReservation(id='fixture-upload', job_id=unknown.id, owner_id=reader.id, mode='classic',
         expected_sha256=source.sha256, expected_size=source.byte_size, mime='image/png',
         expires_at=at + timedelta(minutes=5), max_expires_at=at + timedelta(minutes=10)))
     db.add(ServiceHeartbeat(role='control-worker', instance_id='fixture-worker', heartbeat_at=at,
         last_success_at=at, consecutive_failures=0, failure_count=0))
     db.add(BillingAccount(owner_id=reader.id, trial_used_at=at - timedelta(days=10)))
     db.add(BillingCustomer(id='fixture-customer', owner_id=reader.id, provider='creem', environment='test', customer_id='cust_fixture'))
-    binding = BillingPriceBinding(id='fixture-binding', price_id='plus-month-v1', provider='creem', environment='test', product_id='prod_fixture')
+    binding = BillingPriceBinding(id='fixture-binding', price_id='plus-quarter-v1', provider='creem', environment='test', product_id='prod_fixture')
     db.add(binding)
     db.flush()
     checkout = BillingCheckout(id='fixture-checkout', owner_id=reader.id, environment='test', provider='creem',
-        price_id='plus-month-v1', binding_id=binding.id, customer_id='cust_fixture', return_url='https://example.invalid/',
+        price_id='plus-quarter-v1', binding_id=binding.id, customer_id='cust_fixture', return_url='https://example.invalid/',
         trial=False, status='completed', session_id='ch_fixture', expires_at=at)
     db.add(checkout)
     db.flush()
     sub = BillingSubscription(id='creem:test:sub_fixture', owner_id=reader.id, checkout_id=checkout.id,
-        environment='test', provider='creem', customer_id='cust_fixture', price_id='plus-month-v1', binding_id=binding.id,
+        environment='test', provider='creem', customer_id='cust_fixture', price_id='plus-quarter-v1', binding_id=binding.id,
         status='active', paid_starts_at=at-timedelta(days=2), paid_ends_at=at+timedelta(days=28), next_billed_at=at+timedelta(days=28))
     db.add(sub)
     db.flush()
@@ -117,8 +112,8 @@ with session_factory()() as db:
         invoice_id=invoice.id, kind='paid', starts_at=at-timedelta(days=2), ends_at=at+timedelta(days=28))
     db.add(term)
     db.flush()
-    db.add(QuotaPeriod(id='fixture-subscription-quota', owner_id=reader.id, billing_term_id=term.id, kind='redraw_monthly',
-        mode='redraw', source='subscription', source_key='fixture-term:0', starts_at=term.starts_at, ends_at=term.ends_at, granted=300))
+    db.add(QuotaPeriod(id='fixture-subscription-quota', owner_id=reader.id, billing_term_id=term.id, kind='classic_monthly',
+        mode='classic', source='subscription', source_key='fixture-term:0', starts_at=term.starts_at, ends_at=term.ends_at, granted=300))
     event = BillingEvent(id='creem:test:evt_fixture', environment='test', provider='creem', event_type='refund.created',
         resource_id='refund_fixture', payload={'transaction_id': 'tx_fixture'}, occurred_at=at, status='pending',
         attempts=3, error_code='FIXTURE_PROVIDER_OFFLINE', next_attempt_at=at + timedelta(hours=1))

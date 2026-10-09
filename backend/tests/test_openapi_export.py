@@ -26,7 +26,6 @@ def test_exporter_ignores_service_configuration_and_matches_checked_in_contract(
         "GA4_DEBUG_MODE": "true",
         "GA4_EXTENSION_API_SECRET": marker,
 
-        "PROVIDERS_JSON": "invalid-inherited-providers",
     }
     # An accidental dotenv read, startup migration, worker or external request is
     # a hard failure, even if the exporter would otherwise hide it in its output.

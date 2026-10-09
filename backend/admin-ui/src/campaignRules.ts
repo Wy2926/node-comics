@@ -1,7 +1,7 @@
 export const campaignEndpoint = '/v1/admin/quota-campaigns';
 export const campaignStorageKey = 'nc-admin-quota-campaign:pending';
 export type CampaignRules = {
-  name: string; mode: 'classic' | 'redraw'; pages: number; audience: 'all' | 'existing' | 'new';
+  name: string; mode: 'classic'; pages: number; audience: 'all' | 'existing' | 'new';
   starts_at: string | null; ends_at: string | null; validity_days: number | null;
 };
 export type QuotaCampaign = CampaignRules & {

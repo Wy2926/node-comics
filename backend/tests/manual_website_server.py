@@ -50,9 +50,9 @@ async def catalog():
     await asyncio.sleep(min(15, max(0, state.get('catalog_delay_ms', 0) / 1000)))
     month = {'id':'lite-month','plan_id':'lite','plan_revision_id':'fixture-lite',
         'name':'Lite','currency':'usd','unit_amount':599,'interval':'month',
-        'hourly_image_limit':1200,'monthly_redraw_pages':0,'trial_days':7,
-        'trial_redraw_pages':0,'channels':[{'provider':'stripe','binding_id':'fixture',
-            'trial_days':7,'trial_redraw_pages':0}]}
+        'hourly_image_limit':1200,'monthly_classic_pages':0,'trial_days':7,
+        'trial_classic_pages':0,'channels':[{'provider':'stripe','binding_id':'fixture',
+            'trial_days':7,'trial_classic_pages':0}]}
     offers = [month, {**month, 'id':'lite-year', 'interval':'year', 'unit_amount':5999}]
     return JSONResponse({'offers':state.get('catalog_offers', offers)},
         status_code=state.get('catalog_status', 200))
@@ -113,7 +113,7 @@ def me(request: Request):
         return JSONResponse({'error':{'message':'账户服务暂时不可用，请重试。'}}, status_code=state['me_failure'] or 401)
     return {'user':{'id':'fixture-reader','name':'Demo Reader'},'entitlements':{'plan':'plus',
         'plus_expires_at':'2026-10-20T00:00:00Z','image_rate_limit':{'limit':100},
-        'modes':{'classic':{'allowed':True,'unlimited':True,'quota':None},'redraw':{'allowed':True,'unlimited':False,'quota':{'available':287,'granted':300,'reserved':3}}}}}
+        'modes':{'classic':{'allowed':True,'unlimited':True,'quota':None},'classic':{'allowed':True,'unlimited':False,'quota':{'available':287,'granted':300,'reserved':3}}}}}
 
 
 @app.get('/v1/billing/status')

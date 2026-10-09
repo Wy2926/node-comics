@@ -37,13 +37,13 @@ function CampaignForm({copy, onClose, onSubmit}: {copy?: QuotaCampaign; onClose:
     }}>
       <div className="billing-form-grid">
         <label className="campaign-full">活动名称<input ref={firstField} required maxLength={100} value={draft.name} onChange={e => field('name', e.target.value)} placeholder="例如：新用户翻译额度"/></label>
-        <label>翻译模式<select value={draft.mode} onChange={e => field('mode', e.target.value as CampaignDraft['mode'])}><option value="classic">常规翻译</option><option value="redraw">AI 重绘</option></select></label>
+        <label>翻译模式<select value={draft.mode} onChange={e => field('mode', e.target.value as CampaignDraft['mode'])}><option value="classic">常规翻译</option></select></label>
         <label>每人赠送页数<input type="number" required min={1} max={1000000} step={1} value={draft.pages} onChange={e => field('pages', e.target.value)}/></label>
         <label>适用用户<select value={draft.audience} onChange={e => field('audience', e.target.value as CampaignDraft['audience'])}>{Object.entries(audienceName).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select><small className="muted">新老用户以活动创建时间划分，与开始时间无关。</small></label>
         <label>开始发放时间<input type="datetime-local" value={draft.starts_at} onChange={e => field('starts_at', e.target.value)}/><small className="muted">留空表示启用后即可发放。</small></label>
         <TimingFields draft={draft} onChange={field}/>
       </div>
-      <div className="campaign-impact"><strong>{copy ? '这是另一笔赠送活动' : '保存后核对规则，再启用发放'}</strong><p>每个活动每人领取一次。{copy && '复制后会重新划分新老用户，发放时间需重新设置。'}不同活动的额度可以叠加，已领过其他活动的用户也可能再次获赠。页数、模式和人群保存后固定；同一活动的期限可单独调整。</p>{draft.mode === 'redraw' && <p>有效的重绘赠送额度也会开放 AI 重绘使用权限。</p>}</div>
+      <div className="campaign-impact"><strong>{copy ? '这是另一笔赠送活动' : '保存后核对规则，再启用发放'}</strong><p>每个活动每人领取一次。{copy && '复制后会重新划分新老用户，发放时间需重新设置。'}不同活动的额度可以叠加，已领过其他活动的用户也可能再次获赠。页数、模式和人群保存后固定；同一活动的期限可单独调整。</p></div>
       {error && <p role="alert" className="error">{error}</p>}
       <div className="campaign-actions"><button type="button" className="secondary" onClick={onClose}>取消</button><button className="primary">保存为暂停活动</button></div>
     </form>

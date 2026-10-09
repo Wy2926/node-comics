@@ -1,40 +1,35 @@
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {Api} from '../src/api';
-import {paymentUrl,offerAmount,selectedChannel,hasManagedSubscription} from '../src/billing';
+import {paymentUrl,offerAmount,hasManagedSubscription,pricingUrl} from '../src/billing';
 import {billingOffer} from './billing-fixture-data';
 
 afterEach(()=>vi.unstubAllGlobals());
 
-it('loads public quotes without authentication and submits the selected price and channel',async()=>{
-  const fetch=vi.fn().mockResolvedValue(Response.json({enabled:true,offers:[billingOffer]}));
+it('uses one localized website pricing destination without a payment token or direct checkout',()=>{
+  expect(pricingUrl('zh-CN')).toBe('https://comics.nodelane.net/pricing/');
+  expect(pricingUrl('en')).toBe('https://comics.nodelane.net/en/pricing/');
+  expect(pricingUrl('pt-BR')).toBe('https://comics.nodelane.net/pt-br/pricing/');
+  expect(pricingUrl('zh-TW')).toBe('https://comics.nodelane.net/zh-tw/pricing/');
+  const api=new Api('https://billing.test','fixture-token');
+  expect('startCheckout' in api).toBe(false);
+  expect('billingCatalog' in api).toBe(false);
+});
+
+it('keeps subscription management on the original provider',async()=>{
+  const fetch=vi.fn().mockResolvedValue(Response.json({provider:'creem',url:'https://creem.io/my-orders/login/fixture'}));
   vi.stubGlobal('fetch',fetch);
-  const catalog=await new Api('https://billing.test').billingCatalog();
-  expect(catalog.offers).toEqual([billingOffer]);
-  expect(catalog.offers[0]).toMatchObject({plan_id:'lite',hourly_image_limit:1200});
-  expect(fetch.mock.calls[0][0]).toBe('https://billing.test/v1/billing/catalog');
-  expect(fetch.mock.calls[0][1].headers.has('Authorization')).toBe(false);
-  for(const priceId of [billingOffer.id,'fixture-lite-annual','plus-month-v1','plus-year-v1']){
-    fetch.mockResolvedValueOnce(Response.json({provider:'creem',environment:'test',trial:true,checkout_url:'https://creem.io/test/checkout/fixture'}));
-    await new Api('https://billing.test','fixture-token').startCheckout(priceId,'creem');
-    const [url,init]=fetch.mock.calls.at(-1)!;
-    expect(url).toBe('https://billing.test/v1/billing/checkouts');
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({price_id:priceId,provider:'creem'});
-    expect(init.headers.get('Authorization')).toBe('Bearer fixture-token');
-  }
+  await new Api('https://billing.test','fixture-token').billingPortal('creem');
+  const [url,init]=fetch.mock.calls[0];
+  expect(url).toBe('https://billing.test/v1/billing/portal');
+  expect(init.method).toBe('POST');
+  expect(JSON.parse(init.body)).toEqual({provider:'creem'});
+  expect(init.headers.get('Authorization')).toBe('Bearer fixture-token');
 });
 
 it('formats Stripe minor units, including zero-decimal display currencies',()=>{
   for(const [currency,unit_amount,value] of [['usd',999,9.99],['jpy',500,500],['isk',500,5],['ugx',500,5]] as const){
     expect(offerAmount({...billingOffer,currency,unit_amount},'en')).toBe(new Intl.NumberFormat('en',{style:'currency',currency}).format(value));
   }
-});
-
-it('keeps pending checkouts on the original channel even when another is preferred',()=>{
-  expect(selectedChannel(billingOffer,'creem')?.provider).toBe('creem');
-  expect(selectedChannel(billingOffer,'stripe','creem')?.provider).toBe('creem');
-  expect(selectedChannel({...billingOffer,channels:billingOffer.channels.slice(0,1)},'stripe','creem')).toBeUndefined();
-  expect(selectedChannel({...billingOffer,channels:[]},'creem')).toBeUndefined();
 });
 
 it('allows another purchase after expiry or revoked terminal access',()=>{

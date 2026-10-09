@@ -7,9 +7,9 @@ const origin=process.env.WEBSITE_PREVIEW_URL||'http://127.0.0.1:4321';
 const out=path.resolve('artifacts/website-pricing');
 await mkdir(out,{recursive:true});
 const locales=['','zh-tw/','en/','ja/','ko/','fr/','es/','pt-br/','de/','it/','ru/','pl/','uk/','tr/','vi/','id/','ar/'];
-const month={id:'lite-month',plan_id:'lite',plan_revision_id:'lite-v1',name:'Lite',currency:'usd',unit_amount:599,interval:'month',monthly_redraw_pages:0,hourly_image_limit:1200,trial_days:7,trial_redraw_pages:0,channels:[{provider:'stripe',binding_id:'fixture',trial_days:7,trial_redraw_pages:0}]};
-const year={...month,id:'lite-year',interval:'year',unit_amount:5999};
-let offers=[month,year],status=200,release=null,onCatalogRequest=null;
+const quarter={id:'plus-quarter',plan_id:'plus',plan_revision_id:'plus-v1',name:'PLUS',currency:'usd',unit_amount:666,interval:'quarter',monthly_classic_pages:2500,hourly_image_limit:1200,trial_days:0,trial_classic_pages:0,channels:[{provider:'stripe',binding_id:'fixture',trial_days:0,trial_classic_pages:0}]};
+const year={...quarter,id:'plus-year',interval:'year',unit_amount:2399};
+let offers=[quarter,year],status=200,release=null,onCatalogRequest=null;
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
@@ -18,54 +18,47 @@ await page.route('**/v1/billing/catalog',async route=>{
  if(release)await release;
  await route.fulfill({status,json:{offers}});
 });
-const shot=async name=>{await page.evaluate(()=>{document.activeElement?.blur();scrollTo({top:0,behavior:'instant'});});await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});};
+const shot=async(name,preserveFocus=false)=>{if(!preserveFocus)await page.evaluate(()=>{document.activeElement?.blur();scrollTo({top:0,behavior:'instant'});});await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});};
 const noOverflow=async(target=page)=>assert(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow '+target.url()+' width='+target.viewportSize().width);
 const comparison=async(target,hourlyPages)=>{
  const frame=target.locator('.pricing-comparison');
- assert.equal(await frame.count(),1,'one connected pricing comparison');
- assert.equal(await frame.locator('.pricing-grid .price-card').count(),2,'both pricing cards share the comparison frame');
- const table=frame.locator('table.plan-comparison');
- assert.equal(await table.locator('thead th').count(),3,'comparison has feature, ordinary and Lite columns');
- assert.equal(await table.locator('tbody tr').count(),9,'nine feature comparison rows');
- assert.equal(await table.locator('.feature-info-trigger').count(),5,'only detailed feature headings need info controls');
- for(const feature of ['classic','local','model','rate','priority','reading','feedback','requests','early']){
-  const row=table.locator(`tbody tr[data-feature="${feature}"]`);
-  assert.equal(await row.count(),1,`comparison feature ${feature}`);
-  assert.equal(await row.locator(':scope > th, :scope > td').count(),3,`aligned columns for ${feature}`);
-  const values=row.locator(':scope > td'),shared=feature==='reading'||feature==='local';
-  assert.equal(await values.nth(0).locator('.icon-check').count(),shared?1:0,`ordinary checkmark for ${feature}`);
-  assert.equal(await values.nth(1).locator('.icon-check').count(),1,`Lite checkmark for ${feature}`);
-  assert.equal(await values.nth(1).locator('strong').count(),shared?0:1,`Lite emphasis for ${feature}`);
-  if(shared)assert.equal(await values.nth(0).innerText(),await values.nth(1).innerText(),`shared benefit ${feature}`);
-  const detailed=['classic','local','rate','feedback','requests'].includes(feature),trigger=row.locator('th .feature-info-trigger'),tip=row.locator('[role="tooltip"]');
-  assert.equal(await trigger.count(),detailed?1:0,`info control for ${feature}`);
-  if(detailed){
-   assert.equal(await trigger.getAttribute('aria-describedby'),await tip.getAttribute('id'),`accessible description for ${feature}`);
-   assert.equal(await trigger.getAttribute('aria-label'),await row.locator('.feature-label').innerText(),`localized info label for ${feature}`);
-   assert((await tip.textContent()).trim(),`localized detail for ${feature}`);
+ assert.equal(await frame.count(),1);
+ const cards=frame.locator('.subscription-card');
+ assert.equal(await cards.count(),hourlyPages?2:3);
+ for(const card of await cards.all()){
+  assert.equal(await card.locator('.subscription-allowance').count(),1);
+  assert.equal(await card.locator('.subscription-features li').count(),8);
+  for(const feature of ['local','model','rate','priority','reading','feedback','requests','early']){
+   const row=card.locator(`[data-feature="${feature}"]`);
+   assert.equal(await row.count(),1);
+   const trigger=row.locator('.feature-info-trigger'),tip=row.locator('[role="tooltip"]');
+   const detailed=['local','rate','feedback','requests'].includes(feature);
+   assert.equal(await trigger.count(),detailed?1:0);
+   if(detailed){
+    assert.equal(await trigger.getAttribute('aria-describedby'),await tip.getAttribute('id'));
+    assert((await tip.textContent()).trim());
+   }
   }
  }
- for(const value of await table.locator('[data-feature="local"] td').all())assert.match(await value.innerText(),/MTU/,'local translation uses self-hosted MTU');
- assert((await table.locator('[data-feature="rate"] td').last().innerText()).replace(/\D/g,'').includes(String(hourlyPages)),'Lite hourly request limit follows the active catalog');
- const models=table.locator('[data-feature="model"] td');
- assert.match(await models.nth(0).innerText(),/GPT 6 Luna/);
- assert.match(await models.nth(1).innerText(),/Gemini 3\.8 Flash/);
- assert(!/PLUS|\b300\b/.test(await frame.innerText()),'retired PLUS is absent from new-purchase pricing');
+ if(hourlyPages)assert((await cards.nth(1).locator('[data-feature="rate"]').innerText()).replace(/\D/g,'').includes(String(hourlyPages)));
+ assert.match(await cards.nth(0).locator('[data-feature="local"]').innerText(),/MTU/);
+ assert.match(await cards.nth(1).locator('[data-feature="local"]').innerText(),/MTU/);
+
 };
 const live=async()=>{
  await page.locator('[data-billing-catalog="live"]').waitFor();
- assert.equal(await page.locator('.published-lite-pricing').count(),0,'live API offers replace published fallback');
+ assert.equal(await page.locator('.published-plan-pricing').count(),0,'live API offers replace published fallback');
 };
 const published=async(target,state)=>{
- await target.locator(`.billing-availability[data-state="${state}"]`).waitFor();
- const block=target.locator('.published-lite-pricing');
- assert(await block.isVisible(),'published Lite pricing is visible');
+ await target.locator(`.billing-availability[data-state="${state}"]`).first().waitFor();
+ const block=target.locator('.published-plan-pricing');
+ assert.equal(await block.count(),2,'PLUS and Pro prices are visible');
  const locale=await target.locator('html').getAttribute('lang');
- const interval=await block.getAttribute('data-billing-interval');
- const expected='US$'+new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(interval==='year'?59.99:5.99);
- assert.equal(await block.locator('.price-value').innerText(),expected,'actual charge for the selected cadence');
- await comparison(target,1200);
- assert(await target.locator('.billing-availability button').isDisabled(),'unavailable purchase action is disabled');
+ const interval=await block.first().getAttribute('data-billing-interval');
+ const expected='US$'+new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(interval==='year'?23.99:6.66);
+ assert.equal(await block.first().locator('.price-value').innerText(),expected,'actual charge for the selected cadence');
+ await comparison(target,0);
+ assert(await target.locator('.billing-availability button').first().isDisabled(),'unavailable purchase action is disabled');
  assert.equal(await target.locator('a[href*="price="]').count(),0,'no synthetic checkout link');
  assert.equal(await target.locator('[data-billing-catalog="live"]').count(),0);
 };
@@ -80,7 +73,7 @@ try {
   }
  }finally{await staticContext.close();}
  await page.goto(origin+'/pricing/');await live();
- const info=page.locator('[data-feature="local"] .feature-info-trigger'),tip=page.locator('[data-feature="local"] [role="tooltip"]');
+ const info=page.locator('.subscription-card.paid [data-feature="local"] .feature-info-trigger'),tip=page.locator('.subscription-card.paid [data-feature="local"] [role="tooltip"]');
  await info.hover();assert(await tip.isVisible(),'hover opens feature detail');
  await page.keyboard.press('Escape');assert(!(await tip.isVisible()),'Escape dismisses feature detail');
  await info.focus();assert(await tip.isVisible(),'keyboard focus opens feature detail');
@@ -88,15 +81,15 @@ try {
  await info.click();assert(await tip.isVisible(),'click opens feature detail');
  await page.locator('h1').click();assert(!(await tip.isVisible()),'outside click dismisses feature detail');
  assert.equal(await page.locator('.account-link').getAttribute('aria-label'),'我的账户');
- assert.match(await page.locator('.billing-offer .price').innerText(),/5.99/);
+ assert.match(await page.locator('.billing-offer .price').innerText(),/6.66/);
  await page.locator('input[value="year"]').check({force:true});
- assert.match(await page.locator('.billing-total').innerText(),/59.99/);
- assert.match(await page.locator('.billing-offer .price').innerText(),/59.99/);
- assert.match(await page.locator('.monthly-equivalent').innerText(),/5.00/);
- assert.match(await page.locator('.annual-badge').innerText(),/16.5/);
- assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-year/);
+ assert.match(await page.locator('.billing-total').innerText(),/23.99/);
+ assert.match(await page.locator('.billing-offer .price').innerText(),/23.99/);
+ assert.match(await page.locator('.monthly-equivalent').innerText(),/2.00/);
+ assert.match(await page.locator('.annual-badge').innerText(),/9.9/);
+ assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=plus-year/);
  await noOverflow();await shot('desktop-year');
- await page.locator('.language-menu summary').click();await shot('desktop-language');
+ await page.locator('.language-menu summary').click();await shot('desktop-language',true);
  await page.locator('.language-menu a[lang="en"]').click();await live();
  assert.match(page.url(),/\/en\/pricing\//);
  assert.equal(await page.locator('.account-link').getAttribute('aria-label'),'My account');
@@ -114,20 +107,20 @@ try {
  await page.locator('.mobile-nav summary').click();assert(await page.locator('.mobile-nav a[href="/account/"]').isVisible());await page.locator('.mobile-nav summary').click();
  await page.setViewportSize({width:1440,height:1100});
  offers=[year];await page.reload();await published(page,'unavailable');
- assert(await page.locator('input[value="month"]').isChecked(),'missing monthly quote does not switch cadence automatically');
- assert(!(await page.locator('input[value="month"]').isDisabled()),'published monthly preview remains available');
+ assert(await page.locator('input[value="quarter"]').isChecked(),'missing quarterly quote does not switch cadence automatically');
+ assert(!(await page.locator('input[value="quarter"]').isDisabled()),'published quarterly preview remains available');
  await page.locator('input[value="year"]').check({force:true});await live();assert.equal(await page.locator('.annual-badge').count(),0);
  offers=[
-  {...month,id:'lite-api-month',plan_revision_id:'lite-v2',unit_amount:699,hourly_image_limit:1500},
-  {...year,id:'lite-api-year',plan_revision_id:'lite-v3',hourly_image_limit:1800},
+  {...quarter,id:'plus-api-quarter',plan_revision_id:'plus-v2',unit_amount:699,hourly_image_limit:1500},
+  {...year,id:'plus-api-year',plan_revision_id:'plus-v3',hourly_image_limit:1800},
  ];
  await page.reload();await live();
  assert.match(await page.locator('.billing-offer .price').innerText(),/6.99/);
  await comparison(page,1500);
- assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-api-month/);
+ assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=plus-api-quarter/);
  await page.locator('input[value="year"]').check({force:true});
  await comparison(page,1800);
- assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-api-year/);
+ assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=plus-api-year/);
  offers=[];
  for(const locale of locales){
   await page.goto(origin+'/'+locale+'pricing/');await published(page,'unavailable');
@@ -138,14 +131,14 @@ try {
  }
  await page.setViewportSize({width:1440,height:1100});
  status=503;await page.goto(origin+'/pricing/');await published(page,'error');
- assert(await page.locator('[role="alert"]').isVisible());await shot('error');
- status=200;offers=[month,year];let done;
+ assert(await page.locator('[role="alert"]').first().isVisible());await shot('error');
+ status=200;offers=[quarter,year];let done;
  release=new Promise(resolve=>done=resolve);
  const requested=new Promise(resolve=>onCatalogRequest=resolve);
  await page.reload({waitUntil:'domcontentloaded'});
  await requested;await published(page,'loading');await shot('loading');
  done();release=null;onCatalogRequest=null;await live();
- assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=lite-month/);
+ assert.match(await page.locator('a[data-purchase-link]').getAttribute('href'),/price=plus-quarter/);
  assert.deepEqual(errors,[]);
- console.log('PASS: seventeen locales with and without JavaScript, eight widths, connected nine-feature comparison with accessible feature tips, Lite monthly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
+ console.log('PASS: seventeen locales with and without JavaScript, eight widths, subscription cards with explicit monthly allowances with accessible feature tips, PLUS quarterly/yearly prices and rolling hourly limits, loading/error/empty states, live API quota/price replacement, annual amounts/link, year-only and language/mobile navigation; screenshots: '+out);
 }finally{await browser.close();}

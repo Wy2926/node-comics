@@ -6,7 +6,7 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "quota_purchases_0014"
+HEAD = "classic_quotas_0015"
 NEW_TABLES = {"guest_sessions", "guest_daily_usage", "guest_daily_budgets", "quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests"}
@@ -196,16 +196,15 @@ def test_gift_upgrade_preserves_calendar_segment_and_used_reserved_bucket(isolat
         command.upgrade(config, 'redis_admission_0004')
         connection.execute(text("INSERT INTO users (id, subject, name, role, created_at, membership_id, plus_started_at, plus_expires_at, plus_timezone, plus_monthly_pages) VALUES ('calendar-user', 'calendar-user', 'Existing', 'user', :start, 'calendar-segment', :start, :end, 'America/New_York', 300)"), {'start': start, 'end': end})
         connection.execute(QuotaPeriod.__table__.insert().values(id=period_id, owner_id='calendar-user',
-            kind=MONTHLY, mode='redraw', source='membership', source_key=f'{MONTHLY}:{iso(start)}',
+            kind=MONTHLY, mode='classic', source='membership', source_key=f'{MONTHLY}:{iso(start)}',
             starts_at=start, ends_at=end, granted=300, used=125, reserved=3))
     db.initialize()
     with Session(isolated_migration_database) as session:
         user = session.get(User, 'calendar-user')
         assert user.plus_timezone == 'America/New_York' and not user.plus_pending
-        quota = allowance_json(session, user, MONTHLY, datetime(2026, 2, 1))
-        assert quota['id'] == period_id
-        assert (quota['used'], quota['reserved'], quota['available']) == (125, 3, 172)
-        assert quota['resets_at'] == iso(end)
+        assert user.plus_monthly_pages is None
+        period = session.get(QuotaPeriod, period_id)
+        assert (period.used, period.reserved) == (125, 3)
     assert_current_schema_matches_models(isolated_migration_database)
 
 

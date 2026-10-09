@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {authError, errorText, request} from './api';
-import {benefitsSummary, billingEndpoint, environmentName, intervalName, minorAmount, money, priceAmount, providerName, type BillingChannel, type BillingEnvironment, type BillingPrice, type BillingProduct, type BillingProvider} from './billing';
+import {benefitsSummary, billingEndpoint, environmentName, intervalName, minorAmount, pageAllowance, money, priceAmount, providerName, type BillingChannel, type BillingEnvironment, type BillingPrice, type BillingProduct, type BillingProvider} from './billing';
 import {BillingDialog} from './BillingShared';
 
 export type CatalogEditor = {kind: 'product'} | {kind: 'benefits'; product: BillingProduct} | {kind: 'price'; product: BillingProduct; copy?: BillingPrice} | {kind: 'binding'; price: BillingPrice};
@@ -11,7 +11,7 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
   const [recordId] = useState(() => crypto.randomUUID());
   const [productId, setProductId] = useState('');
   const [isPack, setIsPack] = useState((latest?.quota_pages ?? 0) > 0);
-  const [benefits, setBenefits] = useState({name: latest?.name ?? '', monthly_redraw_pages: latest?.monthly_redraw_pages ?? 300, trial_days: latest?.trial_days ?? 7, trial_redraw_pages: latest?.trial_redraw_pages ?? 30, hourly_image_limit: latest?.hourly_image_limit ?? null as number | null, service_plan_id: latest?.service_plan_id ?? null as string | null, quota_pages: latest?.quota_pages ?? 0, quota_validity_days: latest?.quota_validity_days ?? null as number | null});
+  const [benefits, setBenefits] = useState({name: latest?.name ?? '', monthly_classic_pages: latest ? latest.monthly_classic_pages : null as number | null, trial_days: latest?.trial_days ?? 7, trial_classic_pages: latest ? latest.trial_classic_pages : 30 as number | null, hourly_image_limit: latest?.hourly_image_limit ?? null as number | null, service_plan_id: latest?.service_plan_id ?? null as string | null, quota_pages: latest?.quota_pages ?? 0, quota_validity_days: latest?.quota_validity_days ?? null as number | null});
   const [price, setPrice] = useState({plan_revision_id: copied?.plan_revision_id ?? latest?.id ?? '', currency: copied?.currency ?? 'usd', amount: copied ? priceAmount(copied.unit_amount, copied.currency) : '', interval: copied?.interval ?? ((latest?.quota_pages ?? 0) > 0 ? 'once' : 'month'), environment: copied?.environment ?? channels.find(channel => channel.enabled)?.environment ?? 'test'});
   const servicePlans = products.filter(value => value.revisions.some(revision => !revision.quota_pages));
   const priceIsPack = (product?.revisions.find(value => value.id === price.plan_revision_id)?.quota_pages ?? 0) > 0;
@@ -37,29 +37,29 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
   }
   return <BillingDialog title={title} busy={busy} onClose={onClose}><form className="billing-form" onSubmit={event => {event.preventDefault(); void submit();}}>
     <fieldset className="config-body" disabled={busy}>
-      {(editor.kind === 'product' || editor.kind === 'benefits') && <><p className="muted">订阅提供不限累计页数的常规翻译；额度包按成功页数扣量，不自动续费。两者使用同一套服务档位。</p><div className="billing-form-grid">
+      {(editor.kind === 'product' || editor.kind === 'benefits') && <><p className="muted">订阅支持每月有限页数或不限量；年付仍逐月发放，未用不结转。免费模型先扣免费额度，用完后扣订阅、购买额度；高级模型不使用免费额度。</p><div className="billing-form-grid">
         <label>产品类型<select value={isPack ? 'once' : 'subscription'} onChange={event => {
           const pack = event.target.value === 'once';
           setIsPack(pack);
           setBenefits({...benefits, service_plan_id: null, quota_pages: 0, quota_validity_days: null,
-            monthly_redraw_pages: 0, trial_days: 0, trial_redraw_pages: 0, hourly_image_limit: null});
+            monthly_classic_pages: pack ? 0 : null, trial_days: 0, trial_classic_pages: 0, hourly_image_limit: null});
         }}><option value="subscription">按月／按年订阅</option><option value="once">一次性常规额度包</option></select></label>
         {editor.kind === 'product' && <label>产品编号<input required autoFocus pattern="[a-z][a-z0-9_-]*" maxLength={64} value={productId} placeholder="例如 plus" onChange={event => setProductId(event.target.value)}/><small>小写字母开头，可包含数字、短横线和下划线。</small></label>}
         <label>产品名称<input required maxLength={100} value={benefits.name} placeholder="例如 PLUS" onChange={event => setBenefits({...benefits, name: event.target.value})}/></label>
         {isPack ? <>
           <label>购买页数<input required type="number" min={1} max={1000000} step={1} value={benefits.quota_pages || ''} onChange={event => setBenefits({...benefits, quota_pages: Number(event.target.value)})}/></label>
-          <label>额度有效天数<input type="number" min={1} max={36500} step={1} value={benefits.quota_validity_days ?? ''} placeholder="留空表示不过期" onChange={event => setBenefits({...benefits, quota_validity_days: event.target.value === '' ? null : Number(event.target.value)})}/><small>会员期间不扣购买额度，但有效期仍继续计算。</small></label>
+          <label>额度有效天数<input type="number" min={1} max={36500} step={1} value={benefits.quota_validity_days ?? ''} placeholder="留空表示不过期" onChange={event => setBenefits({...benefits, quota_validity_days: event.target.value === '' ? null : Number(event.target.value)})}/><small>订阅额度用完后可扣购买额度，有效期仍继续计算。</small></label>
           <label>服务档位<select required value={benefits.service_plan_id ?? ''} onChange={event => {
             const selected = servicePlans.find(value => value.id === event.target.value)?.revisions.filter(value => !value.quota_pages).sort((a, b) => b.version - a.version)[0];
             setBenefits({...benefits, service_plan_id: event.target.value || null, hourly_image_limit: selected?.hourly_image_limit ?? null});
           }}><option value="">选择已有会员套餐</option>{servicePlans.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select><small>仅购买额度享受该档的模型、分钟准入与调度；不会将免费日额度升级或赠送会员月额度。</small></label>
-        </> : <label>每月重绘页数<input required type="number" min={0} max={1000000} step={1} value={benefits.monthly_redraw_pages} onChange={event => setBenefits({...benefits, monthly_redraw_pages: Number(event.target.value)})}/></label>}
+        </> : <label>每月翻译页数<input type="number" min={0} max={1000000} step={1} placeholder="留空表示不限量" value={benefits.monthly_classic_pages ?? ''} onChange={event => setBenefits({...benefits, monthly_classic_pages: pageAllowance(event.target.value)})}/></label>}
         <label>每小时新受理页数<input type="number" min={1} max={1000000} step={1} value={benefits.hourly_image_limit ?? ''} onChange={event => setBenefits({...benefits, hourly_image_limit: event.target.value === '' ? null : Number(event.target.value)})}/><small>全账户滚动 60 分钟内的新翻译页数；留空表示不设小时限额。分钟保护仍生效。</small></label>
-        {!isPack && <><label>首次试用天数<input required type="number" min={0} max={30} step={1} value={benefits.trial_days} onChange={event => setBenefits({...benefits, trial_days: Number(event.target.value), trial_redraw_pages: Number(event.target.value) === 0 ? 0 : benefits.trial_redraw_pages})}/></label>
-        <label>试用重绘页数<input required type="number" min={0} max={1000000} step={1} disabled={!benefits.trial_days} value={benefits.trial_redraw_pages} onChange={event => setBenefits({...benefits, trial_redraw_pages: Number(event.target.value)})}/></label></>}
+        {!isPack && <><label>首次试用天数<input required type="number" min={0} max={30} step={1} value={benefits.trial_days} onChange={event => setBenefits({...benefits, trial_days: Number(event.target.value), trial_classic_pages: event.target.value === '' ? null : Number(event.target.value) === 0 ? 0 : benefits.trial_classic_pages})}/></label>
+        <label>试用翻译页数<input type="number" min={0} max={1000000} step={1} disabled={!benefits.trial_days} placeholder="留空表示不限量" value={benefits.trial_classic_pages ?? ''} onChange={event => setBenefits({...benefits, trial_classic_pages: pageAllowance(event.target.value)})}/></label></>}
       </div>{editor.kind === 'benefits' && <p className="provider-warning">保存后请添加采用新权益的价格。现有价格、订阅和已购额度继续保留原权益。</p>}</>}
       {editor.kind === 'price' && <><p className="muted">价格先保存为草稿，关联并验证支付渠道后发布。发布同一产品、环境、币种和周期的新价格，会自动停售原价格。</p><div className="billing-form-grid">
-        <label>付款周期<select value={price.interval} onChange={event => setPrice({...price, interval: event.target.value as BillingPrice['interval']})}>{priceIsPack ? <option value="once">一次性购买（不自动续费）</option> : <><option value="month">月付</option><option value="year">年付</option></>}</select></label>
+        <label>付款周期<select value={price.interval} onChange={event => setPrice({...price, interval: event.target.value as BillingPrice['interval']})}>{priceIsPack ? <option value="once">一次性购买（不自动续费）</option> : <><option value="month">月付</option><option value="quarter">季付（每三个月）</option><option value="year">年付</option></>}</select></label>
         <label>币种<input required pattern="[a-zA-Z]{3}" maxLength={3} value={price.currency} onChange={event => setPrice({...price, currency: event.target.value.toLowerCase()})}/></label>
         <label>价格金额（{price.currency.toUpperCase()}）<input required inputMode="decimal" pattern="[0-9]+(\.[0-9]+)?" value={price.amount} onChange={event => setPrice({...price, amount: event.target.value})}/><small>填写实际金额，例如 9.99。</small></label>
         <label>支付环境<select value={price.environment} onChange={event => setPrice({...price, environment: event.target.value as BillingEnvironment})}><option value="test">测试环境</option><option value="live">正式环境</option></select></label>
