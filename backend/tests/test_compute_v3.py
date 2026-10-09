@@ -44,7 +44,7 @@ def v3(client, monkeypatch, png):
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
     settings.cache_clear()
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        '{"translations":{"0":"Hello"}}', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
+        '{"0":"Hello"}', {'input_tokens': 10, 'output_tokens': 2}, 'fixture'))
     node, auth, admin = provision(client, 'test:cuda:0')
     with session_factory()() as db:
         record = db.get(ComputeNode, node['node_id'])
@@ -226,7 +226,7 @@ def test_all_empty_translations_deliver_and_settle_once(v3, png, monkeypatch, re
     lease = claim(v3).json()['leases'][0]
     analyze(v3, lease)
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        '{"translations":{"0":""}}', {'input_tokens': 10, 'output_tokens': 2}, 'empty-translation'))
+        '{"0":""}', {'input_tokens': 10, 'output_tokens': 2}, 'empty-translation'))
     text(lease)
     translated = heartbeat(v3, [lease]).json()['leases'][0]['translations']
     assert translated['translations'] == {'0': ''}

@@ -344,7 +344,7 @@ def test_real_cuda_node_uploads_overlay(v3, tmp_path, monkeypatch, ocr_language,
         arabic = 'العربية لا لأ لإ لآ مُحَمَّد ٢٠٠،؟…: AMIRA (200)'
         def arabic_fixture(segments, language, profile):
             assert language == 'ar'
-            return TextResponse(json.dumps({'translations': {s['id']: arabic for s in segments}}),
+            return TextResponse(json.dumps({s['id']: arabic for s in segments}),
                                 {'input_tokens': 10, 'output_tokens': 10}, 'fixture')
         monkeypatch.setattr(classic, 'call_text', arabic_fixture)
     else:

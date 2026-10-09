@@ -258,7 +258,7 @@ def test_worker_uses_frozen_model_after_plan_scope_and_revision_changes(text_cas
     calls = []
     def model(segments, language, profile):
         calls.append(profile)
-        return TextResponse('{"translations":{"b001":"你好"}}', {'input_tokens': 10, 'output_tokens': 2}, 'frozen')
+        return TextResponse('{"b001":"你好"}', {'input_tokens': 10, 'output_tokens': 2}, 'frozen')
     monkeypatch.setattr(classic, 'call_text', model)
     for _ in range(2):
         assert classic.run_text_stage(job_id, lease_id) == {'translations': {'b001': '你好'}}

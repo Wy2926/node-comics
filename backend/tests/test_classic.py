@@ -36,7 +36,7 @@ def analysis(segments=None):
 @pytest.fixture
 def text_database(tmp_path, monkeypatch):
     # This fixture can run without importing the HTTP app or other test modules.
-    from app import translation_requests, system_settings  # noqa: F401
+    from app import billing_models, translation_models, translation_requests, system_settings  # noqa: F401
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///' + (tmp_path / 'stages.db').as_posix())
     monkeypatch.setenv('DEV_AUTH', 'true')
     monkeypatch.setenv('CLASSIC_ENABLED', 'true')
@@ -88,16 +88,16 @@ def text_case(text_database, monkeypatch):
     from app.storage import get_store
     get_store().put('isolated-original', b'fixture', 'image/png', kind='original')
     def text(*args):
-        return TextResponse('{"translations":{"b001":"你好！"}}',
+        return TextResponse('{"b001":"你好！"}',
                             {'input_tokens': 100, 'output_tokens': 20}, 'isolated-request')
     monkeypatch.setattr(classic, 'call_text', text)
     return job_id, lease_id
 
 
-@pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"translations":{"wrong":"好"}}',
-    '{"translations":{"b001":2}}',
-    '{"translations":{"b001":"好","b001":"好"}}',
-    '{"translations":{"b001":"好"},"note":"injected"}', 'not json'])
+@pytest.mark.parametrize('content', ['{}', '{"translations":[]}', '{"wrong":"好"}',
+    '{"b001":2}',
+    '{"b001":"好","b001":"好"}',
+    '{"b001":"好","note":"injected"}', 'not json'])
 def test_rejects_incomplete_or_ambiguous_contract(content):
     with pytest.raises(TextError):
         parse_translations(content, SEGMENTS)
@@ -113,6 +113,38 @@ def test_text_stage_checkpoint_replay_never_repeats_paid_call(text_case):
         assert (call.accounted_micros, call.cost_state) == (1100, 'estimated')
 
 
+def test_compact_prompt_resumes_old_checkpoint_with_original_page_ids(text_case, monkeypatch):
+    import json
+    from app.adapters.text import messages, response_schema
+    job_id, lease_id = text_case
+    segments = [{'id': key, 'source': 'x' * 80} for key in ['0', '10', '199']]
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        job.config = {**job.config, 'prompt_version': 'comic-json-v8',
+                      'text': {**job.config['text'], 'group_bytes': 128}}
+        state = db.get(ClassicState, job_id)
+        state.analysis = analysis(segments)
+        state.translations = {'0': ''}
+        db.commit()
+    called = []
+    def model(batch, language, profile):
+        ids = [segment['id'] for segment in batch]
+        called.append(ids)
+        assert list(json.loads(messages(batch, language)[1]['content'])) == ids
+        assert response_schema(batch)['schema']['required'] == ids
+        return TextResponse(json.dumps({key: 'translated ' + key for key in ids}),
+                            {'input_tokens': 10, 'output_tokens': 5}, 'compact')
+    monkeypatch.setattr(classic, 'call_text', model)
+    expected = {'translations': {'0': '', '10': 'translated 10', '199': 'translated 199'}}
+    assert classic.run_text_stage(job_id, lease_id) == expected
+    assert classic.run_text_stage(job_id, lease_id) == expected
+    assert called == [['10'], ['199']]
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall).order_by(TextCall.group_index)).all()
+        assert [call.group_index for call in calls] == [1, 2]
+        assert all(call.accounted_micros == 200 for call in calls)
+
+
 @pytest.mark.parametrize('values', [
     {'b001': ''}, {'b001': ' \n\t '}, {'b001': '', 'b002': 'translated'},
 ])
@@ -126,7 +158,7 @@ def test_empty_translation_checkpoint_replay_and_delivery_do_not_repeat_call(tex
         db.get(ClassicState, job_id).analysis = analysis(segments)
         db.commit()
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        json.dumps({'translations': values}), {'input_tokens': 100, 'output_tokens': 5}, 'empty-translation'))
+        json.dumps(values), {'input_tokens': 100, 'output_tokens': 5}, 'empty-translation'))
     assert classic.run_text_stage(job_id, lease_id) == {'translations': expected}
     assert classic.run_text_stage(job_id, lease_id) == {'translations': expected}
     with session_factory()() as db:
@@ -228,7 +260,7 @@ def test_format_repair_records_cost_for_every_subcall(text_case, monkeypatch):
 
 def test_invalid_json_never_saves_partial_translations_and_stops_at_attempt_limit(text_case, monkeypatch):
     monkeypatch.setattr(classic, 'call_text', lambda *args: TextResponse(
-        '{"translations":{"b001":"first","b001":"second"}}',
+        '{"b001":"first","b001":"second"}',
         {'input_tokens': 100, 'output_tokens': 5}, 'duplicate-json-id'))
     monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
     with pytest.raises(TextError, match='TEXT_INVALID_RESPONSE'):

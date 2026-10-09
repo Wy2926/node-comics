@@ -212,7 +212,7 @@ def test_json_prompt_version_changes_cache_identity_without_changing_node_protoc
         current = snapshot(db)
         monkeypatch.setattr(classic_config, 'PROMPT_VERSION', 'previous-prompt')
         previous = snapshot(db)
-    assert current['prompt_version'] == 'comic-json-v8'
+    assert current['prompt_version'] == 'comic-json-v9'
     assert current['engine'] == previous['engine'] == {'protocol_version': 3}
     assert current['text'] == previous['text']
     assert digest(current) != digest(previous)
@@ -359,7 +359,7 @@ def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_cas
     def call(messages, profile, api_key, *, json_schema=None):
         assert json_schema['strict'] is True
         seen.append((messages, profile['channel'], api_key))
-        return TextResponse('{"translations":{}}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
+        return TextResponse('{}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
     monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', LLMConfig, (), call))
     provider = create(admin_case, {'name': 'Second source', 'channel': 'synthetic',
                                   'config': {'model': 'test'}, 'api_key': 'isolated-new-key'})
