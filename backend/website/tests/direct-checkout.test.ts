@@ -32,7 +32,7 @@ test('direct checkout uses exact quote and pending channel, never another interv
   const original=pendingCheckout({...year,channels:[{...year.channels[0],provider:'stripe'}]},'stripe');
   const pending = {...billing,subscription_checkout:original,offers:[month]};
   assert.deepEqual(checkoutSelection(pending,'lite-year'),{price_id:'lite-year',provider:'stripe'});
-  assert.equal(checkoutSelection(pending,'lite-month'),null);
+  assert.deepEqual(checkoutSelection(pending,'lite-month'),{price_id:'lite-month',provider:'creem'});
   assert.throws(()=>checkoutSelection({...pending,subscription_checkout:{...original,provider:'creem'}},'lite-year'));
   assert.throws(()=>checkoutSelection(pending,'unavailable-price'));
   assert.equal(checkoutSelection({...billing,gift:{state:'active',starts_at:null,ends_at:null,days:30}},'lite-year'),null);
@@ -44,7 +44,7 @@ test('checkout sends one POST, validates destination/provider, and never retries
     const calls: string[] = [];
     const request = (async (path: string, method?: string, body?: unknown) => {
       calls.push(path);
-      if (path === '/v1/billing/status') return billing;
+      if (path.startsWith('/v1/billing/status')) return billing;
       assert.equal(method,'POST');
       assert.deepEqual(body,{price_id:'lite-year',provider:'creem'});
       if (scenario === 'network') throw new TypeError('Network failure');
@@ -52,7 +52,7 @@ test('checkout sends one POST, validates destination/provider, and never retries
     }) as typeof api;
     if (scenario === 'ok') assert.equal(await directCheckout('lite-year',request),'https://creem.io/test/checkout/fixture');
     else await assert.rejects(directCheckout('lite-year',request));
-    assert.deepEqual(calls,['/v1/billing/status','/v1/billing/checkouts']);
+    assert.deepEqual(calls.map(path=>path.split('?')[0]),['/v1/billing/status','/v1/billing/checkouts']);
   }
 });
 
@@ -69,7 +69,7 @@ for (const published of publishedSubscriptions) {
       const calls: string[] = [];
       const request = (async (path: string, method?: string, body?: unknown) => {
         calls.push(path);
-        if (path === '/v1/billing/status') {
+        if (path.startsWith('/v1/billing/status')) {
           assert.equal(method,'GET');
           return status;
         }
@@ -79,7 +79,7 @@ for (const published of publishedSubscriptions) {
         return {provider:'creem',checkout_url:'https://creem.io/checkout/fixture'};
       }) as typeof api;
       assert.equal(await directCheckout(offer.id,request),'https://creem.io/checkout/fixture');
-      assert.deepEqual(calls,['/v1/billing/status','/v1/billing/checkouts']);
+      assert.deepEqual(calls.map(path=>path.split('?')[0]),['/v1/billing/status','/v1/billing/checkouts']);
     }
   });
 
@@ -95,7 +95,7 @@ for (const published of publishedSubscriptions) {
     assert.equal(checkoutSelection({...status,subscription:{status:'active'} as Billing['subscription']},offer.id),null);
     const original = pendingCheckout({...offer,id:'retired-price',channels:[{...offer.channels[0],provider:'stripe'}]},'stripe');
     const pending = {...status,subscription_checkout:original};
-    assert.equal(checkoutSelection(pending,offer.id),null);
+    assert.deepEqual(checkoutSelection(pending,offer.id),{price_id:offer.id,provider:'creem'});
     assert.deepEqual(checkoutSelection(pending,original.price.id),{price_id:original.price.id,provider:'stripe'});
   });
 }
@@ -106,11 +106,16 @@ test('all page packs remain available to members, gifts and pending subscription
   }
 });
 
-test('a different subscription quote resumes its original checkout without writing',async()=>{
+test('a different subscription quote creates its own checkout instead of redirecting to the old price',async()=>{
   const calls:string[]=[];
-  const request=(async(path:string)=>{calls.push(path);return {...billing,subscription_checkout:pendingCheckout(year)};}) as typeof api;
-  assert.deepEqual(await directCheckout(month.id,request),{pending_price_id:year.id});
-  assert.deepEqual(calls,['/v1/billing/status']);
+  const request=(async(path:string,method?:string,body?:unknown)=>{
+    calls.push(path);
+    if(method==='GET')return {...billing,subscription_checkout:pendingCheckout(year)};
+    assert.deepEqual(body,{price_id:month.id,provider:'creem'});
+    return {provider:'creem',checkout_url:'https://creem.io/test/checkout/new-month'};
+  }) as typeof api;
+  assert.equal(await directCheckout(month.id,request),'https://creem.io/test/checkout/new-month');
+  assert.deepEqual(calls,['/v1/billing/status?price_id=lite-month','/v1/billing/checkouts']);
 });
 
 test('an unpaid subscription does not block new quota orders and quota intents do not block subscribing',async()=>{
@@ -118,7 +123,7 @@ test('an unpaid subscription does not block new quota orders and quota intents d
   purchaseIntent(storage,'buyer',pack.id,'creem');
   let pending=true;
   const request=(async(path:string,_method?:string,body?:unknown,headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:[pack],subscription_checkout:pending?pendingCheckout(year):null};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack],subscription_checkout:pending?pendingCheckout(year):null};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     writes.push({body,headers});return {provider:'creem',checkout_url:'https://creem.io/test/checkout/new-kind'};
   }) as typeof api;
@@ -135,7 +140,7 @@ test('a retired subscription quote and an unconfirmed retired quota retain their
   const quota=purchaseIntent(storage,'buyer','retired-pack','creem');
   purchaseIntent(storage,'buyer','different-pack','stripe');
   const request=(async(path:string,_method?:string,body?:unknown,headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,offers:[],quota_offers:[],subscription_checkout:subscription};
+    if(path.startsWith('/v1/billing/status'))return {...billing,offers:[],quota_offers:[],subscription_checkout:subscription};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     writes.push({body,headers});const provider=(body as {provider:BillingProvider}).provider;
     return {provider,checkout_url:provider==='stripe'?'https://checkout.stripe.com/c/pay/original':'https://creem.io/test/checkout/original'};
@@ -155,7 +160,7 @@ test('an unavailable quote without this account\'s local original request never 
   const calls:string[]=[];
   const request=(async(path:string)=>{calls.push(path);return path==='/v1/me'?{user:{id:'buyer'}}:billing;}) as typeof api;
   await assert.rejects(directCheckout('retired-pack',request,storage),/CHECKOUT_UNAVAILABLE/);
-  assert.deepEqual(calls,['/v1/billing/status','/v1/me']);
+  assert.deepEqual(calls,['/v1/billing/status?price_id=retired-pack','/v1/me']);
 });
 
 test('unconfirmed purchase keys are account-and-quote scoped, retain their provider and never clear a newer intent',()=>{
@@ -179,7 +184,7 @@ test('one-time checkout retains its key after response loss and clears on confir
   const keys:string[]=[];
   let fulfilled=false;
   const request=(async(path:string,method?:string,body?:unknown,headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:[pack]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack]};
     if(path==='/v1/me')return {user:{id:'verified-user'}};
     assert.equal(method,'POST');assert.deepEqual(body,{price_id:'pack',provider:'creem'});
     assert.ok(headers?.['Idempotency-Key']);keys.push(headers['Idempotency-Key']);
@@ -200,7 +205,7 @@ test('A to B to A response-loss retries remain independent and keep each origina
   const storage=memoryStorage(),other={...pack,id:'other-pack'},writes:{price_id:string;provider:string;key:string}[]=[];
   let changed=false;
   const request=(async(path:string,_method?:string,body?:{price_id:string;provider:string},headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:changed?[{...pack,channels:[{...pack.channels[0],provider:'stripe'}]},other]:[pack,other]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:changed?[{...pack,channels:[{...pack.channels[0],provider:'stripe'}]},other]:[pack,other]};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     writes.push({...body!,key:headers!['Idempotency-Key']});throw new TypeError('Response lost');
   }) as typeof api;
@@ -214,7 +219,7 @@ test('A to B to A response-loss retries remain independent and keep each origina
 test('a validated quota checkout URL ends only its request, so explicit same-price and different-price purchases get new keys',async()=>{
   const storage=memoryStorage(),other={...pack,id:'other-pack'},writes:{price_id:string;key:string}[]=[];
   const request=(async(path:string,_method?:string,body?:{price_id:string},headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:[pack,other]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack,other]};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     writes.push({price_id:body!.price_id,key:headers!['Idempotency-Key']});
     return {provider:'creem',checkout_url:'https://creem.io/test/checkout/independent'};
@@ -230,7 +235,7 @@ test('wrong-provider, missing and unsafe URLs never clear the original quota int
   const storage=memoryStorage(),keys:string[]=[];
   let result:{provider:string;checkout_url:string|null}={provider:'stripe',checkout_url:'https://creem.io/test/checkout/wrong-provider'};
   const request=(async(path:string,_method?:string,_body?:unknown,headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:[pack]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack]};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     keys.push(headers!['Idempotency-Key']);return result;
   }) as typeof api;
@@ -248,7 +253,7 @@ test('a verified unpaid terminal response offers, but never automatically starts
   const keys:string[]=[];
   let code='BILLING_PURCHASE_RETRY_ALLOWED',status=409;
   const request=(async(path:string,_method?:string,_body?:unknown,headers?:Record<string,string>)=>{
-    if(path==='/v1/billing/status')return {...billing,quota_offers:[pack]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack]};
     if(path==='/v1/me')return {user:{id:'verified-user'}};
     keys.push(headers!['Idempotency-Key']);throw new ApiError('checkout ended',status,code);
   }) as typeof api;

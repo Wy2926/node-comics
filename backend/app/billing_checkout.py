@@ -7,14 +7,13 @@ from . import stripe_client as stripe, creem_client as creem
 from .billing_providers import BillingError, require, provider_enabled, provider_environment, provider_config_json, resource_key, remote_id, stripe_quote
 from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding, BillingOrder
 from .entitlement_models import QuotaPeriod
-from .billing_access import active_terms, access_dates
+from .billing_access import ongoing_subscription, access_dates
 from .billing_catalog import offers, price_json, default_provider
 from .billing_orders import checkout_order, transition
 from .config import settings
 from .db import session_factory
 from .entitlements import locked_user, iso, gift_json
 from .models import now, uid
-from .billing_renewal import LIVE as LIVE_SUBSCRIPTIONS
 
 PENDING = ['creating', 'open', 'unknown']
 
@@ -37,27 +36,46 @@ def customer_for(db, owner_id, provider):
         BillingCustomer.provider == provider, BillingCustomer.environment == provider_environment(provider)))
 
 
+def bind_checkout_customer(db, row, customer_id, *, subscription=False):
+    """Freeze each paid checkout's customer, including independent first purchases."""
+    require(isinstance(customer_id, str) and customer_id, 'BILLING_CUSTOMER_MISMATCH')
+    require(row.customer_id in (None, customer_id), 'BILLING_CUSTOMER_MISMATCH')
+    if row.customer_id is None:
+        for model in (BillingCustomer, BillingSubscription):
+            other = db.scalar(select(model.owner_id).where(model.provider == row.provider,
+                model.environment == row.environment, model.customer_id == customer_id,
+                model.owner_id != row.owner_id).limit(1))
+            require(other is None, 'BILLING_CUSTOMER_MISMATCH')
+    row.customer_id = customer_id
+    # One-time purchases never claim the default subscription customer.
+    if subscription and customer_for(db, row.owner_id, row.provider) is None:
+        db.add(BillingCustomer(owner_id=row.owner_id, provider=row.provider,
+            environment=row.environment, customer_id=customer_id))
+
+
 def current_subscription(db, owner_id, provider=None):
     query = select(BillingSubscription).join(BillingCheckout, BillingSubscription.checkout_id == BillingCheckout.id).where(
         BillingSubscription.owner_id == owner_id)
     if provider is not None:
         query = query.where(BillingSubscription.provider == provider)
-    return db.scalar(query.order_by(BillingCheckout.created_at.desc()).limit(1))
+    return db.scalar(query.order_by(ongoing_subscription().desc(), BillingCheckout.created_at.desc()).limit(1))
 
 
-def subscription_checkout(db, owner_id):
-    return db.execute(select(BillingCheckout, BillingPrice).join(
+def subscription_checkout(db, owner_id, price_id=None):
+    query = select(BillingCheckout, BillingPrice).join(
         BillingPrice, BillingPrice.id == BillingCheckout.price_id).where(
             BillingCheckout.owner_id == owner_id, BillingPrice.interval != 'once', pending_checkout_condition())
-        .order_by(BillingCheckout.created_at, BillingCheckout.id).limit(1)).first()
+    if price_id is not None:
+        query = query.where(BillingCheckout.price_id == price_id)
+    return db.execute(query.order_by(BillingCheckout.created_at, BillingCheckout.id).limit(1)).first()
 
 
-def billing_status(db, user):
+def billing_status(db, user, price_id=None):
     from .billing_renewal import renewal_json
     account = db.get(BillingAccount, user.id)
     sub = current_subscription(db, user.id)
     pending = None
-    selected = subscription_checkout(db, user.id)
+    selected = subscription_checkout(db, user.id, price_id)
     if selected:
         row, price = selected
         quote = price_json(db, price)
@@ -281,18 +299,19 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             account = BillingAccount(owner_id=owner_id)
             db.add(account)
         customer = customer_for(db, owner_id, provider)
-        selected = subscription_checkout(db, owner_id) if price.interval != 'once' else None
+        selected = subscription_checkout(db, owner_id, price_id) if price.interval != 'once' else None
         row = replay if price.interval == 'once' else selected[0] if selected else None
         require(not replay or row and replay.id == row.id, 'BILLING_CHECKOUT_PRICE_CONFLICT')
+        if price.interval != 'once':
+            active = db.scalar(select(BillingSubscription.id).where(BillingSubscription.owner_id == owner_id,
+                ongoing_subscription()).limit(1))
+            require(active is None, 'BILLING_SUBSCRIPTION_EXISTS')
         if row is None:
             if price.interval != 'once':
                 gift = gift_json(user)
                 require(not gift or gift['state'] == 'expired', 'BILLING_GIFT_ACTIVE')
-                active = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == owner_id,
-                    BillingSubscription.status.in_(LIVE_SUBSCRIPTIONS)).limit(1))
-                require(active is None and not active_terms(db, user.id), 'BILLING_SUBSCRIPTION_EXISTS')
             require(provider == default_provider(db), 'BILLING_CHANNEL_UNAVAILABLE')
-            require(price and price.environment == provider_environment(provider) and price.status == 'active', 'BILLING_PLAN_UNAVAILABLE')
+            require(price.environment == provider_environment(provider) and price.status == 'active', 'BILLING_PLAN_UNAVAILABLE')
             binding = db.scalar(select(BillingPriceBinding).where(BillingPriceBinding.price_id == price_id,
                 BillingPriceBinding.provider == provider, BillingPriceBinding.environment == price.environment,
                 BillingPriceBinding.status == 'active'))
@@ -301,10 +320,14 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             if price.interval == 'once':
                 require(revision.quota_pages > 0 and revision.service_plan_id and not revision.trial_days
                     and revision.trial_classic_pages == 0 and revision.monthly_classic_pages == 0, 'BILLING_PLAN_UNAVAILABLE')
+            trial = price.interval != 'once' and account.trial_used_at is None and revision.trial_days > 0
+            if trial:
+                trial = not db.scalar(select(BillingCheckout.id).where(BillingCheckout.owner_id == owner_id,
+                    BillingCheckout.trial.is_(True), pending_checkout_condition()).limit(1))
             row = BillingCheckout(id=uid(), owner_id=owner_id, provider=provider, binding_id=binding.id,
                 environment=price.environment, price_id=price.id, customer_id=customer.customer_id if customer else None,
                 idempotency_key=idempotency_key, return_url=getattr(settings(), provider + '_return_url'),
-                trial=price.interval != 'once' and account.trial_used_at is None and revision.trial_days > 0,
+                trial=trial,
                 created_at=now(), expires_at=now() + timedelta(hours=23))
             db.add(row)
             db.flush()
@@ -346,15 +369,15 @@ def sync_owner(owner_id):
         sub_provider = sub.provider if sub else None
         if sub_id:
             sub.synced_at = now()
-        selected = subscription_checkout(db, owner_id)
-        pending = [selected[0]] if selected else []
         threshold = now() - timedelta(seconds=10)
-        pending.extend(db.scalars(select(BillingCheckout).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
-            .where(BillingCheckout.owner_id == owner_id, BillingPrice.interval == 'once', pending_checkout_condition(),
-                BillingCheckout.provider.in_(enabled),
-                or_(BillingCheckout.last_checked_at.is_(None), BillingCheckout.last_checked_at <= threshold))
-            .order_by(func.coalesce(BillingCheckout.last_checked_at, BillingCheckout.created_at),
-                BillingCheckout.created_at, BillingCheckout.id).limit(2)))
+        pending = []
+        for category, limit in ((BillingPrice.interval != 'once', 1), (BillingPrice.interval == 'once', 2)):
+            pending.extend(db.scalars(select(BillingCheckout).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
+                .where(BillingCheckout.owner_id == owner_id, category, pending_checkout_condition(),
+                    BillingCheckout.provider.in_(enabled),
+                    or_(BillingCheckout.last_checked_at.is_(None), BillingCheckout.last_checked_at <= threshold))
+                .order_by(func.coalesce(BillingCheckout.last_checked_at, BillingCheckout.created_at),
+                    BillingCheckout.created_at, BillingCheckout.id).limit(limit)))
         purchase = db.scalar(select(BillingCheckout).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
             .where(BillingCheckout.owner_id == owner_id, BillingPrice.interval == 'once',
                 BillingCheckout.provider.in_(enabled),

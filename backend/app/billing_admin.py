@@ -3,8 +3,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field
-from sqlalchemy import func, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.orm import Session, aliased
 from .auth import admin
 from .billing_catalog import price_json
 from .billing_models import BillingAccount, BillingCustomer, BillingInvoice, BillingTerm, BillingRefund, BillingDispute, BillingCheckout, BillingEvent, BillingOrder, BillingOrderTransition, BillingPrice, BillingPlanRevision, BillingSubscription
@@ -330,19 +330,30 @@ def subscription_json(sub):
     return {**fields(sub, SUBSCRIPTION_FIELDS), **renewal_json(sub), 'renewal_error': sub.renewal_error}
 
 
+def duplicate_subscription():
+    from .billing_access import ongoing_subscription
+    other = aliased(BillingSubscription)
+    return and_(ongoing_subscription(), select(other.id).where(
+        other.owner_id == BillingSubscription.owner_id, other.environment == BillingSubscription.environment,
+        other.id != BillingSubscription.id, ongoing_subscription(other)).exists())
+
+
 @router.get('/subscriptions')
 def subscriptions(provider: Literal['stripe', 'creem'] | None = None, environment: Literal['test', 'live'] | None = None,
         owner_id: str | None = Query(None, max_length=36), status: str | None = Query(None, max_length=24),
-        q: str | None = Query(None, max_length=320), page: int = Query(1, ge=1),
+        q: str | None = Query(None, max_length=320), duplicates_only: bool = False, page: int = Query(1, ge=1),
         page_size: int = Query(30, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(BillingSubscription, User.name).join(User, User.id == BillingSubscription.owner_id)
+    duplicate = duplicate_subscription()
+    query = select(BillingSubscription, User.name, duplicate).join(User, User.id == BillingSubscription.owner_id)
+    if duplicates_only:
+        query = query.where(duplicate)
     for column, value in ((BillingSubscription.provider, provider), (BillingSubscription.environment, environment),
             (BillingSubscription.owner_id, owner_id), (BillingSubscription.status, status)):
         if value is not None:
             query = query.where(column == value)
     query = search_text(query, q, (BillingSubscription.id, BillingSubscription.customer_id, BillingSubscription.owner_id, User.name))
     return paged(db, query.order_by(BillingSubscription.synced_at.desc(), BillingSubscription.id.desc()), page,
-        page_size, lambda row: {**subscription_json(row[0]), 'owner_name': row[1]})
+        page_size, lambda row: {**subscription_json(row[0]), 'owner_name': row[1], 'duplicate_subscription': row[2]})
 
 
 def subscription_required(db, subscription_id):
@@ -357,7 +368,9 @@ def subscription_detail(subscription_id: str, db: Session = Depends(get_db)):
     sub = subscription_required(db, subscription_id)
     account = db.get(BillingAccount, sub.owner_id)
     checkout = db.get(BillingCheckout, sub.checkout_id)
-    return {'subscription': {**subscription_json(sub), 'owner_name': db.get(User, sub.owner_id).name},
+    duplicate = db.scalar(select(duplicate_subscription()).where(BillingSubscription.id == sub.id))
+    return {'subscription': {**subscription_json(sub), 'owner_name': db.get(User, sub.owner_id).name,
+            'duplicate_subscription': duplicate},
         'price': price_json(db, db.get(BillingPrice, sub.price_id)),
         'trial_used_at': account.trial_used_at if account else None,
         'checkout': fields(checkout, ('id', 'session_id', 'trial', 'status', 'created_at', 'last_checked_at', 'error_code'))}

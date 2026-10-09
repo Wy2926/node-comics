@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from . import creem_client as creem
 from .billing_providers import require, resource_key, remote_id
-from .billing_models import BillingAccount, BillingCheckout, BillingCustomer, BillingSubscription, BillingPrice, BillingPriceBinding, BillingPlanRevision, BillingInvoice, BillingTerm, BillingEvent
-from .billing_checkout import bind_session, customer_for
+from .billing_models import BillingAccount, BillingCheckout, BillingSubscription, BillingPrice, BillingPriceBinding, BillingPlanRevision, BillingInvoice, BillingTerm, BillingEvent
+from .billing_checkout import bind_session, bind_checkout_customer
 from .billing_grants import grant_term
 from .billing_orders import checkout_order, payment_order, transition, revoke_invoice, record_subscription_state
 from .config import settings
@@ -165,11 +165,7 @@ def sync_subscription(subscription_id, transaction_id=None, event_id=None):
             and items[0].get('units') == 1, 'CREEM_PLAN_MISMATCH')
         account = db.get(BillingAccount, user.id)
         require(account is not None)
-        customer = customer_for(db, user.id, 'creem')
-        if customer is None:
-            customer = BillingCustomer(owner_id=user.id, provider='creem', environment=row.environment, customer_id=customer_id)
-            db.add(customer)
-        require(customer.customer_id == customer_id, 'CREEM_CUSTOMER_MISMATCH')
+        bind_checkout_customer(db, row, customer_id, subscription=True)
         price = db.get(BillingPrice, row.price_id)
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
         sub = db.get(BillingSubscription, resource_key('creem', subscription_id), populate_existing=True)

@@ -2,7 +2,7 @@
 from datetime import timedelta
 from sqlalchemy import or_, select, update
 from . import stripe_client as stripe
-from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingEvent, BillingSubscription, BillingPlanRevision, BillingPrice, BillingPriceBinding
+from .billing_models import BillingAccount, BillingCheckout, BillingEvent, BillingSubscription, BillingPlanRevision, BillingPrice, BillingPriceBinding
 from .config import settings
 from .db import session_factory
 from .billing_grants import timestamp, grant_term, apply_invoice, invoice_subscription
@@ -10,7 +10,7 @@ from .entitlements import locked_user
 from .models import now
 from .billing_providers import resource_key, stripe_quote
 from .billing_orders import checkout_order, transition, record_subscription_state
-from .billing_checkout import customer_for
+from .billing_checkout import bind_checkout_customer
 
 
 
@@ -48,19 +48,16 @@ def sync_subscription(subscription_id, invoice_id=None):
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
         account = db.get(BillingAccount, row.owner_id)
         stripe.require(account is not None)
-        customer = customer_for(db, row.owner_id, 'stripe')
-        if customer is None:
-            customer = BillingCustomer(owner_id=user.id, provider='stripe', environment=cfg.stripe_environment, customer_id=subscription['customer'])
-            db.add(customer)
-        stripe.require(customer.customer_id == subscription['customer'])
+        customer_id = subscription['customer']
+        bind_checkout_customer(db, row, customer_id, subscription=True)
         sub = db.get(BillingSubscription, resource_key('stripe', subscription_id), populate_existing=True)
         previous_status = sub.status if sub else None
         if sub is None:
             sub = BillingSubscription(id=resource_key('stripe', subscription_id), provider='stripe', binding_id=row.binding_id, owner_id=user.id, checkout_id=row.id,
-                environment=cfg.stripe_environment, customer_id=customer.customer_id, price_id=price.id, status=subscription['status'])
+                environment=cfg.stripe_environment, customer_id=customer_id, price_id=price.id, status=subscription['status'])
             db.add(sub)
             db.flush()
-        stripe.require(sub.owner_id == user.id and sub.customer_id == customer.customer_id)
+        stripe.require(sub.owner_id == user.id and sub.customer_id == customer_id)
         sub.status, sub.synced_at = subscription['status'], now()
         end = timestamp(item.get('current_period_end'))
         sub.cancel_at = timestamp(subscription.get('cancel_at')) or (end if subscription.get('cancel_at_period_end') else None)

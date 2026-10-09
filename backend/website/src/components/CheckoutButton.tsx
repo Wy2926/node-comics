@@ -31,7 +31,7 @@ export default function CheckoutButton({ priceId, accountHref, label, copy,disab
       } else {
         const destination = await directCheckout(id);
         if(current!==epoch.current)return;
-        location.assign(typeof destination==='string'?destination:destination&&typeof destination.pending_price_id==='string'?`${pricing}?price=${encodeURIComponent(destination.pending_price_id)}`:accountHref);
+        location.assign(typeof destination==='string'?destination:accountHref);
       }
     } catch(error) {
       if(current!==epoch.current)return;

@@ -267,16 +267,19 @@ test('subscription recovery does not hide or disable any quota purchase action',
   }
 });
 
-test('every locale keeps original subscription recovery separate from every new quota quote',()=>{
+test('every locale keeps other subscription prices and cycles available beside pending checkout',()=>{
   const sub={...subscription,id:'retired-year',interval:'year' as const};
   for(const locale of locales){
     const $=pricingSnapshot({...emptyBilling,subscription_checkout:original(sub)},locale,pack.id);
     const subscriptionButton=$('.subscription-card.paid [data-purchase-link]'),quotaButton=$('.quota-offer [data-purchase-link]');
-    assert.equal(subscriptionButton.attr('href'),localPath('/pricing/?price=retired-year',locale));
+    assert.equal(subscriptionButton.attr('href'),localPath('/pricing/?price=subscription-month',locale));
     assert.equal(quotaButton.attr('href'),localPath('/pricing/?price=synthetic-pack',locale));
-    assert.ok(subscriptionButton.text().includes('resume original'));assert.ok(!quotaButton.text().includes('resume original'));
+    assert.ok(!subscriptionButton.text().includes('resume original'));assert.ok(!quotaButton.text().includes('resume original'));
     assert.equal(subscriptionButton.attr('aria-disabled'),undefined);assert.equal(quotaButton.attr('aria-disabled'),undefined);
-    assert.equal($('.quota-offer').length,2);assert.equal($('.billing-cycle[disabled]').length,1);
+    assert.equal($('.quota-offer').length,2);assert.equal($('.billing-cycle[disabled]').length,0);
+    const recovered=pricingSnapshot({...emptyBilling,subscription_checkout:original(sub)},locale,sub.id);
+    assert.equal(recovered('.subscription-card.paid [data-purchase-link]').attr('href'),localPath('/pricing/?price=retired-year',locale));
+    assert.ok(recovered('.subscription-card.paid [data-purchase-link]').text().includes('resume original'));
   }
 });
 

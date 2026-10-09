@@ -89,7 +89,7 @@ export async function api<T>(path:string,_method?:string,body?:unknown,headers?:
   if(performanceCheck){
     const record={path,startedMs:Math.round(performance.now()-fixtureStarted),finishedMs:undefined as number|undefined};
     observations.requests.push(record);report();
-    const parameter=path==='/v1/me'?'meDelay':path==='/v1/billing/status'?'statusDelay':path==='/v1/billing/sync'?'syncDelay':null;
+    const parameter=path==='/v1/me'?'meDelay':path.split('?')[0]==='/v1/billing/status'?'statusDelay':path==='/v1/billing/sync'?'syncDelay':null;
     const delay=parameter?Number(parameters.get(parameter)||0):0;
     if(Number.isFinite(delay)&&delay>0)await new Promise(resolve=>setTimeout(resolve,Math.min(delay,30000)));
     record.finishedMs=Math.round(performance.now()-fixtureStarted);report();
@@ -97,7 +97,7 @@ export async function api<T>(path:string,_method?:string,body?:unknown,headers?:
     if(path==='/v1/billing/sync'&&parameters.has('syncFail'))throw new ApiError('模拟支付同步超时，已有权益不受影响。',503);
   }
   if(path==='/v1/me')return {user:{id:'synthetic-'+version,name:version===1?'界面验收':'界面验收 '+version},entitlements} as T;
-  if(path==='/v1/billing/status'){if(scenario==='error')throw new ApiError('账户服务暂时不可用，请重试。',503);return structuredClone(billing) as T;}
+  if(path.split('?')[0]==='/v1/billing/status'){if(scenario==='error')throw new ApiError('账户服务暂时不可用，请重试。',503);return structuredClone(billing) as T;}
   if(path==='/v1/billing/sync')return structuredClone({billing,entitlements}) as T;
   if(path==='/v1/billing/checkouts'){
     const message=`已验证报价：${(body as {price_id:string}).price_id} · ${(body as {provider:string}).provider}${headers?.['Idempotency-Key']?' · '+headers['Idempotency-Key']:''}`;

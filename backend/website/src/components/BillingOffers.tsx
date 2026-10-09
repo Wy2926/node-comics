@@ -65,9 +65,10 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
     return()=>{disposed=true;unsubscribe?.();clearTimeout(timeout);controller.abort();};
   },[]);
   const pending=billing?.subscription_checkout?.price;
-  const available=pending?[pending]:(billing?.offers??(error?[]:offers??[])).filter(offer=>offer.interval!=='once');
+  const available=(billing?.offers??(error?[]:offers??[])).filter(offer=>offer.interval!=='once'&&offer.id!==pending?.id);
+  if(pending)available.push(pending);
   const requested=available.find(offer=>offer.id===selectedPrice);
-  const interval=pending?.interval==='month'||pending?.interval==='quarter'||pending?.interval==='year'?pending.interval:requested?.interval==='month'||requested?.interval==='quarter'||requested?.interval==='year'?requested.interval:preferred;
+  const interval=requested?.interval==='month'||requested?.interval==='quarter'||requested?.interval==='year'?requested.interval:preferred;
   const managed=!!billing&&(hasManagedSubscription(billing.subscription?.status,billing.entitlement_expires_at)||!!billing.gift&&billing.gift.state!=='expired');
   const display=available.some(offer=>offer.interval===interval)?available:publishedSubscriptions;
   const plans=[...new Set(display.map(offer=>offer.plan_id))].map(plan=>
@@ -78,7 +79,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
   const annual=offerForInterval(available,'year',selectedPrice);
   const discount=annual?annualSavings(annual,available)?.percent??0:available.length?0:publishedAnnualDiscount;
   return <div className="pricing-comparison">
-    <BillingCycle offers={available.length?available:publishedSubscriptions} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale} preview disabled={!!pending} annualDiscount={discount}/>
+    <BillingCycle offers={available.length?available:publishedSubscriptions} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale} preview annualDiscount={discount}/>
     <div className="subscription-grid">
       <article className="subscription-card free">
         <header><p className="membership-heading">{highlights.free}</p><h2>{free.name}</h2></header>
@@ -96,7 +97,7 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
         <div className="plan-allowance"><span>{quota.subscription}</span><strong className="subscription-allowance">{offerBenefits(offer,locale)}</strong>{extra&&<p className="plan-difference">{extra}</p>}</div>
         <div className="subscription-purchase">
         {offer.channels.length>0?<>
-        {managed&&!pending?<a className="button" href={accountHref}>{manageLabel(locale)} ↗</a>:<CheckoutButton priceId={offer.id} accountHref={accountHref} label={pending?.id===offer.id?checkoutCopy.resume??benefits.subscribe(offer.name):benefits.subscribe(offer.name)} copy={buttonCopy} disabled={billing===undefined||!!pending&&pending.id!==offer.id}/>}
+        {managed?<a className="button" href={accountHref}>{manageLabel(locale)} ↗</a>:<CheckoutButton priceId={offer.id} accountHref={accountHref} label={pending?.id===offer.id?checkoutCopy.resume??benefits.subscribe(offer.name):benefits.subscribe(offer.name)} copy={buttonCopy} disabled={billing===undefined}/>}
         <p className="trial-note">{offer.trial_days>0&&`${trialCopy(offer.trial_days,locale)} · ${offer.trial_classic_pages===null?copy.classic:quotaPurchaseCopy(locale).pages.replace('{0}',offer.trial_classic_pages.toLocaleString(locale))}`} {renewalCopy(offer,locale)} {text.cancel} {publishedPricingCopy(locale).tax}</p>
         </>:<PublishedPurchaseAvailability locale={locale} name={offer.name} interval={interval} state={error?'error':offers?'unavailable':'loading'}/>}
         </div>

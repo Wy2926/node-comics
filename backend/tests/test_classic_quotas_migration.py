@@ -15,7 +15,7 @@ def test_classic_upgrade_replaces_reflected_interval_and_mode_checks(isolated_mi
                         "VALUES ('legacy-v1','legacy',1,'Legacy',300,0,0,CURRENT_TIMESTAMP)"))
     migrate(engine, 'head')
     with engine.begin() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == 'classic_quotas_0015'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == 'subscription_customer_0016'
         assert tuple(db.execute(text("SELECT monthly_classic_pages,trial_classic_pages "
                                      "FROM billing_plan_revisions WHERE id='legacy-v1'")).one()) == (None, 0)
         db.execute(text("INSERT INTO billing_prices "

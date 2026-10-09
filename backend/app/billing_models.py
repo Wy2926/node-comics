@@ -170,6 +170,7 @@ class BillingSubscription(Base):
     renewal_action_at: Mapped[datetime | None] = mapped_column(DateTime)
     renewal_error: Mapped[str | None] = mapped_column(String(80))
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=now, index=True)
+    __table_args__ = (Index('ix_billing_subscriptions_customer', 'provider', 'environment', 'customer_id'),)
 
 
 class BillingInvoice(Base):

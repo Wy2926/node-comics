@@ -33,8 +33,6 @@ export function checkoutSelection(billing: Billing, priceId: string) {
   if (!offer) throw Error("CHECKOUT_UNAVAILABLE");
   const pending =
     offer.interval === "once" ? null : billing.subscription_checkout;
-  // Only subscriptions have a single original checkout to resume.
-  if (pending && pending.price.id !== priceId) return null;
   if (
     offer.interval !== "once" &&
     (hasManagedSubscription(
@@ -44,7 +42,7 @@ export function checkoutSelection(billing: Billing, priceId: string) {
       (billing.gift && billing.gift.state !== "expired"))
   )
     return null;
-  const channel = selectedChannel(offer, pending?.provider);
+  const channel = selectedChannel(offer, pending?.price.id === priceId ? pending.provider : undefined);
   if (!channel) throw Error("CHECKOUT_UNAVAILABLE");
   return { price_id: offer.id, provider: channel.provider };
 }
@@ -57,7 +55,7 @@ export async function directCheckout(
   const identity = request === api ? await sessionIdentity() : undefined;
   if (request === api && !identity) throw new ApiError("LOGIN_REQUIRED", 401);
   const billing = await request<Billing>(
-    "/v1/billing/status",
+    `/v1/billing/status?price_id=${encodeURIComponent(priceId)}`,
     "GET",
     undefined,
     undefined,
@@ -87,11 +85,7 @@ export async function directCheckout(
     // its exact original key/provider is replayed; the server validates it.
     selection = { price_id: priceId, provider: intent.provider };
   } else selection = checkoutSelection(billing, priceId);
-  if (!selection) {
-    return billing.subscription_checkout
-      ? { pending_price_id: billing.subscription_checkout.price.id }
-      : null;
-  }
+  if (!selection) return null;
   let result: {
     checkout_url: string | null;
     provider: BillingProvider;

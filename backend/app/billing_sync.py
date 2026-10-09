@@ -84,7 +84,7 @@ def reconcile_once():
     enabled = [p for p in ('stripe', 'creem') if provider_enabled(p)]
     if not enabled:
         return
-    from .billing_renewal import reconcile_renewals
+    from .billing_renewal import LIVE, reconcile_renewals
     reconcile_renewals(enabled)
     with session_factory()() as db:
         ids = list(db.scalars(select(BillingEvent.id).where(BillingEvent.provider.in_(enabled),
@@ -92,12 +92,12 @@ def reconcile_once():
             .order_by(BillingEvent.received_at).limit(20)))
     for event_id in ids:
         process_event(event_id)
-    from .billing_checkout import sync_owner, pending_checkout_condition, LIVE_SUBSCRIPTIONS
+    from .billing_checkout import sync_owner, pending_checkout_condition
     threshold = now() - timedelta(minutes=5)
     with session_factory()() as db:
         subscriptions = list(db.scalars(select(BillingSubscription).where(BillingSubscription.provider.in_(enabled),
             BillingSubscription.synced_at < threshold,
-            or_(BillingSubscription.status.in_(LIVE_SUBSCRIPTIONS), BillingSubscription.paid_ends_at > now(),
+            or_(BillingSubscription.status.in_(LIVE), BillingSubscription.paid_ends_at > now(),
                 BillingSubscription.trial_ends_at > now())).order_by(BillingSubscription.synced_at).limit(10)))
         owners = list(db.scalars(select(BillingCheckout.owner_id).where(BillingCheckout.provider.in_(enabled),
             pending_checkout_condition(),

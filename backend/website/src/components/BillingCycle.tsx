@@ -13,12 +13,12 @@ const labels:Record<string,[string,string,string,string]>={
   ja:['月払い','年払い','毎月更新','毎年更新'],
   ko:['월간 결제','연간 결제','매월 갱신','매년 갱신'],
 };
-export default function BillingCycle({offers,value,onChange,locale,disabled=false,preview=false,annualDiscount}:{offers:BillingOffer[];value:BillingInterval;onChange:(value:BillingInterval)=>void;locale:string;disabled?:boolean;preview?:boolean;annualDiscount?:number}){
+export default function BillingCycle({offers,value,onChange,locale,preview=false,annualDiscount}:{offers:BillingOffer[];value:BillingInterval;onChange:(value:BillingInterval)=>void;locale:string;preview?:boolean;annualDiscount?:number}){
   const id=useId(),copy=billingCopy(locale),text=commerceCopy(locale)?.billingCycle??labels[locale]??labels.en;
   const annualOffers=offers.filter(p=>p.interval==='year');
   const discount=annualDiscount??(annualOffers.length?Math.min(...annualOffers.map(p=>annualSavings(p,offers)?.percent??0)):0);
   const cycles:BillingInterval[]=offers.some(p=>p.interval==='month')?['month',...(offers.some(p=>p.interval==='quarter')?['quarter' as const]:[]),'year']:['quarter','year'];
-  const control=<fieldset className={`billing-cycle${preview?' billing-cycle-segmented':''}`} disabled={disabled}><legend>{copy.plan}</legend>{cycles.map(cycle=>{
+  const control=<fieldset className={`billing-cycle${preview?' billing-cycle-segmented':''}`}><legend>{copy.plan}</legend>{cycles.map(cycle=>{
     const available=preview||offers.some(p=>p.interval===cycle);
     return <label className="billing-cycle-card" key={cycle} data-selected={value===cycle} data-disabled={!available}>
       <input type="radio" name={id} value={cycle} checked={value===cycle} disabled={!available} onChange={()=>onChange(cycle)}/>

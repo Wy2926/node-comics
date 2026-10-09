@@ -48,8 +48,11 @@ def schedule_gift(db, user, at):
             .where(BillingCheckout.owner_id == user.id, BillingPrice.interval != 'once',
                 pending_checkout_condition()).limit(1)):
         problem('BILLING_CHECKOUT_PENDING', '请先核实当前结账，再安排赠送会员', 409)
-    sub = db.scalar(select(BillingSubscription).where(BillingSubscription.owner_id == user.id,
-        BillingSubscription.status.in_(LIVE)).limit(1))
+    subscriptions = list(db.scalars(select(BillingSubscription).where(BillingSubscription.owner_id == user.id,
+        BillingSubscription.status.in_(LIVE)).limit(2)))
+    if len(subscriptions) > 1:
+        problem('BILLING_DUPLICATE_SUBSCRIPTIONS', '存在多笔有效订阅，请先人工核实再安排赠送', 409)
+    sub = subscriptions[0] if subscriptions else None
     if sub and sub.renewal_action in ('resume', 'cancel'):
         problem('BILLING_RENEWAL_PENDING', '请先核实当前续费操作，再安排赠送会员', 409)
     if not sub or not sub.auto_renew or sub.cancel_at:

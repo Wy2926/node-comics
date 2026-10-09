@@ -1,7 +1,15 @@
 """Read paid/trial access from granted terms, independently of quota balances."""
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
-from .billing_models import BillingOrder, BillingPlanRevision, BillingPrice, BillingTerm
+from .billing_models import BillingOrder, BillingPlanRevision, BillingPrice, BillingSubscription, BillingTerm
 from .models import now
+
+
+def ongoing_subscription(sub=BillingSubscription):
+    from .billing_renewal import LIVE
+    at = now()
+    return or_(sub.status.in_(LIVE), select(BillingTerm.id).where(
+        BillingTerm.subscription_id == sub.id, BillingTerm.revoked_at.is_(None),
+        BillingTerm.starts_at <= at, BillingTerm.ends_at > at).exists())
 
 
 def active_terms(db, owner_id, at=None):

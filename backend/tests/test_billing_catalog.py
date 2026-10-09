@@ -176,14 +176,19 @@ def test_new_price_and_benefits_do_not_change_existing_subscription(billing):
     assert billing['posts'][-1][1]['line_items[0][price]']=='price_newmonthly'
 
 
-def test_pending_checkout_keeps_quote_and_rejects_switch(billing):
-    checkout(billing)
+def test_pending_checkout_keeps_quote_without_blocking_other_prices(billing):
+    original = checkout(billing)
     quote(billing,key='newmonthly',interval='month',amount=1499)
     c=billing['client']
-    assert c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':'newmonthly'}).status_code==409
-    checkout(billing)
-    assert len(billing['posts'])==1
-    assert c.get('/v1/billing/status',headers=billing['auth']).json()['subscription_checkout']['price']['unit_amount']==999
+    other = c.post('/v1/billing/checkouts',headers=billing['auth'],json={'provider':'stripe', 'price_id':'newmonthly'})
+    assert other.status_code == 200, other.text
+    assert other.json()['checkout_id'] != original['checkout_id']
+    assert checkout(billing) == original
+    assert len(billing['posts']) == 2
+    for price_id, amount in [('fixture-price', 999), ('newmonthly', 1499)]:
+        pending = c.get('/v1/billing/status', headers=billing['auth'], params={'price_id': price_id}).json()['subscription_checkout']
+        assert pending['price']['id'] == price_id and pending['price']['unit_amount'] == amount
+    assert c.get('/v1/billing/status?price_id=unavailable', headers=billing['auth']).json()['subscription_checkout'] is None
 
 
 def test_multiple_plans_custom_trial_and_zero_quota_keep_classic_access(billing):

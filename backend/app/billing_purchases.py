@@ -2,10 +2,11 @@
 from datetime import timedelta
 from sqlalchemy import literal_column, select
 from . import stripe_client as stripe, creem_client as creem
-from .billing_models import BillingCheckout, BillingCustomer, BillingEvent, BillingOrder, BillingPlanRevision, BillingPrice, BillingPriceBinding
+from .billing_models import BillingCheckout, BillingEvent, BillingOrder, BillingPlanRevision, BillingPrice, BillingPriceBinding
 from .billing_orders import checkout_order, transition
 from .billing_providers import require, provider_environment, stripe_quote
 from .billing_grants import timestamp
+from .billing_checkout import bind_checkout_customer
 from .db import session_factory
 from .entitlement_models import QuotaPeriod
 from .entitlements import locked_user
@@ -72,18 +73,6 @@ def grant_purchase(db, row, order, paid_at):
         transaction_key=key, kind='purchase', amount=revision.quota_pages, note=revision.name))
 
 
-def bind_customer(db, row, customer_id):
-    require(isinstance(customer_id, str) and customer_id, 'BILLING_CUSTOMER_MISMATCH')
-    require(row.customer_id in (None, customer_id), 'BILLING_CUSTOMER_MISMATCH')
-    # Independent one-time checkouts may create different provider customers.
-    # Bind this paid chain only; never claim the subscription's canonical customer.
-    if row.customer_id is None:
-        owner = db.scalar(select(BillingCustomer.owner_id).where(BillingCustomer.provider == row.provider,
-            BillingCustomer.environment == row.environment, BillingCustomer.customer_id == customer_id))
-        require(owner in (None, row.owner_id), 'BILLING_CUSTOMER_MISMATCH')
-    row.customer_id = customer_id
-
-
 def sync_stripe_purchase(checkout_id):
     with session_factory()() as db:
         row = db.get(BillingCheckout, checkout_id)
@@ -99,7 +88,7 @@ def sync_stripe_purchase(checkout_id):
             and not session.get('subscription'), 'BILLING_PURCHASE_CONFLICT')
         if session.get('status') != 'complete' or session.get('payment_status') != 'paid':
             return
-        bind_customer(db, row, session.get('customer'))
+        bind_checkout_customer(db, row, session.get('customer'))
         lines = stripe.call('checkout.sessions.line_items', 'list', row.session_id, params={'limit': 2})
         require(not lines.get('has_more') and len(lines.get('data', [])) == 1, 'STRIPE_PLAN_MISMATCH')
         line = lines['data'][0]
@@ -192,7 +181,7 @@ def sync_creem_purchase(checkout_id):
             'BILLING_PURCHASE_CONFLICT')
         if session.get('status') != 'completed':
             return
-        bind_customer(db, row, creem.object_id(session.get('customer')))
+        bind_checkout_customer(db, row, creem.object_id(session.get('customer')))
         remote_order = session.get('order')
         require(isinstance(remote_order, dict), 'CREEM_PURCHASE_UNPAID')
         creem.environment(remote_order)

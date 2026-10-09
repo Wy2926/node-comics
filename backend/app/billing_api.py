@@ -5,13 +5,13 @@ import json
 import re
 from typing import Literal
 import stripe as sdk
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from . import stripe_client as stripe, creem_client as creem
 from .auth import identity
-from .billing_checkout import billing_status, start_checkout, sync_owner, customer_for
+from .billing_checkout import billing_status, start_checkout, sync_owner, customer_for, current_subscription
 from .billing_models import BillingEvent
 from .billing_providers import BillingError, require, provider_enabled, provider_environment, resource_key
 from .billing_sync import process_event
@@ -67,8 +67,9 @@ def billing_error(exc):
 
 
 @router.get('/v1/billing/status')
-def status(user: User = Depends(identity), db: Session = Depends(get_db)):
-    return billing_status(db, user)
+def status(price_id: str | None = Query(None, min_length=1, max_length=36),
+        user: User = Depends(identity), db: Session = Depends(get_db)):
+    return billing_status(db, user, price_id)
 
 
 @router.get('/v1/billing/catalog')
@@ -113,7 +114,7 @@ def cancel_renewal(body: PortalRequest, user: User = Depends(identity), db: Sess
 
 @router.post('/v1/billing/portal')
 def portal(body: PortalRequest, user: User = Depends(identity), db: Session = Depends(get_db)):
-    account = customer_for(db, user.id, body.provider)
+    account = current_subscription(db, user.id, body.provider) or customer_for(db, user.id, body.provider)
     if not account:
         problem('SUBSCRIPTION_NOT_FOUND', '没有可管理的订阅', 404)
     try:
