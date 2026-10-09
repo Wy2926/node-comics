@@ -52,7 +52,7 @@
  .nc-sites-layout {grid-template-columns:minmax(0,1fr);gap:28px}
  .nc-site-request {max-width:640px;width:100%}
 }
-@media (max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
  .nc-sites-layout {grid-template-columns:minmax(0,1fr);gap:24px}
  .nc-sites-page .nc-sites-heading-icon {display:none}
  .nc-sites-page .nc-site-request-shortcut {display:inline-flex;width:100%}
@@ -74,6 +74,6 @@
  .nc-site-request .button {min-height:44px;white-space:normal}
  .nc-site-request .nc-support-form .button {width:100%}
 }
-@media (pointer:coarse) and (max-height:500px) and (min-width:701px), (hover:none) and (max-height:500px) and (min-width:701px) {
+@media (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (hover: none) {
  .nc-sites-grid {grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 }

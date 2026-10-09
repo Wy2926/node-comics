@@ -103,7 +103,7 @@ button.nc-remote-crumb:hover:not(:disabled) { color: var(--accent); background: 
   .nc-remote-title { gap: 8px; }
   .nc-remote-title h2 { font-size: var(--text-body); }
 }
-@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-remote-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .nc-remote-sidebar { position: static; padding: 14px 12px; }
   .nc-remote-sidebar h2 { margin-bottom: 12px; }

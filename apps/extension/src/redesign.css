@@ -2051,7 +2051,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
 }
 
 /* Phone navigation uses the existing destinations and actions, never a second page tree. */
-@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-app:not(.is-reading) {
     --nc-mobile-nav-size: 80px;
   }
@@ -2134,7 +2134,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
   .nc-app .nc-pagination { justify-content: center; gap: 10px; }
   .nc-app .nc-pagination>span { flex-basis: 100%; text-align: center; }
 }
-@media (pointer: coarse) and (max-height: 500px) and (min-width: 701px), (hover: none) and (max-height: 500px) and (min-width: 701px) {
+@media (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-app:not(.is-reading) { --nc-mobile-nav-size: 58px; }
   .nc-app .nc-app-header>nav>button { flex-direction: row; gap: 8px; font-size: .8125rem; }
 }

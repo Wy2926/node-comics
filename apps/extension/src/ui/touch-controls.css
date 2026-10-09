@@ -1,6 +1,6 @@
-/* Geometry only: desktop and touch surfaces consume exactly the same visual tokens. */
-@media (max-width: 700px), (pointer: coarse), (hover: none) {
-  .nc-app :is(button.button, button.icon-button, button.text-link, a.text-link, .segmented > button) {
+/* Input capability controls hit areas; viewport size controls page layout. */
+@media (pointer: coarse), (hover: none) {
+  .nc-app :is(button.button, button.icon-button, button.text-link, button.nc-select, a.text-link, .segmented > button) {
     min-height: 44px;
     min-width: 44px;
   }

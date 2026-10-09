@@ -157,7 +157,7 @@
   .nc-search-site-options { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .nc-search-result-list { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 700px), (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-search-workbench, .nc-search-result-list { grid-template-columns: minmax(0, 1fr); }
   .nc-search-sheet {
     inset: var(--nc-viewport-top, 0px) auto auto var(--nc-viewport-left, 0px);

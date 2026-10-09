@@ -162,9 +162,8 @@ test('long lists flip above viewport edge and scroll only options; light/dark fo
   }
 });
 
-test('shared language controls work with popup sizing and the same option helper', async () => {
+test('shared language controls keep flags, keyboard search and the same option helper', async () => {
   const target = page.getByRole('combobox', {name: '默认目标语言', exact: true});
-  assert.equal(Math.round((await target.boundingBox()).width), 148);
   assert.match(await target.locator('img').getAttribute('src'), /\/flags\/cn\.svg$/);
   await target.focus(); await target.press('e');
   const targetList = await listFor(target);

@@ -83,13 +83,7 @@ button.nc-select:disabled {
 .nc-select-option[aria-selected=true] .nc-select-check { visibility: visible; }
 .nc-select-option[aria-disabled=true] { color: var(--muted); opacity: .6; cursor: not-allowed; }
 
-/* Preserve the popup's existing compact language control without changing its layout. */
-.nc-popup-language .nc-select { width: 148px; min-width: 0; min-height: 40px; padding: 8px; gap: 6px; font-size: .75rem; }
-.nc-popup-language .nc-select-list { font-size: .75rem; }
-.nc-popup-language .nc-select-content { gap: 7px; }
-
-@media (max-width: 700px), (pointer: coarse), (hover: none) {
-  .nc-library .nc-select, .nc-popup-language .nc-select { min-height: 44px; }
+@media (pointer: coarse), (hover: none) {
   .nc-select-option { min-height: 44px; padding-block: 10px; }
-  .nc-select-list, .nc-popup-language .nc-select-list { font-size: var(--text-small); }
+  .nc-select-list { font-size: var(--text-small); }
 }

@@ -72,7 +72,7 @@
  .nc-download-actions {grid-column:2;flex-direction:row;align-items:center;gap:12px}
  .nc-download-controls {justify-content:flex-start}
 }
-@media(max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
  .nc-download-center .nc-page-heading {align-items:flex-start;flex-direction:column;gap:14px}
  .nc-download-book {padding:16px;grid-template-columns:60px minmax(0,1fr);gap:14px;scroll-margin-block:80px calc(96px + env(safe-area-inset-bottom,0px))}
  .nc-download-cover {width:60px;height:86px;grid-row:1}

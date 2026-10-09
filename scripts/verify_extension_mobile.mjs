@@ -200,8 +200,51 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
       await page.getByRole('button',{name:'键盘快捷键',exact:true}).scrollIntoViewIfNeeded();
       await inViewport(page.getByRole('button',{name:'键盘快捷键',exact:true}));
     }
-    await page.setViewportSize({width:390,height:844});await shot('popup');
+    await page.setViewportSize({width:390,height:844});
+    assert(await page.evaluate(()=>getComputedStyle(document.documentElement).backgroundColor===getComputedStyle(document.querySelector('.nc-popup')).backgroundColor),'Phone popup background must follow its theme below short content');
+    await shot('popup');
     check('popup layout and language list fit phone and landscape with mocked extension APIs');
+    for(const hasTouch of [false,true]){
+      const desktop=await browser.newContext({viewport:{width:420,height:600},screen:{width:1920,height:1080},hasTouch,locale:'zh-CN',reducedMotion:'reduce'});
+      try{
+        await desktop.route(/^https?:\/\//,route=>new URL(route.request().url()).origin===origin?route.continue():route.fulfill({status:503,contentType:'application/json',body:'{}'}));
+        await desktop.addInitScript(({version})=>{
+          localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',appearance:'light'}));
+          localStorage.setItem('nc-release-notes-version',version);
+        },{version});
+        let desktopPage=await desktop.newPage();desktopPage.on('pageerror',error=>errors.push(error.message));
+        await desktopPage.goto(web);
+        const desktopNav=desktopPage.getByRole('navigation',{name:'主导航'});await desktopNav.waitFor();
+        for(const [width,height] of [[1440,480],[1001,480],[1000,480],[844,390],[701,700],[700,700]]){
+          await desktopPage.setViewportSize({width,height});
+          assert.equal(await desktopNav.evaluate(el=>getComputedStyle(el).position==='fixed'),width<=700||hasTouch&&width<=1000&&height<=500);
+          for(const name of ['我的漫画','远程书库','搜索漫画','漫画网站']){
+            await desktopNav.getByRole('button',{name,exact:true}).click();
+            assert(await desktopPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Desktop overflow: ${width}x${height}, touch=${hasTouch}, ${name}`);
+          }
+        }
+        await desktop.addInitScript(()=>{window.chrome={runtime:{getURL:path=>location.origin+path,sendMessage:async()=>({}),openOptionsPage:async()=>{}},tabs:{query:async()=>[{id:1,url:'https://mobile-fixture.test/comic',title:'Desktop fixture'}]}};});
+        // setViewportSize also resets emulated screen dimensions. A fresh page
+        // keeps a 420px popup viewport on the context's 1920px desktop screen.
+        await desktopPage.close();desktopPage=await desktop.newPage();
+        desktopPage.on('pageerror',error=>errors.push(error.message));
+        await desktopPage.goto(`${origin}/entrypoints/popup/index.html`);
+        await desktopPage.locator('.nc-popup-language .nc-select').waitFor();
+        assert.equal(await desktopPage.locator('.nc-popup').evaluate(el=>el.getBoundingClientRect().width),420);
+        assert.equal(await desktopPage.evaluate(()=>screen.width),1920);
+        assert.equal(await desktopPage.locator('.nc-popup-language').evaluate(el=>getComputedStyle(el).flexDirection),'row');
+        assert.equal(await desktopPage.locator('.nc-popup-library .nc-popup-shortcut').evaluate(el=>getComputedStyle(el).display),'flex');
+        if(hasTouch){
+          assert((await desktopPage.locator('.nc-popup-language .nc-select').boundingBox()).height>=44);
+        }else{
+          assert((await desktopPage.locator('.switch').boundingBox()).height<44);
+          await desktopPage.locator('.nc-popup-language .nc-select').click();
+          assert.equal((await desktopPage.locator('.nc-select-option').first().boundingBox()).height,36);
+        }
+        await desktopPage.screenshot({path:path.join(out,`${engine}-desktop-popup-touch-${hasTouch}.png`)});
+      }finally{await desktop.close();}
+    }
+    check('desktop mouse/touch widths retain bounded navigation and compact popup without hiding shortcuts');
     assert.deepEqual(errors,[]);
     reports.push({engine,checks,errors,realMobileDevice:false,externalServices:false});
   }catch(error){

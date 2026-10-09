@@ -37,7 +37,7 @@ context.setDefaultTimeout(15000);context.setDefaultNavigationTimeout(15000);
 let permissionRequests=0;
 await context.exposeBinding('fixturePermissionRequest',()=>{permissionRequests++;});
 await context.addInitScript(()=>{if(location.protocol==='chrome-extension:')chrome.permissions.request=()=>{void window.fixturePermissionRequest();throw Error('Unexpected host permission request');};});
-const checks=[],errors=[];let supportSubmissions=0;context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
+const checks=[],errors=[];let supportSubmissions=0,nativeGeometry;context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const origin='chrome-extension://'+new URL(worker.url()).hostname;
 const languageOptions=[['zh-Hans','简体中文'],['zh-Hant','繁體中文'],['en','English'],['ja','日本語'],['ko','한국어'],['fr','Français']];
@@ -65,18 +65,42 @@ async function assertPopupLayout(){
  const geometry=await popup.evaluate(()=>{
   const main=document.querySelector('main'),header=document.querySelector('.nc-popup-header'),grid=document.querySelector('.nc-popup-tool-grid');
   return {width:document.documentElement.scrollWidth,height:main.getBoundingClientRect().height,header:header.getBoundingClientRect().height,columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+   languageWidth:document.querySelector('.nc-popup-language .nc-select').getBoundingClientRect().width,
    tools:[...grid.children].map(el=>{const rect=el.getBoundingClientRect();return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,overflow:el.scrollWidth>el.clientWidth};}),
    overflow:[...main.querySelectorAll('button,[role="combobox"],kbd')].filter(el=>{const rect=el.getBoundingClientRect();return rect.x<-.5||rect.right>420.5;}).map(el=>el.textContent)};
  });
- assert.equal(geometry.width,420);assert(geometry.height<=600.5);assert(geometry.header<=70,'Compact header exceeded 70 px');assert.equal(geometry.columns,2);assert.equal(geometry.tools.length,4);
+ assert.equal(geometry.width,420);assert.equal(geometry.languageWidth,158);assert(geometry.height<=600.5);assert(geometry.header<=70,'Compact header exceeded 70 px');assert.equal(geometry.columns,2);assert.equal(geometry.tools.length,4);
  const [region,library,settings,keyboard]=geometry.tools;assert.equal(region.y,library.y);assert.equal(settings.y,keyboard.y);assert.equal(region.x,settings.x);assert.equal(library.x,keyboard.x);assert(settings.y>=region.y+region.height);assert(library.x>=region.x+region.width);
  assert(geometry.tools.every(tool=>!tool.overflow),'Tool content overflows its card');assert.deepEqual(geometry.overflow,[]);return geometry;
+}
+async function assertNativePopup(){
+ // Native action views are not ordinary Playwright tabs: never force their viewport.
+ await popup.evaluate(()=>chrome.action.openPopup());
+ try{
+  await popup.waitForFunction(()=>chrome.extension.getViews({type:'popup'})[0]?.document.querySelector('.nc-popup-tool-grid'));
+  nativeGeometry=await popup.evaluate(async()=>{
+   const view=chrome.extension.getViews({type:'popup'})[0];
+   await new Promise(resolve=>view.requestAnimationFrame(()=>view.requestAnimationFrame(resolve)));
+   const doc=view.document,main=doc.querySelector('main'),scroll=doc.querySelector('.nc-popup-scroll');
+   return {width:view.innerWidth,height:view.innerHeight,contentWidth:doc.documentElement.scrollWidth,
+    mainHeight:main.getBoundingClientRect().height,scrollHeight:scroll.clientHeight,
+    switchHeight:doc.querySelector('.switch').getBoundingClientRect().height,
+    shortcuts:view.getComputedStyle(doc.querySelector('.nc-popup-shortcut')).display};
+  });
+  assert.equal(nativeGeometry.width,420,'Native popup must establish its own desktop width');
+  assert.equal(nativeGeometry.contentWidth,420);
+  assert(nativeGeometry.height>300&&nativeGeometry.height<=600,'Native popup height must not depend on its initial viewport');
+  assert(nativeGeometry.mainHeight<=600&&nativeGeometry.scrollHeight>200);
+  assert(nativeGeometry.switchHeight<44,'Desktop popup must not inherit phone hit-area geometry');
+  assert.notEqual(nativeGeometry.shortcuts,'none');
+ }finally{await popup.evaluate(()=>chrome.extension.getViews({type:'popup'}).forEach(view=>view.close()));}
 }
 try{
  await source.setContent('<body style="margin:0;width:600px;height:900px;background:#eaf3ff"><div style="margin:30px;border:5px solid #202d43;height:750px;font:40px sans-serif">HELLO!<br>TEST COMIC</div></body>');image=await source.screenshot({clip:{x:0,y:0,width:600,height:900}});
  await source.goto(site);await source.locator('img').first().evaluate(image=>image.decode());await source.evaluate(()=>scrollTo(0,80));
  await worker.evaluate(async()=>{await chrome.storage.local.set({'nc-reader-settings':{uiLanguage:'zh-CN'}});});
  await openPopup();assert.equal((await messages()).length,0);assert.equal(await popup.locator('.nc-image-picker').count(),0);await screenshot('popup-light');console.log('Preview: '+path.join(out,'popup-light.png'));check('打开 Popup 不发现图片、不启动翻译、不加载缩略图');
+ await assertNativePopup();check('浏览器原生 action 弹窗自行展开至 420px，正文有可用高度且桌面控件保持紧凑');
  assert(!(await popup.locator('main').innerText()).includes(await source.title()));assert(!(await popup.locator('main').innerText()).includes(new URL(source.url()).hostname));assert.equal(await popup.locator('.nc-popup-cover,.nc-popup-footer').count(),0);await assertPopupLayout();check('移除网页标题和地址，顶栏不超过 70 px，四项工具为两列两行');
  const tools=popup.locator('.nc-popup-tool-grid > button');assert.deepEqual(await tools.locator(':scope > span:not(.nc-popup-shortcut)').allTextContents(),['划图翻译','我的漫画','设置','键盘快捷键']);
  await popup.waitForFunction(()=>document.querySelector('.nc-popup-library kbd')?.textContent==='Alt + 1');assert.deepEqual(await shortcutTexts('.nc-popup-library'),['Alt + 1']);assert.deepEqual(await tools.nth(2).locator('kbd').allTextContents(),['Alt + ,']);assert.deepEqual(await tools.nth(3).locator('kbd').allTextContents(),['Alt + Shift + K']);
@@ -176,7 +200,7 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await source.reload();assert.equal(await source.evaluate(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646')),false);
  await popup.close();await openPopup();assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');await hostVisible();check('关闭自动翻译后，手动翻译按钮仍可使用');
  assert.equal(permissionRequests,0);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);check('Popup、设置和后台全流程没有申请网站访问权限');
- assert.equal(supportSubmissions,0);assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,permissionRequests,supportSubmissions,nativeShortcut,nativeTranslateShortcut,scope:'Built MV3 in isolated Chromium; local image fixture, intercepted adapted-site navigation and API responses, simulated access restrictions and no live translation provider'},null,2));console.log('Artifacts: '+out);console.log('Checks: '+checks.length);
+ assert.equal(supportSubmissions,0);assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,permissionRequests,supportSubmissions,nativeGeometry,nativeShortcut,nativeTranslateShortcut,scope:'Built MV3 in isolated Chromium; local image fixture, intercepted adapted-site navigation and API responses, simulated access restrictions and no live translation provider'},null,2));console.log('Artifacts: '+out);console.log('Checks: '+checks.length);
 }catch(failure){
  if(popup&&!popup.isClosed()){await popup.screenshot({path:path.join(out,'popup-failure.png')}).catch(()=>{});await writeFile(path.join(out,'popup-failure.html'),await popup.content().catch(()=>''));}
  await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,permissionRequests,supportSubmissions,failure:{message:failure.message,stack:failure.stack},pages:context.pages().map(page=>page.url()),scope:'Built MV3 in isolated Chromium; fixture and simulated API responses'},null,2));console.log('Failed artifacts: '+out);throw failure;

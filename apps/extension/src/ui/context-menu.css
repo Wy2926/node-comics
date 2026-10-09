@@ -5,4 +5,4 @@
 .nc-context-menu[data-popover-fallback-open]{display:block}
 .nc-context-menu{overscroll-behavior:contain;touch-action:pan-y}
 .nc-context-menu>button>span{min-width:0;overflow-wrap:anywhere}
-@media(max-width:700px),(pointer:coarse),(hover:none){.nc-context-menu>button{min-height:44px;font-size:var(--text-small)}}
+@media(pointer:coarse),(hover:none){.nc-context-menu>button{min-height:44px;font-size:var(--text-small)}}

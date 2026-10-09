@@ -79,6 +79,4 @@ it('keeps compact reader CSS and directory behavior aligned for short no-hover s
   expect(media.at(-1)).toBe(compactReaderQuery.split(', ').slice(1)
     .map(query => query.replace(' and (pointer:', ' and (orientation: landscape) and (pointer:')
       .replace(' and (hover:', ' and (orientation: landscape) and (hover:')).join(', '));
-  const touch = readFileSync(new URL('../src/ui/touch-controls.css', import.meta.url), 'utf8');
-  expect(touch).toContain('@media (max-width: 700px), (pointer: coarse), (hover: none)');
 });

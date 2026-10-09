@@ -33,7 +33,7 @@
 .nc-batch-toolbar>span{font-weight:700;margin-right:auto}
 .nc-batch-toolbar>.nc-inline{flex-wrap:wrap;gap:16px}
 .nc-removal-list{padding-left:24px;overflow-wrap:anywhere}
-@media (max-width:700px), (pointer:coarse) and (max-height:500px), (hover:none) and (max-height:500px) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
  .nc-library .nc-shelf-title {gap:10px}
  .nc-app .nc-profile-avatar.nc-shelf-count {min-width:28px;height:28px;font-size:1rem}
  .nc-shelf-updates {height:44px;padding:0 7px 4px 12px;gap:5px;font-size:.75rem}
@@ -58,7 +58,7 @@
  .nc-library .nc-batch-toolbar .button {white-space:normal}
  .nc-shelf-window .nc-cover-retry {top:42px;right:8px;min-height:44px}
 }
-@media (pointer:coarse) and (max-height:500px) and (min-width:701px), (hover:none) and (max-height:500px) and (min-width:701px) {
+@media (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (min-width: 701px) and (max-width: 1000px) and (max-height: 500px) and (hover: none) {
  .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid {grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 }
 @media(prefers-reduced-motion:reduce){.nc-shelf-updates{transition:none}.nc-shelf-updates:hover:not(:disabled),.nc-shelf-updates:active:not(:disabled){transform:rotate(-2deg)}}

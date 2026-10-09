@@ -208,7 +208,7 @@ test('a choice inside a modal escapes clipping and preserves dialog focus', asyn
 });
 
 test('the target language control can switch by mouse', async () => {
-  const selector = '.nc-popup-language [role="combobox"]';
+  const selector = '[role="combobox"][aria-label="默认目标语言"]';
   await click(selector);
   await click(option('en'));
   assert.deepEqual(await state(selector), {value: 'en', expanded: 'false', focused: true});

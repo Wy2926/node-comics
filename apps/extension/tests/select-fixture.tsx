@@ -50,7 +50,7 @@ function Fixture() {
       <button onClick={() => setEmpty(!empty)}>Toggle options</button>
       <button onClick={() => dialog.current?.showModal()}>Open dialog</button>
     </div>
-    <section className="nc-popup-language" style={{width: 380}}>
+    <section style={{width: 380}}>
       <TargetLanguage value={language} onChange={setLanguage} describedBy="work-help"/>
     </section>
     <InterfaceLanguage value={uiLanguage} onChange={setUiLanguage}/>

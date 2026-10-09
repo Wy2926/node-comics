@@ -58,7 +58,7 @@
 .nc-login-resume small { display: block; color: var(--muted); margin-top: 3px; font-size: .6875rem; }
 .nc-login-resume.error .nc-login-bookmark { color: var(--danger); background: var(--danger-soft); }
 @keyframes nc-login-page-turn { 0%,100% { transform: rotate(7deg); } 50% { transform: perspective(600px) rotateY(-15deg) rotate(3deg) translateY(-5px); } }
-@media (max-width: 700px), (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-login-controls { position: static; display: flex; justify-content: flex-end; flex: none; padding: 8px 12px; }
   .nc-login-spread { grid-template-columns: 1fr; }
   .nc-login-cover { display: none; }
@@ -71,7 +71,7 @@
   .nc-login-footnote { padding-top: 14px; }
   .nc-login-resume { right: max(12px, env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
-@media (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+@media (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-login-content { padding: 16px 20px; }
 }
 @media (prefers-reduced-motion: reduce) {

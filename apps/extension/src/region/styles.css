@@ -159,8 +159,10 @@ button:disabled {
 [hidden] {
   display: none!important;
 }
-@media (max-width: 700px), (pointer: coarse), (hover: none) {
+@media (pointer: coarse), (hover: none) {
   button { min-height: 44px; min-width: 44px; }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .bar {
     bottom: max(8px, env(safe-area-inset-bottom));
     left: max(8px, env(safe-area-inset-left));

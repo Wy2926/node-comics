@@ -2,6 +2,9 @@ import {readFileSync} from 'node:fs';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {Scrollbars} from '../src/ui/Scrollbars';
 
+const cssQueries = (path: string) => [...readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+  .matchAll(/@media\s*([^{]+)\{/g)].map(match => match[1].replace(/\s+/g, ''));
+
 const {install, scope, effects} = vi.hoisted(() => ({
   install: vi.fn<() => () => void>(), scope: {}, effects: [] as (() => void | (() => void))[],
 }));
@@ -21,8 +24,7 @@ it.each([
   'src/ui/discovery/discovery.css', 'src/ui/shelf.css', 'src/ui/comic-search/comic-search.css',
   'src/ui/remote-library/remote-library.css',
 ])('%s preserves geometry when accepting no-hover input', path => {
-  const css = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-  const queries = [...css.matchAll(/@media\s*([^{]+)\{/g)].map(match => match[1].replace(/\s+/g, ''));
+  const queries = cssQueries(path);
   const touchQueries = queries.filter(query => query.includes('(pointer:coarse)'));
   expect(touchQueries.length).toBeGreaterThan(0);
   for (const query of touchQueries) {
@@ -31,6 +33,38 @@ it.each([
       expect(branches).toContain(branch.replace('(pointer:coarse)', '(hover:none)'));
     }
   }
+});
+
+it.each([
+  'src/redesign.css', 'src/ui/theme/surfaces.css', 'src/ui/notification.css', 'src/ui/login.css',
+  'src/ui/comic-sites.css', 'src/ui/downloads/downloads.css', 'src/ui/discovery/discovery.css',
+  'src/ui/shelf.css', 'src/ui/comic-search/comic-search.css', 'src/ui/remote-library/remote-library.css',
+  'src/inline/display.css', 'src/region/styles.css',
+])('%s uses the reader breakpoint and bounds short touch layouts to 1000px', path => {
+  const reader = readFileSync(new URL('../src/reader/ReaderChrome.tsx', import.meta.url), 'utf8');
+  const query = reader.match(/compactReaderQuery = '([^']+)'/)![1].replace(/\s+/g, '');
+  const queries = cssQueries(path);
+  expect(queries).toContain(query);
+  for (const branch of queries.flatMap(value => value.split(','))) {
+    if (branch.includes('(max-height:500px)')) expect(branch).toContain('(max-width:1000px)');
+  }
+});
+
+it.each(['src/ui/touch-controls.css', 'src/ui/select.css', 'src/ui/context-menu.css'])(
+  '%s does not mistake a narrow mouse-driven popup for touch input', path => {
+    expect(cssQueries(path)).toEqual(['(pointer:coarse),(hover:none)']);
+  },
+);
+
+it('keeps popup sizing independent of the auto-sized native viewport', () => {
+  const css = readFileSync(new URL('../entrypoints/popup/popup.css', import.meta.url), 'utf8');
+  const desktop = css.slice(0, css.indexOf('@media'));
+  expect(desktop).toContain('width: 420px;');
+  expect(desktop).toContain('max-height: 600px;');
+  expect(desktop).not.toMatch(/\d(?:d|s|l)?v[wh]/);
+  expect(cssQueries('entrypoints/popup/popup.css').filter(query => query.includes('pointer:coarse')))
+    .toEqual(['(max-device-width:1000px)and(pointer:coarse),(max-device-width:1000px)and(hover:none)']);
+  expect(readFileSync(new URL('../src/ui/select.css', import.meta.url), 'utf8')).not.toContain('.nc-popup');
 });
 
 function pointerFixture(pointer: 'fine' | 'coarse', hover: 'hover' | 'none', popover = true) {

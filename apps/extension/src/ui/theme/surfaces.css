@@ -176,7 +176,7 @@
 .nc-export-options .form-grid > label { display: grid; min-width: 0; gap: 8px; }
 .nc-export-options .form-grid .nc-select { width: 100%; }
 .nc-export-footer > div { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; justify-content: flex-end; }
-@media (max-width: 700px), (max-height: 500px) and (pointer: coarse), (max-height: 500px) and (hover: none) {
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
   .nc-app dialog.modal.nc-viewport-dialog, .nc-app dialog.nc-shortcut-panel.nc-viewport-dialog {
     position: fixed;
     inset: calc(var(--nc-viewport-top, 0px) + max(8px, env(safe-area-inset-top))) auto auto calc(var(--nc-viewport-left, 0px) + max(8px, env(safe-area-inset-left)));
