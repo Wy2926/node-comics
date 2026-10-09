@@ -17,7 +17,7 @@ export async function readAuth():Promise<AuthState>{
     else value=await readPrivateAuth();
   }catch{return {session:null};}
   if(!value)return {session:null};
-  if(value.session===null)return {session:null,...(value.reason==='expired'?{reason:'expired' as const}:{})};
+  if(value.session===null)return {session:null,...(value.reason==='expired'||value.reason==='signed_out'?{reason:value.reason}:{})};
   if(!validSession(value.session)||value.session.apiOrigin!==API_ORIGIN)return {session:null,reason:'expired'};
   return value;
 }
@@ -49,7 +49,7 @@ export async function updateSession(id:string,token:string,change:(session:Sessi
   });
 }
 export async function signOut(id:string){
-  await navigator.locks.request('nc-auth-write',async()=>{if((await readAuth()).session?.id===id)await writeAuth({session:null});});
+  await navigator.locks.request('nc-auth-write',async()=>{if((await readAuth()).session?.id===id)await writeAuth({session:null,reason:'signed_out'});});
 }
 export function subscribeAuth(listener:()=>void){
   const changed=(changes:Record<string,chrome.storage.StorageChange>,area:string)=>{if(area==='local'&&changes[authKey])listener();};

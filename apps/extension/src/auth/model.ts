@@ -11,7 +11,7 @@ export interface Session {
   credential:{kind:'development'}|{kind:'oidc';refreshToken:string;tokenEndpoint:string;clientId:string;resource:string};
   retryAt?:number;
 }
-export interface AuthState {session:Session|null;reason?:'expired';}
+export interface AuthState {session:Session|null;reason?:'expired'|'signed_out';}
 export const expiredMessage=()=>msg("登录已过期，请重新登录。原图和阅读位置已保留。");
 export class SessionExpired extends Error {constructor(){super(expiredMessage());}}
 export class RefreshUnavailable extends Error {constructor(){super(msg("暂时无法续期登录，请检查网络后重试。原图仍可继续阅读。"));}}

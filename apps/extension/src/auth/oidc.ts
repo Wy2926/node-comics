@@ -6,6 +6,7 @@ import {launchLoginWindow} from './auth-window';
 import {loginRedirectUrl} from './auth-redirect';
 import {requireHostAccess} from '../host-permissions';
 import {requestOidcToken} from './token-request';
+import {readAuth} from './storage';
 export interface AuthConfig { mode: 'development'|'oidc'; dev_auth: boolean; issuer: string; client_id: string; audience: string; authorization_endpoint: string; token_endpoint: string; scopes: string }
 interface Pending { state:string; verifier:string; redirect:string; issuer:string; apiBase:string; tokenEndpoint:string; clientId:string; resource?:string; created:number }
 const KEY='nc-oidc-pending';
@@ -53,10 +54,11 @@ export async function startOidc(config:AuthConfig,apiBase:string):Promise<Sessio
   const challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
   const pending:Pending={state,verifier,redirect,issuer:config.issuer,apiBase,tokenEndpoint:token.href,clientId:config.client_id,resource:config.audience,created:Date.now()};
   sessionStorage.setItem(KEY,JSON.stringify(pending));
-  // Local sign-out leaves the identity provider's SSO cookie intact. Explicit
-  // sign-in must let the reader enter another account instead of reusing it.
+  // Reuse the website's IdP session, but an explicit local sign-out still lets
+  // the reader choose another account. Consent retains offline_access grants.
+  const prompt=(await readAuth()).reason==='signed_out'?'login consent':'consent';
   const scopes=[...new Set(['openid','profile','offline_access',...config.scopes.split(/\s+/).filter(Boolean)])].join(' ');
-  authorization.search=new URLSearchParams({response_type:'code',client_id:config.client_id,redirect_uri:redirect,scope:scopes,prompt:'login consent',state,code_challenge:challenge,code_challenge_method:'S256',...(config.audience?{resource:config.audience,audience:config.audience}:{})}).toString();
+  authorization.search=new URLSearchParams({response_type:'code',client_id:config.client_id,redirect_uri:redirect,scope:scopes,prompt,state,code_challenge:challenge,code_challenge_method:'S256',...(config.audience?{resource:config.audience,audience:config.audience}:{})}).toString();
   if(extension){
     try {
       const callback=await launchLoginWindow(authorization.href);

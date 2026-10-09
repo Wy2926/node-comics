@@ -1,6 +1,8 @@
 import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { finishOidc, startOidc, type AuthConfig } from './oidc';
+const { readAuth } = vi.hoisted(() => ({ readAuth: vi.fn() }));
+vi.mock('./storage', () => ({ readAuth }));
 
 const KEY = 'nc-oidc-pending';
 const API = 'https://comics.example.test';
@@ -24,6 +26,7 @@ let assigned: ReturnType<typeof vi.fn>;
 let request: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  readAuth.mockResolvedValue({ session: null });
   current = new URL(READER);
   entries = new Map();
   assigned = vi.fn();
@@ -79,7 +82,7 @@ describe('OIDC public-client boundaries', () => {
     expect(authorization.searchParams.get('state')).toBe(pending.state);
     expect(authorization.searchParams.get('redirect_uri')).toBe(READER);
     expect(authorization.searchParams.get('resource')).toBe(API);
-    expect(authorization.searchParams.get('prompt')).toBe('login consent');
+    expect(authorization.searchParams.get('prompt')).toBe('consent');
     expect(authorization.searchParams.get('scope')?.split(' ')).toContain('offline_access');
     successfulResponses();
     current = callback(pending);
@@ -211,6 +214,7 @@ describe('OIDC public-client boundaries', () => {
     }
     const otherUser = { ...user, id: 'other-user', name: 'Other reader' };
     for (const [index, selectedUser] of [user, otherUser].entries()) {
+      readAuth.mockResolvedValue({ session: null, ...(index ? { reason: 'signed_out' } : {}) });
       const token = `selected-account-token-${index}`;
       request.mockResolvedValueOnce(Response.json({ access_token: token, token_type: 'Bearer', expires_in: 3600, refresh_token: 'test-refresh' }));
       request.mockResolvedValueOnce(Response.json({ user: selectedUser }));
@@ -221,7 +225,7 @@ describe('OIDC public-client boundaries', () => {
         session = await finishOidc();
       }
       expect(session).toMatchObject({ token, user: selectedUser, apiOrigin: API });
-      expect(authorizations[index].searchParams.get('prompt')).toBe('login consent');
+      expect(authorizations[index].searchParams.get('prompt')).toBe(index ? 'login consent' : 'consent');
       expect(entries.has(KEY)).toBe(false);
     }
     expect(authorizations[0].searchParams.get('state')).not.toBe(authorizations[1].searchParams.get('state'));
@@ -235,7 +239,7 @@ describe('OIDC public-client boundaries', () => {
       const authorization = new URL(url);
       const pending = JSON.parse(entries.get(KEY)!) as Pending;
       expect(authorization.searchParams.get('redirect_uri')).toBe(redirect);
-      expect(authorization.searchParams.get('prompt')).toBe('login consent');
+      expect(authorization.searchParams.get('prompt')).toBe('consent');
       expect(pending.redirect).toBe(redirect);
       return callback(pending).href;
     });

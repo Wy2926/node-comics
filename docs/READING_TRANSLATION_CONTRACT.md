@@ -4,6 +4,8 @@
 
 本文约束 **NodeLane 官方渠道**的后端 API 与客户端恢复行为。客户端渠道抽象、MTU 直传协议及缓存边界见[客户端翻译渠道](TRANSLATION_CHANNELS.md)；本地渠道不要求实现本文的账号、权益或持久任务协议。
 
+插件与官网按权益选择正文模型的增量接口见[模型选择设计](TRANSLATION_MODEL_SELECTION_DESIGN.md)（待实现）。当前机器契约尚无 `model_id`；设计要求旧请求省略该字段时保留原默认分流、请求摘要与恢复行为。
+
 采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。客户端页面库使用 `node-comics-reading-v2-*`；原图使用 `original-v2-static-srgb` 渲染身份，固定 144 dpi 的 PDF 使用 `pdf-v3-static-srgb`，隔离旧缩放缓存、页面摘要与本地送译操作并保留书架和阅读进度。官方请求使用独立的 `translation-requests-overlay-v1` 库及带 `overlay-v1` 的账户 scope。升级与数据库基线遵循[部署规范](DEPLOYMENT.md)，不兼容旧资产下载协议。
 
 ## 1. 翻译流程

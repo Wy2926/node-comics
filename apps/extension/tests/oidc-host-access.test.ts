@@ -19,7 +19,7 @@ describe('OIDC with installed host access',()=>{
     expect(chrome.permissions.contains).toHaveBeenCalledExactlyOnceWith({origins:['https://identity.test/*']});
     expect(chrome.permissions.request).not.toHaveBeenCalled();
     const url=new URL(login.launch.mock.calls[0][0]);
-    expect(url.searchParams.get('prompt')).toBe('login consent');
+    expect(url.searchParams.get('prompt')).toBe('consent');
     expect(url.searchParams.get('scope')?.split(' ')).toContain('offline_access');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(sessionStorage.removeItem).toHaveBeenCalledWith('nc-oidc-pending');

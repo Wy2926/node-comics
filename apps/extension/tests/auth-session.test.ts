@@ -46,7 +46,7 @@ describe('shared renewable sessions',()=>{
     expect(JSON.stringify(saved)).not.toMatch(/refresh-one|test-token|public-client/);
     expect(entries.size).toBe(0);
     await signOut('test-session');
-    expect(await readAuth()).toEqual({session:null});
+    expect(await readAuth()).toEqual({session:null,reason:'signed_out'});
     expect(saved[authKey]).toMatchObject({session:null});
   });
   it('refreshes once for concurrent consumers and persists rotation before using the token',async()=>{
