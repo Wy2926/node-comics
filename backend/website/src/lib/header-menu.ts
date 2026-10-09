@@ -7,11 +7,10 @@ export function bindHeaderMenus(root: Document) {
     }
   }
   root.addEventListener('pointerdown', event => closeOutside(event.target));
+  // WebKit link taps can blur without a new focus target before click fires.
+  // Dismiss on incoming outside focus, not focusout, so the link stays clickable.
   root.addEventListener('focusin', event => closeOutside(event.target));
   for (const menu of menus) {
-    menu.addEventListener('focusout', event => {
-      if (!menu.contains(event.relatedTarget as Node | null)) menu.open = false;
-    });
     menu.addEventListener('keydown', event => {
       if (event.key !== 'Escape' || !menu.open) return;
       event.preventDefault();

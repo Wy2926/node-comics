@@ -30,6 +30,11 @@ test('header menus preserve internal focus and dismiss outside focus, pointer an
     assert.equal(menu.open, true);
     dispatch(root, 'pointerdown', { target: link });
     assert.equal(menu.open, true);
+    // WebKit blurs the summary without focusing the tapped link before click.
+    dispatch(menu, 'focusout', { relatedTarget: null });
+    assert.equal(menu.open, true, 'a link tap must remain clickable after focus is lost');
+    dispatch(link, 'click', {});
+    assert.equal(menu.open, true);
     assert.equal(dispatch(menu, 'keydown', { key: 'Escape' }).defaultPrevented, true);
     assert.equal(menu.open, false);
     assert.equal(summary.focused, true);
@@ -38,9 +43,6 @@ test('header menus preserve internal focus and dismiss outside focus, pointer an
     assert.equal(menu.open, false);
     menu.open = true;
     dispatch(root, 'focusin', { target: new ElementStub() });
-    assert.equal(menu.open, false);
-    menu.open = true;
-    dispatch(menu, 'focusout', { relatedTarget: null });
     assert.equal(menu.open, false);
   } finally { Object.assign(globalThis, { Node: previous }); }
 });
