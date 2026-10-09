@@ -694,39 +694,9 @@ try{
     await button('显示译图');await hasOverlay('ready');await hasOverlay('lazy');assert.equal(createdJobs,cachedJobs);
     check('Generic same-element redraws and delayed canvas drawings refresh without DOM mutations; restoring and returning reuse cached translations');
     await writeFile(path.join(out,'generic-canvas-metrics.json'),JSON.stringify(await metrics(),null,2));
-    if(process.env.RUN_LIVE_COMICWALKER==='1') {
-      // Public source page is live; original pixels are sent only to this local API fixture.
-      await page.goto('https://comic-walker.com/detail/KC_008597_S/episodes/KC_0085970000200011_E',{waitUntil:'domcontentloaded'});
-      await page.locator('canvas').first().waitFor({timeout:45000});
-      await page.waitForFunction(()=>{const c=document.querySelector('canvas');if(!c||c.width<80||c.height<80)return false;try{const p=new OffscreenCanvas(32,32),x=p.getContext('2d');x.drawImage(c,0,0,32,32);const d=x.getImageData(0,0,32,32).data;return d.some((v,i)=>v!==d[i%4]);}catch{return false;}},null,{timeout:45000});
-      await measureCanvases();
-      const sourcePixels=await page.locator('canvas').first().evaluate(c=>c.toDataURL());
-      const sourceBox=await page.locator('canvas').first().boundingBox();
-      await page.screenshot({path:path.join(out,'comicwalker-live-original.png')});
-      await activate();
-      await page.waitForFunction(()=>[...document.querySelectorAll('canvas')].some(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0&&c.nextElementSibling?.hasAttribute('data-nc-canvas-translation');}),null,{timeout:30000});
-      await aligned();
-      assert.equal(await page.locator('canvas').first().evaluate(c=>c.toDataURL()),sourcePixels);
-      assert.deepEqual(await page.locator('canvas').first().boundingBox(),sourceBox);
-      await page.screenshot({path:path.join(out,'comicwalker-live-translated.png')});
-      await page.getByRole('slider').press('ArrowLeft');
-      await page.waitForFunction(()=>document.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')==='2');
-      await page.waitForFunction(()=>{const visible=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0;});return visible.length===2&&visible.every(c=>c.nextElementSibling?.hasAttribute('data-nc-canvas-translation'));},null,{timeout:30000});
-      await aligned();await page.screenshot({path:path.join(out,'comicwalker-live-next-spread.png')});
-      await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('[data-nc-canvas-translation]'));
-      assert.equal(await page.locator('canvas').first().evaluate(c=>c.toDataURL()),sourcePixels);
-      await page.screenshot({path:path.join(out,'comicwalker-live-restored.png')});
-      await page.getByRole('button',{name:/タテ読み|縦読み|竖向阅读/}).click();
-      await button('显示译图');
-      await page.waitForFunction(()=>[...document.querySelectorAll('canvas[mode="vertical"]')].some(c=>{const r=c.getBoundingClientRect();return r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0&&c.nextElementSibling?.hasAttribute('data-nc-canvas-translation');}),null,{timeout:30000});
-      await aligned();await page.screenshot({path:path.join(out,'comicwalker-live-vertical.png')});
-      await button('恢复原图');await page.waitForFunction(()=>!document.querySelector('[data-nc-canvas-translation]'));
-      await writeFile(path.join(out,'comicwalker-canvas-metrics.json'),JSON.stringify(await metrics(),null,2));
-      check('Live Comic Walker generic canvases display local fixture results in horizontal and vertical readers, translate both next-spread pages and restore original pixels/geometry; no live provider used');
-    }
   }
   complete=true;
-  let liveSource=liveWindowSource||(process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite)||(process.env.RUN_LIVE_COMICWALKER==='1'&&(!selectedSite||selectedSite==='generic'));
+  let liveSource=liveWindowSource||(process.env.RUN_LIVE_COMICPASH==='1'&&!selectedSite);
   for(const site of siteChecks.filter(site=>!selectedSite||site.id===selectedSite)) {
     const {verifyInline}=await import(site.url);
     const result=await verifyInline({browser,page,activate,button,source:images.get(2),out,check});

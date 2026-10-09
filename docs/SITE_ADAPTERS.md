@@ -110,6 +110,7 @@ npm run build
 | [KLManga](../apps/extension/src/sources/sites/klmanga/README.md) | HTTP 名称搜索、完整静态目录／封面与分批 POST 正文、12 小时更新；作品与章节导入、浮动入口，标签页翻译复用通用大图识别 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | HTTP 名称搜索、完整公开目录／正文／封面与 12 小时同步；作品／章节导入与网页浮动入口，阅读器及当前标签页原位翻译复用共享 GigaViewer 引擎 |
+| [ComicWalker / カドコミ](../apps/extension/src/sources/sites/comicwalker/README.md) | HTTP 名称搜索、完整公开目录／正文／封面、图片还原与 12 小时同步；作品／章节导入、浮动入口及有限 canvas 下一页预翻 |
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 阅读器内已解码同源 Blob 正文原位翻译，复用公共取图与动态页生命周期；不提供导入或目录 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |
