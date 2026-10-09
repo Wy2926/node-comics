@@ -13,6 +13,7 @@ COPY backend/website/package*.json ./
 RUN npm ci
 COPY backend/website ./
 COPY backend/shared /workspace/backend/shared
+COPY backend/app/catalog_defaults.json /workspace/backend/app/catalog_defaults.json
 COPY docs/images /workspace/docs/images
 RUN npm run build
 

@@ -14,6 +14,7 @@ import { accountReturnPath } from '../src/lib/auth-config';
 import {ApiError,type api} from '../src/lib/auth';
 import { locales, localPath } from '../src/i18n/locales';
 import type { Billing, BillingOffer, PendingCheckout, BillingProvider } from '../src/lib/billing';
+import { publishedSubscriptions } from '../src/data/published-plans';
 const month: BillingOffer = { id:'lite-month',name:'Lite',plan_id:'lite',plan_revision_id:'v1',currency:'usd',unit_amount:599,interval:'month',monthly_classic_pages:0,trial_days:7,trial_classic_pages:0,channels:[{provider:'creem',binding_id:'binding',trial_days:7,trial_classic_pages:0}] };
 const year: BillingOffer = {...month,id:'lite-year',unit_amount:5999,interval:'year'};
 const pack:BillingOffer={...month,id:'pack',plan_id:'pages',interval:'once',quota_pages:100,quota_validity_days:null,service_plan_id:'lite',trial_days:0};
@@ -54,6 +55,50 @@ test('checkout sends one POST, validates destination/provider, and never retries
     assert.deepEqual(calls,['/v1/billing/status','/v1/billing/checkouts']);
   }
 });
+
+for (const published of publishedSubscriptions) {
+  const offer: BillingOffer = {
+    ...published,
+    id: `fixture-${published.plan_id}-${published.interval}`,
+    channels: [{provider:'creem',binding_id:'fixture-binding',trial_days:0,trial_classic_pages:0}],
+  };
+
+  test(`${offer.plan_id} ${offer.interval} checkout follows the active quote, including after an expired gift`, async () => {
+    for (const gift of [null, {state:'expired' as const,starts_at:null,ends_at:null,days:6}]) {
+      const status: Billing = {...billing,offers:[offer],gift};
+      const calls: string[] = [];
+      const request = (async (path: string, method?: string, body?: unknown) => {
+        calls.push(path);
+        if (path === '/v1/billing/status') {
+          assert.equal(method,'GET');
+          return status;
+        }
+        assert.equal(path,'/v1/billing/checkouts');
+        assert.equal(method,'POST');
+        assert.deepEqual(body,{price_id:offer.id,provider:'creem'});
+        return {provider:'creem',checkout_url:'https://creem.io/checkout/fixture'};
+      }) as typeof api;
+      assert.equal(await directCheckout(offer.id,request),'https://creem.io/checkout/fixture');
+      assert.deepEqual(calls,['/v1/billing/status','/v1/billing/checkouts']);
+    }
+  });
+
+  test(`${offer.plan_id} ${offer.interval} never bypasses quote, channel or existing membership checks`, () => {
+    const status: Billing = {...billing,offers:[offer]};
+    assert.throws(()=>checkoutSelection({...status,enabled:false},offer.id),/CHECKOUT_UNAVAILABLE/);
+    assert.throws(()=>checkoutSelection({...status,offers:[]},offer.id),/CHECKOUT_UNAVAILABLE/);
+    assert.throws(()=>checkoutSelection({...status,offers:[{...offer,channels:[]}]},offer.id),/CHECKOUT_UNAVAILABLE/);
+    assert.throws(()=>checkoutSelection({...status,offers:[published]},published.id),/CHECKOUT_UNAVAILABLE/);
+    for (const state of ['pending','scheduled','active'] as const) {
+      assert.equal(checkoutSelection({...status,gift:{state,starts_at:null,ends_at:null,days:30}},offer.id),null);
+    }
+    assert.equal(checkoutSelection({...status,subscription:{status:'active'} as Billing['subscription']},offer.id),null);
+    const original = pendingCheckout({...offer,id:'retired-price',channels:[{...offer.channels[0],provider:'stripe'}]},'stripe');
+    const pending = {...status,subscription_checkout:original};
+    assert.equal(checkoutSelection(pending,offer.id),null);
+    assert.deepEqual(checkoutSelection(pending,original.price.id),{price_id:original.price.id,provider:'stripe'});
+  });
+}
 
 test('all page packs remain available to members, gifts and pending subscriptions',()=>{
   for(const extra of [{},{subscription:{status:'active'} as Billing['subscription']},{gift:{state:'active' as const,starts_at:null,ends_at:null,days:30}},{subscription_checkout:pendingCheckout(year)}]){

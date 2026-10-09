@@ -1,5 +1,6 @@
 import type {Billing,BillingOffer} from '../src/lib/billing';
 import {ApiError} from '../src/lib/auth-session';
+import {publishedSubscriptions} from '../src/data/published-plans';
 export {ApiError};
 const plusMonth:BillingOffer={id:'old-plus-month',name:'PLUS 示例',plan_id:'plus',plan_revision_id:'plus-v1',currency:'usd',unit_amount:999,interval:'month',monthly_classic_pages:300,trial_days:7,trial_classic_pages:30,channels:[{provider:'stripe',binding_id:'stripe-fixture',trial_days:7,trial_classic_pages:30},{provider:'creem',binding_id:'creem-fixture',trial_days:7,trial_classic_pages:30}]};
 const plusAnnual:BillingOffer={...plusMonth,id:'old-plus-year',unit_amount:9999,interval:'year'};
@@ -13,7 +14,8 @@ const pending=parameters.has('pending')||scenario==='subscription-pending';
 const subscriptionProvider='creem';
 const billing:Billing={enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:null,environment:'test',trial_eligible:true,gift:null,entitlement_expires_at:null,
   subscription_checkout:pending?{id:'fixture-subscription-checkout',provider:subscriptionProvider,price:{...annual,channels:annual.channels.filter(channel=>channel.provider===subscriptionProvider)},idempotency_key:null,error:null}:null,
-  offers:[month,annual,plusMonth,plusAnnual],subscription:null};
+  offers:publishedSubscriptions.map(offer=>({...offer,id:`fixture-${offer.plan_id}-${offer.interval}`,
+    channels:[{provider:'creem',binding_id:'creem-fixture',trial_days:0,trial_classic_pages:0}]})),subscription:null};
 const performanceCheck=parameters.has('perf');
 const fixtureStarted=performance.now();
 const observations:{accountVisibleMs:number|null;requests:{path:string;startedMs:number;finishedMs?:number}[]}={accountVisibleMs:null,requests:[]};
@@ -80,7 +82,7 @@ export const signIn=async(path?:string)=>{const output=document.getElementById('
 export const signOut=async()=>{loggedIn=false;authChanges.dispatchEvent(new Event('change'));};
 export const finishLogin=async()=>{};
 export const loginReturnPath=()=>'/account/';
-export const fixtureCatalog=()=>({offers:billing.offers.filter(offer=>offer.plan_id==='lite'),quota_offers:billing.quota_offers??[]});
+export const fixtureCatalog=()=>({offers:billing.offers,quota_offers:billing.quota_offers??[]});
 let endedKey:string|undefined;
 export async function api<T>(path:string,_method?:string,body?:unknown,headers?:Record<string,string>):Promise<T>{
   const version=accountVersion;
