@@ -7,12 +7,13 @@ import {API_BASE,API_ORIGIN} from '../../../../service';
 import {fallbackLanguages,modeLabels,type Capabilities,type Entitlements} from '../../../../types';
 import type {ChannelDefinition,ChannelConnection,ChannelRuntime,RuntimeOptions} from '../../contracts';
 import {TranslationCoordinator,translationJob} from './coordinator';
-import {operationId} from './operations';
 import {translationState} from './state';
 import {translationScope,readEntryOperations,blockEntryOperations,removeEntryOperations,readImageJobsPage} from './store';
 import {loadDeliveredResult,registerResultReader,releaseResultReaders,resultBlobKey} from '../../../../storage/translations/results';
 import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from '../../../input/limits';
 import {loadTranslationInput} from '../../../input/load';
+import {readChannelSettings,updateChannelSettings} from '../../configuration';
+import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
 
 // These baseline choices keep sign-in and cached views reachable without a network request.
 // New requests still require a successful policy refresh; the server enforces its actual limits.
@@ -65,12 +66,20 @@ export const definition:ChannelDefinition={
     const authorization=session?sessionAuthorization(session.id):undefined;
     const api=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),live,authorization);
     let caps=baselineCapabilities(),rights:Entitlements|undefined,policyError='';
+    const selectedModel=(await readChannelSettings()).modelPreferences?.[scope.key];
     if(session){
       try{caps=await api.capabilities();rights=await api.entitlements();assertCurrent(live);}
       catch(error){assertCurrent(live);if((await readAuth()).session?.id!==session.id)throw error;policyError=(error as Error).message;}
+    }else{
+      try{caps=await api.capabilities();assertCurrent(live);}catch{assertCurrent(live);}
     }
     const connection:ChannelConnection={
-      key:JSON.stringify([profile.id,profile.revision,session?.id??null]),scope,label:'NodeLane',
+      key:JSON.stringify([profile.id,profile.revision,session?.id??null,selectedModel??null]),scope,label:'NodeLane',
+      get modelSelection(){return {value:selectedModel,models:caps.translation_models,async select(value?:string){
+        assertCurrent(live);
+        if(value&&!selectedModelAvailable(caps.translation_models,value))throw Error(msg('此翻译方式暂不可用'));
+        await updateChannelSettings(settings=>{const modelPreferences={...settings.modelPreferences};if(value)modelPreferences[scope.key]=value;else delete modelPreferences[scope.key];return {...settings,modelPreferences};});
+      }};},
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
       requiresInternet:true,allowsFeedback:true,analyticsCategory:'official',isCurrent:live,
@@ -92,7 +101,8 @@ export const definition:ChannelDefinition={
         let active=true;
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const modelId=options.modelId??selectedModel;
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,modelId,modelAvailable:()=>selectedModelAvailable(caps.translation_models,modelId),onModelRejected:async()=>{const fresh=await runtimeApi.capabilities();assertCurrent(current);caps=fresh;options.onChange();},getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},
@@ -103,7 +113,7 @@ export const definition:ChannelDefinition={
           get waitingIds(){return core?.waitingIds??[];},
           get retryDelay(){return core?.retryDelay??0;},
           stateFor(target,requested,error=''){
-            return translationState({page:target.page,mode:target.mode,language:options.language,userId,origin:API_ORIGIN,active:requested,caps,rights,error:error||policyError,operation:core?.records.find(record=>record.id===operationId(scope.key,options.language,target))});
+            return translationState({page:target.page,mode:target.mode,language:options.language,modelId,userId,origin:API_ORIGIN,active:requested,caps,rights,error:error||policyError,operation:core?.records.find(record=>record.entryId===target.entryId&&record.pageId===target.page.id&&record.mode===target.mode)});
           },
           async refresh(){
             if(!core)return;assertCurrent(current);

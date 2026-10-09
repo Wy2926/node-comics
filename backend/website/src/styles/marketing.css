@@ -17,10 +17,10 @@ body[data-site-theme='midnight'] {
   --comic-stroke: var(--line);
   --comic-border: 1px solid var(--line);
   --comic-input-border: 1px solid #61728a;
-  --comic-control-radius: 999px;
-  --comic-card-radius: 14px;
-  --comic-panel-radius: 18px;
-  --comic-tab-radius: 8px;
+  --comic-control-radius: 4px;
+  --comic-card-radius: 8px;
+  --comic-panel-radius: 10px;
+  --comic-tab-radius: 4px;
   --comic-tab-paper: var(--surface-soft);
   --comic-tab-selected-bottom: var(--accent);
   --comic-control-selected-bg: var(--accent-soft);

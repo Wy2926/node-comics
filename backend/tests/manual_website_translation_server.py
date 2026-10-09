@@ -28,7 +28,8 @@ DEFAULTS = dict(guest=False, accepted=0, create_calls=0, input_calls=0, get_call
                events_truncate_once=False, events_reconnect_once=False,
                events_delay_ms=250, result_delay_ms=0, widget_delay_ms=25,
                result_failure=False, result_failure_once=False, last_input=None,
-               tiles_enabled=True, max_dimension=100000, fail_before_accept_once=False)
+               tiles_enabled=True, max_dimension=100000, fail_before_accept_once=False,
+               models_enabled=False, model_paid=False)
 state.update(DEFAULTS, requests={}, request_log=[], admitted_requests={})
 
 
@@ -82,6 +83,12 @@ async def start_session(request: Request):
 @app.get('/v1/capabilities')
 def capabilities(request: Request):
     return {'result_protocol': 'overlay-v1',
+            **({'translation_models': [
+                {'id': 'fixture-standard', 'name': '标准模型', 'requires_paid': False, 'available': True},
+                {'id': 'fixture-premium', 'name': '进阶模型', 'requires_paid': True,
+                 'available': state['model_paid'] and authorized(request),
+                 'unavailable_reason': None if state['model_paid'] and authorized(request) else 'not_allowed'},
+            ]} if state['models_enabled'] else {}),
             **({'representations': ['overlay-v1', 'overlay-tiles-v1', 'full-image-v1', 'original']} if state['tiles_enabled'] else {}),
             'limits': {'max_bytes': 134217728, 'max_pixels': state['max_dimension']**2, 'max_dimension': state['max_dimension']},
             'languages': [{'id':key,'label':label} for key,label in LANGUAGES.items()],
@@ -92,6 +99,7 @@ def capabilities(request: Request):
 def snapshot(key):
     entry = tasks[key]
     return {'id': key, 'state': entry['state'],
+            **({'requested_model_id': entry['body'].get('model_id'), 'model': entry['model']} if entry.get('model') else {}),
             'result': entry.get('result') if entry['state'] == 'succeeded' else None}
 
 
@@ -160,6 +168,12 @@ async def create_task(key: str, request: Request):
         state['fail_before_accept_once'] = False
         return error('NETWORK_ERROR',503)
     if key not in tasks:
+        model_id = body.get('model_id')
+        if state['models_enabled'] and model_id:
+            if model_id not in ('fixture-standard', 'fixture-premium'):
+                return error('TRANSLATION_MODEL_INVALID', 422)
+            if model_id == 'fixture-premium' and (guest or not state['model_paid']):
+                return error('TRANSLATION_MODEL_NOT_ALLOWED')
         if guest and state['accepted'] >= 5:
             return error('GUEST_DAILY_LIMIT',429)
         if guest:
@@ -169,7 +183,9 @@ async def create_task(key: str, request: Request):
             return error('TRANSLATION_NOT_FOUND',404)
         prepared_body = tasks[parent]['prepared_body'] if parent else body
         tasks[key] = {'id':key,'state':'needs_input','owner':'guest' if guest else 'account',
-                      'body':body, 'prepared_body':prepared_body}
+                      'body':body, 'prepared_body':prepared_body,
+                      'model': {'id': model_id or 'fixture-standard',
+                                'name': '进阶模型' if model_id == 'fixture-premium' else '标准模型'} if state['models_enabled'] else None}
         state['admitted_requests'][key] = body
     elif tasks[key]['body'] != body:
         return error('IDEMPOTENCY_CONFLICT',409)

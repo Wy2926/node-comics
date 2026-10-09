@@ -99,7 +99,7 @@ def provider_json(db, provider):
 
 def _provider_query(provider_id=None, *, purpose='text'):
     weight = PURPOSE_WEIGHTS[purpose]
-    query = select(TranslationProvider.id, weight.label('weight'), TranslationProvider.text_plan_ids,
+    query = select(TranslationProvider.id, TranslationProvider.name, weight.label('weight'), TranslationProvider.text_plan_ids,
         TranslationProviderRevision.id.label('revision_id'), TranslationProviderRevision.channel,
         TranslationProviderRevision.config).join(TranslationProviderRevision,
             TranslationProviderRevision.id == TranslationProvider.revision_id).where(

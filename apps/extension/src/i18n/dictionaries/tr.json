@@ -1,4 +1,11 @@
 {
+  "付费权益": "Ücretli erişim",
+  "翻译模型": "Çeviri modeli",
+  "自动选择（默认）": "Otomatik (varsayılan)",
+  "可用": "Kullanılabilir",
+  "不可用": "Kullanılamaz",
+  "更换模型仅影响新任务；已有译图需手动重新翻译。": "Model değişikliği yalnızca yeni görevleri etkiler. Mevcut sonuçları elle yeniden çevirin.",
+  "实际模型：{0}": "Kullanılan model: {0}",
   "前往定价页面": "Fiyatları görüntüle",
   "订阅和购买额度请前往定价页面。": "Abonelik veya sayfa paketi satın almak için fiyatlandırma sayfasını ziyaret edin.",
   "购买额度": "Sayfa paketleri",

@@ -4,8 +4,9 @@ import {supportsLanguage,type Page,type Mode,type Capabilities,type Entitlements
 import type {TranslationState} from '../../../automatic';
 import {quotaErrors,exhausted} from './operations';
 import {translationScope,type LocalOperation} from './store';
+import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
 
-export function translationState({page,mode,language,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
+export function translationState({page,mode,language,modelId,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;modelId?:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
   if(!userId)return active?{kind:'login',message:msg("登录后自动翻译")}:undefined;
   const t=pageTranslation(page,mode,language,translationScope(origin,userId));
   if(operation?.state==='blocked'){
@@ -26,6 +27,7 @@ export function translationState({page,mode,language,userId,origin,active,caps,r
   if(!active)return;
   if(page.translationError)return {kind:'error',message:page.translationError};
   if(!caps)return {kind:error?'error':'waiting',message:error||msg("正在连接翻译服务")};
+  if(!selectedModelAvailable(caps.translation_models,modelId))return {kind:'upgrade',message:msg('升级权益，继续翻译')};
   if(!caps.modes.find(m=>m.id===mode)?.enabled||!supportsLanguage(caps,mode,language))return {kind:'error',message:msg("此翻译方式暂不可用"),retryable:false};
   if(rights&&exhausted(rights.modes[mode]))return {kind:'upgrade',message:msg("升级权益，继续翻译")};
   if(error)return {kind:'error',message:error};

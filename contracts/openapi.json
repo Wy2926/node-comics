@@ -7639,6 +7639,13 @@
           "unknown_release_seconds": {
             "type": "integer",
             "title": "Unknown Release Seconds"
+          },
+          "translation_models": {
+            "items": {
+              "$ref": "#/components/schemas/TranslationModelCapability"
+            },
+            "type": "array",
+            "title": "Translation Models"
           }
         },
         "type": "object",
@@ -9957,6 +9964,20 @@
             ],
             "title": "Target Language"
           },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
           "retry_of": {
             "anyOf": [
               {
@@ -10011,6 +10032,68 @@
         "type": "object",
         "title": "TranslationInput"
       },
+      "TranslationModelCapability": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "requires_paid": {
+            "type": "boolean",
+            "title": "Requires Paid"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_allowed",
+                  "quota_exhausted",
+                  "unavailable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "requires_paid",
+          "available"
+        ],
+        "title": "TranslationModelCapability"
+      },
+      "TranslationModelResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TranslationModelResponse"
+      },
       "TranslationResponse": {
         "properties": {
           "id": {
@@ -10042,6 +10125,27 @@
           "target_language": {
             "type": "string",
             "title": "Target Language"
+          },
+          "requested_model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Model Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslationModelResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "image_sha256": {
             "type": "string",

@@ -1,5 +1,6 @@
 import { ApiError, assertSession, authenticatedFetch, sessionIdentity } from './auth';
-import type { Snapshot } from './translation-store';
+import type { RecordMeta, Snapshot } from './translation-store';
+import type {TranslationModelChoice} from '../../../shared/translation-models';
 export interface Guest {
   enabled: boolean;
   site_key: string;
@@ -15,6 +16,7 @@ export interface Account {
   sessionId: string;
 }
 export interface Capabilities {
+  translation_models?:TranslationModelChoice[];
   result_protocol: string;
   representations?: string[];
   limits: { max_bytes: number; max_pixels: number; max_dimension: number };
@@ -26,6 +28,13 @@ export interface Capabilities {
       { allowed: boolean; unlimited: boolean; quota?: { available: number } }
     >;
   };
+}
+/** Resume exactly the stored intent; absent model fields remain absent for old centers. */
+export function translationBody(meta:RecordMeta){
+  return {...(meta.intent??{
+    image:{sha256:meta.sha256,byte_size:meta.inputBytes,content_type:meta.mime,normalization_version:1},
+    mode:meta.mode,target_language:meta.language,...(meta.resultFormat?{result_format:meta.resultFormat}:{}),
+  }),...(meta.modelId?{model_id:meta.modelId}:{})};
 }
 export class TranslationError extends Error {
   constructor(

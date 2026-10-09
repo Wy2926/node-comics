@@ -63,9 +63,14 @@ def job_for_request(db, owner_id, key, request_hash):
     return db.get(Job, receipt.job_id)
 
 
-def remember_request(db, owner_id, key, request_hash, job):
+def remember_request(db, owner_id, key, request_hash, job, *, model=None):
+    if model is None:
+        previous = db.scalar(select(TranslationRequest.descriptor).where(
+            TranslationRequest.owner_id == owner_id, TranslationRequest.job_id == job.id)
+            .order_by(TranslationRequest.created_at, TranslationRequest.id).limit(1))
+        model = (previous or {}).get('model')
     db.add(TranslationRequest(owner_id=owner_id, id=request_identifier(key), request_hash=request_hash,
-        job_id=job.id))
+        job_id=job.id, descriptor={'model': model} if model else {}))
     db.flush()
     return job
 
@@ -101,7 +106,7 @@ def find_reusable(db, user, asset, mode, language, config):
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
-               source_sha256=None, request_hash_override=None, result_format='overlay-v1'):
+               source_sha256=None, request_hash_override=None, result_format='overlay-v1', model_id=None):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
@@ -113,9 +118,14 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     if existing:
         return existing
     at = now()
-    policy = admission_policy(db, user, mode, at)
-    config = config or configuration(db, mode, language, source_sha256=sha,
-        plan_id=policy.service_plan)
+    model_reason = None
+    if model_id:
+        from .translation_selection import select_model
+        config, policy, model_reason = select_model(db, user, model_id, at)
+    else:
+        policy = admission_policy(db, user, mode, at)
+        config = config or configuration(db, mode, language, source_sha256=sha,
+            plan_id=policy.service_plan)
     if result_format == 'overlay-tiles-v1':
         config = {**config, 'result_format': result_format, 'version': digest([config['version'], result_format])}
     cached = None if force else find_reusable(db, user, sha, mode, language, config)
@@ -133,7 +143,11 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     # free allowances first, then the selected subscription/purchased allowance.
     from .translation_models import TranslationProvider
     provider = db.get(TranslationProvider, config['text']['provider_id'])
-    if provider and (provider.text_plan_ids is None or 'free' in provider.text_plan_ids):
+    if model_reason == 'not_allowed':
+        problem('TRANSLATION_MODEL_NOT_ALLOWED', '当前权益不支持所选模型，请升级或选择其他模型', 403)
+    if model_reason == 'quota_exhausted':
+        problem('DAILY_QUOTA_EXHAUSTED', '可用于所选模型的翻译页数已用完', 403)
+    if not model_id and provider and (provider.text_plan_ids is None or 'free' in provider.text_plan_ids):
         policy = free_model_policy(db, user, policy, at)
     kind = require_entitlement(user, mode, db=db, policy=policy)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
@@ -152,7 +166,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
         job.input_pinned = True
         ensure_stages(db, job)
     touch_job(db, job)
-    return remember_request(db, user.id, key, request_hash, job)
+    return remember_request(db, user.id, key, request_hash, job,
+                            model={'id': provider.id, 'name': provider.name} if provider else None)
 
 
 def cancel_job(db, job):

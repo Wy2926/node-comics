@@ -1,10 +1,13 @@
 import type { TranslationResult } from '../../../shared/translation-images/types';
 import { probeImageMetadata } from '../../../shared/translation-images/image-metadata';
 import { TRANSLATION_MAX_DIMENSION } from '../../../shared/translation-images/limits';
+import type {TranslationModel} from '../../../shared/translation-models';
 export const SOURCE_MAX_DIMENSION = TRANSLATION_MAX_DIMENSION;
 export type Mode = 'classic';
 export interface Snapshot {
   id: string;
+  requested_model_id?:string|null;
+  model?:TranslationModel|null;
   state:
     | 'needs_input'
     | 'queued'
@@ -31,6 +34,7 @@ export interface RecordMeta {
   mode: Mode;
   language: string;
   requestId?: string;
+  modelId?:string;
   /** Frozen with requestId; absence preserves the ordinary format of existing requests. */
   resultFormat?: 'overlay-tiles-v1';
   intent?: { retry_of: string } | { regenerate_of: string };

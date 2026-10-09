@@ -10,14 +10,17 @@ import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
+import {TranslationModelPicker} from './TranslationModelPicker';
+import type {ModelSelection} from '../translation/channels/contracts';
 type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
+  modelSelection?: ModelSelection;
   children?: ReactNode;
   onOpenShortcuts?: () => void;
 };
-export function Preferences({ settings, setSettings, caps, children, onOpenShortcuts }: Props) {
+export function Preferences({ settings, setSettings, caps, modelSelection, children, onOpenShortcuts }: Props) {
   return <div className="nc-preferences">
     <PageTitle icon="settings" eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
     <AppearanceSettings settings={settings} onChange={setSettings}>
@@ -42,6 +45,7 @@ export function Preferences({ settings, setSettings, caps, children, onOpenShort
       <SettingRow title={msg("默认目标语言")} description={msg("常规翻译支持 16 个语言选项；新增语言会采用常规翻译，已有译图版本保留。")}>
         <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
       </SettingRow>
+      <TranslationModelPicker selection={modelSelection}/>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <SettingRow title={msg("翻页方向")} description={msg("单页模式中的方向键遵循此设置。")}>
         <Select aria-label={msg("翻页方向")} value={settings.direction} onChange={e => setSettings(s => ({ ...s, direction: e.target.value as Settings['direction'] }))}>

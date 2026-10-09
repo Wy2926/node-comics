@@ -102,6 +102,7 @@
   }
 
   .nc-app .nc-reader .nc-reader-tool-group:first-child { overflow-x: auto; overscroll-behavior-x: contain; }
+  .nc-app .nc-reader .nc-reader-model { width: 72px; height: auto; max-height: 42px; }
   .nc-app .nc-reader .nc-reader-tool-group > button,
   .nc-app .nc-reader .nc-page-versions button { width: 48px; height: var(--reader-tool-size); }
   .nc-app .nc-reader .nc-reader-rail.right button { gap: 1px; padding: 2px; }

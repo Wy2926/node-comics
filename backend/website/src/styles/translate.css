@@ -8,8 +8,8 @@
 .translation-identity .button { padding: 7px 16px; min-height: 36px; font-size: .77rem; }
 .translation-quota { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
 .translation-quota b { color: var(--ink); font-size: 1.15rem; font-weight: 500; margin-inline-start: 6px; }
-.translation-composer { max-width: 880px; margin: 0 auto 30px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
-.image-dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 21px; min-height: 280px; padding: 28px 22px; border: 1px dashed #475973; border-radius: 12px; text-align: center; min-width: 0; transition: background .15s; }
+.translation-composer { max-width: 880px; margin: 0 auto 30px; padding: 22px; border: 1px solid var(--line); border-radius: var(--comic-panel-radius); background: var(--surface); }
+.image-dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 21px; min-height: 280px; padding: 28px 22px; border: 1px dashed #475973; border-radius: var(--comic-card-radius); text-align: center; min-width: 0; transition: background .15s; }
 .image-dropzone[data-drag='true'] { background: var(--accent-soft); }
 .image-dropzone:focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
 .image-dropzone p { font-size: .88rem; margin: 0; line-height: 1.7; }
@@ -21,12 +21,29 @@
 .image-dropzone[data-compact='true'] .image-dropzone-copy { flex: 1; min-width: min(200px, 100%); }
 .translation-settings { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-top: 24px; }
 .translation-settings label { display: grid; gap: 7px; flex: 1 1 180px; min-width: 0; font-size: .77rem; color: var(--muted); }
-.translation-settings select { width: 100%; min-width: 0; border-radius: 10px; min-height: 48px; }
+.translation-settings select { width: 100%; min-width: 0; }
 .translation-settings > .button { min-height: 48px; }
+.translation-model-picker{display:grid;gap:7px;flex:1 1 240px;min-width:0;font-size:.77rem;color:var(--muted)}
+.translation-model-picker details{position:relative;color:var(--ink)}
+.translation-model-picker summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;overflow-wrap:anywhere;list-style:none}
+.translation-model-picker summary::-webkit-details-marker{display:none}
+.translation-model-picker summary::after{content:'';flex:none;width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.translation-model-picker details[open] summary::after{transform:rotate(225deg)}
+.translation-model-picker summary:focus-visible{outline:var(--comic-focus-ring);outline-offset:var(--comic-focus-offset)}
+.translation-model-options{position:absolute;inset-inline:0;top:calc(100% + 6px);z-index:10;display:grid;gap:6px;padding:8px;background:var(--surface);border:var(--comic-border);border-radius:var(--comic-card-radius);box-shadow:var(--comic-shadow);max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.translation-model-option{display:flex;align-items:center;gap:8px;min-width:0}
+.translation-model-option[data-paid=false]+.translation-model-option[data-paid=true]{border-top:1px solid var(--line);padding-top:6px}
+.translation-model-choice{flex:1;min-width:0;display:grid;gap:5px;text-align:start;padding:10px;border-radius:var(--comic-control-radius);min-height:var(--comic-control-height);border:1px solid transparent;background:var(--surface);color:var(--ink);text-decoration:none}
+.translation-model-choice[aria-pressed=true],.translation-model-choice:hover,.translation-model-choice:focus-visible{border-color:var(--accent);background:var(--comic-control-selected-bg)}
+.translation-model-option>button:disabled{opacity:1;color:var(--muted);cursor:not-allowed}
+.translation-model-option strong{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-wrap:anywhere;font-size:var(--comic-control-font-size-compact);font-weight:500}
+.translation-model-option small{justify-self:start;padding:1px 6px;border:var(--comic-badge-border);border-radius:var(--comic-badge-radius);font-size:.72rem;color:var(--muted)}
+.translation-model-badges{display:flex;flex-wrap:wrap;gap:6px}
+.translation-model-upgrade{flex-shrink:0;font-size:.72rem;color:var(--accent)}
 .translation-details { max-width: 880px; margin: 0 auto; border-top: 1px solid var(--line); }
 .translation-details > summary { cursor: pointer; padding: 20px 0; font-size: .83rem; color: var(--muted); }
 .translation-details > summary:hover { color: var(--ink); }
-.translation-history-count { display: inline-block; margin-inline-start: 12px; min-width: 25px; text-align: center; background: var(--surface-soft); border-radius: 99px; font-size: .72rem; color: var(--ink); }
+.translation-history-count { display: inline-block; margin-inline-start: 12px; min-width: 25px; text-align: center; background: var(--surface-soft); border-radius: var(--comic-badge-radius); font-size: .72rem; color: var(--ink); }
 .translation-files { max-width: 880px; margin: 0 auto 26px; }
 .translation-files-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .translation-files-heading h2 { font-size: .96rem; font-weight: 500; }
@@ -59,18 +76,18 @@
 .translation-storage meter::-webkit-meter-optimum-value { background: var(--accent); }
 .translation-storage meter::-moz-meter-bar { background: var(--accent); }
 .translation-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
-.translation-tabs > button { border-radius: 999px; padding: 9px 17px; font-size: .76rem; border: 0; }
+.translation-tabs > button { border-radius: var(--comic-tab-radius); padding: 9px 17px; font-size: .76rem; border: 0; }
 .translation-notes { margin-top: 12px; }
 .translation-notes-body { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 0 0 20px; }
 .translation-notes strong { font-size: .77rem; font-weight: 500; }
 .translation-notes p, .translation-note { font-size: .75rem; color: var(--muted); line-height: 1.85; margin-top: 7px; }
 .translation-error { color: var(--danger); font-size: .8rem; line-height: 1.7; overflow-wrap: anywhere; margin: 6px 0; }
-.translation-alert { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; max-width: 880px; padding: 18px 22px; margin: 0 auto 24px; color: var(--danger); background: var(--danger-soft); border: 1px solid var(--line); border-radius: 12px; }
+.translation-alert { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; max-width: 880px; padding: 18px 22px; margin: 0 auto 24px; color: var(--danger); background: var(--danger-soft); border: 1px solid var(--line); border-radius: var(--comic-card-radius); }
 .translation-alert-mark { font-size: 1.1rem; }
 .translation-alert > div { flex: 1; min-width: 170px; }
 .translation-alert strong { font-size: .84rem; }
 .translation-alert p { font-size: .8rem; line-height: 1.7; margin-top: 3px; }
-.translation-availability { max-width: 880px; padding: 16px 20px; margin: 0 auto 24px; background: var(--comic-warning-paper); border-radius: 12px; font-size: .85rem; }
+.translation-availability { max-width: 880px; padding: 16px 20px; margin: 0 auto 24px; background: var(--comic-warning-paper); border-radius: var(--comic-card-radius); font-size: .85rem; }
 .translation-verification-overlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: #10182866; overflow-y: auto; animation: translation-verification-enter .18s ease-out; }
 .translation-verification { position: relative; display: grid; gap: 20px; width: min(400px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; margin: 0; padding: 28px; background: var(--surface); color: var(--ink); border: var(--comic-border); border-top: 6px solid var(--accent); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-dialog-shadow); animation: translation-verification-card-enter .2s ease-out; }
 .translation-verification-copy { padding-right: var(--comic-control-height-icon); }

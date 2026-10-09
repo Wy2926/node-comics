@@ -28,7 +28,7 @@ if(autoScenario==='lite')rights.modes.classic={...rights.modes.classic,unlimited
 const activeCount=()=>[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length;
 for(const copy of stored)for(const page of copy.pages)for(const job of page.jobs)Object.assign(job,{image_sha256:page.imageSha256});
 
-const state={ordinals,imageOrdinals,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status='succeeded';state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
+const state={modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status='succeeded';state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
@@ -39,7 +39,7 @@ window.fetch=async(input,init={})=>{
   if(state.offline||state.failDownloads&&url.pathname.endsWith('/result'))throw Error('网络连接失败（隔离验收）');
   if(state.failNext){state.failNext=false;throw Error('网络连接失败（隔离验收）');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
-  if(url.pathname==='/v1/capabilities')return json({result_protocol:'overlay-v1',representations:['overlay-v1','overlay-tiles-v1'],modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:10000000000,max_dimension:100000},entitlements:rights});
+  if(url.pathname==='/v1/capabilities')return json({...(!state.legacyModels?{translation_models:[{id:'fixture-standard',name:'标准模型',requires_paid:false,available:true},{id:'fixture-premium',name:'进阶模型',requires_paid:true,available:state.modelPaid,unavailable_reason:state.modelPaid?null:'not_allowed'}]}:{}),result_protocol:'overlay-v1',representations:['overlay-v1','overlay-tiles-v1'],modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:10000000000,max_dimension:100000},entitlements:rights});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   const billingScenario=new URLSearchParams(location.search).get('billing');
   const billing={offers:[billingOffer],subscription_checkout:null,enabled:!!billingScenario&&billingScenario!=='disabled',providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:billingScenario==='paid'?'stripe':null,environment:'test',trial_eligible:billingScenario!=='paid',gift:null,entitlement_expires_at:null,subscription:billingScenario==='paid'?{provider:'stripe',price:billingOffer,status:'active',next_billed_at:'2026-10-20T00:00:00Z',cancel_at:null,trial_ends_at:null,auto_renew:true,can_cancel:true,renewal_state:'normal',resume_at:null,paid_ends_at:'2026-10-20T00:00:00Z'}:null};
@@ -52,7 +52,7 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   const snapshot=(id:string):TranslationSnapshot|undefined=>{
     const j=jobs.get(operations.get(id)??id);if(!j)return;
-    return {id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?overlay.result(id,j.image_sha256!):null};
+    return {id,model:j.model,requested_model_id:j.requested_model_id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?overlay.result(id,j.image_sha256!):null};
   };
   if(url.pathname==='/v1/translations/events'){
     const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};
@@ -74,15 +74,15 @@ window.fetch=async(input,init={})=>{
     if(action==='input'){const j=jobs.get(operations.get(id)??id)!;j.status=autoScenario?'running':'queued';return json(snapshot(id));}
     if(init.method!=='PUT')return snapshot(id)?json(snapshot(id)):json({error:{code:'NOT_FOUND',message:'Not found'}},404);
     const value=body as TranslationInput;state.translationRequests.push({id,body:value});
-    if(operations.has(id))return json(snapshot(id));
+    if(operations.has(id))return json(snapshot(id));    if(!state.legacyModels&&value.model_id==='fixture-premium'&&!state.modelPaid)return json({error:{code:'TRANSLATION_MODEL_NOT_ALLOWED',message:'当前权益不支持'}},403);
     const prior='retry_of' in value?snapshot(value.retry_of):'regenerate_of' in value?snapshot(value.regenerate_of):undefined;
     const sha='image' in value?value.image.sha256:prior?.image_sha256,mode='image' in value?value.mode:prior!.mode,language='image' in value?value.target_language:prior!.target_language;
     const index=sha?imageOrdinals[sha]:undefined;if(index===undefined)throw Error('Unknown fixture image identity.');
-    const matching='image' in value?[...jobs.values()].filter(j=>j.image_sha256===sha&&j.mode===mode&&j.target_language===language).at(-1):undefined;
+    const matching='image' in value?[...jobs.values()].filter(j=>j.image_sha256===sha&&j.mode===mode&&j.target_language===language&&(state.legacyModels||j.requested_model_id===value.model_id)).at(-1):undefined;
     if(matching){operations.set(id,matching.id);return json(snapshot(id));}
     if(Date.now()<state.rateBlockedUntil)return new Response(JSON.stringify({error:{code:'IMAGE_RATE_LIMITED',message:'等待翻译'}}),{status:429,headers:{'Content-Type':'application/json','Retry-After':String(Math.ceil((state.rateBlockedUntil-Date.now())/1000))}});
     if(rights.modes[mode].quota?.available===0)return json({error:{code:'DAILY_QUOTA_EXHAUSTED',message:'升级权益，继续翻译'}},403);
-    const j:Job={...job(index,'awaiting_upload'),id,mode,target_language:language,image_sha256:sha,created_at:new Date().toISOString()};jobs.set(id,j);operations.set(id,id);state.submitted.push(index);
+    const j:Job={...job(index,'awaiting_upload'),...(!state.legacyModels?{requested_model_id:value.model_id,model:{id:value.model_id??'fixture-standard',name:value.model_id==='fixture-premium'?'进阶模型':'标准模型'}}:{}),id,mode,target_language:language,image_sha256:sha,created_at:new Date().toISOString()};jobs.set(id,j);operations.set(id,id);state.submitted.push(index);
     if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}
     return json(snapshot(id),202);
   }

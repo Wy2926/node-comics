@@ -1,5 +1,5 @@
 import type {PageReference} from '../../comics/pages/identity';
-import type {Capabilities, Job} from '../../types';
+import type {Capabilities, Job, TranslationModelChoice} from '../../types';
 import type {ReadingTarget, TranslationState} from '../automatic';
 import type {PreparedInput} from '../input/prepare';
 
@@ -18,6 +18,7 @@ export interface ChannelConnectionInput {settings:Record<string,string>;secrets:
 export interface ChannelConnectionResult {settings:Record<string,string>;secrets:Record<string,string>;}
 export interface RuntimeOptions {
   language: string;
+  modelId?: string;
   getBlob: (key:string)=>Promise<Blob|undefined>;
   readOriginal?: (ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;
   onJobs: (jobs:Job[])=>Promise<void>;
@@ -40,7 +41,13 @@ export interface ChannelRuntime {
   refresh():Promise<void>;
   dispose():void;
 }
+export interface ModelSelection {
+  value?:string;
+  models?:TranslationModelChoice[];
+  select(value?:string):Promise<void>;
+}
 export interface ChannelConnection {
+  readonly modelSelection?:ModelSelection;
   /** Low-cardinality product category; never a profile name, URL or protocol ID. */
   analyticsCategory?:'official'|'local';
   key: string;

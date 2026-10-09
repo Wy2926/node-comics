@@ -41,6 +41,8 @@ class TranslationInput(RequestBody):
     image: ImageDescriptor | None = None
     mode: Literal['classic'] | None = None
     target_language: Language | None = None
+    model_id: str | None = Field(default=None, min_length=1, max_length=36,
+        pattern=r'^[a-zA-Z0-9_-]+$', strict=True, exclude=True)
     retry_of: UUID | None = None
     regenerate_of: UUID | None = None
     acknowledge_unknown_cost: bool = False
@@ -167,12 +169,15 @@ def translation_json(db, row, *, context=None):
         'target_language': entry.target_language if entry else descriptor['target_language'],
         'image_sha256': entry.source_sha256 if entry else descriptor['image']['sha256'],
         'input_expires_at': iso(upload.expires_at) if upload else None,
+        'requested_model_id': descriptor.get('model_id'), 'model': descriptor.get('model'),
         'result': result, 'error': error, 'created_at': iso(row.created_at),
         'updated_at': iso(row.revoked_at or (entry.changed_at if entry else row.created_at))}
 
 
 def accept_translation(db, user, request_id, body):
     content = body.model_dump(mode='json')
+    if body.model_id is not None:
+        content['model_id'] = body.model_id
     if body.result_format != 'overlay-v1':
         content['result_format'] = body.result_format
     signature = digest(content)
@@ -185,7 +190,7 @@ def accept_translation(db, user, request_id, body):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
         return old
     image, mode, language = body.image, body.mode, body.target_language
-    result_format = body.result_format
+    result_format, model_id = body.result_format, body.model_id
     previous_id = body.retry_of or body.regenerate_of
     if previous_id:
         previous = owned_translation(db, user.id, previous_id)
@@ -201,6 +206,11 @@ def accept_translation(db, user, request_id, body):
             problem('REGENERATE_NOT_ALLOWED', '只有完成的请求可以重新翻译', 409)
         image = ImageDescriptor.model_validate(previous.descriptor['image'])
         mode, language = entry.mode, entry.target_language
+        if body.retry_of:
+            inherited_model = (previous.descriptor or {}).get('model_id')
+            if model_id is not None and model_id != inherited_model:
+                problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原模型选择；换模型请重新翻译', 409)
+            model_id = inherited_model
         result_format = (previous.descriptor or {}).get('result_format', 'overlay-v1')
         if body.result_format != 'overlay-v1' and body.result_format != result_format:
             problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原结果格式', 409)
@@ -210,12 +220,15 @@ def accept_translation(db, user, request_id, body):
         problem('IMAGE_TOO_LARGE', '图片大小超过限制', 413)
     asset = None  # Inputs are private to each actual job, never claimed by hash.
     entry = create_job(db, user, asset, mode, language, request_id, operation='translation',
-        force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature, result_format=result_format)
+        force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature,
+        result_format=result_format, model_id=model_id)
     row = db.get(TranslationRequest, (user.id, request_id))
-    row.descriptor = {'image': image.model_dump(), 'mode': mode, 'target_language': language,
+    row.descriptor = {**(row.descriptor or {}), 'image': image.model_dump(), 'mode': mode, 'target_language': language,
         'retry_of': str(body.retry_of) if body.retry_of else None,
         'regenerate_of': str(body.regenerate_of) if body.regenerate_of else None,
         'acknowledge_unknown_cost': body.acknowledge_unknown_cost}
+    if model_id is not None:
+        row.descriptor = {**row.descriptor, 'model_id': model_id}
     if result_format != 'overlay-v1':
         row.descriptor = {**row.descriptor, 'result_format': result_format}
     if entry.status == 'awaiting_upload':

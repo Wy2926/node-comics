@@ -61,7 +61,7 @@ def is_plus(db, user, at=None):
     return is_operator_plus(user, at) or bool(active_terms(db, user.id, at))
 
 
-def membership_benefits(db, user, at=None):
+def membership_choices(db, user, at=None):
     at = at or now()
     benefits = active_benefits(db, user.id, at)
     choices = [{'plan': revision.plan_id, 'service_plan': revision.service_plan_id or revision.plan_id,
@@ -71,6 +71,11 @@ def membership_benefits(db, user, at=None):
     if is_operator_plus(user, at):
         choices.append({'plan': 'plus', 'service_plan': 'plus', 'paid': True,
                         'hourly_image_limit': None, 'unlimited': user.plus_monthly_pages is None})
+    return choices
+
+
+def membership_benefits(db, user, at=None, *, choices=None):
+    choices = membership_choices(db, user, at) if choices is None else choices
     return max(choices, key=lambda value: (value['unlimited'], value['hourly_image_limit'] is None,
         value['hourly_image_limit'] or 0, value['plan']), default={
             'plan': 'free', 'service_plan': 'free', 'paid': False, 'hourly_image_limit': None, 'unlimited': False})
@@ -243,28 +248,34 @@ class AdmissionPolicy:
         return int(self.plan not in ('free', 'guest') or self.kind in (MONTHLY, PURCHASE, UNLIMITED))
 
 
-def admission_policy(db, user, mode='classic', at=None, *, benefits=None):
+def admission_policy(db, user, mode='classic', at=None, *, benefits=None, service_plans=None, choices=None):
     """Read-only until reserve; callers resolve UUID/cache reuse before enforcing it."""
     at = at or now()
     if user.kind == 'guest':
         return AdmissionPolicy('guest', 'guest', 'guest_trial', None)
     benefits = benefits if benefits is not None else membership_benefits(db, user, at)
-    kind = quota_kind(user, mode, at, db, benefits=benefits)
+    access = benefits
+    if service_plans is not None:
+        choices = membership_choices(db, user, at) if choices is None else choices
+        access = membership_benefits(db, user, at, choices=[item for item in choices if item['service_plan'] in service_plans])
+    kind = quota_kind(user, mode, at, db, benefits=access)
     if kind in (UNLIMITED, 'unavailable'):
-        return AdmissionPolicy(benefits['plan'], benefits['service_plan'], kind, benefits['hourly_image_limit'])
-    subscription = first_subscription(db, user.id, at) if benefits['paid'] else None
-    gift = _automatic_period(db, user, MONTHLY, at)
+        return AdmissionPolicy(benefits['plan'], access['service_plan'], kind, access['hourly_image_limit'])
+    subscription = first_subscription(db, user.id, at, service_plans=service_plans) if access['paid'] else None
+    gift = _automatic_period(db, user, MONTHLY, at) if service_plans is None or 'plus' in service_plans else None
     if gift and gift.granted > gift.used + gift.reserved and (not subscription or gift.ends_at <= subscription[0].ends_at):
         return AdmissionPolicy(benefits['plan'], 'plus', MONTHLY, None, gift)
     if subscription:
         period, revision = subscription
         return AdmissionPolicy(benefits['plan'], revision.service_plan_id or revision.plan_id,
                                MONTHLY, revision.hourly_image_limit, period)
-    purchase = first_purchase(db, user.id, at)
+    purchase = first_purchase(db, user.id, at, service_plans=service_plans)
     if purchase:
         period, revision = purchase
         return AdmissionPolicy(benefits['plan'], revision.service_plan_id, PURCHASE, revision.hourly_image_limit, period)
     # The subscription identity remains, but free pages never authorize paid models.
+    if service_plans is not None and 'free' not in service_plans:
+        return AdmissionPolicy(benefits['plan'], access['service_plan'], MONTHLY, access['hourly_image_limit'])
     return AdmissionPolicy(benefits['plan'], 'free', DAILY, benefits['hourly_image_limit'], _first_period(db, user, mode, DAILY, at))
 
 

@@ -66,6 +66,7 @@ button.nc-select:disabled {
 .nc-select-list[hidden] { display: none; }
 .nc-select-list[data-popover-fallback-open] { display: block; }
 .nc-select-list::backdrop { background: transparent; }
+button.nc-select-option { border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; box-shadow: none; }
 .nc-select-option {
   display: flex;
   align-items: center;
@@ -77,11 +78,11 @@ button.nc-select:disabled {
   cursor: pointer;
 }
 .nc-select-option > span { min-width: 0; overflow-wrap: anywhere; }
-.nc-select-option[data-active=true] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.nc-select-option[aria-selected=true] { color: var(--accent); font-weight: 700; }
+.nc-select-option[data-active=true], .nc-select-option:focus-visible, .nc-select-option:hover:not(:disabled):not([aria-disabled=true]) { outline: none; background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.nc-select-option:is([aria-selected=true],[aria-pressed=true]) { color: var(--accent); font-weight: 700; }
 .nc-select-check { visibility: hidden; flex: none; }
 .nc-select-option[aria-selected=true] .nc-select-check { visibility: visible; }
-.nc-select-option[aria-disabled=true] { color: var(--muted); opacity: .6; cursor: not-allowed; }
+.nc-select-option:is([aria-disabled=true],:disabled) { color: var(--muted); opacity: .6; cursor: not-allowed; }
 
 @media (pointer: coarse), (hover: none) {
   .nc-select-option { min-height: 44px; padding-block: 10px; }

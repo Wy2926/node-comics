@@ -4,17 +4,19 @@ import type {InputProfile} from '../../../input/limits';
 import {openSourceDatabase, type DatabaseSchema} from '../../../../storage/database';
 import {mergeJobs} from '../../../../reader/jobs';
 
-export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;image:TranslationImage;sourceSha256?:string;inputProfile?:InputProfile;inputSize?:{width:number;height:number};blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;deniedPolicy?:string;deniedImageLimit?:number;createdAt:number;}
+export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;modelId?:string;image:TranslationImage;sourceSha256?:string;inputProfile?:InputProfile;inputSize?:{width:number;height:number};blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;deniedPolicy?:string;deniedImageLimit?:number;createdAt:number;}
 export interface SyncState {id:string;imageRetryAt?:number;controlRetryAt?:number;}
 interface StoredJob {scope:string;id:string;sourceSha256?:string;job:Job;}
 const storedJob=(scope:string,job:Job):StoredJob=>({scope,id:job.id,sourceSha256:job.source_image_sha256??job.image_sha256,job});
 const schema:DatabaseSchema={
-  operations:{keyPath:'id',indexes:[{name:'scope',keyPath:'scope'},{name:'entryId',keyPath:['entryId','id']}]},sync:{keyPath:'id'},
+  operations:{keyPath:'id',indexes:[{name:'scope',keyPath:'scope'},{name:'entryId',keyPath:['entryId','id']},{name:'pageIntent',keyPath:['scope','entryId','pageId','mode','language']}]},sync:{keyPath:'id'},
   jobs:{keyPath:['scope','id'],indexes:[{name:'scopeImage',keyPath:['scope','sourceSha256']},{name:'scopeImageJob',keyPath:['scope','sourceSha256','id']}]},
   tombstones:{keyPath:'id'},
 };
 function upgrade(tx:IDBTransaction,oldVersion:number){
-  if(oldVersion!==1&&oldVersion!==2)throw Error('Unsupported translation database version');
+  if(oldVersion!==1&&oldVersion!==2&&oldVersion!==3)throw Error('Unsupported translation database version');
+  tx.objectStore('operations').createIndex('pageIntent',['scope','entryId','pageId','mode','language']);
+  if(oldVersion===3)return;
   tx.objectStore('operations').createIndex('entryId',['entryId','id']);
   tx.db.createObjectStore('tombstones',{keyPath:'id'});
   if(oldVersion===1){
@@ -36,7 +38,7 @@ function upgrade(tx:IDBTransaction,oldVersion:number){
   }else tx.objectStore('jobs').createIndex('scopeImageJob',['scope','sourceSha256','id']);
 }
 let opening:Promise<IDBDatabase>|undefined;
-function db(){return opening??=openSourceDatabase('translation-requests-overlay-v1',schema,()=>{opening=undefined;},undefined,undefined,{version:3,upgrade}).catch(error=>{opening=undefined;throw error;});}
+function db(){return opening??=openSourceDatabase('translation-requests-overlay-v1',schema,()=>{opening=undefined;},undefined,undefined,{version:4,upgrade}).catch(error=>{opening=undefined;throw error;});}
 async function transaction<T>(name:string,mode:IDBTransactionMode,action:(store:IDBObjectStore)=>IDBRequest<T>):Promise<T>{const database=await db();return new Promise((resolve,reject)=>{const tx=database.transaction(name,mode);const request=action(tx.objectStore(name));tx.oncomplete=()=>resolve(request.result);tx.onabort=tx.onerror=()=>reject(tx.error);});}
 export const translationScope=(origin:string,userId:string)=>JSON.stringify([origin,userId,'overlay-v1']);
 export async function readOperations(ids:readonly string[]):Promise<LocalOperation[]>{
@@ -47,6 +49,9 @@ export async function readOperations(ids:readonly string[]):Promise<LocalOperati
   });
 }
 export const readOperation=(id:string)=>transaction<LocalOperation|undefined>('operations','readonly',s=>s.get(id));
+/** Only the visible page's model intents, never a chapter/account-wide scan. */
+export const readPageOperations=(scope:string,entryId:string,pageId:string,mode:Mode,language:string)=>
+  transaction<LocalOperation[]>('operations','readonly',s=>s.index('pageIntent').getAll([scope,entryId,pageId,mode,language]));
 export async function saveOperation(value:LocalOperation){
   const database=await db();return new Promise<void>((resolve,reject)=>{
     const tx=database.transaction(['operations','tombstones'],'readwrite'),removed=tx.objectStore('tombstones').get(value.entryId);let stale=false;

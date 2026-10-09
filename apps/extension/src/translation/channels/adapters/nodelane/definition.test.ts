@@ -11,6 +11,7 @@ import {translationCache} from '../../../../storage/translations';
 import {resultBlobKey} from '../../../../storage/translations/results';
 import {cacheInput,readInput} from '../../../input/cache';
 import {hashFile} from '../../../../importers/hash';
+import {readChannelSettings,writeChannelSettings} from '../../configuration';
 
 const auth=vi.hoisted(()=>({value:{session:null} as AuthState,listeners:new Set<()=>void>()}));
 vi.mock('../../../../auth/storage',()=>({
@@ -25,14 +26,35 @@ beforeEach(()=>{auth.value={session:null};auth.listeners.clear();});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('NodeLane channel boundary',()=>{
+  it('isolates model preferences by user and center, preserving stale selections after entitlement changes',async()=>{
+    const saved=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
+    const model={id:'model-a',name:'Model A',requires_paid:true,available:true};
+    const readCaps=vi.spyOn(Api.prototype,'capabilities').mockResolvedValue({...capabilities,translation_models:[model]});
+    vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const first=session(),second=session();auth.value={session:first};
+    const connection=await definition.open(profile,{},()=>true);
+    await connection.modelSelection!.select('model-a');connection.dispose();
+    const settings=await readChannelSettings();
+    await writeChannelSettings({...settings,modelPreferences:{...settings.modelPreferences,'other-center':'other-model'}});
+    auth.value={session:second};
+    const other=await definition.open(profile,{},()=>true);expect(other.modelSelection!.value).toBeUndefined();other.dispose();
+    auth.value={session:first};
+    readCaps.mockResolvedValue({...capabilities,translation_models:[{...model,available:false,unavailable_reason:'not_allowed'}]});
+    const restored=await definition.open(profile,{},()=>true);
+    expect(restored.modelSelection!.value).toBe('model-a');
+    await expect(restored.modelSelection!.select('model-a')).rejects.toThrow('不可用');
+    await restored.modelSelection!.select();
+    expect((await readChannelSettings()).modelPreferences).toEqual({'other-center':'other-model'});restored.dispose();
+  });
   it('provides a login state without issuing account or translation requests while signed out',async()=>{
-    const caps=vi.spyOn(Api.prototype,'capabilities'),rights=vi.spyOn(Api.prototype,'entitlements'),translate=vi.spyOn(Api.prototype,'translate');
+    const caps=vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities),rights=vi.spyOn(Api.prototype,'entitlements'),translate=vi.spyOn(Api.prototype,'translate');
     const connection=await definition.open(profile,{},()=>true),runtime=connection.createRuntime(options());
     await runtime.init();expect(connection.available).toBe(false);
     expect(connection.capabilities.modes.map(mode=>mode.id)).toEqual(['classic']);
     expect(runtime.stateFor(target(0),true)).toEqual({kind:'login',message:'登录后自动翻译'});
     await expect(runtime.submit([target(0)])).rejects.toThrow('登录');
-    expect(caps).not.toHaveBeenCalled();expect(rights).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();connection.dispose();
+    expect(caps).toHaveBeenCalledOnce();expect(rights).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();connection.dispose();
   });
   it('notifies on session changes and ignores token-only refreshes',async()=>{
     const first=session();auth.value={session:first};const changed=vi.fn(),unsubscribe=definition.subscribe!(changed);

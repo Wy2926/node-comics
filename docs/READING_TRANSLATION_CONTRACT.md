@@ -4,7 +4,7 @@
 
 本文约束 **NodeLane 官方渠道**的后端 API 与客户端恢复行为。客户端渠道抽象、MTU 直传协议及缓存边界见[客户端翻译渠道](TRANSLATION_CHANNELS.md)；本地渠道不要求实现本文的账号、权益或持久任务协议。
 
-插件与官网按权益选择正文模型的增量接口见[模型选择设计](TRANSLATION_MODEL_SELECTION_DESIGN.md)（待实现）。当前机器契约尚无 `model_id`；设计要求旧请求省略该字段时保留原默认分流、请求摘要与恢复行为。
+插件与官网按权益选择正文模型的规则见[模型选择规范](TRANSLATION_MODEL_SELECTION_DESIGN.md)。可选 `model_id` 省略或为 `null` 时保留默认分流及旧请求摘要；显式选择须由服务端按权益校验，不能静默换模。
 
 采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。客户端页面库使用 `node-comics-reading-v2-*`；原图使用 `original-v2-static-srgb` 渲染身份，固定 144 dpi 的 PDF 使用 `pdf-v3-static-srgb`，隔离旧缩放缓存、页面摘要与本地送译操作并保留书架和阅读进度。官方请求使用独立的 `translation-requests-overlay-v1` 库及带 `overlay-v1` 的账户 scope。升级与数据库基线遵循[部署规范](DEPLOYMENT.md)，不兼容旧资产下载协议。
 
@@ -16,7 +16,7 @@
 
 注册用户调用现有 Bearer `/v1/translations`；游客调用同结构 Cookie `/v1/guest/translations`，均要求 `X-Translation-Protocol: overlay-v1`。游客额外使用 `X-Guest-Request: 1`，新 UUID 携带 `X-Turnstile-Token`（action=`guest_translate`）；`POST /v1/guest/session` 的 token 对应 `guest_session`。服务端校验 Turnstile hostname/action，不把前端成功当作准入。身份与限额见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。
 
-受理／上传前冻结本地 UUID、实际输入与结果格式；可选 `resultFormat` 字段随记录保存，旧记录缺字段表示普通覆盖，无需修改 IndexedDB 表结构。刷新和失联后先 GET 原 UUID，仅确认 404 才以同 UUID 提交原描述；恢复不按当前分块能力重选格式，`needs_input` 重传原字节。已冻结的本地送译副本缺失时明确失败，不重新编码并改写原摘要。SSE 退避核实，未知结果不自动重调。普通／分块覆盖均合成并保存完整译图，再次查看直接读本地；写盘失败仍可立即下载。明确重试／重译创建新 UUID，请求体只保留 `retry_of`／`regenerate_of`，由服务端继承结果格式，不把传输失败当作重译。
+受理／上传前冻结本地 UUID、实际输入与结果格式；可选 `resultFormat` 字段随记录保存，旧记录缺字段表示普通覆盖，无需修改 IndexedDB 表结构。刷新和失联后先 GET 原 UUID，仅确认 404 才以同 UUID 提交原描述；恢复不按当前分块能力重选格式，`needs_input` 重传原字节。已冻结的本地送译副本缺失时明确失败，不重新编码并改写原摘要。SSE 退避核实，未知结果不自动重调。普通／分块覆盖均合成并保存完整译图，再次查看直接读本地；写盘失败仍可立即下载。明确重试／重译创建新 UUID，请求体使用 `retry_of`／`regenerate_of` 及可选 `model_id`，由服务端继承结果格式，不把传输失败当作重译。
 
 提交请求、接收并保存译图分别显示本地进度；“同步已暂停”只描述客户端停止同步，不表示后端任务暂停。页面隐藏或断网后停止订阅，回到前台且网络恢复时核实原 UUID；用户主动暂停后由用户恢复。验证使用固定浮层，不占工作台布局；新匿名会话与新翻译分别取得各自 action 的 token，已有任务恢复不重复验证。
 
@@ -46,7 +46,7 @@ sequenceDiagram
 
 - 本地 `targetKey` 为页面上下文与模式的 SHA-256，固定 64 个十六进制字符。这个本地键不进入翻译请求。
 - 每次新的翻译意图生成标准 UUID，公开 `id` 固定 36 字符；发送前把 UUID 与完整业务输入保存到 IndexedDB。账户、内容、模式、语言分别隔离。
-- 同一账户、同一 UUID 永久绑定相同业务输入。重复 PUT 返回原资源；换图、换模式、换语言或改变重试来源返回冲突。任务不携带阅读优先级。
+- 同一账户、同一 UUID 永久绑定相同业务输入。重复 PUT 返回原资源；换图、换模式、换语言、改变显式模型或重试来源返回冲突。任务不携带阅读优先级。
 - 网络失败、刷新、扩展重启或回包丢失均继续使用原 UUID。先 GET 核实；明确未受理时可以重放原 PUT。不得通过生成新 UUID 自动重试状态未知的任务。
 - 多个 UUID 指向相同的本人任务或结果时，服务端复用已有工作，不重复创建计算任务或扣量。删除后的旧 UUID 保留撤销回执，不能使被删除访问复活。
 

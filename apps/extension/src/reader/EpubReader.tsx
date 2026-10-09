@@ -41,7 +41,7 @@ interface Props {
   controlsBlocked?: boolean;
   onOpenShortcuts(): void;
   notify(message: string): void;
-  caps?: Capabilities;
+  caps?: Capabilities; modelSelection?:import('../translation/channels/contracts').ModelSelection;
   channelLabel?: string;
   translationScope?: string;
   onReadingWindow(targets: ReadingTarget[], visible: Page[], immediate?: boolean): void;
@@ -85,7 +85,7 @@ export function EpubReader({
   controlsBlocked = false,
   onOpenShortcuts,
   notify,
-  caps,
+  caps, modelSelection,
   channelLabel,
   translationScope,
   onReadingWindow,
@@ -454,7 +454,7 @@ export function EpubReader({
       {panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
         href={tocHref ?? position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
         : <div className="nc-drawer-content">{panel === 'translation'
-          ? <ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel}
+          ? <ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} modelSelection={modelSelection}
             note={msg('仅翻译 EPUB 内的图片，正文文字保持原文。选择译图后，随读翻译可见图片与最多三张后续图片。')}/>
           : <ReaderSettings settings={settings} setSettings={setSettings} onLayout={layout => setSettings(value => ({...value, layout}))}
             sizing={fixedLayout ? null : <ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}

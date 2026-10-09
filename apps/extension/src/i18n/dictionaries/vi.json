@@ -1,4 +1,11 @@
 {
+  "付费权益": "Quyền truy cập trả phí",
+  "翻译模型": "Mô hình dịch",
+  "自动选择（默认）": "Tự động (mặc định)",
+  "可用": "Khả dụng",
+  "不可用": "Không khả dụng",
+  "更换模型仅影响新任务；已有译图需手动重新翻译。": "Đổi mô hình chỉ áp dụng cho tác vụ mới. Hãy dịch lại thủ công các kết quả hiện có.",
+  "实际模型：{0}": "Mô hình đã dùng: {0}",
   "前往定价页面": "Xem bảng giá",
   "订阅和购买额度请前往定价页面。": "Truy cập trang giá để đăng ký hoặc mua gói trang dịch.",
   "购买额度": "Gói trang dịch",

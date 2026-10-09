@@ -4,24 +4,25 @@ import {msg} from '../i18n/runtime';
 import {fallbackLanguages, type Capabilities, type Settings} from '../types';
 import {LanguageFlag} from '../ui/LanguageFlag';
 import {Select, SelectOption} from '../ui/Select';
+import {TranslationModelPicker} from '../ui/TranslationModelPicker';
+import type {ModelSelection} from '../translation/channels/contracts';
 
-export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, note}: {
+export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, modelSelection, note}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   caps?: Capabilities;
   channelLabel?: string;
+  modelSelection?: ModelSelection;
   note: string;
 }) {
   const languages = caps?.languages ?? fallbackLanguages;
   return <>
     {channelLabel && <p className="nc-muted">{channelLabel}</p>}
-    {languages.length <= 4 ? <ReaderChoice label={msg('目标语言')} value={settings.language}
-      options={languages.map(language => ({...language, icon: <LanguageFlag language={language.id}/>}))}
-      onChange={language => setSettings(value => ({...value, language}))}/>
-      : <label className="field">{msg('目标语言')}<Select aria-label={msg('翻译目标语言')} value={settings.language}
+    <label className="field">{msg('目标语言')}<Select aria-label={msg('翻译目标语言')} value={settings.language}
         onChange={event => setSettings(value => ({...value, language: event.target.value}))}>
         {languages.map(language => <SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}
-      </Select></label>}
+      </Select></label>
+    <TranslationModelPicker selection={modelSelection}/>
     <p className="nc-muted nc-default-mode-note">{note}</p>
   </>;
 }

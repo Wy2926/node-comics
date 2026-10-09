@@ -63,7 +63,7 @@ export async function savedChannelSecretFields(id:string){
   return Object.keys((await readChannelCredentials(id)).secrets);
 }
 export async function selectChannel(id:string){await updateChannelSettings(value=>{if(id!==defaultChannel.id&&!value.profiles.some(p=>p.id===id))throw Error(msg('翻译渠道已移除'));return {...value,activeId:id};});}
-export async function removeChannel(id:string){if(id===defaultChannel.id)throw Error(msg('内置渠道不能移除'));await updateChannelSettings(async value=>{await deleteChannelSecrets(id);return {activeId:value.activeId===id?defaultChannel.id:value.activeId,profiles:value.profiles.filter(p=>p.id!==id)};});}
+export async function removeChannel(id:string){if(id===defaultChannel.id)throw Error(msg('内置渠道不能移除'));await updateChannelSettings(async value=>{await deleteChannelSecrets(id);return {...value,activeId:value.activeId===id?defaultChannel.id:value.activeId,profiles:value.profiles.filter(p=>p.id!==id)};});}
 export async function connectChannel(adapterId:string,name:string,input:ChannelConnectionInput,id?:string):Promise<ChannelProfile>{
   const definition=channelDefinition(adapterId);
   if(!definition.configurable||!definition.connect)throw Error(msg('此渠道无需配置'));

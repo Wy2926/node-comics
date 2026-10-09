@@ -3,15 +3,19 @@ import type {UiLanguage} from './i18n/locales';
 import type {EpubIndex, EpubLocation} from './comics/formats/contracts';
 import type {TranslationResult} from '../../../backend/shared/translation-images/types';
 import type {InputProfile} from '../../../backend/shared/translation-images/limits';
+import type {TranslationModel,TranslationModelChoice} from '../../../backend/shared/translation-models';
+export type {TranslationModel,TranslationModelChoice} from '../../../backend/shared/translation-models';
 export type {TranslationArtifact,TranslationResult} from '../../../backend/shared/translation-images/types';
 export type Mode = 'classic';
 export interface MembershipGift {starts_at:string|null;ends_at:string|null;days:number;state:'pending'|'scheduled'|'active'|'expired'}
 export type JobStatus = 'awaiting_upload' | 'validating_upload' | 'queued' | 'running' | 'succeeded' | 'no_text' | 'failed' | 'cancelled' | 'outcome_unknown' | 'unknown_released';
 /** Local source binding; never substitutes the server's actual input digest. */
-export interface Job {source_image_sha256?:string;input_profile?:InputProfile;}
+export interface Job {source_image_sha256?:string;input_profile?:InputProfile;requested_model_id?:string|null;model?:TranslationModel|null;}
 export interface Job { result?: {key:string;recoverable:boolean}; delivery?:TranslationResult; id: string; mode: Mode; target_language: string; status: JobStatus; phase: string; error?: { code: string; message: string }; quota_pages: number; quota_kind?:QuotaKind; quota_period_id?:string|null; created_at: string; completed_at?: string; version: number; cache_hit: boolean; reused?:boolean; quality_flags?: string[]; result_available?: boolean; result_expired?: boolean; settlement?: 'reserved'|'settled'|'released'|'free'|'included'; cancel_requested?:boolean; image_sha256?:string;  updated_at?:string; }
 export interface TranslationImage {sha256:string;byte_size:number;content_type:string;normalization_version?:1;}
-export type TranslationInput = ({image:TranslationImage;mode:Mode;target_language:string;result_format?:'overlay-tiles-v1'}|{retry_of:string}|{regenerate_of:string});
+export type TranslationInput = ({image:TranslationImage;mode:Mode;target_language:string;result_format?:'overlay-tiles-v1'}|{retry_of:string}|{regenerate_of:string})&{model_id?:string|null};
+export interface TranslationSnapshot {requested_model_id?:string|null;model?:TranslationModel|null;}
+export interface Capabilities {translation_models?:TranslationModelChoice[];}
 export interface TranslationSnapshot {id:string;state:'needs_input'|'queued'|'running'|'succeeded'|'failed'|'needs_attention';mode:Mode;target_language:string;image_sha256?:string;created_at?:string;updated_at?:string;result?:TranslationResult|null;error?:{code:string;message:string}|null;}
 export interface TranslationBatch {items:TranslationSnapshot[];missing_ids:string[];}
 export interface ImageRateLimit {window_seconds:number;limit:number;remaining?:number;retry_after_seconds?:number;}

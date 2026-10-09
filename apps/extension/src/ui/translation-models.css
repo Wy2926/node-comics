@@ -1,0 +1,14 @@
+.nc-model-picker{display:grid;gap:8px;width:100%;min-width:0;margin-block:12px}
+button.nc-model-trigger{width:100%;font-size:var(--text-body)}
+.nc-model-trigger strong{flex:1;min-width:0;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-model-options{display:grid;gap:4px}
+.nc-model-option[data-paid=false]+.nc-model-option[data-paid=true]{border-top:1px solid var(--line);padding-top:4px}
+.nc-model-option>.nc-model-choice{display:grid;width:100%;min-width:0;gap:6px;text-decoration:none}
+.nc-model-choice strong{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-wrap:anywhere;font-weight:600}
+.nc-model-choice strong svg{flex:none;color:var(--accent)}
+.nc-model-choice small,.nc-model-trigger small{font-size:var(--text-caption);line-height:1.5;font-weight:400;color:var(--muted)}
+.nc-model-badges{display:flex;flex-wrap:wrap;gap:6px}
+.nc-model-badges small{padding:1px 6px;border:var(--comic-badge-border);border-radius:var(--comic-badge-radius)}
+.nc-model-choice [data-available=true],.nc-model-trigger [data-available=true]{color:var(--success)}
+.nc-model-choice .nc-model-upgrade{flex:none;color:var(--accent)}
+.nc-model-menu>p[role=alert]{font-size:var(--text-caption);line-height:1.5;margin:8px 9px 4px;color:var(--danger)}

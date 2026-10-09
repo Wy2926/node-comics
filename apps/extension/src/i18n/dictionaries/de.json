@@ -1,4 +1,11 @@
 {
+  "付费权益": "Kostenpflichtiger Zugang",
+  "翻译模型": "Übersetzungsmodell",
+  "自动选择（默认）": "Automatisch (Standard)",
+  "可用": "Verfügbar",
+  "不可用": "Nicht verfügbar",
+  "更换模型仅影响新任务；已有译图需手动重新翻译。": "Ein Modellwechsel gilt nur für neue Aufgaben. Vorhandene Ergebnisse müssen manuell neu übersetzt werden.",
+  "实际模型：{0}": "Verwendetes Modell: {0}",
   "前往定价页面": "Preise ansehen",
   "订阅和购买额度请前往定价页面。": "Abonnements und Seitenpakete finden Sie auf der Preisseite.",
   "购买额度": "Seitenpakete",

@@ -42,7 +42,7 @@ describe('translation request database upgrade',()=>{
     expect(await m.readJobs(f.core.scope,[t.page.imageSha256!])).toEqual([extended]);
     expect(await m.readJobs(f.core.scope,[],[unmapped.id])).toEqual([unmapped]);
     expect(await m.readJobs(other.core.scope,[],[original.id])).toEqual([otherJob]);
-    const db=await request(indexedDB.open(databaseName));expect(db.version).toBe(3);expect([...db.objectStoreNames]).toEqual(['jobs','operations','sync','tombstones']);db.close();
+    const db=await request(indexedDB.open(databaseName));expect(db.version).toBe(4);expect([...db.objectStoreNames]).toEqual(['jobs','operations','sync','tombstones']);expect(db.transaction('operations').objectStore('operations').indexNames.contains('pageIntent')).toBe(true);db.close();
     vi.resetModules();const reopened=await import('../src/translation/channels/adapters/nodelane/store');
     expect(await reopened.readJobs(f.core.scope,[],[original.id])).toEqual([extended]);
     expect((await reopened.readOperation(record.id))?.requestId).toBe(record.requestId);
@@ -197,10 +197,12 @@ describe('bounded translation history access',()=>{
         await m.saveReceipt(record,m.translationJob(record.result,record));
       }
       await m.saveSync({id:f.core.scope});await f.core.init();
-      const observation={operationScans:0,jobQueries:[] as unknown[],syncWrites:0,syncBytes:[] as number[]};
+      const observation={operationScans:0,pageQueries:[] as unknown[],jobQueries:[] as unknown[],syncWrites:0,syncBytes:[] as number[]};
       const getAll=IDBIndex.prototype.getAll,get=IDBObjectStore.prototype.get,put=IDBObjectStore.prototype.put;
       const allSpy=vi.spyOn(IDBIndex.prototype,'getAll').mockImplementation(function(this:IDBIndex,...args:Parameters<IDBIndex['getAll']>){
-        if(this.objectStore.name==='operations')observation.operationScans++;
+        if(this.objectStore.name==='operations'){
+          if(this.name==='pageIntent')observation.pageQueries.push(args[0]);else observation.operationScans++;
+        }
         if(this.objectStore.name==='jobs')observation.jobQueries.push(args[0]);
         return getAll.apply(this,args);
       });
@@ -214,6 +216,7 @@ describe('bounded translation history access',()=>{
       });
       await f.core.submit([m.target(1000)]);allSpy.mockRestore();getSpy.mockRestore();putSpy.mockRestore();
       expect(observation.operationScans).toBe(0);expect(observation.syncWrites).toBe(0);
+      expect(observation.pageQueries).toEqual(Array(2).fill([f.core.scope,'book','page-1000','classic','zh-Hans']));
       expect(observation.jobQueries).toEqual([[f.core.scope,m.target(1000).page.imageSha256]]);
       expect(f.core.records).toHaveLength(1);expect((await m.readJobs(f.core.scope,[m.target(0).page.imageSha256!]))).toHaveLength(1);
       observations.push(observation);

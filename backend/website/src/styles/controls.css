@@ -151,7 +151,7 @@
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled) :is(strong, small, .annual-badge),
 .billing-cycle:disabled label:not(.price-card .billing-cycle-card) :is(strong, small, .annual-badge) { color: var(--comic-control-disabled-ink); }
 
-.translation-settings select {
+:is(.translation-settings select, .translation-model-picker summary) {
   min-height: var(--comic-control-height);
   padding: 10px 32px 10px 12px;
   border: var(--comic-input-border);
@@ -162,7 +162,8 @@
   font-size: var(--comic-control-font-size);
   transition: border-color var(--comic-control-duration), background var(--comic-control-duration);
 }
-.translation-settings select:focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
+.translation-model-picker summary { padding-inline-end: 14px; }
+:is(.translation-settings select, .translation-model-picker summary):focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
 .translation-settings select:disabled { background: var(--comic-control-disabled-bg); color: var(--comic-control-disabled-ink); border-color: var(--comic-control-disabled-border); cursor: not-allowed; }
 
 .button > svg,
@@ -271,12 +272,12 @@
 /* Compact cadence control shared by static and hydrated pricing. */
 .billing-cycle-picker { display: grid; justify-items: center; gap: 10px; min-width: 0; }
 .billing-cycle-saving { min-height: 2.8em; max-width: 100%; margin: 0; color: var(--accent); font-size: .72rem; line-height: 1.4; text-align: center; }
-.billing-cycle-saving .annual-badge { display: inline-block; padding: 4px 10px; border: 1px solid #29486a; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: inherit; font-weight: 500; line-height: inherit; }
+.billing-cycle-saving .annual-badge { display: inline-block; padding: 4px 10px; border: 1px solid #29486a; border-radius: var(--comic-badge-radius); background: var(--accent-soft); color: var(--accent); font-size: inherit; font-weight: 500; line-height: inherit; }
 .price-value { display: inline-block; white-space: nowrap; font: inherit; letter-spacing: inherit; }
 .price-value .price-currency { display: inline-block; margin-inline: .12em; color: var(--muted); font-size: max(.34em, .68rem); font-weight: 500; letter-spacing: 0; }
-.billing-cycle.billing-cycle-segmented { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 4px; padding: 4px; margin: 0; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.billing-cycle.billing-cycle-segmented { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 4px; padding: 4px; margin: 0; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface); }
 .billing-cycle-segmented legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.billing-cycle.billing-cycle-segmented label.billing-cycle-card { display: flex; align-items: center; justify-content: center; flex-direction: row; flex: 1; min-width: 0; min-height: 42px; padding: 8px 23px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); box-shadow: none; transform: none; }
+.billing-cycle.billing-cycle-segmented label.billing-cycle-card { display: flex; align-items: center; justify-content: center; flex-direction: row; flex: 1; min-width: 0; min-height: 42px; padding: 8px 23px; border: 0; border-radius: var(--comic-control-radius); background: transparent; color: var(--muted); box-shadow: none; transform: none; }
 .billing-cycle.billing-cycle-segmented label.billing-cycle-card strong { font-size: .84rem; font-weight: 500; }
 .billing-cycle.billing-cycle-segmented label.billing-cycle-card[data-selected='true'] { background: var(--accent-soft); color: var(--ink); box-shadow: inset 0 0 0 1px #3989e8; }
 .billing-cycle.billing-cycle-segmented label.billing-cycle-card input { position: absolute; inset: auto; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

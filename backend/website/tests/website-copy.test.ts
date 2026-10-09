@@ -77,10 +77,10 @@ test('all website locales omit the retired image feature from prose, metadata an
 
 test('the workbench only starts standard translation and preserves existing result recovery', () => {
   const source = readFileSync(new URL('../src/components/TranslationWorkbench.tsx', import.meta.url), 'utf8');
-  assert.equal(/setMode|\bt\.mode|\bt\.redraw|value="redraw"/.test(source), false);
+  assert.equal(/\bsetMode\b|\bt\.mode|\bt\.redraw|value="redraw"/.test(source), false);
   assert.match(source, /meta\.mode = 'classic'/);
   assert.match(source, /if \(!snapshot\)\s*\{\s*\/\/[^\n]*\n\s*if \(meta\.mode !== 'classic'\) throw/);
-  assert.match(source, /async function again\(meta: RecordMeta\)\s*\{\s*if \(meta\.mode !== 'classic'/);
+  assert.match(source, /async function again\(meta: RecordMeta,\s*regenerate\s*=\s*false\)\s*\{\s*if \(meta\.mode !== 'classic'/);
   assert.match(source, /row\.mode === 'classic' && row\.state === 'failed'/);
   assert.match(source, /const blob =[\s\S]*?await readImages\(meta\.id\)/);
   assert.match(source, /translationArchive\(records, readResult\)/);

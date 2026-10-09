@@ -206,21 +206,22 @@ def my_entitlements(user: User = Depends(identity), db: Session = Depends(get_db
 @app.get("/v1/capabilities", response_model=CapabilitiesResponse)
 def capabilities(db: Session = Depends(get_db), user: User | None = Depends(optional_identity)):
     cfg = settings()
-    from .classic_config import enabled as classic_enabled
+    from .translation_selection import model_catalog
     entitlements = entitlements_json(db, user) if user else None
+    models, classic_enabled = model_catalog(db, user, entitlements['service_plan'] if entitlements else 'guest')
     from datetime import timedelta
     from .models import now
     from .queue_models import ComputeNode
     tiled = db.scalar(select(ComputeNode.id).where(ComputeNode.enabled.is_(True),
         ComputeNode.heartbeat_at > now() - timedelta(seconds=cfg.cluster_node_timeout_seconds),
         ComputeNode.runtime_report['overlay_tiles'].as_boolean().is_(True)).limit(1))
-    return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled(db,
-                plan_id=entitlements['service_plan'] if entitlements else 'guest'), "languages": list(LANGUAGES)}],
+    return {"modes": [{"id": "classic", "label": "常规翻译", "enabled": classic_enabled, "languages": list(LANGUAGES)}],
             "languages": [{"id": key, "label": value} for key, value in LANGUAGES.items()],
             "representations": ['overlay-v1', 'full-image-v1', 'original'] + (['overlay-tiles-v1'] if tiled else []),
             # Retain the numeric field for existing clients; area is derived from the sole dimension ceiling.
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_dimension ** 2, "max_dimension": cfg.max_dimension, "max_translation_ids": 32},
             "entitlements": entitlements,
+            "translation_models": models,
             "unknown_release_seconds": cfg.unknown_release_seconds}
 
 

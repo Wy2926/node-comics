@@ -171,6 +171,17 @@ class LanguageCapability(BaseModel):
     label: str
 
 
+class TranslationModelResponse(BaseModel):
+    id: str
+    name: str
+
+
+class TranslationModelCapability(TranslationModelResponse):
+    requires_paid: bool
+    available: bool
+    unavailable_reason: Literal['not_allowed', 'quota_exhausted', 'unavailable'] | None = None
+
+
 class CapabilitiesResponse(BaseModel):
     result_protocol: Literal["overlay-v1"] = "overlay-v1"
     representations: list[str] = Field(default_factory=lambda: ["overlay-v1", "full-image-v1", "original"])
@@ -179,6 +190,7 @@ class CapabilitiesResponse(BaseModel):
     limits: dict[str, int]
     entitlements: EntitlementsResponse | None
     unknown_release_seconds: int
+    translation_models: list[TranslationModelCapability] = Field(default_factory=list)
 
 
 class TranslationArtifactResponse(BaseModel):
@@ -207,6 +219,8 @@ class TranslationResponse(BaseModel):
     execution_resolved: bool = False
     mode: Literal['classic']
     target_language: str
+    requested_model_id: str | None = None
+    model: TranslationModelResponse | None = None
     image_sha256: str
     input_expires_at: str | None
     result: TranslationResultResponse | None

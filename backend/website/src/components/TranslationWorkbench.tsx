@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import ImageDropzone from './ImageDropzone';
 import Turnstile from './Turnstile';
+import TranslationModelPicker from './TranslationModelPicker';
+import {modelCopy} from '../i18n/translation-models';
+import {selectedModelAvailable} from '../../../shared/translation-models';
 import { translationError } from '../i18n/translation-error';
 import type { TranslationCopy } from '../i18n/translate';
 import { translationCacheCopy } from '../i18n/translation-cache';
@@ -29,6 +32,7 @@ import {
   type Account,
   type Guest,
   type Capabilities,
+  translationBody,
 } from '../lib/translation-api';
 import { pixels } from '../lib/translation-pixels';
 import { saveDownload, translationArchive, translationFilename } from '../lib/translation-download';
@@ -60,6 +64,21 @@ const delay = (ms: number, signal: AbortSignal) =>
 
 export default function TranslationWorkbench({ locale, copy: t }: { locale: Locale; copy: TranslationCopy }) {
   const cacheCopy = translationCacheCopy[locale];
+  const modelsCopy = modelCopy[locale];
+  const [modelId,setModelId] = useState<string>();
+  const modelPreferenceKey=(identity?:Account)=>'nc-translation-model:'+ (identity?'user:'+identity.id:'guest');
+  function readModelPreference(identity?:Account){try{return localStorage.getItem(modelPreferenceKey(identity))||undefined;}catch{return undefined;}}
+  function chooseModel(value?:string){
+    const key=modelPreferenceKey(isGuestScope?undefined:account);
+    try{if(value)localStorage.setItem(key,value);else localStorage.removeItem(key);}catch{/* Choice still applies to this batch. */}
+    setModelId(value);
+  }
+  function errorText(code:string){
+    if(code==='TRANSLATION_MODEL_NOT_ALLOWED')return modelsCopy.not_allowed;
+    if(code==='TRANSLATION_MODEL_UNAVAILABLE'||code==='TRANSLATION_MODEL_INVALID')return modelsCopy.temporary;
+    if(code==='DAILY_QUOTA_EXHAUSTED')return modelsCopy.quota_exhausted;
+    return translationError(code,t);
+  }
   const [rows, setRows] = useState<RecordMeta[]>([]),
     [account, setAccount] = useState<Account>(),
     [guest, setGuest] = useState<Guest>(),
@@ -91,6 +110,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   const verificationDialog = useRef<HTMLDivElement>(null);
   const guestRef = useRef<Guest | undefined>(undefined);
   const scopes = useRef<string[]>([]);
+  const scopeVersion = useRef(0);
   const [hasGuestHistory, setHasGuestHistory] = useState(false);
   const [usedBytes, setUsedBytes] = useState(0);
   const isGuestScope = showGuest || !account;
@@ -119,7 +139,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         : error instanceof Error
           ? error.message
           : '';
-    setError(translationError(code, t));
+    setError(errorText(code));
   }
   async function commit(
     meta: RecordMeta,
@@ -158,6 +178,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         setGuest(visitor);
         guestRef.current = visitor;
         setCaps(capabilities);
+        setModelId(readModelPreference(identity));
         setReady(true);
       } catch (error) {
         if (!gone()) fail(error);
@@ -165,14 +186,16 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     };
     void load();
     const unsubscribe = subscribeAuth(() => {
+      scopeVersion.current++;
       controller.current?.abort(Error('AUTH_REQUIRED'));
       resumeOnReturn.current = false;
       verification.current?.reject(Error('AUTH_REQUIRED'));
-      setAccount(undefined); setCaps(undefined); setReady(false); setRows([]); setShowGuest(false);
+      setAccount(undefined); setCaps(undefined); setModelId(undefined); setReady(false); setRows([]); setShowGuest(false);
       void load();
     });
     return () => {
       generation++;
+      scopeVersion.current++;
       unsubscribe();
       resumeOnReturn.current = false;
       resumePending.current = () => undefined;
@@ -180,6 +203,17 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       verification.current?.reject(Error('NETWORK_ERROR'));
     };
   }, []);
+  useEffect(()=>{
+    if(!ready)return;
+    const abort=new AbortController();
+    const refreshModels=()=>{
+      if(running.current||document.hidden)return;
+      void json<Capabilities>('/v1/capabilities',{signal:abort.signal},isGuestScope?undefined:account)
+        .then(value=>{if(!abort.signal.aborted)setCaps(value);}).catch(()=>undefined);
+    };
+    window.addEventListener('focus',refreshModels);
+    return ()=>{abort.abort();window.removeEventListener('focus',refreshModels);};
+  },[ready,account,isGuestScope]);
   useEffect(() => {
     if (ready) {
       const pending = rows.filter(
@@ -236,12 +270,20 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     controller.current?.abort(Error('USER_PAUSED'));
   }
   async function changeHistory(value: boolean) {
-    setShowGuest(value);
-    scopes.current = [
+    if (running.current) return;
+    const version = ++scopeVersion.current;
+    const identity = value ? undefined : account;
+    const nextScopes = [
       draftScope(),
       ...(value || !account ? ['guest:*'] : ['user:' + account.id]),
     ];
-    await refresh();
+    const [capabilities, found] = await Promise.all([
+      json<Capabilities>('/v1/capabilities', {}, identity), listRecords(nextScopes),
+    ]);
+    if (version !== scopeVersion.current || running.current) return;
+    scopes.current = nextScopes;
+    setShowGuest(value); setCaps(capabilities); setModelId(readModelPreference(identity));
+    setRows(found);
   }
   function challenge(action: string, signal: AbortSignal): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -271,6 +313,10 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   }
   async function run(candidates: RecordMeta[]) {
     if (!candidates.length || running.current || removing.current || importing || !caps || !ready) return;
+    const batchModel=modelId,batchLanguage=language;
+    if(candidates.some(row=>!row.requestId)&&!selectedModelAvailable(caps.translation_models,batchModel)){
+      setError(modelsCopy.not_allowed);return;
+    }
     runningIds.current = candidates.map((row) => row.id);
     if (document.hidden || !navigator.onLine) {
       resumeOnReturn.current = candidates.some((row) => !!row.requestId);
@@ -311,7 +357,8 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           throw Error('GUEST_SESSION_EXPIRED');
         if (!meta.requestId) {
           meta.mode = 'classic';
-          meta.language = language;
+          meta.language = batchLanguage;
+          meta.modelId = batchModel;
         }
         const allowTiles = meta.requestId
           ? meta.resultFormat === 'overlay-tiles-v1'
@@ -414,19 +461,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                 'Content-Type': 'application/json',
                 ...(token ? { 'X-Turnstile-Token': token } : {}),
               },
-              body: JSON.stringify(
-                meta.intent ?? {
-                  image: {
-                    sha256: meta.sha256,
-                    byte_size: meta.inputBytes,
-                    content_type: meta.mime,
-                    normalization_version: 1,
-                  },
-                  mode: meta.mode,
-                  target_language: meta.language,
-                  ...(meta.resultFormat ? { result_format: meta.resultFormat } : {}),
-                },
-              ),
+              body: JSON.stringify(translationBody(meta)),
               signal: abort.signal,
             },
             useAccount,
@@ -561,6 +596,10 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         }
       }
     } catch (error) {
+      if(error instanceof TranslationError&&['TRANSLATION_MODEL_NOT_ALLOWED','TRANSLATION_MODEL_INVALID','TRANSLATION_MODEL_UNAVAILABLE','DAILY_QUOTA_EXHAUSTED'].includes(error.code)){
+        const fresh=await json<Capabilities>('/v1/capabilities',{signal:abort.signal},isGuestScope?undefined:account).catch(()=>undefined);
+        if(fresh&&!abort.signal.aborted)setCaps(fresh);
+      }
       if (currentMeta &&
           error instanceof Error && error.message !== 'RESULT_SAVE_FAILED' &&
           active.has(currentMeta.state)) {
@@ -581,8 +620,9 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
       resumePending.current();
     }
   }
-  async function again(meta: RecordMeta) {
-    if (meta.mode !== 'classic' || meta.state !== 'failed') return;
+  async function again(meta: RecordMeta,regenerate=false) {
+    if (meta.mode !== 'classic' || (regenerate?meta.state!=='succeeded':meta.state!=='failed')) return;
+    if(regenerate&&!selectedModelAvailable(caps?.translation_models,modelId)){setError(modelsCopy.not_allowed);return;}
     if (!meta.requestId) {
       await run([meta]);
       return;
@@ -599,7 +639,8 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           updated: Date.now(),
           state: 'submitting',
           requestId: crypto.randomUUID(),
-          intent: { retry_of: meta.requestId },
+          modelId:regenerate?modelId:meta.modelId,
+          intent: regenerate?{regenerate_of:meta.requestId}:{ retry_of: meta.requestId },
           snapshot: undefined,
           error: undefined,
         };
@@ -725,6 +766,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
             ))}
           </select>
         </label>
+        <TranslationModelPicker models={caps?.translation_models} value={modelId} onChange={chooseModel} copy={modelsCopy} upgradeUrl={localPath('/pricing/',locale)} disabled={!ready}/>
         <button
           className="button"
           disabled={
@@ -732,6 +774,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
             clearing || importing ||
             busy ||
             !language ||
+            !selectedModelAvailable(caps?.translation_models,modelId) ||
             (isGuestScope && !guest?.enabled) ||
             !displayed.some(
               (row) => row.state === 'draft' || row.state === 'preparing',
@@ -759,6 +802,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           </button>
         )}
         </div>
+        <p className="translation-note">{modelsCopy.hint}</p>
       </section>
       {check && (
         <div className="translation-verification-overlay">
@@ -827,15 +871,17 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                     <small>
                       <span className="record-state" data-state={row.state}>{t[row.state as keyof typeof t] ?? t.paused}</span>
                       {row.state !== 'draft' && <span>{row.language}</span>}
+                      {row.state !== 'draft' && <span>{row.snapshot?.model?.name??(row.modelId?caps?.translation_models?.find(model=>model.id===row.modelId)?.name??row.modelId:modelsCopy.automatic)}</span>}
                       {row.snapshot?.result?.kind === 'no_text' && <span>{t.noText}</span>}
                       {row.snapshot?.result?.kind === 'partial' && <span>{t.partial}</span>}
                     </small>
-                    {row.error && <p className="translation-error">{translationError(row.error, t)}</p>}
+                    {row.error && <p className="translation-error">{errorText(row.error)}</p>}
                   </div>
                   <div className="record-actions">
                     {(row.state === 'succeeded' || volatile?.id === row.id) && (
                       <button className="button secondary" disabled={downloading || clearing} onClick={() => void download([row])}>{t.download}</button>
                     )}
+                    {row.state==='succeeded'&&<button className="button secondary" disabled={busy||importing||clearing||!selectedModelAvailable(caps?.translation_models,modelId)} onClick={()=>void again(row,true)}>{modelsCopy.retranslate}</button>}
                     {row.requestId && !['failed', 'succeeded'].includes(row.state) && (
                       <button className="button secondary" disabled={busy || importing || clearing} onClick={() => void run([row])}>{t.resume}</button>
                     )}

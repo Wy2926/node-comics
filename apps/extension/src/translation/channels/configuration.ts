@@ -3,13 +3,14 @@ import type {ChannelProfile} from './contracts';
 
 export const channelSettingsKey='nc-translation-channels';
 export const defaultChannel:ChannelProfile={id:'nodelane',adapterId:'nodelane',name:'NodeLane',revision:1,settings:{}};
-export interface ChannelSettings {activeId:string;profiles:ChannelProfile[];}
+export interface ChannelSettings {activeId:string;profiles:ChannelProfile[];modelPreferences?:Record<string,string>;}
 const defaults=():ChannelSettings=>({activeId:defaultChannel.id,profiles:[]});
 function normalize(value:unknown):ChannelSettings {
   if(!value||typeof value!=='object')return defaults();
   const input=value as ChannelSettings;
   const profiles=Array.isArray(input.profiles)?input.profiles.filter(p=>p&&typeof p.id==='string'&&p.id!==defaultChannel.id&&typeof p.adapterId==='string'&&typeof p.name==='string'&&Number.isSafeInteger(p.revision)&&p.revision>0&&p.settings&&Object.values(p.settings).every(v=>typeof v==='string')):[];
-  return {activeId:input.activeId===defaultChannel.id||profiles.some(p=>p.id===input.activeId)?input.activeId:defaultChannel.id,profiles};
+  const modelPreferences=input.modelPreferences&&typeof input.modelPreferences==='object'?Object.fromEntries(Object.entries(input.modelPreferences).filter(([,id])=>typeof id==='string'&&id.length>0&&id.length<=36)):undefined;
+  return {activeId:input.activeId===defaultChannel.id||profiles.some(p=>p.id===input.activeId)?input.activeId:defaultChannel.id,profiles,...(modelPreferences?{modelPreferences}:{})};
 }
 export async function readChannelSettings():Promise<ChannelSettings>{
   if(typeof chrome!=='undefined'&&chrome.storage?.local)return normalize((await chrome.storage.local.get(channelSettingsKey))[channelSettingsKey]);

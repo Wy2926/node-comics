@@ -19,14 +19,14 @@ def active_benefits(db, owner_id, at=None):
         BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at)))
 
 
-def first_purchase(db, owner_id, at):
+def first_purchase(db, owner_id, at, *, service_plans=None):
     """One available page bucket and its original immutable service quote.
 
     Depleted permanent purchases are deliberately outside the partial-index
     selector. No purchase history or account-wide balance is loaded at admission.
     """
     from .entitlement_models import QuotaPeriod
-    return db.execute(select(QuotaPeriod, BillingPlanRevision).join(BillingOrder,
+    query = select(QuotaPeriod, BillingPlanRevision).join(BillingOrder,
         BillingOrder.id == QuotaPeriod.billing_order_id).join(BillingPrice,
         BillingPrice.id == BillingOrder.price_id).join(BillingPlanRevision,
         BillingPlanRevision.id == BillingPrice.plan_revision_id).where(
@@ -34,13 +34,15 @@ def first_purchase(db, owner_id, at):
             QuotaPeriod.mode == 'classic', QuotaPeriod.source == 'purchase',
             QuotaPeriod.revoked_at.is_(None), QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved,
             QuotaPeriod.starts_at <= at, or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at))
-        .order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.starts_at, QuotaPeriod.id).limit(1)).first()
+    if service_plans is not None:
+        query = query.where(BillingPlanRevision.service_plan_id.in_(service_plans))
+    return db.execute(query.order_by(QuotaPeriod.ends_at.asc().nulls_last(), QuotaPeriod.starts_at, QuotaPeriod.id).limit(1)).first()
 
 
-def first_subscription(db, owner_id, at):
+def first_subscription(db, owner_id, at, *, service_plans=None):
     """Choose a spendable monthly bucket with the service that issued it."""
     from .entitlement_models import QuotaPeriod
-    return db.execute(select(QuotaPeriod, BillingPlanRevision).join(BillingTerm,
+    query = select(QuotaPeriod, BillingPlanRevision).join(BillingTerm,
         BillingTerm.id == QuotaPeriod.billing_term_id).join(BillingPrice,
         BillingPrice.id == BillingTerm.price_id).join(BillingPlanRevision,
         BillingPlanRevision.id == BillingPrice.plan_revision_id).where(
@@ -50,7 +52,9 @@ def first_subscription(db, owner_id, at):
             BillingTerm.revoked_at.is_(None), BillingTerm.starts_at <= at, BillingTerm.ends_at > at,
             QuotaPeriod.starts_at <= at, QuotaPeriod.ends_at > at,
             QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved)
-        .order_by(QuotaPeriod.ends_at, QuotaPeriod.starts_at, QuotaPeriod.id).limit(1)).first()
+    if service_plans is not None:
+        query = query.where(func.coalesce(BillingPlanRevision.service_plan_id, BillingPlanRevision.plan_id).in_(service_plans))
+    return db.execute(query.order_by(QuotaPeriod.ends_at, QuotaPeriod.starts_at, QuotaPeriod.id).limit(1)).first()
 
 
 def plan_expression(at):
