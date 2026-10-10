@@ -25,7 +25,7 @@ export function DiscoveryPage({active, translate, renderSearch, onSearchSites}: 
   const language = useUiLocale();
   const [translator] = useState(() => new TextTranslationSession(createTextTranslationAdapters()[0]));
   useEffect(() => () => translator.dispose(), [translator]);
-  useEffect(() => {if (!active || !translate) translator.cancel();}, [active, translate, translator]);
+  useEffect(() => {if (!active) translator.cancel();}, [active, translator]);
   const scroll = useRef(0);
   const loadMore = useRef<HTMLDivElement>(null);
   useEffect(() => {void session.search(); return () => session.dispose();}, [session]);

@@ -4,13 +4,13 @@ import {createRequire} from 'node:module';
 import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-const root = process.cwd(), live = process.argv.includes('--live'), textOnly = process.argv.includes('--text-only');
-const output = path.join(root, 'artifacts/discovery');
+const root = process.cwd(), live = process.argv.includes('--live'), textOnly = process.argv.includes('--text-only'), detailOnly = process.argv.includes('--detail-only');
+const output = process.env.DISCOVERY_OUTPUT || path.join(root, 'artifacts/discovery');
 await mkdir(output, {recursive: true});
 const out = await mkdtemp(path.join(output, live ? 'live-' : 'fixture-'));
 const extension = path.join(out, 'extension');
 await cp(path.join(root, 'apps/extension/.output/chrome-mv3'), extension, {recursive: true});
-if (!live && !textOnly) {
+if (!live && !textOnly && !detailOnly) {
   const source = path.join(root, 'apps/extension/src').replaceAll('\\', '/');
   const probe = path.join(extension, 'probe.js');
   await writeFile(probe, `export {catalogHtml,readerHtml} from '${source}/sources/sites/guazimanhua/tests/fixtures.ts';
@@ -25,11 +25,12 @@ const context = await chromium.launchPersistentContext(path.join(out, 'profile')
     ...live ? [] : ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']],
 });
 context.setDefaultTimeout(20_000);
-await context.addInitScript(() => {
+await context.addInitScript(version => {
+  if (location.protocol === 'chrome-extension:') localStorage.setItem('nc-release-notes-version', version);
   if (location.protocol === 'chrome-extension:' && !localStorage.getItem('nc-settings')) {
     localStorage.setItem('nc-settings', JSON.stringify({uiLanguage: 'zh-CN', appearance: 'light', language: 'en', layout: 'single', fit: 'window'}));
   }
-});
+}, JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8')).version);
 const checks = [], errors = [], requests = [], sourceRequests = [];
 const textRequests = [];
 let textActive = 0, textPeak = 0, textFail = false, textDelay = 200;
@@ -37,7 +38,8 @@ let descriptionGate, releaseDescription;
 const check = name => {checks.push(name); console.log('PASS ' + name);};
 context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
 const image = await readFile(path.join(root, 'samples/starlight-bookshop.png'));
-const media = id => ({id, title: {native: `星光书店 ${id}`, english: `Starlight Bookshop ${id}`, romaji: `Hoshi ${id}`}, genres: ['Fantasy', 'Drama'], status: 'RELEASING', format: id === 2 ? 'ONE_SHOT' : 'MANGA', averageScore: 88, startDate: {year: 2026}, coverImage: {large: 'https://s4.anilist.co/fixture.png'}});
+const longTitle = '穿越到星光书店之后与异世界伙伴一起寻找失落故事的漫长冒险';
+const media = id => ({id, title: {native: detailOnly ? longTitle + ` ${id}` : `星光书店 ${id}`, english: `Starlight Bookshop ${id}`, romaji: `Hoshi ${id}`}, genres: ['Fantasy', 'Drama'], status: 'RELEASING', format: id === 2 ? 'ONE_SHOT' : 'MANGA', averageScore: 88, startDate: {year: detailOnly && id === 2 ? null : 2026}, coverImage: {large: 'https://s4.anilist.co/fixture.png'}});
 let page2Fail = true, rateLimit = false, unavailable = false, detailFail = false, slowImport = false, sourceItem = 123, catalog = '', reader = '';
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 await context.route(/https?:\/\//, async route => {
@@ -65,7 +67,7 @@ await context.route(/https?:\/\//, async route => {
     if (unavailable) return route.fulfill({status: 503, json: {errors: [{message: 'Fixture offline'}]}});
     if (body.variables.id) {
       if (detailFail) return route.fulfill({status: 503, body: 'Unavailable'});
-      return route.fulfill({json: {data: {Media: {...media(body.variables.id), synonyms: ['星光书店'], description: 'A bookshop between worlds.\n'.repeat(15), staff: {edges: [{role: 'Story & Art', node: {name: {full: 'Fixture author'}}}]}}}}});
+      return route.fulfill({json: {data: {Media: {...media(body.variables.id), synonyms: detailOnly ? Array.from({length: 16}, (_, index) => `${longTitle} ${index}`) : ['星光书店'], description: 'A bookshop between worlds.\n'.repeat(detailOnly ? 60 : 15), staff: {edges: [{role: 'Story & Art', node: {name: {full: 'Fixture author'}}}]}}}}});
     }
     if (body.variables.search === 'slow') await pause(600);
     if (body.variables.page === 2 && page2Fail) {page2Fail = false; return route.fulfill({status: 503, body: 'Offline'});}
@@ -104,7 +106,7 @@ async function setTextEnabled(enabled) {
   await settingsPage.waitForFunction(enabled => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === enabled, enabled);
   await page.waitForFunction(enabled => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === enabled, enabled);
   await page.bringToFront();
-  if (!enabled) await page.waitForFunction(() => !document.querySelector('.nc-discovery-text-status'));
+  if (!enabled) await page.waitForFunction(() => !document.querySelector('.nc-discovery-card-entry .nc-discovery-text-status'));
 }
 const settleUi = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const setTextScale = async scale => {
@@ -186,7 +188,127 @@ try {
     return count.left >= rankings.right && count.top < rankings.bottom;
   }), true);
   assert.equal(await page.locator('.nc-discovery-controls').getByText('AniList', {exact: true}).count(), 0);
-  if (live) {
+  if (detailOnly) {
+    await cards.first().click();
+    await dialog.getByRole('button', {name: '展开简介', exact: true}).waitFor();
+    const titleTools = dialog.locator('.nc-discovery-detail-identity .nc-discovery-text-status');
+    const descriptionTools = dialog.locator('.nc-discovery-description-controls');
+    assert.equal(await titleTools.getByRole('button', {name: '翻译', exact: true}).count(), 1, 'Settings-off must retain manual title translation');
+    assert.equal(await descriptionTools.getByRole('button', {name: '翻译', exact: true}).count(), 1, 'Settings-off must retain manual description translation');
+    assert.equal(textRequests.length, 0, 'Opening details with auto translation off must not request text');
+    // A failed attempt in a previous language visit must not swallow an explicit new request.
+    textFail = true;
+    await titleTools.getByRole('button', {name: '翻译', exact: true}).click();
+    await titleTools.getByText('文字翻译失败', {exact: true}).waitFor();
+    assert.equal(textRequests.length, 1);
+    for (const uiLanguage of ['fr', 'zh-CN']) {
+      await page.evaluate(uiLanguage => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, uiLanguage);
+      await page.waitForFunction(language => document.documentElement.lang === language, uiLanguage);
+    }
+    assert.equal(textRequests.length, 1, 'Language changes with automatic translation off must not issue requests');
+    textFail = false;
+    await titleTools.getByRole('button', {name: '翻译', exact: true}).click();
+    await pause(500);
+    assert.equal(textRequests.length, 2, 'Manual translation after a failed language round trip must issue a fresh request');
+    await titleTools.getByRole('button', {name: '查看原文', exact: true}).waitFor();
+    assert((await dialog.locator('h2').innerText()).startsWith('译文 zh-CN'));
+    assert.deepEqual(textRequests.map(row => row.kind), ['title', 'title'], 'A manual title request must not also translate the description or cards');
+    await descriptionTools.getByRole('button', {name: '翻译', exact: true}).click();
+    await descriptionTools.getByRole('button', {name: '查看原文', exact: true}).waitFor();
+    assert.deepEqual(textRequests.map(row => row.kind), ['title', 'title', 'description']);
+    for (const tools of [titleTools, descriptionTools]) {
+      await tools.getByRole('button', {name: '查看原文', exact: true}).click();
+      await tools.getByRole('button', {name: '查看译文', exact: true}).click();
+    }
+    assert.equal(textRequests.length, 3, 'Original/translated toggles must reuse the completed result');
+    check('Settings-off retains independent manual title/description translation and cached original toggles');
+    for (const width of [1560, 1280, 700, 390, 320]) {
+      await page.setViewportSize({width, height: width >= 1280 ? 1120 : 740});
+      await setTextScale(1.25);
+      await dialog.locator('h2').scrollIntoViewIfNeeded(); await settleUi();
+      const heading = await dialog.locator('.nc-discovery-detail-heading').boundingBox(), score = await dialog.locator('.nc-discovery-detail-rating').boundingBox();
+      assert(Math.abs(score.y - heading.y) < 2 && Math.abs(score.x + score.width - heading.x - heading.width) < 2, `Score must remain at the heading's top right at ${width}px`);
+      assert.equal(await dialog.locator('.nc-discovery-detail').evaluate(element => element.scrollWidth <= element.clientWidth + 1), true);
+      if (width <= 700) {
+        const titleAction = await titleTools.boundingBox(), year = await dialog.locator('time').boundingBox();
+        assert(titleAction.x >= year.x + year.width && titleAction.y < year.y + year.height && titleAction.y + titleAction.height > year.y, 'Mobile title translation action must sit beside the actual year');
+      }
+      if (width === 390 || width === 1560) await page.screenshot({path: path.join(out, `detail-heading-${width}.png`)});
+      const footerPosition = () => dialog.evaluate(element => element.querySelector('.nc-discovery-detail-footer').getBoundingClientRect().top + element.querySelector('.nc-discovery-detail-copy').scrollTop + element.querySelector('.nc-discovery-detail').scrollTop);
+      const before = await footerPosition(), beforeBounds = await dialog.locator('.nc-discovery-detail-footer').boundingBox();
+      await descriptionTools.getByRole('button', {name: '展开简介', exact: true}).click();
+      await dialog.locator('.nc-discovery-aliases summary').click();
+      const bounds = await dialog.evaluate(element => {
+        const box = selector => {const node = element.querySelector(selector), rect = node.getBoundingClientRect(); return {top: rect.top, bottom: rect.bottom, height: rect.height};};
+        return {description: box('.nc-discovery-description'), aliases: box('.nc-discovery-aliases'), body: box('.nc-discovery-detail-body'), footer: box('.nc-discovery-detail-footer')};
+      });
+      if (width <= 700) {
+        assert(bounds.aliases.top >= bounds.description.bottom - 1 && bounds.footer.top >= bounds.aliases.bottom - 1, `Expanded content must not overlap aliases or footer at ${width}px`);
+        assert(bounds.body.height > 1500 && await footerPosition() > before + 1000, `Mobile long content must grow naturally and push the footer down at ${width}px: ${JSON.stringify(bounds)}`);
+      } else {
+        assert.deepEqual(await dialog.locator('.nc-discovery-detail-footer').boundingBox(), beforeBounds, 'Desktop footer stays fixed while only description/aliases scroll');
+        assert(await dialog.locator('.nc-discovery-detail-body').evaluate(element => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === 'auto'));
+      }
+      await dialog.getByRole('button', {name: '查找阅读来源', exact: true}).scrollIntoViewIfNeeded();
+      const footer = await dialog.locator('.nc-discovery-detail-footer').boundingBox(), viewport = await dialog.boundingBox();
+      assert(footer.y >= viewport.y && footer.y < viewport.y + viewport.height, 'Footer must be reachable by scrolling');
+      if (width === 390 || width === 1560) await page.screenshot({path: path.join(out, `detail-expanded-footer-${width}.png`)});
+      const scrollBefore = await dialog.evaluate(element => [...element.querySelectorAll('*')].filter(node => node.scrollTop > 0).map(node => ({className: node.className, top: node.scrollTop})));
+      await dialog.getByRole('button', {name: '查找阅读来源', exact: true}).click();
+      assert.equal(await dialog.getByRole('textbox', {name: '搜索名称', exact: true}).inputValue(), longTitle + ' 1');
+      await dialog.getByRole('button', {name: '返回作品详情', exact: true}).click();
+      assert.deepEqual(await dialog.evaluate(element => [...element.querySelectorAll('*')].filter(node => node.scrollTop > 0).map(node => ({className: node.className, top: node.scrollTop}))), scrollBefore, 'Returning from source search must restore detail scrolling');
+      await dialog.locator('.nc-discovery-aliases summary').click();
+      await descriptionTools.getByRole('button', {name: '收起简介', exact: true}).click();
+    }
+    check('Mobile 320–700px long titles keep scores top-right and actions beside the year; long descriptions/aliases grow naturally; desktop 1280/1560px retains its fixed footer at 125% text scale');
+    for (const uiLanguage of ['de', 'ru']) {
+      await page.evaluate(uiLanguage => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, uiLanguage);
+      await page.waitForFunction(language => document.documentElement.lang === language, uiLanguage);
+      textFail = true; textDelay = 800;
+      await titleTools.getByRole('button', {name: await label('翻译'), exact: true}).click();
+      await titleTools.getByText(await label('翻译中…'), {exact: true}).waitFor();
+      assert(await dialog.locator('.nc-discovery-detail').evaluate(element => element.scrollWidth <= element.clientWidth + 1), `Long ${uiLanguage} pending labels must fit the mobile detail`);
+      await titleTools.getByText(await label('文字翻译失败'), {exact: true}).waitFor();
+      assert(await dialog.locator('.nc-discovery-detail').evaluate(element => element.scrollWidth <= element.clientWidth + 1), `Long ${uiLanguage} failure/retry labels must fit the mobile detail`);
+      textFail = false; textDelay = 200;
+      await titleTools.getByRole('button', {name: await label('重试'), exact: true}).click();
+      await titleTools.getByRole('button', {name: await label('查看原文'), exact: true}).click();
+      await titleTools.getByRole('button', {name: await label('查看译文'), exact: true}).waitFor();
+      assert(await dialog.locator('.nc-discovery-detail').evaluate(element => element.scrollWidth <= element.clientWidth + 1), `Long ${uiLanguage} original/translation controls must not cause mobile horizontal scrolling`);
+      assert(await dialog.locator('.nc-discovery-format > span').evaluate(element => element.getBoundingClientRect().height <= parseFloat(getComputedStyle(element).lineHeight) * 2), 'Publication labels must use their own wrapping row, not squeeze into the year/action columns');
+      await dialog.locator('h2').scrollIntoViewIfNeeded(); await settleUi();
+      if (uiLanguage === 'de') await page.screenshot({path: path.join(out, 'detail-german-320.png')});
+    }
+    check('German and Russian pending, failure/retry and original/translated controls wrap within the 320px mobile detail at 125% text scale');
+    await page.keyboard.press('Escape');
+    assert.equal(await dialog.count(), 0);
+    assert(await cards.first().evaluate(element => element === document.activeElement));
+    await page.setViewportSize({width: 390, height: 740});
+    await page.evaluate(() => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage: 'zh-CN'}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));});
+    await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+    await cards.nth(1).click();
+    await descriptionTools.getByRole('button', {name: '翻译', exact: true}).waitFor();
+    assert.equal(await dialog.locator('time').count(), 0);
+    assert.equal(await titleTools.getByRole('button', {name: '翻译', exact: true}).count(), 1, 'Missing year must not hide the title translation action');
+    descriptionGate = new Promise(resolve => {releaseDescription = resolve;});
+    // Use a fresh target language so the description cannot hit the completed zh-CN cache.
+    await page.evaluate(() => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage: 'en'}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));});
+    await page.waitForFunction(() => document.documentElement.lang === 'en');
+    await descriptionTools.getByRole('button', {name: await label('翻译'), exact: true}).click();
+    await descriptionTools.getByText(await label('翻译中…'), {exact: true}).waitFor();
+    await page.keyboard.press('Escape');
+    releaseDescription(); descriptionGate = undefined;
+    await pause(300);
+    const closedRequests = textRequests.length;
+    await cards.nth(1).click();
+    await descriptionTools.getByRole('button', {name: await label('翻译'), exact: true}).waitFor();
+    assert.equal(textRequests.length, closedRequests, 'Reopening with automatic translation off must not restart a cancelled manual request');
+    assert((await dialog.locator('.nc-discovery-description p').innerText()).startsWith('A bookshop'));
+    assert.equal(await dialog.locator('[role=status]').count(), 0, 'Cancelled requests must not leave stale pending or failure UI');
+    await page.keyboard.press('Escape');
+    check('Missing years preserve manual controls; closing a pending manual translation ignores late responses and reopening does not auto-request');
+  } else if (live) {
     assert(requests.length >= 1);
     await cards.first().click();
     await dialog.getByRole('button', {name: '查找阅读来源', exact: true}).waitFor();
@@ -538,7 +660,7 @@ try {
     check('Six accent themes in light/dark render without horizontal overflow');
   }
   assert.deepEqual(errors, []);
-  await writeFile(path.join(out, 'result.json'), JSON.stringify({live, textOnly, checks, errors, metadataRequests: requests.length, textRequests: textRequests.length, textPeak}, null, 2));
+  await writeFile(path.join(out, 'result.json'), JSON.stringify({live, textOnly, detailOnly, checks, errors, metadataRequests: requests.length, textRequests: textRequests.length, textPeak}, null, 2));
   console.log(JSON.stringify({out, checks: checks.length, errors}));
 } catch (error) {
   if (page) await page.screenshot({path: path.join(out, 'failure.png')}).catch(() => {});

@@ -508,6 +508,7 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+.nc-discovery-publication-badges { display:contents; }
 .nc-discovery-badge {
   --badge-color: var(--icon-comic-yellow);
   position: relative;
@@ -764,15 +765,28 @@
   .nc-discovery-detail-copy { display:contents; }
   .nc-discovery-detail-copy>* { grid-column:1/-1; }
   .nc-discovery-detail h2 { font-size: 1.125rem; }
-  .nc-discovery-detail-copy>.nc-discovery-detail-heading { grid-column:2; grid-row:1; gap:10px; flex-wrap:wrap; }
+  .nc-discovery-detail-copy>.nc-discovery-detail-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-column:2; grid-row:1; gap:10px; }
+  .nc-discovery-detail-identity { display:contents; }
+  .nc-discovery-detail-heading h2 { grid-column:1; grid-row:1; }
+  .nc-discovery-detail-heading .nc-discovery-detail-rating { grid-column:2; grid-row:1; }
   .nc-discovery-detail-rating { width: 3.5rem; height: 3rem; }
   .nc-discovery-detail-rating b { font-size: 1.375rem; }
   .nc-discovery-detail-rating small { font-size:.625rem; }
   .nc-discovery-rating-spark { display:none; }
-  .nc-discovery-detail-facts { gap: 8px; margin-top: 10px; }
-  .nc-discovery-detail-year time { font-size: 1.375rem; }
+  .nc-discovery-detail-facts { display:grid; grid-template-columns:max-content minmax(0,1fr); grid-column:1/-1; gap:8px; margin-top:0; }
+  .nc-discovery-detail-year, .nc-discovery-publication-types { display:contents; }
+  .nc-discovery-detail-year > span { grid-column:1/-1; grid-row:1; }
+  .nc-discovery-detail-year time { grid-column:1; grid-row:2; }
+  .nc-discovery-publication-types > .nc-discovery-text-status { grid-column:2; grid-row:2; min-width:0; }
+  .nc-discovery-publication-types > .nc-discovery-text-status > :is(span, button) { max-width:100%; min-width:0; white-space:normal; overflow-wrap:anywhere; text-align:start; }
+  .nc-discovery-publication-types .spinner { flex:none; }
+  .nc-discovery-publication-types .nc-discovery-inline-action > span { min-width:0; overflow-wrap:anywhere; }
+  .nc-discovery-publication-badges { display:flex; flex-wrap:wrap; align-items:center; gap:8px; grid-column:1/-1; grid-row:3; }
+  .nc-discovery-detail-facts:not(:has(.nc-discovery-detail-year)) .nc-discovery-text-status { grid-column:1/-1; grid-row:1; }
+  .nc-discovery-detail-year time { font-size: 1.375rem; align-self:center; }
   .nc-discovery-detail-tags, .nc-discovery-contributors { margin-top: 0; }
-  .nc-discovery-detail-copy>.nc-discovery-detail-body { flex: none; margin: 0; padding-right: 0; overflow: visible; }
+  .nc-discovery-detail-copy>.nc-discovery-detail-body { flex: none; min-height:auto; margin: 0; padding-right: 0; overflow: visible; }
+  .nc-discovery-description p { overflow-wrap:anywhere; }
   .nc-discovery-description-controls { flex-wrap: wrap; gap: 8px; }
   .nc-discovery-description-controls .nc-discovery-text-status { flex-wrap: wrap; white-space: normal; }
   .nc-discovery-inline-action,.nc-discovery-aliases summary { min-height: 44px; }

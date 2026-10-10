@@ -44,9 +44,9 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
   const searching = pane === 'sources';
   const [originalTitle, setOriginalTitle] = useState(false), [originalDescription, setOriginalDescription] = useState(false);
   useEffect(() => {setOriginalTitle(false); setOriginalDescription(false);}, [language]);
-  const translating = translate && active && !searching;
-  const titleTranslation = useTextTranslation(translator, (detail ?? work).title, language, translating);
-  const descriptionTranslation = useTextTranslation(translator, detail?.description ?? '', language, translating);
+  const translating = active && !searching;
+  const titleTranslation = useTextTranslation(translator, (detail ?? work).title, language, translating, translate);
+  const descriptionTranslation = useTextTranslation(translator, detail?.description ?? '', language, translating, translate);
   const current = useRef({active, pane});
   current.current = {active, pane};
   const scroll = useRef({details: 0, sources: 0}), returnFocus = useRef<HTMLElement | null>(null);
@@ -102,15 +102,17 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
       <article className="nc-discovery-detail-copy">
           <header className="nc-discovery-detail-heading">
             <div className="nc-discovery-detail-identity">
-              <h2>{translate && !originalTitle && titleTranslation.text ? titleTranslation.text : value.title}</h2>
+              <h2>{!originalTitle && titleTranslation.text ? titleTranslation.text : value.title}</h2>
               <div className="nc-discovery-detail-facts">
                 {value.year && <div className="nc-discovery-detail-year"><span><Icon name="calendar" size={16}/>{msg('年份')}</span><time dateTime={String(value.year)}>{value.year}</time></div>}
                 <div className="nc-discovery-publication-types">
-                  {value.status && <DiscoveryBadge kind="status" className={`is-${value.status}`} icon={statusIcons[value.status]}>
-                    {statusLabels()[value.status]}
-                  </DiscoveryBadge>}
-                  {value.format && <DiscoveryBadge kind="format" icon={value.format === 'oneshot' ? 'page-unread' : 'book'} className="nc-discovery-format">{formatLabels()[value.format]}</DiscoveryBadge>}
-                  {translate && <TextTranslationStatus pending={titleTranslation.pending} error={titleTranslation.error} translated={!!titleTranslation.text} original={originalTitle} onOriginal={() => setOriginalTitle(value => !value)} onRetry={titleTranslation.retry}/>}
+                  <div className="nc-discovery-publication-badges">
+                    {value.status && <DiscoveryBadge kind="status" className={`is-${value.status}`} icon={statusIcons[value.status]}>
+                      {statusLabels()[value.status]}
+                    </DiscoveryBadge>}
+                    {value.format && <DiscoveryBadge kind="format" icon={value.format === 'oneshot' ? 'page-unread' : 'book'} className="nc-discovery-format">{formatLabels()[value.format]}</DiscoveryBadge>}
+                  </div>
+                  <TextTranslationStatus pending={titleTranslation.pending} error={titleTranslation.error} translated={!!titleTranslation.text} original={originalTitle} onOriginal={() => setOriginalTitle(value => !value)} onRetry={titleTranslation.retry} onTranslate={titleTranslation.retry}/>
                 </div>
               </div>
             </div>
@@ -131,10 +133,10 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
             {error && <DiscoveryNotice error={error} onRetry={onRetry}/>}
             {detail?.description && <div className="nc-discovery-description">
               <div className="nc-discovery-description-controls">
-                {translate && <TextTranslationStatus pending={descriptionTranslation.pending} error={descriptionTranslation.error} translated={!!descriptionTranslation.text} original={originalDescription} onOriginal={() => setOriginalDescription(value => !value)} onRetry={descriptionTranslation.retry}/>}
+                <TextTranslationStatus pending={descriptionTranslation.pending} error={descriptionTranslation.error} translated={!!descriptionTranslation.text} original={originalDescription} onOriginal={() => setOriginalDescription(value => !value)} onRetry={descriptionTranslation.retry} onTranslate={descriptionTranslation.retry}/>
                 <button className="nc-search-text-button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? msg('收起简介') : msg('展开简介')}</button>
               </div>
-              <p className={expanded ? undefined : 'is-collapsed'}>{translate && !originalDescription && descriptionTranslation.text ? descriptionTranslation.text : detail.description}</p>
+              <p className={expanded ? undefined : 'is-collapsed'}>{!originalDescription && descriptionTranslation.text ? descriptionTranslation.text : detail.description}</p>
             </div>}
             {value.titles.length > 1 && <details className="nc-discovery-aliases"><summary>{msg('作品别名')}</summary><div>{value.titles.filter(title => title !== value.title).map(title => <DiscoveryBadge kind="alias" icon="message" key={title}>{title}</DiscoveryBadge>)}</div></details>}
           </div>
