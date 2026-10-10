@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Đọc trang dịch đầu tiên của bạn",
         "paragraphs": [
-          "Nhập truyện cục bộ hoặc EPUB, hay mở website tương thích và OPDS trong trình đọc. Chọn ngôn ngữ, dịch thông thường và kiểm tra ảnh hiện tại. Cả kênh NodeLane lẫn MTU trong tiện ích chỉ dùng dịch thông thường; EPUB không dịch văn bản.",
+          "Nhập truyện cục bộ hoặc EPUB, hay mở website tương thích và OPDS trong trình đọc. Chọn ngôn ngữ, dịch và kiểm tra ảnh hiện tại. Cả kênh NodeLane lẫn MTU trong tiện ích đều dịch hình ảnh; EPUB không dịch văn bản.",
           "Ảnh hiện tại được ưu tiên rồi bổ sung vùng lân cận có giới hạn theo vị trí đọc. Cùng một MTU xử lý lần lượt từng ảnh. Chuyển hoặc so sánh bản gốc giữ vị trí; dịch tab, ảnh nhấp chuột phải và vùng chọn cũng dùng kênh hiện tại.",
           "Nếu một trang bị lỗi, hãy giải quyết vấn đề được báo cáo trước khi thử lại theo cách thủ công. Việc đóng một trang hoặc mất kết nối không chứng tỏ rằng MTU đã ngừng tính toán. Tránh gửi đi lặp lại trong khi dịch vụ có thể vẫn đang bận."
         ],
@@ -159,7 +159,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Dịch manga cần một quy trình làm việc bằng hình ảnh",
         "paragraphs": [
-          "Đối thoại trong manga thường là một phần của tác phẩm nghệ thuật. Bản dịch văn bản của trình duyệt không thể trực tiếp đưa các từ đã dịch trở lại ô lời thoại. Dịch hình ảnh thông thường phát hiện văn bản, đọc nó bằng OCR, dịch nó, xóa chữ gốc và đưa ra kết quả.",
+          "Đối thoại trong manga thường là một phần của tác phẩm nghệ thuật. Bản dịch văn bản của trình duyệt không thể trực tiếp đưa các từ đã dịch trở lại ô lời thoại. Dịch hình ảnh phát hiện văn bản, đọc nó bằng OCR, dịch nó, xóa chữ gốc và đưa ra kết quả.",
           "Nếu bạn đã có máy tính có khả năng chạy dịch vụ dịch thuật, bạn có thể sử dụng manga-translator-ui để xử lý hình ảnh và NodeLane Comics để đọc trình duyệt liên tục. Tiện ích mở rộng sẽ gửi hình ảnh từ cửa sổ đọc hiện tại đến dịch vụ đã chọn và hiển thị các bản dịch được trả về tại chỗ."
         ]
       },
@@ -210,11 +210,6 @@ export const localTranslationGuides: Guide[] = [
               "thiết lập",
               "Cài đặt, chạy và định cấu hình dịch vụ của bạn",
               "Dịch vụ dịch thuật được duy trì bởi NodeLane"
-            ],
-            [
-              "Chế độ mở rộng",
-              "Hiện tại chỉ có dịch thông thường",
-              "Tiện ích chỉ dịch thông thường, dùng hạn mức tài khoản"
             ],
             [
               "Chi phí",
@@ -275,7 +270,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Bắt đầu với một trang",
         "paragraphs": [
-          "Khởi động dịch vụ Web của MTU và dịch một hình ảnh trong giao diện của chính nó. Sau đó thêm địa chỉ dịch vụ và tài khoản trong cài đặt NodeLane, kết nối và chọn dịch thông thường và ngôn ngữ đích.",
+          "Khởi động dịch vụ Web của MTU và dịch một hình ảnh trong giao diện của chính nó. Sau đó thêm địa chỉ dịch vụ và tài khoản trong cài đặt NodeLane, kết nối và chọn dịch và ngôn ngữ đích.",
           "Nếu kết nối không thành công, hãy kiểm tra địa chỉ và quyền của trình duyệt. Nếu đăng nhập hoạt động nhưng không có hình ảnh xuất hiện, hãy kiểm tra cấu hình dịch của dịch vụ. Một thử nghiệm nhỏ cho bạn biết nhiều hơn về sự phù hợp cho việc đọc hàng ngày hơn là yêu cầu về tốc độ chung."
         ],
         "links": [

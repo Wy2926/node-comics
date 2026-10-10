@@ -718,7 +718,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           <div className="translation-quota" aria-live="polite">
             <span>{isGuestScope ? t.remaining : t.account}</span>
             <b>{isGuestScope ? (guest?.remaining ?? '—') : entitlement?.unlimited ? '∞' : (entitlement?.quota?.available ?? '—')}</b>
-            <span>{isGuestScope ? `/ ${guest?.daily_limit ?? 5}` : entitlement?.unlimited ? t.unlimited : t.classic}</span>
+            {isGuestScope ? <span>/ {guest?.daily_limit ?? 5}</span> : entitlement?.unlimited && <span>{t.unlimited}</span>}
           </div>
           {!account && (
             <button

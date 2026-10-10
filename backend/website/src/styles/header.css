@@ -9,7 +9,7 @@
   background: var(--surface);
   border-bottom: var(--comic-border);
 }
-.header-inner { position: relative; min-height: 88px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px; }
+.header-inner { position: relative; min-height: 88px; display: grid; grid-template-columns: auto minmax(max-content, 1fr) auto; align-items: center; gap: 24px; }
 .header-inner .brand { flex-shrink: 0; }
 .header-inner .brand img { width: 190px; height: auto; }
 .desktop-nav { display: flex; justify-self: center; align-items: center; gap: 6px; font-size: .83rem; font-weight: var(--comic-control-font-weight); }
@@ -62,7 +62,7 @@
   border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow);
   font-size: .9rem;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
   .header-inner { grid-template-columns: minmax(0, 1fr) auto; }
   .desktop-nav { display: none; }
   .mobile-nav { display: block; }

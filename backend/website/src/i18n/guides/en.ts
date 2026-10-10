@@ -29,7 +29,7 @@ export const localTranslationGuides: Guide[] = [
         'Check that Current channel shows the new service. You may save multiple service profiles, but only the selected channel is used at a time.'
       ] },
       { title: '4. Read your first translated page', paragraphs: [
-        "Open a local book, OPDS item or supported website in the reader. Choose your target language and the MTU channel, then test the current image. Both official and MTU channels provide standard image translation in the current extension.",
+        "Open a local book, OPDS item or supported website in the reader. Choose your target language and the MTU channel, then test the current image. Both official and MTU channels provide image translation in the current extension.",
         "Current images take priority within a limited nearby reading window. One MTU channel processes images serially. Switch back to originals or compare side by side without losing your position; reader, website and region translation share the selected channel.",
         'If a page fails, resolve its reported issue before retrying manually. Closing a page or losing the connection does not prove that MTU stopped computing. Avoid repeated submissions while the service may still be busy.'
       ], links: [{label: 'Importing local comics and supported formats', href: '/guides/local-comics/'}] },
@@ -57,7 +57,7 @@ export const localTranslationGuides: Guide[] = [
     related: ['local-translation', 'translation-modes', 'local-comics'],
     sections: [
       { title: 'Manga translation needs an image workflow', paragraphs: [
-        'Dialogue in manga is usually part of the artwork. A browser’s text translation cannot directly put translated words back into speech bubbles. Classic image translation detects text, reads it with OCR, translates it, removes the original lettering and lays out the result.',
+        'Dialogue in manga is usually part of the artwork. A browser’s text translation cannot directly put translated words back into speech bubbles. Image translation detects text, reads it with OCR, translates it, removes the original lettering and lays out the result.',
         'If you already have a computer capable of running a translation service, you can use manga-translator-ui for image processing and NodeLane Comics for continuous browser reading. The extension sends images from the current reading window to the selected service and displays returned translations in place.'
       ] },
       { title: 'Local reading, a local service and offline translation', paragraphs: [
@@ -72,7 +72,6 @@ export const localTranslationGuides: Guide[] = [
       ], table: { headers: ['Consideration', 'Your MTU channel', 'Official NodeLane channel'], rows: [
         ['Account', 'MTU credentials; no NodeLane login', 'NodeLane login required'],
         ['Setup', 'Install, run and configure your service', 'Translation service maintained by NodeLane'],
-        ['Extension modes', 'Currently classic translation only', "Standard image translation with the current account allowance"],
         ['Costs', 'No official allowance used; hardware, power and chosen APIs are yours', 'Official plans and allowance rules'],
         ['Missing result cache', 'Manual retranslation required', 'Eligible official results can be downloaded again while available']
       ] }, links: [{label: 'Connect your local service', href: '/guides/local-translation/'}, {label: 'Official plans and allowances', href: '/pricing/'}] },
@@ -89,7 +88,7 @@ export const localTranslationGuides: Guide[] = [
         'Imported local comics and cached translations remain readable while those resources are available. Generating new translations offline requires a running local service and a fully offline processing pipeline. Website originals must also be cached in advance. Keeping result caches reduces repeated work, but a cache is not a permanent backup.'
       ], links: [{label: 'Image uploads and extension permissions', href: '/guides/comic-reader-privacy/'}] },
       { title: 'Start with one page', paragraphs: [
-        'Start MTU’s Web service and translate one image in its own interface. Then add the service address and account in NodeLane settings, connect, and select classic translation and a target language.',
+        'Start MTU’s Web service and translate one image in its own interface. Then add the service address and account in NodeLane settings, connect, and select translation and a target language.',
         'If connecting fails, check the address and browser permission. If login works but no image appears, check the service’s translation configuration. A small trial tells you more about suitability for everyday reading than a general speed claim.'
       ], links: [{label: 'Follow the local translation tutorial', href: '/guides/local-translation/'}, {label: 'Download the comic reader and translator', href: '/download/'}] }
     ]

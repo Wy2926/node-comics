@@ -61,7 +61,7 @@ export default {
       "Birden fazla OPDS kitaplığı bağlayın, katalogları gezin, arayın ve okuyun. Güvenilir Range desteği varsa veriler okudukça alınır; aksi hâlde dosyanın tamamını açıkça indirmeniz gerekir.",
       "Önerileri keşfedin ve desteklenen farklı sitelerde başlığa göre arayın. Okuyucuya eklemek için site bağdaştırıcısı gerekir; kaynak kataloğu salt okunur kalır.",
       "Geçerli sayfanın görsellerini, sağ tık menüsüyle tek bir görseli veya görünür dikdörtgen alanı çevirin. Alan seçimi kaydırarak uzun görsel birleştirmez; kısayollar tarayıcıdan ayarlanır.",
-      "Uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. Resmî kanalı veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi roman orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır.",
+      "Uzantı çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. Resmî kanalı veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi roman orijinal olarak açılır; otomatik çeviri varsayılan olarak kapalıdır.",
       "Bir sitede seçilen dilin tüm bölümlerini önbelleğe alın. İndirmeyi duraklatıp eksikleri tamamlayarak sürdürün. Tamamlanan bölümler çevrimdışı okunabilir; okuma görünümünü, ölçeği ve orijinal karşılaştırmasını ayarlayın."
     ],
     "ribbon": [
@@ -89,7 +89,7 @@ export default {
     "free": "ücretsiz",
     "month": "ay",
     "freeBenefits": [
-      "Günde 30 standart çeviri sayfası",
+      "Günde 30 çeviri sayfası",
       "Web ve yerel çizgi roman okuma",
       "Orijinal karşılaştırması ve okuma konumunun korunması",
       "Geçerli mevcut sonuçlarınıza erişim",
@@ -132,7 +132,7 @@ export default {
     "emailButton": "E-posta gönder",
     "aboutTitle": "NodeLane Comics hakkında",
     "aboutDescription": "NodeLane Comics, Chrome, Edge ve Firefox için manga okuma ve çeviri uzantısıdır: yerel çizgi romanlar, EPUB, Google Drive, OPDS ve desteklenen siteler.",
-    "aboutBody": "NodeLane Comics, çizgi roman okumayı ve görsel çevirisini tarayıcıda bir araya getirir. Dosyalarınızı açın, Drive veya OPDS bağlayın, desteklenen sitelerde hikâyeler bulun ve sayfaları ya da görünür alanları çevirin. Normal çeviri resmî kanal veya kendi manga-translator-ui hizmetinizle çalışır. Tanıma ve çeviri hata yapabildiği için orijinal her zaman kontrol edilebilir. Çizgi roman kataloğu sunmuyoruz, çizgi roman satmıyoruz ve ödeme duvarı, giriş veya DRM engellerini aşmıyoruz. Yalnızca erişme ve işleme hakkınız olan içeriği kullanın.",
+    "aboutBody": "NodeLane Comics, çizgi roman okumayı ve görsel çevirisini tarayıcıda bir araya getirir. Dosyalarınızı açın, Drive veya OPDS bağlayın, desteklenen sitelerde hikâyeler bulun ve sayfaları ya da görünür alanları çevirin. çeviri resmî kanal veya kendi manga-translator-ui hizmetinizle çalışır. Tanıma ve çeviri hata yapabildiği için orijinal her zaman kontrol edilebilir. Çizgi roman kataloğu sunmuyoruz, çizgi roman satmıyoruz ve ödeme duvarı, giriş veya DRM engellerini aşmıyoruz. Yalnızca erişme ve işleme hakkınız olan içeriği kullanın.",
     "changelogTitle": "NodeLane Comics sürüm notları",
     "changelogDescription": "Manga çevirmen güncellemelerini, yeni site desteğini, tarayıcı uyumluluğunu ve okuma düzeltmelerini takip edin. Chrome, Edge ve Firefox mağaza onayları farklı olabilir; yüklü sürümünüzü kontrol edin.",
     "rss": "Güncellemeleri RSS ile takip et",
@@ -195,14 +195,14 @@ export default {
   ],
   "minutes": 5,
   "title": "Normal manga çevirisi: resmî kanal mı, kendi MTU’nuz mu?",
-  "description": "Uzantıda normal çevirinin işleyişi ve resmî kanal ile manga-translator-ui arasındaki farklar.",
+  "description": "Uzantıda çevirinin işleyişi ve resmî kanal ile manga-translator-ui arasındaki farklar.",
   "category": "Çeviri ipuçları",
   "sections": [
     {
-      "title": "Normal çeviri nasıl çalışır?",
+      "title": "Çeviri nasıl çalışır?",
       "paragraphs": [
         "Uzantı metni bulur, OCR ile tanır, çevirir, metin alanındaki arka planı onarır ve sonucu sayfaya yerleştirir. Orijinal karşılaştırma için erişilebilir kalır.",
-        "Güncel uzantı yalnızca normal çeviri kullanır."
+        "Uzantı, resimlerdeki metni çevirir."
       ]
     },
     {
@@ -288,7 +288,7 @@ export default {
     {
       "title": "Hem kelimeleri hem de görselleri kontrol edin",
       "paragraphs": [
-        "Normal çeviri metni atlayabilir veya arka planı ve yazı yerleşimini hatalı onarabilir. Hikâyeyi etkilediklerinde yüz ifadelerini, el yazısını ve arka planı karşılaştırın.",
+        "Çeviri metni atlayabilir veya arka planı ve yazı yerleşimini hatalı onarabilir. Hikâyeyi etkilediklerinde yüz ifadelerini, el yazısını ve arka planı karşılaştırın.",
         "NodeLane Comics orijinali kullanılabilir durumda tutar. Çeviri, eserin kendisini doğrulama yeteneğini ortadan kaldırmadan anlama engelini azaltır."
       ]
     }
@@ -348,7 +348,7 @@ export default {
     {
       "title": "Çeviri ve saklama",
       "paragraphs": [
-        "Uzantı normal çeviri kullanır. Standart çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+        "Uzantı çeviri kullanır. çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
         "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz."
       ]
     },
@@ -452,14 +452,14 @@ export default {
           {
             "title": "Servis sağlayıcılar ve transferler",
             "paragraphs": [
-              "Uzantı normal çeviri kullanır. Klasik işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
+              "Uzantı çeviri kullanır. işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
               "Çeviri görselleri merkezi sunucudaki özel dosyaları kullanır; tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Kimlik, altyapı, çeviri ve ödeme hizmetleri, verileri gerektiği şekilde geçerli politikaları kapsamında işler. İşleme bölgenizin dışında gerçekleşebilir. Reklam hedefleme için kişisel bilgileri satmıyoruz veya gönderilen çizgi romanları kullanmıyoruz. Tüm sağlayıcıların hiçbir şeyi saklamayacağını veya verileri eğitim için asla kullanmayacağını garanti etmiyoruz; bu sağlayıcıya ve anlaşmaya bağlıdır. Yetkisiz veya uygun olmayan hassas içerik göndermeyin."
             ]
           },
           {
             "title": "Saklama ve silme",
             "paragraphs": [
-              "Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+              "Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
               "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir.",
               "Hesap silme veya daha geniş kapsamlı silme talepleri için kimlik ve kapsam doğrulaması amacıyla bizimle iletişime geçin. İşlem, denetim veya güvenlik kayıtlarının hizmet yükümlülükleri, anlaşmazlıklar veya geçerli gereksinimler nedeniyle saklanması gerekebilir. Tüm kayıtlar için tek bir silme tarihi sözü verilmemektedir; yanıt, sonucu ve kısıtlamaları açıklayacaktır."
             ]
@@ -488,7 +488,7 @@ export default {
             "title": "İçerik hakları ve yapay zeka sonuçları",
             "paragraphs": [
               "Seçilen içeriğe erişme, yükleme, tercüme etme ve işleme hakkına sahip olmanız ve kaynak site ve hak sahibinin gerekliliklerini takip etmeniz gerekir. Uzantı, çevrilmiş görüntüleri yayınlamak için hiçbir telif hakkı veya otomatik izin vermez. Ödeme duvarlarını, oturum açma gerekliliklerini veya DRM'yi atlamayın. Kaynak içeriğinin yasallığını veya eksiksizliğini garanti etmiyoruz. Telif hakkı sorgularında eser, haklar, sorun ve iletişim bilgileri belirtilmelidir.",
-              "Yapay zekâ metni atlayabilir, yanlış çevirebilir veya yanlış yerleştirebilir. Sonuçlar okumaya yardımcı olur; orijinalin veya uzman incelemesinin yerini almaz. Sitenin özgün illüstrasyonları yapay zekâ ile üretilmiştir; dil karşılaştırmaları kaydedilmiş normal çeviri örneklerini gösterir. Her görsel için doğruluk, hız veya sonuç garantisi vermez. Orijinalle karşılaştırın ve geri bildirim gönderin."
+              "Yapay zekâ metni atlayabilir, yanlış çevirebilir veya yanlış yerleştirebilir. Sonuçlar okumaya yardımcı olur; orijinalin veya uzman incelemesinin yerini almaz. Sitenin özgün illüstrasyonları yapay zekâ ile üretilmiştir; dil karşılaştırmaları kaydedilmiş çeviri örneklerini gösterir. Her görsel için doğruluk, hız veya sonuç garantisi vermez. Orijinalle karşılaştırın ve geri bildirim gönderin."
             ]
           },
           {
@@ -569,7 +569,7 @@ export default {
       {
         "id": "translation-modes",
         "question": "Uzantıda hangi çeviri ve kanallar kullanılabilir?",
-        "answer": "Güncel uzantı normal çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. NodeLane resmî kanalını veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri kapalıdır.",
+        "answer": "Güncel uzantı çeviri kullanır: OCR, metin çevirisi, arka plan onarımı ve dizgi. NodeLane resmî kanalını veya kendi manga-translator-ui hizmetinizi seçin. Yeni çizgi romanlar orijinal olarak açılır; otomatik çeviri kapalıdır.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -587,13 +587,13 @@ export default {
       {
         "id": "image-privacy",
         "question": "Resimler yükleniyor mu yoksa saklanıyor mu?",
-        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı normal çeviri kullanır. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. Standart çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
+        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı çeviri kullanır. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Başarısız olan çeviriler sayfa kullanıyor mu?",
-        "answer": "Hesapla yapılan resmî çeviride sayfalar önce ayrılabilir ve başarılı teslimden sonra kotadan düşülür. Açık bir hata ayrılan kotayı serbest bırakır; metin bulunmayan veya kısmi tanımada orijinal metnin korunduğu normal sonuçlar için de aynı kural geçerlidir. MTU, NodeLane resmî kotasını kullanmaz. Anonim denemelerde çalışma alanının yeni istek sayımı kuralları ayrıca geçerlidir; başarısız denemeler de sayılır.",
+        "answer": "Hesapla yapılan resmî çeviride sayfalar önce ayrılabilir ve başarılı teslimden sonra kotadan düşülür. Açık bir hata ayrılan kotayı serbest bırakır; metin bulunmayan veya kısmi tanımada orijinal metnin korunduğu sonuçlar için de aynı kural geçerlidir. MTU, NodeLane resmî kotasını kullanmaz. Anonim denemelerde çalışma alanının yeni istek sayımı kuralları ayrıca geçerlidir; başarısız denemeler de sayılır.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -662,7 +662,7 @@ export default {
         "items": [
           "Okumak için doğrudan manga içe aktarımıyla Atsumaru, MangaBall, RawOtaku ve JF00 kaynakları eklendi.",
           "Keşfet sayfasında başlıkları ve açıklamaları çevirin, orijinal ve çevrilmiş metin arasında geçiş yapın, çeviri durumunu kontrol edin ve hataları yeniden deneyin.",
-          "Çok uzun çizgi romanlar için iyileştirilmiş standart çeviri; çevrilmiş görüntülerin tamamının kaydedilmesi ve kesintiye uğrayan görevlerin kurtarılması da dahil.",
+          "Çok uzun çizgi romanlar için iyileştirilmiş çeviri; çevrilmiş görüntülerin tamamının kaydedilmesi ve kesintiye uğrayan görevlerin kurtarılması da dahil.",
           "Aşırı uzun görüntüleri JPEG olarak kodlarken boyutun kesilmesi düzeltildi. Çevrilmiş görsellerin tamamı gerektiğinde PNG kullanın.",
           "Orijinalleri değiştirmeden tutarken bazı AVIF görüntülerinde resmi çeviri gönderme hataları düzeltildi.",
           "Her kitap için yakınlaştırmayı hatırlar ve sürekli bölüm yükleme, kaydırma ve okuma konumunu koruma iyileştirmeleriyle bitişik yüksek çözünürlüklü sayfaları önceden yükler.",
@@ -827,7 +827,7 @@ export default {
     "退出官网账户": "Bu web sitesinden çıkış yapın",
     "当前套餐": "Mevcut plan",
     "普通账户": "Ücretsiz",
-    "常规翻译": "Standart çeviri",
+    "翻译": "Çeviri",
     "不限累计页数": "Sınırsız toplam sayfa",
     "页": " sayfa",
     " 页可用": " sayfa kullanılabilir",
@@ -876,6 +876,6 @@ export default {
     "中文示意": "Çin illüstrasyonu",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Orijinal manga: Japonca diyalogları olan bir sahil gezgini",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Aynı orijinal manga illüstrasyonunun Çince versiyonu",
-    "产品常规翻译实测效果": "Ürünün standart çevirisinden elde edilen gerçek sonuçlar"
+    "产品翻译实测效果": "Ürünün çevirisinden elde edilen gerçek sonuçlar"
   }
 } satisfies Dictionary;

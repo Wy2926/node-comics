@@ -13,7 +13,7 @@ const copy: HomeCopy = {
     "loading": "Cargando imagen…",
     "error": "No se pudo cargar la imagen.",
     "retry": "Inténtalo de nuevo",
-    "caption": "Resultados de traducción estándar registrados"
+    "caption": "Resultados de traducción registrados"
   },
   "eyebrow": "EXTENSIÓN PARA TRADUCIR MANGA",
   "title": ["Traduce tu manga.","Sigue leyendo."],
@@ -67,7 +67,7 @@ const copy: HomeCopy = {
   "compareEyebrow": "MIRA MÁS DE CERCA",
   "compareTitle": "Comprueba la traducción. Conserva el original.",
   "compareBody": "Alterna entre el original japonés y los resultados de traducción guardados. En el lector, la vista original y la traducida están siempre a mano.",
-  "compareNote": "Una muestra real de traducción estándar sobre una ilustración original de IA. Los resultados varían según la obra de arte, el texto y el idioma.",
+  "compareNote": "Una muestra real de traducción sobre una ilustración original de IA. Los resultados varían según la obra de arte, el texto y el idioma.",
   "compareLink": "Cómo funciona la traducción",
   "readerEyebrow": "SEIS PANTALLAS PARA EXPLORAR",
   "readerTitle": "Tu próximo cómic. Tu próxima página.",
@@ -125,7 +125,7 @@ const copy: HomeCopy = {
     ]
   ],
   "modesEyebrow": "ELIGE TU SERVICIO DE TRADUCCIÓN",
-  "modesTitle": "Una traducción clásica, dos opciones de servicio.",
+  "modesTitle": "Una traducción, dos opciones de servicio.",
   "modes": [
     [
       "Servicio oficial de NodeLane",

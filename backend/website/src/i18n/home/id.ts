@@ -13,7 +13,7 @@ const copy: HomeCopy = {
     "loading": "Memuat gambar…",
     "error": "Gambar tidak dapat dimuat.",
     "retry": "Coba lagi",
-    "caption": "Hasil terjemahan standar dicatat"
+    "caption": "Hasil terjemahan dicatat"
   },
   "eyebrow": "EKSTENSI PENERJEMAH MANGA",
   "title": ["Terjemahkan manga.","Lanjutkan membaca."],
@@ -67,7 +67,7 @@ const copy: HomeCopy = {
   "compareEyebrow": "LIHAT LEBIH DEKAT",
   "compareTitle": "Periksa terjemahannya. Pertahankan aslinya.",
   "compareBody": "Beralih antara hasil terjemahan asli Jepang dan rekaman. Di pembaca, pandangan asli dan terjemahan tetap berada dalam jangkauan.",
-  "compareNote": "Contoh terjemahan standar nyata pada ilustrasi AI asli. Hasil bervariasi berdasarkan karya seni, teks dan bahasa.",
+  "compareNote": "Contoh terjemahan nyata pada ilustrasi AI asli. Hasil bervariasi berdasarkan karya seni, teks dan bahasa.",
   "compareLink": "Cara kerja terjemahan",
   "readerEyebrow": "ENAM TAMPILAN. JELAJAHI ISINYA.",
   "readerTitle": "Komik berikutnya. Halaman berikutnya.",
@@ -125,7 +125,7 @@ const copy: HomeCopy = {
     ]
   ],
   "modesEyebrow": "TERJEMAHKAN SAAT ANDA MAU",
-  "modesTitle": "Terjemahan biasa. Pilih saluran Anda.",
+  "modesTitle": "Terjemahan. Pilih saluran Anda.",
   "modes": [
     [
       "Saluran resmi NodeLane",

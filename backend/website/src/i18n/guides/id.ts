@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Baca halaman terjemahan pertama Anda",
         "paragraphs": [
-          "Impor komik lokal, buka EPUB, OPDS, atau situs yang didukung. Pilih bahasa tujuan dan aktifkan terjemahan biasa. Ekstensi saat ini memakai terjemahan biasa untuk saluran resmi maupun MTU.",
+          "Impor komik lokal, buka EPUB, OPDS, atau situs yang didukung. Pilih bahasa tujuan dan aktifkan terjemahan. Ekstensi saat ini memakai terjemahan untuk saluran resmi maupun MTU.",
           "Gambar saat ini dan yang berdekatan diprioritaskan dalam jendela terbatas; di satu saluran MTU, gambar dijalankan satu per satu. Komik baru dibuka sebagai gambar asli dan terjemahan otomatis nonaktif secara default. Bandingkan tanpa kehilangan posisi; pembaca dan terjemahan halaman memakai saluran pilihan.",
           "Jika suatu halaman gagal, selesaikan masalah yang dilaporkan sebelum mencoba lagi secara manual. Menutup halaman atau kehilangan koneksi tidak membuktikan bahwa MTU menghentikan komputasi. Hindari pengiriman berulang-ulang saat layanan mungkin masih sibuk."
         ],
@@ -159,7 +159,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Terjemahan manga memerlukan alur kerja gambar",
         "paragraphs": [
-          "Dialog dalam manga biasanya merupakan bagian dari karya seni. Terjemahan teks browser tidak dapat secara langsung mengembalikan kata-kata yang diterjemahkan ke dalam gelembung ucapan. Terjemahan gambar standar mendeteksi teks, membacanya dengan OCR, menerjemahkannya, menghapus huruf asli dan menampilkan hasilnya.",
+          "Dialog dalam manga biasanya merupakan bagian dari karya seni. Terjemahan teks browser tidak dapat secara langsung mengembalikan kata-kata yang diterjemahkan ke dalam gelembung ucapan. Terjemahan gambar mendeteksi teks, membacanya dengan OCR, menerjemahkannya, menghapus huruf asli dan menampilkan hasilnya.",
           "Jika Anda sudah memiliki komputer yang mampu menjalankan layanan terjemahan, Anda dapat menggunakan manga-translator-ui untuk pemrosesan gambar dan NodeLane Comics untuk membaca browser secara berkelanjutan. Ekstensi mengirimkan gambar dari jendela bacaan saat ini ke layanan yang dipilih dan menampilkan terjemahan yang dikembalikan pada tempatnya."
         ]
       },
@@ -210,11 +210,6 @@ export const localTranslationGuides: Guide[] = [
               "Pengaturan",
               "Instal, jalankan, dan konfigurasikan layanan Anda",
               "Layanan terjemahan dikelola oleh NodeLane"
-            ],
-            [
-              "Mode ekstensi",
-              "Terjemahan biasa",
-              "Terjemahan standar di ekstensi"
             ],
             [
               "Biaya",
@@ -275,7 +270,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Mulailah dengan satu halaman",
         "paragraphs": [
-          "Mulai layanan Web MTU dan terjemahkan satu gambar dalam antarmukanya sendiri. Kemudian tambahkan alamat layanan dan akun di pengaturan NodeLane, sambungkan, dan pilih terjemahan standar dan bahasa target.",
+          "Mulai layanan Web MTU dan terjemahkan satu gambar dalam antarmukanya sendiri. Kemudian tambahkan alamat layanan dan akun di pengaturan NodeLane, sambungkan, dan pilih terjemahan dan bahasa target.",
           "Jika koneksi gagal, periksa alamat dan izin browser. Jika login berhasil tetapi tidak ada gambar yang muncul, periksa konfigurasi terjemahan layanan. Uji coba kecil memberi tahu Anda lebih banyak tentang kesesuaian untuk membaca sehari-hari dibandingkan klaim kecepatan umum."
         ],
         "links": [

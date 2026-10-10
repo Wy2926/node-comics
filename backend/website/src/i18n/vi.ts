@@ -47,7 +47,7 @@ export default {
     "heroAlt": "Manga gốc: một du khách chờ đợi trên sân ga bên bờ biển",
     "nextStop": "ĐIỂM ĐẾN TIẾP THEO / MỘT THẾ GIỚI MỚI",
     "featureHeading": "Từ thư viện của bạn đến trang web đang mở",
-    "featureDescription": "Mở tệp truyện và EPUB, kết nối OPDS hoặc dịch ảnh và vùng chọn trên web. Chọn dịch thông thường qua NodeLane hoặc MTU tự triển khai; vị trí đọc và nội dung đã lưu nằm trong trình duyệt này.",
+    "featureDescription": "Mở tệp truyện và EPUB, kết nối OPDS hoặc dịch ảnh và vùng chọn trên web. Chọn dịch qua NodeLane hoặc MTU tự triển khai; vị trí đọc và nội dung đã lưu nằm trong trình duyệt này.",
     "featureTitles": [
       "Truyện cục bộ và EPUB",
       "Thư viện OPDS",
@@ -61,11 +61,11 @@ export default {
       "Kết nối nhiều thư viện OPDS để duyệt, tìm kiếm và đọc theo nhu cầu. Nguồn hỗ trợ có thể đồng bộ tiến độ; nếu đọc từng phần đáng tin cậy, không cần tải cả sách trước.",
       "Khám phá bảng xếp hạng, tóm tắt và tên khác trên AniList; tìm website được hỗ trợ theo tên tác phẩm hoặc tên đã dịch.",
       "Dịch tab hiện tại, ảnh được nhấp chuột phải hoặc vùng chữ nhật trên màn hình. Khởi động bằng phím tắt của trình duyệt và tùy chỉnh phím thao tác đọc, dịch trên web.",
-      "Tiện ích chỉ cung cấp dịch thông thường. Chọn NodeLane hoặc manga-translator-ui tự triển khai; MTU không cần tài khoản NodeLane và không dùng hạn mức chính thức.",
+      "Tiện ích chỉ cung cấp dịch. Chọn NodeLane hoặc manga-translator-ui tự triển khai; MTU không cần tài khoản NodeLane và không dùng hạn mức chính thức.",
       "Lưu toàn bộ chương từ website theo ngôn ngữ đã chọn, tạm dừng, tiếp tục và bổ sung phần thiếu. Điều chỉnh hướng đọc, thu phóng, nền, giao diện và ngôn ngữ."
     ],
     "ribbon": [
-      "Dịch thông thường·kênh tùy chọn",
+      "Dịch·kênh tùy chọn",
       "Tệp·Drive·OPDS·website",
       "Luôn có bản gốc để so sánh",
       "Tiếp tục vị trí đã đọc"
@@ -89,13 +89,13 @@ export default {
     "free": "miễn phí",
     "month": "tháng",
     "freeBenefits": [
-      "30 trang dịch thông thường mỗi ngày",
+      "30 trang dịch mỗi ngày",
       "Đọc tệp cục bộ, Drive, OPDS và website tương thích",
       "Đối chiếu bản gốc và giữ nguyên vị trí đọc",
       "Truy cập kết quả hiện có còn hợp lệ",
       "Tối đa 10 ảnh dịch mới trong mỗi khoảng 60 giây trượt"
     ],
-    "freeNote": "Hạn mức ngày đặt lại theo giờ Asia/Shanghai, không cộng dồn. Tiện ích cung cấp dịch thông thường; chế độ khác trong công cụ dịch ảnh website tùy quyền thực tế của tài khoản.",
+    "freeNote": "Hạn mức ngày đặt lại theo giờ Asia/Shanghai, không cộng dồn. Tiện ích cung cấp dịch; chế độ khác trong công cụ dịch ảnh website tùy quyền thực tế của tài khoản.",
     "quotaNote": "Một phiên bản hình ảnh được tạo thành công ở chế độ và ngôn ngữ đã chọn được tính là một trang. Yêu cầu trùng lặp và sử dụng lại kết quả hợp lệ không bị tính phí hai lần. Một bản dịch mới rõ ràng sử dụng quyền hiện tại. Vẫn áp dụng giới hạn tần suất, kích thước hình ảnh và năng lực dịch vụ; không đảm bảo tốc độ hoàn thành.",
     "downloadTitle": "Cài đặt tiện ích mở rộng dịch truyện tranh manga của bạn",
     "downloadDescription": "Tải NodeLane Comics cho Chrome, Edge hoặc Firefox. Mở Chrome Web Store, Edge Add-ons hoặc Firefox Add-ons, hoặc tải gói phù hợp với trình duyệt.",
@@ -132,7 +132,7 @@ export default {
     "emailButton": "Gửi email",
     "aboutTitle": "Về NodeLane Comics",
     "aboutDescription": "Tiện ích đọc truyện và dịch ảnh cho Chrome, Edge, Firefox; hỗ trợ tệp cục bộ, Google Drive, OPDS, website được tích hợp và vùng chọn trên web.",
-    "aboutBody": "NodeLane Comics kết hợp kệ sách, trình đọc truyện và EPUB, thư viện từ xa và dịch ảnh web trong một tiện ích. Bắt đầu từ tệp của bạn hoặc nguồn có quyền truy cập, chọn dịch thông thường qua NodeLane hay dịch vụ riêng và so sánh bản gốc. Bản dịch có thể sai. Chúng tôi không cung cấp hay bán truyện, không vượt giới hạn trả phí, đăng nhập hoặc DRM.",
+    "aboutBody": "NodeLane Comics kết hợp kệ sách, trình đọc truyện và EPUB, thư viện từ xa và dịch ảnh web trong một tiện ích. Bắt đầu từ tệp của bạn hoặc nguồn có quyền truy cập, chọn dịch qua NodeLane hay dịch vụ riêng và so sánh bản gốc. Bản dịch có thể sai. Chúng tôi không cung cấp hay bán truyện, không vượt giới hạn trả phí, đăng nhập hoặc DRM.",
     "changelogTitle": "NodeLane Comics ghi chú phát hành",
     "changelogDescription": "Theo dõi các cập nhật của dịch giả manga, hỗ trợ trang web mới, khả năng tương thích trình duyệt và sửa lỗi đọc. Chrome, Edge và Firefox phê duyệt cửa hàng có thể khác nhau; kiểm tra phiên bản đã cài đặt của bạn.",
     "rss": "Theo dõi cập nhật qua RSS",
@@ -167,7 +167,7 @@ export default {
       "title": "Chọn nguồn và kênh dịch",
       "paragraphs": [
         "Truyện cục bộ, Google Drive, OPDS và website tương thích dùng chung kệ và trình đọc. EPUB giữ văn bản nguyên gốc và chỉ dịch ảnh trong sách. Dịch trên website khác không đưa trang vào kệ.",
-        "Cài tiện ích và mở tác phẩm bạn có quyền xử lý. Dịch thông thường qua NodeLane cần đăng nhập, dùng cùng hạn mức với website. MTU dùng tài khoản và dịch vụ riêng."
+        "Cài tiện ích và mở tác phẩm bạn có quyền xử lý. Dịch qua NodeLane cần đăng nhập, dùng cùng hạn mức với website. MTU dùng tài khoản và dịch vụ riêng."
       ]
     },
     {
@@ -194,14 +194,14 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Dịch thông thường và chọn kênh: NodeLane hay MTU",
-  "description": "Hiểu dịch ảnh thông thường, hạn mức chính thức, manga-translator-ui và so sánh bản gốc trước khi chọn dịch vụ.",
+  "title": "Dịch và chọn kênh: NodeLane hay MTU",
+  "description": "Hiểu dịch ảnh, hạn mức chính thức, manga-translator-ui và so sánh bản gốc trước khi chọn dịch vụ.",
   "category": "Mẹo dịch thuật",
   "sections": [
     {
-      "title": "Tiện ích dùng dịch thông thường",
+      "title": "Tiện ích dùng dịch",
       "paragraphs": [
-        "Nhận diện/OCR, dịch văn bản, xóa chữ cục bộ và dàn chữ tạo ảnh dịch. Tiện ích hiển thị bản gốc và bản dịch thông thường, cho phép chuyển hoặc so sánh cạnh nhau.",
+        "Nhận diện/OCR, dịch văn bản, xóa chữ cục bộ và dàn chữ tạo ảnh dịch. Tiện ích hiển thị bản gốc và bản dịch, cho phép chuyển hoặc so sánh cạnh nhau.",
         "Trình đọc, tab, ảnh nhấp chuột phải và vùng chọn dùng chung kênh, ngôn ngữ. EPUB không dịch văn bản, chỉ xử lý ảnh tương thích trong sách."
       ]
     },
@@ -289,7 +289,7 @@ export default {
     {
       "title": "Kiểm tra bản dịch, hình và khung liền kề",
       "paragraphs": [
-        "Dịch thông thường vẫn có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng. Khi nét mặt, chữ viết tay hay nền ảnh ảnh hưởng câu chuyện, hãy so sánh bản gốc và các khung trước, sau.",
+        "Dịch vẫn có thể bỏ sót, dịch sai hoặc dàn chữ chưa đúng. Khi nét mặt, chữ viết tay hay nền ảnh ảnh hưởng câu chuyện, hãy so sánh bản gốc và các khung trước, sau.",
         "NodeLane Comics giữ nguyên bản gốc. Bản dịch hạ thấp rào cản hiểu biết mà không lấy đi khả năng xác minh tác phẩm."
       ]
     }
@@ -349,7 +349,7 @@ export default {
     {
       "title": "Dịch và lưu giữ",
       "paragraphs": [
-        "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
+        "Tiện ích dùng dịch với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
         "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn."
       ]
     },
@@ -452,14 +452,14 @@ export default {
           {
             "title": "Nhà cung cấp dịch vụ và chuyển giao",
             "paragraphs": [
-              "Tiện ích dùng dịch thông thường với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
+              "Tiện ích dùng dịch với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
               "Hình ảnh dịch sử dụng file riêng tư trên máy chủ trung tâm; văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Các dịch vụ nhận dạng, cơ sở hạ tầng, dịch thuật và thanh toán xử lý dữ liệu khi cần thiết theo chính sách hiện hành của họ. Quá trình xử lý có thể diễn ra bên ngoài khu vực của bạn. Chúng tôi không bán thông tin cá nhân hoặc sử dụng truyện tranh đã gửi để nhắm mục tiêu quảng cáo. Chúng tôi không hứa rằng tất cả các nhà cung cấp sẽ không giữ lại gì hoặc không bao giờ sử dụng dữ liệu để đào tạo; điều này phụ thuộc vào nhà cung cấp và thỏa thuận. Không gửi nội dung nhạy cảm trái phép hoặc không phù hợp."
             ]
           },
           {
             "title": "Giữ lại và xóa",
             "paragraphs": [
-              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
+              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
               "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
               "Đối với các yêu cầu xóa tài khoản hoặc phạm vi rộng hơn, hãy liên hệ với chúng tôi để xác minh danh tính và phạm vi. Hồ sơ giao dịch, kiểm toán hoặc bảo mật có thể cần được lưu giữ để phục vụ các nghĩa vụ dịch vụ, tranh chấp hoặc các yêu cầu hiện hành. Không có thời hạn xóa duy nhất nào được hứa hẹn cho tất cả hồ sơ; câu trả lời sẽ giải thích kết quả và những hạn chế."
             ]
@@ -568,8 +568,8 @@ export default {
       },
       {
         "id": "translation-modes",
-        "question": "Chọn dịch thông thường qua NodeLane hay MTU thế nào?",
-        "answer": "Tiện ích chỉ dùng dịch thông thường: nhận diện chữ, dịch, xóa chữ cục bộ và dàn chữ. Kênh NodeLane cần đăng nhập và hạn mức tài khoản; MTU dùng dịch vụ riêng nên không cần tài khoản NodeLane. Cả hai đều so sánh được bản gốc.",
+        "question": "Chọn dịch qua NodeLane hay MTU thế nào?",
+        "answer": "Tiện ích chỉ dùng dịch: nhận diện chữ, dịch, xóa chữ cục bộ và dàn chữ. Kênh NodeLane cần đăng nhập và hạn mức tài khoản; MTU dùng dịch vụ riêng nên không cần tài khoản NodeLane. Cả hai đều so sánh được bản gốc.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -587,7 +587,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Hình ảnh có được tải lên hoặc giữ lại không?",
-        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch thông thường lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
+        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
         "relatedPath": "/privacy/"
       },
       {
@@ -617,7 +617,7 @@ export default {
       {
         "id": "local-translation",
         "question": "Dùng dịch vụ riêng mà không đăng nhập NodeLane được không?",
-        "answer": "Có. Thêm và chọn manga-translator-ui tự triển khai trong cài đặt. Có thể lưu nhiều cấu hình nhưng chỉ dùng một kênh tại một thời điểm. Tiện ích chỉ dịch thông thường và không dùng hạn mức NodeLane. Sau khi kết nối thành công, mật khẩu và mã MTU được lưu trên thiết bị. Internet và xử lý ảnh tùy cấu hình dịch vụ. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại.",
+        "answer": "Có. Thêm và chọn manga-translator-ui tự triển khai trong cài đặt. Có thể lưu nhiều cấu hình nhưng chỉ dùng một kênh tại một thời điểm. Tiện ích chỉ dịch và không dùng hạn mức NodeLane. Sau khi kết nối thành công, mật khẩu và mã MTU được lưu trên thiết bị. Internet và xử lý ảnh tùy cấu hình dịch vụ. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại.",
         "relatedPath": "/guides/local-translation/"
       },
       {
@@ -662,7 +662,7 @@ export default {
         "items": [
           "Đã thêm các nguồn Atsumaru, MangaBall, RawOtaku và JF00, với tính năng nhập manga trực tiếp để đọc.",
           "Dịch tiêu đề và mô tả trên trang Khám phá, chuyển đổi giữa văn bản gốc và văn bản đã dịch, kiểm tra trạng thái dịch và thử lại không thành công.",
-          "Cải thiện dịch thông thường cho các truyện tranh rất dài, bao gồm lưu các hình ảnh đã dịch hoàn chỉnh và khôi phục các tác vụ bị gián đoạn.",
+          "Cải thiện dịch cho các truyện tranh rất dài, bao gồm lưu các hình ảnh đã dịch hoàn chỉnh và khôi phục các tác vụ bị gián đoạn.",
           "Đã sửa lỗi cắt bớt kích thước khi mã hóa hình ảnh cực dài dưới dạng JPEG. Hình ảnh đã dịch hoàn chỉnh hãy sử dụng PNG khi cần.",
           "Đã sửa lỗi gửi bản dịch chính thức với một số hình ảnh AVIF trong khi vẫn đọc bản gốc không thay đổi.",
           "Ghi nhớ thu phóng cho từng cuốn sách và tải trước các trang có độ phân giải cao liền kề, với các cải tiến về tải chương liên tục, cuộn và duy trì vị trí đọc.",
@@ -827,7 +827,7 @@ export default {
     "退出官网账户": "Đăng xuất khỏi trang web này",
     "当前套餐": "Gói hiện tại",
     "普通账户": "Miễn phí",
-    "常规翻译": "Dịch thông thường",
+    "翻译": "Dịch",
     "不限累计页数": "Tổng số trang không giới hạn",
     "页": " trang",
     " 页可用": " trang có sẵn",
@@ -876,6 +876,6 @@ export default {
     "中文示意": "Minh họa tiếng Trung",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Manga gốc: du khách bên bờ biển với lời thoại tiếng Nhật",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Phiên bản tiếng Trung của cùng một hình minh họa manga gốc",
-    "产品常规翻译实测效果": "Kết quả thực tế từ bản dịch chuẩn của sản phẩm"
+    "产品翻译实测效果": "Kết quả thực tế từ bản dịch chuẩn của sản phẩm"
   }
 } satisfies Dictionary;

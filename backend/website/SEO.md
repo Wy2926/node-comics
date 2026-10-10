@@ -20,11 +20,12 @@
 | `/about/` | NodeLane 漫译品牌与用途 | about NodeLane Comics |
 | `/changelog/` | NodeLane 漫译版本更新 | NodeLane Comics release notes |
 | `/guides/manga-translation/` | 如何在浏览器翻译漫画 | how to translate manga in a browser |
-| `/guides/translation-modes/` | 常规图片翻译、官方与 MTU 渠道选择 | standard manga translation, official vs MTU service |
+| `/guides/translation-modes/` | 图片翻译、官方与 MTU 渠道选择 | manga translation, official vs MTU service |
 | `/guides/local-translation/` | 本地翻译教程、manga-translator-ui 连接与排错 | manga-translator-ui setup, local translation tutorial |
 | `/guides/local-manga-translator/` | 本地漫画翻译工具、费用、隐私与离线条件 | local manga translator, self-hosted manga translation |
 | `/guides/local-comics/` | CBZ／CBR／PDF／MOBI／EPUB 阅读 | CBZ reader, CBR reader, PDF / MOBI / EPUB reader |
 | `/guides/remote-library/` | Google Drive、OPDS 远程书库与阅读进度 | Google Drive comics, OPDS reader, reading progress |
+| `/guides/find-manga/` | 按名称查找漫画、别名搜索、来源核对与导入 | find manga by title, source search, import and read |
 | `/guides/japanese-manga/` | 日语漫画翻译、原图对照 | Japanese manga translation, original comparison |
 | `/guides/translation-troubleshooting/` | 漫画翻译失败、一直等待 | manga translation failed, stuck translation |
 | `/guides/comic-reader-privacy/` | 漫画翻译图片上传、网站权限 | manga translator image uploads, extension permissions |

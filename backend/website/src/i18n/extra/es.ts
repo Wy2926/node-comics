@@ -9,7 +9,6 @@ export const translate = {
   "start": "Iniciar traducción",
   "history": "Historial local",
   "language": "Traducir al",
-  "classic": "Estándar",
   "download": "Descargar traducción",
   "remove": "Eliminar registro local",
   "confirmDelete": "¿Eliminar esta imagen local y su traducción? Esto no se puede deshacer.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Reconectar",
   "submitting": "Enviando solicitud",
   "receiving": "Guardando la traducción",
-  "formatUnavailable": "Este modo de traducción no está disponible actualmente para imágenes de tanto tiempo.",
+  "formatUnavailable": "El servicio de traducción no admite imágenes de este tamaño por ahora.",
   "inputMissing": "Falta la entrada de traducción guardada. Esta tarea no se puede reanudar."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Las suscripciones aún no están disponibles",
     "loading": "Cargando planes…",
     "error": "No se pueden cargar planes. Por favor actualice.",
-    "classic": "Traducción clásica ilimitada",
+    "classic": "Traducción ilimitada",
     "renewMonthly": "Se renueva mensualmente.",
     "renewAnnual": "Se renueva anualmente."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Hasta {n} nuevas páginas de traducción por hora consecutiva",
     "trial": "Las cuentas nuevas elegibles pueden probar durante {d} días. Se requiere una tarjeta.",
     "subscribe": "Obtener {name}",
-    "description": "Traducción clásica con límite horario para nuevas solicitudes de traducción.",
+    "description": "Traducción con límite horario para nuevas solicitudes de traducción.",
     "intro": "Elija un plan de traducción para utilizar los beneficios de su suscripción en la extensión."
   },
   "manage": "Administrar suscripción",

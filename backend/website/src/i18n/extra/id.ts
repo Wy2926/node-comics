@@ -9,7 +9,6 @@ export const translate = {
   "start": "Mulai menerjemahkan",
   "history": "Riwayat lokal",
   "language": "Bahasa tujuan",
-  "classic": "Terjemahan standar",
   "download": "Unduh gambar terjemahan lengkap",
   "remove": "Hapus catatan lokal",
   "confirmDelete": "Hapus gambar dan terjemahan lokal ini? Hal ini tidak dapat dibatalkan.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Hubungkan kembali",
   "submitting": "Mengirim permintaan",
   "receiving": "Menyimpan terjemahan",
-  "formatUnavailable": "Mode terjemahan ini saat ini tidak tersedia untuk gambar sepanjang ini.",
+  "formatUnavailable": "Layanan terjemahan saat ini belum mendukung gambar berukuran ini.",
   "inputMissing": "Gambar input terjemahan yang disimpan tidak ditemukan. Tugas ini tidak dapat dilanjutkan."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Langganan belum tersedia",
     "loading": "Memuat paket…",
     "error": "Tidak dapat memuat paket. Silakan muat ulang.",
-    "classic": "Terjemahan standar tanpa batas",
+    "classic": "Terjemahan tanpa batas",
     "renewMonthly": "Diperpanjang setiap bulan.",
     "renewAnnual": "Diperpanjang setiap tahun."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Hingga {n} halaman terjemahan baru dalam setiap periode bergulir 60 menit",
     "trial": "Akun baru yang memenuhi syarat dapat mencoba selama {d} hari. Kartu diperlukan.",
     "subscribe": "Dapatkan {name}",
-    "description": "Terjemahan standar dengan batas permintaan terjemahan baru per jam.",
+    "description": "Terjemahan dengan batas permintaan terjemahan baru per jam.",
     "intro": "Pilih paket terjemahan untuk menggunakan manfaat langganan Anda di ekstensi."
   },
   "manage": "Kelola langganan",

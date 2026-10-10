@@ -13,7 +13,7 @@ const copy: HomeCopy = {
     "loading": "Resim yükleniyor…",
     "error": "Resim yüklenemedi.",
     "retry": "Tekrar dene",
-    "caption": "Kaydedilmiş standart çeviri sonuçları"
+    "caption": "Kaydedilmiş çeviri sonuçları"
   },
   "eyebrow": "MANGA ÇEVİRİ TARAYICI UZANTISI",
   "title": ["Manganızı çevirin.","Okumaya devam edin."],
@@ -67,7 +67,7 @@ const copy: HomeCopy = {
   "compareEyebrow": "DAHA YAKINDAN BAK",
   "compareTitle": "Çeviriyi kontrol et. Orijinali koru.",
   "compareBody": "Japonca orijinal ile kaydedilmiş çeviri sonuçları arasında geçiş yapın. Okuyucunun orijinal ve tercüme edilmiş görünümleri ulaşılabilir durumda kalır.",
-  "compareNote": "Orijinal bir AI illüstrasyonunda gerçek bir standart çeviri örneği. Sonuçlar sanat eserine, metne ve dile göre değişiklik gösterir.",
+  "compareNote": "Orijinal bir AI illüstrasyonunda gerçek bir çeviri örneği. Sonuçlar sanat eserine, metne ve dile göre değişiklik gösterir.",
   "compareLink": "Çeviri nasıl çalışır",
   "readerEyebrow": "ALTI EKRAN. İÇERİYE BİR BAKIŞ.",
   "readerTitle": "Sıradaki çizgi romanın. Sıradaki sayfan.",
@@ -125,7 +125,7 @@ const copy: HomeCopy = {
     ]
   ],
   "modesEyebrow": "İSTEDİĞİN ZAMAN ÇEVİR",
-  "modesTitle": "Normal çeviri. Kanalı siz seçin.",
+  "modesTitle": "Çeviri. Kanalı siz seçin.",
   "modes": [
     [
       "NodeLane resmî kanalı",

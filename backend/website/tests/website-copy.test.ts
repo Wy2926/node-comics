@@ -75,9 +75,26 @@ test('all website locales omit the retired image feature from prose, metadata an
   }
 });
 
-test('the workbench only starts standard translation and preserves existing result recovery', () => {
+test('website copy uses one translation name across all locales, including account and workspace labels', () => {
+  const retiredName = /常[规規](?:图片|圖片|漫画|漫畫|方式)?翻[译譯]|常[规規][译譯](?:图|圖|本)|一般翻譯|通常(?:の)?(?:画像|漫画)?翻訳|일반\s+(?:이미지\s+)?번역|\b(?:standard|classic|regular|normal)[ -]+(?:(?:image|manga) )?translat|(?:traduction|traduzione|traducción|tradução).{0,18}(?:classiqu|classica|clásic|clássic|standard|estándar|padrão)|(?:klassisch\p{L}*\s+Übersetzung|Standardübersetzung)|(?:обычн|стандартн|классическ)\p{L}*\s+перевод|(?:звичайн|стандартн|класичн)\p{L}*\s+переклад|(?:zwykł|klasyczn|standardow)\p{L}*\s+tłumacz|tłumacz\p{L}*\s+(?:klasyczn|standardow)\p{L}*|(?:klasik|standart|normal)\s+(?:görüntü\s+)?çeviri|terjemahan(?: gambar)?\s+(?:standar|klasik|biasa)|dịch(?: hình ảnh| ảnh)?\s+(?:thông thường|tiêu chuẩn)|(?:الترجمة|ترجمة(?: الصور| صور)?)\s+(?:القياسية|التقليدية|العادية|قياسية)/iu;
+  function check(value: unknown, label: string) {
+    if (typeof value === 'string') assert.doesNotMatch(value, retiredName, label);
+    else if (value && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) check(item, `${label}.${key}`);
+    }
+  }
+  for (const locale of locales) {
+    check({ dictionary: dictionaries[locale], home: homeCopy[locale], workspace: translationCopy[locale], commerce: commerceCopy(locale), billing: billingCopy(locale) }, locale);
+    assert.equal('classic' in translationCopy[locale], false, `${locale}: obsolete workspace mode badge`);
+    const comparison = dictionaries[locale].documents.guides.find(guide => guide.slug === 'local-manga-translator')!.sections.find(section => section.table?.headers.length === 3)!.table!;
+    assert.equal(comparison.rows.length, 4, `${locale}: remove redundant translation-mode comparison`);
+  }
+});
+
+test('the workbench starts one translation workflow and preserves existing result recovery', () => {
   const source = readFileSync(new URL('../src/components/TranslationWorkbench.tsx', import.meta.url), 'utf8');
   assert.equal(/\bsetMode\b|\bt\.mode|\bt\.redraw|value="redraw"/.test(source), false);
+  assert.doesNotMatch(source, /\bt\.classic\b/);
   assert.match(source, /meta\.mode = 'classic'/);
   assert.match(source, /if \(!snapshot\)\s*\{\s*\/\/[^\n]*\n\s*if \(meta\.mode !== 'classic'\) throw/);
   assert.match(source, /async function again\(meta: RecordMeta,\s*regenerate\s*=\s*false\)\s*\{\s*if \(meta\.mode !== 'classic'/);

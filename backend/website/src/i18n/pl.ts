@@ -61,7 +61,7 @@ export default {
       "Dodawaj wiele bibliotek OPDS, przeglądaj katalogi, wyszukuj i czytaj. Przy niezawodnej obsłudze Range dane są pobierane w miarę czytania; w przeciwnym razie trzeba jawnie pobrać cały plik.",
       "Przeglądaj propozycje i wyszukuj tytuły na różnych obsługiwanych stronach. Dodawanie do czytnika wymaga adaptera strony, a katalog źródłowy pozostaje tylko do odczytu.",
       "Tłumacz obrazy na bieżącej stronie, pojedynczy obraz z menu kontekstowego lub widoczny prostokątny obszar. Zaznaczenie nie łączy obrazu podczas przewijania; skróty można ustawić w przeglądarce.",
-      "Rozszerzenie korzysta ze zwykłego tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał lub własny manga-translator-ui. Nowy komiks otwiera się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone.",
+      "Rozszerzenie korzysta z tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał lub własny manga-translator-ui. Nowy komiks otwiera się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone.",
       "Zapisuj w pamięci podręcznej wszystkie rozdziały wybranego języka na stronie. Wstrzymuj i wznawiaj pobieranie, uzupełniając braki. Gotowe rozdziały można czytać offline; dopasuj widok, skalę i porównanie z oryginałem."
     ],
     "ribbon": [
@@ -89,7 +89,7 @@ export default {
     "free": "bezpłatny",
     "month": "miesiąc",
     "freeBenefits": [
-      "30 stron tłumaczeń klasycznych dziennie",
+      "30 stron tłumaczeń dziennie",
       "Czytanie komiksów w Internecie i lokalnie",
       "Oryginalne porównanie i pozycja do czytania",
       "Dostęp do aktualnych, aktualnych wyników",
@@ -132,7 +132,7 @@ export default {
     "emailButton": "Wyślij e-mail",
     "aboutTitle": "O NodeLane Comics",
     "aboutDescription": "NodeLane Comics to rozszerzenie do czytania i tłumaczenia mangi w Chrome, Edge i Firefox: komiksy lokalne, EPUB, Google Drive, OPDS i obsługiwane strony.",
-    "aboutBody": "NodeLane Comics łączy czytanie komiksów i tłumaczenie obrazów w przeglądarce. Otwieraj własne pliki, łącz Drive lub OPDS, odkrywaj historie na obsługiwanych stronach i tłumacz strony albo widoczne obszary. Zwykłe tłumaczenie działa przez oficjalny kanał lub Twój manga-translator-ui. Oryginał pozostaje dostępny do sprawdzenia, ponieważ rozpoznawanie i tłumaczenie mogą zawierać błędy. Nie udostępniamy katalogu komiksów, nie sprzedajemy komiksów ani nie omijamy płatnego dostępu, logowania lub DRM. Korzystaj wyłącznie z treści, które masz prawo odczytywać i przetwarzać.",
+    "aboutBody": "NodeLane Comics łączy czytanie komiksów i tłumaczenie obrazów w przeglądarce. Otwieraj własne pliki, łącz Drive lub OPDS, odkrywaj historie na obsługiwanych stronach i tłumacz strony albo widoczne obszary. tłumaczenie działa przez oficjalny kanał lub Twój manga-translator-ui. Oryginał pozostaje dostępny do sprawdzenia, ponieważ rozpoznawanie i tłumaczenie mogą zawierać błędy. Nie udostępniamy katalogu komiksów, nie sprzedajemy komiksów ani nie omijamy płatnego dostępu, logowania lub DRM. Korzystaj wyłącznie z treści, które masz prawo odczytywać i przetwarzać.",
     "changelogTitle": "NodeLane Comics informacje o wydaniu",
     "changelogDescription": "Śledź aktualizacje tłumacza mangi, obsługę nowej witryny, kompatybilność przeglądarki i poprawki dotyczące czytania. Zatwierdzenia sklepów Chrome, Edge i Firefox mogą się różnić; sprawdź zainstalowaną wersję.",
     "rss": "Śledź aktualizacje poprzez RSS",
@@ -194,15 +194,15 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Zwykłe tłumaczenie mangi: oficjalny kanał czy własny MTU?",
-  "description": "Jak działa zwykłe tłumaczenie w rozszerzeniu i czym różnią się oficjalny kanał i manga-translator-ui.",
+  "title": "Tłumaczenie mangi: oficjalny kanał czy własny MTU?",
+  "description": "Jak działa tłumaczenie w rozszerzeniu i czym różnią się oficjalny kanał i manga-translator-ui.",
   "category": "Wskazówki dotyczące tłumaczeń",
   "sections": [
     {
-      "title": "Jak działa zwykłe tłumaczenie",
+      "title": "Jak działa tłumaczenie",
       "paragraphs": [
         "Rozszerzenie wykrywa tekst, rozpoznaje go przez OCR, tłumaczy, odtwarza tło w obszarze tekstu i umieszcza wynik na stronie. Oryginał pozostaje dostępny do porównania.",
-        "Bieżące rozszerzenie korzysta wyłącznie ze zwykłego tłumaczenia."
+        "Rozszerzenie tłumaczy obrazy."
       ]
     },
     {
@@ -288,7 +288,7 @@ export default {
     {
       "title": "Sprawdź zarówno słowa, jak i obrazy",
       "paragraphs": [
-        "Zwykłe tłumaczenie może pominąć tekst albo niedokładnie odtworzyć tło i układ napisów. Porównuj mimikę, pismo odręczne i tło, kiedy mają znaczenie dla historii.",
+        "Tłumaczenie może pominąć tekst albo niedokładnie odtworzyć tło i układ napisów. Porównuj mimikę, pismo odręczne i tło, kiedy mają znaczenie dla historii.",
         "NodeLane Comics zapewnia dostępność oryginału. Tłumaczenie obniża barierę zrozumienia, nie pozbawiając jednocześnie możliwości sprawdzenia samego dzieła."
       ]
     }
@@ -348,7 +348,7 @@ export default {
     {
       "title": "Tłumaczenie i przechowywanie",
       "paragraphs": [
-        "Rozszerzenie używa zwykłego tłumaczenia. Tłumaczenie klasyczne wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+        "Rozszerzenie używa tłumaczenia. Tłumaczenie wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
         "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii."
       ]
     },
@@ -452,14 +452,14 @@ export default {
           {
             "title": "Usługodawcy i transfery",
             "paragraphs": [
-              "Rozszerzenie używa zwykłego tłumaczenia. Klasyczne przetwarzanie może obejmować wykrywanie/OCR, modele tekstowe, lokalną naprawę tła i skład. Dostawcy tekstu przetwarzają rozpoznany tekst potrzebny do tłumaczenia. Rzeczywiści dostawcy są skonfigurowani na serwerze dla tego zadania.",
+              "Rozszerzenie używa tłumaczenia. przetwarzanie może obejmować wykrywanie/OCR, modele tekstowe, lokalną naprawę tła i skład. Dostawcy tekstu przetwarzają rozpoznany tekst potrzebny do tłumaczenia. Rzeczywiści dostawcy są skonfigurowani na serwerze dla tego zadania.",
               "Obrazy tłumaczeń korzystają z prywatnych plików na serwerze centralnym; rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usługi związane z tożsamością, infrastrukturą, tłumaczeniami i płatnościami przetwarzają dane w razie potrzeby, zgodnie z obowiązującymi politykami. Przetwarzanie może odbywać się poza Twoim regionem. Nie sprzedajemy danych osobowych ani nie wykorzystujemy przesłanych komiksów do kierowania reklam. Nie obiecujemy, że wszyscy dostawcy niczego nie zachowają ani nigdy nie wykorzystają danych do celów szkoleniowych; zależy to od dostawcy i umowy. Nie przesyłaj nieautoryzowanych lub nieodpowiednich treści wrażliwych."
             ]
           },
           {
             "title": "Przechowywanie i usuwanie",
             "paragraphs": [
-              "Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+              "Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
               "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz.",
               "W przypadku żądań usunięcia konta lub szerszych wniosków skontaktuj się z nami w celu weryfikacji tożsamości i zakresu. Rejestry transakcji, audytów lub bezpieczeństwa mogą wymagać przechowywania ze względu na zobowiązania serwisowe, spory lub obowiązujące wymagania. Nie ma określonego terminu usunięcia wszystkich zapisów; odpowiedź wyjaśni wynik i ograniczenia."
             ]
@@ -488,7 +488,7 @@ export default {
             "title": "Prawa do treści i wyniki AI",
             "paragraphs": [
               "Musisz mieć prawo dostępu, przesyłania, tłumaczenia i przetwarzania wybranych treści oraz przestrzegać wymagań dotyczących witryny źródłowej i posiadacza praw. Rozszerzenie nie przyznaje żadnych praw autorskich ani automatycznych uprawnień do publikowania przetłumaczonych obrazów. Nie omijaj zapór płatniczych, wymagań dotyczących logowania ani DRM. Nie gwarantujemy legalności ani kompletności treści źródłowych. Zapytania dotyczące praw autorskich powinny określać dzieło, prawa, wydanie i dane kontaktowe.",
-              "AI może pominąć, błędnie przetłumaczyć lub umieścić tekst. Wyniki pomagają czytać i nie zastępują oryginału ani profesjonalnej weryfikacji. Oryginalne ilustracje strony są wygenerowane przez AI; porównania języków pokazują zapisane przykłady zwykłego tłumaczenia. Nie gwarantują dokładności, szybkości ani wyniku dla każdego obrazu. Porównuj z oryginałem i przesyłaj uwagi."
+              "AI może pominąć, błędnie przetłumaczyć lub umieścić tekst. Wyniki pomagają czytać i nie zastępują oryginału ani profesjonalnej weryfikacji. Oryginalne ilustracje strony są wygenerowane przez AI; porównania języków pokazują zapisane przykłady tłumaczenia. Nie gwarantują dokładności, szybkości ani wyniku dla każdego obrazu. Porównuj z oryginałem i przesyłaj uwagi."
             ]
           },
           {
@@ -569,7 +569,7 @@ export default {
       {
         "id": "translation-modes",
         "question": "Jakie tłumaczenie i kanały są dostępne w rozszerzeniu?",
-        "answer": "Bieżące rozszerzenie używa zwykłego tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał NodeLane lub własny manga-translator-ui. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest wyłączone.",
+        "answer": "Bieżące rozszerzenie używa tłumaczenia: OCR, tłumaczenia tekstu, odtworzenia tła i składu. Wybierz oficjalny kanał NodeLane lub własny manga-translator-ui. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest wyłączone.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -587,7 +587,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Czy obrazy są przesyłane lub zachowywane?",
-        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa zwykłego tłumaczenia. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie klasyczne zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
+        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa tłumaczenia. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
         "relatedPath": "/privacy/"
       },
       {
@@ -662,7 +662,7 @@ export default {
         "items": [
           "Dodano źródła Atsumaru, MangaBall, RawOtaku i JF00, z bezpośrednim importem mangi do czytania.",
           "Tłumacz tytuły i opisy na stronie Odkryj, przełączaj się między tekstem oryginalnym i przetłumaczonym, sprawdzaj status tłumaczenia i ponawiaj próby.",
-          "Ulepszone tłumaczenie klasyczne bardzo długich komiksów, w tym zapisywanie kompletnych przetłumaczonych obrazów i odzyskiwanie przerwanych zadań.",
+          "Ulepszone tłumaczenie bardzo długich komiksów, w tym zapisywanie kompletnych przetłumaczonych obrazów i odzyskiwanie przerwanych zadań.",
           "Naprawiono obcinanie wymiarów podczas kodowania bardzo długich obrazów jako JPEG. W razie potrzeby kompletne przetłumaczone obrazy używają PNG.",
           "Naprawiono błędy w przesyłaniu oficjalnych tłumaczeń niektórych obrazów AVIF, przy jednoczesnym zachowaniu niezmienionego czytania oryginałów.",
           "Zapamiętuje powiększenie każdej książki i wstępnie ładuje sąsiednie strony w wysokiej rozdzielczości, z ulepszeniami w zakresie ciągłego ładowania rozdziałów, przewijania i zachowywania pozycji czytania.",
@@ -827,7 +827,7 @@ export default {
     "退出官网账户": "Wyloguj się z tej witryny",
     "当前套餐": "Aktualny plan",
     "普通账户": "Bezpłatny",
-    "常规翻译": "Tłumaczenie standardowe",
+    "翻译": "Tłumaczenie",
     "不限累计页数": "Nieograniczona liczba stron",
     "页": " strony",
     " 页可用": " dostępne strony",
@@ -876,6 +876,6 @@ export default {
     "中文示意": "Chińska ilustracja",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Oryginalna manga: nadmorski podróżnik z japońskim dialogiem",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Chińska wersja tej samej oryginalnej ilustracji mangi",
-    "产品常规翻译实测效果": "Rzeczywiste wyniki ze standardowego tłumaczenia produktu"
+    "产品翻译实测效果": "Rzeczywiste wyniki z tłumaczenia produktu"
   }
 } satisfies Dictionary;

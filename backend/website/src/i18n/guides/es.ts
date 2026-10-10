@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Lee tu primera página traducida",
         "paragraphs": [
-          "Importa un manga local o abre una fuente compatible en el lector. Elige un idioma y la traducción clásica con tu canal MTU seleccionado.",
+          "Importa un manga local o abre una fuente compatible en el lector. Elige un idioma y la traducción con tu canal MTU seleccionado.",
           "La página actual tiene prioridad, seguida de una ventana limitada de imágenes cercanas. Las imágenes se procesan de una en una en el mismo canal MTU. Compara original y traducción sin perder tu posición; el lector y la traducción en la página usan el mismo servicio seleccionado.",
           "Si una página falla, resuelva el problema informado antes de volver a intentarlo manualmente. Cerrar una página o perder la conexión no prueba que MTU dejó de calcular. Evite envíos repetidos mientras el servicio aún esté ocupado."
         ],
@@ -159,7 +159,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "La traducción de manga necesita un flujo de trabajo de imágenes",
         "paragraphs": [
-          "El diálogo en el manga suele ser parte de la obra de arte. La traducción de texto de un navegador no puede devolver directamente las palabras traducidas a los bocadillos. La traducción de imágenes clásica detecta texto, lo lee con OCR, lo traduce, elimina las letras originales y presenta el resultado.",
+          "El diálogo en el manga suele ser parte de la obra de arte. La traducción de texto de un navegador no puede devolver directamente las palabras traducidas a los bocadillos. La traducción de imágenes detecta texto, lo lee con OCR, lo traduce, elimina las letras originales y presenta el resultado.",
           "Si ya tiene una computadora capaz de ejecutar un servicio de traducción, puede usar manga-translator-ui para el procesamiento de imágenes y NodeLane Comics para la lectura continua del navegador. La extensión envía imágenes desde la ventana de lectura actual al servicio seleccionado y muestra las traducciones devueltas en su lugar."
         ]
       },
@@ -210,11 +210,6 @@ export const localTranslationGuides: Guide[] = [
               "Configuración",
               "Instala, ejecuta y configura tu servicio",
               "Servicio de traducción mantenido por NodeLane"
-            ],
-            [
-              "Modos de extensión",
-              "Actualmente solo traducción clásica",
-              "Traducción estándar en la extensión"
             ],
             [
               "Costos",
@@ -275,7 +270,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Comience con una página",
         "paragraphs": [
-          "Inicie el servicio web de MTU y traduzca una imagen en su propia interfaz. Luego agregue la dirección de servicio y la cuenta en la configuración NodeLane, conéctese y seleccione la traducción clásica y un idioma de destino.",
+          "Inicie el servicio web de MTU y traduzca una imagen en su propia interfaz. Luego agregue la dirección de servicio y la cuenta en la configuración NodeLane, conéctese y seleccione la traducción y un idioma de destino.",
           "Si la conexión falla, verifique la dirección y el permiso del navegador. Si el inicio de sesión funciona pero no aparece ninguna imagen, verifique la configuración de traducción del servicio. Una pequeña prueba le dice más sobre la idoneidad para la lectura diaria que una afirmación general de velocidad."
         ],
         "links": [

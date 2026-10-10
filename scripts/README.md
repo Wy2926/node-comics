@@ -105,7 +105,8 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 
 | 工具 | 范围 |
 | --- | --- |
-| `verify_website_languages.mjs` | 17 语公开页面、桌面键盘操作、Android Chromium／iPhone WebKit 触控语言与导航菜单、返回恢复、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；`--menus-only` 只运行菜单回归，需安装与 Playwright 匹配的 WebKit，不调用真实身份、计费或模型服务 |
+| `verify_website_languages.mjs` | 17 语公开页面、14 档宽度导航防挤压／遮挡、RTL、无 JS 导航、桌面键盘操作、Android Chromium／iPhone WebKit 触控语言与导航菜单、返回恢复、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；`--header-only` 只检查导航布局，`--menus-only` 检查布局与菜单交互，触控检查需安装与 Playwright 匹配的 WebKit，不调用真实身份、计费或模型服务 |
+| `verify_website_guides.mjs` | 构建预览中的 17 语教程目录及六篇图文教程、桌面／320px 窄屏、四语截图源文件摘要匹配与放大链接、中日韩英桌面／手机截图、无 JavaScript 与断图降级；不调用身份、计费或翻译服务 |
 | `verify_website_download.mjs` | 17 语下载页；指向公开服务时真实下载并核对摘要 |
 | `verify_website_pricing.mjs` | 17 语无 JavaScript 公示月价与年总价、Free／Lite 三列九项权益对照及可聚焦／悬停／点按的信息提示、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `verify_website_compare.mjs` | 17 语首页单张真实对照图、锚点和三浏览器入口，原生月／年套餐预览与语言链接；桌面和手机布局 |

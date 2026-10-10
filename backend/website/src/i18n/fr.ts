@@ -61,12 +61,12 @@ export default {
       "Connectez plusieurs bibliothèques OPDS pour parcourir, rechercher et lire à la demande. Si une ressource permet une lecture fiable par plages HTTP, seules les parties nécessaires sont récupérées ; sinon, un téléchargement complet explicite est requis.",
       "Explorez les tendances, les nouveautés et les classements AniList. Recherchez un titre, un alias ou un nom traduit sur les sites compatibles, puis vérifiez la source avant de l’ajouter.",
       "Traduisez la page, une image par clic droit ou un rectangle visible. La sélection ne défile pas pour assembler une longue image. Personnalisez les raccourcis dans le navigateur.",
-      "Traduction classique, retour à l’original et comparaison côte à côte. Choisissez le service officiel avec votre compte ou votre propre manga-translator-ui sans quota officiel.",
+      "Traduction, retour à l’original et comparaison côte à côte. Choisissez le service officiel avec votre compte ou votre propre manga-translator-ui sans quota officiel.",
       "Mettez les chapitres en cache, faites une pause puis reprenez et complétez les pages manquantes. Réglez la lecture continue ou page par page, le sens, le zoom et le fond."
     ],
     "ribbon": [
       "Fichiers, EPUB et OPDS",
-      "Traduction classique",
+      "Traduction",
       "Originaux et comparaison",
       "Chapitres en cache hors ligne"
     ],
@@ -89,7 +89,7 @@ export default {
     "free": "gratuit",
     "month": "mois",
     "freeBenefits": [
-      "30 pages de traduction classique par jour",
+      "30 pages de traduction par jour",
       "Lecture de BD web et locale",
       "Comparaison avec l’original et conservation de la position de lecture",
       "Accès à vos résultats existants valides",
@@ -132,7 +132,7 @@ export default {
     "emailButton": "Envoyer un email",
     "aboutTitle": "À propos de NodeLane Comics",
     "aboutDescription": "Une extension pour découvrir, lire et traduire des mangas : fichiers locaux, EPUB, Drive, OPDS et sites compatibles. Le site propose aussi un espace de traduction d’images.",
-    "aboutBody": "NodeLane Comics réunit découverte, recherche sur plusieurs sites, lecture et traduction classique dans une extension pour Chrome, Edge et Firefox. Importez des fichiers locaux, connectez Google Drive ou plusieurs bibliothèques OPDS et lisez des sites compatibles. Comparez les images originales, conservez votre position et préparez des chapitres hors ligne. Choisissez le service officiel ou votre propre manga-translator-ui. Le site dispose d’un espace distinct de traduction d’images. Nous ne fournissons pas de catalogue de mangas et ne contournons ni les connexions, ni les paywalls, ni les DRM. Utilisez uniquement des contenus que vous avez le droit de lire et de traiter.",
+    "aboutBody": "NodeLane Comics réunit découverte, recherche sur plusieurs sites, lecture et traduction dans une extension pour Chrome, Edge et Firefox. Importez des fichiers locaux, connectez Google Drive ou plusieurs bibliothèques OPDS et lisez des sites compatibles. Comparez les images originales, conservez votre position et préparez des chapitres hors ligne. Choisissez le service officiel ou votre propre manga-translator-ui. Le site dispose d’un espace distinct de traduction d’images. Nous ne fournissons pas de catalogue de mangas et ne contournons ni les connexions, ni les paywalls, ni les DRM. Utilisez uniquement des contenus que vous avez le droit de lire et de traiter.",
     "changelogTitle": "Notes de version NodeLane Comics",
     "changelogDescription": "Suivez les mises à jour du traducteur de manga, la prise en charge du nouveau site, la compatibilité du navigateur et les correctifs de lecture. Les approbations des magasins Chrome, Edge et Firefox peuvent différer ; vérifiez votre version installée.",
     "rss": "Suivez les mises à jour via RSS",
@@ -194,14 +194,14 @@ export default {
     "manga-translation"
   ],
   "minutes": 5,
-  "title": "Traduction classique : service officiel ou manga-translator-ui ?",
-  "description": "Découvrez la traduction classique de l’extension, choisissez le service officiel ou votre propre MTU et distinguez les fonctions de l’espace Web de traduction d’images.",
+  "title": "Traduction : service officiel ou manga-translator-ui ?",
+  "description": "Découvrez la traduction de l’extension, choisissez le service officiel ou votre propre MTU et distinguez les fonctions de l’espace Web de traduction d’images.",
   "category": "Conseils de traduction",
   "sections": [
     {
-      "title": "La traduction classique dans l’extension",
+      "title": "La traduction dans l’extension",
       "paragraphs": [
-        "L’extension propose la traduction classique : détection du texte, reconnaissance OCR, traduction, effacement et remise en place du texte. Elle permet de revenir à l’original ou de comparer les deux images côte à côte.",
+        "L’extension propose la traduction : détection du texte, reconnaissance OCR, traduction, effacement et remise en place du texte. Elle permet de revenir à l’original ou de comparer les deux images côte à côte.",
         "La reconnaissance et la traduction peuvent omettre des mots ou mal interpréter les noms, les effets sonores et le contexte. Vérifiez aussi la mise en page. Comparez plusieurs pages représentatives avec les originaux ; une formulation fluide ne garantit pas l’exactitude."
       ]
     },
@@ -222,7 +222,7 @@ export default {
     {
       "title": "Votre service manga-translator-ui",
       "paragraphs": [
-        "Ajoutez votre service manga-translator-ui dans les paramètres et sélectionnez-le pour la traduction classique. Vous pouvez enregistrer plusieurs profils ; un seul est utilisé à la fois. Aucun compte NodeLane ni quota officiel n’est nécessaire. Le mot de passe et le jeton MTU sont enregistrés sur cet ordinateur. Le traitement, les frais de modèles et les besoins réseau dépendent de votre service ; un MTU local ne garantit pas une traduction entièrement hors ligne. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
+        "Ajoutez votre service manga-translator-ui dans les paramètres et sélectionnez-le pour la traduction. Vous pouvez enregistrer plusieurs profils ; un seul est utilisé à la fois. Aucun compte NodeLane ni quota officiel n’est nécessaire. Le mot de passe et le jeton MTU sont enregistrés sur cet ordinateur. Le traitement, les frais de modèles et les besoins réseau dépendent de votre service ; un MTU local ne garantit pas une traduction entièrement hors ligne. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
       ]
     }
   ],
@@ -348,7 +348,7 @@ export default {
     {
       "title": "Traduction et conservation",
       "paragraphs": [
-        "L’extension actuelle propose uniquement la traduction classique. La traduction classique utilise la reconnaissance, la traduction de texte, le nettoyage et la composition. Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction classique conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
+        "La traduction utilise la reconnaissance, la traduction de texte, le nettoyage et la composition. Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
         "Les résultats sont réutilisés uniquement au sein du même compte lorsque le contenu, le mode, la langue et la configuration effective correspondent et qu'une demande valide demeure. Les originaux et les résultats ne sont pas partagés entre les utilisateurs. Le navigateur combine des superpositions avec sa propre image originale ; le serveur ne conserve pas de copies originales permanentes."
       ]
     },
@@ -452,14 +452,14 @@ export default {
           {
             "title": "Prestataires et transferts",
             "paragraphs": [
-              "L’extension actuelle propose uniquement la traduction classique. Le traitement classique peut impliquer la détection/OCR, les modèles de texte, la réparation de l'arrière-plan local et la composition. Les fournisseurs de texte traitent le texte reconnu nécessaire à la traduction. Les fournisseurs réels sont configurés sur le serveur pour la tâche.",
+              "Le traitement peut impliquer la détection/OCR, les modèles de texte, la réparation de l'arrière-plan local et la composition. Les fournisseurs de texte traitent le texte reconnu nécessaire à la traduction. Les fournisseurs réels sont configurés sur le serveur pour la tâche.",
               "Les images de traduction utilisent des fichiers privés sur le serveur central ; le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données. Les services d’identité, d’infrastructure, de traduction et de paiement traitent les données selon les besoins, conformément à leurs politiques applicables. Le traitement peut avoir lieu en dehors de votre région. Nous ne vendons pas d'informations personnelles et n'utilisons pas les bandes dessinées soumises à des fins de ciblage publicitaire. Nous ne promettons pas que tous les prestataires ne conserveront rien ou n'utiliseront jamais les données à des fins de formation ; cela dépend du fournisseur et de l'accord. Ne soumettez pas de contenu sensible non autorisé ou inapproprié."
             ]
           },
           {
             "title": "Conservation et suppression",
             "paragraphs": [
-              "Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction classique conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
+              "Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
               "Les résultats sont réutilisés uniquement au sein du même compte lorsque le contenu, le mode, la langue et la configuration effective correspondent et qu'une demande valide demeure. Les originaux et les résultats ne sont pas partagés entre les utilisateurs. Le navigateur combine des superpositions avec sa propre image originale ; le serveur ne conserve pas de copies originales permanentes. La suppression d’un enregistrement de traduction révoque immédiatement l’accès au serveur de cette demande. Les autres demandes valides dans votre compte restent utilisables ; le fichier de résultats est supprimé après la révocation de la dernière demande valide. Les copies téléchargées ou mises en cache peuvent rester sur votre appareil jusqu'à ce que vous les effaciez.",
               "Pour les demandes de suppression de compte ou plus larges, contactez-nous pour une vérification de l'identité et de la portée. Les enregistrements de transactions, d'audit ou de sécurité peuvent devoir être conservés pour des obligations de service, des litiges ou des exigences applicables. Aucun délai d'effacement unique n'est promis pour tous les documents ; la réponse expliquera le résultat et les contraintes."
             ]
@@ -488,7 +488,7 @@ export default {
             "title": "Droits de contenu et résultats de l’IA",
             "paragraphs": [
               "Vous devez avoir le droit d'accéder, de télécharger, de traduire et de traiter le contenu sélectionné et de respecter les exigences du site source et du titulaire des droits. L'extension n'accorde aucun droit d'auteur ni autorisation automatique de publier des images traduites. Ne contournez pas les paywalls, les exigences de connexion ou DRM. Nous ne garantissons pas la légalité ou l'exhaustivité du contenu source. Les demandes de renseignements sur les droits d'auteur doivent identifier l'œuvre, les droits, le problème et les coordonnées.",
-              "L’IA peut omettre, mal traduire ou mal placer du texte. Les résultats facilitent la lecture et ne remplacent ni les originaux ni une vérification professionnelle. Les illustrations originales du site sont générées par IA ; les comparaisons linguistiques sont des exemples enregistrés de traduction classique. Elles ne garantissent ni la précision ni la vitesse pour chaque image. Vous pouvez comparer les originaux et envoyer des commentaires."
+              "L’IA peut omettre, mal traduire ou mal placer du texte. Les résultats facilitent la lecture et ne remplacent ni les originaux ni une vérification professionnelle. Les illustrations originales du site sont générées par IA ; les comparaisons linguistiques sont des exemples enregistrés de traduction. Elles ne garantissent ni la précision ni la vitesse pour chaque image. Vous pouvez comparer les originaux et envoyer des commentaires."
             ]
           },
           {
@@ -569,7 +569,7 @@ export default {
       {
         "id": "translation-modes",
         "question": "Quelle traduction propose l’extension et quel service choisir ?",
-        "answer": "L’extension actuelle propose uniquement la traduction classique, avec comparaison et retour à l’original. Utilisez le service officiel avec votre compte ou connectez votre propre manga-translator-ui sans quota officiel.",
+        "answer": "L’extension propose la traduction, avec comparaison et retour à l’original. Utilisez le service officiel avec votre compte ou connectez votre propre manga-translator-ui sans quota officiel.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -587,13 +587,13 @@ export default {
       {
         "id": "image-privacy",
         "question": "Les images sont-elles téléchargées ou conservées ?",
-        "answer": "Lorsque vous utilisez la traduction officielle, les règles de conservation suivantes s’appliquent. La traduction envoie les images des pages sélectionnées au backend et aux fournisseurs concernés. Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction classique conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données. La suppression d’un enregistrement de traduction révoque immédiatement l’accès au serveur de cette demande. Les autres demandes valides dans votre compte restent utilisables ; le fichier de résultats est supprimé après la révocation de la dernière demande valide. Les copies téléchargées ou mises en cache peuvent rester sur votre appareil jusqu'à ce que vous les effaciez. Les cookies sources, les jetons de connexion et l'historique de navigation ne sont pas téléchargés. L’extension actuelle propose uniquement la traduction classique. Avec MTU, les images sont envoyées directement au service sélectionné ; le traitement et la conservation dépendent de sa configuration.",
+        "answer": "Lorsque vous utilisez la traduction officielle, les règles de conservation suivantes s’appliquent. La traduction envoie les images des pages sélectionnées au backend et aux fournisseurs concernés. Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données. La suppression d’un enregistrement de traduction révoque immédiatement l’accès au serveur de cette demande. Les autres demandes valides dans votre compte restent utilisables ; le fichier de résultats est supprimé après la révocation de la dernière demande valide. Les copies téléchargées ou mises en cache peuvent rester sur votre appareil jusqu'à ce que vous les effaciez. Les cookies sources, les jetons de connexion et l'historique de navigation ne sont pas téléchargés. Avec MTU, les images sont envoyées directement au service sélectionné ; le traitement et la conservation dépendent de sa configuration.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Les traductions échouées utilisent-elles des pages ?",
-        "answer": "Pour les tâches officielles de votre compte, les pages peuvent être réservées avant le traitement, puis décomptées après une livraison réussie. Un échec explicite libère la réservation, tout comme un résultat classique confirmé sans texte ou avec une reconnaissance partielle et l’original conservé. MTU ne consomme pas le quota officiel NodeLane. L’essai invité suit séparément les règles de demandes acceptées affichées dans l’espace Web, où les échecs peuvent aussi compter.",
+        "answer": "Pour les tâches officielles de votre compte, les pages peuvent être réservées avant le traitement, puis décomptées après une livraison réussie. Un échec explicite libère la réservation, tout comme un résultat confirmé sans texte ou avec une reconnaissance partielle et l’original conservé. MTU ne consomme pas le quota officiel NodeLane. L’essai invité suit séparément les règles de demandes acceptées affichées dans l’espace Web, où les échecs peuvent aussi compter.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -617,7 +617,7 @@ export default {
       {
         "id": "local-translation",
         "question": "Puis-je traduire des mangas avec un service local sans compte NodeLane ?",
-        "answer": "Ajoutez votre service manga-translator-ui dans les paramètres et sélectionnez-le pour la traduction classique. Vous pouvez enregistrer plusieurs profils ; un seul est utilisé à la fois. Aucun compte NodeLane ni quota officiel n’est nécessaire. Le mot de passe et le jeton MTU sont enregistrés sur cet ordinateur. Le traitement, les frais de modèles et les besoins réseau dépendent de votre service ; un MTU local ne garantit pas une traduction entièrement hors ligne. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion.",
+        "answer": "Ajoutez votre service manga-translator-ui dans les paramètres et sélectionnez-le pour la traduction. Vous pouvez enregistrer plusieurs profils ; un seul est utilisé à la fois. Aucun compte NodeLane ni quota officiel n’est nécessaire. Le mot de passe et le jeton MTU sont enregistrés sur cet ordinateur. Le traitement, les frais de modèles et les besoins réseau dépendent de votre service ; un MTU local ne garantit pas une traduction entièrement hors ligne. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion.",
         "relatedPath": "/guides/local-translation/"
       },
       {
@@ -662,7 +662,7 @@ export default {
         "items": [
           "Ajout des sources Atsumaru, MangaBall, RawOtaku et JF00, avec importation directe de mangas pour la lecture.",
           "Traduisez les titres et les descriptions sur la page Découvrir, basculez entre le texte original et le texte traduit, vérifiez l'état de la traduction et réessayez les échecs.",
-          "Traduction classique améliorée pour les bandes dessinées très longues, y compris la sauvegarde des images traduites complètes et la récupération des tâches interrompues.",
+          "Traduction améliorée pour les bandes dessinées très longues, y compris la sauvegarde des images traduites complètes et la récupération des tâches interrompues.",
           "Troncature de dimension fixe lors de l'encodage d'images extrêmement longues au format JPEG. Les images traduites complètes utilisent PNG si nécessaire.",
           "Correction des échecs de soumission de traduction officielle avec certaines images AVIF tout en gardant la lecture des originaux inchangée.",
           "Mémorise le zoom pour chaque livre et précharge les pages haute résolution adjacentes, avec des améliorations du chargement continu des chapitres, du défilement et de la conservation de la position de lecture.",
@@ -827,7 +827,7 @@ export default {
     "退出官网账户": "Se déconnecter de ce site Web",
     "当前套餐": "Forfait actuel",
     "普通账户": "Gratuit",
-    "常规翻译": "Traduction classique",
+    "翻译": "Traduction",
     "不限累计页数": "Nombre total de pages illimité",
     "页": " pages",
     " 页可用": " pages disponibles",
@@ -876,6 +876,6 @@ export default {
     "中文示意": "Illustration chinoise",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Manga original : un voyageur balnéaire avec dialogues japonais",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Version chinoise de la même illustration originale du manga",
-    "产品常规翻译实测效果": "Résultats réels de la traduction standard du produit"
+    "产品翻译实测效果": "Résultats réels de la traduction du produit"
   }
 } satisfies Dictionary;

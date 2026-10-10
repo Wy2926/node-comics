@@ -1,0 +1,42 @@
+---
+import ArticleSection from './ArticleSection.astro';
+import type { Guide, Locale } from '../i18n/types';
+import { dictionaries, localPath } from '../i18n';
+import { guideImage, guideImages } from '../data/guide-media';
+import { guidePresentation } from '../i18n/guide-presentation';
+interface Props { guide: Guide; locale: Locale; related: Guide[] }
+const { guide, locale, related } = Astro.props;
+const t = dictionaries[locale].ui;
+const media = guideImages[guide.slug] ?? {};
+const href = (path: string) => localPath(path, locale);
+---
+<div class="container guide-layout">
+  <aside class="guide-sidebar">
+    <a class="back-to-guides" href={href('/guides/')}><span aria-hidden="true">←</span> {t.allGuides}</a>
+    <details class="guide-contents" open><summary>{t.contents}</summary><nav aria-label={t.contents}>{guide.sections.map((section, index) => <a href={`#section-${index + 1}`}><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{section.title}</a>)}</nav></details>
+    <a class="guide-help" href={href('/help/')}>{t.help} ↗</a>
+  </aside>
+  <article class="prose guide-prose">
+    {Object.keys(media).length > 0 && <p class="capture-note">{guidePresentation[locale].screenshots}</p>}
+    {guide.sections.map((section, index) => <ArticleSection section={section} index={index} locale={locale} numbered={!section.screenshot} image={media[index] ? guideImage(media[index]!, locale) : undefined} />)}
+    <aside class="guide-next"><h2>{t.related}</h2>{related.map(item => <a href={href(`/guides/${item.slug}/`)}><span>{item.title}</span><span aria-hidden="true">↗</span></a>)}</aside>
+  </article>
+</div>
+<style>
+  .guide-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 64px; align-items: start; padding-block: 12px 80px; }
+  .guide-sidebar { position: sticky; top: 122px; max-height: calc(100dvh - 150px); overflow-y: auto; font-size: .78rem; }
+  .back-to-guides { display: inline-block; color: var(--accent); margin-bottom: 30px; }
+  .guide-contents { border-top: 1px solid var(--line); padding-top: 18px; }
+  .guide-contents summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  .guide-contents nav { display: grid; gap: 18px; margin-block: 20px 30px; }
+  .guide-contents nav a { display: flex; gap: 12px; color: var(--muted); line-height: 1.6; }
+  .guide-contents nav a:hover { color: var(--accent); }
+  .guide-contents nav span { color: var(--accent); font: .7rem/1.9 ui-monospace, monospace; }
+  .guide-help { color: var(--muted); }
+  .guide-prose { min-width: 0; font-size: 1rem; }
+  .guide-prose .capture-note { margin: 0 0 36px; padding-inline-start: 16px; border-inline-start: 2px solid var(--accent); font-size: .76rem; line-height: 1.8; }
+  .guide-next { border-top: 1px solid var(--line); padding-top: 30px; margin-top: 56px; }
+  .guide-next a { display: flex; justify-content: space-between; gap: 24px; padding-block: 15px; text-decoration: none; border-bottom: 1px solid var(--line); font-size: .94rem; }
+  @media (max-width: 1000px) { .guide-layout { grid-template-columns: 180px minmax(0, 1fr); gap: 32px; } }
+  @media (max-width: 760px) { .guide-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; } .guide-sidebar { position: static; max-height: none; } .guide-contents nav { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; } .back-to-guides { margin-bottom: 14px; } .guide-help { display: none; } .guide-prose { font-size: .94rem; } }
+</style>

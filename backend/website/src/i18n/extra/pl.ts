@@ -9,7 +9,6 @@ export const translate = {
   "start": "Rozpocznij tłumaczenie",
   "history": "Historia lokalna",
   "language": "Przetłumacz na",
-  "classic": "Standardowy",
   "download": "Pobierz tłumaczenie",
   "remove": "Usuń lokalny wpis",
   "confirmDelete": "Usunąć ten lokalny obraz i tłumaczenie? Tego nie można cofnąć.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Połącz ponownie",
   "submitting": "Wysyłanie żądania",
   "receiving": "Zapisywanie tłumaczenia",
-  "formatUnavailable": "Ten tryb tłumaczenia nie jest obecnie dostępny w przypadku tak długich obrazów.",
+  "formatUnavailable": "Usługa tłumaczenia nie obsługuje obecnie obrazów tego rozmiaru.",
   "inputMissing": "Brakuje zapisanego obrazu wejściowego do tłumaczenia. Nie można wznowić tego zadania."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Subskrypcje nie są jeszcze dostępne",
     "loading": "Ładuję plany…",
     "error": "Nie można wczytać planów. Odśwież.",
-    "classic": "Tłumaczenie standardowe bez łącznego limitu stron",
+    "classic": "Tłumaczenie bez łącznego limitu stron",
     "renewMonthly": "Odnawia się co miesiąc.",
     "renewAnnual": "Odnawia się co rok."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Do {n} nowych stron tłumaczenia w ruchomym oknie godzinnym",
     "trial": "Nowe konta spełniające warunki mogą korzystać z okresu próbnego przez {d} dni. Wymagana karta.",
     "subscribe": "Zdobądź {name}",
-    "description": "Tłumaczenie klasyczne z godzinowym limitem nowych zleceń tłumaczeniowych.",
+    "description": "Tłumaczenie z godzinowym limitem nowych zleceń tłumaczeniowych.",
     "intro": "Wybierz plan tłumaczeń, aby skorzystać z zalet subskrypcji w rozszerzeniu."
   },
   "manage": "Zarządzaj subskrypcją",

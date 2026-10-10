@@ -1,13 +1,22 @@
 ---
 import type { GuideSection, Locale } from '../i18n/types';
 import { localPath } from '../i18n';
-interface Props { section: GuideSection; index: number; locale: Locale }
-const { section, index, locale } = Astro.props;
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import { guidePresentation } from '../i18n/guide-presentation';
+interface Props { section: GuideSection; index: number; locale: Locale; numbered?: boolean; image?: ImageMetadata }
+const { section, index, locale, numbered, image } = Astro.props;
 const headingId = `section-${index + 1}`;
 ---
-<section class:list={{ 'illustrated-step': !!section.screenshot }} aria-labelledby={headingId}>
+<section class:list={{ 'illustrated-step': !!section.screenshot, 'visual-step': !!image, 'numbered-step': numbered }} aria-labelledby={headingId}>
   <div class="step-copy">
-  <h2 id={headingId}>{section.title}</h2>
+  <h2 id={headingId}>{numbered && <span class="step-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>}{section.title}</h2>
+  {image && <figure class="desktop-screenshot">
+    <a href={image.src} target="_blank" rel="noopener" aria-label={`${section.title} · ${guidePresentation[locale].enlarge}`}>
+      <Image src={image} alt={section.title} widths={[480, 800, 1200, 1440]} sizes="(max-width: 760px) calc(100vw - 36px), (max-width: 1100px) 70vw, 980px" format="webp" quality={85} loading="lazy" decoding="async" />
+    </a>
+    <figcaption><span>{section.title}</span><a href={image.src} target="_blank" rel="noopener">{guidePresentation[locale].enlarge} ↗</a></figcaption>
+  </figure>}
   {section.paragraphs.map(text => <p>{text}</p>)}
   {section.steps && <ol>{section.steps.map(text => <li>{text}</li>)}</ol>}
   {section.code && <pre tabindex="0" aria-labelledby={headingId}><code>{section.code}</code></pre>}
@@ -40,6 +49,18 @@ const headingId = `section-${index + 1}`;
   .article-links { font-size: 1rem; }
   .illustrated-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .7fr); gap: 32px; align-items: center; padding-block: 32px; border-top: 1px solid var(--line); }
   .step-copy { min-width: 0; }
+  .numbered-step { padding-top: 30px; margin-bottom: 42px; border-top: 1px solid var(--line); }
+  .numbered-step h2 { display: flex; align-items: baseline; gap: 14px; line-height: 1.6; letter-spacing: -.02em; }
+  .step-number { flex-shrink: 0; font: .75rem ui-monospace, monospace; color: var(--accent); }
+  .numbered-step ol { padding-inline-start: 24px; }
+  .numbered-step li { padding-inline-start: 8px; }
+  .numbered-step li::marker { color: var(--accent); font-weight: 600; }
+  .desktop-screenshot { margin: 22px 0 28px; }
+  .desktop-screenshot > a { display: block; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-soft); }
+  .desktop-screenshot img { width: 100%; height: auto; }
+  .desktop-screenshot figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; margin-top: 12px; color: var(--muted); font-size: .72rem; line-height: 1.65; }
+  .desktop-screenshot figcaption a { flex-shrink: 0; text-decoration: none; }
+  @media (max-width: 600px) { .desktop-screenshot figcaption { flex-wrap: wrap; gap: 5px; } .numbered-step { margin-bottom: 28px; } }
   .guide-screenshot { margin: 0; min-width: 0; }
   .screenshot-placeholder { display: grid; justify-items: center; gap: 16px; padding: 24px; border: 1px dashed #526880; border-radius: var(--comic-panel-radius); background: linear-gradient(145deg, var(--surface-soft), var(--surface)); }
   .placeholder-phone { width: 136px; height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; border: 1px solid #526880; border-radius: 20px; color: var(--accent); }

@@ -36,11 +36,11 @@ export function subscriptionStatusLabel(status:string,locale:string){
   return (commerceCopy(locale)?.statuses??text[locale]??text.en)[index[status]??7];
 }
 const labels:Record<string,{plan:string;month:string;year:string;unavailable:string;loading:string;error:string;classic:string;renew:(annual:boolean)=>string}>={
-  'zh-CN':{plan:'订阅套餐',month:'月',year:'年',unavailable:'订阅暂未开放',loading:'正在读取套餐…',error:'暂时无法读取套餐，请刷新重试。',classic:'常规翻译不限页数',renew:a=>a?'按年自动续费。':'按月自动续费。'},
-  'zh-TW':{plan:'訂閱方案',month:'月',year:'年',unavailable:'訂閱尚未開放',loading:'正在讀取方案…',error:'暫時無法讀取方案，請重新整理。',classic:'一般翻譯不限頁數',renew:a=>a?'按年自動續訂。':'按月自動續訂。'},
-  en:{plan:'Subscription plan',month:'month',year:'year',unavailable:'Subscriptions are not available yet',loading:'Loading plans…',error:'Unable to load plans. Please refresh.',classic:'Unlimited classic translation',renew:a=>a?'Renews annually.':'Renews monthly.'},
-  ja:{plan:'購読プラン',month:'月',year:'年',unavailable:'購読受付は準備中です',loading:'プランを読み込み中…',error:'プランを取得できません。再読み込みしてください。',classic:'通常翻訳はページ数無制限',renew:a=>a?'毎年自動更新。':'毎月自動更新。'},
-  ko:{plan:'구독 요금제',month:'월',year:'년',unavailable:'구독 서비스 준비 중',loading:'요금제 불러오는 중…',error:'요금제를 불러올 수 없습니다. 새로고침해 주세요.',classic:'일반 번역 페이지 무제한',renew:a=>a?'매년 자동 갱신됩니다.':'매월 자동 갱신됩니다.'},
+  'zh-CN':{plan:'订阅套餐',month:'月',year:'年',unavailable:'订阅暂未开放',loading:'正在读取套餐…',error:'暂时无法读取套餐，请刷新重试。',classic:'翻译不限页数',renew:a=>a?'按年自动续费。':'按月自动续费。'},
+  'zh-TW':{plan:'訂閱方案',month:'月',year:'年',unavailable:'訂閱尚未開放',loading:'正在讀取方案…',error:'暫時無法讀取方案，請重新整理。',classic:'翻譯不限頁數',renew:a=>a?'按年自動續訂。':'按月自動續訂。'},
+  en:{plan:'Subscription plan',month:'month',year:'year',unavailable:'Subscriptions are not available yet',loading:'Loading plans…',error:'Unable to load plans. Please refresh.',classic:'Unlimited translation',renew:a=>a?'Renews annually.':'Renews monthly.'},
+  ja:{plan:'購読プラン',month:'月',year:'年',unavailable:'購読受付は準備中です',loading:'プランを読み込み中…',error:'プランを取得できません。再読み込みしてください。',classic:'翻訳はページ数無制限',renew:a=>a?'毎年自動更新。':'毎月自動更新。'},
+  ko:{plan:'구독 요금제',month:'월',year:'년',unavailable:'구독 서비스 준비 중',loading:'요금제 불러오는 중…',error:'요금제를 불러올 수 없습니다. 새로고침해 주세요.',classic:'번역 페이지 무제한',renew:a=>a?'매년 자동 갱신됩니다.':'매월 자동 갱신됩니다.'},
 };
 export function billingCopy(locale:string) {
  const copy=commerceCopy(locale)?.billing;

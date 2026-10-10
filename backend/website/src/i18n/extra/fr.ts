@@ -9,7 +9,6 @@ export const translate = {
   "start": "Commencer la traduction",
   "history": "Historique local",
   "language": "Traduire en",
-  "classic": "Standard",
   "download": "Télécharger la traduction",
   "remove": "Supprimer l'enregistrement local",
   "confirmDelete": "Supprimer cette image locale et cette traduction ? Cela ne peut pas être annulé.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Reconnecter",
   "submitting": "Soumettre la demande",
   "receiving": "Enregistrement de la traduction",
-  "formatUnavailable": "Ce mode de traduction n'est actuellement pas disponible pour les images aussi longues.",
+  "formatUnavailable": "Le service de traduction ne prend pas en charge les images de cette taille pour le moment.",
   "inputMissing": "L'entrée de traduction enregistrée est manquante. Cette tâche ne peut pas être reprise."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Les abonnements ne sont pas encore disponibles",
     "loading": "Chargement des plans…",
     "error": "Impossible de charger les plans. Veuillez actualiser.",
-    "classic": "Traduction classique illimitée",
+    "classic": "Traduction illimitée",
     "renewMonthly": "Se renouvelle mensuellement.",
     "renewAnnual": "Renouvellement annuel."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Jusqu'à {n} nouvelles pages de traduction par heure glissante",
     "trial": "Les nouveaux comptes éligibles peuvent essayer pendant {d} jours. Carte bancaire requise.",
     "subscribe": "Obtenez {name}",
-    "description": "Traduction classique avec une limite horaire pour les nouvelles demandes de traduction.",
+    "description": "Traduction avec une limite horaire pour les nouvelles demandes de traduction.",
     "intro": "Choisissez un plan de traduction pour utiliser les avantages de votre abonnement dans l'extension."
   },
   "manage": "Gérer l'abonnement",

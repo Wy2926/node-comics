@@ -51,8 +51,9 @@ body[data-site-theme='midnight'] :is(.language-menu summary, .account-link) { bo
 body[data-site-theme='midnight'] .header-actions .account-link { width: auto; padding-inline: 10px; }
 body[data-site-theme='midnight'] .language-menu nav { box-shadow: 0 12px 32px #0006; }
 .header-download { white-space: nowrap; }
+/* Reserve the inner-page CTA width without exposing a duplicate homepage action. */
+body[data-page='/'] .header-download { visibility: hidden; pointer-events: none; }
 body[data-site-theme='midnight'] .button:not(.secondary, .light, .home-install) { --control-bg: #1475dd; --control-ink: #fff; --control-hover-bg: #246ac1; }
-body[data-page='/'] .header-download { display: none; }
 body[data-site-theme='midnight'] .site-footer { background: var(--canvas); border-top: 1px solid var(--line); }
 body[data-site-theme='midnight'] .footer-bottom { line-height: 1.7; }
 body[data-site-theme='midnight'] .directory-track img[src$='toolpilot-logo-black.svg'] { background: #f3f6fc; padding: 7px; border-radius: 5px; }
@@ -61,9 +62,14 @@ body[data-site-theme='midnight'] .page-intro h1 { font-family: Georgia, 'Noto Se
 .ui-icon { display: inline-block; flex: none; width: 20px; height: 20px; background: currentColor; mask: var(--ui-icon) center / contain no-repeat; }
 .icon-check { --ui-icon: url('/icons/check.svg'); color: var(--accent); }
 .icon-arrow { --ui-icon: url('/icons/arrow-right.svg'); }
+/* Keep the four navigation links intact before switching to the compact menu. */
+@media (max-width: 1440px) {
+  body[data-site-theme='midnight'] .header-inner .brand img { width: 190px; }
+  body[data-site-theme='midnight'] .header-inner { column-gap: 16px; }
+  body[data-site-theme='midnight'] .header-actions .account-link > span { display: none; }
+}
 @media (max-width: 1100px) {
   body[data-site-theme='midnight'] .container { width: calc(100% - 64px); }
-  body[data-site-theme='midnight'] .header-inner .brand img { width: 190px; }
 }
 @media (max-width: 760px) {
   body[data-site-theme='midnight'] .container { width: calc(100% - 36px); }

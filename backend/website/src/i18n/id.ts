@@ -61,7 +61,7 @@ export default {
       "Hubungkan beberapa pustaka OPDS, telusuri katalog, cari, dan baca. Jika dukungan Range dapat diandalkan, data diambil sesuai kebutuhan; jika tidak, Anda harus memilih mengunduh seluruh file.",
       "Jelajahi rekomendasi dan cari judul di berbagai situs yang didukung. Menambahkan ke pembaca memerlukan adaptor situs; katalog sumber tetap hanya dapat dibaca.",
       "Terjemahkan gambar di halaman saat ini, satu gambar melalui menu klik kanan, atau area persegi panjang yang terlihat. Pemilihan area tidak menyambung gambar dengan menggulir; pintasan diatur melalui browser.",
-      "Ekstensi menggunakan terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default.",
+      "Ekstensi menggunakan terjemahan: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif secara default.",
       "Simpan semua bab dalam bahasa yang dipilih ke cache. Jeda dan lanjutkan unduhan untuk melengkapi yang belum tersimpan. Bab yang selesai disimpan dapat dibaca offline; sesuaikan tampilan, skala, dan perbandingan dengan aslinya."
     ],
     "ribbon": [
@@ -89,7 +89,7 @@ export default {
     "free": "gratis",
     "month": "bulan",
     "freeBenefits": [
-      "30 halaman terjemahan standar per hari",
+      "30 halaman terjemahan per hari",
       "Membaca komik web dan lokal",
       "Perbandingan dengan asli dan posisi membaca",
       "Akses ke hasil yang sudah ada dan masih berlaku",
@@ -132,7 +132,7 @@ export default {
     "emailButton": "Kirim email",
     "aboutTitle": "Tentang NodeLane Comics",
     "aboutDescription": "NodeLane Comics adalah ekstensi pembaca dan penerjemah manga untuk Chrome, Edge, dan Firefox: komik lokal, EPUB, Google Drive, OPDS, serta situs yang didukung.",
-    "aboutBody": "NodeLane Comics menyatukan pembacaan komik dan terjemahan gambar di browser. Buka file sendiri, hubungkan Drive atau OPDS, temukan cerita di situs yang didukung, dan terjemahkan halaman atau area yang terlihat. Terjemahan biasa bekerja melalui saluran resmi atau manga-translator-ui Anda. Gambar asli tetap tersedia untuk diperiksa karena pengenalan dan terjemahan bisa salah. Kami tidak menyediakan katalog komik, menjual komik, atau melewati akses berbayar, login, maupun DRM. Gunakan hanya konten yang berhak Anda akses dan proses.",
+    "aboutBody": "NodeLane Comics menyatukan pembacaan komik dan terjemahan gambar di browser. Buka file sendiri, hubungkan Drive atau OPDS, temukan cerita di situs yang didukung, dan terjemahkan halaman atau area yang terlihat. Terjemahan bekerja melalui saluran resmi atau manga-translator-ui Anda. Gambar asli tetap tersedia untuk diperiksa karena pengenalan dan terjemahan bisa salah. Kami tidak menyediakan katalog komik, menjual komik, atau melewati akses berbayar, login, maupun DRM. Gunakan hanya konten yang berhak Anda akses dan proses.",
     "changelogTitle": "NodeLane Comics catatan rilis",
     "changelogDescription": "Ikuti pembaruan penerjemah manga, dukungan situs baru, kompatibilitas browser, dan perbaikan membaca. Persetujuan toko Chrome, Edge dan Firefox mungkin berbeda; periksa versi yang Anda instal.",
     "rss": "Ikuti pembaruan melalui RSS",
@@ -195,14 +195,14 @@ export default {
   ],
   "minutes": 5,
   "title": "Terjemahan manga biasa: saluran resmi atau MTU sendiri?",
-  "description": "Cara kerja terjemahan biasa di ekstensi serta perbedaan saluran resmi dan manga-translator-ui.",
+  "description": "Cara kerja terjemahan di ekstensi serta perbedaan saluran resmi dan manga-translator-ui.",
   "category": "Kiat terjemahan",
   "sections": [
     {
-      "title": "Cara kerja terjemahan biasa",
+      "title": "Cara kerja terjemahan",
       "paragraphs": [
         "Ekstensi menemukan teks, mengenalinya dengan OCR, menerjemahkan, memulihkan latar di area teks, dan menempatkan hasil pada halaman. Gambar asli tetap tersedia untuk dibandingkan.",
-        "Ekstensi saat ini hanya menggunakan terjemahan biasa."
+        "Ekstensi menerjemahkan gambar."
       ]
     },
     {
@@ -288,7 +288,7 @@ export default {
     {
       "title": "Periksa kata-kata dan gambar",
       "paragraphs": [
-        "Terjemahan biasa dapat melewatkan teks atau kurang tepat memulihkan latar dan posisi tulisan. Bandingkan ekspresi, tulisan tangan, dan latar ketika detail tersebut memengaruhi cerita.",
+        "Terjemahan dapat melewatkan teks atau kurang tepat memulihkan latar dan posisi tulisan. Bandingkan ekspresi, tulisan tangan, dan latar ketika detail tersebut memengaruhi cerita.",
         "NodeLane Comics menyimpan yang asli tetap tersedia. Penerjemahan menurunkan hambatan pemahaman tanpa menghilangkan kemampuan untuk memverifikasi karya itu sendiri."
       ]
     }
@@ -348,7 +348,7 @@ export default {
     {
       "title": "Terjemahan dan retensi",
       "paragraphs": [
-        "Ekstensi memakai terjemahan biasa. Terjemahan standar menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+        "Ekstensi memakai terjemahan. Terjemahan menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
         "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen."
       ]
     },
@@ -452,14 +452,14 @@ export default {
           {
             "title": "Penyedia layanan dan transfer",
             "paragraphs": [
-              "Ekstensi memakai terjemahan biasa. Pemrosesan standar mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
+              "Ekstensi memakai terjemahan. Pemrosesan mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
               "Gambar terjemahan menggunakan file pribadi di server pusat; teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Layanan identitas, infrastruktur, penerjemahan, dan pembayaran memproses data sesuai kebutuhan, berdasarkan kebijakan yang berlaku. Pemrosesan mungkin terjadi di luar wilayah Anda. Kami tidak menjual informasi pribadi atau menggunakan komik yang dikirimkan untuk penargetan iklan. Kami tidak berjanji semua penyedia tidak menyimpan apa pun atau tidak pernah menggunakan data untuk pelatihan; ini tergantung pada penyedia dan perjanjian. Jangan mengirimkan konten sensitif yang tidak sah atau tidak sesuai."
             ]
           },
           {
             "title": "Retensi dan penghapusan",
             "paragraphs": [
-              "Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+              "Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
               "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya.",
               "Untuk permintaan penghapusan akun atau yang lebih luas, hubungi kami untuk verifikasi identitas dan cakupan. Catatan transaksi, audit, atau keamanan mungkin memerlukan penyimpanan untuk kewajiban layanan, perselisihan, atau persyaratan yang berlaku. Tidak ada tenggat waktu penghapusan yang dijanjikan untuk semua catatan; tanggapannya akan menjelaskan hasil dan kendalanya."
             ]
@@ -488,7 +488,7 @@ export default {
             "title": "Hak konten dan hasil AI",
             "paragraphs": [
               "Anda harus memiliki hak untuk mengakses, mengunggah, menerjemahkan, dan memproses konten yang dipilih serta mengikuti persyaratan situs sumber dan pemegang hak. Ekstensi ini tidak memberikan hak cipta atau izin otomatis untuk mempublikasikan gambar terjemahan. Jangan mengabaikan paywall, persyaratan login, atau DRM. Kami tidak menjamin legalitas atau kelengkapan konten sumber. Penyelidikan hak cipta harus mengidentifikasi karya, hak, masalah, dan informasi kontak.",
-              "AI dapat melewatkan, salah menerjemahkan, atau salah menempatkan teks. Hasil membantu membaca dan tidak menggantikan gambar asli atau pemeriksaan profesional. Ilustrasi orisinal situs dibuat dengan AI; perbandingan bahasa menampilkan contoh terjemahan biasa yang direkam. Contoh tersebut tidak menjamin akurasi, kecepatan, atau hasil untuk setiap gambar. Bandingkan dengan aslinya dan kirim masukan."
+              "AI dapat melewatkan, salah menerjemahkan, atau salah menempatkan teks. Hasil membantu membaca dan tidak menggantikan gambar asli atau pemeriksaan profesional. Ilustrasi orisinal situs dibuat dengan AI; perbandingan bahasa menampilkan contoh terjemahan yang direkam. Contoh tersebut tidak menjamin akurasi, kecepatan, atau hasil untuk setiap gambar. Bandingkan dengan aslinya dan kirim masukan."
             ]
           },
           {
@@ -569,7 +569,7 @@ export default {
       {
         "id": "translation-modes",
         "question": "Terjemahan dan saluran apa yang tersedia di ekstensi?",
-        "answer": "Ekstensi saat ini memakai terjemahan biasa: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi NodeLane atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif.",
+        "answer": "Ekstensi saat ini memakai terjemahan: OCR, terjemahan teks, pemulihan latar, dan tata letak. Pilih saluran resmi NodeLane atau manga-translator-ui sendiri. Komik baru dibuka sebagai gambar asli; terjemahan otomatis nonaktif.",
         "relatedPath": "/guides/translation-modes/"
       },
       {
@@ -587,13 +587,13 @@ export default {
       {
         "id": "image-privacy",
         "question": "Apakah gambar diunggah atau disimpan?",
-        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan biasa. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan standar menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
+        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
         "relatedPath": "/privacy/"
       },
       {
         "id": "translation-failed",
         "question": "Apakah terjemahan yang gagal menggunakan halaman?",
-        "answer": "Pada terjemahan resmi dengan akun, halaman dapat dicadangkan terlebih dahulu lalu dipotong dari kuota setelah hasil berhasil diberikan. Kegagalan yang jelas melepaskan cadangan, begitu pula hasil biasa tanpa teks atau pengenalan parsial yang mempertahankan teks asli. MTU tidak memakai kuota resmi NodeLane. Percobaan anonim mengikuti aturan penghitungan permintaan baru yang terpisah di ruang kerja; percobaan yang gagal juga dihitung.",
+        "answer": "Pada terjemahan resmi dengan akun, halaman dapat dicadangkan terlebih dahulu lalu dipotong dari kuota setelah hasil berhasil diberikan. Kegagalan yang jelas melepaskan cadangan, begitu pula hasil tanpa teks atau pengenalan parsial yang mempertahankan teks asli. MTU tidak memakai kuota resmi NodeLane. Percobaan anonim mengikuti aturan penghitungan permintaan baru yang terpisah di ruang kerja; percobaan yang gagal juga dihitung.",
         "relatedPath": "/guides/translation-troubleshooting/"
       },
       {
@@ -662,7 +662,7 @@ export default {
         "items": [
           "Menambahkan sumber Atsumaru, MangaBall, RawOtaku, dan JF00, dengan impor manga langsung untuk dibaca.",
           "Terjemahkan judul dan deskripsi di halaman Temukan, beralih antara teks asli dan terjemahan, periksa status terjemahan, dan coba lagi kegagalan.",
-          "Peningkatan terjemahan standar untuk komik strip yang sangat panjang, termasuk menyimpan gambar terjemahan lengkap dan memulihkan tugas yang terputus.",
+          "Peningkatan terjemahan untuk komik strip yang sangat panjang, termasuk menyimpan gambar terjemahan lengkap dan memulihkan tugas yang terputus.",
           "Pemotongan dimensi tetap saat menyandikan gambar yang sangat panjang sebagai JPEG. Gambar terjemahan lengkap menggunakan PNG bila diperlukan.",
           "Memperbaiki kegagalan pengiriman terjemahan resmi pada beberapa gambar AVIF sambil tetap membaca aslinya tidak berubah.",
           "Mengingat zoom untuk setiap buku dan memuat halaman resolusi tinggi yang berdekatan, dengan peningkatan pada pemuatan bab terus-menerus, pengguliran, dan retensi posisi membaca.",
@@ -827,7 +827,7 @@ export default {
     "退出官网账户": "Keluar dari situs web ini",
     "当前套餐": "Paket saat ini",
     "普通账户": "Gratis",
-    "常规翻译": "Terjemahan standar",
+    "翻译": "Terjemahan",
     "不限累计页数": "Jumlah halaman tidak terbatas",
     "页": " halaman",
     " 页可用": " halaman tersedia",
@@ -876,6 +876,6 @@ export default {
     "中文示意": "Ilustrasi Cina",
     "原创漫画：海边站台上的旅人，气泡文字为日文": "Manga asli: penjelajah pantai dengan dialog Jepang",
     "相同漫画的中文示意：下一站，会是怎样的世界？": "Versi Cina dari ilustrasi manga asli yang sama",
-    "产品常规翻译实测效果": "Hasil aktual dari terjemahan standar produk"
+    "产品翻译实测效果": "Hasil aktual dari terjemahan produk"
   }
 } satisfies Dictionary;

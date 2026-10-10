@@ -9,7 +9,6 @@ export const translate = {
   "start": "Çeviriyi başlat",
   "history": "Yerel geçmiş",
   "language": "Hedef dil",
-  "classic": "Standart çeviri",
   "download": "Tam çevrilmiş görseli indir",
   "remove": "Yerel kaydı sil",
   "confirmDelete": "Bu yerel resim ve çeviri silinsin mi? Bu geri alınamaz.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Yeniden bağlan",
   "submitting": "İstek gönderiliyor",
   "receiving": "Çeviri kaydediliyor",
-  "formatUnavailable": "Bu çeviri modu şu anda bu kadar uzun resimler için kullanılamamaktadır.",
+  "formatUnavailable": "Çeviri hizmeti şu anda bu boyuttaki görselleri desteklemiyor.",
   "inputMissing": "Kaydedilen çeviri girdisi olan görsel bulunamadı. Bu göreve devam edilemez."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Abonelikler henüz kullanılamıyor",
     "loading": "Planlar yükleniyor…",
     "error": "Planlar yüklenemiyor. Lütfen yenileyin.",
-    "classic": "Sınırsız standart çeviri",
+    "classic": "Sınırsız çeviri",
     "renewMonthly": "Aylık olarak yenilenir.",
     "renewAnnual": "Yıllık yenilenir."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Her kayan bir saatlik dönemde en fazla {n} yeni çeviri sayfası",
     "trial": "Koşulları sağlayan ilk kez kullanıcılar {d} gün deneyebilir. Kart gereklidir.",
     "subscribe": "{name} alın",
-    "description": "Yeni çeviri istekleri için saatlik sınırı olan standart çeviri.",
+    "description": "Yeni çeviri istekleri için saatlik sınırı olan çeviri.",
     "intro": "Uzantıdaki abonelik avantajlarınızdan yararlanmak için bir çeviri planı seçin."
   },
   "manage": "Aboneliği yönet",

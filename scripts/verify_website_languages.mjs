@@ -22,6 +22,66 @@ async function context(locale,options={},owner=browser){
   return value;
 }
 async function noOverflow(page){assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow: '+page.url());}
+async function verifyHeaderLayout(){
+  const value=await context('en'),page=await value.newPage();
+  const widths=[1920,1441,1440,1366,1281,1280,1101,1100,900,761,760,480,390,320];
+  try {
+    for(const locale of languages){
+      await page.goto(`${origin}/${prefix(locale)}guides/remote-library/`);
+      await page.evaluate(()=>document.fonts.ready);
+      const geometry=()=>page.locator('.header-inner > .brand, .desktop-nav, .header-tools, .header-download').evaluateAll(elements=>elements.map(element=>{
+        const {x,y,width,height}=element.getBoundingClientRect();return {x,y,width,height};
+      }));
+      const positions=new Map();
+      for(const width of widths){
+        await page.setViewportSize({width,height:1000});
+        positions.set(width,await geometry());
+        const errors=await page.evaluate(()=>{
+          const errors=[],header=document.querySelector('.header-inner').getBoundingClientRect();
+          const controls=[...document.querySelectorAll('.header-inner > .brand, .desktop-nav a, .header-download, .language-menu > summary, .account-link, .mobile-nav > summary')]
+            .map(element=>({element,rect:element.getBoundingClientRect()})).filter(item=>item.rect.width&&item.rect.height);
+          for(const {element,rect} of controls){
+            const name=element.textContent.trim()||element.getAttribute('aria-label');
+            if(rect.left<header.left-1||rect.right>header.right+1||rect.top<header.top-1||rect.bottom>header.bottom+1)errors.push(`outside header: ${name}`);
+            if(!element.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)))errors.push(`obscured: ${name}`);
+          }
+          for(let i=0;i<controls.length;i++)for(let j=i+1;j<controls.length;j++){
+            const a=controls[i].rect,b=controls[j].rect;
+            if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)errors.push('overlapping controls');
+          }
+          const nav=document.querySelector('.desktop-nav').getBoundingClientRect();
+          if(nav.width){
+            for(const selector of ['.header-inner > .brand','.header-tools']){
+              const other=document.querySelector(selector).getBoundingClientRect();
+              if(Math.max(nav.left-other.right,other.left-nav.right)<12)errors.push('navigation squeezed');
+            }
+          }
+          if(document.documentElement.scrollWidth>innerWidth)errors.push('horizontal overflow');
+          return errors;
+        });
+        assert.deepEqual(errors,[],`${locale}: header at ${width}px`);
+        if(['zh-CN','en','ja','ko','uk','ar'].includes(locale)&&[1366,1280,390].includes(width))await page.screenshot({path:path.join(out,`header-${locale}-${width}.png`)});
+      }
+      await page.goto(`${origin}/${prefix(locale)}`);
+      await page.evaluate(()=>document.fonts.ready);
+      for(const width of widths){
+        await page.setViewportSize({width,height:1000});
+        assert.equal(await page.locator('.header-download').isVisible(),false,`${locale}: homepage has no top download action at ${width}px`);
+        assert.equal(await page.locator('.header-download').evaluate(element=>{element.focus();return element===document.activeElement;}),false,`${locale}: hidden download action is not focusable`);
+        assert.deepEqual(await geometry(),positions.get(width),`${locale}: header shifts between homepage and guide at ${width}px`);
+      }
+    }
+    const noScript=await context('uk',{javaScriptEnabled:false,viewport:{width:1280,height:900}});
+    try {
+      const fallback=await noScript.newPage();
+      await fallback.goto(`${origin}/uk/guides/remote-library/`);
+      await fallback.locator('.mobile-nav summary').click();
+      await fallback.locator('.mobile-nav a[href="/uk/help/"]').click();
+      await fallback.waitForURL('**/uk/help/');
+    } finally {await noScript.close();}
+    console.log(`Verified stable homepage/guide header controls in 17 languages at ${widths.length} widths, including breakpoint edges, RTL and no-JS navigation.`);
+  } finally {await value.close();}
+}
 async function verifyMenuDismissal(page,input){
   const menu=page.locator('.language-menu'),summary=menu.locator('summary');
   await summary[input]();
@@ -64,6 +124,8 @@ async function verifyTouchMenus(owner,device,name){
   } finally {await value.close();}
 }
 async function verify(){
+  await verifyHeaderLayout();
+  if(process.argv.includes('--header-only'))return;
   const keyboardContext=await context('zh-CN'),keyboard=await keyboardContext.newPage();
   await keyboard.goto(origin+'/?menu=1');
   await keyboard.waitForFunction(()=>document.querySelector('.language-menu a[lang=en]')?.getAttribute('href')==='/en/?menu=1');

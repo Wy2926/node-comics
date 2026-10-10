@@ -1,0 +1,56 @@
+---
+import { Image } from 'astro:assets';
+import { dictionaries, localPath, type Locale } from '../i18n';
+import { featuredGuides, guideCovers, guideImage } from '../data/guide-media';
+import { guidePresentation } from '../i18n/guide-presentation';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const { documents: { guides }, ui } = dictionaries[locale];
+const copy = guidePresentation[locale];
+const featured = featuredGuides.map(slug => guides.find(guide => guide.slug === slug)!);
+const reference = guides.filter(guide => !featuredGuides.includes(guide.slug));
+---
+<section class="container guide-directory" aria-labelledby="workflow-heading">
+  <div class="directory-heading"><h2 id="workflow-heading">{copy.workflows}</h2><p>{copy.intro}</p></div>
+  <div class="workflow-grid">
+    {featured.map((guide, i) => {
+      const imageName = guideCovers[guide.slug];
+      const mobile = guide.sections.find(section => section.screenshot?.src)?.screenshot;
+      return <a class="workflow-card" href={localPath(`/guides/${guide.slug}/`, locale)}>
+        <div class:list={['workflow-image', { 'phone-image': !!mobile }]}>
+          {imageName ? <Image src={guideImage(imageName, locale)} alt="" aria-hidden="true" widths={[480, 720]} sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 420px" format="webp" quality={78} loading="lazy" /> : mobile && <img src={mobile.src} alt="" aria-hidden="true" width="1080" height="2400" loading="lazy" decoding="async" />}
+          <span class="workflow-number" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+        </div>
+        <div class="workflow-copy"><span class="workflow-meta">{guide.category} · {guide.minutes} {ui.minutes}</span><h3>{guide.title}</h3><p>{guide.description}</p><span class="workflow-action">{ui.readGuide}<span aria-hidden="true">↗</span></span></div>
+      </a>;
+    })}
+  </div>
+  <section class="guide-reference" aria-labelledby="reference-heading"><h2 id="reference-heading">{copy.reference}</h2><div>{reference.map(guide => <a href={localPath(`/guides/${guide.slug}/`, locale)}><span><small>{guide.category}</small><strong>{guide.title}</strong></span><span aria-hidden="true">↗</span></a>)}</div></section>
+</section>
+<style>
+  .guide-directory { padding-block: 16px 88px; }
+  .directory-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; margin-block: 0 28px; }
+  .directory-heading h2, .guide-reference h2 { font-size: 1.3rem; letter-spacing: -.02em; }
+  .directory-heading p { color: var(--muted); font-size: .9rem; }
+  .workflow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
+  .workflow-card { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: border-color .2s; }
+  .workflow-card:hover { border-color: var(--accent); }
+  .workflow-image { position: relative; overflow: hidden; aspect-ratio: 3 / 2; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
+  .workflow-image img { width: 100%; height: 100%; object-fit: contain; }
+  .phone-image img { padding: 12px; }
+  .workflow-number { position: absolute; inset-inline-start: 12px; bottom: 12px; color: var(--ink); background: var(--canvas); border: 1px solid var(--line); border-radius: 5px; padding: 2px 10px; font: .75rem ui-monospace, monospace; }
+  .workflow-copy { display: flex; flex: 1; flex-direction: column; padding: 24px; }
+  .workflow-meta { color: var(--accent); font-size: .73rem; margin-bottom: 12px; }
+  .workflow-copy h3 { font-size: 1.18rem; line-height: 1.65; letter-spacing: -.02em; }
+  .workflow-copy p { color: var(--muted); font-size: .85rem; margin-block: 12px 22px; }
+  .workflow-action { display: flex; justify-content: space-between; margin-top: auto; font-size: .8rem; color: var(--accent); }
+  .guide-reference { margin-top: 64px; }
+  .guide-reference > div { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-top: 22px; }
+  .guide-reference a { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 20px; border-top: 1px solid var(--line); }
+  .guide-reference a:hover { color: var(--accent); }
+  .guide-reference small { display: block; color: var(--muted); font-size: .72rem; margin-bottom: 5px; }
+  .guide-reference strong { font-size: .95rem; font-weight: 500; }
+  @media (max-width: 1100px) { .workflow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .directory-heading { display: block; } .directory-heading p { margin-top: 10px; } }
+  @media (max-width: 700px) { .workflow-grid, .guide-reference > div { grid-template-columns: 1fr; } .workflow-copy { padding: 22px; } .guide-directory { padding-bottom: 48px; } }
+  @media (prefers-reduced-motion: reduce) { .workflow-card { transition: none; } }
+</style>

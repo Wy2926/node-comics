@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Çevrilmiş ilk sayfanızı okuyun",
         "paragraphs": [
-          "Yerel çizgi roman içe aktarın, EPUB, OPDS veya desteklenen bir site açın. Hedef dili seçip normal çeviriyi açın. Güncel uzantı hem resmî kanalda hem MTU’da normal çeviri kullanır.",
+          "Yerel çizgi roman içe aktarın, EPUB, OPDS veya desteklenen bir site açın. Hedef dili seçip çeviriyi açın. Güncel uzantı hem resmî kanalda hem MTU’da çeviri kullanır.",
           "Geçerli ve yakındaki görseller sınırlı pencerede öncelik alır; aynı MTU kanalında görseller tek tek başlatılır. Yeni çizgi roman orijinal olarak açılır ve otomatik çeviri varsayılan olarak kapalıdır. Konumu kaybetmeden karşılaştırın; okuyucu ve sayfa çevirisi seçilen kanalı kullanır.",
           "Bir sayfa başarısız olursa manuel olarak yeniden denemeden önce bildirilen sorunu çözün. Bir sayfayı kapatmak veya bağlantıyı kaybetmek MTU'nin hesaplamayı durdurduğunu kanıtlamaz. Hizmet hala meşgulken tekrarlanan gönderimlerden kaçının."
         ],
@@ -159,7 +159,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Manga çevirisinin bir görüntü iş akışına ihtiyacı var",
         "paragraphs": [
-          "Mangada diyalog genellikle sanat eserinin bir parçasıdır. Bir tarayıcının metin çevirisi, çevrilmiş kelimeleri doğrudan konuşma balonlarına geri koyamaz. Klasik görüntü çevirisi metni algılar, OCR ile okur, çevirir, orijinal harfleri kaldırır ve sonucu ortaya koyar.",
+          "Mangada diyalog genellikle sanat eserinin bir parçasıdır. Bir tarayıcının metin çevirisi, çevrilmiş kelimeleri doğrudan konuşma balonlarına geri koyamaz. görüntü çevirisi metni algılar, OCR ile okur, çevirir, orijinal harfleri kaldırır ve sonucu ortaya koyar.",
           "Zaten çeviri hizmetini çalıştırabilen bir bilgisayarınız varsa, görüntü işleme için manga-translator-ui ve tarayıcıdan sürekli okuma için NodeLane Comics kullanabilirsiniz. Uzantı, geçerli okuma penceresindeki görüntüleri seçilen hizmete gönderir ve döndürülen çevirileri yerinde görüntüler."
         ]
       },
@@ -210,11 +210,6 @@ export const localTranslationGuides: Guide[] = [
               "Kurulum",
               "Hizmetinizi yükleyin, çalıştırın ve yapılandırın",
               "NodeLane tarafından sağlanan çeviri hizmeti"
-            ],
-            [
-              "Uzatma modları",
-              "Normal çeviri",
-              "Uzantıda standart çeviri"
             ],
             [
               "Maliyetler",
@@ -275,7 +270,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Tek sayfayla başlayın",
         "paragraphs": [
-          "MTU'in Web hizmetini başlatın ve bir görüntüyü kendi arayüzünde çevirin. Daha sonra NodeLane ayarlarına hizmet adresini ve hesabı ekleyin, bağlanın ve standart çeviri ile hedef dili seçin.",
+          "MTU'in Web hizmetini başlatın ve bir görüntüyü kendi arayüzünde çevirin. Daha sonra NodeLane ayarlarına hizmet adresini ve hesabı ekleyin, bağlanın ve çeviri ile hedef dili seçin.",
           "Bağlantı başarısız olursa adresi ve tarayıcı iznini kontrol edin. Oturum açma çalışıyor ancak resim görünmüyorsa hizmetin çeviri yapılandırmasını kontrol edin. Küçük bir deneme size genel bir hız iddiasından ziyade günlük okumaya uygunluk hakkında daha fazla bilgi verir."
         ],
         "links": [

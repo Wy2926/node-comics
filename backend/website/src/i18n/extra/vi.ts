@@ -9,7 +9,6 @@ export const translate = {
   "start": "Bắt đầu dịch",
   "history": "Lịch sử cục bộ",
   "language": "Ngôn ngữ đích",
-  "classic": "Dịch thông thường",
   "download": "Tải toàn bộ ảnh đã dịch",
   "remove": "Xóa bản ghi cục bộ",
   "confirmDelete": "Xóa hình ảnh và bản dịch cục bộ này? Điều này không thể hoàn tác được.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Kết nối lại",
   "submitting": "Đang gửi yêu cầu",
   "receiving": "Đang lưu bản dịch",
-  "formatUnavailable": "Chế độ dịch này hiện không khả dụng cho những hình ảnh dài như vậy.",
+  "formatUnavailable": "Dịch vụ dịch hiện chưa hỗ trợ hình ảnh có kích thước này.",
   "inputMissing": "Không tìm thấy ảnh đầu vào đã lưu để dịch. Không thể tiếp tục tác vụ này."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Đăng ký chưa có sẵn",
     "loading": "Đang tải các gói…",
     "error": "Không thể tải các gói. Vui lòng làm mới trang.",
-    "classic": "Dịch thông thường không giới hạn",
+    "classic": "Dịch không giới hạn",
     "renewMonthly": "Gia hạn hàng tháng.",
     "renewAnnual": "Gia hạn hàng năm."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Tối đa {n} trang dịch mới trong mỗi khoảng 60 phút trượt",
     "trial": "Tài khoản mới đủ điều kiện được dùng thử {d} ngày. Yêu cầu thẻ.",
     "subscribe": "Đăng ký {name}",
-    "description": "Dịch thông thường với giới hạn yêu cầu dịch mới theo giờ.",
+    "description": "Dịch với giới hạn yêu cầu dịch mới theo giờ.",
     "intro": "Chọn một gói dịch để sử dụng quyền lợi đăng ký trong tiện ích."
   },
   "manage": "Quản lý đăng ký",

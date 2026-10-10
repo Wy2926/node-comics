@@ -78,7 +78,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "4. Przeczytaj swoją pierwszą przetłumaczoną stronę",
         "paragraphs": [
-          "Importuj komiks lokalny, otwórz EPUB, OPDS lub obsługiwaną stronę. Wybierz język docelowy i włącz zwykłe tłumaczenie. Bieżące rozszerzenie używa zwykłego tłumaczenia dla oficjalnego kanału i MTU.",
+          "Importuj komiks lokalny, otwórz EPUB, OPDS lub obsługiwaną stronę. Wybierz język docelowy i włącz tłumaczenie. Bieżące rozszerzenie używa tłumaczenia dla oficjalnego kanału i MTU.",
           "Bieżące i pobliskie obrazy mają priorytet w ograniczonym oknie; w jednym kanale MTU obrazy są wysyłane pojedynczo. Nowe komiksy otwierają się w oryginale, a automatyczne tłumaczenie jest domyślnie wyłączone. Porównuj bez utraty pozycji; czytnik i tłumaczenie na stronie używają wybranego kanału.",
           "Jeśli strona nie powiedzie się, rozwiąż zgłoszony problem przed ponowną próbą ręczną. Zamknięcie strony lub utrata połączenia nie oznacza, że ​​MTU przestał działać. Unikaj wielokrotnego przesyłania zgłoszeń, gdy usługa może być nadal zajęta."
         ],
@@ -159,7 +159,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Tłumaczenie mangi wymaga przepływu pracy z obrazami",
         "paragraphs": [
-          "Dialog w mandze jest zwykle częścią grafiki. Tłumaczenie tekstu w przeglądarce nie może bezpośrednio umieścić przetłumaczonych słów z powrotem w dymkach. Klasyczne tłumaczenie obrazu wykrywa tekst, czyta go za pomocą OCR, tłumaczy, usuwa oryginalne litery i wyświetla wynik.",
+          "Dialog w mandze jest zwykle częścią grafiki. Tłumaczenie tekstu w przeglądarce nie może bezpośrednio umieścić przetłumaczonych słów z powrotem w dymkach. Tłumaczenie obrazu wykrywa tekst, czyta go za pomocą OCR, tłumaczy, usuwa oryginalne litery i wyświetla wynik.",
           "Jeżeli posiadasz już komputer, na którym możesz wykonać usługę tłumaczeniową, możesz użyć manga-translator-ui do przetwarzania obrazu i NodeLane Comics do ciągłego czytania w przeglądarce. Rozszerzenie wysyła obrazy z bieżącego okna czytania do wybranego serwisu i na miejscu wyświetla zwrócone tłumaczenia."
         ]
       },
@@ -210,11 +210,6 @@ export const localTranslationGuides: Guide[] = [
               "Konfiguracja",
               "Zainstaluj, uruchom i skonfiguruj swoją usługę",
               "Usługa tłumaczeniowa prowadzona przez NodeLane"
-            ],
-            [
-              "Tryby rozszerzeń",
-              "Zwykłe tłumaczenie",
-              "Standardowe tłumaczenie w rozszerzeniu"
             ],
             [
               "Koszty",
@@ -275,7 +270,7 @@ export const localTranslationGuides: Guide[] = [
       {
         "title": "Zacznij od jednej strony",
         "paragraphs": [
-          "Uruchom usługę internetową MTU i przetłumacz jeden obraz w jej własnym interfejsie. Następnie dodaj adres usługi i konto w ustawieniach NodeLane, połącz się i wybierz tłumaczenie klasyczne oraz język docelowy.",
+          "Uruchom usługę internetową MTU i przetłumacz jeden obraz w jej własnym interfejsie. Następnie dodaj adres usługi i konto w ustawieniach NodeLane, połącz się i wybierz tłumaczenie oraz język docelowy.",
           "Jeśli połączenie nie powiedzie się, sprawdź adres i uprawnienia przeglądarki. Jeśli logowanie działa, ale nie pojawia się żaden obraz, sprawdź konfigurację tłumaczenia usługi. Mała próba powie Ci więcej o przydatności do codziennego czytania niż ogólne twierdzenie o szybkości."
         ],
         "links": [

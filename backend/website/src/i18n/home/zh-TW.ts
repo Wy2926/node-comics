@@ -1,7 +1,7 @@
 import type { HomeCopy } from './types';
 
 const copy: HomeCopy = {
-  comparison: { title: '同一頁，多種語言。', group: '翻譯效果對照', labels: ['日文原圖', '中文', '英文', '韓文'], loading: '正在載入圖片…', error: '圖片載入失敗。', retry: '重新載入', caption: '已記錄的一般翻譯實測效果' },
+  comparison: { title: '同一頁，多種語言。', group: '翻譯效果對照', labels: ['日文原圖', '中文', '英文', '韓文'], loading: '正在載入圖片…', error: '圖片載入失敗。', retry: '重新載入', caption: '已記錄的翻譯實測效果' },
     eyebrow: "漫畫翻譯瀏覽器擴充功能", title: ["看懂漫畫，","繼續你的閱讀。"],
     description: "適用於桌面 Chrome、Edge 和 Firefox 的漫畫翻譯擴充功能。使用 NodeLane 雲端服務翻譯漫畫圖片，在閱讀器中隨時對照原圖。",
     install: '取得擴充功能', seeReader: "查看翻譯效果", desktop: '為桌面閱讀設計',
@@ -22,7 +22,7 @@ const copy: HomeCopy = {
     steps: [["安裝擴充功能","從 Chrome、Edge 或 Firefox 官方商店安裝。"],["開啟漫畫","匯入本機漫畫，或開啟已適配的漫畫網站。"],["選擇翻譯語言","使用所選服務翻譯圖片，隨時對照原圖繼續閱讀。"]],
     compareEyebrow: '看清每一頁', compareTitle: '看懂譯文，也保留原圖。',
     compareBody: '切換查看日文原圖和已記錄的翻譯結果。在閱讀器裡，原圖與譯圖也隨時可選。',
-    compareNote: '原創 AI 插畫上的一般翻譯實測範例。效果因畫面、文字和語言而異。', compareLink: '瞭解翻譯方式',
+    compareNote: '原創 AI 插畫上的翻譯實測範例。效果因畫面、文字和語言而異。', compareLink: '瞭解翻譯方式',
     readerEyebrow: '六個畫面，看看裡面', readerTitle: '從下一本，到下一頁。', readerBody: '發現想看的漫畫，整理進書架，快取後慢慢讀。這裡展示專案介紹中的真實介面。',
     galleryLabels: ['我的漫畫', '發現漫畫', '搜尋漫畫', '離線中心', '閱讀與目錄', '原圖與譯圖'],
     galleryBodies: ['匯入、搜尋和管理漫畫，從上次讀到的位置繼續。', '瀏覽榜單，查看作品簡介、評分和別名，發現下一本。', '按名稱或別名搜尋網站，也可先翻譯名稱，再選擇來源。', '查看章節快取進度與空間佔用，隨時暫停或繼續。', '展開章節目錄，查看語言、頁數、快取和閱讀狀態。', '並排查看原圖與譯圖，也可切回原圖繼續閱讀。'],
@@ -56,14 +56,14 @@ const copy: HomeCopy = {
     modes: [
       [
         "NodeLane 官方管道",
-        "登入後使用官方常規翻譯，按帳戶方案與額度處理圖片；譯圖逐頁顯示，可隨時切回原圖。"
+        "登入後使用官方翻譯，按帳戶方案與額度處理圖片；譯圖逐頁顯示，可隨時切回原圖。"
       ],
       [
         "自架 manga-translator-ui",
         "新增自己的服務位址與 MTU 帳密，可保存多個設定並選擇目前管道；無需 NodeLane 帳號或官方額度。"
       ]
     ],
-    controlNote: "新漫畫預設顯示原圖。選擇管道與目標語言，再開啟常規翻譯；閱讀器與網頁共用目前管道。",
+    controlNote: "新漫畫預設顯示原圖。選擇管道與目標語言，再開啟翻譯；閱讀器與網頁共用目前管道。",
     privacyTitle: "免費閱讀，按需選擇翻譯方案。", privacyBody: "NodeLane Comics 提供免費擴充功能與按帳戶計量的雲端翻譯服務。方案受速率與服務容量限制；訂閱前可查看即時購買狀態、完整權益和帳單規則。",
     privacy: '隱私政策', pricing: "比較 Free 與 PLUS / Pro", ctaTitle: "從下一頁，讀懂更多。", ctaBody: "為桌面 Chrome、Edge 或 Firefox 安裝 NodeLane Comics。",
   };

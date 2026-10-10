@@ -9,7 +9,6 @@ export const translate = {
   "start": "Iniciar tradução",
   "history": "Histórico local",
   "language": "Traduzir para",
-  "classic": "Padrão",
   "download": "Baixar tradução",
   "remove": "Excluir registro local",
   "confirmDelete": "Excluir esta imagem local e tradução? Isto não pode ser desfeito.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Reconectar",
   "submitting": "Enviando solicitação",
   "receiving": "Salvando a tradução",
-  "formatUnavailable": "Este modo de tradução não está disponível atualmente para imagens com tanto tempo.",
+  "formatUnavailable": "O serviço de tradução ainda não oferece suporte a imagens deste tamanho.",
   "inputMissing": "A entrada de tradução salva está faltando. Esta tarefa não pode ser retomada."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "As assinaturas ainda não estão disponíveis",
     "loading": "Carregando planos…",
     "error": "Não foi possível carregar os planos. Atualize.",
-    "classic": "Tradução clássica ilimitada",
+    "classic": "Tradução ilimitada",
     "renewMonthly": "Renova mensalmente.",
     "renewAnnual": "Renovação anual."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Até {n} novas páginas de tradução por janela móvel de uma hora",
     "trial": "Contas novas elegíveis podem testar por {d} dias. É necessário um cartão.",
     "subscribe": "Obtenha {name}",
-    "description": "Tradução clássica com limite de hora em novas solicitações de tradução.",
+    "description": "Tradução com limite de hora em novas solicitações de tradução.",
     "intro": "Escolha um plano de tradução para usar os benefícios da sua assinatura na extensão."
   },
   "manage": "Gerenciar assinatura",

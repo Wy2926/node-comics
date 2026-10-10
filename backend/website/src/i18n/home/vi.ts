@@ -129,14 +129,14 @@ const copy: HomeCopy = {
   "modes": [
       [
         "Kênh NodeLane",
-        "Đăng nhập để dùng dịch thông thường theo gói và hạn mức tài khoản. Kết quả xuất hiện theo từng ảnh; bạn luôn có thể trở về bản gốc."
+        "Đăng nhập để dùng dịch theo gói và hạn mức tài khoản. Kết quả xuất hiện theo từng ảnh; bạn luôn có thể trở về bản gốc."
       ],
       [
         "manga-translator-ui tự triển khai",
         "Thêm địa chỉ và tài khoản MTU, lưu nhiều cấu hình rồi chọn dịch vụ hiện tại. Không cần tài khoản NodeLane và không dùng hạn mức chính thức."
       ]
     ],
-  "controlNote": "Truyện mới mở ở bản gốc. Chọn kênh và ngôn ngữ rồi bật dịch thông thường; trình đọc và dịch trên web dùng chung kênh đang chọn.",
+  "controlNote": "Truyện mới mở ở bản gốc. Chọn kênh và ngôn ngữ rồi bật dịch; trình đọc và dịch trên web dùng chung kênh đang chọn.",
   "privacyTitle": "Đọc miễn phí. Chọn gói dịch phù hợp.",
   "privacyBody": "NodeLane Comics cung cấp tiện ích miễn phí và dịch đám mây theo tài khoản. Có giới hạn tần suất yêu cầu và năng lực dịch vụ. Hãy xem tình trạng cung cấp, quyền lợi và điều kiện thanh toán trước khi đăng ký.",
   "privacy": "Chính sách quyền riêng tư",

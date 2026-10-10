@@ -9,7 +9,6 @@ export const translate = {
   "start": "Übersetzung starten",
   "history": "Lokaler Verlauf",
   "language": "Übersetzen in",
-  "classic": "Standard",
   "download": "Übersetzung herunterladen",
   "remove": "Lokalen Eintrag löschen",
   "confirmDelete": "Dieses lokale Bild und die Übersetzung löschen? Dies kann nicht rückgängig gemacht werden.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Neu verbinden",
   "submitting": "Anfrage wird gesendet",
   "receiving": "Übersetzung wird gespeichert",
-  "formatUnavailable": "Dieser Übersetzungsmodus ist derzeit für Bilder dieser Länge nicht verfügbar.",
+  "formatUnavailable": "Der Übersetzungsdienst unterstützt derzeit keine Bilder dieser Größe.",
   "inputMissing": "Das gespeicherte Bild für die Übersetzung fehlt. Diese Aufgabe kann nicht fortgesetzt werden."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Abonnements sind noch nicht verfügbar",
     "loading": "Pläne werden geladen…",
     "error": "Pläne können nicht geladen werden. Bitte aktualisieren.",
-    "classic": "Standardübersetzung ohne Gesamtseitenlimit",
+    "classic": "Übersetzung ohne Gesamtseitenlimit",
     "renewMonthly": "Wird monatlich erneuert.",
     "renewAnnual": "Verlängert sich jährlich."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Bis zu {n} neue Übersetzungsseiten in jedem gleitenden Stundenfenster",
     "trial": "Berechtigte Erstnutzer erhalten eine Testphase von {d} Tagen. Eine Karte ist erforderlich.",
     "subscribe": "Holen Sie sich {name}",
-    "description": "Klassische Übersetzung mit einem stündlichen Limit für neue Übersetzungsanfragen.",
+    "description": "Übersetzung mit einem stündlichen Limit für neue Übersetzungsanfragen.",
     "intro": "Wählen Sie einen Übersetzungsplan, um Ihre Abonnementvorteile in der Erweiterung zu nutzen."
   },
   "manage": "Abonnement verwalten",

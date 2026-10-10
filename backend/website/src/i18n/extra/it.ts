@@ -9,7 +9,6 @@ export const translate = {
   "start": "Inizia la traduzione",
   "history": "Cronologia locale",
   "language": "Tradurre in",
-  "classic": "Standard",
   "download": "Scarica la traduzione",
   "remove": "Elimina il record locale",
   "confirmDelete": "Eliminare l'immagine locale e la traduzione? Questa operazione non può essere annullata.",
@@ -63,7 +62,7 @@ export const translate = {
   "reload": "Riconnettiti",
   "submitting": "Invio richiesta",
   "receiving": "Salvataggio della traduzione",
-  "formatUnavailable": "Questa modalità di traduzione non è attualmente disponibile per immagini così lunghe.",
+  "formatUnavailable": "Il servizio di traduzione non supporta attualmente immagini di queste dimensioni.",
   "inputMissing": "Manca l'input di traduzione salvato. Questa attività non può essere ripresa."
 };
 
@@ -156,7 +155,7 @@ export const commerce = {
     "unavailable": "Gli abbonamenti non sono ancora disponibili",
     "loading": "Caricamento piani…",
     "error": "Impossibile caricare i piani. Aggiorna.",
-    "classic": "Traduzione classica illimitata",
+    "classic": "Traduzione illimitata",
     "renewMonthly": "Si rinnova mensilmente.",
     "renewAnnual": "Rinnovo annuale."
   },
@@ -164,7 +163,7 @@ export const commerce = {
     "hourly": "Fino a {n} nuove pagine di traduzione per finestra mobile di un’ora",
     "trial": "I nuovi account idonei possono provare per {d} giorni. È richiesta una carta.",
     "subscribe": "Ottieni {name}",
-    "description": "Traduzione classica con limite orario sulle nuove richieste di traduzione.",
+    "description": "Traduzione con limite orario sulle nuove richieste di traduzione.",
     "intro": "Scegli un piano di traduzione per utilizzare i vantaggi dell'abbonamento nell'estensione."
   },
   "manage": "Gestisci l'abbonamento",
