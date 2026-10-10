@@ -33,7 +33,7 @@ export interface ChannelRuntime {
   init():Promise<void>;
   /** Hydrate local receipts only; never waits for policy, admission or remote verification. */
   restore(targets:ReadingTarget[]):Promise<void>;
-  submit(targets:ReadingTarget[],isCurrent?:()=>boolean):Promise<void>;
+  submit(targets:ReadingTarget[],isCurrent?:(target:ReadingTarget)=>boolean):Promise<void>;
   manual(target:ReadingTarget):Promise<void>;
   wait(signal:AbortSignal):Promise<boolean>;
   readonly hasPending:boolean;

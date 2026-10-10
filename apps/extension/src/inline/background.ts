@@ -22,7 +22,7 @@ import {imageWork} from '../translation/input/work';
 interface WindowRequest {request:InlineRequest;sender:chrome.runtime.MessageSender;activity:RequestActivity;refreshRights:boolean;}
 interface Preparation {id:string;controller:AbortController;promise:Promise<void>;}
 interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;waitIds?:string;active:boolean;abort:AbortController;explicitImage:boolean;
-  window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;}
+  id:string;revision:number;readingIds:Set<string>;window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;}
 interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
@@ -117,7 +117,7 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
     for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,translationScope:channel.scope.key,jobs:mergeJobs(page.jobs,incoming)});}
     publish(ctx);
   };
-  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,preparing:new Map(),sources:new RequestPool(3),submitAgain:false};
+  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,id:crypto.randomUUID(),revision:0,readingIds:new Set(),preparing:new Map(),sources:new RequestPool(3),submitAgain:false};
   if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:key=>originals.read(key),isCurrent:current,onJobs:attach,onChange:()=>{if(ctx)publish(ctx);},onInputConsumed:key=>originals.uploaded(key)});
   contexts.set(tabId,ctx);await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
   }catch(error){
@@ -140,7 +140,7 @@ function publish(ctx:Context){
   },0);
 }
 function cancelSources(ctx:Context,keepIds:readonly string[]){
-  const keep=new Set(keepIds);
+  const keep=ctx.readingIds=new Set(keepIds);
   for(const [key,work] of ctx.preparing)if(!keep.has(work.id)){work.controller.abort();ctx.preparing.delete(key);}
 }
 
@@ -204,7 +204,8 @@ function submitPrepared(ctx:Context):Promise<void>{
         const image=view.request.images.find(image=>image.id===view.request.retryId),page=image&&ctx.pages.get(pageKey(view.request,image));
         const target=targets.find(target=>target.page.id===page?.id);
         if(target){view.request={...view.request,retryId:undefined};await ctx.core!.manual(target);}
-      }else await ctx.core!.submit(targets,current);
+      }else await ctx.core!.submit(targets,target=>ctx.active&&ctx.channel.isCurrent()&&view.request.images.some(image=>
+        ctx.readingIds.has(image.id)&&ctx.pages.get(pageKey(view.request,image))?.id===target.page.id));
       publish(ctx);
     }
   })().finally(()=>{ctx.submitting=undefined;publish(ctx);});
@@ -231,7 +232,7 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     else item.state=state;
     items.push(item);
   }
-  return {mode,language,scope,items,analyticsChannel:ctx.channel.analyticsCategory,requiresInternet:ctx.channel.requiresInternet,retryAfterMs:ctx.core?.retryDelay||undefined,hasPending:ctx.core?.hasPending,
+  return {contextId:ctx.id,revision:++ctx.revision,mode,language,scope,items,analyticsChannel:ctx.channel.analyticsCategory,requiresInternet:ctx.channel.requiresInternet,retryAfterMs:ctx.core?.retryDelay||undefined,hasPending:ctx.core?.hasPending,
     needsSubmit:ctx.channel.available&&request.images.some(image=>!ctx.pages.has(pageKey(request,image))&&!ctx.preparing.has(pageKey(request,image))&&!ctx.sourceErrors.has(pageKey(request,image)))};
 }
 /** A display reload can only read this page's selected result; it never enters the plan/retry path. */
@@ -240,10 +241,18 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   if(!ctx.channel.available)throw Error(ctx.channel.unavailable?.message??msg('正在连接翻译服务'));
   const current=()=>!signal.aborted&&activity.current()&&ctx.active&&ctx.channel.isCurrent();
   assertCurrent(current);
+  // A page binding is published before its local receipts finish restoring.
+  // Display recovery waits for that image only, never for unrelated admission.
+  await ctx.preparing.get(pageKey(request,request.images[0]))?.promise;
+  assertCurrent(current);
   const page=ctx.pages.get(pageKey(request,request.images[0])),job=page&&pageResult(ctx,page);
-  if(!page)throw Object.assign(Error(msg('正在准备页面…')),{code:'INLINE_RESULT_NOT_READY'});
+  const notReady=()=>Object.assign(Error(msg('正在准备页面…')),{code:'INLINE_RESULT_NOT_READY'});
+  if(!page)throw notReady();
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.result?.key]);
-  if(!job?.result||key!==request.resultKey)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
+  if(!job?.result||key!==request.resultKey){
+    if(pageTranslation(page,'classic',ctx.settings.language,ctx.channel.scope.key).expired)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
+    throw notReady();
+  }
   let blob:Blob;
   try{blob=await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
     if((error as {code?:string}).code==='RESULT_NOT_CACHED'&&current()&&page){ctx.missingResults.add(job.id);ctx.pages.set(pageKey(request,request.images[0]),{...page,translationError:(error as Error).message});}
@@ -255,7 +264,7 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
     const latest=ctx.pages.get(pageKey(request,request.images[0])),selected=latest&&pageResult(ctx,latest);
     return current()&&selected?.id===job.id&&selected.result?.key===job.result?.key;
   };
-  assertCurrent(selectedCurrent);
+  if(!selectedCurrent())throw notReady();
   return {blob,current:selectedCurrent};
 }
 

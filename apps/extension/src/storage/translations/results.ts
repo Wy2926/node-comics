@@ -10,7 +10,7 @@ import {materializeResult,OriginalUnavailableError,validateResult} from '../../t
 export {resultInMemory} from './memory';
 
 interface ResultRequest {scope:TranslationScope;job:Job;isCurrent:()=>boolean}
-const downloads=new Map<string,Promise<Blob>>();
+const downloads=new Map<string,{promise:Promise<Blob>;isCurrent:()=>boolean}>();
 const readers=new Map<string,{owner:string;read:()=>Promise<Blob>}>();
 export function registerResultReader(scope:TranslationScope,job:Job,read:()=>Promise<Blob>){readers.set(resultBlobKey(scope,job),{owner:scope.key,read});}
 export function releaseResultReaders(scope:TranslationScope){for(const [key,value] of readers)if(value.owner===scope.key)readers.delete(key);}
@@ -64,7 +64,7 @@ export async function loadResultBlob(request:ResultRequest&{download?:()=>Promis
   }:undefined});
 }
 /** Cache hits are complete, previously verified images; only misses run the supplied loader. */
-async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>}):Promise<Blob>{
+async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>},retryShared=true):Promise<Blob>{
   assertResult(request);const {scope,job,load,isCurrent}=request,key=resultBlobKey(scope,job);
   let pending=downloads.get(key);
   if(!pending){
@@ -78,11 +78,20 @@ async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>})
       const blob=await load();assertCurrent(isCurrent);
       return publish(request,blob,token);
     };
-    pending=(async()=>typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-result:'+key,read):await read())();
+    const promise=(async()=>typeof navigator!=='undefined'&&navigator.locks?await navigator.locks.request('nc-result:'+key,read):await read())();
+    pending={promise,isCurrent};
     downloads.set(key,pending);
-    void pending.finally(()=>{if(downloads.get(key)===pending)downloads.delete(key);}).catch(()=>{});
+    void promise.finally(()=>{if(downloads.get(key)===pending)downloads.delete(key);}).catch(()=>{});
   }
-  const blob=await pending;assertCurrent(isCurrent);return blob;
+  let blob:Blob;
+  try{blob=await pending.promise;}catch(error){
+    // Cancelling one display must not fail a different reader of the same result.
+    // Retry that shared cancellation once, with this reader's own authorization.
+    if(!retryShared||pending.isCurrent===isCurrent||pending.isCurrent()||!isCurrent())throw error;
+    if(downloads.get(key)===pending)downloads.delete(key);
+    return loadCachedResult(request,false);
+  }
+  assertCurrent(isCurrent);return blob;
 }
 
 /** Compose and verify official results once, then persist the complete image for every consumer. */

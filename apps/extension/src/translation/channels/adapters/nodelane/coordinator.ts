@@ -146,7 +146,7 @@ export class TranslationCoordinator {
     }catch(error){if(this.stream===stream)this.stopWatching();await this.backpressure(error);throw error;}
   }
   private async recover(){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&r.result.state!=='succeeded'&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
-  async submit(targets:ReadingTarget[],requestCurrent=()=>true){
+  async submit(targets:ReadingTarget[],requestCurrent:(target:ReadingTarget)=>boolean=()=>true){
     await this.init();const window=targets.slice(0,MAX_READING_TARGETS),previous=[...this.wanted].join(',');
     const ids=await Promise.all(window.map(async target=>(await this.pageOperation(target))?.id??operationId(this.scope,this.options.language,target,this.options.modelId)));
     this.wanted=new Set(ids);if(previous!==[...this.wanted].join(','))this.options.onChange();this.state=await readSync(this.scope)??this.state;
@@ -157,14 +157,15 @@ export class TranslationCoordinator {
     if(this.controlDelay)return;
     await this.recover();
     for(const [index,target] of window.entries()){
-      if(!requestCurrent()||this.controlDelay)break;
+      if(this.controlDelay)break;
+      if(!requestCurrent(target))continue;
       try{await withTranslationLock(operationId(this.scope,this.options.language,target),async()=>{
         let record=await this.pageOperation(target);
         if(!record){
           if(this.remaining('imageRetryAt')>0||this.options.canSubmit?.(target)===false)return;
           // A previously delivered job without a local intent stays visible until explicit retranslation.
           if(pageTranslation(target.page,target.mode,this.options.language,this.scope).latest)return;
-          await this.legacy.check(target);record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent());
+          await this.legacy.check(target);record=await this.createOperation(target,()=>requestCurrent(target)&&this.options.api.isCurrent());
         }
         if(record.id!==ids[index]){this.wanted.delete(ids[index]);this.wanted.add(record.id);}
         this.remember(record);
@@ -173,12 +174,12 @@ export class TranslationCoordinator {
         // Image admission backpressure covers every new page in this scope, including a new window.
         // Accepted requests can be recovered and supplied with their original bytes.
         if(record.state==='blocked'||record.state==='accepted'||record.state==='uncertain'||this.recordDelay(record)>0||this.remaining('imageRetryAt')>0)return;
-        if(!requestCurrent()||this.options.canSubmit?.(target)===false)return;
+        if(!requestCurrent(target)||this.options.canSubmit?.(target)===false)return;
         record.state='uncertain';await this.save(record);
         try{const result=await this.options.api.translate(record.requestId,record.request);if(this.wanted.has(record.id))this.refreshed.add(record.requestId);await this.receive(record,result);}
         catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500||e.code==='TRANSLATION_MODEL_UNAVAILABLE';record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;if(quotaErrors.has(e.code))record.deniedPolicy=this.rightsKey;if(e.code==='IMAGE_RATE_LIMITED')record.deniedImageLimit=this.imageLimit;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);if(['TRANSLATION_MODEL_NOT_ALLOWED','TRANSLATION_MODEL_INVALID','TRANSLATION_MODEL_UNAVAILABLE','DAILY_QUOTA_EXHAUSTED'].includes(e.code))await this.options.onModelRejected?.().catch(()=>undefined);
         }
-      });}catch(error){if(!this.options.api.isCurrent())throw error;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
+      });}catch(error){if(!this.options.api.isCurrent())throw error;if(!requestCurrent(target))continue;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
     }
   }
   async manual(target:ReadingTarget,requestCurrent=()=>true){

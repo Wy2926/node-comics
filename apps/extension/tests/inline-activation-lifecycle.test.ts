@@ -30,11 +30,19 @@ const request=(generation=1)=>({type:'NC_INLINE_TICK',navigationId:'nav-7',gener
 const imageClick=()=>({menuItemId:'nc-translate-image',editable:false,frameId:0,mediaType:'image',
   srcUrl:request().images[0].url,pageUrl:url}) as chrome.contextMenus.OnClickData;
 const gate=()=>{let finish!:()=>void;const promise=new Promise<void>(resolve=>{finish=resolve;});return {promise,finish};};
-let listener:Listener,removed:(id:number)=>void;
+let listener:Listener,removed:(id:number)=>void,connected:(port:chrome.runtime.Port)=>void;
 let session:Record<string,unknown>,cores:ChannelRuntime[],channels:ChannelConnection[],options:RuntimeOptions[];
 let background:typeof import('../src/inline/background');
 let locks:ReturnType<typeof vi.fn<(name:string,run:()=>Promise<unknown>)=>Promise<unknown>>>;
 const send=(message:unknown)=>new Promise<Reply|undefined>(resolve=>{if(listener(message,sender,resolve)!==true)resolve(undefined);});
+function imagePort(resultKey:string,generation=1){
+  const listeners=new Set<(message:unknown)=>void>(),ended=new Set<()=>void>(),postMessage=vi.fn();
+  const port={name:'NC_INLINE_RESULT',sender,postMessage,disconnect:vi.fn(),
+    onMessage:{addListener:(fn:(message:unknown)=>void)=>listeners.add(fn),removeListener:(fn:(message:unknown)=>void)=>listeners.delete(fn)},
+    onDisconnect:{addListener:(fn:()=>void)=>ended.add(fn),removeListener:(fn:()=>void)=>ended.delete(fn)}} as unknown as chrome.runtime.Port;
+  connected(port);for(const fn of listeners)fn({type:'open',request:{...request(generation),type:'NC_INLINE_IMAGE',resultKey}});
+  return {postMessage,close:()=>{for(const fn of ended)fn();}};
+}
 
 beforeEach(async()=>{
   vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];
@@ -69,7 +77,7 @@ beforeEach(async()=>{
   vi.stubGlobal('fetch',vi.fn(async()=>{throw Error('No external requests allowed');}));
   vi.stubGlobal('chrome',{
     runtime:{id:'test',getURL:(path:string)=>'chrome-extension://test/'+path,
-      onMessage:{addListener(fn:Listener){listener=fn;}},onConnect:{addListener(){}}},
+      onMessage:{addListener(fn:Listener){listener=fn;}},onConnect:{addListener(fn:typeof connected){connected=fn;}}},
     storage:{local:{get:mocks.localSettings},session:{
       get:async(key:string)=>structuredClone({[key]:session[key]}),set:async(value:Record<string,unknown>)=>Object.assign(session,structuredClone(value)),
       remove:async(key:string)=>{delete session[key];}},onChanged:{addListener(){}}},
@@ -81,6 +89,54 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('waits for local receipts before reading a still-valid restored result',async()=>{
+    const restoring=gate(),open=mocks.openChannel.getMockImplementation()!;
+    const completed:Job={id:'cached-result',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:0,cache_hit:true,image_sha256:'a'.repeat(64),result:{key:'valid-bytes',recoverable:true}};
+    mocks.openChannel.mockImplementationOnce(async(current:()=>boolean)=>{
+      const channel=await open(current);
+      vi.mocked(cores[0].restore).mockImplementation(async()=>{await restoring.promise;await options[0].onJobs([completed]);});
+      vi.mocked(channel.readResult).mockResolvedValue(new Blob(['valid bytes']));return channel;
+    });
+    const pending=send(request());await vi.waitFor(()=>expect(cores[0].restore).toHaveBeenCalledOnce());
+    const resultKey=JSON.stringify([JSON.stringify(['test-scope','classic','zh-Hans']),completed.id,completed.result!.key]);
+    const port=imagePort(resultKey);
+    try{
+      await new Promise(resolve=>setTimeout(resolve,20));expect(port.postMessage).not.toHaveBeenCalled();
+      restoring.finish();expect(await pending).toMatchObject({ok:true,data:{items:[{resultKey}]}});
+      await vi.waitFor(()=>expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'image'})));
+      expect(channels[0].readResult).toHaveBeenCalledOnce();
+    }finally{restoring.finish();await pending;port.close();}
+  });
+  it('keeps admission current for the overlapping page after a window changes',async()=>{
+    const held=gate(),open=mocks.openChannel.getMockImplementation()!;let live:(target:Parameters<ChannelRuntime['submit']>[0][number])=>boolean;
+    mocks.openChannel.mockImplementationOnce(async(current:()=>boolean)=>{
+      const channel=await open(current);
+      vi.mocked(cores[0].submit).mockImplementationOnce(async(_targets,isCurrent)=>{live=isCurrent!;await held.promise;});return channel;
+    });
+    const old=send(request());await vi.waitFor(()=>expect(cores[0].submit).toHaveBeenCalledOnce());
+    const target=vi.mocked(cores[0].submit).mock.calls[0][0][0];
+    await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:2,keepIds:['image-7']});
+    try{
+      expect(live!(target)).toBe(true);
+      await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:3,keepIds:[]});
+      expect(live!(target)).toBe(false);
+    }finally{held.finish();await old;}
+  });
+  it('resynchronizes an obsolete result key but still rejects a revoked result',async()=>{
+    await send(request());
+    const completed:Job={id:'result',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:0,cache_hit:true,image_sha256:'a'.repeat(64),result:{key:'valid',recoverable:true}};
+    await options[0].onJobs([completed]);
+    const obsolete=imagePort('old-result-key');
+    try{await vi.waitFor(()=>expect(obsolete.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'error',code:'INLINE_RESULT_NOT_READY'})));}
+    finally{obsolete.close();}
+    await options[0].onJobs([{...completed,result_expired:true,result_available:false}]);
+    const revoked=imagePort(JSON.stringify([JSON.stringify(['test-scope','classic','zh-Hans']),completed.id,'valid']));
+    try{await vi.waitFor(()=>expect(revoked.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'error',message:'图片已过期或无法访问，请保留本地副本或重新上传。'})));}
+    finally{revoked.close();}
+    expect(channels[0].readResult).not.toHaveBeenCalled();
+  });
   it('frees a delivered image slot even during admission backoff, but keeps a newer pending request',async()=>{
     await send(request());
     vi.mocked(cores[0].stateFor).mockReturnValue({kind:'translating',message:'Loading result'});

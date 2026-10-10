@@ -63,10 +63,11 @@ function mockChannel(account: string, changed: () => void): ChannelConnection {
     createRuntime(options) {
       const attempted = new Set<string>();
       const errors = new Map<string, string>();
-      const submit = async (targets: ReadingTarget[], current = () => true) => {
-        events.push('submit:' + targets.length + ':' + current() + ':' + options.isCurrent()); changed();
+      const submit = async (targets: ReadingTarget[], current: (target:ReadingTarget)=>boolean = () => true) => {
+        events.push('submit:' + targets.length + ':' + targets.every(current) + ':' + options.isCurrent()); changed();
         for (const target of targets) {
-          if (!current() || !options.isCurrent()) return;
+          if (!options.isCurrent()) return;
+          if (!current(target)) continue;
           if (attempted.has(target.page.id) || pageTranslation(target.page, target.mode, options.language, scope.key).latest) continue;
           attempted.add(target.page.id);
           if (failFirst && target.page.id.endsWith('image-1.png') && !failures.has(scope.key)) {
@@ -80,7 +81,7 @@ function mockChannel(account: string, changed: () => void): ChannelConnection {
             errors.set(target.page.id, (error as Error).message); options.onChange(); continue;
           }
           try {
-            if (!current()) return;
+            if (!current(target)) continue;
             submitted.push(scope.key + ':' + target.page.id); changed();
             const identity = 'identity' in lease ? (lease as {identity: {imageSha256: string}}).identity : undefined;
             const job: Job = {id: scope.key + ':' + options.language + ':' + target.page.id, mode: 'classic', target_language: options.language, status: 'succeeded', phase: 'done', quota_pages: 0, created_at: new Date().toISOString(), version: 1, cache_hit: false, source_image_sha256: identity?.imageSha256, result: {key: target.page.id, recoverable: true}};

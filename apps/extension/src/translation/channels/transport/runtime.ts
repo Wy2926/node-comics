@@ -115,11 +115,11 @@ export class DirectImageRuntime implements ChannelRuntime {
       void this.reconcile(true).then(() => this.pump()).catch(() => {}).finally(() => this.schedule());
     }, 750);
   }
-  async submit(targets: ReadingTarget[], isCurrent = () => true) {
+  async submit(targets: ReadingTarget[], isCurrent: (target:ReadingTarget)=>boolean = () => true) {
     await this.init();
-    if (!this.current() || !isCurrent()) return;
+    if (!this.current()) return;
     // Only the unstarted tail is replaced. An already submitted image retains its receipt.
-    this.targets = targets.slice(0, MAX_READING_TARGETS); this.runtimeError = undefined;
+    this.targets = targets.slice(0, MAX_READING_TARGETS).filter(isCurrent); this.runtimeError = undefined;
     void this.pump();
   }
   private async pump() {

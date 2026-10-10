@@ -20,6 +20,20 @@ const request = () => ({ scope:{key:crypto.randomUUID()},
   job: job(1, {status: 'succeeded'}),
   download: vi.fn(async () => new Blob(['translated'])), isCurrent: () => true });
 
+it('retries a cancelled shared read for a still-current display without poisoning it',async()=>{
+  const input=request();let firstCurrent=true,finish!:()=>void;
+  const held=new Promise<void>(resolve=>{finish=resolve;});
+  input.download.mockImplementation(async()=>{await held;return new Blob(['valid result']);});
+  const first=loadResultBlob({...input,isCurrent:()=>firstCurrent});
+  const cancelled=expect(first).rejects.toThrow();
+  await vi.waitFor(()=>expect(input.download).toHaveBeenCalledOnce());
+  const second=loadResultBlob({...input,isCurrent:()=>true});
+  const retained=expect(second).resolves.toBeInstanceOf(Blob);
+  firstCurrent=false;finish();await cancelled;await retained;
+  expect(await(await second).text()).toBe('valid result');
+  expect(input.download).toHaveBeenCalledTimes(2);
+});
+
 it('retains decoded long results without a separate pixel or dimension admission ceiling',async()=>{
   const close=vi.fn();vi.mocked(createImageBitmap).mockResolvedValueOnce({width:64,height:100000,close} as unknown as ImageBitmap);
   const input=request(),blob=await loadResultBlob(input);

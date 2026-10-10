@@ -9,6 +9,23 @@ import {loadResultBlob,resultInMemory,resultBlobKey} from '../src/storage/transl
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 
 describe('content identity and recoverable source references',()=>{
+ it('silently drops preparation that left the reading window without an account error',async()=>{
+  const f=fixture(),page=target(0);let current=true,finish!:()=>void;
+  const held=new Promise<void>(resolve=>{finish=resolve;});
+  const prepareInput=vi.fn(async()=>{await held;return originalInput(0);});
+  const core=new TranslationCoordinator({...f.core.options,prepareInput});
+  const pending=core.submit([page],()=>current);
+  await vi.waitFor(()=>expect(prepareInput).toHaveBeenCalledOnce());
+  current=false;finish();await pending;
+  expect(f.api.isCurrent()).toBe(true);expect(f.submit).not.toHaveBeenCalled();
+  expect(page.page.translationError).toBeUndefined();
+ });
+ it('skips a departed target but admits an overlapping target from the same batch',async()=>{
+  const f=fixture(),departed=target(0),retained=target(1);
+  await f.core.submit([departed,retained],page=>page===retained);
+  expect(f.submit).toHaveBeenCalledOnce();
+  expect(f.submit.mock.calls[0][1]).toMatchObject({image:{sha256:retained.page.imageSha256}});
+ });
  it('restores completed local receipts without remote verification or admission backoff on reentry',async()=>{
   const f=fixture(),page=target(0);
   f.submit.mockImplementation(async(id,body)=>snapshot(id,body,{state:'succeeded',result:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:page.page.imageSha256!,width:800,height:1200}}));

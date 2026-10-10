@@ -50,6 +50,7 @@ export function installInline() {
   let automatic = false,
     dismissedUrl = '';
   let translatedView: Pick<InlineResponse, 'mode' | 'language' | 'requiresInternet' | 'analyticsChannel'> | undefined;
+  let latestResponse:Pick<InlineResponse,'contextId'|'revision'>|undefined;
   let enabled = false,
     paused = false,
     original = false,
@@ -402,6 +403,10 @@ export function installInline() {
   }
   function apply(data: InlineResponse, targets: Candidate[], stamp: number, observedAt: number) {
     if (stamp !== generation || !enabled || location.href !== initialUrl) return;
+    // TICK/WAIT replies and pushed updates travel independently. A late queued
+    // snapshot must never cancel a result delivered by a newer completion.
+    if(latestResponse?.contextId===data.contextId&&data.revision<=latestResponse.revision)return;
+    latestResponse={contextId:data.contextId,revision:data.revision};
     if (scope && scope !== data.scope) for (const item of tracked.values()) {cancelResult(item);item.display.restore();}
     scope = data.scope;
     translatedView = data;
@@ -533,6 +538,7 @@ export function installInline() {
     paused = false;
     original = false;
     scope = '';
+    latestResponse = undefined;
     retryAt = 0;
     readingWindow = new ReadingWindow<Candidate>(item=>item.id);
     readingProgress = new ReadingProgress();
@@ -654,6 +660,7 @@ export function installInline() {
       analyticsObservation++;
       analytics.start(automatic);
       scope = '';
+      latestResponse = undefined;
       translatedView = undefined;
       retryAt = 0;
       for(const item of tracked.values())cancelResult(item);

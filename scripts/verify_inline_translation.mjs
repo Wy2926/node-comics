@@ -17,7 +17,7 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||['generic','feedback','prefetch','window','image','latency'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||['generic','feedback','prefetch','window','image','latency','ordering'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve(process.env.INLINE_OUTPUT||'artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
@@ -28,6 +28,7 @@ assert(!(manifest.content_scripts??[]).some(s=>s.js.includes('content-scripts/in
 // Dispatch the actual registered menu callback. Only this temporary copy exposes its listener
 // and installed menu titles; required host access must never cause a runtime permission request.
 const background=path.join(extension,'background.js');
+if(selectedSite==='ordering')await writeFile(background,`globalThis.fixtureHoldTick=true;const addInlineListener=chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);chrome.runtime.onMessage.addListener=listener=>addInlineListener((message,sender,respond)=>listener(message,sender,value=>{if(globalThis.fixtureHoldTick&&message.type==='NC_INLINE_TICK'&&value?.ok&&value.data?.hasPending){globalThis.fixtureHoldTick=false;globalThis.fixtureReleaseTick=()=>respond(value);}else respond(value);}));\n`+await readFile(background,'utf8'));
 await writeFile(background,`globalThis.fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.fixturePermissionRequests++;throw Error('Unexpected host permission request')};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
 await writeFile(background,`globalThis.fixtureTransfers={maxMessageBytes:0,resultChunks:0,sourceChunks:0};const observeChunk=(v,kind)=>{if(v?.type==='chunk'){fixtureTransfers.maxMessageBytes=Math.max(fixtureTransfers.maxMessageBytes,JSON.stringify(v).length);fixtureTransfers[kind]++;}};const connectListener=chrome.runtime.onConnect.addListener.bind(chrome.runtime.onConnect);chrome.runtime.onConnect.addListener=fn=>connectListener(port=>{const post=port.postMessage.bind(port);port.postMessage=v=>{observeChunk(v,'resultChunks');post(v)};fn(port)});const connectTab=chrome.tabs.connect.bind(chrome.tabs);chrome.tabs.connect=(...args)=>{const port=connectTab(...args);port.onMessage.addListener(v=>observeChunk(v,'sourceChunks'));return port};\n`+await readFile(background,'utf8'));
 const requests=[],sourceRequests=[],translations=new Map(),jobs=new Map(),uploads=new Map(),images=new Map();let createdJobs=0;
@@ -193,6 +194,25 @@ try{
   output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  if(selectedSite==='ordering'){
+    jobs.clear();
+    await page.goto(site+'/latency');await page.locator('img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+    await activate();
+    await page.waitForFunction(()=>document.getElementById('panel-1').style.content.includes('blob:'),{},{timeout:15000});
+    assert(await worker.evaluate(()=>typeof globalThis.fixtureReleaseTick==='function'),'an older queued snapshot is held while completion is pushed');
+    const before=await page.locator('#panel-1').evaluate(image=>{
+      window.fixtureLostDisplay=0;
+      const observer=new MutationObserver(()=>{if(!image.style.content.includes('blob:'))window.fixtureLostDisplay++;});
+      observer.observe(image,{attributes:true,attributeFilter:['style']});
+      return {src:image.src,scroll:scrollY,width:image.getBoundingClientRect().width,height:image.getBoundingClientRect().height};
+    });
+    await worker.evaluate(()=>globalThis.fixtureReleaseTick());await page.waitForTimeout(700);
+    await page.screenshot({path:path.join(out,'completed-without-interaction.png')});
+    assert.equal(await page.evaluate(()=>window.fixtureLostDisplay),0,'an old queued snapshot must not remove a completed translation without user interaction');
+    assert.deepEqual(await page.locator('#panel-1').evaluate(image=>({src:image.src,scroll:scrollY,width:image.getBoundingClientRect().width,height:image.getBoundingClientRect().height})),before);
+    check('a delayed queued response cannot cancel or remove the completed image, with no scrolling or user interaction');
+    await button('关闭');
+  }
   if(selectedSite==='latency'){
     const until=async(condition,message)=>{const end=Date.now()+15000;while(!condition()&&Date.now()<end)await page.waitForTimeout(20);assert(condition(),message);};
     const shown=id=>page.waitForFunction(id=>document.getElementById(id).style.content.includes('blob:'),id,{timeout:15000});
@@ -230,10 +250,16 @@ try{
     await activate();await until(()=>admissionStarted,'neighbour admission is held');await shown('panel-5');
     check('a queued page completes through its live status feed while the neighbouring translation PUT is held');
     releaseAdmission();await until(()=>!!releaseResult,'neighbour result download is held');
+    // Actual wheel input crosses several reading windows while the same result is loading.
+    await page.mouse.move(1100,400);
+    for(const delta of [140,240,-120,220,-180,280]){await page.mouse.wheel(0,delta);await page.waitForTimeout(40);}
     await page.locator('#panel-6').evaluate(image=>image.scrollIntoView({block:'start',behavior:'instant'}));
     await page.waitForTimeout(300);releaseResult();await shown('panel-6');
     assert.equal(resultRequests.filter(id=>id===heldResult).length,1);
-    check('scrolling within the retained window does not restart a held translated-image transfer');
+    const {nodes:scrollNodes}=await cdp.send('Accessibility.getFullAXTree');
+    assert(!scrollNodes.some(node=>/账户或服务已切换|图片已过期/.test(JSON.stringify(node))),'scrolling must not report a false account switch or expired result');
+    await page.screenshot({path:path.join(out,'scroll-keeps-current-result.png')});
+    check('repeated wheel scrolling across windows keeps the held result transfer alive, displays it once, and reports no false account/expiration error');
     await button('关闭');
     // The install-time library tab has its own policy reader; isolate this inline retry.
     for(const tab of browser.pages())if(tab!==page)await tab.close();
