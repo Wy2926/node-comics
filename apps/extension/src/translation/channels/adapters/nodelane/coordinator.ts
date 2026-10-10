@@ -14,7 +14,7 @@ import {cacheInput} from '../../../input/cache';
 import {loadTranslationInput} from '../../../input/load';
 import {translationSize} from '../../../input/limits';
 
-interface Options {api:Api;userId:string;language:string;modelId?:string;modelAvailable?:()=>boolean;onModelRejected?:()=>Promise<void>;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;prepareInput?:(target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
+interface Options {api:Api;userId:string;language:string;modelId?:string;canSubmit?:(target:ReadingTarget)=>boolean;onModelRejected?:()=>Promise<void>;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;prepareInput?:(target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
 const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!r.result&&['needs_input','queued','running','needs_attention'].includes(r.result.state);
 const policyKey=(rights:Entitlements|undefined)=>rights?new Sha256().update(new TextEncoder().encode(JSON.stringify(rights))).digest():undefined;
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
@@ -28,6 +28,7 @@ export class TranslationCoordinator {
   readonly scope:string;state:SyncState;records:LocalOperation[]=[];
   private initializing?:Promise<void>;private uploads=new Map<string,Promise<void>>();private uploadPool=new RequestPool(UPLOAD_CONCURRENCY);
   private wanted=new Set<string>();private refreshed=new Set<string>();
+  private missingAdmission=false;
   private historyKey='';
   private stream?:{ids:Set<string>;records:LocalOperation[];controller:AbortController;events:AsyncGenerator<TranslationBatch>;signal:AbortSignal;abort:()=>void};
   private monotonic=new Map<string,{wall:number;until:number}>();private imageLimit?:number;private rightsKey?:string;
@@ -63,7 +64,9 @@ export class TranslationCoordinator {
     const imageDelay=this.remaining('imageRetryAt');
     const waits=this.records.filter(r=>this.wanted.has(r.id)&&(['uncertain','local','deferred'].includes(r.state)||r.result?.state==='needs_input'))
       .map(r=>Math.max(this.recordDelay(r),r.state==='local'||r.state==='deferred'?imageDelay:0)).filter(n=>n>0);
-    return Math.max(this.controlDelay,waits.length?Math.min(...waits):this.wanted.size?imageDelay:0);
+    const missing=this.missingAdmission&&[...this.wanted].some(id=>!this.records.some(record=>record.id===id));
+    const remote=missing||this.records.some(record=>this.wanted.has(record.id)&&record.result?.state!=='succeeded');
+    return Math.max(remote?this.controlDelay:0,waits.length?Math.min(...waits):missing?imageDelay:0);
   }
   get waitingIds(){return this.records.filter(r=>this.wanted.has(r.id)&&r.state==='accepted'&&active(r)&&this.recordDelay(r)<=0).map(r=>r.requestId).sort();}
   get hasPending(){return this.waitingIds.length>0;}
@@ -76,6 +79,7 @@ export class TranslationCoordinator {
     const jobs=await readJobs(this.scope,hashes,ids);this.current();
     await this.options.onJobs(jobs);this.historyKey=key;
   }
+  async restore(targets:ReadingTarget[]){await this.init();await this.restoreHistory(targets);}
   private async receive(record:LocalOperation,result:TranslationSnapshot){
     if(result.id!==record.requestId)throw new ApiError(msg('翻译回执与操作编号不符'),'INVALID_RECEIPT');
     // Server/SSE still asks for the same frozen input. A reload or another
@@ -141,7 +145,7 @@ export class TranslationCoordinator {
       if(!this.hasPending)this.stopWatching();return true;
     }catch(error){if(this.stream===stream)this.stopWatching();await this.backpressure(error);throw error;}
   }
-  private async recover(){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
+  private async recover(){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&r.result.state!=='succeeded'&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
   async submit(targets:ReadingTarget[],requestCurrent=()=>true){
     await this.init();const window=targets.slice(0,MAX_READING_TARGETS),previous=[...this.wanted].join(',');
     const ids=await Promise.all(window.map(async target=>(await this.pageOperation(target))?.id??operationId(this.scope,this.options.language,target,this.options.modelId)));
@@ -149,6 +153,7 @@ export class TranslationCoordinator {
     for(const record of this.records)if(!this.wanted.has(record.id)){this.refreshed.delete(record.requestId);this.monotonic.delete('retry:'+record.requestId);}
     this.records=(await readOperations([...this.wanted])).filter(record=>this.wanted.has(record.id));
     await this.restoreHistory(window);
+    this.missingAdmission=window.some((target,index)=>!this.records.some(record=>record.id===ids[index])&&!pageTranslation(target.page,target.mode,this.options.language,this.scope).latest);
     if(this.controlDelay)return;
     await this.recover();
     for(const [index,target] of window.entries()){
@@ -156,7 +161,7 @@ export class TranslationCoordinator {
       try{await withTranslationLock(operationId(this.scope,this.options.language,target),async()=>{
         let record=await this.pageOperation(target);
         if(!record){
-          if(this.remaining('imageRetryAt')>0||this.options.modelAvailable?.()===false)return;
+          if(this.remaining('imageRetryAt')>0||this.options.canSubmit?.(target)===false)return;
           // A previously delivered job without a local intent stays visible until explicit retranslation.
           if(pageTranslation(target.page,target.mode,this.options.language,this.scope).latest)return;
           await this.legacy.check(target);record=await this.createOperation(target,()=>requestCurrent()&&this.options.api.isCurrent());
@@ -168,7 +173,7 @@ export class TranslationCoordinator {
         // Image admission backpressure covers every new page in this scope, including a new window.
         // Accepted requests can be recovered and supplied with their original bytes.
         if(record.state==='blocked'||record.state==='accepted'||record.state==='uncertain'||this.recordDelay(record)>0||this.remaining('imageRetryAt')>0)return;
-        if(!requestCurrent())return;
+        if(!requestCurrent()||this.options.canSubmit?.(target)===false)return;
         record.state='uncertain';await this.save(record);
         try{const result=await this.options.api.translate(record.requestId,record.request);if(this.wanted.has(record.id))this.refreshed.add(record.requestId);await this.receive(record,result);}
         catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500||e.code==='TRANSLATION_MODEL_UNAVAILABLE';record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;if(quotaErrors.has(e.code))record.deniedPolicy=this.rightsKey;if(e.code==='IMAGE_RATE_LIMITED')record.deniedImageLimit=this.imageLimit;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);if(['TRANSLATION_MODEL_NOT_ALLOWED','TRANSLATION_MODEL_INVALID','TRANSLATION_MODEL_UNAVAILABLE','DAILY_QUOTA_EXHAUSTED'].includes(e.code))await this.options.onModelRejected?.().catch(()=>undefined);
@@ -182,7 +187,7 @@ export class TranslationCoordinator {
       const previous=await this.pageOperation(target),latest=pageTranslation(target.page,target.mode,this.options.language,this.scope);
       if(!previous)await this.legacy.check(target,true);
       if(previous?.state==='uncertain'||previous&&active(previous)||latest.pending||latest.latest?.status==='unknown_released')throw Error(msg('原请求结果待核实，暂不能重复翻译。'));
-      if(this.options.modelAvailable?.()===false)throw Error(msg('此翻译方式暂不可用'));
+      if(this.options.canSubmit?.(target)===false)throw Error(msg('此翻译方式暂不可用'));
       const sameModel=(previous?.modelId??latest.latest?.requested_model_id??undefined)===this.options.modelId;
       const source=previous?.result?.id??latest.latest?.id,state=previous?.result?.state??latest.latest?.status;
       const frozen=previous?.result?.result??previous?.inputSize??latest.latest?.delivery,profile=previous?.inputProfile??latest.latest?.input_profile;

@@ -1,9 +1,19 @@
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {Api} from '../src/api';
 import {deliveredBytes,deliveredSnapshot} from './overlay-fixture';
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 const id='11111111-1111-4111-8111-111111111111',body={image:{sha256:'a'.repeat(64),byte_size:4,content_type:'image/png'},mode:'classic' as const,target_language:'zh-Hans'};
 describe('translation resource API',()=>{
+ it.each(['translate','translations'] as const)('bounds a stalled %s control request without replacing its UUID',async method=>{
+  const deadline=new AbortController(),timeout=vi.spyOn(AbortSignal,'timeout').mockReturnValue(deadline.signal);
+  const fetch=vi.fn((_url:unknown,init:RequestInit)=>new Promise<Response>((_resolve,reject)=>init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true})));
+  vi.stubGlobal('fetch',fetch);const api=new Api('https://deadline.example');
+  const pending=method==='translate'?api.translate(id,body):api.translations([id]);
+  const rejected=expect(pending).rejects.toMatchObject({name:'TimeoutError'});
+  await vi.waitFor(()=>expect(fetch).toHaveBeenCalledOnce());
+  deadline.abort(new DOMException('Control timeout','TimeoutError'));await rejected;
+  expect(timeout).toHaveBeenCalledWith(30000);expect(String(fetch.mock.calls[0][0])).toContain(id);expect(fetch).toHaveBeenCalledOnce();
+ });
  it('exposes only supported classic capabilities, retaining the server enabled flag',async()=>{
   const fetch=vi.fn().mockResolvedValue(Response.json({result_protocol:'overlay-v1',modes:[{id:'classic',enabled:false,label:'Classic'},{id:'unsupported',enabled:true,label:'Unknown'}],languages:[],entitlements:null}));
   vi.stubGlobal('fetch',fetch);

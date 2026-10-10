@@ -2,13 +2,26 @@ import 'fake-indexeddb/auto';
 import {describe,it,expect,vi} from 'vitest';
 import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {makeOperation,operationId} from '../src/translation/channels/adapters/nodelane/operations';
-import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
+import {readOperation,saveOperation,saveSync} from '../src/translation/channels/adapters/nodelane/store';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
 import {fixture,target,originalBytes,originalInput,job,origin,snapshot} from './translation-fixture';
 import {loadResultBlob,resultInMemory,resultBlobKey} from '../src/storage/translations/results';
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 
 describe('content identity and recoverable source references',()=>{
+ it('restores completed local receipts without remote verification or admission backoff on reentry',async()=>{
+  const f=fixture(),page=target(0);
+  f.submit.mockImplementation(async(id,body)=>snapshot(id,body,{state:'succeeded',result:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:page.page.imageSha256!,width:800,height:1200}}));
+  await f.core.submit([page]);await f.core.submit([]);
+  await saveSync({id:f.core.scope,imageRetryAt:Date.now()+60000,controlRetryAt:Date.now()+60000});
+  const restored=new TranslationCoordinator(f.core.options);
+  f.onJobs.mockClear();await restored.restore([page]);
+  expect(f.onJobs).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({status:'no_text',result:expect.anything()})]));
+  await restored.submit([page]);expect(restored.retryDelay).toBe(0);
+  expect(f.api.translations).not.toHaveBeenCalled();expect(f.submit).toHaveBeenCalledOnce();
+  await restored.submit([target(1)]);expect(restored.retryDelay).toBeGreaterThan(59000);
+  expect(f.submit).toHaveBeenCalledOnce();
+ });
  it('uses a separate render identity without recovering the old PDF operation',async()=>{
   const f=fixture(),ref={entryId:'book',contentId:'pdf-revision',pageId:'page-0',renderProfileId:RENDER_PROFILE};
   const oldTarget={...target(0),page:{...target(0).page,...ref,blobKey:pageReference(ref)}};

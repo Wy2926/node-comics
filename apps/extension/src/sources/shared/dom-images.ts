@@ -82,6 +82,6 @@ export function renderedImages(doc: Document, url: string, selector = 'img', sig
         ? raw
         : safeImageUrl(raw, url);
     return source ? [{ element, key: source, url: source,
-      ...(localBlob ? {read: () => readBlobImage(element, source, url, signal)} : {}) }] : [];
+      ...(localBlob ? {read: (requestSignal?:AbortSignal) => readBlobImage(element, source, url, AbortSignal.any([...(signal?[signal]:[]),...(requestSignal?[requestSignal]:[])]))} : {}) }] : [];
   });
 }

@@ -45,7 +45,7 @@ describe('model selection',()=>{
     expect(await readPageOperations(core.scope,'book',page.page.id,'classic','zh-Hans')).toHaveLength(2);
   });
   it('does not create locked model tasks but still recovers accepted requests',async()=>{
-    const f=fixture(),page=target(0),core=new TranslationCoordinator({...f.core.options,modelId:'locked',modelAvailable:()=>false});
+    const f=fixture(),page=target(0),core=new TranslationCoordinator({...f.core.options,modelId:'locked',canSubmit:()=>false});
     await core.submit([page]);expect(f.submit).not.toHaveBeenCalled();
     await expect(core.manual(page)).rejects.toThrow('不可用');
     const original=makeOperation(page,core.scope,'zh-Hans',originalInput(0),undefined,'a');original.state='uncertain';await saveOperation(original);

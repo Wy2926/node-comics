@@ -27,6 +27,6 @@ it('requests a bounded private purchase page with encoded cursor and cancellatio
   await new Api('https://billing.test','fixture-token').quotaPurchases('page&id',controller.signal);
   const [url,init]=fetch.mock.calls[0];
   expect(url).toBe('https://billing.test/v1/me/quota-purchases?limit=20&cursor=page%26id');
-  expect(init.signal).toBe(controller.signal);
+  expect(init.signal.aborted).toBe(false);controller.abort();expect(init.signal.aborted).toBe(true);
   expect(init.headers.get('Authorization')).toBe('Bearer fixture-token');
 });

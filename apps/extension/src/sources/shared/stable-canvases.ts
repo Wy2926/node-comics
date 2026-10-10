@@ -60,14 +60,16 @@ export function stableCanvasTargets(context: SourcePageContext, candidates: () =
         const state = inspect(canvas);
         if (!state?.url || state.sampledAt - state.changedAt < settleTime) continue;
         const url = state.url;
-        found.push({ element: canvas, key: url, url, read: async () => {
+        found.push({ element: canvas, key: url, url, read: async (requestSignal?:AbortSignal) => {
+          const signal=AbortSignal.any([context.signal,...(requestSignal?[requestSignal]:[])]);
           const current = () => {
+            signal.throwIfAborted();
             active();
             if (!canvas.isConnected || context.document.hidden || !candidates().includes(canvas) || inspect(canvas, true)?.url !== url)
               throw Error('SOURCE_RESOURCE_EXPIRED');
           };
           current();
-          const blob = await canvasImage(canvas, context.signal);
+          const blob = await canvasImage(canvas, signal);
           current();
           return blob;
         } });

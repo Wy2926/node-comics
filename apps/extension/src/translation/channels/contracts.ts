@@ -31,6 +31,8 @@ export interface RuntimeOptions {
 /** submit updates a reading window; it must not await an entire image translation. */
 export interface ChannelRuntime {
   init():Promise<void>;
+  /** Hydrate local receipts only; never waits for policy, admission or remote verification. */
+  restore(targets:ReadingTarget[]):Promise<void>;
   submit(targets:ReadingTarget[],isCurrent?:()=>boolean):Promise<void>;
   manual(target:ReadingTarget):Promise<void>;
   wait(signal:AbortSignal):Promise<boolean>;
@@ -74,7 +76,7 @@ export interface ChannelDefinition {
   fields:readonly ChannelField[];
   permissionOrigins?(input:ChannelConnectionInput):string[];
   connect?(input:ChannelConnectionInput):Promise<ChannelConnectionResult>;
-  open(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean):Promise<ChannelConnection>;
+  open(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean,options?:{deferPolicy?:boolean}):Promise<ChannelConnection>;
   subscribe?(listener:()=>void):()=>void;
   /** Local source removal only; neither method may contact the translation service. */
   inspectLocalEntry?(entryId:string):Promise<LocalTranslationResultReference[]>;

@@ -52,6 +52,10 @@ export class DirectImageRuntime implements ChannelRuntime {
       this.schedule();
     })();
   }
+  async restore(targets:ReadingTarget[]) {
+    await this.init();
+    for(const target of targets){const record=await readDirectOperation(this.id(target));if(record)await this.adopt(record);}
+  }
   private async publish(record: DirectOperation) {
     const saved = await updateDirectOperation(record); this.records.set(saved.id, saved);
     if (this.current()) await this.options.onJobs([saved.job]);

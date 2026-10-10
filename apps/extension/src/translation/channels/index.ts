@@ -100,9 +100,9 @@ export async function connectChannel(adapterId:string,name:string,input:ChannelC
   });
   return profile;
 }
-export async function openActiveChannel(isCurrent:()=>boolean=()=>true):Promise<ChannelConnection>{
+export async function openActiveChannel(isCurrent:()=>boolean=()=>true,options?:{deferPolicy?:boolean}):Promise<ChannelConnection>{
   const value=await listChannels(),profile=value.profiles.find(p=>p.id===value.activeId)!;
-  return channelDefinition(profile.adapterId).open(profile,await readChannelSecrets(profile.id,profile),isCurrent);
+  return channelDefinition(profile.adapterId).open(profile,await readChannelSecrets(profile.id,profile),isCurrent,options);
 }
 export function subscribeChannels(listener:()=>void){
   let stopped=false,cleanup:undefined|(()=>void),generation=0;

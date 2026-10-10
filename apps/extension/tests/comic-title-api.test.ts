@@ -7,7 +7,7 @@ describe('comic title API client',()=>{
   it('posts only the trimmed name and requested title language with the existing authorization and signal',async()=>{
     const fetch=vi.fn().mockResolvedValue(Response.json({name:'星光书店',target_language:'zh-Hans'}));vi.stubGlobal('fetch',fetch);
     const controller=new AbortController();await new Api('https://api.example/','token').translateComicTitle(' 星あかりの本屋 ','zh-Hans',controller.signal);
-    const [url,init]=fetch.mock.calls[0];expect(url).toBe('https://api.example/v1/comic-titles/translate');expect(JSON.parse(init.body)).toEqual({name:'星あかりの本屋',target_language:'zh-Hans'});expect(init.signal).toBe(controller.signal);expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token');
+    const [url,init]=fetch.mock.calls[0];expect(url).toBe('https://api.example/v1/comic-titles/translate');expect(JSON.parse(init.body)).toEqual({name:'星あかりの本屋',target_language:'zh-Hans'});expect(init.signal.aborted).toBe(false);controller.abort();expect(init.signal.aborted).toBe(true);expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token');
   });
   it('counts input code points rather than UTF-16 and does not apply the input limit to responses',async()=>{
     const fetch=vi.fn().mockResolvedValue(Response.json({name:'a'.repeat(90),target_language:'en'}));vi.stubGlobal('fetch',fetch);const api=new Api('https://api.example');

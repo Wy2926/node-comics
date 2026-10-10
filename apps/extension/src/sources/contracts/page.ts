@@ -3,7 +3,7 @@ export interface PageImage {
   element: ComicElement;
   key: string;
   url: string;
-  read?: () => Promise<Blob>;
+  read?: (signal?:AbortSignal) => Promise<Blob>;
 }
 
 import type { SourceLocation } from './definition';

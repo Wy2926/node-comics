@@ -88,7 +88,7 @@ function mockChannel(account: string, changed: () => void): ChannelConnection {
           } finally {lease.release();}
         }
       };
-      return {init: async () => {events.push('init'); changed();}, submit, manual: async target => {attempted.delete(target.page.id); errors.delete(target.page.id); await submit([target]);}, wait: async () => false,
+      return {init: async () => {events.push('init'); changed();}, restore:async()=>{}, submit, manual: async target => {attempted.delete(target.page.id); errors.delete(target.page.id); await submit([target]);}, wait: async () => false,
         hasPending: false, waitingIds: [], retryDelay: 0, stateFor: (target, _active, error) => errors.has(target.page.id) || error ? {kind: 'error', message: errors.get(target.page.id) ?? error!} : undefined, refresh: async () => {}, dispose() {}};
     },
     async readResult(job) {

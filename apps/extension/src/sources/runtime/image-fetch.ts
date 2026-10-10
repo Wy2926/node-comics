@@ -24,7 +24,7 @@ export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:R
       const redirect=observeImageRedirect(current);
       try{
         let response:Response;
-        try{response=await fetch(current,{credentials:'include',cache:'no-store',redirect:'manual',referrerPolicy:'no-referrer',signal:lifetime});}
+        try{response=await fetch(current,{credentials:'include',redirect:'manual',referrerPolicy:'no-referrer',signal:lifetime});}
         catch(error){lifetime.throwIfAborted();throw Error(msg('图片网络请求失败，请检查连接或刷新来源页面后重试。'),{cause:error});}
         if(response.type==='opaqueredirect'||[301,302,303,307,308].includes(response.status)){
           const target=redirect.location()??response.headers.get('location');

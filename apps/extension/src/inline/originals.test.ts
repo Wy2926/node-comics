@@ -52,6 +52,26 @@ describe('bounded inline upload originals',()=>{
     const a=store.read('a'),b=store.read('a');await vi.waitFor(()=>expect(restore).toHaveBeenCalledOnce());
     finish(new Blob(['1234']));expect(await(await a)!.text()).toBe('1234');expect(await b).toBe(await a);
   });
+  it('cancels a display-only cache miss without cancelling a later accepted-task recovery',async()=>{
+    const store=new InlineOriginals('account-a',0),display=new AbortController();let finish!:(blob:Blob)=>void;
+    const restore=vi.fn((signal?:AbortSignal)=>new Promise<Blob>((resolve,reject)=>{
+      if(signal)signal.addEventListener('abort',()=>reject(signal.reason),{once:true});else finish=resolve;
+    }));
+    await store.remember('a',new Blob(['original']),restore);
+    const shown=store.read('a',display.signal),rejected=expect(shown).rejects.toThrow();
+    await vi.waitFor(()=>expect(restore).toHaveBeenCalledOnce());
+    const accepted=store.read('a');await vi.waitFor(()=>expect(restore).toHaveBeenCalledTimes(2));
+    expect(restore.mock.calls.map(([signal])=>signal)).toEqual([display.signal,undefined]);
+    display.abort();await rejected;finish(new Blob(['restored']));expect(await(await accepted)!.text()).toBe('restored');
+  });
+  it('reuses an accepted-task read for display without granting the display cancellation ownership',async()=>{
+    const store=new InlineOriginals('account-a',0),display=new AbortController();let finish!:(blob:Blob)=>void;
+    const restore=vi.fn(()=>new Promise<Blob>(resolve=>{finish=resolve;}));
+    await store.remember('a',new Blob(['original']),restore);
+    const accepted=store.read('a');await vi.waitFor(()=>expect(restore).toHaveBeenCalledOnce());
+    const shown=store.read('a',display.signal),rejected=expect(shown).rejects.toThrow();display.abort();
+    finish(new Blob(['restored']));expect(await(await accepted)!.text()).toBe('restored');await rejected;expect(restore).toHaveBeenCalledOnce();
+  });
   it('drops accepted upload bytes and restores only if a later retry needs them',async()=>{
     const store=new InlineOriginals('account-a'),restore=vi.fn(async()=>new Blob(['restored']));
     await store.remember('a',new Blob(['a']),restore);await store.uploaded('a');

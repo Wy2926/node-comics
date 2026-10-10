@@ -21,7 +21,9 @@
 
 来源读取、原图规范化与保存、译图接收和合成不设置单图字节、像素或边长上限。上传准入由各渠道的翻译入口负责：官方送译副本遵守服务 capabilities，本地 MTU 在发送前检查 32 MiB 上传预算。这些上传规则不传给来源、页面缓存或结果下载。图片格式、有效尺寸、内容摘要和协议描述仍须校验；窗口、并发、缓存总预算与格式整体防护保持独立。
 
-`ChannelDefinition` 声明配置字段并建立连接；`ChannelConnection` 提供能力、作用域、结果读取和运行器工厂；`ChannelRuntime` 提供 `init/submit/manual/wait/stateFor/refresh/dispose`。`submit` 更新阅读窗口并启动工作，不等待整张译图。官方查询与恢复留在官方运行器内，MTU 运行器只等待一次图片 HTTP 调用的结果。
+`ChannelDefinition` 声明配置字段并建立连接；`ChannelConnection` 提供能力、作用域、结果读取和运行器工厂；`ChannelRuntime` 提供 `init/restore/submit/manual/wait/stateFor/refresh/dispose`。`restore` 仅读取本地回执，不联网或创建任务；`submit` 更新阅读窗口并启动工作，不等待整张译图。网页原位入口以 `deferPolicy` 建立本地连接，新增翻译时才刷新远端能力／权益；阅读器正常打开仍加载完整渠道能力。官方查询与恢复留在官方运行器内，MTU 运行器只等待一次图片 HTTP 调用的结果。
+
+官方新增／显式重译的模式、语言与模型准入统一由渠道检查，不阻断已受理 UUID 的核实、补传与状态订阅；公共入口直接使用渠道状态，不再用能力判断覆盖已有任务状态。
 
 官方 `operations.ts` 只根据已准备好的图片信息同步构造请求记录，不读取图片或推断送译摘要。来源读取回调与资源释放由调用方提供，输入恢复函数不依赖官方请求记录或通用 `Job`。
 

@@ -4,7 +4,7 @@ import {sessionAuthorization} from '../../../../auth/session';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
 import {msg} from '../../../../i18n/runtime';
 import {API_BASE,API_ORIGIN} from '../../../../service';
-import {fallbackLanguages,modeLabels,type Capabilities,type Entitlements} from '../../../../types';
+import {fallbackLanguages,modeLabels,supportsLanguage,type Capabilities,type Entitlements} from '../../../../types';
 import type {ChannelDefinition,ChannelConnection,ChannelRuntime,RuntimeOptions} from '../../contracts';
 import {TranslationCoordinator,translationJob} from './coordinator';
 import {translationState} from './state';
@@ -14,6 +14,7 @@ import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} 
 import {loadTranslationInput} from '../../../input/load';
 import {readChannelSettings,updateChannelSettings} from '../../configuration';
 import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
+import {pageTranslation} from '../../../../reader/presentation';
 
 // These baseline choices keep sign-in and cached views reachable without a network request.
 // New requests still require a successful policy refresh; the server enforces its actual limits.
@@ -57,7 +58,7 @@ export const definition:ChannelDefinition={
     });
     return()=>{stopped=true;unsubscribe();};
   },
-  async open(profile,_secrets,isCurrent){
+  async open(profile,_secrets,isCurrent,openOptions){
     const {session}=await readAuth();let disposed=false;
     const live=()=>!disposed&&isCurrent();
     assertCurrent(live);
@@ -67,10 +68,10 @@ export const definition:ChannelDefinition={
     const api=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),live,authorization);
     let caps=baselineCapabilities(),rights:Entitlements|undefined,policyError='';
     const selectedModel=(await readChannelSettings()).modelPreferences?.[scope.key];
-    if(session){
+    if(session&&!openOptions?.deferPolicy){
       try{caps=await api.capabilities();rights=await api.entitlements();assertCurrent(live);}
       catch(error){assertCurrent(live);if((await readAuth()).session?.id!==session.id)throw error;policyError=(error as Error).message;}
-    }else{
+    }else if(!session&&!openOptions?.deferPolicy){
       try{caps=await api.capabilities();assertCurrent(live);}catch{assertCurrent(live);}
     }
     const connection:ChannelConnection={
@@ -102,11 +103,17 @@ export const definition:ChannelDefinition={
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
         const modelId=options.modelId??selectedModel;
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,modelId,modelAvailable:()=>selectedModelAvailable(caps.translation_models,modelId),onModelRejected:async()=>{const fresh=await runtimeApi.capabilities();assertCurrent(current);caps=fresh;options.onChange();},getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,modelId,canSubmit:target=>!!caps.modes.find(mode=>mode.id===target.mode)?.enabled&&supportsLanguage(caps,target.mode,options.language)&&selectedModelAvailable(caps.translation_models,modelId),onModelRejected:async()=>{const fresh=await runtimeApi.capabilities();assertCurrent(current);caps=fresh;options.onChange();},getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},
-          async submit(targets,requestCurrent=()=>true){const official=requireCore();if(targets.length&&!rights)await runtime.refresh();await official.submit(targets,()=>current()&&requestCurrent());},
+          async restore(targets){await requireCore().restore(targets);},
+          async submit(targets,requestCurrent=()=>true){
+            const official=requireCore();
+            // A completed local result is usable without a network policy read.
+            if(!rights&&targets.some(target=>!pageTranslation(target.page,target.mode,options.language,scope.key).latest))await runtime.refresh();
+            await official.submit(targets,()=>current()&&requestCurrent());
+          },
           async manual(target){await runtime.refresh();await requireCore().manual(target,current);},
           async wait(signal){if(!core)return false;return core.wait(signal);},
           get hasPending(){return core?.hasPending??false;},

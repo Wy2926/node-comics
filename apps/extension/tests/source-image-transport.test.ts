@@ -17,7 +17,8 @@ describe('common image request context',()=>{
     const fetch=vi.fn(async()=>new Response('image'));vi.stubGlobal('fetch',fetch);
     expect(await(await fetchSourceImage(image,undefined,undefined,{pageUrl:source})).blob.text()).toBe('image');
     expect(fixture.headers).toEqual([{referer:'https://reader.test/'}]);
-    expect(fetch).toHaveBeenCalledWith(image,expect.objectContaining({redirect:'manual',cache:'no-store',credentials:'include',referrerPolicy:'no-referrer'}));
+    expect(fetch).toHaveBeenCalledWith(image,expect.objectContaining({redirect:'manual',credentials:'include',referrerPolicy:'no-referrer'}));
+    expect(fetch).not.toHaveBeenCalledWith(image,expect.objectContaining({cache:expect.any(String)}));
   });
   it.each([
     ['no-referrer',undefined],['origin','https://reader.test/'],['unsafe-url',source.split('#')[0]],

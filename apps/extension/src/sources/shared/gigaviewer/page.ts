@@ -27,9 +27,10 @@ export function gigaViewerPage(context: SourcePageContext, parsePages: (value: u
       const key = `${item.id}:${item.resource.url}:${item.resource.processing ?? ''}`;
       // Exporting the displayed canvas may throw SecurityError. Read/restore the mapped HTTP original instead.
       if (item.resource.processing) return [{element, key, url: item.resource.url}];
-      return [{element, key, url: 'page-image:' + item.id, read: async () => {
+      return [{element, key, url: 'page-image:' + item.id, read: async (requestSignal?:AbortSignal) => {
+        const signal=AbortSignal.any([context.signal,...(requestSignal?[requestSignal]:[])]);
         const current = () => {
-          context.signal.throwIfAborted();
+          signal.throwIfAborted();
           if (!element.isConnected || !session.inlineTargets().some(target => target.element === element && target.key === key))
             throw Error('SOURCE_RESOURCE_EXPIRED');
         };
@@ -40,7 +41,7 @@ export function gigaViewerPage(context: SourcePageContext, parsePages: (value: u
           const ctx = canvas.getContext('2d'); if (!ctx) throw Error('SOURCE_RESOURCE_EXPIRED');
           ctx.drawImage(element, 0, 0);
         } else canvas = element;
-        const blob = await canvasImage(canvas, context.signal); current(); return blob;
+        const blob = await canvasImage(canvas, signal); current(); return blob;
       }}];
     });
   }

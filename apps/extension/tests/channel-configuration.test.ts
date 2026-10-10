@@ -81,7 +81,7 @@ describe('channel configuration and connection',()=>{
     const profile=await connectChannel('fixture','Local',input()),secrets=await readChannelSecrets(profile.id);
     const stored=JSON.stringify(metadata);expect(stored).not.toContain('private-token');expect(stored).not.toContain('fixture-password');expect(stored).not.toContain('"password"');expect(stored).not.toContain('"token"');
     expect(secrets).toEqual({token:'private-token-fixture-password',password:'fixture-password'});await selectChannel(profile.id);
-    const current=()=>true;await openActiveChannel(current);expect(protocol.open).toHaveBeenCalledWith(profile,secrets,current);
+    const current=()=>true;await openActiveChannel(current);expect(protocol.open).toHaveBeenCalledWith(profile,secrets,current,undefined);
   });
   it('reuses only the declared saved password for an unchanged destination without exposing its value to the settings UI',async()=>{
     const {connectChannel,savedChannelSecretFields}=await import('../src/translation/channels');
@@ -120,7 +120,7 @@ describe('channel configuration and connection',()=>{
     expect(await savedChannelSecretFields(profile.id)).toEqual([]);
     await selectChannel(profile.id);
     const current=()=>true;await openActiveChannel(current);
-    expect(protocol.open).toHaveBeenLastCalledWith(profile,{token:'legacy-token'},current);
+    expect(protocol.open).toHaveBeenLastCalledWith(profile,{token:'legacy-token'},current,undefined);
     protocol.connect.mockImplementation(async(value:ChannelConnectionInput)=>{
       if(!value.secrets.password)throw Error('Password required');return result(value);
     });
@@ -174,7 +174,7 @@ describe('channel configuration and connection',()=>{
     expect(await readChannelCredentials(profile.id)).toEqual({profile,secrets:{}});
     expect(await savedChannelSecretFields(profile.id)).toEqual([]);
     const current=()=>true;await openActiveChannel(current);
-    expect(protocol.open).toHaveBeenLastCalledWith(profile,{},current);
+    expect(protocol.open).toHaveBeenLastCalledWith(profile,{},current,undefined);
     protocol.connect.mockImplementation(async(value:ChannelConnectionInput)=>{
       if(!value.secrets.password)throw Error('Password required');return result(value);
     });
@@ -187,7 +187,7 @@ describe('channel configuration and connection',()=>{
     expect(await savedChannelSecretFields(profile.id)).toEqual(['token','password']);
     expect(await readChannelSecrets(profile.id,restored)).toEqual(result(input()).secrets);
     await openActiveChannel(current);
-    expect(protocol.open).toHaveBeenLastCalledWith(restored,result(input()).secrets,current);
+    expect(protocol.open).toHaveBeenLastCalledWith(restored,result(input()).secrets,current,undefined);
   });
   it('does not recreate a removed profile when a pending reconnect returns',async()=>{
     const {connectChannel,selectChannel,removeChannel,listChannels}=await import('../src/translation/channels');

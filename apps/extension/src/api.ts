@@ -35,7 +35,8 @@ export class Api {
     throw new ApiError(msg("登录已过期，请重新登录。"),'AUTH_REQUIRED',401);
   }
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    return this.controlPool.run(() => this.fetchRequest<T>(path, init));
+    const signal=AbortSignal.any([AbortSignal.timeout(30000),...(init.signal?[init.signal]:[])]);
+    return this.controlPool.run(() => this.fetchRequest<T>(path, {...init,signal}));
   }
   private async fetchRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
     assertCurrent(this.isCurrent);
@@ -90,9 +91,9 @@ export class Api {
   async translation(id:string,signal?:AbortSignal){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{signal}));}
   async translations(ids:string[],options:{etag?:string;signal?:AbortSignal}={}){
     if(!ids.length||ids.length>32)throw new ApiError('每次读取需提供 1–32 个翻译编号。','INVALID_TRANSLATION_COUNT');
-    const query=new URLSearchParams({ids:ids.join(',')});
+    const query=new URLSearchParams({ids:ids.join(',')}),signal=AbortSignal.any([AbortSignal.timeout(30000),...(options.signal?[options.signal]:[])]);
     const fetchSnapshot=async()=>{
-      const response=await this.authorizedFetch(this.base+'/v1/translations?'+query,{signal:options.signal,cache:'no-store',headers:options.etag?{'If-None-Match':options.etag}:{}});
+      const response=await this.authorizedFetch(this.base+'/v1/translations?'+query,{signal,cache:'no-store',headers:options.etag?{'If-None-Match':options.etag}:{}});
       if(response.status===304)return {etag:response.headers.get('ETag')??options.etag,unchanged:true as const};
       if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
       const batch=await response.json() as TranslationBatch;await this.assertAuthorized();for(const item of batch.items)this.remember(item);

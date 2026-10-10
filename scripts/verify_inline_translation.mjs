@@ -17,9 +17,9 @@ for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {
   if(files.includes('verify-inline.mjs'))siteChecks.push({id:site.name,url:pathToFileURL(path.join(tests,'verify-inline.mjs')).href});
 }
 const selectedSite=process.env.INLINE_SITE_ONLY;
-assert(!selectedSite||['generic','feedback','prefetch','window','image'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
+assert(!selectedSite||['generic','feedback','prefetch','window','image','latency'].includes(selectedSite)||siteChecks.some(site=>site.id===selectedSite),'Unknown INLINE_SITE_ONLY');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const out=path.resolve('artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
+const out=path.resolve(process.env.INLINE_OUTPUT||'artifacts/inline-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 assert(manifest.host_permissions.includes('http://*/*')&&manifest.host_permissions.includes('https://*/*'));
@@ -40,6 +40,9 @@ const resultRequests=[];
 const eventStreams=new Set();
 let heldResult,releaseResult,failResult;
 let preparationGate,releasePreparation;
+let heldAdmissionImage,releaseAdmission,admissionStarted=false,failCapabilities=0,capabilityRetrySeconds=1;
+let measureSources=false,sourceActive=0,sourcePeak=0;
+const sourceTimings=[],heldSources=new Set(),sourceReleases=new Map();
 const accessCount=()=>requests.filter(r=>r.path.startsWith('/v1/images/')&&r.path.endsWith('/access')).length;
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const refresh=()=>{for(const job of jobs.values())if(complete&&job.status==='queued'&&Date.now()-Date.parse(job.created_at)>700)Object.assign(job,{status:'succeeded',output_asset_id:'output-'+job.id,updated_at:new Date().toISOString()});};
@@ -59,8 +62,21 @@ const server=createServer(async(req,res)=>{
     if(url.pathname.startsWith('/source/')){
       sourceRequests.push({path:url.pathname,referer:req.headers.referer??null});
       if(req.headers.referer!==site+'/'){res.writeHead(403,{'Cache-Control':'no-store'});res.end();return;}
+      const number=parseInt(url.pathname.split('/')[2],10);
+      if(measureSources){
+        const timing={image:number,started:Date.now()};sourceTimings.push(timing);sourcePeak=Math.max(sourcePeak,++sourceActive);
+        let ended=false;
+        const finish=()=>{if(ended)return;ended=true;sourceActive--;timing.finished=Date.now();timing.cancelled=!res.writableFinished;};
+        res.on('close',finish);
+        await new Promise(resolve=>{
+          const close=()=>{sourceReleases.delete(number);resolve();};res.once('close',close);
+          if(heldSources.has(number))sourceReleases.set(number,()=>{res.off('close',close);sourceReleases.delete(number);resolve();});
+          else setTimeout(()=>{res.off('close',close);resolve();},150);
+        });
+        if(res.destroyed)return;
+      }
       await preparationGate;
-      const source=images.get(parseInt(url.pathname.split('/')[2],10));res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(source);return;
+      const source=images.get(number);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});res.end(source);return;
     }
     if(/^\/v1\/translations\/[^/]+\/result$/.test(url.pathname)){
       assert(req.headers.authorization,'result requires bearer authentication');
@@ -71,7 +87,7 @@ const server=createServer(async(req,res)=>{
     }
     requests.push({method:req.method,path:url.pathname,authorization:!!req.headers.authorization});refresh();
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
-    if(url.pathname==='/v1/capabilities'){await preparationGate;return json(caps);}
+    if(url.pathname==='/v1/capabilities'){await preparationGate;if(failCapabilities>0){failCapabilities--;return json({error:{code:'REQUEST_RATE_LIMITED',message:'Fixture policy temporarily unavailable',retry_after_seconds:capabilityRetrySeconds}},503,{'Retry-After':String(capabilityRetrySeconds)});}return json(caps);}
     if(url.pathname==='/v1/me/entitlements')return json(rights);
     if(url.pathname==='/v1/translations/events'&&req.method==='GET'){
       const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);let previous='';
@@ -107,8 +123,10 @@ const server=createServer(async(req,res)=>{
         const previousId=body.retry_of??body.regenerate_of,previous=previousId&&translations.get(previousId),source=previous&&jobs.get(previous.jobId);
         if(previousId)assert(source,'explicit generation must reference a translation owned by the reader');
         const image=body.image??{sha256:source.image_sha256},requestedMode=body.mode??source.mode,requestedLanguage=body.target_language??source.target_language;
+        if(image.sha256===heldAdmissionImage){admissionStarted=true;await new Promise(resolve=>{releaseAdmission=resolve;});}
         let job=!previousId&&[...jobs.values()].filter(j=>j.image_sha256===image.sha256&&j.mode===requestedMode&&j.target_language===requestedLanguage).at(-1);
         if(!job){const jobId=randomUUID();job={id:jobId,input_asset_id:'original-'+image.sha256,output_asset_id:null,mode:requestedMode,target_language:requestedLanguage,status:source?'queued':'awaiting_upload',width:source?.width,height:source?.height,created_at:new Date().toISOString(),image_sha256:image.sha256};jobs.set(jobId,job);createdJobs++;}
+        if(image.sha256===heldAdmissionImage)heldResult='output-'+job.id;
         translations.set(id,{jobId:job.id,fingerprint});return json(translationResult(id),job.status==='succeeded'?200:202);
       }
     }
@@ -119,6 +137,9 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));api=`http://127
 // Redirect the build-time service only inside the isolated fixture copy.
 for(const file of await readdir(extension,{recursive:true}))if(file.endsWith('.js')){const target=path.join(extension,file),source=await readFile(target,'utf8');await writeFile(target,source.replaceAll(process.env.INLINE_BUILD_API||'https://comics.nodelane.net',api));}
 const web=createServer((req,res)=>{
+  if(req.url==='/latency'){
+    res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>Inline pipeline latency fixture</title><style>body{margin:0;background:#edf2f8}img{display:block;width:600px;height:825px;margin:24px auto}</style>${Array.from({length:14},(_,n)=>`<img id="panel-${n+1}" src="${api}/source/${n+1}.png">`).join('')}`);return;
+  }
   if(req.url==='/sliced'){
     res.setHeader('Content-Type','text/html;charset=utf-8');res.end(`<!doctype html><title>Sliced reading surface</title>
       <style>body{margin:0;background:#edf2f8}main{height:810px;overflow:hidden;position:relative}.sheet{position:absolute;top:0;width:500px;height:810px}img{display:block;width:500px;height:270px}nav{position:fixed;bottom:8px;left:16px}button{padding:8px}</style>
@@ -156,6 +177,12 @@ async function button(name){
   await page.mouse.click((q[0]+q[2]+q[4]+q[6])/4,(q[1]+q[3]+q[5]+q[7])/4);
 }
 const activate=()=>worker.evaluate(async url=>{const tab=(await chrome.tabs.query({})).find(t=>t.url===url);await globalThis.fixtureMenu({menuItemId:'nc-translate-page',pageUrl:url},tab);},page.url());
+const network=online=>worker.evaluate(async({url,online})=>{
+  const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
+  await chrome.scripting.executeScript({target:{tabId:tab.id},func:online=>{
+    Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>online});window.dispatchEvent(new Event(online?'online':'offline'));
+  },args:[online]});
+},{url:page.url(),online});
 const geometry=()=>page.locator('#first').evaluate(i=>({width:i.getBoundingClientRect().width,height:i.getBoundingClientRect().height,src:i.getAttribute('src'),srcset:i.parentElement.querySelector('source').getAttribute('srcset'),scroll:scrollY,clicks:window.fixtureClicks??0}));
 try{
   // Generate public synthetic test panels plus one compact overlay used at native page coordinates.
@@ -166,6 +193,82 @@ try{
   output=Buffer.from(await page.evaluate(async()=>{const canvas=new OffscreenCanvas(512,192),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,512,192);ctx.fillStyle='#224560';ctx.font='42px system-ui';ctx.fillText('你好！继续阅读故事',24,96);return [...new Uint8Array(await(await canvas.convertToBlob({type:'image/webp',quality:1})).arrayBuffer())];}));
   const seed=(n,status)=>{const hash=sha(images.get(n)),id='seed-'+n;jobs.set(id,{id,width:images.get(n).readUInt32BE(16),height:images.get(n).readUInt32BE(20),input_asset_id:'original-'+hash,output_asset_id:status==='succeeded'?'output-'+id:null,mode,target_language:language,status,phase:'done',quota_pages:0,version:1,cache_hit:true,result_available:status==='succeeded',result_expired:false,created_at:'2026-01-01T00:00:00Z',image_sha256:hash,file_hash:hash,page_index:0,...(status==='failed'?{error:{message:'示例翻译失败',code:'FIXTURE_FAILED'}}:{})});};seed(1,'succeeded');seed(3,'failed');
   await worker.evaluate(async api=>{await chrome.storage.local.set({'nc-reader-settings':{apiBase:api,autoTranslateTabs:false,language:'zh-Hans',requestConcurrency:2},'nc-auth':{session:{id:'fixture-session',token:'isolated-fixture',expiresAt:Date.now()+3600000,refreshAt:Date.now()+3500000,credential:{kind:'development'},user:{id:'fixture-reader',name:'Fixture',role:'reader'},apiOrigin:api}}});},api);
+  if(selectedSite==='latency'){
+    const until=async(condition,message)=>{const end=Date.now()+15000;while(!condition()&&Date.now()<end)await page.waitForTimeout(20);assert(condition(),message);};
+    const shown=id=>page.waitForFunction(id=>document.getElementById(id).style.content.includes('blob:'),id,{timeout:15000});
+    await page.goto(site+'/latency');await page.locator('img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+    const original=await page.locator('#panel-1').evaluate(image=>({src:image.src,width:image.getBoundingClientRect().width,height:image.getBoundingClientRect().height}));
+    measureSources=true;[2,3,4].forEach(id=>heldSources.add(id));
+    const began=Date.now();await activate();await shown('panel-1');const firstMs=Date.now()-began;
+    await until(()=>sourceReleases.size===3,'three slow neighbouring reads are held');
+    assert.equal(sourcePeak,3);assert(sourceTimings.some(read=>read.image===1&&read.finished));
+    assert(sourceTimings.filter(read=>[2,3,4].includes(read.image)).every(read=>!read.finished));
+    await page.screenshot({path:path.join(out,'latency-first-before-neighbours.png')});
+    check(`first translated page displays in ${firstMs} ms while three slow neighbours remain unread; source peak concurrency is exactly three`);
+    await page.locator('#panel-10').scrollIntoViewIfNeeded();await shown('panel-10');
+    await until(()=>[2,3,4].every(id=>sourceTimings.some(read=>read.image===id&&read.cancelled)),'leaving the window cancels the three held HTTP reads');
+    assert.equal(await page.locator('#panel-1').evaluate(image=>image.style.content),'');
+    const reads=sourceTimings.filter(read=>read.image===1).length,downloads=resultRequests.length,requestsBefore=requests.length,translationsBefore=translations.size;
+    preparationGate=new Promise(resolve=>{releasePreparation=resolve;});
+    await page.locator('#panel-1').evaluate(image=>{
+      window.fixtureRestore={started:performance.now()};
+      const observer=new MutationObserver(()=>{if(image.style.content.includes('blob:')){window.fixtureRestore.ms=performance.now()-window.fixtureRestore.started;observer.disconnect();}});
+      observer.observe(image,{attributes:true,attributeFilter:['style']});image.scrollIntoView({block:'start',behavior:'instant'});
+    });
+    await shown('panel-1');const restoreMs=Math.round(await page.evaluate(()=>window.fixtureRestore.ms));
+    assert.equal(sourceTimings.filter(read=>read.image===1).length,reads);assert.equal(resultRequests.length,downloads);
+    assert.equal(translations.size,translationsBefore);
+    assert(!requests.slice(requestsBefore).some(request=>request.path==='/v1/translations'),'completed page needs no remote verification');
+    assert.deepEqual(await page.locator('#panel-1').evaluate(image=>({src:image.src,width:image.getBoundingClientRect().width,height:image.getBoundingClientRect().height})),original);
+    await page.screenshot({path:path.join(out,'latency-cache-restored.png')});
+    check(`returning to the evicted display restores its local translated image in ${restoreMs} ms with source/API preparation held, no extra original/result download or translation UUID, and unchanged geometry`);
+    releasePreparation();preparationGate=undefined;releasePreparation=undefined;
+    heldSources.clear();for(const release of [...sourceReleases.values()])release();
+    await button('关闭');
+    heldAdmissionImage=sha(images.get(6));
+    await page.locator('#panel-5').evaluate(image=>image.scrollIntoView({block:'start',behavior:'instant'}));
+    await activate();await until(()=>admissionStarted,'neighbour admission is held');await shown('panel-5');
+    check('a queued page completes through its live status feed while the neighbouring translation PUT is held');
+    releaseAdmission();await until(()=>!!releaseResult,'neighbour result download is held');
+    await page.locator('#panel-6').evaluate(image=>image.scrollIntoView({block:'start',behavior:'instant'}));
+    await page.waitForTimeout(300);releaseResult();await shown('panel-6');
+    assert.equal(resultRequests.filter(id=>id===heldResult).length,1);
+    check('scrolling within the retained window does not restart a held translated-image transfer');
+    await button('关闭');
+    // The install-time library tab has its own policy reader; isolate this inline retry.
+    for(const tab of browser.pages())if(tab!==page)await tab.close();
+    heldAdmissionImage=undefined;failCapabilities=1;capabilityRetrySeconds=3;
+    const policyReads=requests.filter(request=>request.path==='/v1/capabilities').length;
+    await worker.evaluate(async()=>{const value=(await chrome.storage.local.get('nc-auth'))['nc-auth'];await chrome.storage.local.set({'nc-auth':{...value,session:{...value.session,id:'fixture-session-retry',user:{...value.session.user,id:'fixture-policy-retry'}}}});});
+    await page.locator('#panel-1').evaluate(image=>image.scrollIntoView({block:'start',behavior:'instant'}));
+    await activate();await until(()=>failCapabilities===0,'policy failure reaches the inline request');
+    await page.locator('#panel-10').evaluate(image=>{image.scrollIntoView({block:'start',behavior:'instant'});window.dispatchEvent(new Event('scroll'));});
+    await page.waitForTimeout(600);
+    assert.equal(requests.filter(request=>request.path==='/v1/capabilities').length-policyReads,1,'scroll cannot bypass Retry-After');
+    await page.locator('#panel-1').evaluate(image=>{image.scrollIntoView({block:'start',behavior:'instant'});window.dispatchEvent(new Event('scroll'));});
+    await shown('panel-1');
+    assert.equal(failCapabilities,0);assert.equal(requests.filter(request=>request.path==='/v1/capabilities').length-policyReads,2);
+    check('scrolling across windows respects policy Retry-After, then retries once despite late per-image progress');
+    await shown('panel-5');
+    await button('关闭');
+    const offlineApiReads=requests.filter(request=>request.path.startsWith('/v1/')).length,offlineTranslations=translations.size;
+    await network(false);
+    await activate();await shown('panel-1');
+    await page.locator('#panel-14').evaluate(image=>{image.scrollIntoView({block:'start',behavior:'instant'});window.dispatchEvent(new Event('scroll'));});
+    await page.waitForTimeout(600);
+    assert.equal(requests.filter(request=>request.path.startsWith('/v1/')).length,offlineApiReads);
+    assert.equal(translations.size,offlineTranslations);
+    await page.locator('#panel-1').evaluate(image=>{image.scrollIntoView({block:'start',behavior:'instant'});window.dispatchEvent(new Event('scroll'));});
+    await shown('panel-1');
+    await page.screenshot({path:path.join(out,'latency-offline-cache.png')});
+    check('starting with simulated offline state restores cached translations; scrolling to uncached pages makes no API calls or new UUIDs');
+    await network(true);
+    await page.locator('#panel-14').evaluate(image=>{image.scrollIntoView({block:'start',behavior:'instant'});window.dispatchEvent(new Event('scroll'));});
+    await shown('panel-14');
+    check('returning online resumes the latest window without another activation');
+    await button('关闭');
+    await writeFile(path.join(out,'latency.json'),JSON.stringify({firstMs,restoreMs,sourcePeak,sourceTimings},null,2));
+  }
   if(selectedSite==='image') {
     const translated=id=>page.waitForFunction(id=>document.getElementById(id).style.content.includes('blob:'),id,{timeout:20000});
     const original=id=>page.waitForFunction(id=>!document.getElementById(id).style.content,id,{timeout:10000});
@@ -271,7 +374,7 @@ try{
     await button('关闭');
   }
   if(selectedSite==='feedback') {
-    const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&node.name?.value===text);
+    const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&(node.name?.value===text||text==='准备翻译…'&&node.name?.value==='正在准备页面…'));
     const waitNotice=async(text,visible=true)=>{
       const until=Date.now()+10000;
       while(await notice(text)!==visible&&Date.now()<until)await page.waitForTimeout(25);
@@ -536,12 +639,6 @@ try{
   assert([...jobs.values()].filter(j=>[7,8,9,10,11,12].some(n=>j.image_sha256===sha(images.get(n)))).every(j=>j.status!=='succeeded'));
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('short pages prefetch the extra slot immediately and keep refilling while previous translations remain unfinished');
-  const network=online=>worker.evaluate(async({url,online})=>{
-    const tab=(await chrome.tabs.query({})).find(t=>t.url===url);
-    await chrome.scripting.executeScript({target:{tabId:tab.id},func:online=>{
-      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>online});window.dispatchEvent(new Event(online?'online':'offline'));
-    },args:[online]});
-  },{url:page.url(),online});
   await network(false);await page.waitForTimeout(300);assert.equal(eventStreams.size,0);
   const offlineRequests=requests.length;await page.waitForTimeout(500);assert.equal(requests.length,offlineRequests);
   await network(true);const onlineDeadline=Date.now()+5000;while(eventStreams.size!==1&&Date.now()<onlineDeadline)await page.waitForTimeout(50);

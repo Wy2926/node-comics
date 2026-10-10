@@ -32,7 +32,7 @@ interface Candidate {
   resultKey?: string;
   resultMode?: InlineResult['resultMode'];
   loadError?: InlineResult['state'] & {retranslate?:boolean};
-  loading?: { key: string; stamp: number };
+  loading?: { key: string; controller: AbortController };
 }
 export function installInline() {
   let navigationId: string = crypto.randomUUID(),
@@ -53,7 +53,7 @@ export function installInline() {
   let enabled = false,
     paused = false,
     original = false,
-    running = false,
+    running: number | undefined,
     watching = false,
     generation = 0,
     sequence = 0,
@@ -61,7 +61,7 @@ export function installInline() {
     retryId: string | undefined;
   let failures = 0, retryAt = 0;
   let readingWindow = new ReadingWindow<Candidate>(item=>item.id), readingProgress = new ReadingProgress();
-  let refreshRights = true, hasPending = false, pendingPrefetch = false;
+  let refreshRights = true, hasPending = false;
   let candidates: Candidate[] = [],
     windowImages: Candidate[] = [],
     activeImages: Candidate[] = [],
@@ -71,7 +71,6 @@ export function installInline() {
   const tracked = new Map<ComicElement, Candidate>();
   let retained = new Set<Candidate>();
   const imageLoads = new RequestPool(2);
-  const transfers = new Set<AbortController>();
   const sourceTransfers = new Set<() => void>();
   const host = document.createElement('div');
   host.style.cssText =
@@ -105,8 +104,9 @@ export function installInline() {
     generation++;
     activeImages = [];
     for (const item of windowImages) item.checked = false;
-    for (const transfer of transfers) transfer.abort();
-    void send('NC_INLINE_INVALIDATE').catch(() => {});
+    // Window changes do not invalidate an unchanged result in the retained display window.
+    for (const item of tracked.values()) if (!enabled || paused || original || document.hidden || !retained.has(item)) cancelResult(item);
+    void send('NC_INLINE_INVALIDATE',{keepIds:enabled&&!paused&&!original&&!document.hidden?windowImages.map(item=>item.id):[]}).catch(() => {});
   };
   const togglePause = () => {
     paused = !paused;
@@ -275,6 +275,7 @@ export function installInline() {
       const url = target.url;
       let item = tracked.get(image);
       if (item && (item.url !== url || item.sourceKey !== target.key)) {
+        cancelResult(item);
         item.display.restore();
         tracked.delete(image);
         item = undefined;
@@ -298,6 +299,7 @@ export function installInline() {
     const present = new Set(next);
     for (const [image, item] of tracked)
       if (!present.has(item)) {
+        cancelResult(item);
         item.display.restore();
         tracked.delete(image);
       }
@@ -314,12 +316,15 @@ export function installInline() {
     windowImages=nextWindow;
     if(retryId&&!windowImages.some(item=>item.id===retryId))retryId=undefined;
     retained=document.hidden||!windowImages.length?new Set():retainedImages(candidates,innerWidth,innerHeight);
-    for (const item of candidates) if (!retained.has(item)) item.display.restore();
+    for (const item of candidates) if (!retained.has(item)) {cancelResult(item);item.display.restore();}
     readingWindow.update(windowImages);
     if (changed) {
       invalidate();
       schedule(Math.max(0,readingWindow.readyAt-performance.now()));
     }
+    // Known results are a display concern, independent of admission backoff or policy refresh.
+    for(const item of windowImages)if(item.resultKey&&item.display.key!==item.resultKey&&!item.loading&&!item.loadError&&!paused&&!original)
+      void loadResult(item,item.resultKey,generation);
     if (!scope)
       label.textContent = selection ? msg('翻译图片') : candidates.length
         ? msg('漫译 · 发现 {0} 张大图', { '0': candidates.length })
@@ -336,12 +341,12 @@ export function installInline() {
   }
   function schedule(delay = 0) {
     clearTimeout(timer);
-    if (enabled && !paused && !original && !document.hidden && (translatedView?.requiresInternet !== true || navigator.onLine !== false))
-      timer = setTimeout(() => void tick(), Math.max(0,delay,retryAt-performance.now()));
+    if (enabled && !paused && !original && !document.hidden)
+      timer = setTimeout(() => void tick(), Math.max(0,delay));
   }
   function refill() {
     // Do not rotate a full pending batch. Reuse its subscription until a slot is free.
-    pendingPrefetch=readingBatch(windowImages,retryId).some(item=>!activeImages.includes(item))||!!retryId;
+    const pendingPrefetch=readingBatch(windowImages,retryId).some(item=>!activeImages.includes(item))||!!retryId;
     if(pendingPrefetch)schedule(Math.max(0,readingWindow.readyAt-performance.now(),readingWindow.prefetchAt-performance.now()));
   }
   const payload = (targets: Candidate[]) => ({
@@ -353,13 +358,14 @@ export function installInline() {
       referrerPolicy:pageImageReferrerPolicy(i.image),
     })),
   });
+  function cancelResult(item:Candidate){item.loading?.controller.abort();item.loading=undefined;}
   async function loadResult(item: Candidate, key: string, stamp: number) {
-    if (item.loading?.key === key && item.loading.stamp === stamp) return;
-    const loading = { key, stamp }, controller = new AbortController();
-    const live = () => enabled && !paused && !original && !document.hidden && stamp === generation
+    if (item.loading?.key === key) return;
+    cancelResult(item);
+    const controller = new AbortController(), loading = { key, controller }, resultScope=scope;
+    const live = () => !controller.signal.aborted && enabled && !paused && !original && !document.hidden && resultScope === scope
       && retained.has(item) && item.resultKey === key && item.image.isConnected && current(item);
     item.loading = loading;
-    transfers.add(controller);
     paint();
     try {
       await imageLoads.run(async () => {
@@ -372,11 +378,13 @@ export function installInline() {
       });
     } catch (error) {
       if (live()) {
+        if((error as {code?:string}).code==='INLINE_RESULT_NOT_READY'){
+          item.resultKey=undefined;item.checked=false;item.state={kind:'waiting',message:msg('正在准备页面…')};schedule();return;
+        }
         const retranslate=(error as {code?:string}).code==='RESULT_NOT_CACHED';
         item.loadError = { kind: 'error', message: (error as Error).message, retranslate, retryAction:retranslate?'translate':undefined, retryLabel: msg('点击重新加载') };
       }
     } finally {
-      transfers.delete(controller);
       if (item.loading === loading) item.loading = undefined;
       paint();
     }
@@ -394,7 +402,7 @@ export function installInline() {
   }
   function apply(data: InlineResponse, targets: Candidate[], stamp: number, observedAt: number) {
     if (stamp !== generation || !enabled || location.href !== initialUrl) return;
-    if (scope && scope !== data.scope) for (const item of tracked.values()) item.display.restore();
+    if (scope && scope !== data.scope) for (const item of tracked.values()) {cancelResult(item);item.display.restore();}
     scope = data.scope;
     translatedView = data;
     observeAnalytics(data,observedAt);
@@ -406,10 +414,12 @@ export function installInline() {
       const item = targets.find((t) => t.id === result.id);
       if (!item || !item.image.isConnected || !current(item)) continue;
       item.state = result.state;
-      item.checked = true;
+      // A late progress snapshot must not erase the retry scheduled by a failed control request.
+      item.checked = !(result.state?.kind==='error'&&retryAt>performance.now());
       item.pending = result.pending;
       item.resultMode = result.resultMode;
       if (item.resultKey !== result.resultKey) {
+        cancelResult(item);
         item.resultKey = result.resultKey;
         item.loadError = undefined;
       }
@@ -424,7 +434,7 @@ export function installInline() {
   }
   async function watch() {
     if (
-      watching || running || pendingPrefetch ||
+      watching ||
       !hasPending ||
       !enabled ||
       paused ||
@@ -437,7 +447,7 @@ export function installInline() {
     watching = true;
     let retry = 0;
     try {
-      while (!running && !pendingPrefetch && enabled && !paused && !original && !document.hidden && activeImages.length && (translatedView?.requiresInternet !== true || navigator.onLine !== false)) {
+      while (hasPending && enabled && !paused && !original && !document.hidden && activeImages.length && (translatedView?.requiresInternet !== true || navigator.onLine !== false)) {
         const stamp = generation, observedAt = Date.now(),
           targets = activeImages;
         try {
@@ -463,20 +473,22 @@ export function installInline() {
     }
   }
   async function tick() {
-    if (running || !enabled || paused || original || document.hidden) return;
+    if (running === generation || !enabled || paused || original || document.hidden) return;
     scan();
     if (!windowImages.length) return;
     const stamp = generation, observedAt = Date.now();
     if(performance.now()<readingWindow.readyAt){schedule(readingWindow.readyAt-performance.now());return;}
-    const targets=readingBatch(!retryId&&performance.now()<readingWindow.prefetchAt?windowImages.slice(0,1):windowImages,retryId);
+    const targets=readingBatch(windowImages,retryId);
     if(!targets.length){refill();return;}
     activeImages = targets;
-    pendingPrefetch = false;
-    running = true;
+    running = stamp;
     const retry = retryId;
     retryId = undefined;
     try {
-      const response = await send('NC_INLINE_TICK', { ...payload(targets), retryId: retry, refreshRights });
+      // Continue local restoration during backoff; the background gates only remote work.
+      // Report offline separately so a local channel can still run without internet.
+      const deferRemote=retryAt>performance.now()?'backoff':navigator.onLine===false?'offline':undefined;
+      const response = await send('NC_INLINE_TICK', { ...payload(targets), retryId: retry, refreshRights, deferRemote });
       if (stamp !== generation || !enabled || location.href !== initialUrl) return;
       if (!response?.ok) {
         const delay=response?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++);
@@ -486,16 +498,16 @@ export function installInline() {
       const data = response.data as InlineResponse | undefined;
       if (!data) return;
       apply(data, targets, stamp, observedAt);
-      refreshRights = false;
-      failures = 0;
+      if(!deferRemote||deferRemote==='offline'&&!data.requiresInternet){refreshRights=false;failures=0;}
+      if(retryAt>performance.now())schedule(retryAt-performance.now());
     } catch (error) {
       if (stamp === generation) {
-        for (const item of targets) {item.checked=false;item.state = { kind: 'error', message: (error as Error).message };}
+        for (const item of targets) if(!item.resultKey) {item.checked=false;item.state = { kind: 'error', message: (error as Error).message };}
         if(retryAt<=performance.now())retryAt=performance.now()+Math.min(30000,1000*2**failures++);
-        schedule();
+        schedule(retryAt-performance.now());
       }
     } finally {
-      running = false;
+      if(running===stamp)running=undefined;
       paint();
       if (stamp !== generation) schedule();
       else refill();
@@ -585,6 +597,12 @@ export function installInline() {
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
     if (enabled && initialUrl !== location.href) stop();
+    if(message?.type==='NC_INLINE_UPDATE'){
+      if(enabled&&!paused&&!original&&!document.hidden&&message.navigationId===navigationId&&message.generation===generation){
+        apply(message.data,windowImages,generation,Date.now());refill();void watch();
+      }
+      return;
+    }
     if (message?.type === 'NC_INLINE_IDENTITY') {
       navigationId = lifecycle.current().navigationId;
       respond({ url: location.href, navigationId, enabled, activeUrl: initialUrl, dismissedUrl });
@@ -601,7 +619,7 @@ export function installInline() {
         respond({ok:false}); return;
       }
       const id='selected-'+ ++sequence;
-      preparedSelection={snapshot,id,target:{element,url,key:url,...(localBlob?{read:()=>readBlobImage(element,url,pageUrl)}:{})}};
+      preparedSelection={snapshot,id,target:{element,url,key:url,...(localBlob?{read:(signal?:AbortSignal)=>readBlobImage(element,url,pageUrl,signal)}:{})}};
       respond({ok:true,image:{id,url:/^(blob:|data:)/.test(url)?'page-image:'+id:url}});
       return;
     }
@@ -638,6 +656,7 @@ export function installInline() {
       scope = '';
       translatedView = undefined;
       retryAt = 0;
+      for(const item of tracked.values())cancelResult(item);
       invalidate();
       for (const item of tracked.values()) {
         item.display.restore();
@@ -651,7 +670,7 @@ export function installInline() {
   });
   chrome.runtime.onConnect.addListener(port => {
     if (port.name !== INLINE_SOURCE_PORT) return;
-    if (port.sender?.id !== chrome.runtime.id || !port.sender.url?.startsWith(chrome.runtime.getURL('')) || sourceTransfers.size >= 2) {port.disconnect();return;}
+    if (port.sender?.id !== chrome.runtime.id || !port.sender.url?.startsWith(chrome.runtime.getURL('')) || sourceTransfers.size >= 3) {port.disconnect();return;}
     const close = serveImage(port, async (value, signal) => {
       const message = value as {navigationId?: string; id?: string};
       if (message?.navigationId !== navigationId || !enabled) throw Error(msg('图片已离开当前阅读范围。'));
@@ -659,7 +678,7 @@ export function installInline() {
       if (!item || !current(item) || !/^(blob:|data:|page-image:)/.test(item.url)) {
         throw Error(msg('图片已离开当前阅读范围。'));
       }
-      const blob = await (item.read ? item.read() : sourceImage(item.url));
+      const blob = await (item.read ? item.read(signal) : sourceImage(item.url,signal));
       return {blob, current: () => !signal.aborted && message.navigationId === navigationId && current(item) && windowImages.includes(item)};
     }, () => sourceTransfers.delete(close));
     sourceTransfers.add(close);

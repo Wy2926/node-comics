@@ -65,7 +65,7 @@ beforeEach(async()=>{
   }});
   mocks.capture.mockResolvedValue({blob:source,sha256:sha,width:100,height:80,rect});
   mocks.prepare.mockResolvedValue({image:{sha256:sha,byte_size:source.size,content_type:source.type,normalization_version:1},sourceSha256:sha,width:100,height:80});
-  core={init:vi.fn(async()=>{}),submit:vi.fn(async()=>{}),manual:vi.fn(async()=>{}),wait:vi.fn(async()=>false),hasPending:false,
+  core={init:vi.fn(async()=>{}),restore:vi.fn(async()=>{}),submit:vi.fn(async()=>{}),manual:vi.fn(async()=>{}),wait:vi.fn(async()=>false),hasPending:false,
     waitingIds:[],retryDelay:0,stateFor:vi.fn(()=>undefined),refresh:vi.fn(async()=>{}),dispose:vi.fn()};
   channel={key:'channel-session-1',scope:{key:'account-1'},label:'Fixture',available:true,requiresInternet:true,allowsFeedback:true,isCurrent:()=>true,
     capabilities:{modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'zh-Hans',label:'Chinese'}],

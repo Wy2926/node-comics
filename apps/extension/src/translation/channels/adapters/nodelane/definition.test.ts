@@ -4,8 +4,10 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {Api} from '../../../../api';
 import type {AuthState,Session} from '../../../../auth/model';
 import {API_ORIGIN} from '../../../../service';
-import type {Capabilities} from '../../../../types';
-import {entitlement,job,target,originalBytes} from '../../../../../tests/translation-fixture';
+import type {Capabilities,Job} from '../../../../types';
+import {entitlement,job,target,originalBytes,originalInput,snapshot} from '../../../../../tests/translation-fixture';
+import {makeOperation} from './operations';
+import {saveOperation} from './store';
 import {definition} from './definition';
 import {translationCache} from '../../../../storage/translations';
 import {resultBlobKey} from '../../../../storage/translations/results';
@@ -21,11 +23,38 @@ vi.mock('../../../../auth/storage',()=>({
 const profile={id:'official',adapterId:'nodelane',name:'NodeLane',revision:1,settings:{}};
 const capabilities:Capabilities={modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'zh-Hans',label:'Chinese'}],limits:{max_bytes:10_000_000,max_pixels:100_000_000,max_dimension:20_000,max_translation_ids:32},entitlements:null};
 function session(id=crypto.randomUUID()):Session{return {id,token:'fixture-token',user:{id:'user-'+id,name:'fixture',role:'reader'},apiOrigin:API_ORIGIN,expiresAt:Date.now()+3600000,refreshAt:Date.now()+3000000,credential:{kind:'development'}};}
-const options=()=>({language:'zh-Hans',getBlob:async()=>undefined,onJobs:vi.fn(async()=>{}),onChange:vi.fn(),isCurrent:()=>true});
+const options=()=>({language:'zh-Hans',getBlob:async()=>undefined,onJobs:vi.fn(async(_jobs:Job[])=>{}),onChange:vi.fn(),isCurrent:()=>true});
 beforeEach(()=>{auth.value={session:null};auth.listeners.clear();});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('NodeLane channel boundary',()=>{
+  it('opens the inline local-cache path without contacting policy, while new admission still requires it',async()=>{
+    auth.value={session:session()};
+    const caps=vi.spyOn(Api.prototype,'capabilities').mockRejectedValue(Error('offline'));
+    const rights=vi.spyOn(Api.prototype,'entitlements').mockRejectedValue(Error('offline'));
+    const translate=vi.spyOn(Api.prototype,'translate');
+    const connection=await definition.open(profile,{},()=>true,{deferPolicy:true});
+    const runtime=connection.createRuntime(options());await runtime.init();await runtime.restore([target(0)]);
+    expect(caps).not.toHaveBeenCalled();expect(rights).not.toHaveBeenCalled();
+    await expect(runtime.submit([target(0)])).rejects.toThrow('offline');
+    expect(caps).toHaveBeenCalledOnce();expect(translate).not.toHaveBeenCalled();connection.dispose();
+  });
+  it.each(['mode','language'] as const)('disabled %s blocks new tasks, not accepted UUID recovery or its state',async unavailable=>{
+    auth.value={session:session()};
+    vi.spyOn(Api.prototype,'capabilities').mockResolvedValue({...capabilities,modes:[{id:'classic',label:'Classic',enabled:unavailable!=='mode',languages:unavailable==='language'?['en']:['zh-Hans']}]});
+    vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const translate=vi.spyOn(Api.prototype,'translate'),connection=await definition.open(profile,{},()=>true),page=target(0),fresh=target(1);
+    const record=makeOperation(page,connection.scope.key,'zh-Hans',originalInput(0));
+    record.state='accepted';record.result=snapshot(record.requestId,record.request);await saveOperation(record);
+    const local=makeOperation(fresh,connection.scope.key,'zh-Hans',originalInput(1));await saveOperation(local);
+    const recover=vi.spyOn(Api.prototype,'translations').mockResolvedValue({items:[record.result],missing_ids:[],unchanged:false,etag:'accepted'});
+    const settings=options();settings.onJobs.mockImplementation(async jobs=>{page.page.translationScope=connection.scope.key;page.page.jobs=jobs;});
+    const runtime=connection.createRuntime(settings);await runtime.submit([page,fresh,target(2)]);
+    expect(recover).toHaveBeenCalledWith([record.requestId],expect.anything());
+    expect(runtime.waitingIds).toEqual([record.requestId]);expect(runtime.stateFor(page,true)?.kind).toBe('waiting');
+    expect(runtime.stateFor(target(2),true)?.kind).toBe('error');expect(translate).not.toHaveBeenCalled();
+    await expect(runtime.manual(fresh)).rejects.toThrow('不可用');connection.dispose();
+  });
   it('isolates model preferences by user and center, preserving stale selections after entitlement changes',async()=>{
     const saved=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});

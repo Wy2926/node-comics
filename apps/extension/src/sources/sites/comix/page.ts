@@ -54,14 +54,15 @@ export const createPage: CreateSourcePage = context => {
         if (!version) { version = crypto.randomUUID(); versions.set(element,version); }
         const url = 'page-image:' + version;
         const key = `${page.dataset.page}:${element.width}:${element.height}`;
-        return [{element, key, url, read: async () => {
+        return [{element, key, url, read: async (requestSignal?:AbortSignal) => {
+          const signal=AbortSignal.any([context.signal,...(requestSignal?[requestSignal]:[])]);
           const current = () => {
-            context.signal.throwIfAborted();
+            signal.throwIfAborted();
             const target = session.inlineTargets().find(image => image.element === element);
             if (!element.isConnected || target?.url !== url || target.key !== key) throw Error('SOURCE_RESOURCE_EXPIRED');
           };
           current();
-          const blob = await canvasImage(element,context.signal);
+          const blob = await canvasImage(element,signal);
           current();
           return blob;
         }}];

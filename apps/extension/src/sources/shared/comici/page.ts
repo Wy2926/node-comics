@@ -62,15 +62,16 @@ export function comiciPage(context: SourcePageContext, location: ComiciSite['loc
             element: canvas,
             key,
             url: 'page-image:' + id,
-            read: async () => {
+            read: async (requestSignal?:AbortSignal) => {
+              const signal=AbortSignal.any([context.signal,...(requestSignal?[requestSignal]:[])]);
               const current = () => {
-                context.signal.throwIfAborted();
+                signal.throwIfAborted();
                 const target = session.inlineTargets().find(image => image.element === canvas);
                 if (!canvas.isConnected || target?.url !== 'page-image:' + id ||
                   target.key !== key) throw Error('SOURCE_RESOURCE_EXPIRED');
               };
               current();
-              const blob = await canvasImage(canvas, context.signal);
+              const blob = await canvasImage(canvas, signal);
               current();
               return blob;
             },
