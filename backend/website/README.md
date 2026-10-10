@@ -1,6 +1,6 @@
 # NodeLane 官网
 
-Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，用深色左右分栏、单一主安装按钮、真实阅读对照与 Free／PLUS／Pro 突出产品重点；完整功能、FAQ 与条款留在独立页面。网页图片翻译由首屏和页脚次级链接进入 `/translate/`，流程为批量上传（每次最多 10 张）、选择目标语言、翻译、下载。文件列表显示进度、失败重试与恢复；支持逐张下载及将当前列表已完成译图打包为 ZIP，不提供预览、缩放或原译对照。本地记录按账户隔离，存储说明折叠展示。ZIP 库按需加载，逐张读取结果并直接打包，不重复压缩图片。
+Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，依次展示当前标签页翻译、黑白／彩色多语言对照、适配网站搜索和安装入口；不展示套餐，完整功能、定价、FAQ 与条款留在独立页面。网页图片翻译由顶部导航和页脚进入 `/translate/`，流程为批量上传（每次最多 10 张）、选择目标语言、翻译、下载。文件列表显示进度、失败重试与恢复；支持逐张下载及将当前列表已完成译图打包为 ZIP，不提供预览、缩放或原译对照。本地记录按账户隔离，存储说明折叠展示。ZIP 库按需加载，逐张读取结果并直接打包，不重复压缩图片。
 
 ## 运行
 
@@ -33,7 +33,9 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - 不提供独立广告落地页，统一使用对应语言的首页。品牌使用真实的 NodeLane Comics 团队身份，不宣称注册公司。
 - 隐私政策、FAQ 和指南中的扩展权限说明以 [WXT 配置](../../apps/extension/wxt.config.ts)和[公共权限规则](../../docs/SITE_ADAPTERS.md#必须保持的约束)为准，修改时同步全部语言；不要将安装时声明的网站访问权限与账号登录、OAuth 或可选统计授权混为一谈。
 - 获取插件按钮使用 `data-install-extension`：通过本机浏览器信息识别桌面 Chrome、Edge、Firefox，点击直达对应官方商店；Android 和 iPhone／iPad 进入当前语言的 Firefox／Orion 教程，未知浏览器或禁用 JavaScript 时保留下载选择页。商店地址以 [src/data/site.ts](src/data/site.ts) 为唯一来源，不上传浏览器信息。
-- 手机入口为 `/guides/android-firefox/` 与 `/guides/ios-orion/`，不是独立 App 下载；首页 PC 浏览器在上一行，Android／iOS 在下一行，下载页、帮助页和指南目录均可进入。17 语正文维护在 [src/i18n/mobile.ts](src/i18n/mobile.ts)，官方链接维护在 [src/data/mobile.ts](src/data/mobile.ts)。iOS／Orion 当前标为“适配中”，未正式支持，不提供已完成的安装步骤或截图。Android 三个截图槽位使用 [public/guides/firefox](public/guides/firefox) 中的真实模拟器截图：简繁中文共用 zh-CN，其余语言使用 en，保留本地化图注、1080×2400 比例和懒加载。截图不证明永久安装、登录或翻译全流程；来源和摘要见 [ASSETS.md](ASSETS.md)。
+- 首页保留 Android、Chrome、Edge、Firefox、iOS 五个现有品牌图标，移动端图标位于浏览器两侧，窄屏自动换行。主安装按钮按浏览器显示 Chrome／Edge／Firefox 图标，其余默认 Chrome；不改变上述安装地址规则。
+- 手机入口为 `/guides/android-firefox/` 与 `/guides/ios-orion/`，不是独立 App 下载；下载页、帮助页和指南目录均可进入。17 语正文维护在 [src/i18n/mobile.ts](src/i18n/mobile.ts)，官方链接维护在 [src/data/mobile.ts](src/data/mobile.ts)。iOS／Orion 当前标为“适配中”，未正式支持，不提供已完成的安装步骤或截图。Android 三个截图槽位使用 [public/guides/firefox](public/guides/firefox) 中的真实模拟器截图：简繁中文共用 zh-CN，其余语言使用 en，保留本地化图注、1080×2400 比例和懒加载。截图不证明永久安装、登录或翻译全流程；来源和摘要见 [ASSETS.md](ASSETS.md)。
+- 首页不加载 React、账单模块或动画库，专用交互脚本构建预算为 gzip 4 KiB。入场效果使用 CSS 和一次性 IntersectionObserver，尊重减少动态效果设置；禁用 JavaScript 仍能看到静态图片和安装入口。标签页截图用鼠标左右移动、触控横向拖动或键盘滑杆对照，原图首次交互才下载；漫画效果在桌面并排展示，手机复用滑动对照，保留黑白／彩色和语言选择，不另设原译图按钮。图片构建为响应式 WebP，首屏优先加载，其余懒加载；只下载选中的对照版本，解码后整体切换，失败保留当前图。展示文案维护在 [src/i18n/home/showcase.ts](src/i18n/home/showcase.ts)，SEO 字典独立保留。
 
 图片翻译浏览器验收：构建后在仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_website_translation_server.py`，打开 `http://127.0.0.1:4322/`；可用 `--port` 指定独立端口，避免与账户夹具冲突。服务生成 `artifacts/website-translation/` 合成图片，提供模拟身份、人机验证、普通覆盖和 WebP 分块结果。`POST /__state` 可设置 `tiles_enabled`、`max_dimension`、`fail_create_response_once`、`events_truncate_once`、`events_reconnect_once`、`result_failure_once`，以及 `widget_delay_ms`、`events_delay_ms`、`result_delay_ms`（0–30000 毫秒）；`reset: true` 清空模拟任务和计数。`GET /__state` 返回每个 UUID 的创建、上传、查询、下载与 SSE 计数，用于核实恢复不会重复提交。自动分块验收见[脚本入口](../../scripts/README.md#官网验收)，不会访问真实 Cloudflare、数据库或模型。正式匿名体验配置见[部署规范](../../docs/DEPLOYMENT.md#官网匿名图片体验)。
 
@@ -44,14 +46,14 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。插件与官网工作台均提供常规图片翻译；官网不提供其他模式的新任务入口，已有本地结果仍可读取、下载和恢复查询。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
 - 卸载反馈页 `/uninstall/` 提供17 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
-- [公开套餐](../app/catalog_defaults.json) 是初始化草稿和网站展示的共同数据源；首页、定价页显示 PLUS／Pro 的季付与年付总价、每月额度、免费／付费模型及永久额度包。新套餐无试用。实时购买仍以账单 API 的有效渠道为准，静态价格不会生成支付链接。季度和年度均按原始账期锚点逐月发放，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)。
+- [公开套餐](../app/catalog_defaults.json) 是初始化草稿和网站展示的共同数据源；定价页显示 PLUS／Pro 的季付与年付总价、每月额度、免费／付费模型及永久额度包。新套餐无试用。实时购买仍以账单 API 的有效渠道为准，静态价格不会生成支付链接。季度和年度均按原始账期锚点逐月发放，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)。
 - [public/design-tokens.css](public/design-tokens.css) 维护基础视觉令牌，也供 Drive 连接页复用；[src/styles/marketing.css](src/styles/marketing.css) 为官网布局提供统一深色覆盖，不改变 Drive 令牌；[src/styles/controls.css](src/styles/controls.css) 统一全站按钮、选择器及其交互状态，页面 CSS 只安排控件布局。[ComicSymbol.astro](src/components/ComicSymbol.astro) 提供原创静态 SVG。图片来源见 [ASSETS.md](ASSETS.md)，依赖与许可见 [DEPENDENCIES.md](DEPENDENCIES.md)。升级依赖后执行 `npm run notices`。
 - 每页维护标题、正文、canonical、hreflang 和结构化数据；页面关键词分工、17 语用词与 FAQ 规则见 [SEO 规范](SEO.md)。账户、身份回调、支付返回与卸载反馈页不索引。构建检查站内链接、锚点、商店入口及 FAQ 正文与 SEO 数据一致性。
 - 账户使用同源 OIDC + PKCE，精确回调为 `/auth/callback/`；前端不存 client secret。官网在当前浏览器持久保存一份账户会话，跨标签页合并刷新、同步退出和换号；写请求不自动重放，支付返回页不发放权益。官网与插件复用身份服务的 SSO，不互传令牌，不同步本地退出。登录期限由身份服务实际刷新令牌与授权期限决定，持久化不延长这些期限。见[身份规范](../../docs/PRODUCTION_IDENTITY.md)和[支付规则](../../docs/STRIPE_BILLING.md)。
 
 浏览器检查入口见[脚本说明](../../scripts/README.md#官网验收)，覆盖17 语、加载与失败、图片切换、登录返回和订阅交互。
 
-定价页采用套餐卡与统一权益对照表：卡片展示周期总价、每月折合价、实际月额度差值，以及免费模型／付费新增模型；年付优惠以可比报价计算并配装饰性 SVG。对照表只强调有差异的权益，共同功能保持普通样式。首页模型逐项换行，所有名称来自公开目录，不在各语言重复维护。完整模型选择协议见[模型选择设计](../../docs/TRANSLATION_MODEL_SELECTION_DESIGN.md)。
+定价页采用套餐卡与统一权益对照表：卡片展示周期总价、每月折合价、实际月额度差值，以及免费模型／付费新增模型；年付优惠以可比报价计算并配装饰性 SVG。对照表只强调有差异的权益，共同功能保持普通样式。模型名称来自公开目录，不在各语言重复维护。完整模型选择协议见[模型选择设计](../../docs/TRANSLATION_MODEL_SELECTION_DESIGN.md)。
 
 定价对照表的长解释收在对应功能标题旁的信息图标中，支持悬停、键盘聚焦和点按；Esc、焦点离开或点击外部关闭。提示复用当前主题令牌，按视口定位以适配窄屏和 RTL；窄屏表格可横向滚动并固定行标题，不增加请求或将说明复制到每个套餐单元格。
 

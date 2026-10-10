@@ -28,6 +28,13 @@ export function browserStoreUrl(identity: BrowserIdentity, stores: Record<StoreB
   return browser ? stores[browser] || undefined : undefined;
 }
 
+// The icon is a presentation hint, not a promise of mobile installation support.
+export function installIconBrowser(identity: BrowserIdentity): StoreBrowser {
+  if (/Edg(?:A|iOS)?\//.test(identity.userAgent) || identity.userAgentData?.brands?.some(item => item.brand === 'Microsoft Edge')) return 'edge';
+  if (/Firefox\/|FxiOS\//.test(identity.userAgent)) return 'firefox';
+  return 'chrome';
+}
+
 // A mobile installation action always opens instructions, never an app package.
 export function mobileGuidePath(identity: BrowserIdentity): string | undefined {
   const { userAgent, platform, maxTouchPoints = 0 } = identity;

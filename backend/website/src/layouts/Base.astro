@@ -13,6 +13,7 @@ import '../styles/public-site.css';
 import '../styles/marketing.css';
 import '../styles/rtl.css';
 import {translationCopy} from '../i18n/translate';
+import {showcaseCopy} from '../i18n/home/showcase';
 interface Props {
   title: string;
   description: string;
@@ -26,7 +27,7 @@ const locale=localeFromPath(path);
 const route=basePath(path);
 const t=dictionaries[locale].ui;
 const href=(target:string)=>localPath(target,locale);
-const navigation=[{href:href('/features/'),label:t.features},{href:href('/pricing/'),label:t.pricing},{href:href('/help/'),label:t.help}];
+const navigation=[{href:href('/features/'),label:t.features},{href:href('/translate/'),label:showcaseCopy[locale].translator},{href:href('/pricing/'),label:t.pricing},{href:href('/help/'),label:t.help}];
 const pageLanguages = locales;
 const canonical = absolute(path);
 const pageTitle = route === '/' ? title : `${title} · ${t.brandName}`;
@@ -95,9 +96,14 @@ const graph = [
       <div class="container footer-bottom"><span>© {new Date().getFullYear()} {t.brandName}. {t.copyright}</span><span>{t.artNote}</span><a href={href('/feed.xml')}>RSS ↗</a></div>
     </footer>
     <script>
-      import { browserStoreUrl, mobileGuidePath } from '../lib/browser-store';
+      import { browserStoreUrl, mobileGuidePath, installIconBrowser } from '../lib/browser-store';
       import { localPath, localeFromPath } from '../i18n/locales';
       const stores = JSON.parse(document.body.dataset.installStores ?? '{}');
+      const iconBrowser = installIconBrowser(navigator);
+      const iconSource = document.querySelector<HTMLImageElement>(`.hero-store[data-browser="${iconBrowser}"] img`)?.src;
+      document.querySelectorAll<HTMLImageElement>('[data-install-icon]').forEach(icon => {
+        if (iconSource) icon.src = iconSource;
+      });
       const guide = mobileGuidePath(navigator);
       const destination = guide ? localPath(guide, localeFromPath(location.pathname)) : browserStoreUrl(navigator, stores);
       if (destination) {

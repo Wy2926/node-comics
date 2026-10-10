@@ -1,103 +1,106 @@
 ---
 import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
 import BrowserStores from './BrowserStores.astro';
-import {publishedSubscriptions,publishedModels} from '../data/published-plans';
-import {quarterlyCopy} from '../i18n/billing-cadence';
-import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
-import {amountParts,offerBenefits} from '../lib/billing';
+import { browserStores } from '../data/site';
 import { dictionaries, localPath, type Locale } from '../i18n';
 import { homeCopy } from '../i18n/home';
-import { translationCopy } from '../i18n/translate';
-import { billingCopy } from '../lib/billing';
-import { pricingCopy, publishedPricingCopy } from '../lib/pricing';
-import { comparisonRows } from '../lib/pricing-comparison';
-import { publishedAmountParts, publishedAnnualDiscount } from './PublishedPlanPricing';
-import PriceAmount from './PriceAmount';
-import comparisonZh from '../../../../docs/images/translation-comparison.png';
-import comparisonEn from '../../../../docs/images/en/translation-comparison.png';
+import { showcaseCopy } from '../i18n/home/showcase';
 import '../styles/home.css';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const h = homeCopy[locale];
+const c = showcaseCopy[locale];
 const t = dictionaries[locale].ui;
 const href = (path: string) => localPath(path, locale);
-const billing = billingCopy(locale);
-const published = publishedPricingCopy(locale);
-const rows = comparisonRows(locale, 0).filter(row => ['classic', 'model', 'rate', 'priority', 'reading'].includes(row.key));
-const screenshot = locale.startsWith('zh') ? comparisonZh : comparisonEn;
-const previewWidths = [640, 1120, 1680];
-const previews = await Promise.all(previewWidths.map(width =>
-  getImage({ src: screenshot, width, format: 'webp', quality: 85 })
-));
+const sources = import.meta.glob<{ default: ImageMetadata }>('../assets/home/*.{png,jpg,webp}', { eager: true });
+async function picture(name: string, widths: number[]) {
+  const source = sources[`../assets/home/${name}`].default;
+  const images = await Promise.all(widths.map(width => getImage({ src: source, width, format: 'webp', quality: 85 })));
+  return { src: images[images.length - 1].src, srcset: images.map((image, index) => `${image.src} ${widths[index]}w`).join(', '), width: source.width, height: source.height };
+}
+const languageNames: Record<string, string> = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', en: 'English', ja: '日本語', ko: '한국어' };
+const language = ['zh-CN', 'zh-TW', 'ko'].includes(locale) ? locale : 'en';
+const [monoOriginal, colorOriginal, inlineOriginal, inlineTranslated, search] = await Promise.all([
+  picture('mono-original.png', [480, 836]), picture('color-original.jpg', [480, 1000]),
+  picture('inline-original.png', [640, 1120, 1440]), picture('inline-translated.png', [640, 1120, 1440]),
+  picture('search.png', [640, 1120, 1384]),
+]);
+const translations = async (kind: string, languages: string[]) => Object.fromEntries(await Promise.all(languages.map(async lang => [lang, await picture(`${kind}-${lang}.webp`, [480, kind === 'mono' ? 836 : 1000])])));
+const samples = {
+  mono: { original: monoOriginal, language: '日本語', translations: await translations('mono', ['zh-CN', 'zh-TW', 'en', 'ko']) },
+  color: { original: colorOriginal, language: '繁體中文', translations: await translations('color', ['zh-CN', 'en', 'ja', 'ko']) },
+};
+const translated = samples.mono.translations[language];
+const comparisonSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1100px) 43vw, 490px';
+const chromeIcon = browserStores.find(store => store.id === 'chrome')!.icon;
 ---
-<div class="product-home">
+<div class="product-home" data-home-showcase data-language={language}>
   <section class="home-hero container" aria-labelledby="home-title">
     <div class="home-copy">
-      <h1 id="home-title">{h.title[0]}<span>{h.title[1]}</span></h1>
-      <p class="home-description">{h.galleryBodies[5]}</p>
+      <p class="home-eyebrow">{h.eyebrow}</p>
+      <h1 id="home-title">{c.title[0]}<span>{c.title[1]}</span></h1>
+      <p class="home-description">{c.description}</p>
       <a class="button home-install" data-install-extension href={href('/download/')}>
-        {h.install}<span class="button-arrow" aria-hidden="true"><span class="ui-icon icon-arrow"></span></span>
+        <img data-install-icon src={chromeIcon} alt="" aria-hidden="true" width="28" height="28" />
+        {h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span>
       </a>
-      <a class="home-try" href={href('/translate/')}>{translationCopy[locale].open}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
-      <BrowserStores locale={locale} compact />
+      <BrowserStores locale={locale} />
       <p class="home-access">{h.readerAccess}</p>
     </div>
     <figure class="home-preview" id="see-it">
-      <span class="home-anchor" id="translation" aria-hidden="true"></span>
-      <a class="home-screenshot" href={screenshot.src} target="_blank" rel="noopener noreferrer" aria-label={h.enlarge}>
-        <img src={previews[1].src} srcset={previews.map((preview, index) => preview.src + ' ' + previewWidths[index] + 'w').join(', ')} sizes="(max-width: 900px) calc(100vw - 36px), (max-width: 1440px) 56vw, 790px" alt={h.galleryAlt[5]} width={screenshot.width} height={screenshot.height} loading="eager" fetchpriority="high" decoding="async" />
-      </a>
-      <figcaption>{h.screenshotNote}</figcaption>
+      <div class="home-inline-comparison" data-inline-comparison>
+        <a class="home-screenshot" href={inlineTranslated.src} target="_blank" rel="noopener noreferrer" aria-label={h.enlarge}>
+          <img {...inlineTranslated} sizes="(max-width: 900px) calc(100vw - 40px), (max-width: 1440px) calc(100vw - 120px), 1280px" alt={c.description} loading="eager" fetchpriority="high" decoding="async" data-inline-image />
+        </a>
+        <div class="home-inline-markers" aria-hidden="true"><span>{c.original}</span><span>{c.translated}</span></div>
+        <input class="home-inline-range" data-home-controls hidden type="range" min="0" max="100" value="50" dir="ltr" aria-label={h.comparison.group} />
+      </div>
+      <p class="home-image-status home-inline-status" role="status" aria-live="polite" data-inline-status></p>
     </figure>
   </section>
-
-  <section class="container home-service" aria-labelledby="home-service-title">
-    <div class="home-service-heading">
-      <h2 id="home-service-title">{h.privacyTitle}</h2><p>{h.readerAccess}</p>
-      <a class="text-link home-pricing-link" href={href('/pricing/')}>{h.pricing}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
+  <section class="home-comparison container" id="translation" aria-labelledby="comparison-title" data-reveal>
+    <h2 id="comparison-title">{c.compare}</h2>
+    <fieldset class="home-samples home-controls" data-home-controls hidden>
+      <legend class="sr-only">{h.comparison.group}</legend>
+      <button class="button secondary" type="button" data-sample="mono" aria-pressed="true">{c.mono}</button>
+      <button class="button secondary" type="button" data-sample="color" aria-pressed="false">{c.color}</button>
+    </fieldset>
+    <fieldset class="home-languages home-controls" data-home-controls hidden>
+      <legend class="sr-only">{c.translated}</legend>
+      {Object.entries(languageNames).map(([lang, name]) => <button class="button secondary" type="button" data-language-choice={lang} lang={lang} aria-pressed={lang === language} hidden={lang === 'ja'}>{name}</button>)}
+    </fieldset>
+    <div class="home-image-pair" dir="ltr" aria-busy="false">
+      <figure data-comparison="original">
+        <a href={monoOriginal.src} target="_blank" rel="noopener noreferrer" aria-label={h.enlarge}><img {...monoOriginal} sizes={comparisonSizes} alt={`${c.original} · 日本語`} loading="lazy" decoding="async" /></a>
+        <figcaption>{c.original} · <bdi data-original-language>日本語</bdi></figcaption>
+      </figure>
+      <figure data-comparison="translated">
+        <a href={translated.src} target="_blank" rel="noopener noreferrer" aria-label={h.enlarge}><img {...translated} sizes={comparisonSizes} alt={`${c.translated} · ${languageNames[language]}`} loading="lazy" decoding="async" /></a>
+        <figcaption>{c.translated} · <bdi data-translated-language>{languageNames[language]}</bdi></figcaption>
+      </figure>
+      <div class="home-inline-markers home-pair-mobile" aria-hidden="true"><span>{c.original}</span><span>{c.translated}</span></div>
+      <input class="home-inline-range home-pair-mobile" data-home-controls hidden type="range" min="0" max="100" value="50" dir="ltr" aria-label={h.comparison.group} />
     </div>
-    <div class="home-membership">
-      <div class="billing-cycle-picker home-cycle-picker">
-      <fieldset class="billing-cycle billing-cycle-segmented home-cycle">
-        <legend>{billing.plan}</legend>
-        {(['quarter','year'] as const).map((interval,index) => <label class="billing-cycle-card" data-selected={index === 0}>
-          <input type="radio" name="home-billing-cycle" value={interval} checked={index === 0} />
-          <strong>{index === 0 ? quarterlyCopy(locale).label : published.yearly}</strong>
-        </label>)}
-      </fieldset>
-      <p class="billing-cycle-saving"><span class="annual-badge">{pricingCopy(locale).save(publishedAnnualDiscount)}</span></p>
-      </div>
-      <div class="home-plans">
-        <article class="home-plan">
-          <h3>{t.freePlan}</h3>
-          <p class="home-price"><PriceAmount parts={publishedAmountParts('free', locale)} /></p>
-          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}>{row.shared && <span class="ui-icon icon-check" aria-hidden="true"></span>}{row.key==='model'?<span class="home-model-list">{publishedModels.free.map(model=><bdi>{model}</bdi>)}</span>:<span>{row.free}</span>}</li>)}</ul>
-          <a class="button secondary" data-install-extension href={href('/download/')}>{h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
-        </article>
-        {['plus','pro'].map(planId=><article class="home-plan home-plan-paid">
-          <h3>{planId==='plus'?'PLUS':'Pro'}</h3>
-          {(['quarter','year'] as const).map(interval => <p class="home-price" data-home-price={interval} hidden={interval !== 'quarter'}><PriceAmount parts={amountParts(publishedSubscriptions.find(offer=>offer.plan_id===planId&&offer.interval===interval)!,locale)} /><small>/ {interval === 'quarter' ? quarterlyCopy(locale).unit : billing.year}</small></p>)}
-          <ul>{rows.map(row => <li data-feature={row.key} data-shared={row.shared}><span class="ui-icon icon-check" aria-hidden="true"></span>{row.key==='model'?<strong class="home-model-list">{[...publishedModels.free,...publishedModels.paid_extra].map(model=><bdi>{model}</bdi>)}</strong>:row.shared ? <span>{row.lite}</span> : <strong>{row.key==='classic'?offerBenefits(publishedSubscriptions.find(offer=>offer.plan_id===planId)!,locale):row.lite}</strong>}</li>)}</ul>
-          <a class="button" href={href('/pricing/')}>{t.pricing}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
-        </article>)}
-      </div>
-      <p class="home-billing-note" data-home-price="quarter">{quarterlyCopy(locale).renewal} {published.tax}</p>
-      <p class="home-billing-note" data-home-price="year" hidden>{billing.renew(true)} {published.tax}</p>
-      <p class="home-billing-note">{subscriptionQuotaCopy(locale).renewal}</p>
+    <p class="home-image-status" role="status" aria-live="polite" data-image-status></p>
+  </section>
+  <section class="home-search container" aria-labelledby="search-title" data-reveal>
+    <a href={search.src} target="_blank" rel="noopener noreferrer" aria-label={h.enlarge}>
+      <img {...search} sizes="(max-width: 850px) calc(100vw - 40px), (max-width: 1440px) 58vw, 790px" alt={c.searchTitle} loading="lazy" decoding="async" />
+    </a>
+    <div><h2 id="search-title">{c.searchTitle}</h2><p>{c.searchBody}</p></div>
+  </section>
+  <section class="home-closing container" aria-labelledby="closing-title" data-reveal>
+    <h2 id="closing-title">{c.cta}</h2>
+    <div class="home-closing-actions">
+      <a class="button home-install" data-install-extension href={href('/download/')}><img data-install-icon src={chromeIcon} alt="" aria-hidden="true" width="28" height="28" />{h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span></a>
+      <a class="button secondary" href={href('/guides/')}>{t.guides}</a>
     </div>
   </section>
+  <script type="application/json" data-home-assets set:html={JSON.stringify({ samples, inline: { original: inlineOriginal, translated: inlineTranslated }, languageNames, labels: { original: c.original, translated: c.translated, loading: h.comparison.loading, error: h.comparison.error } }).replace(/</g, '\\u003c')} />
 </div>
 <script>
-  const cycle = document.querySelector('.home-cycle');
-  cycle?.addEventListener('change', event => {
-    if (!(event.target instanceof HTMLInputElement)) return;
-    const interval = event.target.value;
-    cycle.querySelectorAll('label').forEach(label => {
-      label.dataset.selected = String(label.querySelector('input')?.value === interval);
-    });
-    document.querySelectorAll<HTMLElement>('[data-home-price]').forEach(price => {
-      price.hidden = price.dataset.homePrice !== interval;
-    });
-  });
+  import { setupHomeShowcase } from '../lib/home-showcase';
+  setupHomeShowcase();
 </script>

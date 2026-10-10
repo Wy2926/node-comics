@@ -3,32 +3,27 @@ import { browserStores } from '../data/site';
 import { mobilePlatforms } from '../data/mobile';
 import { mobileCopy } from '../i18n/mobile';
 import { dictionaries, localPath, type Locale } from '../i18n';
-interface Props { locale: Locale; compact?: boolean }
-const { locale, compact = false } = Astro.props;
+interface Props { locale: Locale }
+const { locale } = Astro.props;
 const t = dictionaries[locale].ui;
 const m = mobileCopy[locale];
+const mobile = mobilePlatforms.map(platform => ({
+  id: platform.id, mobile: true, name: platform.name, icon: platform.icon,
+  href: localPath(`/guides/${platform.slug}/`, locale),
+  detail: `${platform.browser} · ${platform.id === 'ios' ? m.iosStatus : m.label}`,
+}));
+const desktop = browserStores.map(store => ({
+  id: store.id, mobile: false, name: store.name.replace('Google ', '').replace('Microsoft ', '').replace('Mozilla ', ''),
+  icon: store.icon, href: store.url || `${localPath('/download/', locale)}#${store.id}`, detail: '',
+}));
+const platforms = [mobile[0], ...desktop, mobile[1]];
 ---
-<nav class="hero-stores" aria-label={`${t.download} · ${m.label}`}>
-  <div class="hero-store-row" data-platform-row="desktop">
-  {browserStores.map(store => <a class="hero-store" data-browser={store.id}
-    href={store.url || `${localPath('/download/', locale)}#${store.id}`}
-    target={store.url ? '_blank' : undefined} rel={store.url ? 'noopener noreferrer' : undefined}>
-    <span class="hero-store-heading"><img src={store.icon} alt={store.name} aria-hidden="true" width="32" height="32" /><strong>{store.name.replace('Google ', '').replace('Microsoft ', '').replace('Mozilla ', '')}</strong><span class="hero-store-arrow" aria-hidden="true">{store.url ? '↗' : '↓'}</span></span>
-    {!compact && <span class="hero-store-label">{store.url ? store.label : t.downloadZip}</span>}
+<nav class="hero-stores" dir="ltr" aria-label={`${t.download} · ${m.label}`}>
+  {platforms.map(platform => <a class="hero-store" data-browser={!platform.mobile ? platform.id : undefined} data-platform={platform.mobile ? platform.id : undefined}
+    href={platform.href} target={!platform.mobile && platform.href.startsWith('https:') ? '_blank' : undefined}
+    rel={!platform.mobile ? 'noopener noreferrer' : undefined}>
+    <img src={platform.icon} alt="" aria-hidden="true" width="36" height="36" />
+    <strong>{platform.name}</strong>
+    {platform.detail && <small dir="auto">{platform.detail}</small>}
   </a>)}
-  </div>
-  <div class="hero-store-row" data-platform-row="mobile">
-  {mobilePlatforms.map(platform => <a class="hero-store hero-mobile" data-platform={platform.id}
-    href={localPath(`/guides/${platform.slug}/`, locale)} aria-label={`${platform.name} · ${platform.browser} · ${platform.id === 'ios' ? m.iosStatus : m.label}`}>
-    <span class="hero-store-heading"><img src={platform.icon} alt="" aria-hidden="true" width="32" height="32" /><span class="hero-mobile-copy"><strong>{platform.name}</strong><small>{platform.browser} · {platform.id === 'ios' ? m.iosStatus : m.label}</small></span></span>
-  </a>)}
-  </div>
 </nav>
-{browserStores.filter(store => !store.url).map(store => <p class="hero-store-status">{store.name} · {t.storeUnavailable}</p>)}
-<style>
-  .hero-store-heading { display: flex; align-items: center; gap: 9px; }
-  .hero-mobile, .hero-mobile .hero-store-heading { min-width: 0; }
-  .hero-mobile-copy { display: grid; gap: 3px; min-width: 0; }
-  .hero-mobile-copy small { color: var(--muted); font-size: .67rem; line-height: 1.4; font-weight: 400; overflow-wrap: anywhere; }
-  .hero-mobile img { object-fit: contain; }
-</style>

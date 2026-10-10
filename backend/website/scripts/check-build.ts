@@ -1,9 +1,11 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { load } from 'cheerio';
+import { gzipSync } from 'node:zlib';
 import { browserStores, site } from '../src/data/site';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
+import { homeCopy } from '../src/i18n/home';
 import { publishedAmount } from '../src/components/PublishedPlanPricing';
 import { comparisonRows } from '../src/lib/pricing-comparison';
 import { publishedModels } from '../src/data/published-plans';
@@ -14,7 +16,6 @@ const errors: string[] = [];
 const titles = new Set<string>();
 const descriptions = new Set<string>();
 const indexedRoutes = new Set<string>();
-const homePreviews = new Map<string, string>();
 const pages = new Map<string, ReturnType<typeof load>>();
 const htmlFiles = (await files(root)).filter(path => path.endsWith('.html'));
 for (const file of htmlFiles) pages.set(file, load(await readFile(file, 'utf8')));
@@ -78,20 +79,19 @@ for (const file of htmlFiles) {
     } catch { errors.push(`${label}: invalid JSON-LD graph`); }
   });
   if (basePath(route) === '/') {
-    const platformRows = $('.hero-stores > .hero-store-row');
-    if (platformRows.length !== 2 || platformRows.eq(0).attr('data-platform-row') !== 'desktop'
-      || platformRows.eq(0).find('[data-browser]').length !== 3
-      || platformRows.eq(1).attr('data-platform-row') !== 'mobile'
-      || platformRows.eq(1).find('[data-platform]').length !== 2)
-      errors.push(`${label}: desktop browsers must be grouped above the mobile tutorials`);
+    if (title !== dictionaries[locale].ui.seoHomeTitle || description !== homeCopy[locale].description)
+      errors.push(`${label}: redesign must preserve the existing localized SEO title and description`);
+    const software = JSON.parse($('script[type="application/ld+json"]').text())['@graph'].find((entry: Record<string, unknown>) => entry['@type'] === 'SoftwareApplication');
+    if (software?.offers?.description !== $('.home-access').text() || software?.offers?.price !== '0')
+      errors.push(`${label}: free installation structured data must match visible content`);
+    const platforms = $('.hero-stores > a').toArray().map(node => $(node).attr('data-browser') ?? $(node).attr('data-platform'));
+    if (platforms.join(',') !== 'android,chrome,edge,firefox,ios')
+      errors.push(`${label}: mobile platforms must flank the desktop browsers`);
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
-    if ($('.home-hero .button').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
-    if (!$(`.home-service a[href="${localPath('/pricing/',locale)}"]`).length || $('.home-plan').length !== 3) errors.push(`${label}: missing Free/PLUS/Pro plan entrance`);
-    $('.home-plan').each((index, card) => {
-      const expected = index === 0 ? publishedModels.free : [...publishedModels.free, ...publishedModels.paid_extra];
-      const models = $(card).find('[data-feature="model"] .home-model-list > bdi').toArray().map(item => $(item).text());
-      if (JSON.stringify(models) !== JSON.stringify(expected)) errors.push(`${label}: homepage models must be complete and on separate lines`);
-    });
+    if ($('.home-copy a[data-install-extension]').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
+    if ($('main .home-plan, main .home-price, main .home-cycle, main a[href$="/pricing/"]').length) errors.push(`${label}: pricing belongs on the separate pricing page`);
+    if ($('main a[href$="/translate/"]').length || $(`.site-header nav a[href="${localPath('/translate/',locale)}"]`).length !== 2) errors.push(`${label}: translator must be in desktop and mobile navigation`);
+    if ($('main [data-install-icon][src="/browsers/chrome.svg"]').length !== 2) errors.push(`${label}: installation icons need a Chrome no-script fallback`);
     for (const store of browserStores) {
       const entrance = $(`.hero-store[data-browser="${store.id}"]`);
       const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
@@ -103,15 +103,14 @@ for (const file of htmlFiles) {
         || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(platform.id === 'ios' ? mobileCopy[locale].iosStatus : mobileCopy[locale].label))
         errors.push(`${label}: mobile entrance must be a localized tutorial or compatibility status ${platform.id}`);
     }
-    if ($('.home-faq, .home-cta, .home-steps').length || $('.home-cycle input[type=radio]').length !== 2) errors.push(`${label}: keep one focused hero and a static quarterly/yearly plan preview`);
-    for (const feature of ['classic', 'model', 'rate', 'priority', 'reading']) {
-      if ($(`.home-plan li[data-feature="${feature}"]`).length !== 3) errors.push(`${label}: homepage must compare ${feature}`);
-    }
-    if ($('.home-plan').first().find('.icon-check').length !== 1 || $('.home-plan-paid .icon-check').length !== 10 || $('.home-plan-paid li strong').length !== 8) errors.push(`${label}: homepage must distinguish shared benefits from Lite advantages`);
-    if ($('.home-price .price-currency').length !== 5 || $('.home-cycle-picker .billing-cycle-saving .annual-badge').length !== 1) errors.push(`${label}: homepage needs separated currency typography and a stable annual discount slot`);
-    const preview = $('.home-screenshot img').attr('src');
-    if (!preview || $('.home-screenshot img').length !== 1 || !$('.home-screenshot img').attr('srcset')) errors.push(`${label}: expected one responsive real product screenshot`);
-    else homePreviews.set(locale, preview);
+    if ($('.home-screenshot img').length !== 1 || !$('.home-screenshot img').attr('srcset')) errors.push(`${label}: expected one responsive in-tab screenshot`);
+    if ($('[data-inline-comparison] input[type=range][hidden]').length !== 1 || $('[data-inline]').length) errors.push(`${label}: in-tab comparison must use an accessible progressively enhanced slider`);
+    const scripts = await Promise.all($('script[type=module]').toArray().map(node => $(node).attr('src') ? readFile(join(root, $(node).attr('src')!), 'utf8') : $(node).text()));
+    const showcaseScript = scripts.find(text => text.includes('[data-home-showcase]'));
+    if (!showcaseScript || gzipSync(showcaseScript).byteLength > 4 * 1024) errors.push(`${label}: homepage interaction script exceeds its 4 KiB gzip budget`);
+    if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-search img[loading="lazy"]').length !== 1) errors.push(`${label}: comparison and search must be lazy-loaded static content`);
+    if ($('.home-image-pair input[type=range][hidden]').length !== 1 || $('[data-view-choice]').length) errors.push(`${label}: mobile comparison must use a slider rather than original/translated buttons`);
+    if ($('[data-sample]').length !== 2 || $('[data-language-choice]:not([hidden])').length !== 4) errors.push(`${label}: expected both samples and their available output languages`);
   }
   const mobilePlatform = mobilePlatforms.find(platform => basePath(route) === `/guides/${platform.slug}/`);
   if (mobilePlatform) {
@@ -190,11 +189,6 @@ for (const file of htmlFiles) {
   }
   if (/(sk-[a-zA-Z0-9]{20,}|sub2api\.nodelane\.net)/.test(html)) errors.push(`${label}: private generation config leaked`);
 }
-for (const locale of locales) {
-  const expected = locale.startsWith('zh') ? homePreviews.get('zh-CN') : homePreviews.get('en');
-  if (homePreviews.get(locale) !== expected) errors.push(`${locale}: incorrect screenshot language`);
-}
-if (homePreviews.get('zh-CN') === homePreviews.get('en')) errors.push('Chinese and English screenshot sets must differ');
 const sitemap = await readFile(join(root,'sitemap.xml'),'utf8');
 const xml = load(sitemap, { xmlMode: true });
 const locations = xml('url > loc').toArray().map(node => xml(node).text());

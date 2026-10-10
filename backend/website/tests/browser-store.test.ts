@@ -1,10 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { browserStoreUrl, desktopBrowser } from '../src/lib/browser-store';
+import { browserStoreUrl, desktopBrowser, installIconBrowser } from '../src/lib/browser-store';
 import { site } from '../src/data/site';
 
 const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+
+test('install icon recognizes the three browsers and defaults everything else to Chrome', () => {
+  for (const [ua, browser] of [[chrome, 'chrome'], [chrome + ' Edg/140.0', 'edge'], ['Firefox/143.0', 'firefox'], ['Android EdgA/140.0', 'edge'], ['iPhone FxiOS/143.0', 'firefox'], ['Safari/605.1', 'chrome'], [chrome + ' OPR/120.0', 'chrome'], ['', 'chrome']] as const)
+    assert.equal(installIconBrowser({ userAgent: ua }), browser);
+  assert.equal(installIconBrowser({ userAgent: chrome, userAgentData: { brands: [{ brand: 'Microsoft Edge' }] } }), 'edge');
+});
 
 test('desktop installation goes to the configured browser store, with Edge before Chrome', () => {
   for (const [userAgent, browser] of [
