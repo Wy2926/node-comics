@@ -1,0 +1,174 @@
+/* Full-page phone presentation only; imported after the unchanged desktop styles.
+ * Keep every existing selector inside this gate. A narrow PC window / desktop
+ * popup (including a touch laptop) must not opt in just because it is narrow.
+ * No viewport listeners, duplicate page trees, or business rules belong here.
+ */
+.nc-phone-scope-toggle { display: none; }
+
+@media (max-device-width: 1000px) and (pointer: coarse), (max-device-width: 1000px) and (hover: none) {
+  @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) {
+    .nc-app {
+      --nc-phone-gutter: 12px;
+      --nc-phone-gap: 8px;
+      --nc-phone-hit: 44px;
+      --comic-panel-radius: 6px 14px 14px 14px;
+      --comic-card-radius: 4px 10px 10px 10px;
+      --comic-shadow: 2px 2px 0 var(--comic-shadow-color);
+    }
+
+    /* Compact chrome; visual density never reduces the touch target. */
+    .nc-app:not(.is-reading) { --nc-mobile-nav-size: max(64px, 4rem); }
+    .nc-app .nc-app-header {
+      min-height: 56px;
+      padding-block: max(4px, env(safe-area-inset-top, 0px)) 4px;
+    }
+    .nc-app .nc-app-header .nc-header-actions { gap: 4px; }
+    .nc-app .nc-app-header .nc-header-actions .nc-icon { width: 22px; height: 22px; }
+    .nc-app .nc-app-header>nav { gap: 2px; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+    .nc-app .nc-app-header>nav>button { gap: 2px; padding: 0; }
+    .nc-app .nc-app-header>nav>button>.nc-icon { width: 20px; height: 20px; }
+    .nc-app .nc-main {
+      padding: 12px max(var(--nc-phone-gutter), env(safe-area-inset-right, 0px)) 20px max(var(--nc-phone-gutter), env(safe-area-inset-left, 0px));
+    }
+    .nc-app .nc-main .nc-page-heading { margin-bottom: 12px; gap: 8px; }
+    .nc-app .button { min-height: var(--nc-phone-hit); padding: 6px 10px; font-size: var(--text-small); }
+    .nc-app .segmented { gap: 2px; padding: 2px; }
+    .nc-app .segmented>button { min-height: var(--nc-phone-hit); padding: 6px 10px; }
+
+    /* Settings are rows, not a stack of full-width desktop controls. */
+    .nc-app :is(.settings-card, .nc-purchases) { padding: 12px; }
+    .nc-app .settings-card { margin-bottom: 12px; }
+    .nc-app .nc-preferences>.page-title { margin-bottom: 12px; }
+    .nc-app .nc-preferences>.settings-card>h3 { margin-bottom: 0; padding-bottom: 8px; }
+    .nc-app .setting-row { gap: var(--nc-phone-gap); padding-block: 10px; }
+    .nc-app .setting-row b { overflow-wrap: anywhere; }
+    .nc-app .setting-row:has(> .nc-select, > div > .nc-select) { grid-template-columns: minmax(0, 1fr) minmax(min(9rem, 55%), 46%); align-items: center; }
+    .nc-app .setting-row p { margin-top: 4px; font-size: var(--text-caption); line-height: 1.45; }
+    .nc-app .setting-row>.nc-select { padding-inline: 8px; }
+    .nc-app .setting-row>div:has(> .nc-select) { min-width: 0; }
+    .nc-app .setting-row>div>.nc-select { width: 100%; min-width: 0; padding-inline: 8px; gap: 6px; }
+    .nc-app .nc-theme-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .nc-app .nc-theme-options button { gap: 5px; padding: 6px; font-size: var(--text-caption); }
+    .nc-app .privacy-note { padding: 10px; gap: 8px; }
+    .nc-app .nc-channel-heading { gap: 8px; }
+    .nc-app .nc-channel-heading>.button { width: auto; }
+    .nc-app .nc-channel-card { padding: 10px; }
+
+    /* Shelf geometry is measured by ShelfGrid; its bounded window is unchanged. */
+    .nc-app .nc-library .nc-shelf-tools { gap: 8px; margin-bottom: 16px; }
+    .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; }
+    .nc-app .nc-shelf-window .nc-library-card-body { --card-title-size: .8125rem; padding: 8px; }
+    .nc-app .nc-shelf-window .nc-card-reading-time { bottom: 6px; left: 6px; padding: 3px 4px; gap: 3px; max-width: calc(100% - 12px); }
+    .nc-app .nc-shelf-window .nc-card-update { width: 50px; height: 46px; top: -9px; right: -6px; }
+    .nc-app .nc-shelf-window .nc-book.is-managing .nc-card-select { top: 42px; }
+    .nc-app .nc-library .nc-batch-toolbar { padding: 10px; gap: 8px; }
+    .nc-app .nc-main :is(.nc-library, .nc-remote-library, .nc-download-center) .nc-empty { padding-block: 16px; gap: 8px; }
+
+    /* Discovery keeps covers primary and the tools in two compact rows. */
+    .nc-app .nc-discovery-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-bottom: 10px; }
+    .nc-app .nc-discovery-rankings { grid-column: 1/-1; gap: 16px; padding-bottom: 4px; }
+    .nc-app .nc-discovery-tools { grid-column: 1; grid-row: 2; gap: 4px; }
+    .nc-app .nc-discovery-count { grid-column: 2; grid-row: 2; }
+    .nc-app .nc-discovery-count strong { font-size: var(--text-caption); }
+    .nc-app .nc-discovery-toolbar:has(.nc-discovery-search) .nc-discovery-tools { grid-column: 1/-1; }
+    .nc-app .nc-discovery-toolbar:has(.nc-discovery-search) .nc-discovery-count { grid-column: 1/-1; grid-row: 3; }
+    .nc-app .nc-discovery-controls { margin-bottom: 16px; }
+    .nc-app .nc-discovery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; }
+    .nc-app .nc-discovery-card h2 { margin-top: 6px; font-size: var(--text-caption); }
+    .nc-app .nc-discovery-poster-top { padding: 5px 4px 20px; gap: 3px; }
+    .nc-app .nc-discovery-score, .nc-app .nc-discovery-status { padding: 2px 3px; }
+    .nc-app .nc-discovery-poster-bottom { padding: 22px 6px 6px; gap: 2px; }
+    .nc-app .nc-discovery-filter-row { gap: 8px; padding-top: 12px; }
+
+    /* One search session and checkbox set; only the phone disclosure is new. */
+    .nc-app .nc-search-workbench { gap: 10px; }
+    .nc-app .nc-search-composer { padding: 12px; }
+    .nc-app .nc-search-mode.segmented { margin-bottom: 12px; }
+    .nc-app .nc-search-form, .nc-app .nc-search-fields { gap: 10px; }
+    .nc-app .nc-search-submit-row { gap: 8px; }
+    .nc-app .nc-search-submit-hint>p { display: none; }
+    .nc-app .nc-comic-search .nc-search-name input,
+    .nc-app .nc-comic-search .nc-search-submit-row>.button { min-height: var(--nc-phone-hit); height: auto; padding: 8px; white-space: normal; }
+    .nc-app .nc-search-form:not(:has(.nc-search-language)) { grid-template-columns: minmax(0, 1fr) fit-content(45%); }
+    .nc-app .nc-search-form:not(:has(.nc-search-language)) .nc-search-submit-row>.button { grid-area: 1/2; }
+    .nc-app .nc-search-form:not(:has(.nc-search-language)) .nc-search-submit-hint { display: none; }
+    .nc-app .nc-search-sites { padding: 0 12px; }
+    .nc-app .nc-search-sites-heading { display: none; }
+    .nc-app .nc-phone-scope-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--nc-phone-hit); padding: 8px 0; text-align: start; font-size: var(--text-small); }
+    .nc-app .nc-phone-scope-toggle>span { margin-inline-start: auto; color: var(--muted); font-size: var(--text-caption); }
+    .nc-app .nc-phone-scope-toggle>.nc-icon { flex: none; transform: rotate(90deg); }
+    .nc-app .nc-phone-scope-toggle[aria-expanded=true]>.nc-icon { transform: rotate(-90deg); }
+    .nc-app .nc-search-sites[data-phone-expanded=false]>.nc-search-site-options,
+    .nc-app .nc-search-sites[data-phone-expanded=false]>p:not([role]) { display: none; }
+    .nc-app .nc-search-sites[data-phone-expanded=true] { padding-bottom: 10px; }
+    .nc-app .nc-search-site-options { gap: 6px; }
+    .nc-app .nc-search-site-option { min-height: var(--nc-phone-hit); padding: 6px; }
+    .nc-app .nc-search-sites>p { margin-block: 8px 0; }
+    .nc-app .nc-search-intro { margin-top: 12px; }
+    .nc-app .nc-search-result { padding: 10px; gap: 10px; }
+    .nc-app .nc-search-result-cover { width: 60px; height: 90px; }
+    .nc-app .nc-search-result-list { gap: 10px; }
+
+    /* Adapted sites are full-width horizontal rows. Keep access/date metadata. */
+    .nc-app .nc-sites-page .nc-site-request-shortcut { width: auto; margin-inline-start: auto; align-items: center; }
+    .nc-app .nc-site-link-import { padding: 12px; margin-bottom: 16px; }
+    .nc-app .nc-site-link-import label { font-size: var(--text-small); margin-bottom: 6px; }
+    .nc-app .nc-site-link-import>div { flex-direction: row; gap: 8px; }
+    .nc-app .nc-site-link-import input { min-height: var(--nc-phone-hit); padding: 8px; }
+    .nc-app .nc-site-link-import .button { width: auto; flex: none; max-width: 45%; }
+    .nc-app .nc-site-link-import p { margin-top: 8px; font-size: var(--text-caption); }
+    .nc-app .nc-sites-section-heading { padding-bottom: 12px; }
+    .nc-app .nc-sites-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .nc-app .nc-site-card { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; height: auto; padding: 10px; }
+    .nc-app .nc-site-card-top, .nc-app .nc-site-card-footer { display: contents; }
+    .nc-app .nc-site-monogram { grid-column: 1; grid-row: 1/5; margin-top: 2px; }
+    .nc-app .nc-site-card h3 { grid-column: 2; grid-row: 1; min-width: 0; }
+    .nc-app .nc-site-languages { grid-column: 3; grid-row: 1; justify-content: flex-end; gap: 4px; max-width: 72px; }
+    .nc-app .nc-site-domain { grid-column: 2; grid-row: 2; margin: 0; }
+    .nc-app .nc-site-tags { grid-column: 2/-1; grid-row: 3; gap: 4px; margin: 0; }
+    .nc-app .nc-site-card-footer>.nc-site-adapted { grid-column: 2/-1; grid-row: 4; display: flex; justify-content: space-between; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+    .nc-app .nc-site-adapted>span { gap: 4px; }
+    .nc-app .nc-site-supported { gap: 3px; font-size: var(--text-caption); }
+    .nc-app .nc-site-adapted time { white-space: nowrap; }
+    .nc-app .nc-site-card-footer>.nc-icon { grid-column: 3; grid-row: 2; justify-self: end; align-self: center; }
+    .nc-app .nc-site-request { padding: 12px; }
+
+    /* Secondary pages have compact sections, with their existing actions. */
+    .nc-app .nc-remote-heading>.button { width: auto; margin-inline-start: auto; }
+    .nc-app .nc-remote-layout { gap: 12px; }
+    .nc-app .nc-remote-sidebar { padding: 10px 8px; }
+    .nc-app .nc-remote-sidebar h2 { margin-bottom: 8px; }
+    .nc-app .nc-remote-connection { padding: 8px; }
+    .nc-app .nc-remote-library:has(> .nc-empty)>.nc-remote-heading>.button { display: none; }
+    .nc-app .nc-remote-grid { gap: 16px 10px; }
+    .nc-app .nc-account-page { gap: 12px; }
+    .nc-app .nc-account-empty { padding: 16px 12px; }
+    .nc-app .nc-account-empty>svg, .nc-app .nc-account-empty>h2 { display: none; }
+    .nc-app .nc-account-empty p { margin: 0 0 12px; font-size: var(--text-small); }
+    .nc-app .nc-account-page :is(.nc-rights-card, .nc-chart-card, .nc-stat, .nc-purchase-card) { padding: 12px; }
+    .nc-app .nc-rights-grid, .nc-app .nc-purchase-grid { gap: 10px; }
+
+    /* The same reader chrome, with less reserved space. No position logic changes. */
+    .nc-app .nc-reader { --reader-tool-size: 44px; --reader-mobile-footer: 58px; }
+    .nc-app .nc-reader .nc-reader-tool-group>button,
+    .nc-app .nc-reader .nc-page-versions button { width: 44px; }
+    .nc-app .nc-reader .nc-reader-rail.right { bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+    .nc-app .nc-reader .nc-drawer-content { padding: 12px; }
+    .nc-app .nc-reader .nc-reader-option { padding-block: 10px; gap: 8px; }
+    .nc-app .nc-reader .nc-reader-navigation input[type=number] { width: max(44px, calc(4ch + 4px)); flex: none; }
+
+    @media (min-width: 360px) {
+      .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid,
+      .nc-app .nc-discovery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) { --reader-mobile-header: 60px; }
+      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-rail.left { grid-template-columns: 44px 44px 44px max-content minmax(44px, 1fr) 44px; grid-template-rows: 44px; }
+      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-navigation>button:last-child { grid-area: 1/6; }
+      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-navigation>.nc-reader-progress { grid-area: 1/5; }
+    }
+    @media (min-width: 701px) {
+      .nc-app:not(.is-reading) { --nc-mobile-nav-size: max(58px, 3.625rem); }
+      .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid,
+      .nc-app .nc-discovery-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    }
+  }
+}

@@ -72,7 +72,7 @@ try{
   readingWindow=await page.evaluate(()=>{const viewport=document.querySelector('.nc-reading-viewport'),picture=document.querySelector('.nc-manga-page[data-page-index="0"] .nc-page-picture');return {viewportHeight:viewport.clientHeight,pageHeight:picture.getBoundingClientRect().height,pageTop:picture.getBoundingClientRect().top-viewport.getBoundingClientRect().top};});
   // Fit-window pages are shorter than the viewport. ReadingProgress expands them at their top.
   assert(readingWindow.pageHeight<=readingWindow.viewportHeight&&readingWindow.pageTop<readingWindow.viewportHeight,JSON.stringify(readingWindow));
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(()=>window.channelFixture.requests.length===5);
   await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport img')?.getAttribute('src')?.startsWith('blob:'));
   await page.waitForTimeout(1600);
@@ -89,7 +89,7 @@ try{
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   await page.evaluate(id=>window.channelFixture.selectChannel(id),localId);
   await page.waitForTimeout(1200);
-  assert.equal(await page.getByRole('button',{name:'常规翻译',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await page.getByRole('button',{name:'翻译',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal((await read()).requests.length,initialRequests);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   check('switching channels preserves reading position, isolates official login, and reuses local results');

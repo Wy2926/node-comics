@@ -46,7 +46,7 @@ describe('interface dictionaries',()=>{
   it('refreshes module-level labels and keeps diagnostics and source parsing language-independent',()=>{
     for(const language of uiLanguages){
       installDictionary(language.id,dictionaries[language.id]);
-      expect(modeLabels.classic).toBe(dictionaries[language.id]['常规翻译']);
+      expect(modeLabels.classic).toBe(dictionaries[language.id]['翻译']);
       expect(statusLabels.failed).toBe(dictionaries[language.id]['处理失败']);
       const message=msg('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。');
       expect(translationNotice({kind:'error',message}).message).toBe(msg('连接失败'));

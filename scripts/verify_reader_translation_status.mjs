@@ -43,7 +43,7 @@ try{
   await page.screenshot({path:path.join(out,'rails-before-translation.png')});
   checks.push('The reading toolbar contains no development diagnostics or premature rerun action');
 
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(()=>window.readerFixture.submitted.length===1);await badge.waitFor();
   assert.equal(await rerun.count(),0);
   await viewport.evaluate(v=>v.scrollTop=document.querySelector('.nc-page-picture').clientHeight/3);await settle();
@@ -98,7 +98,7 @@ try{
   checks.push('Actual display confirmation clears the badge and enables result feedback without changing scroll position');
 
   await page.getByRole('button',{name:'原图',exact:true}).click();await page.locator('.nc-page-image[data-result-job="original"]').waitFor();
-  await page.evaluate(()=>window.decodeTest.reject=true);await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.evaluate(()=>window.decodeTest.reject=true);await page.getByRole('button',{name:'翻译',exact:true}).click();
   const retry=badge.getByRole('button',{name:'加载失败 · 重试',exact:true});await retry.waitFor();
   assert.equal(await rerun.count(),0);
   assert.equal(await page.locator('.nc-page-image').getAttribute('data-result-job'),'original');
@@ -112,7 +112,7 @@ try{
   await rerun.focus();await page.keyboard.press('Tab');
   assert(await page.getByRole('button',{name:'原图',exact:true}).evaluate(button=>button===document.activeElement));
   await page.keyboard.press('Tab');
-  assert(await page.getByRole('button',{name:'常规翻译',exact:true}).evaluate(button=>button===document.activeElement));
+  assert(await page.getByRole('button',{name:'翻译',exact:true}).evaluate(button=>button===document.activeElement));
   checks.push('Both rails retain core coordinates across real task transitions; keyboard order follows the vertical layout');
 
   await page.setViewportSize({width:1280,height:420});await settle();

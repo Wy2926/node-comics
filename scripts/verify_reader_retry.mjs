@@ -19,7 +19,7 @@ async function open(offline=false){
   const releaseNotes=page.getByRole('button',{name:'知道了',exact:true});if(await releaseNotes.count())await releaseNotes.click();
   await entry.click();
   await page.locator('.nc-page-image').waitFor();
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
 }
 async function geometry(){return page.locator('.nc-page-picture').first().evaluate(i=>({width:i.clientWidth,height:i.clientHeight,scroll:document.querySelector('.nc-reading-viewport').scrollTop}));}
 async function waitSubmitted(count){await page.waitForFunction(count=>window.readerFixture.submitted.length===count,count,{timeout:15000});}
@@ -67,7 +67,7 @@ try{
   await page.locator('.nc-translation-trigger').click();
   assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
   await page.keyboard.press('Escape');
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();await waitSubmitted(1);
+  await page.getByRole('button',{name:'翻译',exact:true}).click();await waitSubmitted(1);
   assert(await page.evaluate(()=>window.readerFixture.translationRequests.every(request=>request.body.mode==='classic')));
   assert.deepEqual(await geometry(),recoveredGeometry);
   await page.screenshot({path:path.join(out,'classic-only-upgrade.png')});

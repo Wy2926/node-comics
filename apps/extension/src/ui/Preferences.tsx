@@ -42,7 +42,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
-      <SettingRow title={msg("默认目标语言")} description={msg("常规翻译支持 16 个语言选项；新增语言会采用常规翻译，已有译图版本保留。")}>
+      <SettingRow title={msg("默认目标语言")} description={msg("翻译支持 16 个语言选项，已有译图版本保留。")}>
         <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
       </SettingRow>
       <TranslationModelPicker selection={modelSelection}/>

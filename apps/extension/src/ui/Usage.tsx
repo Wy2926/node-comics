@@ -29,13 +29,13 @@ export function AccountUsage({api,onLogin,onEntitlements}:{api:Api;onLogin:()=>v
       {!data&&!error?<p className="nc-loading">{msg("正在汇总用量…")}</p>:data&&<>
         <div className="nc-stat-grid">
           <div className="nc-stat"><span><Icon name="check" size={17}/>{msg('交付合计')}</span><b>{data.delivered}<small>{msg("页")}</small></b></div>
-          <div className="nc-stat"><span><Icon name="book" size={17}/>{msg("常规交付")}</span><b>{data.by_mode.classic??0}<small>{msg("页")}</small></b><p>{msg('其中会员权益内交付 {0} 页', {"0": data.included_delivered})}</p></div>
+          <div className="nc-stat"><span><Icon name="book" size={17}/>{msg("翻译交付")}</span><b>{data.by_mode.classic??0}<small>{msg("页")}</small></b><p>{msg('其中会员权益内交付 {0} 页', {"0": data.included_delivered})}</p></div>
           <div className="nc-stat"><span><Icon name="check" size={17}/>{msg("未扣量交付")}</span><b>{data.free_delivered}<small>{msg("页")}</small></b><p>{msg("包括部分完成和释放预占后的补交付")}</p></div>
         </div>
         <section className="nc-chart-card"><h2>{msg("每日交付页数")}</h2><p>{data.start_date} — {data.end_date} · {data.timezone}</p>
           <div className="nc-bar-chart" role="img" aria-label={msg("最近 {0} 天交付 {1} 页", {"0": days, "1": data.delivered})}><div className="nc-chart-bars">{data.days.map(d=><div className="nc-chart-column" key={d.date} title={msg('{0}：交付 {1} 页', {"0": d.date, "1": d.delivered})}><div className="nc-chart-bar" style={{height:`${d.delivered/max*100}%`}}/><span>{days<=7?d.date.slice(5):''}</span></div>)}</div></div>
           {!data.delivered&&<p className="nc-chart-zero">{msg("所选时段暂无交付")}</p>}
-          <details className="nc-chart-data"><summary>{msg("查看每日数值")}</summary><div className="nc-data-table"><table><thead><tr><th>{msg("日期")}</th><th>{msg("常规页数")}</th><th>{msg("交付合计")}</th></tr></thead><tbody>{data.days.map(d=><tr key={d.date}><td>{d.date}</td><td>{d.classic}</td><td>{d.delivered}</td></tr>)}</tbody></table></div></details>
+          <details className="nc-chart-data"><summary>{msg("查看每日数值")}</summary><div className="nc-data-table"><table><thead><tr><th>{msg("日期")}</th><th>{msg("翻译页数")}</th><th>{msg("交付合计")}</th></tr></thead><tbody>{data.days.map(d=><tr key={d.date}><td>{d.date}</td><td>{d.classic}</td><td>{d.delivered}</td></tr>)}</tbody></table></div></details>
         </section>
         <p className="nc-muted">{msg("按 {0} 的自然日展示交付，不重复计算复用结果。额度按任务受理时的记录结算。", {"0": timezone})}</p>
       </>}

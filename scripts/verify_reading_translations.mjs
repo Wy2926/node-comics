@@ -17,7 +17,7 @@ try{
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline&long');
   await page.locator('.nc-release-notes[open] .nc-release-close').click();
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(()=>window.readerFixture.submitted.length===4);
   await page.waitForFunction(()=>window.readerFixture.requests.includes('/v1/translations/events'));
   let state=await snapshot();assert.deepEqual(state.submitted,[0,1,2,3]);
@@ -105,7 +105,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')==='original');
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(id=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')===id,resultId);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);

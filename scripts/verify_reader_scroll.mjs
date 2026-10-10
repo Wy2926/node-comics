@@ -25,7 +25,7 @@ async function seek(chapter,selector,offset){
 try{
  await page.goto(origin+'/tests/reader-window-fixture.html');
  await page.locator('.nc-page-image').first().waitFor();await settle();
- await page.getByRole('button',{name:'常规翻译',exact:true}).click();await settle();
+ await page.getByRole('button',{name:'翻译',exact:true}).click();await settle();
  const input=page.getByLabel('跳转页码',{exact:true});
  await input.fill('120');await settle();
  const pending=await page.evaluate(()=>{

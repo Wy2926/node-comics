@@ -8,7 +8,7 @@ const engines=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'pla
 const web=process.env.TEST_READER_URL||'http://127.0.0.1:5181';
 const origin=new URL(web).origin;
 assert(['localhost','127.0.0.1'].includes(new URL(web).hostname),'Use an isolated local preview');
-const out=path.resolve('artifacts/mobile-validation');
+const out=path.resolve(process.env.MOBILE_ARTIFACTS||'artifacts/mobile-validation');
 await mkdir(out,{recursive:true});
 const {version}=JSON.parse(await readFile('apps/extension/package.json','utf8'));
 const reports=[];
@@ -53,15 +53,47 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
       for(const name of ['我的漫画','远程书库','发现','搜索漫画','漫画网站']){
         const button=nav.getByRole('button',{name,exact:true});
         await inViewport(button);await button.click();await noOverflow();
+        if(name==='远程书库')assert.equal(await page.getByRole('button',{name:'连接书库',exact:true}).count(),1,'Empty remote library should have one visible connection action');
+        if(name==='漫画网站'){
+          const rows=await page.locator('.nc-site-card').evaluateAll(cards=>cards.map(card=>{
+            const box=card.getBoundingClientRect(),icon=card.querySelector('.nc-site-monogram').getBoundingClientRect(),title=card.querySelector('h3').getBoundingClientRect();
+            return {x:box.x,y:box.y,width:box.width,height:box.height,iconRight:icon.right,titleLeft:title.left};
+          }));
+          assert(rows.length>2&&rows[1].y>=rows[0].y+rows[0].height,'Phone sites must be full-width horizontal rows, not a desktop card grid');
+          assert(rows.every(row=>row.iconRight<=row.titleLeft&&row.width>width*.8&&row.height<=154),'Phone site rows must keep icon beside readable metadata');
+        }
+        if(name==='搜索漫画'){
+          const input=await page.getByRole('textbox',{name:'搜索名称',exact:true}).boundingBox(),submit=await page.getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
+          assert(Math.abs(input.y-submit.y)<1,'Phone direct search action should sit beside the input');
+          assert.equal(await page.locator('.nc-search-site-options').isVisible(),false,'Phone search scope must start collapsed');
+          const scope=page.getByRole('button',{name:/搜索范围.*已选/});
+          await scope.click();
+          assert.equal(await scope.getAttribute('aria-expanded'),'true');
+          const firstSite=page.locator('.nc-search-site-option input').first();
+          const selected=await firstSite.isChecked();await firstSite.setChecked(!selected);
+          await scope.click();await scope.click();
+          assert.equal(await firstSite.isChecked(),!selected,'Collapsing scope must retain site selection');
+          await firstSite.setChecked(selected);await scope.click();
+        }
+        if(name==='发现'){
+          const columns=await page.locator('.nc-discovery-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+          assert(columns>=(width>=360?3:2),'Phone covers must use the available width without oversized cards');
+        }
+        if(width===390)await shot(`main-${name}`);
       }
       await page.getByRole('button',{name:'外观与设置',exact:true}).click();await noOverflow();
+      const languageRow=page.locator('.setting-row').first();
+      assert(await languageRow.evaluate(el=>el.querySelector('.nc-select').getBoundingClientRect().left>el.querySelector('b').getBoundingClientRect().right),'Phone language control should sit beside its label');
+      assert((await page.locator('.settings-card').first().boundingBox()).height<650,'Phone appearance settings should fit in a compact group');
+      assert((await nav.boundingBox()).height<=64,'Phone navigation must not reserve an 80px desktop-like bar');
+      if(width===390)await shot('settings');
       await page.getByRole('button',{name:'我的账户',exact:true}).click();await noOverflow();
       const notice=await page.locator('.nc-notifications').boundingBox(),navigation=await nav.boundingBox();
       assert(notice.y+notice.height<=navigation.y,'Notification area covers bottom navigation');
       check(`all main destinations ${width}x${height}`);
     }
     await page.setViewportSize({width:390,height:844});
-    await nav.getByRole('button',{name:'我的漫画',exact:true}).click();await shot('library');
+    await nav.getByRole('button',{name:'我的漫画',exact:true}).click();
     const utilities=page.getByRole('button',{name:'更多操作 · 主导航',exact:true});
     await utilities.tap();await inViewport(page.getByRole('link',{name:'GitHub',exact:true}));
     await page.locator('.nc-release-trigger').tap();
@@ -83,7 +115,15 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
       }
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      // Native momentum continues after touchEnd. Wait for a settled list before
+      // tapping an option, or that tap only stops the fling on a fast test host.
+      await languageList.evaluate(el=>new Promise((resolve,reject)=>{
+        let previous=el.scrollTop,stable=0,frames=0;
+        const settled=()=>{
+          stable=Math.abs(el.scrollTop-previous)<.5?stable+1:0;previous=el.scrollTop;
+          if(stable>=6)resolve();else if(++frames>=240)reject(Error('Language list did not stop scrolling'));else requestAnimationFrame(settled);
+        };requestAnimationFrame(settled);
+      }));
       assert(await languageList.evaluate(el=>el.scrollTop>0),'Native touch pan did not scroll the language list');
       assert.equal(await select.getAttribute('aria-expanded'),'true');
       await cdp.detach();
@@ -105,14 +145,28 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await nav.getByRole('button',{name:'我的漫画',exact:true}).click();
     await page.evaluate(async()=>{
       const {comicFile}=await import('/tests/comic-fixture.ts');
-      const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1200;
-      const ctx=canvas.getContext('2d');ctx.fillStyle='#e4efff';ctx.fillRect(0,0,800,1200);ctx.fillStyle='#315480';ctx.font='48px sans-serif';ctx.fillText('Mobile reader fixture',60,120);
-      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-      const file=await comicFile('Mobile fixture',Array.from({length:8},()=>blob)),transfer=new DataTransfer();transfer.items.add(file);
+      // Distinct edge-to-edge colors expose any space added by the reader,
+      // including short and tall pages (not whitespace inside an original).
+      const blobs=[];
+      for(const [height,color] of [[1200,'#e4efff'],[400,'#b6dafa'],[3200,'#dfebdc']]){
+        const canvas=document.createElement('canvas');canvas.width=800;canvas.height=height;
+        const ctx=canvas.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,800,height);ctx.fillStyle='#315480';ctx.font='48px sans-serif';ctx.fillText(`Page 800 x ${height}`,60,120);
+        blobs.push(await new Promise(resolve=>canvas.toBlob(resolve,'image/png')));
+      }
+      const file=await comicFile('Mobile fixture',Array.from({length:8},(_,index)=>blobs[index%blobs.length])),transfer=new DataTransfer();transfer.items.add(file);
       const input=document.querySelector('input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
     });
     await page.locator('.nc-page-image').first().waitFor({timeout:60000});
     const viewport=page.locator('.nc-reading-viewport');
+    await page.locator('.nc-manga-page[data-page-index="2"] .nc-page-image').waitFor();
+    const pageGeometry=await page.locator('.nc-manga-page').evaluateAll(pages=>pages.slice(0,3).map(page=>{
+      const box=page.getBoundingClientRect(),image=page.querySelector('.nc-page-image'),picture=page.querySelector('.nc-page-picture').getBoundingClientRect();
+      return {index:Number(page.dataset.pageIndex),top:box.top,bottom:box.bottom,height:picture.height,expectedHeight:picture.width*image.naturalHeight/image.naturalWidth};
+    }));
+    assert.deepEqual(pageGeometry.map(page=>page.index),[0,1,2]);
+    assert(pageGeometry.every((page,index)=>Math.abs(page.height-page.expectedHeight)<1&&(!index||Math.abs(page.top-pageGeometry[index-1].bottom)<1)),`Phone continuous reader adds gaps or letterboxing: ${JSON.stringify(pageGeometry)}`);
+    check('normal, short and tall pages keep their intrinsic ratio with no added continuous-page gap');
+    assert(await page.locator('.nc-reader').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--reader-mobile-header'))<=92),'Phone reading chrome must leave more space for the page');
     await inViewport(page.getByRole('button',{name:'返回我的漫画',exact:true}));
     await inViewport(page.getByRole('button',{name:'打开目录',exact:true}));
     await inViewport(page.getByRole('button',{name:'阅读设置',exact:true}));
@@ -136,6 +190,13 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     check('page draft supports clearing, multi-digit edits, integer bounds and Done/blur commit');
     await viewport.evaluate(el=>el.scrollTo(0,400));
     const offset=await viewport.evaluate(el=>el.scrollTop);
+    const translation=page.getByRole('button',{name:'翻译',exact:true});
+    assert.equal(await translation.getAttribute('title'),'查看译图');
+    assert.equal(await translation.innerText(),'翻译');
+    await translation.click();assert.equal(await translation.getAttribute('aria-pressed'),'true');
+    assert(Math.abs(await viewport.evaluate(el=>el.scrollTop)-offset)<3,'Selecting translation changed reading position');
+    await page.getByRole('button',{name:'原图',exact:true}).click();
+    assert(Math.abs(await viewport.evaluate(el=>el.scrollTop)-offset)<3,'Restoring original changed reading position');
     await page.getByRole('button',{name:'阅读设置',exact:true}).click();
     await inViewport(page.getByRole('button',{name:'关闭面板',exact:true}));await shot('reader-settings');
     await page.getByRole('button',{name:'关闭面板',exact:true}).click();
@@ -143,6 +204,22 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await shot('reader');
     await page.getByRole('button',{name:'打开目录',exact:true}).click();await inViewport(page.getByRole('button',{name:'关闭面板',exact:true}));await shot('reader-directory');await page.getByRole('button',{name:'关闭面板',exact:true}).click();
     await page.setViewportSize({width:844,height:390});await inViewport(page.getByRole('button',{name:'阅读设置',exact:true}));await shot('reader-landscape');
+    // A geometry fixture only: exercise four-digit page labels without loading
+    // thousands of image pages or changing the reader's real eight-page session.
+    for(const width of [320,360,390,844]){
+      await page.setViewportSize({width,height:width===844?390:844});
+      const geometry=await jump.evaluate(input=>{
+        const root=document.documentElement,oldFont=root.style.fontSize,oldValue=input.value,total=input.nextElementSibling,oldTotal=total.textContent;
+        try{
+          root.style.fontSize='20px';input.value='9999';total.textContent='/ 9999';
+          const style=getComputedStyle(input),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+          const box=input.getBoundingClientRect(),label=input.parentElement.getBoundingClientRect();
+          return {inputWidth:box.width,needed:ctx.measureText(input.value).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)+4,totalRight:total.getBoundingClientRect().right,labelRight:label.right,sliderWidth:document.querySelector('.nc-reader-progress').getBoundingClientRect().width};
+        }finally{root.style.fontSize=oldFont;input.value=oldValue;total.textContent=oldTotal;}
+      });
+      assert(geometry.inputWidth>=geometry.needed&&geometry.totalRight<=geometry.labelRight+1&&geometry.sliderWidth>=44,`Reader clips large four-digit page controls at ${width}px: ${JSON.stringify(geometry)}`);
+      await inViewport(page.getByRole('button',{name:'下一页',exact:true}));
+    }
     await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
     await page.getByRole('button',{name:'打开漫画 Mobile fixture',exact:true}).waitFor();await noOverflow();
     await shot('library-populated');
@@ -166,7 +243,26 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await page.evaluate(()=>{const settings=JSON.parse(localStorage.getItem('nc-settings'));localStorage.setItem('nc-settings',JSON.stringify({...settings,appearance:'dark',textScale:1.25}));});
     await page.reload();await page.setViewportSize({width:320,height:568});
     await page.getByRole('button',{name:'外观与设置',exact:true}).click();await noOverflow();await shot('settings-dark-large');
+    const navLabels=await nav.locator('button>span').evaluateAll(labels=>labels.map(label=>{const range=document.createRange();range.selectNodeContents(label);return {text:label.textContent,bottom:label.getBoundingClientRect().bottom,textBottom:range.getBoundingClientRect().bottom,buttonBottom:label.parentElement.getBoundingClientRect().bottom};}));
+    assert(navLabels.every(label=>label.bottom>=label.textBottom-1&&label.bottom<=label.buttonBottom&&label.textBottom<=page.viewportSize().height),`Large navigation labels clipped: ${JSON.stringify(navLabels)}`);
+    for(const name of ['漫画网站','搜索漫画','远程书库','我的账户','发现']){
+      await page.getByRole('button',{name,exact:true}).click();await noOverflow();
+    }
     check('320px dark appearance and large text');
+    for(const uiLanguage of ['de','ru']){
+      await page.evaluate(uiLanguage=>{const settings=JSON.parse(localStorage.getItem('nc-settings'));localStorage.setItem('nc-settings',JSON.stringify({...settings,uiLanguage}));},uiLanguage);
+      await page.reload();await page.goto(`${web}/#settings`);
+      await page.locator('.setting-row').first().waitFor();
+      const overlaps=await page.locator('.setting-row:has(.nc-select)').evaluateAll(rows=>rows.filter(row=>row.querySelector('b').getBoundingClientRect().right>row.querySelector('.nc-select').getBoundingClientRect().left).map(row=>row.querySelector('b').textContent));
+      assert.deepEqual(overlaps,[],`Large ${uiLanguage} settings labels overlap controls`);
+      await noOverflow();await shot(`settings-large-${uiLanguage}`);
+      await page.goto(`${web}/#discover`);
+      await page.locator('.nc-discovery-search-slot>button').click();
+      assert((await page.locator('.nc-discovery-search input').boundingBox()).width>=100,`Large ${uiLanguage} discovery search is squeezed by the result count`);
+      await noOverflow();await shot(`discovery-search-large-${uiLanguage}`);
+    }
+    await page.evaluate(()=>{const settings=JSON.parse(localStorage.getItem('nc-settings'));localStorage.setItem('nc-settings',JSON.stringify({...settings,uiLanguage:'zh-CN'}));});
+    check('large German and Russian settings labels and expanded discovery search');
     // Synthetic visual-viewport geometry, not an operating-system keyboard test.
     await page.setViewportSize({width:390,height:844});
     await page.goto(`${origin}/tests/modal-fixture.html`);
@@ -204,29 +300,46 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     assert(await page.evaluate(()=>getComputedStyle(document.documentElement).backgroundColor===getComputedStyle(document.querySelector('.nc-popup')).backgroundColor),'Phone popup background must follow its theme below short content');
     await shot('popup');
     check('popup layout and language list fit phone and landscape with mocked extension APIs');
+    const prepareDesktop=async desktop=>{
+      await desktop.route(/^https?:\/\//,route=>new URL(route.request().url()).origin===origin?route.continue():route.fulfill({status:503,contentType:'application/json',body:'{}'}));
+      await desktop.addInitScript(({version})=>{
+        localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',appearance:'light'}));
+        localStorage.setItem('nc-release-notes-version',version);
+      },{version});
+    };
     for(const hasTouch of [false,true]){
+      // A narrow window on a large desktop screen is not a phone, even with touch.
+      for(const [width,height] of [[420,600],[1440,480],[1001,480],[1000,480],[844,390],[701,700],[700,700],[650,900]]){
+        // Resizing a page also changes Playwright's emulated screen. Use a
+        // fresh context to keep physical desktop size independent of window size.
+        const resized=await browser.newContext({viewport:{width,height},screen:{width:1920,height:1080},hasTouch,locale:'zh-CN',reducedMotion:'reduce'});
+        try{
+          await prepareDesktop(resized);
+          const resizedPage=await resized.newPage();resizedPage.on('pageerror',error=>errors.push(error.message));
+          await resizedPage.goto(web);
+          const resizedNav=resizedPage.getByRole('navigation',{name:'主导航'});await resizedNav.waitFor();
+          assert.equal(await resizedPage.evaluate(()=>screen.width),1920);
+          assert.equal(await resizedNav.evaluate(el=>getComputedStyle(el).position==='fixed'),width<=700||hasTouch&&width<=1000&&height<=500);
+          for(const name of ['我的漫画','远程书库','搜索漫画','漫画网站']){
+            await resizedNav.getByRole('button',{name,exact:true}).click();
+            assert(await resizedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Desktop overflow: ${width}x${height}, touch=${hasTouch}, ${name}`);
+            if(name==='漫画网站'){
+              assert.equal(await resizedPage.locator('.nc-site-card').first().evaluate(el=>getComputedStyle(el).display),'block',`Phone rows leaked into desktop ${width}x${height}, touch=${hasTouch}`);
+              if(width===420)assert.equal(await resizedPage.locator('.nc-sites-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);
+            }
+            if(name==='搜索漫画'){
+              assert.equal(await resizedPage.locator('.nc-search-site-options').isVisible(),true);
+              assert.equal(await resizedPage.getByRole('button',{name:/搜索范围.*已选/}).isVisible(),false);
+            }
+          }
+          if(width<=700)assert.equal((await resizedNav.boundingBox()).height,80,'Phone density leaked into narrow desktop navigation');
+        }finally{await resized.close();}
+      }
       const desktop=await browser.newContext({viewport:{width:420,height:600},screen:{width:1920,height:1080},hasTouch,locale:'zh-CN',reducedMotion:'reduce'});
       try{
-        await desktop.route(/^https?:\/\//,route=>new URL(route.request().url()).origin===origin?route.continue():route.fulfill({status:503,contentType:'application/json',body:'{}'}));
-        await desktop.addInitScript(({version})=>{
-          localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',appearance:'light'}));
-          localStorage.setItem('nc-release-notes-version',version);
-        },{version});
-        let desktopPage=await desktop.newPage();desktopPage.on('pageerror',error=>errors.push(error.message));
-        await desktopPage.goto(web);
-        const desktopNav=desktopPage.getByRole('navigation',{name:'主导航'});await desktopNav.waitFor();
-        for(const [width,height] of [[1440,480],[1001,480],[1000,480],[844,390],[701,700],[700,700]]){
-          await desktopPage.setViewportSize({width,height});
-          assert.equal(await desktopNav.evaluate(el=>getComputedStyle(el).position==='fixed'),width<=700||hasTouch&&width<=1000&&height<=500);
-          for(const name of ['我的漫画','远程书库','搜索漫画','漫画网站']){
-            await desktopNav.getByRole('button',{name,exact:true}).click();
-            assert(await desktopPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Desktop overflow: ${width}x${height}, touch=${hasTouch}, ${name}`);
-          }
-        }
+        await prepareDesktop(desktop);
         await desktop.addInitScript(()=>{window.chrome={runtime:{getURL:path=>location.origin+path,sendMessage:async()=>({}),openOptionsPage:async()=>{}},tabs:{query:async()=>[{id:1,url:'https://mobile-fixture.test/comic',title:'Desktop fixture'}]}};});
-        // setViewportSize also resets emulated screen dimensions. A fresh page
-        // keeps a 420px popup viewport on the context's 1920px desktop screen.
-        await desktopPage.close();desktopPage=await desktop.newPage();
+        const desktopPage=await desktop.newPage();
         desktopPage.on('pageerror',error=>errors.push(error.message));
         await desktopPage.goto(`${origin}/entrypoints/popup/index.html`);
         await desktopPage.locator('.nc-popup-language .nc-select').waitFor();

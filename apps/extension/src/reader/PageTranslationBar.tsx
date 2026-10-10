@@ -22,7 +22,7 @@ export function PageTranslationBar({selectedView,shownJob,onView,onFeedback,onRe
     {contentLanguageControl}
     {showRetry&&<button data-reader-retry-trigger="true" aria-label={msg('重新翻译此页')} title={msg('重新翻译此页')} disabled={retrying} aria-busy={retrying||undefined} onClick={()=>void retry()}><Icon name="refresh"/><span>{retrying?msg('重试中…'):msg('重新翻译')}</span></button>}
     <div className="nc-page-versions" role="group" aria-label={msg("漫画查看方式")} data-shown-job={shownJob?.id??'original'}>
-      {views.map(value=><button key={value} aria-label={{original:msg("原图"),classic:msg("常规翻译")}[value]} title={{original:msg("查看原图"),classic:msg("查看常规译图")}[value]} aria-pressed={selectedView===value} onClick={()=>onView(value)}><Icon name={{original:'image',classic:'translate'}[value]}/><span>{{original:msg("原图"),classic:msg("常规")}[value]}</span></button>)}
+      {views.map(value=><button key={value} aria-label={{original:msg("原图"),classic:msg("翻译")}[value]} title={{original:msg("查看原图"),classic:msg("查看译图")}[value]} aria-pressed={selectedView===value} onClick={()=>onView(value)}><Icon name={{original:'image',classic:'translate'}[value]}/><span>{{original:msg("原图"),classic:msg("翻译")}[value]}</span></button>)}
     </div>
     </div>
     <span className="nc-rail-divider" aria-hidden="true"/>

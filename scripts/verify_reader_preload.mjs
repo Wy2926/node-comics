@@ -83,7 +83,7 @@ try{
  await decoded([2,3,4]);
  await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport').dataset.decodedPages==='11');
  await page.getByRole('button',{name:'完成模拟翻译',exact:true}).click();
- await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+ await page.getByRole('button',{name:'翻译',exact:true}).click();
  await settings(()=>page.getByRole('switch',{name:'并排对照',exact:true}).click());
  await decoded([2,3,4],2);
  await page.waitForFunction(()=>[...document.querySelectorAll('[data-page-index="3"] .nc-page-image')].some(image=>image.dataset.resultJob!=='original'));

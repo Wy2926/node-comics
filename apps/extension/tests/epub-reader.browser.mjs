@@ -169,7 +169,7 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           await page.getByRole('button', {name: '重开阅读器', exact: true}).waitFor();
         } else {
           const saved = await location(page);
-          await page.getByRole('button', {name: '常规翻译', exact: true}).click();
+          await page.getByRole('button', {name: '翻译', exact: true}).click();
           const retry = page.locator('.nc-image-translation.error .nc-image-translation-action');
           await retry.waitFor({state: 'visible'});
           await page.waitForFunction(() => document.querySelector('output[aria-label="已提交图片"]').textContent.includes('image-2.png'));

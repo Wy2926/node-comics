@@ -48,6 +48,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot);
   const dialog=useRef<HTMLDialogElement>(null),closeRef=useRef<HTMLButtonElement>(null),queryRef=useRef<HTMLInputElement>(null),sourceRef=useRef<HTMLInputElement>(null),scrollRef=useRef<HTMLDivElement>(null);
   const coverCache=useRef(new Map<string,string>()),titleId=useId(),queryId=useId(),sourceId=useId();
+  const scopeId=useId(),[scopeExpanded,setScopeExpanded]=useState(false);
   const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
   const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
@@ -133,9 +134,10 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
           {showResolved&&<section className="nc-search-query"><div><label htmlFor={queryId}>{msg('搜索名称')}</label></div><form onSubmit={event=>{event.preventDefault();submitManual();}}><input ref={queryRef} id={queryId} disabled={!!importing} value={query} onChange={event=>setQuery(event.target.value)} placeholder={msg('输入漫画名称或别名')}/><button className="button secondary small" disabled={!!importing||!query.trim()||!selected.length}>{snapshot.searchedAt?msg('重新搜索'):msg('搜索网站')}</button></form><p>{snapshot.titleState==='missing'?msg('未找到常用{0}名称，请手动输入或明确使用原名搜索。',{'0':languageLabel(snapshot.requestedTitleLanguage)}):snapshot.resolvedTitleLanguage&&snapshot.resolvedTitleLanguage!==snapshot.requestedTitleLanguage?msg('名称语言为{0}，将使用此名称搜索。',{'0':languageLabel(snapshot.resolvedTitleLanguage)}):msg('可以修改搜索名称，不会更改作品资料。')}</p></section>}
           {snapshot.titleError&&<div className="nc-search-inline-error" role="status"><Icon name="info" size={16}/><span>{snapshot.titleError.message}</span>{titleWait>0&&<span>{msg('{0} 秒后可重试',{'0':titleWait})}</span>}{snapshot.titleError.kind==='login'&&onLogin&&<button className="nc-search-text-button" onClick={onLogin}>{msg('登录')}</button>}</div>}
         </div>
-        <aside className="nc-search-sites" aria-label={msg('搜索范围')}>
+        <aside className="nc-search-sites" aria-label={msg('搜索范围')} data-phone-expanded={scopeExpanded}>
+          <button type="button" className="nc-phone-scope-toggle" aria-expanded={scopeExpanded} aria-controls={scopeId} onClick={()=>setScopeExpanded(value=>!value)}><b>{msg('搜索范围')}</b><span>{msg('已选 {0} 个网站',{'0':selected.length})}</span><Icon name="chevron" size={16}/></button>
           <div className="nc-search-sites-heading"><h2>{msg('搜索范围')}</h2><span>{msg('已选 {0} 个网站',{'0':selected.length})}</span></div>
-          <div className="nc-search-site-options">{snapshot.sites.map(state=><label className="nc-search-site-option" key={state.site.key}><input type="checkbox" checked={state.selected} disabled={!!importing} onChange={event=>{session.setSelected(state.site.key,event.target.checked);saveSearchSiteSelection(state.site.key,event.target.checked);}}/><SearchSiteIcon icon={state.site.icon}/><b title={state.site.name}>{state.site.name}</b></label>)}</div>
+          <div id={scopeId} className="nc-search-site-options">{snapshot.sites.map(state=><label className="nc-search-site-option" key={state.site.key}><input type="checkbox" checked={state.selected} disabled={!!importing} onChange={event=>{session.setSelected(state.site.key,event.target.checked);saveSearchSiteSelection(state.site.key,event.target.checked);}}/><SearchSiteIcon icon={state.site.icon}/><b title={state.site.name}>{state.site.name}</b></label>)}</div>
           <p>{msg('各网站仅按搜索名称查询，不按内容语言筛选。')}</p>
           {!selected.length&&<p className="nc-search-notice" role="status">{msg('请先选择至少一个可搜索的网站。')}</p>}
           {permissionError&&<p className="nc-search-notice" role="alert">{permissionError.message}</p>}

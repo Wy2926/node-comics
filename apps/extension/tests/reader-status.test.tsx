@@ -12,10 +12,10 @@ import {needsTranslation,type TranslationState} from '../src/translation/automat
 
 const origin='https://fixture.example';
 const noop=()=>{};
-it('offers originals and classic translation, respecting disabled channel capabilities',()=>{
+it('offers originals and translation, respecting disabled channel capabilities',()=>{
  const controls=(modes?:'classic'[])=>renderToStaticMarkup(<PageTranslationBar selectedView="original" modes={modes} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
- const available=controls();expect(available).toContain('aria-label="原图"');expect(available).toContain('aria-label="常规翻译"');
- const disabled=controls([]);expect(disabled).toContain('aria-label="原图"');expect(disabled).not.toContain('aria-label="常规翻译"');
+ const available=controls();expect(available).toContain('aria-label="原图"');expect(available).toContain('aria-label="翻译"');expect(available).toContain('title="查看译图"');expect(available).toContain('<span>翻译</span>');
+ const disabled=controls([]);expect(disabled).toContain('aria-label="原图"');expect(disabled).not.toContain('aria-label="翻译"');
 });
 it('keeps development diagnostics out of the reading toolbar',()=>{
  const html=renderToStaticMarkup(<PageTranslationBar selectedView="classic" allowsFeedback={false} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);

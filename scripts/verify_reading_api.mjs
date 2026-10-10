@@ -34,7 +34,7 @@ try{
   await page.goto(web);await page.locator('input[type=file]').setInputFiles(path.join(fixture,'cluster-eight.cbz'));await completeLocalImport(page);
   await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
-  await page.getByRole('button',{name:'常规翻译',exact:true}).click();
+  await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:45000});
   assert(translations.some(p=>p.status===202));assert(translations.every(p=>[200,202].includes(p.status)&&p.body.mode==='classic'),JSON.stringify(translations));
   check('actual independent translation requests, automatic-start original upload, worker settlement and result download deliver a translated image');

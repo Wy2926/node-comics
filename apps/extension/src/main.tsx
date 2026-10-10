@@ -5,6 +5,7 @@ import './styles.css';
 import './redesign.css';
 import './library.css';
 import './ui/theme/surfaces.css';
+import './ui/phone.css';
 import {connectReaderSettings} from './inline/settings';
 import {settings} from './comics/application/preferences';
 import {installFileSources} from './comics/sources/install';
