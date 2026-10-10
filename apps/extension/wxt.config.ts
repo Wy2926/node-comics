@@ -8,9 +8,9 @@ writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   zip: {
-    // Preserve relative imports to the image code shared with the website in review sources.
+    // Preserve relative imports to shared image and model code in review sources.
     sourcesRoot: fileURLToPath(new URL('../../', import.meta.url)),
-    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'LICENSE'],
+    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'LICENSE'],
   },
   vite:()=>({plugins:[importAssets(),unrarCsp()],optimizeDeps:{exclude:['node-unrar-js']},worker:{format:'es',plugins:()=>[unrarCsp()]}}),
   manifest: ({browser}) => ({
