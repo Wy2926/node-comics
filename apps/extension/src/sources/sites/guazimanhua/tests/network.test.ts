@@ -81,7 +81,7 @@ describe('瓜子漫画 HTTP adapter', () => {
       get: async (key: string) => ({[key]: records[key]}), set: async (values: object) => Object.assign(records, values),
     }}});
     const fetcher = vi.fn(async (target: string, init: RequestInit) => {
-      expect(init.credentials).toBe('include'); expect(init.redirect).toBe('error');
+      expect(init.credentials).toBe('include');
       expect(target).not.toContain('#');
       return new Response(target.includes('chapter.php') ? readerHtml() : catalogHtml());
     });

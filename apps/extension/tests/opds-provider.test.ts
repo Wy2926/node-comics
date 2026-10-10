@@ -1050,7 +1050,6 @@ describe('OPDS transport security', () => {
       expect(init).toMatchObject({
         method,
         body: JSON.stringify(payload),
-        redirect: 'error',
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
       });

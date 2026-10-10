@@ -34,7 +34,7 @@ docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 
 Firefox 的 Gecko ID 固定为 `comics@nodelane.net`，OIDC 回调为 `https://b6537bc59408f22ed5813efab806261a7e62bd16.extensions.allizom.org/oidc`，在 Logto 登记此精确 Redirect URI。插件内部的 `moz-extension://<UUID>` 由浏览器配置决定，不能作为所有安装共用的 Allowed CORS origin。
 
-Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR 规则仅移除本插件发往精确令牌端点的 POST 请求的 Origin；规则按扩展来源、完整 URL 和请求类型限定，通过 Web Locks 串行更新并在请求结束或失败后删除。已有主机权限、HTTPS、无 Cookie／Referer、禁止重定向、PKCE、回调 state 与 API 身份校验继续生效，无需登记每个 Firefox UUID。网页和 Chrome／Edge 的 Allowed CORS origins 仍按实际来源配置。
+Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR 规则仅移除本插件发往精确令牌端点的 POST 请求的 Origin；规则按扩展来源、完整 URL 和请求类型限定，通过 Web Locks 串行更新并在请求结束或失败后删除。初始端点的主机权限与 HTTPS 校验、无 Cookie／Referer、PKCE、回调 state 与 API 身份校验继续生效；令牌请求遵循浏览器原生 HTTP 重定向语义，无需登记每个 Firefox UUID。网页和 Chrome／Edge 的 Allowed CORS origins 仍按实际来源配置。
 
 ## 撤销与并发行为
 

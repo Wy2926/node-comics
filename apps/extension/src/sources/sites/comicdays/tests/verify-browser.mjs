@@ -122,7 +122,7 @@ try {
   details.decoding = await reader.evaluate(async ({chapter, id}) => {
     const p = await import(chrome.runtime.getURL('verify-source.mjs'));
     const snapshot = await p.network.pages(chapter, {request: async url => {
-      const response = await fetch(url, {redirect: 'error'});
+      const response = await fetch(url);
       if (!response.ok) throw Error('Source page request failed'); return response.text();
     }});
     const page = snapshot.items[0];

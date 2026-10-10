@@ -22,7 +22,7 @@ export function driveHeaders(token: string, reference?: DriveFileReference): Hea
 }
 export async function fetchDriveAccount(token: string, signal?: AbortSignal, request: DriveFetch = fetch): Promise<DriveAccount> {
   const response = await request(`${DRIVE_API}/about?fields=user(permissionId,displayName,emailAddress)`, {
-    headers: driveHeaders(token), signal, cache: 'no-store', credentials: 'omit', redirect: 'error',
+    headers: driveHeaders(token), signal, cache: 'no-store', credentials: 'omit',
   });
   await checkDriveResponse(response);
   const body = await response.json();
@@ -41,7 +41,7 @@ export async function fetchDriveMetadata(reference: DriveFileReference, token: s
   const headers = driveHeaders(token, reference);
   const fields = 'id,name,mimeType,size,version,modifiedTime,resourceKey,capabilities(canDownload),trashed';
   const response = await request(`${DRIVE_API}/files/${encodeURIComponent(reference.fileId)}?supportsAllDrives=true&fields=${encodeURIComponent(fields)}`, {
-    headers, signal, cache: 'no-store', credentials: 'omit', redirect: 'error',
+    headers, signal, cache: 'no-store', credentials: 'omit',
   });
   await checkDriveResponse(response);
   const body = await response.json();

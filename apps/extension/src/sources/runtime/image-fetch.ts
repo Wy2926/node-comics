@@ -14,7 +14,7 @@ export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:R
   const visited=new Set<string>();
   while(true){
     lifetime.throwIfAborted();
-    if(!safeImageUrl(current,current)||visited.has(current)||visited.size>=6)throw Error(msg('图片重定向无效或次数过多，请刷新来源页面后重试。'));
+    if(!safeImageUrl(current,current)||visited.has(current))throw Error(msg('图片重定向无效或次数过多，请刷新来源页面后重试。'));
     visited.add(current);await requireImagePermissions([current]);lifetime.throwIfAborted();
     const requestHeaders:Record<string,string>={};
     if(context){const referer=imageReferer(context.pageUrl,current,context.referrerPolicy);if(referer)requestHeaders.referer=referer;}

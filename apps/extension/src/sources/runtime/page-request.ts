@@ -24,7 +24,7 @@ export async function requestInSourcePage(input: PageNetworkRequest): Promise<Pa
   window.addEventListener('pagehide', abort, { once: true });
   try {
     const response = await fetch(input.url, {
-      credentials: 'include', redirect: 'error', signal: controller.signal,
+      credentials: 'include', signal: controller.signal,
       headers: { Accept: 'application/json, text/html', ...(input.body === undefined ? {} : { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }) },
       ...(input.body === undefined ? {} : { method: 'POST', body: input.body }),
       ...(input.referer ? { referrer: input.referer, referrerPolicy: 'unsafe-url' as ReferrerPolicy } : {})

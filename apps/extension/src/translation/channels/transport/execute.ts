@@ -16,7 +16,6 @@ export function validateTransferRequest(value: unknown): value is ImageTransferR
 
 async function imageBody(response: Response): Promise<Blob> {
   if (!response.ok) throw new ImageTransferError('HTTP_' + response.status);
-  if (response.redirected || response.type === 'opaqueredirect') throw new ImageTransferError('REDIRECT');
   const type = response.headers.get('content-type')?.split(';')[0].toLowerCase();
   if (!type || !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(type))
     throw new ImageTransferError('INVALID_IMAGE');
@@ -53,7 +52,7 @@ export async function executeImageTransfer(id: string, request: ImageTransferReq
         form.append(request.imageField, current.input, 'page');
         for (const [key, value] of Object.entries(request.fields)) form.append(key, value);
         const response = await fetch(request.url, {
-          method: 'POST', headers: request.headers, body: form, credentials: 'omit', redirect: 'error', cache: 'no-store',
+          method: 'POST', headers: request.headers, body: form, credentials: 'omit', cache: 'no-store',
           referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(30 * 60 * 1000),
         });
         const output = await imageBody(response);

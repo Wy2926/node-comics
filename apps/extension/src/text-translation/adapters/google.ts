@@ -43,7 +43,7 @@ export function createGoogleTranslator(fetcher: typeof fetch = fetch, now = Date
         signal.throwIfAborted();
         if (retryAt > now()) throw new TextTranslationError('rate-limit', retryAt);
         const response = await fetcher(url.href, {method: 'POST', body: new URLSearchParams({q: part}),
-          credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer',
+          credentials: 'omit', referrerPolicy: 'no-referrer',
           signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)])});
         if (response.status === 429 || response.status === 503) {
           const header = response.headers.get('Retry-After'), seconds = Number(header);

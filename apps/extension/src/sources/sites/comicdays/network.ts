@@ -34,8 +34,7 @@ export const network = {
   async catalog(url, context) {
     const loc = location(url);
     if (!loc.catalog) throw changed();
-    // The official first_episode entry redirects; source HTTP deliberately rejects redirects.
-    // Its aggregate pagination API provides a direct, source-owned first episode instead.
+    // The aggregate pagination API provides a direct, source-owned first episode.
     const params = new URLSearchParams({type: 'episode', aggregate_id: loc.series});
     const infoUrl = `${origin}/api/viewer/readable_product_pagination_information?${params}`;
     const info = parseInfo(await request(context, infoUrl));

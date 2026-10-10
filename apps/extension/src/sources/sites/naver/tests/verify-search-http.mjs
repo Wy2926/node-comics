@@ -23,7 +23,7 @@ for (const query of ['마음', 'zzzznodelanesearchzzzz']) {
     assert.equal(url.pathname, '/api/search/' + url.pathname.split('/').at(-1));
     assert(['webtoon', 'bestChallenge', 'challenge'].includes(url.pathname.split('/').at(-1)));
     requests.push({origin: url.origin, path: url.pathname});
-    const response = await fetch(target, {signal: controller.signal, redirect: 'error'});
+    const response = await fetch(target, {signal: controller.signal});
     assert(response.ok, 'Public source HTTP ' + response.status);
     return response.text();
   }};

@@ -127,7 +127,7 @@ describe('single-site search runtime', () => {
     };
     await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_PERMISSION_REQUIRED'});
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith('https://fixture.test/api', expect.objectContaining({redirect: 'error', credentials: 'include'}));
+    expect(fetch).toHaveBeenCalledWith('https://fixture.test/api', expect.objectContaining({credentials: 'include'}));
   });
   it.each([
     [429, 'SOURCE_SEARCH_RATE_LIMITED'], [401, 'SOURCE_SEARCH_VERIFICATION_REQUIRED'],
@@ -226,7 +226,7 @@ describe('shared source HTTP transport', () => {
     expect(error).toBeInstanceOf(SourceHttpError);
     expect(error).toMatchObject({kind: 'http', message: '来源请求失败（HTTP 403），请稍后重试或在源站完成验证。', details: {status: 403, retryAfter: 7}});
     expect(error).not.toHaveProperty('code');
-    expect(fetch).toHaveBeenCalledWith('https://fixture.test/catalog', expect.objectContaining({credentials: 'include', redirect: 'error'}));
+    expect(fetch).toHaveBeenCalledWith('https://fixture.test/catalog', expect.objectContaining({credentials: 'include'}));
   });
   it('keeps invalid address, referer and body diagnostics for directory callers', async () => {
     const context = createSourceNetworkContext();

@@ -22,8 +22,8 @@ const {network, definition, validateCatalog, validatePages, imageMimeFromBytes} 
 let requests = 0, imageRequests = 0;
 const request = async (url, options) => {
   assert.equal(new URL(url).origin, 'https://mangapill.com'); requests++;
-  // Match production HTML transport: source redirects must be resolved by the adapter.
-  const response = await fetch(url, {redirect: 'error', headers: {'User-Agent': 'Mozilla/5.0', ...(options?.referer ? {Referer: options.referer} : {})}, signal: AbortSignal.timeout(30000)});
+  // Match production HTML transport with native HTTP redirects.
+  const response = await fetch(url, {headers: {'User-Agent': 'Mozilla/5.0', ...(options?.referer ? {Referer: options.referer} : {})}, signal: AbortSignal.timeout(30000)});
   assert(response.ok, `Source HTTP ${response.status}`); return response.text();
 };
 async function readImage(url, referer) {

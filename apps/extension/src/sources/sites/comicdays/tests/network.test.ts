@@ -14,7 +14,6 @@ const query = {siteId: 'comicdays', query: 'テスト'};
 function fixture() {
   const request = vi.fn(async (url: string) => {
     const u = new URL(url);
-    if (u.pathname.startsWith('/series/')) throw Error('redirect:error rejects the official first_episode redirect');
     if (u.pathname.startsWith('/episode/')) return readerHtml();
     if (u.pathname.endsWith('/readable_product_pagination_information')) return JSON.stringify(info);
     if (u.pathname.endsWith('/pagination_readable_products'))

@@ -14,7 +14,7 @@ it('connects with the MTU login JSON and separates saved password and token from
   expect(JSON.stringify(saved.settings)).not.toContain('fixture-token');
   const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
   expect(url).toBe('http://127.0.0.1:8000/prefix/auth/login');
-  expect(init).toMatchObject({method: 'POST', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer'});
+  expect(init).toMatchObject({method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer'});
   expect(JSON.parse(init.body as string)).toEqual({username: 'local', password: 'fixture-password'});
 });
 it('requires supplied credentials before attempting a service login', async () => {

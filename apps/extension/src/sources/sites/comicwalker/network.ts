@@ -55,7 +55,6 @@ async function request(url: string, context: SourceNetworkContext, referer?: str
 async function viewerEntry(url: string, context: SourceNetworkContext) {
   const loc = location(new URL(url));
   if (!loc?.episode || loc.work) throw Error('ComicWalker 阅读器地址无效。');
-  // Legacy /viewer URLs redirect, but the shared transport rejects redirects.
   // The code prefix is only a lookup candidate: the returned catalog must own this exact episode.
   const candidate = catalogUrl(`KC_${loc.episode.slice(3, 9)}_S`);
   const catalog = parseCatalog(await request(candidate, context), candidate);

@@ -23,7 +23,7 @@ for (const query of ['One Piece', 'zzzznodelanesearchzzzz']) {
     assert.equal(url.pathname, '/api/v1/manga');
 
     requests.push({origin: url.origin, path: url.pathname});
-    const response = await fetch(target, {signal: controller.signal, redirect: 'error'});
+    const response = await fetch(target, {signal: controller.signal});
     assert(response.ok, 'Public source HTTP ' + response.status);
     return response.text();
   }};

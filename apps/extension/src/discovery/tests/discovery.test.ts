@@ -21,7 +21,7 @@ describe('AniList metadata boundary', () => {
     const result = await provider.list({...defaultDiscoveryQuery, search: '"quoted"', status: 'hiatus', year: '2025', country: 'JP', format: 'oneshot'}, 2, signal());
     const [url, request] = fetcher.mock.calls[0];
     expect(url).toBe('https://graphql.anilist.co');
-    expect(request).toMatchObject({credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer'});
+    expect(request).toMatchObject({credentials: 'omit', referrerPolicy: 'no-referrer'});
     expect(new Headers(request?.headers).has('Authorization')).toBe(false);
     expect(JSON.parse(String(request?.body)).variables).toMatchObject({page: 2, search: '"quoted"', status: 'HIATUS', year: '2025%', country: 'JP', formats: ['ONE_SHOT']});
     expect(result).toMatchObject({hasMore: true, works: [{id: 1, status: 'releasing', format: 'oneshot', title: '作品', score: 90}]});

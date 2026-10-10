@@ -55,7 +55,7 @@ export function createAniListProvider(fetcher: typeof fetch = fetch, now = Date.
     if (retryAt > now()) throw new DiscoveryError('rate-limit', retryAt);
     try {
       const response = await fetcher(endpoint, {
-        method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error',
+        method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer',
         headers: {'Content-Type': 'application/json', Accept: 'application/json'},
         body: JSON.stringify({query, variables}), signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       });

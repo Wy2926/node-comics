@@ -27,7 +27,8 @@ export class Api {
       try{response=await fetch(url,{...init,headers,credentials:'omit'});}
       catch{init.signal?.throwIfAborted();throw new ApiError(msg("暂时连接不到服务。请检查网络连接，原图仍可继续阅读。"));}
       try{await this.assertAuthorized();}catch(error){await response.body?.cancel();throw error;}
-      if(response.status!==401||!this.authorization)return response;
+      // A redirected asset host cannot invalidate the API session that authorized the initial request.
+      if(response.status!==401||!this.authorization||response.url&&new URL(response.url).origin!==new URL(url,this.base).origin)return response;
       await response.body?.cancel();
       if(attempt===1)await this.authorization.reject(token);
       else await this.authorization.token(token);
@@ -129,7 +130,7 @@ export class Api {
     if(artifact.path!==expected)throw new ApiError(msg('图片访问地址无效。'),'INVALID_ASSET_ORIGIN');
     const url=new URL(artifact.path,this.base);
     if(url.origin!==new URL(this.base).origin||url.username||url.password)throw new ApiError(msg('图片访问地址无效。'),'INVALID_ASSET_ORIGIN');
-    const response=await this.authorizedFetch(url,{credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',redirect:'error',signal});
+    const response=await this.authorizedFetch(url,{credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',redirect:'follow',signal});
     if(!response.ok)throw new ApiError(msg('图片已过期或无法访问，请保留本地副本或重新上传。'),'ASSET_DOWNLOAD_FAILED',response.status);
     const blob=await response.blob();await this.assertAuthorized();signal?.throwIfAborted();return blob;
   }

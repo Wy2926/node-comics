@@ -255,10 +255,10 @@ describe('serialized source-page request function', () => {
     vi.stubGlobal('document', { [Symbol.for('nc-source-page-document')]: 'fixture-document' });
   });
   const input = () => ({ pageUrl: url, url: target, cancelEvent: 'fixture-cancel', documentToken: 'fixture-document' });
-  it('uses ordinary same-origin credentials, rejects redirects and returns bounded text', async () => {
+  it('uses ordinary same-origin credentials and returns bounded text', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('data')));
     expect(await requestInSourcePage(input())).toMatchObject({ status: 200, body: 'data', challenge: false });
-    expect(fetch).toHaveBeenCalledWith(target, expect.objectContaining({ credentials: 'include', redirect: 'error' }));
+    expect(fetch).toHaveBeenCalledWith(target, expect.objectContaining({ credentials: 'include' }));
   });
   it('refuses cross-origin and changed-page requests', async () => {
     expect(await requestInSourcePage({ ...input(), url: 'https://evil.test/' })).toMatchObject({ error: 'changed' });

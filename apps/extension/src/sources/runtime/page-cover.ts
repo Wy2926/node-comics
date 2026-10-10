@@ -12,17 +12,20 @@ export async function readPageCover(url: string, signal?: AbortSignal): Promise<
     throw new SourceHttpError('request-denied', '来源请求地址无效。');
   await requireImagePermissions([url]);
   lifetime.throwIfAborted();
-  const authorize = async (signal: AbortSignal) => { await requireImagePermissions([url]); signal.throwIfAborted(); };
-  return withPageDocument({ url, matches: target => target === url, authorize, exact: true }, lifetime, async (page) => {
-    await requireImagePermissions([url]);
+  const authorize = async (signal: AbortSignal, target = url) => { await requireImagePermissions([url, target]); signal.throwIfAborted(); };
+  return withPageDocument({ url, matches: target => target === url, authorize, exact: true, followRedirects: true }, lifetime, async (page) => {
+    await requireImagePermissions([url, page.url]);
     page.signal.throwIfAborted();
     const result = await page.request(readCoverInPage, {});
-    await requireImagePermissions([url]);
+    await requireImagePermissions([url, page.url]);
     page.signal.throwIfAborted();
     const invalid = () => new SourceHttpError('invalid-response', '来源响应无效或超过限制。');
-    if (!result || result.pageUrl !== url || !Number.isInteger(result.status) || result.status < 0 || result.status > 599 ||
+    if (!result || result.pageUrl !== page.url || !Number.isInteger(result.status) || result.status < 0 || result.status > 599 ||
       typeof result.data !== 'string' || result.data.length > Math.ceil(4 * 1024 * 1024 / 3) * 4)
       throw invalid();
+    if (typeof result.responseUrl !== 'string' || safeImageUrl(result.responseUrl, result.responseUrl) !== result.responseUrl) throw invalid();
+    await requireImagePermissions([result.responseUrl]);
+    page.signal.throwIfAborted();
     if (result.error === 'changed')
       throw Error(msg('来源页面已变化，请重新发现。'));
     if (result.error === 'size' || result.error === 'type')

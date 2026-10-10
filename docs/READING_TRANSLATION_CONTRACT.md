@@ -122,7 +122,7 @@ X-Translation-Protocol: overlay-v1
 - 分块覆盖不带 bbox，带 `composite=source-atop` 与 `application/vnd.nodelane.overlay-tiles` 文件。文件包含有界清单和连续 WebP 二进制块，每块带坐标、尺寸、字节数及摘要；整包只下载一次。格式与校验见[计算协议](COMPUTE_PROTOCOL.md#webp-分块包)。协商分块的任务若最终变化 bbox 能装入一个 WebP，仍可交付普通覆盖；无变化仍返回 original。
 - `original` 不带文件、bbox 或 composite。`kind=no_text` 表示无文字；`kind=translated` 表示确认翻译成功但没有可见变化。二者都不下载图片，不因滚动自动重译。
 
-扩展受信上下文向配置的中心 origin 携带 Bearer 和协议头 GET 读取 artifact，禁止外部 origin、其他 UUID、查询签名或重定向；令牌不进入来源页面。下载限制字节数和 MIME，公共 `materializeResult(result, original)` 统一核验 artifact 摘要，以及送译原图摘要、规范化版本、整页与覆盖尺寸。阅读器、原位翻译和导出共用此路径：按原生像素使用 `source-atop` 覆盖，最后由显示层缩放，保留原图 alpha 和阅读位置。分块包额外核验每块摘要、尺寸、非重叠范围与完整长度，逐块解码后释放；普通覆盖复用已经解码的补丁，由外层统一释放。
+扩展受信上下文向配置的中心 origin 携带 Bearer 和协议头 GET 读取 artifact，初始地址禁止外部 origin、其他 UUID 或查询签名，允许服务通过 HTTP 重定向交付结果；浏览器原生跨 origin 跳转移除 Authorization，令牌不进入来源页面。下载限制字节数和 MIME，公共 `materializeResult(result, original)` 统一核验 artifact 摘要，以及送译原图摘要、规范化版本、整页与覆盖尺寸。阅读器、原位翻译和导出共用此路径：按原生像素使用 `source-atop` 覆盖，最后由显示层缩放，保留原图 alpha 和阅读位置。分块包额外核验每块摘要、尺寸、非重叠范围与完整长度，逐块解码后释放；普通覆盖复用已经解码的补丁，由外层统一释放。
 
 完整译图正常路径只编码一次：单边不超过 16383 时用 WebP 0.95；更长且不透明的图片用 JPEG 0.95，透明长图保留 PNG。JPEG 原图无需扫描 alpha，其他长图分段检测，不铺底、不缩小合成尺寸。有损编码减少存储和传输，但不承诺逐像素无损；原图、云端无损覆盖及冻结的送译字节不变。原生编码仅在单边不超过 65500、整页不超过 64×1024×1024 像素时使用，额外 RGBA 画布理论上限 256 MiB（不含解码图与编码器）；这是工作集预算，不是图片准入限制。JPEG 输出须核验头部实际尺寸；超出编码上限、原生编码失败或尺寸变化时，使用现有分带 PNG 合成保留完整像素。
 

@@ -12,14 +12,14 @@ const deferred = () => {
 const tick = async () => {for (let i = 0; i < 10; i++) await Promise.resolve();};
 
 describe('Anonymous Google text adapter', () => {
-  it('sends metadata in a POST body with no credentials, redirects or source context', async () => {
+  it('sends metadata in a POST body with no credentials or source context', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json([[['世界之间的', 'A'], ['书店。', 'bookshop']]]));
     const translator = createGoogleTranslator(fetcher);
     expect(await translator.translate('A bookshop', 'zh-CN', signal())).toBe('世界之间的书店。');
     const [url, init] = fetcher.mock.calls[0];
     expect(String(url)).toMatch(/^https:\/\/translate\.googleapis\.com\/translate_a\/single\?/);
     expect(new URL(String(url)).searchParams.get('q')).toBeNull();
-    expect(init).toMatchObject({method: 'POST', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer'});
+    expect(init).toMatchObject({method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer'});
     expect(String(init?.body)).toBe('q=A+bookshop');
     expect(new Headers(init?.headers).has('Authorization')).toBe(false);
   });

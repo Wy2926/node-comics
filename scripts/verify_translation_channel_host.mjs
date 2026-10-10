@@ -33,6 +33,9 @@ const server = createServer(async (req, res) => {
       res.end('<!doctype html><title>Local GPU fixture comic</title><style>body{margin:0;background:#edf2f8}h1{font:20px system-ui;text-align:center}img{display:block;width:640px;margin:20px auto}</style><h1>本地算力 · 原位翻译验收</h1><img id="comic" src="/original.png">'); return;
     }
     if (url.pathname === '/translate/with-form/image') {
+      res.writeHead(307, {Location: '/translated-image'}); res.end(); return;
+    }
+    if (url.pathname === '/translated-image') {
       translations++; translationStartedAt ??= Date.now();
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       const bytes = Buffer.concat(chunks), text = bytes.toString('latin1');
@@ -104,7 +107,9 @@ try {
   const hostTab = await host.evaluate(() => chrome.tabs.getCurrent());
   assert.equal(hostTab.active, false);
   await host.screenshot({path: path.join(out, 'host-running.png')});
-  check('No NodeLane account: the actual inline flow sends one MTU form request from an inactive extension host');
+  assert.equal(requests.filter(request => request.path === '/translate/with-form/image').length, 1);
+  assert(requests.some(request => request.path === '/translated-image' && request.method === 'POST'));
+  check('No NodeLane account: the inactive extension host follows a 307 redirect and delivers the MTU form once');
   const cdp = await context.newCDPSession(probe), versions = new Map();
   cdp.on('ServiceWorker.workerVersionUpdated', ({versions: incoming}) => {for (const version of incoming) versions.set(version.versionId, version);});
   await cdp.send('ServiceWorker.enable');
@@ -123,7 +128,7 @@ try {
   await until(() => Date.now() - translationStartedAt > 35_000, 40_000);
   assert.equal(translations, 1); assert(!host.isClosed());
   const receipt = await probe.evaluate(async () => {
-    const database = await new Promise((resolve, reject) => {const req = indexedDB.open('node-comics-reading-v2-channel-transfers', 1); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);});
+    const database = await new Promise((resolve, reject) => {const req = indexedDB.open('node-comics-reading-v2-channel-transfers'); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);});
     const receipts = await new Promise((resolve, reject) => {const tx = database.transaction('receipts'), req = tx.objectStore('receipts').getAll(); tx.oncomplete = () => resolve(req.result); tx.onabort = tx.onerror = () => reject(tx.error);});
     database.close(); return receipts.map(({id, state, input, output, ...rest}) => ({id, state, inputBytes: input?.size ?? 0, outputBytes: output?.size ?? 0, ...rest}));
   });
@@ -136,11 +141,11 @@ try {
   worker = context.serviceWorkers().find(value => value.url().includes(extensionId)) ?? await context.waitForEvent('serviceworker');
   assert.equal(await worker.evaluate(() => globalThis.fixtureRestartMarker), undefined);
   const jobs = await probe.evaluate(async () => {
-    const database = await new Promise((resolve, reject) => {const req = indexedDB.open('node-comics-reading-v2-channel-operations', 1); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);});
+    const database = await new Promise((resolve, reject) => {const req = indexedDB.open('node-comics-reading-v2-channel-operations'); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);});
     const jobs = await new Promise((resolve, reject) => {const tx = database.transaction('operations'), req = tx.objectStore('operations').getAll(); tx.oncomplete = () => resolve(req.result.map(record => record.job)); tx.onabort = tx.onerror = () => reject(tx.error);});
     database.close(); return jobs;
   });
-  assert.equal(jobs.length, 1); assert.equal(jobs[0].status, 'succeeded'); assert.equal(jobs[0].output_asset_id, null); assert.equal(jobs[0].result.recoverable, false);
+  assert.equal(jobs.length, 1); assert.equal(jobs[0].status, 'succeeded'); assert.equal(jobs[0].result.recoverable, false);
   await page.screenshot({path: path.join(out, 'inline-result-after-worker-restart.png')});
   check('The restarted worker consumes the persisted host result and displays the decoded local translation in the original page');
   await page.reload(); await page.locator('#comic').evaluate(image => image.decode());

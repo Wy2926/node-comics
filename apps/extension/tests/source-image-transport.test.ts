@@ -64,6 +64,13 @@ describe('common image request context',()=>{
     const fetch=vi.fn(async()=>new Response(null,{status:302,headers:{location}}));vi.stubGlobal('fetch',fetch);
     await expect(fetchSourceImage(image)).rejects.toThrow(/重定向/);expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it('follows more than five redirects without imposing a hop ceiling',async()=>{
+    let hop=0;
+    vi.stubGlobal('fetch',vi.fn(async()=>hop++<9?new Response(null,{status:302,headers:{location:'/image-'+hop}}):new Response('image')));
+    expect(await(await fetchSourceImage(image)).blob.text()).toBe('image');
+    expect(fetch).toHaveBeenCalledTimes(10);
+    expect(chrome.permissions.contains).toHaveBeenLastCalledWith({origins:['https://cdn.test/*']});
+  });
   it('rejects a revoked permission without starting a network request',async()=>{
     const fetch=vi.fn();vi.stubGlobal('fetch',fetch);vi.mocked(chrome.permissions.contains).mockImplementation(async()=>false);
     await expect(fetchSourceImage(image)).rejects.toBeInstanceOf(ImagePermissionsRequired);expect(fetch).not.toHaveBeenCalled();

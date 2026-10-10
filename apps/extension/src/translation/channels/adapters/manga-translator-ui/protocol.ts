@@ -46,7 +46,7 @@ export async function login(base: string, username: string, password: string, si
   try {
     response = await fetch(base + 'auth/login', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}),
-      credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer',
+      credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
   } catch {throw Error(msg('无法连接翻译服务，请检查地址、访问权限和服务状态。'));}

@@ -19,7 +19,7 @@ const started = performance.now();
 const context = {request: async (url, options) => {
   assert.equal(new URL(url).origin, 'https://heros-web.com');
   requests++;
-  const response = await fetch(url, {redirect: 'error', signal: AbortSignal.timeout(30000)});
+  const response = await fetch(url, {signal: AbortSignal.timeout(30000)});
   assert(response.ok || options?.acceptStatuses?.includes(response.status), `Source HTTP ${response.status}`);
   return response.text();
 }};
@@ -46,12 +46,12 @@ try {
     assert.equal(first.resource.kind, 'http');
     // Match the public image pipeline's default strict-origin-when-cross-origin Referer.
     const image = await fetch(first.resource.url, {headers: {Referer: 'https://heros-web.com/'},
-      redirect: 'error', signal: AbortSignal.timeout(30000)});
+      signal: AbortSignal.timeout(30000)});
     assert(image.ok && image.headers.get('content-type')?.startsWith('image/'), `Page HTTP ${image.status}`);
     const imageBytes = (await image.arrayBuffer()).byteLength;
     assert(imageBytes > 1000);
     assert(catalog.cover?.url, 'Expected dedicated work artwork');
-    const cover = await fetch(catalog.cover.url, {redirect: 'error', signal: AbortSignal.timeout(30000)});
+    const cover = await fetch(catalog.cover.url, {signal: AbortSignal.timeout(30000)});
     assert(cover.ok && cover.headers.get('content-type')?.startsWith('image/'), `Cover HTTP ${cover.status}`);
     const coverBytes = (await cover.arrayBuffer()).byteLength;
     assert(coverBytes > 1000);

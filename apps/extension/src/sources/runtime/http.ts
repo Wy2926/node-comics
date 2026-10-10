@@ -56,7 +56,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
     if (cached >= 0) return replay.splice(cached, 1)[0].body;
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
-      const response = await fetch(url, {credentials: 'include', redirect: 'error', headers: {Accept: 'application/json, text/html',
+      const response = await fetch(url, {credentials: 'include', headers: {Accept: 'application/json, text/html',
         ...(body === undefined ? {} : {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})});
       // Some sources return a structured empty result with a non-success status.

@@ -14,7 +14,7 @@
 
 - 由已校验的来源页与引用策略生成 Referer；站点通过 `image.headers` / `coverHeaders` 声明必要差异。原位入口读取图片属性和 meta，缺省采用 `strict-origin-when-cross-origin`，不回溯页面响应头。
 - DNR 规则只匹配当前精确图片 URL，同 URL 请求由 Web Lock 串行隔离；完成、失败和取消均清理。
-- `webRequest` 仅在请求期间观察扩展自身的重定向响应头。最多跟随 5 次跳转，每跳重查 URL 与权限；跨来源重新生成请求头。
+- `webRequest` 仅在请求期间观察扩展自身的重定向响应头。不设插件跳转次数上限，每跳重查 URL 与权限；跨来源重新生成请求头。重复 URL 的循环跳转仍拒绝，整个读取链共用 30 秒超时。
 - Cookie 仅由浏览器在授权的源站请求中使用，不传给翻译后端或代理。缺少权限、HTTP 拒绝、资源过期和解码失败分别返回可操作原因。
 - 扩展来源图片请求使用浏览器默认 HTTP 缓存策略，遵循源站缓存头，不强制 `no-store`；成功字节仍由应用缓存管理。浏览器缓存分区、Cookie、Referer 和响应 `Vary` 可能影响命中，不保证后台请求复用网页已加载的字节。私有翻译 API 与结果下载的缓存策略不受此规则改变。
 - Canvas 导出是像素重新编码，摘要可能与原文件不同；受污染画布不能导出。`activeTab` 不等于所有图片 CDN 的权限，`no-cors` 不提供可读字节。
@@ -25,7 +25,6 @@
 
 ```powershell
 node scripts/verify_image_transport.mjs
-node scripts/verify_source_image_cache.mjs
 ```
 
 检查 Referer、逐跳权限、跨来源请求头隔离、同 URL 并发、取消清理、失败重试和缓存恢复。页面资源另覆盖画布重绘、元素替换及导航失效；真实账户会话和浏览器原生权限需要独立验收。

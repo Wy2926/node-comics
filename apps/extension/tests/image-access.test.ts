@@ -10,11 +10,11 @@ function setup(path='/v1/translations/page/result',response=new Response(deliver
   const fetch=vi.fn().mockResolvedValueOnce(Response.json(snapshot)).mockResolvedValueOnce(response);vi.stubGlobal('fetch',fetch);
   return {fetch,api:new Api('https://api.example',crypto.randomUUID())};
 }
-it('downloads only authenticated same-origin result bytes without an access/signature request',async()=>{
+it('starts result downloads at the authenticated API path and allows native redirects',async()=>{
   const {fetch,api}=setup();await api.translationImage('page');
   expect(fetch).toHaveBeenCalledTimes(2);expect(String(fetch.mock.calls[1][0])).toBe('https://api.example/v1/translations/page/result');
   expect(new Headers(fetch.mock.calls[1][1].headers).get('Authorization')).toBe('Bearer '+api.token);
-  expect(fetch.mock.calls[1][1]).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',cache:'no-store'});
+  expect(fetch.mock.calls[1][1]).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer',redirect:'follow',cache:'no-store'});
 });
 it.each(['https://external.example/result','//external.example/result','/v1/translations/other/result','/v1/translations/page/result?signature=x'])('rejects an invalid artifact path %s before sending tokens',async path=>{
   const {fetch,api}=setup(path);await expect(api.translationImage('page')).rejects.toMatchObject({code:'INVALID_ASSET_ORIGIN'});expect(fetch).toHaveBeenCalledOnce();

@@ -15,11 +15,12 @@ let inject: ReturnType<typeof vi.fn>, response: PageCoverResponse;
 beforeEach(() => {
   records = {};
   tab = { id: 7, url, status: 'complete' };
-  response = { pageUrl: url, status: 200, type: 'image/jpg', data: btoa('image bytes'), challenge: false, retryAfter: null };
+  response = { pageUrl: url, responseUrl: url, status: 200, type: 'image/jpg', data: btoa('image bytes'), challenge: false, retryAfter: null };
   inject = vi.fn(async (options: any) => [{ frameId: 0, documentId: 'document-1', result: options.func === readCoverInPage ? response : tab.url }]);
   vi.stubGlobal('navigator', { locks: { request: vi.fn(async (_name: unknown, _options: unknown, run: () => Promise<unknown>) => run()) } });
   vi.stubGlobal('chrome', {
     permissions: { contains: vi.fn(async () => true) },
+    webRequest: { onBeforeRedirect: event() },
     alarms: { get: vi.fn(async () => undefined), create: vi.fn(async () => { }), clear: vi.fn(async () => true), onAlarm: event() },
     tabs: { query: vi.fn(async () => []), create: vi.fn(async () => ({ id: 7 })), get: vi.fn(async () => ({ ...tab })), remove: vi.fn(async () => { }), onUpdated: event(), onRemoved: event() },
     scripting: { executeScript: inject }, storage: { session: { get: vi.fn(async () => records), set: vi.fn(async (value: object) => Object.assign(records, value)), remove: vi.fn(async (key: string) => { delete records[key]; }) } }
@@ -115,11 +116,46 @@ describe('opt-in image-document cover transport', () => {
     expect(chrome.tabs.remove).not.toHaveBeenCalled();
     expect(records).toEqual({});
   });
-  it('rejects redirecting image documents without injecting or removing the destination tab', async () => {
+  it('rejects unobserved navigation without injecting or removing the destination tab', async () => {
     tab.pendingUrl = 'https://other.test/cover.jpg';
     await expect(readPageCover(url)).rejects.toThrow('跳转');
     expect(inject).not.toHaveBeenCalled();
     expect(chrome.tabs.remove).not.toHaveBeenCalled();
+  });
+  it('follows observed HTTP cover redirects and cleans up the final image tab', async () => {
+    const destination = 'https://other.test/cover.jpg';
+    vi.mocked(chrome.tabs.create).mockImplementation(async () => {
+      const listener = vi.mocked(chrome.webRequest.onBeforeRedirect.addListener).mock.calls[0][0];
+      listener({tabId: 7, url, redirectUrl: url + '?next'} as chrome.webRequest.OnBeforeRedirectDetails);
+      listener({tabId: 7, url: url + '?next', redirectUrl: destination} as chrome.webRequest.OnBeforeRedirectDetails);
+      tab.url = destination; response.pageUrl = destination;
+      return {id: 7} as chrome.tabs.Tab;
+    });
+    expect(await (await readPageCover(url)).text()).toBe('image bytes');
+    expect(chrome.permissions.contains).toHaveBeenCalledWith({origins: ['https://static.comix.to/*', 'https://other.test/*']});
+    expect(inject.mock.calls[1][0].args[0].pageUrl).toBe(destination);
+    expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
+    expect(chrome.webRequest.onBeforeRedirect.removeListener).toHaveBeenCalledOnce();
+    expect(records).toEqual({});
+  });
+  it('checks redirected cover permissions before injecting into the final document', async () => {
+    const destination = 'https://denied.test/cover.jpg';
+    vi.mocked(chrome.tabs.create).mockImplementation(async () => {
+      vi.mocked(chrome.webRequest.onBeforeRedirect.addListener).mock.calls[0][0](
+        {tabId: 7, url, redirectUrl: destination} as chrome.webRequest.OnBeforeRedirectDetails);
+      tab.url = destination;
+      return {id: 7} as chrome.tabs.Tab;
+    });
+    vi.mocked(chrome.permissions.contains).mockImplementation(async permission => !permission.origins?.includes('https://denied.test/*'));
+    await expect(readPageCover(url)).rejects.toThrow('权限');
+    expect(inject).not.toHaveBeenCalled();
+    expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
+  });
+  it('rejects a redirected fetch response when the final image permission is missing', async () => {
+    response.responseUrl = 'https://denied.test/cover.jpg';
+    vi.mocked(chrome.permissions.contains).mockImplementation(async permission => !permission.origins?.includes('https://denied.test/*'));
+    await expect(readPageCover(url)).rejects.toThrow('权限');
+    expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
   });
   it('cancels stalled reads and cleans up its tab without waiting for page JavaScript', async () => {
     const controller = new AbortController();
@@ -217,7 +253,7 @@ describe('serialized cover read', () => {
     const result = await readCoverInPage(input());
     expect(result).toMatchObject({ status: 200, type: 'image/jpeg', challenge: false });
     expect(Uint8Array.from(atob(result.data), char => char.charCodeAt(0))).toEqual(bytes);
-    expect(fetch).toHaveBeenCalledExactlyOnceWith(url, expect.objectContaining({ cache: 'force-cache', credentials: 'include', redirect: 'error', referrerPolicy: 'no-referrer' }));
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(url, expect.objectContaining({ cache: 'force-cache', credentials: 'include', redirect: 'follow', referrerPolicy: 'no-referrer' }));
   });
   it('rejects a changed or foreign image document before reading', async () => {
     expect(await readCoverInPage({ ...input(), pageUrl: 'https://other.test/image.jpg' })).toMatchObject({ error: 'changed' });

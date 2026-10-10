@@ -57,7 +57,7 @@ describe('shared renewable sessions',()=>{
     const init=request.mock.calls[0][1] as RequestInit,body=init.body as URLSearchParams;
     expect(request.mock.calls[0][0]).toBe(endpoint);
     expect(Object.fromEntries(body)).toEqual({grant_type:'refresh_token',refresh_token:'refresh-one',client_id:'public-client',resource:'https://comics.nodelane.net/api'});
-    expect(init).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});
+    expect(init).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer'});
     expect((await readAuth()).session).toMatchObject({token:'new-access',credential:{refreshToken:'refresh-two'}});
     expect((await readAuth()).session!.expiresAt).toBeGreaterThan(Date.now()+3500000);
   });

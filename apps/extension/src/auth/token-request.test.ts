@@ -38,7 +38,7 @@ describe('OIDC token request Origin boundary', () => {
       expect(exact.test(other)).toBe(false);
     }
     expect(request.mock.calls[0]).toEqual([endpoint, expect.objectContaining({
-      method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error', body,
+      method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', body,
       signal: expect.any(AbortSignal), headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     })]);
     expect(update.mock.calls[1][0]).toEqual({removeRuleIds: [rule.id]});

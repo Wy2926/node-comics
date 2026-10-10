@@ -1,6 +1,7 @@
 import type { PageRequestInput } from './page-document';
 export interface PageCoverResponse {
   pageUrl: string;
+  responseUrl: string;
   status: number;
   type: string;
   data: string;
@@ -10,7 +11,7 @@ export interface PageCoverResponse {
 }
 /** Serialized by scripting.executeScript; reads only the exact image document, never another URL. */
 export async function readCoverInPage(input: PageRequestInput): Promise<PageCoverResponse> {
-  const result: PageCoverResponse = { pageUrl: location.href, status: 0, type: '', data: '', challenge: false, retryAfter: null };
+  const result: PageCoverResponse = { pageUrl: location.href, responseUrl: location.href, status: 0, type: '', data: '', challenge: false, retryAfter: null };
   if (location.href !== input.pageUrl || !/^https?:/.test(input.pageUrl) ||
     Reflect.get(document, Symbol.for('nc-source-page-document')) !== input.documentToken)
     return { ...result, error: 'changed' };
@@ -21,10 +22,11 @@ export async function readCoverInPage(input: PageRequestInput): Promise<PageCove
   try {
     // Navigation already requested this image. Reuse a successful response instead of downloading it twice.
     const response = await fetch(input.pageUrl, {
-      credentials: 'include', cache: 'force-cache', redirect: 'error',
+      credentials: 'include', cache: 'force-cache', redirect: 'follow',
       referrerPolicy: 'no-referrer', signal: controller.signal
     });
     result.status = response.status;
+    result.responseUrl = response.url || input.pageUrl;
     result.challenge = response.headers.get('cf-mitigated') === 'challenge';
     result.retryAfter = response.headers.get('retry-after');
     result.type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();

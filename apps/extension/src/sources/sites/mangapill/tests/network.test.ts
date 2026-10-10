@@ -203,25 +203,21 @@ describe('MangaPill canonical parent resolution under the production HTTP transp
       request: async target => target === reader ? readerHtml() : quickHtml(),
     })).rejects.toThrow();
   });
-  it('rejects bare redirecting source routes before making any HTTP request', async () => {
-    const request = vi.fn(async () => {throw TypeError('redirect blocked');});
+  it('requires complete catalog and chapter identities before requesting source data', async () => {
+    const request = vi.fn();
     await expect(network.catalog!(bareUrl, {request})).rejects.toThrow('完整作品链接');
     await expect(network.pages!(origin + '/chapters/42-10001000', {request})).rejects.toThrow('完整章节链接');
     await expect(network.resolveCatalog!(origin + '/chapters/42-10001000', {request})).rejects.toThrow('完整章节链接');
     expect(request).not.toHaveBeenCalled();
   });
-  it('completes public reader import and bound page reading with redirect:error and canonical URLs', async () => {
+  it('completes public reader import and bound page reading with canonical URLs', async () => {
     vi.stubGlobal('chrome', undefined);
-    const fetcher = vi.fn(async (target: string, options?: RequestInit) => {
-      expect(options?.redirect).toBe('error');
-      if (target === bareUrl || target === origin + '/chapters/42-10001000') throw TypeError('redirect blocked');
+    const fetcher = vi.fn(async (target: string) => {
       const body = target === reader ? readerHtml() : target === quick.href ? quickHtml() : target === url ? catalogHtml() : undefined;
       if (body === undefined) throw Error('Unexpected source request: ' + target);
       return new Response(body, {status: 200, headers: {'content-type': 'text/html'}});
     });
     vi.stubGlobal('fetch', fetcher);
-    // This guard makes a fabricated bare-route fixture fail just as the production fetch transport does.
-    await expect(createSourceNetworkContext().request(bareUrl)).rejects.toThrow('redirect blocked'); fetcher.mockClear();
     const snapshot = await readImportCatalog(reader);
     expect(validateCatalog(snapshot, [definition])).toMatchObject({id: catalogKey(work), url, complete: true});
     expect(snapshot.entries[0].url).toBe(boundReader);
@@ -235,9 +231,7 @@ describe('MangaPill canonical parent resolution under the production HTTP transp
   it('preserves canonical search hits through the real HTTP context', async () => {
     vi.stubGlobal('chrome', undefined);
     const request = {siteId: 'mangapill', query: 'Fixture'};
-    const fetcher = vi.fn(async (_target: string, options?: RequestInit) => {
-      expect(options?.redirect).toBe('error'); return new Response(searchHtml());
-    });
+    const fetcher = vi.fn(async () => new Response(searchHtml()));
     vi.stubGlobal('fetch', fetcher);
     const result = await network.search!(request, createSourceNetworkContext());
     expect(result.items[0].catalogUrl).toBe(bareUrl + '/fixture-42');

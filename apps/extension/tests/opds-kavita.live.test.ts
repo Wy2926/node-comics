@@ -65,7 +65,6 @@ async function connectUrl(): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'demouser', password: 'Demouser64' }),
-    redirect: 'error',
     credentials: 'omit',
     signal: AbortSignal.timeout(30000),
   });
@@ -78,7 +77,6 @@ async function connectUrl(): Promise<string> {
     await nativeFetch(ORIGIN + '/api/Account/opds-url', {
       method: 'GET',
       headers: { Authorization: 'Bearer ' + value.token },
-      redirect: 'error',
       credentials: 'omit',
       signal: AbortSignal.timeout(30000),
     }),

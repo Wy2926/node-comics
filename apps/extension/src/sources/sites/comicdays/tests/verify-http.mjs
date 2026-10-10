@@ -18,7 +18,7 @@ let requests = 0;
 const context = {request: async (url, options) => {
   assert.equal(new URL(url).origin, 'https://comic-days.com');
   requests++;
-  const response = await fetch(url, {redirect: 'error', signal: AbortSignal.timeout(30000)});
+  const response = await fetch(url, {signal: AbortSignal.timeout(30000)});
   assert(response.ok || options?.acceptStatuses?.includes(response.status), `Source HTTP ${response.status}`);
   return response.text();
 }};
@@ -43,12 +43,12 @@ try {
     assert.equal(new Set(pages.items.map(page => page.id)).size, pages.items.length);
     const first = pages.items[0];
     assert.equal(first.resource.kind, 'http');
-    const image = await fetch(first.resource.url, {redirect: 'error', signal: AbortSignal.timeout(30000)});
+    const image = await fetch(first.resource.url, {signal: AbortSignal.timeout(30000)});
     assert(image.ok && image.headers.get('content-type')?.startsWith('image/'), `Page HTTP ${image.status}`);
     const imageBytes = (await image.arrayBuffer()).byteLength;
     assert(imageBytes > 1000);
     assert(catalog.cover?.url, 'Expected dedicated work artwork');
-    const cover = await fetch(catalog.cover.url, {redirect: 'error', signal: AbortSignal.timeout(30000)});
+    const cover = await fetch(catalog.cover.url, {signal: AbortSignal.timeout(30000)});
     assert(cover.ok && cover.headers.get('content-type')?.startsWith('image/'), `Cover HTTP ${cover.status}`);
     const coverBytes = (await cover.arrayBuffer()).byteLength;
     assert(coverBytes > 1000);

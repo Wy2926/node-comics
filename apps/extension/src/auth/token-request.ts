@@ -9,7 +9,7 @@ export async function requestOidcToken(endpoint: string, body: URLSearchParams):
   const url = secureIdentityUrl(endpoint);
   url.hash = '';
   const send = () => fetch(url.href, {
-    method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error',
+    method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer',
     signal: AbortSignal.timeout(15000), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body,
   });
   const extensionUrl = typeof chrome !== 'undefined' ? chrome.runtime?.getURL?.('') : undefined;

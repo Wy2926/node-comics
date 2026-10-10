@@ -86,7 +86,7 @@ export async function readBounded(
   }
   return output;
 }
-/** Native redirects for reads; credentials and progress writes stay scoped to the connection. */
+/** Native redirects; initial credentials and progress targets stay scoped to the connection. */
 export class OpdsTransport {
   private active = 0;
   private waiters: (() => void)[] = [];
@@ -170,7 +170,7 @@ export class OpdsTransport {
         headers,
         ...(options.body === undefined ? {} : { body: options.body }),
         signal,
-        redirect: options.body === undefined ? 'follow' : 'error',
+        redirect: 'follow',
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
         cache: 'no-store',

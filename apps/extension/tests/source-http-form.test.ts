@@ -37,7 +37,7 @@ describe('bounded source form POST', () => {
     const form = Object.assign(Object.create(null), {action: 'load pages', chapter: '日本語 + &=', 'pages[]': '7'});
     expect(await createSourceNetworkContext().request(endpoint, {referer: source, form})).toBe('source response');
     const request = fetcher.mock.calls[0][1]!;
-    expect(request).toMatchObject({method: 'POST', credentials: 'include', redirect: 'error',
+    expect(request).toMatchObject({method: 'POST', credentials: 'include',
       headers: {Accept: 'application/json, text/html', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'}});
     expect(request.body).toBe('action=load+pages&chapter=%E6%97%A5%E6%9C%AC%E8%AA%9E+%2B+%26%3D&pages%5B%5D=7');
     expect(permission).toHaveBeenCalledExactlyOnceWith({origins: ['https://fixture.test/*']});
@@ -46,7 +46,7 @@ describe('bounded source form POST', () => {
   });
   it('keeps ordinary requests as GET without form-specific body or content type', async () => {
     await createSourceNetworkContext().request(endpoint);
-    expect(fetcher.mock.calls[0][1]).toMatchObject({credentials: 'include', redirect: 'error', headers: {Accept: 'application/json, text/html'}});
+    expect(fetcher.mock.calls[0][1]).toMatchObject({credentials: 'include', headers: {Accept: 'application/json, text/html'}});
     expect(fetcher.mock.calls[0][1]).not.toHaveProperty('method');
     expect(fetcher.mock.calls[0][1]).not.toHaveProperty('body');
     expect(fetcher.mock.calls[0][1]?.headers).not.toHaveProperty('Content-Type');

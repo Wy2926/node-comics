@@ -87,7 +87,7 @@ export class DriveRangeSource implements RandomAccessSource {
       const headers = driveHeaders(await this.options.token(), this.binding);
       headers.set('Range', `bytes=${offset}-${offset + length - 1}`);
       const response = await this.request(`${DRIVE_API}/files/${encodeURIComponent(this.binding.fileId)}?alt=media&supportsAllDrives=true`, {
-        headers, signal: combined, cache: 'no-store', credentials: 'omit', redirect: 'error',
+        headers, signal: combined, cache: 'no-store', credentials: 'omit',
       });
       await checkDriveResponse(response);
       if (response.status !== 206) {

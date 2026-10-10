@@ -6,12 +6,12 @@ import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
 import path from 'node:path';
 const out=path.resolve('artifacts/image-transport',randomUUID()),extension=path.join(out,'extension');
-await mkdir(out,{recursive:true});await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
+await mkdir(out,{recursive:true});await cp(process.env.TEST_EXTENSION_DIR||'apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
 manifest.host_permissions.push('http://127.0.0.1/*');
 await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
 const entry=path.join(out,'probe.ts'),source=path.resolve('apps/extension/src').replaceAll('\\','/');
-await writeFile(entry,`export {fetchSourceImage} from '${source}/sources/runtime/image-fetch';export {readInlineSourceImage} from '${source}/sources/runtime/source-image';`);
+await writeFile(entry,`export {fetchSourceImage} from '${source}/sources/runtime/image-fetch';export {readInlineSourceImage} from '${source}/sources/runtime/source-image';export {readPageCover} from '${source}/sources/runtime/page-cover';export {Api} from '${source}/api';`);
 const {build}=createRequire(path.resolve('apps/extension/package.json'))('vite');
 await build({configFile:false,root:path.resolve('apps/extension'),logLevel:'error',build:{outDir:extension,emptyOutDir:false,lib:{entry,formats:['es'],fileName:()=> 'transport-probe.js'}}});
 await writeFile(path.join(extension,'transport-probe.html'),'<!doctype html><meta charset="utf-8"><title>Image transport verification</title><h1>公共跨域取图验证</h1><pre id="report"></pre>');
@@ -19,8 +19,13 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 let png,first,second,context,page;const requests=[],checks=[],errors=[];
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const serve=name=>async(req,res)=>{
-  const url=new URL(req.url,'http://fixture');requests.push({server:name,path:url.pathname,referer:req.headers.referer??null,marker:req.headers['x-fixture-marker']??null,cookie:req.headers.cookie??null});
+  const url=new URL(req.url,'http://fixture');requests.push({server:name,path:url.pathname,referer:req.headers.referer??null,marker:req.headers['x-fixture-marker']??null,cookie:req.headers.cookie??null,authorization:req.headers.authorization??null});
+  if(url.pathname==='/v1/translations/fixture'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({id:'fixture',state:'succeeded',result:{representation:'full-image-v1',artifact:{path:'/v1/translations/fixture/result'}}}));return;}
+  if(url.pathname==='/v1/translations/fixture/result'){res.writeHead(302,{Location:second+'/result.png'});res.end();return;}
   if(url.pathname==='/redirect'){res.writeHead(302,{Location:second+'/protected.png','Cache-Control':'no-store'});res.end();return;}
+  if(url.pathname.startsWith('/chain/')){const hop=Number(url.pathname.split('/').at(-1));res.writeHead(302,{Location:hop<8?'/chain/'+(hop+1):second+'/protected.png','Cache-Control':'no-store'});res.end();return;}
+  if(url.pathname==='/cover-redirect'){res.writeHead(302,{Location:second+'/plain.png','Cache-Control':'no-store'});res.end();return;}
+  if(url.pathname==='/cached.png'){res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});res.end(png);return;}
   if(url.pathname==='/ungranted'){res.writeHead(302,{Location:first.replace('127.0.0.1','localhost')+'/never.png','Cache-Control':'no-store'});res.end();return;}
   if(url.pathname==='/loop'){res.writeHead(302,{Location:'/loop','Cache-Control':'no-store'});res.end();return;}
   if(url.pathname==='/slow.png')await new Promise(resolve=>setTimeout(resolve,500));
@@ -47,10 +52,13 @@ try{
   }));
   const read=input=>page.evaluate(async input=>{
     const {fetchSourceImage,readInlineSourceImage}=await import(chrome.runtime.getURL('transport-probe.js'));
+    const contains=chrome.permissions.contains;
+    if(input.deniedOrigin)chrome.permissions.contains=async permission=>permission.origins.includes(input.deniedOrigin)?false:contains.call(chrome.permissions,permission);
     try{
       const blob=input.inline?await readInlineSourceImage(input.url,input.pageUrl,undefined,input.policy):(await fetchSourceImage(input.url,undefined,input.headers,input.pageUrl?{pageUrl:input.pageUrl,referrerPolicy:input.policy}:undefined)).blob;
       return {ok:true,size:blob.size,hash:[...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('')};
-    }catch(error){return {ok:false,error:error.message,origins:error.origins};}
+    }catch(error){return {ok:false,error:error.message};}
+    finally{chrome.permissions.contains=contains;}
   },input);
   assert.equal((await read({url:second+'/protected.png'})).ok,false);
   assert.equal((await read({url:second+'/protected.png',pageUrl:first+'/chapter/1',inline:true})).hash,hash(png));
@@ -58,9 +66,30 @@ try{
   assert.equal((await read({url:first+'/redirect',pageUrl:first+'/chapter/1',headers:{'X-Fixture-Marker':'first-origin-only'}})).hash,hash(png));
   assert.equal(requests.at(-2).marker,'first-origin-only');assert.equal(requests.at(-1).marker,null);assert.equal(requests.at(-1).referer,first+'/');
   check('Real manual redirect reads Location through webRequest, checks the next origin and recomputes headers without forwarding site overrides');
-  const denied=await read({url:first+'/ungranted',pageUrl:first+'/chapter/1'});
-  assert.deepEqual(denied.origins,[first.replace('127.0.0.1','localhost')+'/*']);assert(!requests.some(r=>r.path==='/never.png'));
-  check('Unpermitted redirect destination is reported before any request reaches it');
+  assert.equal((await read({url:first+'/chain/0',pageUrl:first+'/chapter/1'})).hash,hash(png));
+  assert.equal(requests.filter(r=>r.path.startsWith('/chain/')).length,9);
+  check('Nine HTTP redirects succeed with the required Referer, beyond the removed five-hop ceiling');
+  for(let attempt=0;attempt<2;attempt++)assert.equal((await read({url:first+'/cached.png'})).hash,hash(png));
+  assert.equal(requests.filter(r=>r.path==='/cached.png').length,1);
+  check('Default HTTP cache reuses a fresh image without downloading it twice');
+  const denied=await read({url:first+'/ungranted',pageUrl:first+'/chapter/1',deniedOrigin:first.replace('127.0.0.1','localhost')+'/*'});
+  assert.equal(denied.ok,false);assert.match(denied.error,/权限/);assert(!requests.some(r=>r.path==='/never.png'));
+  check('Simulated permission denial rejects the redirect destination before any request reaches it');
+  const cover=await page.evaluate(async url=>{
+    const {readPageCover}=await import(chrome.runtime.getURL('transport-probe.js'));
+    const blob=await readPageCover(url);
+    return {size:blob.size,tabs:(await chrome.tabs.query({})).filter(tab=>tab.url?.startsWith('http://127.0.0.1:')).length};
+  },first+'/cover-redirect');
+  assert.equal(cover.size,png.length);assert.equal(cover.tabs,0);
+  check('Image-document cover follows a cross-origin HTTP redirect and closes its temporary tab');
+  const resultSize=await page.evaluate(async base=>{
+    const {Api}=await import(chrome.runtime.getURL('transport-probe.js'));
+    return (await new Api(base,'fixture-only').translationImage('fixture')).size;
+  },first);
+  assert.equal(resultSize,png.length);
+  assert.equal(requests.find(r=>r.path==='/v1/translations/fixture/result').authorization,'Bearer fixture-only');
+  assert.equal(requests.find(r=>r.path==='/result.png').authorization,null);
+  check('Official result download follows a cross-origin redirect without forwarding the API Bearer token');
   const start=requests.length;assert.equal((await read({url:first+'/loop',pageUrl:first+'/chapter/1'})).ok,false);assert.equal(requests.length,start+1);
   check('Redirect loop stops after one request');
   await read({url:second+'/plain.png',pageUrl:first+'/chapter/1',policy:'no-referrer'});assert.equal(requests.at(-1).referer,null);

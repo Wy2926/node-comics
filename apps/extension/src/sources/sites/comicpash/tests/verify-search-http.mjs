@@ -23,7 +23,7 @@ for (const query of ['の', 'zzzznodelanesearchzzzz']) {
     assert.equal(url.pathname, '/api/search');
 
     requests.push({origin: url.origin, path: url.pathname});
-    const response = await fetch(target, {signal: controller.signal, redirect: 'error'});
+    const response = await fetch(target, {signal: controller.signal});
     assert(response.ok, 'Public source HTTP ' + response.status);
     return response.text();
   }};

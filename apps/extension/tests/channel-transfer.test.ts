@@ -11,12 +11,12 @@ const recipe = (): ImageTransferRequest => ({url: 'http://localhost:8000/transla
 beforeEach(() => {transferLocks(); decodedImage();});
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
 
-it('uploads in a page, validates the image and persists only receipt/bytes, never credentials', async () => {
+it('accepts redirected upload results and persists only receipt/bytes, never credentials', async () => {
   const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
-    expect(init.redirect).toBe('error'); expect(init.credentials).toBe('omit');
+    expect(init.credentials).toBe('omit');
     expect(init.body).toBeInstanceOf(FormData);
     expect((init.body as FormData).get('config')).toBe('{}');
-    return new Response(new Blob(['png bytes'], {type: 'image/png'}));
+    return Object.defineProperty(new Response(new Blob(['png bytes'], {type: 'image/png'})), 'redirected', {value: true});
   });
   vi.stubGlobal('fetch', fetcher);
   const id = crypto.randomUUID();
