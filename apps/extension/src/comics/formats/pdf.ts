@@ -1,8 +1,6 @@
 import {getDocument, GlobalWorkerOptions, PDFDataRangeTransport} from 'pdfjs-dist/legacy/build/pdf.mjs';
-import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {MAX_PAGES, MiB} from './limits';
 import {throwIfAborted, type DocumentSession, type IndexedPage, type RandomAccessSource} from './contracts';
-GlobalWorkerOptions.workerSrc = workerUrl;
 
 function pdfDiagnostic(error: unknown): unknown {
   const name = error && typeof error === 'object' && 'name' in error ? error.name : undefined;
@@ -28,6 +26,7 @@ export async function openPdfDocument(source: RandomAccessSource, signal?: Abort
   }
   const range = new SourceRange(source.snapshot.size, initial, true);
   const assets = new URL('import-assets/pdf/', location.origin + '/').href;
+  GlobalWorkerOptions.workerSrc = assets + 'pdf.worker.mjs';
   const task = getDocument({range, disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
     useSystemFonts: false, stopAtErrors: true, maxImageSize: -1,
     cMapUrl: assets + 'cmaps/', cMapPacked: true, standardFontDataUrl: assets + 'standard_fonts/', wasmUrl: assets + 'wasm/'});

@@ -31,6 +31,8 @@ Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页
 
 商店包不含 `manifest.key`；Firefox 公开下载使用 AMO 签名 XPI。包校验、上传与发布见[部署规范](../../docs/DEPLOYMENT.md)。
 
+扩展构建关闭 JavaScript 压缩以便审核；预构建依赖不会因此自动恢复可读性。PDF.js 使用同版本未压缩 Worker，并移除不适用于现有浏览器的旧 IE 回退，来源、许可与修改见[格式依赖规范](../../docs/IMPORT_FORMATS_AND_CACHE.md#依赖与可重复验证)。Chrome／Edge 商店打包后自动扫描最终 ZIP，拒绝再次包含该回退或预压缩 PDF Worker。
+
 Orion 本地安装复用 Firefox MV3 ZIP，不另设浏览器业务分支。打包前配置上述正式 API 与 Drive 连接地址；把生成的扩展 ZIP 保存到 iPhone“文件”，在 Orion 的“扩展 → ＋ → 从文件安装”选择它，无需解压。不是带 `-sources` 的源码包，也不是供 Firefox 正式安装的签名 XPI。文件安装入口见 [Orion 官方说明](https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html#ios-extensions-management)；本地包仍需 iOS 真机验证扩展 API 与授权流程。
 
 ## 开发入口

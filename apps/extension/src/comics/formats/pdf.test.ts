@@ -2,6 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 const pdf=vi.hoisted(()=>({options:undefined as unknown as {disableAutoFetch:boolean;disableStream:boolean;range:{requestDataRange(begin:number,end:number):void}},open:vi.fn(),getPage:vi.fn(),destroy:vi.fn(),render:vi.fn(),cleanup:vi.fn()}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs',()=>({GlobalWorkerOptions:{},PDFDataRangeTransport:class{constructor(public length:number,public initial:Uint8Array){}onDataRange(){}},getDocument:(options:typeof pdf.options)=>{pdf.options=options;return {promise:pdf.open(),destroy:pdf.destroy};}}));
 import {openPdfDocument} from './pdf';
+import {GlobalWorkerOptions} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {RandomAccessSource} from './contracts';
 beforeEach(()=>{
   vi.clearAllMocks();vi.stubGlobal('location',{origin:'chrome-extension://fixture'});
@@ -16,6 +17,7 @@ describe('PDF range and page-render contract',()=>{
   it('indexes page numbers without rendering and disables automatic whole-document fetching',async()=>{
     const {value,readAt}=source(),session=await openPdfDocument(value);
     try{expect(await session.index()).toHaveLength(3);expect(pdf.getPage).not.toHaveBeenCalled();expect(readAt).toHaveBeenCalledTimes(1);expect(readAt.mock.calls[0].slice(0,2)).toEqual([0,65536]);expect(pdf.options).toMatchObject({disableAutoFetch:true,disableStream:true});
+      expect(GlobalWorkerOptions.workerSrc).toBe('chrome-extension://fixture/import-assets/pdf/pdf.worker.mjs');
       const pages=await session.index(),blob=await session.materialize(pages[2]);expect(blob.type).toBe('image/png');expect(pdf.getPage).toHaveBeenCalledExactlyOnceWith(3);expect(pdf.cleanup).toHaveBeenCalledOnce();
     }finally{await session.close();}
   });

@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
+import { readablePdf } from './pdfjs-csp';
 
 /** Package-local format assets and licenses, also used by the offline MV3 reader. */
 export function importAssets(): Plugin {
@@ -17,6 +17,8 @@ export function importAssets(): Plugin {
     }
   }
   files.set("import-assets/licenses/pdfjs.txt", new URL("LICENSE", root));
+  const pdfWorker = 'import-assets/pdf/pdf.worker.mjs';
+  files.set(pdfWorker, new URL('legacy/build/pdf.worker.mjs', root));
   files.set(
     "import-assets/licenses/zip-js.txt",
     new URL("./node_modules/@zip.js/zip.js/LICENSE", import.meta.url),
@@ -68,28 +70,29 @@ export function importAssets(): Plugin {
       new URL(`./node_modules/${name}/package.json`, import.meta.url),
     );
   }
+  const readAsset = (name: string, file: URL) => name === pdfWorker
+    ? readablePdf(readFileSync(file, 'utf8')) : readFileSync(file);
   return {
     name: "local-comic-import-assets",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const file = files.get(
-          (req.url ?? "").split("?")[0].replace(/^\//, ""),
-        );
+        const name = (req.url ?? "").split("?")[0].replace(/^\//, "");
+        const file = files.get(name);
         if (!file) return next();
         res.setHeader(
           "Content-Type",
           file.pathname.endsWith(".wasm")
             ? "application/wasm"
-            : file.pathname.endsWith(".js")
+            : /\.m?js$/.test(file.pathname)
               ? "text/javascript"
               : "application/octet-stream",
         );
-        res.end(readFileSync(fileURLToPath(file)));
+        res.end(readAsset(name, file));
       });
     },
     generateBundle() {
       for (const [fileName, url] of files)
-        this.emitFile({ type: "asset", fileName, source: readFileSync(url) });
+        this.emitFile({ type: "asset", fileName, source: readAsset(fileName, url) });
     },
   };
 }

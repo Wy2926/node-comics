@@ -32,13 +32,15 @@ EPUB 正文不建立图片页身份，不执行图片规范化，也不提供文
 | --- | --- | --- |
 | [zip.js](https://github.com/gildas-lormeau/zip.js) | `@zip.js/zip.js 2.15.0`，使用本地 native streams 构建 | BSD-3-Clause |
 | [node-unrar-js](https://github.com/YuJianrong/node-unrar.js) | `2.0.2`，内含 UnRAR `6.1.7` WASM | JS 包 MIT；UnRAR 使用其独立免费解压许可，包含禁止借此重建 RAR 压缩算法的条款 |
-| [PDF.js](https://github.com/mozilla/pdf.js) | `pdfjs-dist 6.3.289`，legacy 主模块与同版本 Worker | Apache-2.0；内含 core-js `3.50.0`（MIT） |
+| [PDF.js](https://github.com/mozilla/pdf.js) | `pdfjs-dist 6.3.289`，legacy 主模块与同版本未压缩 Worker | Apache-2.0；内含 core-js `3.50.0`（MIT） |
 | PDF 基础字体/字符映射/图像解码器 | 同一 PDF.js 包的 `standard_fonts`、`cmaps`、`wasm` | Foxit/PDFium BSD、Liberation SIL OFL 1.1、Adobe CMap BSD、QCMS MIT、OpenJPEG BSD 等；各自许可随构建打包 |
 | [EPUB.js](https://github.com/futurepress/epub.js) | `epubjs 0.3.93`，按需导入 `src/book.js`，不使用整包 polyfill 入口；XML 传递依赖固定为 `@xmldom/xmldom 0.9.12` | BSD-2-Clause；xmldom 为 MIT；实际打包的传递依赖许可随构建保留 |
 
 这些格式组件不包含模型权重。包下载地址与 SHA-512 integrity 在 [package-lock.json](../apps/extension/package-lock.json)；WASM、Worker、字体、CMap 的逐文件 SHA-256 在 [dependency-checksums.json](../apps/extension/public/import-assets/licenses/dependency-checksums.json)，其中还记录官方 UnRAR 6.1.7 源码包摘要。[UnRAR 许可](../apps/extension/public/import-assets/licenses/unrar.txt)与其他完整许可进入扩展和 Web 包。EPUB.js 的 ZIP／网络客户端不承担实际资源读取，原包和资源访问统一经过本地格式桥；其仍被打包的 JSZip、localforage 等代码保留原许可，不因运行时未使用而省略。
 
 RAR 的 Emscripten 动态命名和 Embind 参数转换函数由 [unrar-csp.ts](../apps/extension/unrar-csp.ts)替换为静态闭包，保留参数转换、析构顺序和原 WASM。升级时构建检查会要求重新审阅。MV3 只增加本地 WASM 所需的 `wasm-unsafe-eval`，未允许 JavaScript `unsafe-eval`。Worker、字体、WASM 均随扩展发布，无运行时 CDN 依赖。
+
+PDF.js 的主模块与 Worker 由 [pdfjs-csp.ts](../apps/extension/pdfjs-csp.ts)将 core-js 的旧 IE／WSH `Object.create` 回退替换为受支持浏览器均具备的原生实现，移除 ActiveX、动态 iframe 和脚本字符串拼接；保留其余 legacy 兼容逻辑，不提高现有浏览器版本要求。原代码段摘要不匹配时构建失败，升级依赖必须复核。依赖清单记录上游文件摘要与此修改，Apache-2.0／MIT 许可继续随包保留。
 
 验证命令与产物位置见[脚本说明](../scripts/README.md#来源与阅读验收)。浏览器使用原创合成页，译图由隔离测试供应商产生，验证恢复及计费行为，不代表真实模型翻译效果。
 

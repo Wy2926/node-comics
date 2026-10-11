@@ -224,9 +224,10 @@
     "pdfjs-dist/wasm/openjpeg.wasm": "004a0e62db930ba9ff2a22212f4554d0bb57a0635a8287caf70f98117cee14ba",
     "pdfjs-dist/wasm/openjpeg_nowasm_fallback.js": "0f998419819da4491d8302222aa9e2ff2494685641aa2a6c21c3760c29f3e319",
     "pdfjs-dist/wasm/qcms_bg.wasm": "663d86126d5f5fcb1c61490f94353e2a8375660b8c5498ab3ebab5a34b08800e",
-    "pdfjs-dist/legacy/build/pdf.worker.min.mjs": "a33cfe728c584fdba4fcc1fd54bcdc2f9f2f13889ddbb5b2bd1d0f8cbe49b84e",
+    "pdfjs-dist/legacy/build/pdf.worker.mjs": "df3bf6bf6b8b8dac8a4042d8c4ecf1cf21e1d197e0fe231c192122409eba656b",
     "pdfjs-dist/legacy/build/pdf.mjs": "91e29f812c593904e8d48d022db5ddf93e3443575d4765ac9bfbb42494cfbd8d"
   },
+  "pdfjs_csp_patch": "pdfjs-csp.ts replaces the SHA-256-verified core-js Object.create fallback with native Object.create in the legacy main module and unminified worker; other compatibility polyfills and PDF decoding are unchanged",
   "core_js": {
     "version": "3.50.0",
     "source": "pdfjs-dist/legacy/build; upstream https://github.com/zloirock/core-js/tree/v3.50.0",
