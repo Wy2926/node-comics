@@ -38,4 +38,4 @@ node apps/extension/src/sources/sites/comicpash/tests/verify-search-http.mjs
 
 `verify-search-http.mjs` 独立检查真实搜索、空结果及下一页，报告在 `artifacts/comicpash/search-http/`；不证明目录导入、受限内容、浏览器权限或模型效果。
 
-浏览器使用隔离 profile；安装权限与撤权恢复、Firefox 现场运行、受限章节和真实翻译模型效果未验证。通过公开样本不代表所有作品及未来协议均已覆盖。
+浏览器使用隔离 profile；安装权限与撤权恢复、Firefox 运行、受限章节和真实翻译模型效果需分别验收，不能以公开样本或模拟结果代替。

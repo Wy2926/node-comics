@@ -1,6 +1,6 @@
 # 当前漫画内容导出
 
-导出仅面向当前来源条目：图片内容可导出页面，EPUB 仅保存完整原包；入口在阅读设置或漫画卡片右键菜单。没有作品归属、章节勾选、来源选择和版本选择。当前模型见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)。
+导出仅面向当前来源条目：图片内容可导出页面，EPUB 仅保存完整原包；入口在漫画卡片菜单。没有作品归属、章节勾选、来源选择和版本选择。当前模型见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md)。
 
 ## 用户流程
 
@@ -24,4 +24,4 @@ CBZ／ZIP 依页序保存可用原始图片字节并包含 `export-manifest.json
 
 实现：[导出服务](../apps/extension/src/comics/application/export-service.ts)、[页面计划](../apps/extension/src/export/plan.ts)、[导出面板](../apps/extension/src/ui/DocumentExport.tsx)。依赖版本与许可证见[格式说明](IMPORT_FORMATS_AND_CACHE.md)。
 
-浏览器验证使用自制 CBZ：完整源文件逐字节一致、导出 CBZ 包含三页和清单、PDF 三页可重新解析。命令为 `node scripts/verify_source_export.mjs`，环境和复验方法见[脚本说明](../scripts/README.md#来源与阅读验收)。
+浏览器验证运行 `node scripts/verify_source_export.mjs`，使用自制 CBZ 检查完整源文件字节、导出页面与清单，以及 PDF 重新解析；环境见[脚本说明](../scripts/README.md#来源与阅读验收)。

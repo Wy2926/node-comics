@@ -51,7 +51,7 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 | `PUT /leases/{id}/result` | multipart：一个 metadata 字符串字段、最多一个 output 文件 | 稳定 terminal 回执本体 |
 | `POST /leases/{id}/complete` | lease_token、error:{code}，可带 timings | 错误或停止确认的稳定 terminal 回执；不接受结果图片 |
 
-`error.code` 为 1–60 位大写字母、数字或下划线，首位必须为字母；不要求中心枚举节点诊断码。中心仅对停止确认、临时故障重试等已有调度码执行特殊逻辑，其他码作为通用失败结束并释放预占额度，保留原码供后台和客户端展示。错误负载不接受任意异常正文。新增诊断码无需再次升级中心；从严格枚举的旧中心升级时须先发布中心再更新节点。
+`error.code` 为 1–60 位大写字母、数字或下划线，首位必须为字母；不要求中心枚举节点诊断码。中心仅对停止确认、临时故障重试等调度码执行特殊逻辑，其他码作为通用失败结束并释放预占额度，保留原码供后台和客户端展示。错误负载不接受任意异常正文。符合此格式的新增诊断码无需升级中心。
 
 结果上传被明确拒绝为无效负载（400、413、415、422）时，节点将冻结文件原子替换为 `RESULT_REJECTED` 失败回执并释放文件，不能循环重传相同无效图片。网络结果未知、429 和 5xx 仍保留冻结字节按同一租约重试，不重新计算或调用 LLM。
 
@@ -71,7 +71,7 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 
 输入必须已规范化为静态单帧和 sRGB：EXIF 方向为 1／缺省；带 ICC 的源图必须先完成颜色转换，再移除 ICC，节点拒绝仍带 ICC 的输入。节点不变换已绑定摘要的输入。节点接受 PNG、JPEG、WebP，图片字节与单边准入统一由中心执行，默认 128 MiB、单边 100000，不设独立总像素上限；节点关闭 Pillow 隐含的总像素限制。中心校验文件长度、摘要、容器结构、尺寸和规范化元数据；节点下载不得超过中心声明的 byte_size，首次完整解码再核对尺寸、摘要和 MIME。损坏像素以 `INPUT_INVALID` 终结该页，发生在 OCR 和文本调用之前；工作内存不足以 `INPUT_MEMORY_EXCEEDED` 终结，不反复重试相同输入。节点的工作内存、并发、检查点与结果传输预算仍独立有效。
 
-注册的 `result_formats` 缺省为 `["overlay-v1"]`；新节点声明 `["overlay-v1","overlay-tiles-v1"]`，中心在 ready 报告中记录分块能力。普通租约配置保持原结构；分块租约额外带 `config.result_format=overlay-tiles-v1`，只分配给支持该格式的节点。旧节点在协议上只能领取普通任务，已有检查点仍是 v3。此次发布同时迁移资产 MIME 列并把完整像素校验移至节点：在维护窗口排空旧任务，按[部署规范](DEPLOYMENT.md)迁移并更新中心，再升级全部节点并核实校验能力，最后恢复受理及启用新版客户端。旧节点的格式兼容不代表支持新尺寸和校验职责，不能只升级中心便开放新流量。没有分块能力的任务不能提交分块结果。新节点的 `RESULT_REJECTED` 诊断码也要求中心支持上述非枚举错误码。
+注册的 `result_formats` 缺省为 `["overlay-v1"]`；仓库节点声明 `["overlay-v1","overlay-tiles-v1"]`，中心在 ready 报告中记录分块能力。分块租约带 `config.result_format=overlay-tiles-v1`，只分配给支持该格式的节点；未协商分块的任务不能提交分块结果。检查点格式仍由 v3 协议约束。格式声明不代替尺寸支持及完整像素校验能力：中心、节点与客户端须按[部署规范](DEPLOYMENT.md)配套升级，核实校验职责后才能开放流量。
 
 analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 4 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。节点生成掩膜时检查非空像素，恢复已有检查点时在恢复文本工作前解码并校验掩膜；中心只校验其文件结构、尺寸和区域元数据。相同分析重复提交不会重新打开文本任务。
 
@@ -139,7 +139,7 @@ metadata 是 JSON 文本：
 
 result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bbox 不得越界。original 的 bbox/output 均为 null，并省略 output 文件。metadata 最多 64 KiB，output 受中心 `cluster_max_result_bytes` 约束，与原图 `max_upload_bytes` 分开；节点编码和传输上限为 88 MiB，与中心默认值一致。这是单文件协议限制，不作为磁盘容量准入。未知字段、多余文件或重复字段均被拒绝。timings 不参与 result 摘要。
 
-`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（输出编码／校验）。节点采用大图提前分块时，块内差分、编码和校验并发完成，整体墙钟计入 `render_encode`，`render_diff` 仅为分块前规划；跨版本比较输出成本使用二者之和，细节见[节点运行](../services/classic-engine/docs/NODE_OPERATIONS.md#状态与恢复)。可选诊断字段 `detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；当前 MTU 的 `ocr_lock_wait` 累计本页等待各识别／取色模型及语言评分锁的时间，不是 GPU 执行时间，也不能跨页相加当作端到端延迟。细分计时不改变结果身份、租约与结算；新增字段须先升级中心以接受，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
+`render` 包含 `render_areas`（气泡分析）、`render_layout`（排版绘字及校验）、`render_diff`（覆盖差异提取）和 `render_encode`（输出编码／校验）。节点采用大图提前分块时，块内差分、编码和校验并发完成，整体墙钟计入 `render_encode`，`render_diff` 仅为分块前规划；输出成本使用二者之和，细节见[节点运行](../services/classic-engine/docs/NODE_OPERATIONS.md#状态与恢复)。可选诊断字段 `detect_lock_wait`、`ocr_lock_wait`、`inpaint_lock_wait` 已包含在所属计算阶段内；MTU 的 `ocr_lock_wait` 累计本页等待各识别／取色模型及语言评分锁的时间，不是 GPU 执行时间，也不能跨页相加当作端到端延迟。细分计时不改变结果身份、租约与结算；新增字段须先升级中心以接受，再更新节点。中心记录的 `delivery.protocol` 是协议版本，不能按耗时展示。
 
 中心先冻结提交摘要和交付意图，在调度锁外检查文件长度、SHA-256、容器声明尺寸和文件结构。像素解码和二值 alpha 校验已由节点完成。校验完成后再次检查租约及最早截止，在短事务中持久化受理时间与截止快照，然后耐久发布文件。最终事务与崩溃恢复共用同一规则：必须有及时受理记录、当前执行代次、对应分析/译文版本且未取消，才能提交 Job 结果描述、产物关联、任务成功、一次结算和稳定回执。无文件 original 也必须完成请求校验后才能受理。恢复与清理规则以[文件存储](OBJECT_STORAGE.md#文件发布与恢复)为准。
 

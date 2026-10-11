@@ -93,7 +93,7 @@ The module guides and technical documents linked below are currently in Chinese.
 | --- | --- |
 | [Browser extension](apps/extension/README.md) | Reader, library, website adapters, and translation UI |
 | [Backend](backend/README.md) | API, persistent jobs, accounts, subscriptions, and administration |
-| [Website](backend/website/README.md) | Product pages in 16 languages, image translation, guest trials, local history, downloads, and account pages |
+| [Website](backend/website/README.md) | Product pages in 17 languages, image translation, guest trials, local history, downloads, and account pages |
 | [Drive connection page](apps/drive-connect/README.md) | Google authorization and file selection |
 | [Compute node](services/compute-node/README.md) | Install, run, and build the Windows bundle or Linux NVIDIA image |
 | [Image engine](services/classic-engine/README.md) | Text detection, OCR, LaMa inpainting, and text rendering |
@@ -106,9 +106,9 @@ Each module README lists its requirements and run commands. See the [scripts gui
 | --- | --- |
 | Product and reading | [Product design](docs/PRODUCT_DESIGN.md), [Single-source reading](docs/SIMPLE_COMIC_READING_DESIGN.md), [Offline caching](docs/OFFLINE_CACHE_DESIGN.md) |
 | Architecture and data | [System architecture](docs/ARCHITECTURE.md), [Sources and caching](docs/COMIC_SOURCE_ARCHITECTURE.md) |
-| Translation and compute | [Translation contract](docs/READING_TRANSLATION_CONTRACT.md), [Compute protocol](docs/COMPUTE_PROTOCOL.md), [Cluster scheduling](docs/TRANSLATION_CLUSTER_DESIGN.md) |
+| Translation and compute | [Translation contract](docs/READING_TRANSLATION_CONTRACT.md), [Model selection](docs/TRANSLATION_MODEL_SELECTION_DESIGN.md), [Compute protocol](docs/COMPUTE_PROTOCOL.md), [Cluster scheduling](docs/TRANSLATION_CLUSTER_DESIGN.md) |
 | Websites and interface | [Website adapters](docs/SITE_ADAPTERS.md), [Comic discovery](docs/DISCOVERY.md), [Cross-language search](docs/COMIC_SEARCH_DESIGN.md), [Interface localization](docs/UI_INTERNATIONALIZATION.md), [Brand copy](docs/BRAND_AND_STORE_LISTING.md) |
-| Accounts and operations | [Membership and quotas](docs/MEMBERSHIP_AND_QUOTAS.md), [Payments](docs/STRIPE_BILLING.md), [Admin console](docs/ADMIN_CONSOLE.md) |
+| Accounts and operations | [Membership and quotas](docs/MEMBERSHIP_AND_QUOTAS.md), [Payments](docs/STRIPE_BILLING.md), [Admin console](docs/ADMIN_CONSOLE.md), [Extension analytics](docs/ANALYTICS.md) |
 | Deployment and maintenance | [Deployment](docs/DEPLOYMENT.md), [Backup and recovery](docs/OPERATIONS.md), [Code standards](docs/CODE_QUALITY.md), [API contract](contracts/README.md) |
 
 See [AGENTS.md](AGENTS.md) for collaboration guidelines. Product rules are maintained in their topic documents rather than duplicated in this README.

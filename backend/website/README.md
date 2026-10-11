@@ -42,8 +42,8 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - 图片工作台只接收 JPG、PNG、WebP，不导入漫画容器、远程网址或书架。送译缩放、编码、摘要和普通／分块结果的完整图合成复用 [shared/translation-images](../shared/translation-images)。像素处理按需启动单 Worker，跨标签页使用 Web Locks 串行；首页不加载像素处理模块或验证脚本。尺寸、能力协商与冻结恢复规则见[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md#官网图片工作台)。
 - 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。
 
-- [src/i18n](src/i18n)：简中、繁中、英、日、韩、法、西、巴西葡萄牙、德、意、俄、波兰、乌克兰、土耳其、越南、印尼、阿拉伯语独立字典；常规公开页面或文案同步 17 语。语言由 URL 决定，切换保留当前页面；[语言偏好方案](../../docs/WEBSITE_LANGUAGE_DESIGN.md)说明浏览器语言提示、手动偏好和匹配规则。
-- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。对外统一称“翻译”或“图片翻译”，官方与 MTU 只作为服务渠道区分，不再按历史翻译模式命名。内部任务标识与已有结果的读取、下载和恢复保持兼容。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
+- [src/i18n](src/i18n)：简中、繁中、英、日、韩、法、西、巴西葡萄牙、德、意、俄、波兰、乌克兰、土耳其、越南、印尼、阿拉伯语独立字典；常规公开页面或文案同步 17 语。语言由 URL 决定，切换保留当前页面；[官网语言选择](../../docs/WEBSITE_LANGUAGE_DESIGN.md)定义浏览器语言提示、手动偏好和匹配规则。
+- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。对外统一称“翻译”或“图片翻译”，官方与 MTU 只作为服务渠道区分。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
 - 教程目录优先展示可独立完成的操作流程，选型、隐私、排障和兼容状态放入次级阅读区；名称搜索教程为 `/guides/find-manga/`。正文使用编号、可折叠目录、步骤、图注和原尺寸图片链接，不引入客户端框架或富文本 HTML 注入。桌面截图在 [src/assets/guides](src/assets/guides) 中维护中、日、韩、英四套：简繁中文用简中，日、韩对应各自版本，其余页面用英文；正文及图注仍为 17 语。构建生成响应式 WebP，图片懒加载且保留尺寸，页面只引用当前语言图片。截图映射及精选入口在 [guide-media.ts](src/data/guide-media.ts)，来源与验证边界见 [ASSETS.md](ASSETS.md)。
 - 卸载反馈页 `/uninstall/` 提供17 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包目录。发布版本和下载签名由后端管理。
@@ -58,4 +58,4 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 
 定价对照表的长解释收在对应功能标题旁的信息图标中，支持悬停、键盘聚焦和点按；Esc、焦点离开或点击外部关闭。提示复用当前主题令牌，按视口定位以适配窄屏和 RTL；窄屏表格可横向滚动并固定行标题，不增加请求或将说明复制到每个套餐单元格。
 
-本地新套餐验收：先构建官网和后台，再运行 `backend/.venv/Scripts/python.exe backend/tests/manual_membership_server.py`（仓库根目录）。定价页 `http://127.0.0.1:4322/pricing/`；后台 `/console-preview/`，本地用户名 `admin`。使用独立 SQLite 和内存 Redis，付款与真实模型调用关闭；显示价格可验收，真实支付与模型另行验证。
+套餐本地预览使用[脚本说明](../../scripts/README.md#官网验收)中的隔离环境；界面验收不代表真实支付或模型已接入。

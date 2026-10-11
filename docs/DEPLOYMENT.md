@@ -1,6 +1,6 @@
 # 构建与部署
 
-部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8；数据库由 `translations_0001` 基线升级至 `subscription_customer_0016`，支持有限常规订阅、季付及独立购买页数，并索引支付客户的订阅归属检查；资产 MIME 列保留 128 字符以保存分块格式。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
+部署输入为当前源码、锁文件和环境配置。公开服务使用共享持久文件卷、OIDC、PostgreSQL 和 Redis 8。安装与运行入口见[后端](../backend/README.md)、[插件](../apps/extension/README.md)及[计算节点](../services/compute-node/README.md)。
 
 ## 发布边界
 
@@ -24,7 +24,7 @@
 
 [独立测试 Compose](../deploy/compose.creem-test.yaml) 提供官网/API、后台处理进程、PostgreSQL、Redis、受限网关和 Cloudflare Quick Tunnel；不使用根 `.env`、已有沙盒、线上数据库或供应商凭据。配置从 [测试模板](../deploy/creem-test.env.example) 复制到忽略的 `deploy/.env.creem-test`，文件限本机运行账号读取。`APP_ENV=test`、`DEV_AUTH=false`、Creem test、禁用 Stripe/匿名体验/分析/管理入口均在 Compose 固定。只有网关绑定 `127.0.0.1:28088`，数据库、API和隧道 metrics 不发布宿主端口；公网关闭开发认证、管理/计算接口、健康详情及 API 文档，关闭访问日志并加 noindex。
 
-此环境用于真实 OIDC 和 **Creem 测试付款**，不接入正式 GPU 或文本供应商。不能把购买到账验收等同于真实翻译扣减验收；后者需另外接入专用计算节点。Quick Tunnel 不支持 SSE、重启后地址变化，适用于本次支付/账户手测，不作为长期环境。限制见 [Cloudflare 官方说明](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)。
+此环境用于真实 OIDC 和 **Creem 测试付款**，不接入正式 GPU 或文本供应商。不能把购买到账验收等同于真实翻译扣减验收；后者需另外接入专用计算节点。Quick Tunnel 不支持 SSE、重启后地址变化，仅用于临时支付／账户手测。限制见 [Cloudflare 官方说明](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)。
 
 从仓库根目录运行，保留原有沙盒：
 
@@ -42,7 +42,7 @@ docker @testCompose run --rm migrate
 - Logto 现有应用只追加精确 `<origin>/auth/callback/` Redirect URI 和 `<origin>` CORS allowed origin；保留已有回调，不修改刷新期限或退出策略。
 - 在 **Creem test API** 创建本环境独立的 `POST /webhooks/creem` 地址，订阅服务端 `CREEM_EVENTS` 中的事件，将返回的签名密钥只存 `CREEM_WEBHOOK_SECRET`。不修改其他环境的 Webhook。远端创建结果不明时先按名称/URL查询，不能盲目重试。参见 [Creem Webhook API](https://docs.creem.io/api-reference/endpoint/create-webhook)。
 - `CORS_ORIGINS` 加入该 origin；`CREEM_RETURN_URL=<origin>/payment/success/`。核对测试 API key、签名密钥和回调后设置 `CREEM_ENABLED=true`。
-- 准备四个无试用、USD 商品：Lite 月付599美分、年付5999美分，100页永久包和50页30天包各599美分。两个额度包为 `onetime/once`；页数、有效期、Lite档位和每小时1200页在本地目录定义，不从远端商品名称推断。四个 ID 填入模板对应项。
+- 准备初始化脚本所需的四个无试用、USD 测试商品：Lite 月付599美分、年付5999美分，100页永久包和50页30天包各599美分。两个额度包为 `onetime/once`；页数、有效期、Lite档位和每小时1200页在本地测试目录定义，不从远端商品名称推断。四个 ID 填入模板对应项；这组固定夹具不代表当前公开套餐。
 
 ```powershell
 docker @testCompose up -d --no-build api control-worker maintenance
@@ -58,19 +58,18 @@ docker @testCompose ps
 
 ## 迁移与兼容性
 
-运行进程只检查结构、支付环境、文件目录权限和 Redis 连通性，不改表、不写默认配置。显式迁移命令同时初始化缺失的供应商、控制池、系统设置和计费目录；不重置已配置值。PostgreSQL 迁移保留 advisory lock，锁等待超过 5 秒失败，禁止无限阻塞线上请求。
+运行进程只检查结构、支付环境、文件目录权限和 Redis 连通性，不改表、不写默认配置。显式迁移命令同时初始化缺失的控制池、系统设置和计费目录；不重置已配置值。文本供应商由管理员配置。PostgreSQL 迁移保留 advisory lock，锁等待超过 5 秒失败，禁止无限阻塞线上请求。
 
-当前运行代码仅接受 `subscription_customer_0016`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。分块产物的 MIME 超过旧列上限，不能通过缩短字段或截断值回退；回滚需恢复一致的代码、数据库和文件备份。
+当前运行代码仅接受 `subscription_customer_0016`，允许的结构版本在 [runtime.py](../backend/app/runtime.py) 中显式维护。普通同结构、同任务／结算语义的发布无需迁移。新增结构也不自动视为兼容：必须先审核新旧读写和回退，必要时先发布接受两版结构的桥接版本。未完成兼容验证的结构、协议或结算变更走维护窗口，不通过环境开关跳过检查。产物 MIME 必须完整保存，不能缩短或截断以适配不兼容结构；回滚需恢复一致的代码、数据库和文件备份。
 
-常规订阅升级移除旧图像编辑配置和权益字段，并将旧图像编辑测试额度归档为不可再消费的常规记录，保留账本引用。它不转换旧已售订阅：部署前须核实不存在需要转换的旧付费授权，核对在途结账与远端状态；存在时停止发布并另行审核权益迁移。先在隔离备份库演练、暂停新受理与支付、排空并停止全部旧进程，再做一致性数据库与图片备份后迁移。新目录发布前保持购买入口暂停，核验季／年按月发放、无试用及永久额度包，再切换新官网和管理后台。不可仅回退旧镜像。
+结构或业务语义不兼容的升级统一走维护窗口：
 
-购买额度升级采用维护窗口，不增加旧支付数据转换、双写或混跑桥接。先备份、阻止新受理并排空旧控制进程，再迁移并更新 API、maintenance、dispatcher；购买记录、原预占和账本必须一起保留。客户端读取新增购买字段，已安装旧插件仍只看到订阅报价；完整购买和余额展示需要新版插件。即使没有正式生产订单，也不清空用户、任务、赠送或全库；测试支付数据如需重置，必须另行核定环境、精确订单及引用关系，迁移本身不执行清空。
+1. 在隔离备份库审核[迁移链](../backend/migrations/versions/)，验证已有数据、约束和重复迁移；核对在途结账、远端支付状态与付费授权。
+2. 暂停新翻译受理与购买，使用原服务排空在途任务并核实结果未知任务，再停止全部旧控制进程。
+3. 为数据库与结果文件建立一致恢复点后显式迁移；用户、任务、购买记录、赠送、原预占和账本一起保留，不以测试订单或缺少正式订单为理由清库。
+4. 更新全部 API、worker、maintenance 和匹配的管理后台／客户端，核实授权、套餐筛选、分钟／小时限制、额度发放与结算后恢复入口。不执行这些规则的旧代码不得混跑。
 
-套餐路由迁移为 `translation_providers` 新增可空的 `text_plan_ids`，已有供应商仍适用于全部套餐，不改模型版本、任务快照或缓存。隔离备份库验证迁移后，停止新受理、排空并停止旧控制进程，再显式迁移、更新全部 API／worker／maintenance 和管理后台，最后设置各模型适用套餐。旧代码不执行套餐筛选，启用限制后不能与新版混跑；不提供删除限制字段的 downgrade，回退须恢复经审核的一致备份。
-
-小时限额迁移只为不可变套餐权益版本新增可空字段，不改历史价格、授权或额度。上线前在隔离备份库验证数据与重复迁移，阻止新受理、排空并停止旧控制进程，再迁移和更新全部进程。Lite 发布前可使用已验证且接受新结构的旧业务备用镜像；Lite 开放购买后旧业务不执行小时限制，禁止只回退旧镜像。迁移不提供删除已售限制字段的 downgrade；回退需匹配业务与付款数据。先验证新版，再绑定发布 Lite、停售 PLUS，最后切换官网。
-
-从早于当前基线的系统升级时，先备份并在隔离库演练，使用旧服务排空／核实活动、结果未知与 `unknown_released` 任务，再停止所有旧控制进程并显式迁移。调度、Job 结果、会员顺延、活动额度及 Redis 准入的旧代码不能混跑，也不能仅回退镜像；回退依赖配套数据库和文件备份。旧远端结果授权不恢复，历史 R2 图片不搬运、不删除；当前 UUID、检查点与账本由迁移规则保留。
+迁移链不转换已售旧付费授权；若升级涉及被移除的权益字段且存在此类授权，停止发布并单独审核权益迁移。停用模式的测试额度可按迁移归档为不可消费记录，账本引用必须保留。套餐限制、已售权益和产物格式变更不支持仅回退镜像或删除限制字段；回退使用审核过的一致代码、数据库和文件备份。迁移不搬运或删除远端图片对象，也不恢复其访问授权。
 
 迁移只在首次安装或已审核的结构升级时执行，不放入普通切流脚本：
 
@@ -80,7 +79,7 @@ docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 ```
 
-当前翻译协议为 overlay-v1，插件从 0.8.0 提供，节点使用 v3。协议切换必须先发布兼容客户端及真实下载入口；Firefox 兼容签名包未就绪时不得继续把旧包当作升级入口。规则见[翻译契约](READING_TRANSLATION_CONTRACT.md)。
+翻译协议为 overlay-v1，节点使用 v3。协议切换必须先提供兼容客户端及真实下载入口；对应浏览器的兼容安装包未就绪时，不得把不兼容包作为升级入口。规则见[翻译契约](READING_TRANSLATION_CONTRACT.md)。
 
 ## API 切流与回退
 
@@ -93,7 +92,7 @@ curl --fail http://127.0.0.1:18089/health/ready
 
 `/health/ready` 检查当前 API 实例可接流量且返回镜像 `release`；`/health/cluster` 单独检查后台、OIDC、计算节点和积压。两者均须验收；API 候选不能用旧 worker 心跳冒充新版后台健康。后台容器的健康命令检查自己的实例，发布还需检查其实际镜像摘要。
 
-首次接入时保留现有 TLS、Cloudflare 信任清单和 Picker 文件。安装 [OpenResty 模板](../deploy/openresty.comics.conf) 与 [API 转发片段](../deploy/openresty.api.inc)，后者在容器内为 `/www/node-comics/openresty.api.inc`。当前服务器已将 `/opt/1panel/www` 挂载到 `/www`，静态根使用 `/opt/1panel/www/node-comics`，无需重建代理容器。其他环境也应挂载整个目录，不逐个绑定 `.inc` 文件，否则原子替换后容器可能仍看到旧 inode。准备 `active/api.inc`（[示例](../deploy/api-active.inc.example)）、`active/website.inc`、`active/admin.inc` 后校验并 reload；禁用后台时 `admin.inc` 为空。首次拆分代理也须先在隔离环境验证全部路由，不能直接覆盖生产配置。
+首次接入时保留现有 TLS、Cloudflare 信任清单和 Picker 文件。安装 [OpenResty 模板](../deploy/openresty.comics.conf) 与 [API 转发片段](../deploy/openresty.api.inc)，后者在容器内为 `/www/node-comics/openresty.api.inc`。以下示例使用宿主机 `/opt/1panel/www` 挂载到容器 `/www`，静态根为 `/opt/1panel/www/node-comics`；部署前核对实际挂载。应挂载整个目录，不逐个绑定 `.inc` 文件，否则原子替换后容器可能仍看到旧 inode。准备 `active/api.inc`（[示例](../deploy/api-active.inc.example)）、`active/website.inc`、`active/admin.inc` 后校验并 reload；禁用后台时 `admin.inc` 为空。首次拆分代理也须先在隔离环境验证全部路由，不能直接覆盖生产配置。
 
 以后只替换活动 include。下列路径是宿主机挂载目录，容器名必须用实际值；脚本在代理宿主机运行：
 
@@ -107,7 +106,7 @@ python scripts/switch_release.py api --port 18089 --release <新版本> --previo
 
 切回旧版使用相同命令，将 `--port / --release / --previous-release` 对调；先检查旧 API 仍然就绪且结构兼容。脚本不停止任何 API，不重试写请求，不执行迁移。
 
-reload 后旧代理 worker 仍可能持有上传、下载和 SSE。SSE 已有 295 秒上限；必须等相关旧代理 worker 退出，才可退休旧 API。保留旧镜像与静态资源至少覆盖发布回退窗口。不要按“reload 后等两秒”删除旧容器。后台模型请求还可能在 HTTP 取消后继续运行，API 退出会等待其执行器完成。
+reload 后旧代理 worker 仍可能持有上传、下载和 SSE。SSE 上限为 295 秒；必须等相关旧代理 worker 退出，才可退休旧 API。保留旧镜像与静态资源至少覆盖发布回退窗口。不能仅凭固定延时删除旧容器。后台模型请求还可能在 HTTP 取消后继续运行，API 退出会等待其执行器完成。
 
 安全退休使用 [retire_release.py](../scripts/retire_release.py)：确认活动槽位、代理已排空、目标镜像身份后禁用旧容器自动重启并发 SIGTERM，等待正常退出；超时保留进程并报错，不发 SIGKILL。API 和 worker 最多会同时占用两份进程内存／连接池；发布前检查余量。新旧 worker 的供应商并发仍受共享池约束，不能提高配置来掩盖发布积压。
 
@@ -121,11 +120,11 @@ maintenance 保持单活：先退休旧实例（含计费维护线程结束）�
 
 ### 官网匿名图片体验
 
-此功能需先升级 API／控制进程和数据库，再发布官网，不能只替换静态页。`website_guests_0010` 保留原用户 ID、OIDC subject、任务和账本，新增 guest 身份与三张会话／预算表；先在备份库演练、停旧进程、显式迁移，再启动支持新结构的全部进程。旧版不支持游客，禁止混跑或仅回退镜像。
+开放匿名体验前，确认 API、控制进程与数据库均支持游客身份和预算，再发布官网；不能只替换静态页。结构升级遵循上面的维护窗口与回退规则。
 
 在 `.env.server` 配置 `GUEST_ORIGIN`（精确官网 HTTPS origin，无尾斜线）、真实 `TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY`、至少 32 字符的独立随机 `GUEST_HASH_SECRET`，最后设置 `GUEST_ENABLED=true`。全部 API 槽位共享稳定 HMAC 密钥；更换会重置网络身份，不应随发布轮换。密钥缺失或生产使用测试密钥拒绝启动。三项每日预算的环境变量仅用于首次初始化，日常通过[后台系统设置](SYSTEM_SETTINGS.md)调整并即时生效，默认值为每位访客 5、同网 100、全站 10000；`GUEST_GLOBAL_CONCURRENCY` 仍由环境变量配置，默认 4。关闭开关拒绝新任务但保留已有任务读取。
 
-Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为16 语翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
+Turnstile 选择 Managed widget、仅允许官网 hostname；校验服务使用官方 [Siteverify](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)，校验 action、hostname，失效和重复 token 拒绝。静态发布为各语言翻译页生成 Cloudflare script/frame/connect 和 blob 图片 CSP，其他页面不放宽；工作台 no-store/noindex，浏览器历史仅本地保存。
 
 上线前必须核实真实 IP 信任链：公网请求只进入 OpenResty／受信 Cloudflare，API 槽位不开放公网；代理覆盖 `X-Forwarded-For`，仅受信 Cloudflare 网段可提供 CF-Connecting-IP。应用只读取处理后的 `request.client.host`，不自行信任用户头。当前容器内 Uvicorn 信任代理头的前提是回环端口和私网访问隔离；若改变拓扑，改为精确可信代理地址。不可用 Cookie 或 Turnstile 替代该检查。
 
@@ -144,7 +143,7 @@ python scripts/prepare_static_release.py admin --source artifacts/admin-export/s
   --oidc-origin https://auth.nodelane.net
 ```
 
-产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、16 语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 继续复用既有独立位置。
+产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、多语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 复用独立位置。
 
 将候选 `release.inc` 通过同一事务式脚本激活：
 
@@ -176,7 +175,7 @@ python scripts/tests/rehearse_deployment.py
 
 1. 在 `apps/extension` 设置正式 `VITE_API_BASE`、`VITE_DRIVE_CONNECT_URL`，更新版本并完成 `npm run check`、`npm test`。
 2. 分别生成 Chrome／Edge 手动安装包与无 `manifest.key` 的商店包。Firefox 审核包运行 `npx --no-install web-ext lint --source-dir .output/firefox-mv3`；公开下载使用 AMO 已签名 XPI。
-3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小、SHA-256 和该安装包的 `download_url`。通过外部工具将包上传到公开 R2 后，粘贴完整、永久、无签名的 HTTPS URL；不根据桶名、域名或文件名猜测地址。保留已有 `/downloads/...` 的 `path`，更新 `current` 与 `current_by_browser` 中已就绪版本。Firefox 新版尚未取得 AMO 签名时，旧包可以保留为历史下载，但此次协议切换不能将它当成兼容更新；官方翻译入口须遵循上述就绪顺序。
+3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小、SHA-256 和该安装包的 `download_url`。通过外部工具将包上传到公开 R2 后，粘贴完整、永久、无签名的 HTTPS URL；不根据桶名、域名或文件名猜测地址。保留已有 `/downloads/...` 的 `path`，更新 `current` 与 `current_by_browser` 中已就绪版本。Firefox 公开入口必须指向已取得 AMO 签名的兼容包。
 4. 从仓库根目录校验本地包、清单，以及已填写下载 URL 对应的公开文件：
 
 ```powershell
@@ -185,11 +184,11 @@ python scripts/verify_extension_release.py --browser <chrome|edge|firefox> --zip
 
 脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。独立重建并发布官网以更新发行清单和下载重定向，无需重启后端；商店提交包不作为手动安装包交付。
 
-官网按钮直接链接各包的 `download_url`，旧 `/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，16 语官网显示暂不可下载，旧路径返回 503；填写并验真后再提供下载，不使用占位地址。
+官网按钮直接链接各包的 `download_url`，`/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，各语言官网显示暂不可下载，下载路径返回 503；填写并验真后再提供下载，不使用占位地址。
 
 ## 上线检查
 
 - 核对镜像、数据库、控制进程、节点版本与心跳，分别确认 `/health/ready` 与 `/health/cluster`。
 - 实际完成 OIDC 登录、临时原图上传、v3 节点直读/交付、原图终态删除与中心鉴权下载；支付按配置渠道独立验证。
-- 检查16 语页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
+- 检查各语言页面、商店入口与平台下载。设置 `WEBSITE_PREVIEW_URL` 后运行 `node scripts/verify_website_download.mjs`，核对包文件名、大小与摘要。
 - 运行记录保存在部署环境或忽略的产物目录；仓库文档只维护流程。

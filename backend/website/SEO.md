@@ -1,6 +1,6 @@
 # 官网搜索与内容规范
 
-官网面向寻找漫画翻译插件、浏览器漫画阅读器、安装方法及使用帮助的用户。支持简体中文 `/`、繁体中文 `/zh-tw/`、英文 `/en/`、日文 `/ja/`、韩文 `/ko/`，以及法语 `/fr/`、西班牙语 `/es/`、巴西葡萄牙语 `/pt-br/`、德语 `/de/`、意大利语 `/it/`、俄语 `/ru/`、波兰语 `/pl/`、乌克兰语 `/uk/`、土耳其语 `/tr/`、越南语 `/vi/`、印尼语 `/id/`。以下是基于实际功能的搜索意图规划，不代表已经取得搜索量或排名数据；上线后按 Search Console 的查询、国家、页面和设备数据修订。
+官网面向寻找漫画翻译插件、浏览器漫画阅读器、安装方法及使用帮助的用户。17 种语言及路径统一见[官网语言选择](../../docs/WEBSITE_LANGUAGE_DESIGN.md)。以下按实际功能分配页面搜索意图，不代表搜索量或排名数据；按 Search Console 的查询、国家、页面和设备数据修订。
 
 ## 关键词与页面分工
 
@@ -11,7 +11,7 @@
 | `/` | 漫画翻译插件、漫画阅读器 | manga translator extension, comic reader |
 | `/features/` | 漫画图片翻译、EPUB 阅读、OPDS 书库 | manga translation features, EPUB reader, OPDS libraries |
 | `/download/` | Chrome／Edge／Firefox 漫画翻译插件下载 | manga translator Chrome / Edge / Firefox |
-| `/pricing/` | 漫画翻译免费额度、Lite 订阅价格 | free manga translation, Lite subscription |
+| `/pricing/` | 漫画翻译免费额度、订阅价格、翻译额度包 | free manga translation, subscription pricing, translation credits |
 | `/guides/` | 漫画翻译教程、本地漫画阅读指南 | manga translation guides, local comic reader guides |
 | `/guides/android-firefox/` | 安卓 Firefox 漫画插件安装教程 | Android Firefox manga extension setup |
 | `/guides/ios-orion/` | iPhone／iPad Orion 适配状态 | iOS Orion compatibility in progress |
@@ -60,7 +60,7 @@
 
 不提供独立广告落地页，站内安装与宣传入口统一落到对应语言首页；每个首页维持同一 canonical、17 语替代链接和站点地图规则。
 
-Google 已从 2026 年 5 月 7 日起停止展示 FAQ 富摘要，并在 6 月移除相关文档。保留 FAQPage 是为了描述内容；FAQ 的搜索价值来自具体问题、完整答案和内链，不承诺特殊搜索外观或排名加成。[Google 官方更新](https://developers.google.com/search/updates#may-2026)
+FAQPage 只描述实际页面内容；FAQ 应提供具体问题、完整答案和相关内链，不承诺特殊搜索外观或排名加成。
 
 ## 验证与上线后观察
 

@@ -8,4 +8,4 @@ backend/.venv/Scripts/python.exe scripts/export_openapi.py
 
 无需设置运行环境或准备服务凭据；可用 `--output <路径>` 导出到其他文件作对比。
 
-前端封装在 `apps/extension/src/api.ts`，当前使用手写 TypeScript 类型；此文件是可用于生成客户端类型的机器契约，尚未建立 CI 自动生成流程。
+前端封装在 [api.ts](../apps/extension/src/api.ts)，使用手写 TypeScript 类型；接口变更时同步更新封装与导出的机器契约。

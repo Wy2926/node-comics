@@ -8,7 +8,7 @@
 - 按名称查询源站搜索，保留原始完整作品名、作者及专用封面，按源站总数与每页 30 条核对分页。不推断搜索结果语言。
 - HTTP 静态完整目录，按源站正序保留全部条目和标题，12 小时同步；不根据章节名推断正文／番外或重分组。
 - HTTP 公开章节完整图片清单；保留重复 URL 的独立页槽，核对 SEO 归属、访问声明、图片序号、来源 CDN 与章节资源目录。不支持源站 VIP／付费章节。
-- 专用封面来自 `.comic-cover-large`；当前已验证 `comic.5um.net/comic/cover/`、`manga.5um.net/prod/` 封面，`manhua.5um.net/colatj/`、`manga.5um.net/prod/` 正文。新增资源主机或协议结构明确失败，不跨站兜底。
+- 专用封面来自 `.comic-cover-large`；支持 `comic.5um.net/comic/cover/`、`manga.5um.net/prod/` 封面，`manhua.5um.net/colatj/`、`manga.5um.net/prod/` 正文。未支持的资源主机或协议结构明确失败，不跨站兜底。
 - 作品 `.comic-actions`、章节 `.reader-nav .nav-right` 嵌入导入／管理入口；网页仅已加载的 `.comic-content > img.comic-image` 支持原位翻译／原图恢复，DOM 不承担完整正文读取。
 
 ## 协议来源

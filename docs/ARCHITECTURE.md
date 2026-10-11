@@ -2,11 +2,11 @@
 
 本文描述当前实现。[翻译集群](TRANSLATION_CLUSTER_DESIGN.md)使用临时输入与稀疏覆盖层，[文件存储](OBJECT_STORAGE.md)规定终态清理和结果交付。
 
-客户端为 WXT + React + TypeScript；控制服务为 FastAPI + SQLAlchemy/Alembic，API、control-worker、maintenance 独立运行。PostgreSQL 持久化任务、租约、权益和检查点，中心共享磁盘暂存原图、持久保存覆盖层结果。数据库升级至当前迁移版本，不读取旧远端翻译结果；切换规则见[部署规范](DEPLOYMENT.md)，运行配置见[后端说明](../backend/README.md)。
+客户端为 WXT + React + TypeScript；控制服务为 FastAPI + SQLAlchemy/Alembic，API、control-worker、maintenance 独立运行。PostgreSQL 持久化任务、租约、权益和检查点，中心共享磁盘暂存原图、持久保存覆盖层结果。结构升级与切换规则见[部署规范](DEPLOYMENT.md)，运行配置见[后端说明](../backend/README.md)。
 
 ## 插件与来源
 
-漫画模型为 `Comic → Entry`；图片条目使用 `PageDescriptor`，EPUB 使用文档索引。每本漫画绑定唯一来源，只保存当前内容。数据库采用 `node-comics-reading-v2-*`；完整本地文件、原图页、分段、缩略图、译图与主动下载分别管理。不迁移或兼容旧书架，来源代次和内容摘要用于拒绝失效读写，不提供版本选择。详见[来源与缓存](COMIC_SOURCE_ARCHITECTURE.md)。
+漫画模型为 `Comic → Entry`；图片条目使用 `PageDescriptor`，EPUB 使用文档索引。每本漫画绑定唯一来源，只保存当前内容。数据库采用 `node-comics-reading-v2-*`；完整本地文件、原图页、分段、缩略图、译图与主动下载分别管理。来源代次和内容摘要用于拒绝失效读写，不提供版本选择。详见[来源与缓存](COMIC_SOURCE_ARCHITECTURE.md)。
 
 来源获取、格式索引／解码、页面服务与翻译分离。文件来源由驱动注册；网站由随插件打包的专用适配器提供身份、清单和读取能力。通用网页只支持原位翻译，不导入漫画。公共层负责权限、消息、导航、资源登记和限额，站点规则只在各自目录；见[网站适配开发规范](SITE_ADAPTERS.md)。
 
@@ -14,7 +14,7 @@
 
 ## 翻译与交付
 
-公开入口为 `PUT /v1/translations/{id}`。客户端保存 36 字符请求 UUID 与固定 64 字符本地页面键，按快照补传缺失原图，上传自动排队；批量快照与 ETag 恢复未知提交，不维护阅读会话。当前页仅提供短时优先提示，长期任务不依赖插件后台常驻。分钟准入、请求保护、调度容量和计费额度独立，接口见[翻译接口契约](READING_TRANSLATION_CONTRACT.md)。
+公开入口为 `PUT /v1/translations/{id}`。客户端保存 36 字符请求 UUID 与固定 64 字符本地页面键，按快照补传缺失原图，上传自动排队；批量快照与 ETag 恢复未知提交，不维护服务端阅读会话，长期任务不依赖插件后台常驻。分钟准入、请求保护、调度容量和计费额度独立，接口见[翻译接口契约](READING_TRANSLATION_CONTRACT.md)。
 
 - **常规翻译**：图像节点领取整页租约，从中心按当前租约取图，执行检测、OCR、抹字和嵌字；中心调用文本供应商并持久化分析／译文。节点一次提交裁剪的无损 RGBA WebP 覆盖层，中心核对租约、版本、摘要并落盘后结算，终态提交后删除原图。见[计算协议](COMPUTE_PROTOCOL.md)。
 - **文本供应商**：独立的供应商及不可变配置版本，任务固定配置；按供应商限流、统一重试与计量，见[供应商契约](TRANSLATION_PROVIDERS.md)。
@@ -23,8 +23,8 @@
 
 ## 身份、权益与存储
 
-图片、任务、回执与结果访问按用户隔离。`Job` 保存执行和冻结结果，`TranslationRequest` 保存账户内 UUID 与任务关系，`Asset` 保存输入及产物描述。相同账户按内容／模式／语言／有效配置复用本人任务，新增 UUID 指向同一 Job；不新增计算或共享授权表。不同账户分别执行，不共享原图文件。重复执行与网络重放不能重复扣量，额度与供应商成本分别记录。见[会员规则](MEMBERSHIP_AND_QUOTAS.md)、[支付契约](STRIPE_BILLING.md)和[账户内复用](RESULT_SHARING.md)。
+图片、任务、回执与结果访问按用户隔离。`Job` 保存执行和冻结结果，`TranslationRequest` 保存账户内 UUID 与任务关系，`Asset` 保存输入及产物描述。相同账户按内容／模式／语言／有效配置复用本人任务，新增 UUID 指向同一 Job。不同账户分别执行，不共享原图文件。重复执行与网络重放不能重复扣量，额度与供应商成本分别记录。见[会员规则](MEMBERSHIP_AND_QUOTAS.md)、[支付契约](STRIPE_BILLING.md)和[账户内复用](READING_TRANSLATION_CONTRACT.md#账户内复用)。
 
-请求回执与任务状态在事务内提交；通知只负责唤醒快照等待，客户端按持久 UUID 恢复。任务终态后立即删除原图字节，保留输入描述；有效结果长期保留，最后一个本人 UUID 引用撤销后回收文件，UUID 墓碑和结算证据保留。服务端只使用本地文件，不保留存储后端选择或远端读取分支。生命周期见[文件存储规则](OBJECT_STORAGE.md)。
+请求回执与任务状态在事务内提交；通知只负责唤醒快照等待，客户端按持久 UUID 恢复。任务终态后立即删除原图字节，保留输入描述；有效注册账户结果长期保留，最后一个本人 UUID 引用撤销后回收文件，UUID 墓碑和结算证据保留。生命周期与游客期限见[文件存储规则](OBJECT_STORAGE.md)。
 
 生产使用 OIDC 授权码 + PKCE，后端验证签名、issuer、audience 与有效期；凭据只在受信上下文保存。配置不足时拒绝启动，开发身份不得公开部署。日志不保存凭据、图片文字或签名地址。见[生产身份](PRODUCTION_IDENTITY.md)、[运维恢复](OPERATIONS.md)。本地构建、隔离验证与公开部署分别验收。

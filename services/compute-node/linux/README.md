@@ -6,7 +6,7 @@ Vast 扩容采用 **固定 CUDA 基础模板 + 版本化运行包 + 每实例独
 
 [vast-template.json](vast-template.json) 是无凭据模板定义：固定 `vastai/base-image` 的 Linux amd64 digest，使用 SSH 启动方式和指定 on-start 脚本。运行包和安装入口来自 GitHub Release 附件，并分别锁定 SHA-256；大文件不进入 Git 历史。模板源文件不等于账号内已经保存或新实例验收成功，部署时须分别确认。
 
-当前仓库模板是 MTU 发布草稿：发布新运行包后填写 bootstrap／运行包的版本 URL 和 SHA-256，才能用于实例启动。旧发布附件保持历史原样，不代表新引擎已部署。Vast 镜像字段使用纯 digest 引用，保存后重新打开确认完整摘要。
+仓库模板中的 bootstrap／运行包 URL 和 SHA-256 为待填写占位符，不能直接用于实例启动。发布运行包后须填入版本化附件地址和摘要；Vast 镜像字段使用纯 digest 引用，保存后重新打开确认完整摘要。
 
 新增节点：
 

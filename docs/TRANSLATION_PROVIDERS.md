@@ -4,11 +4,11 @@
 
 ## 管理与使用
 
-管理员在 `<ADMIN_WEB_PATH>#translation-providers` 创建供应商。首期渠道为 OpenAI，可创建多个供应商，各自保存名称、Base URL、模型、API Key、协议、重试与计量参数。协议可选 `chat_completions`、`responses`，模型必须明确填写。供应商上游 RPM 单独配置，与模型参数及用户业务限流分开。
+管理员在 `<ADMIN_WEB_PATH>#translation-providers` 创建供应商。OpenAI 兼容渠道支持多个供应商，各自保存名称、Base URL、模型、API Key、协议、重试与计量参数。协议可选 `chat_completions`、`responses`，模型必须明确填写。供应商上游 RPM 单独配置，与模型参数及用户业务限流分开。
 
-“思考程度”用于正文与漫画名请求，新建及编辑旧配置时默认 `none`（关闭思考，最低档）；也可选择 `minimal`、`low`、`medium`、`high`、`xhigh`、`max` 或“供应商默认”（`provider_default`，不发送此参数）。各模型支持的档位不同，需按模型能力选择；GPT-6 Luna 支持 `none`。Chat Completions 发送 `reasoning_effort`，Responses 发送 `reasoning.effort`；OpenRouter 的 Chat Completions 兼容前者。降低思考程度优先减少推理开销，不保证固定响应时间。[OpenAI 模型说明](https://developers.openai.com/api/docs/models/gpt-6-luna)、[OpenRouter 参数说明](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+“思考程度”用于正文与漫画名请求，管理表单默认 `none`（关闭思考，最低档）；也可选择 `minimal`、`low`、`medium`、`high`、`xhigh`、`max` 或“供应商默认”（`provider_default`，不发送此参数）。各模型支持的档位不同，需按模型能力选择。Chat Completions 发送 `reasoning_effort`，Responses 发送 `reasoning.effort`；OpenRouter 的 Chat Completions 兼容前者。降低思考程度优先减少推理开销，不保证固定响应时间。[OpenRouter 参数说明](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
 
-已有供应商版本及任务快照缺少此字段时继续不发送参数；在后台编辑并保存后，新版本采用表单选定值，已提交的正文任务仍使用原版本。该设置进入供应商版本与正文结果缓存身份，无须修改数据库结构。
+供应商版本及任务快照缺少此字段时不发送参数；在后台编辑并保存后，新版本采用表单选定值，已提交的正文任务仍使用原版本。该设置进入供应商版本与正文结果缓存身份。
 
 OpenRouter 可通过 `openrouter_providers` 指定最多 20 个不重复的上游供应商 ID，后台支持逐行或英文逗号输入，顺序即优先级；可填写如 `google-vertex/us-east5` 的完整端点 ID。非空列表发送 `provider.order` 与 `allow_fallbacks=false`，只在列表内尝试；留空或旧版本缺省时沿用 OpenRouter 默认路由。结构化输出仍要求 `require_parameters=true`，不退回不支持 JSON Schema 的端点。此字段仅接受 OpenRouter 官方主机，随模型配置保存不可变版本，正文与漫画名共用，不新增外部查询或应用内重试循环。[OpenRouter 供应商路由](https://openrouter.ai/docs/guides/routing/provider-selection)
 
@@ -20,13 +20,13 @@ OpenRouter 可通过 `openrouter_providers` 指定最多 20 个不重复的上�
 
 当前套餐没有已启用且正文权重大于 0 的供应商时，常规翻译不对新提交开放；没有可用漫画名候选时，仅缓存未命中的查询返回 503，已有缓存仍可返回。`CLASSIC_ENABLED` 仍是图像引擎的总开关，不影响漫画名查询；OCR／LaMa／嵌字与计算资源池维持独立配置。
 
-编辑连接参数、模型、思考程度、重试参数、价格或密钥会创建不可变版本。新任务快照保存供应商 ID、版本 ID、渠道及非秘密参数；运行时只加载该版本的密钥。名称、启停、套餐范围、分流权重和上游 RPM 不更改版本；历史版本中已有的 RPM 字段原样保留，执行时统一读取供应商当前限额。编辑时省略密钥表示保留；新建必须填写密钥，空字符串无效。
+编辑连接参数、模型、思考程度、重试参数、价格或密钥会创建不可变版本。新任务快照保存供应商 ID、版本 ID、渠道及非秘密参数；运行时只加载该版本的密钥。名称、启停、套餐范围、分流权重和上游 RPM 不更改版本；执行时统一读取供应商当前 RPM 限额，不读取版本配置中的同名字段。编辑时省略密钥表示保留；新建必须填写密钥，空字符串无效。
 
 停用使尚未领取的文本阶段暂停。在两个文本请求之间停用也会释放租约并回到待执行，不消耗阶段恢复次数；重新启用可继续利用已保存译文。已发送的请求不能撤回，其用量与结果仍按原租约记录。页处理总时限包含第一次文本请求之后的等待时间，暂停过久的页面恢复时可能因总时限耗尽而失败。
 
 ## 正文套餐路由
 
-供应商的 `text_plan_ids` 为 `null` 时适用于全部套餐（含以后新增的套餐），非空数组则仅适用于指定套餐。后台可选择匿名体验 `guest`、普通用户 `free`、赠送／订阅 PLUS `plus`，以及计费目录中的 Lite 等产品 ID；不按月付／年付价格或支付渠道路由。空数组、未知套餐和无效 ID 拒绝保存；停止正文新分配使用权重 0。例如经济模型选择 `guest / free / lite`，高阶模型仅选择 `plus`。同一套餐可选择多个供应商，再按正文权重分流；“全部套餐”供应商会参与每个套餐的候选池，并非仅在无匹配时兜底。
+供应商的 `text_plan_ids` 为 `null` 时适用于全部套餐（含以后新增的套餐），非空数组则仅适用于指定套餐。可选 ID 以管理接口返回的 `plans` 为准，包含匿名体验、普通用户及计费目录中的服务档位和自定义产品 ID；默认产品见 [catalog_defaults.json](../backend/app/catalog_defaults.json)，模型授权配置见[模型选择规范](TRANSLATION_MODEL_SELECTION_DESIGN.md)，本文不维护独立套餐列表。不按价格周期或支付渠道路由。空数组、未知套餐和无效 ID 拒绝保存；停止正文新分配使用权重 0。同一套餐可选择多个供应商，再按正文权重分流；“全部套餐”供应商会参与每个套餐的候选池，并非仅在无匹配时兜底。
 
 新正文任务在账户锁内复用额度准入的同一份有效权益：已生效的运营 PLUS 优先，否则沿用会员模块对当前未撤销付费／试用授权的有效套餐选择；无有效会员而实际使用购买常规页数时，采用该额度包版本的 `service_plan_id`。未生效、待确认、过期或撤销的授权不参与，游客单独使用 `guest`。客户端可提交公开目录中的 `model_id`，不能指定套餐、扣费桶或上游供应商参数；不指定模型时由后端默认路由。候选池为空时在额度预占前返回 503 `TRANSLATION_PROVIDER_UNAVAILABLE`，不借用其他套餐的模型。`/v1/capabilities` 返回各模型在当前权益下的可用状态。
 
@@ -34,7 +34,7 @@ OpenRouter 可通过 `openrouter_providers` 指定最多 20 个不重复的上�
 
 范围和权重仅影响新分配。已受理任务的 UUID 重放、阶段自动重试与恢复继续原模型及密钥版本，不因套餐到期或范围修改切换模型；显式 `retry_of / regenerate_of` 创建新任务时按当前有效套餐选型。正文缓存仍包含实际供应商和不可变版本，不同模型不复用同一结果；同一模型配置仍可复用本人已有结果，不为套餐名额外复制缓存。漫画名的独立权重与共享缓存不受影响。
 
-候选模型与非秘密版本沿用一次数据库读取，在内存中筛选套餐并稳定加权选择；模型候选解析不增加外部请求、执行池或缓存；新受理另以一次主键读取判定实际模型是否支持 free，用于免费额度优先扣减。套餐与额度准入共用权益解析，上游 RPM 仍按供应商跨套餐、跨用途共享。隔离测试验证 4000 个分流键只读取一次候选配置；真实服务延迟未据此测量。
+候选模型与非秘密版本通过一次数据库读取，在内存中筛选套餐并稳定加权选择；模型候选解析不增加外部请求、执行池或缓存；新受理另以一次主键读取判定实际模型是否支持 free，用于免费额度优先扣减。套餐与额度准入共用权益解析，上游 RPM 按供应商跨套餐、跨用途共享。
 
 ## 代码边界
 
@@ -58,7 +58,7 @@ OpenRouter 可通过 `openrouter_providers` 指定最多 20 个不重复的上�
 
 分流算法与供应商配置、凭据及执行分离，通过 `translation_routing.py` 的 `STRATEGIES` 注册表扩展；当前策略为 `weighted`，两种用途共用入口，分别传入对应权重和业务键。
 
-漫画名在缓存未命中时读取所选供应商的当前版本，发送独立的系统指令和 `{"name":"漫画名","target_language":"语言代码"}` 用户消息，再严格校验响应。它不导入正文翻译模块。共用部分为供应商配置与凭据、分流算法、上游请求准入、消息传输和统一响应／错误；具体规则见[漫画名 API](../backend/README.md#漫画名翻译-api)。
+漫画名在缓存未命中时读取所选供应商的当前版本，发送独立的系统指令和 `{"name":"漫画名","target_language":"语言代码"}` 用户消息，再严格校验响应。它不导入正文翻译模块。共用部分为供应商配置与凭据、分流算法、上游请求准入、消息传输和统一响应／错误；具体规则见[名称服务](COMIC_SEARCH_DESIGN.md#名称服务)。
 
 OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有界。接口契约依据 [Chat Completions](https://developers.openai.com/api/reference/python/resources/chat/subresources/completions/methods/create) 与 [Responses](https://developers.openai.com/api/reference/python/resources/responses/methods/create)。连接在实际套接字建立时检查目标地址，禁止内部网络和重定向。
 
@@ -66,9 +66,9 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 
 ### 正文 LLM 文本格式
 
-发布时协调更新 API、文本 worker 与 maintenance。新任务使用 `comic-json-v9` 缓存身份；已有 JSON 任务保留供应商版本及输出上限，恢复时未完成分组使用当前代码的提示词和 Schema，已完成的 ID 到译文检查点可以直接复用。运行代码不会按旧 `prompt_version` 选择历史提示词／解析器；早于 JSON 的任务须先排空。计算节点仍须支持跳过空字符串绘字；回退到不接受空译文的节点代码前须排空这些任务。回退到只支持 8192 token 的中心代码前，先将供应商指向原版本，并排空使用更大上限的新任务。插件、计算协议格式及数据库结构无须更换；独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
+新任务使用 `comic-json-v9` 缓存身份。恢复任务保留供应商版本及输出上限；未完成分组使用运行代码的提示词和 Schema，已完成的 ID 到译文检查点直接复用，不按任务的 `prompt_version` 装载另一套提示词或解析器。API、文本 worker 与 maintenance 须配套发布；升级前排空不符合当前 JSON 契约的任务，回退前排空超出目标版本输出上限或空译文支持范围的任务。计算节点须支持跳过空字符串绘字。独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
 
-Chat Completions 与 Responses 共用 `comic-json-v9` 输出契约，源文本和译文只采用 JSON：顶层直接为段落 ID 到文本的对象映射，不携带 `translations` 包装。正文逐组生成严格 JSON Schema，禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验继续执行。使用标准库编码和解析，没有新增第三方依赖；模型 HTTP 信封、内部检查点及发给节点的 `translations` 包装保持原有结构。
+Chat Completions 与 Responses 共用 `comic-json-v9` 输出契约，源文本和译文只采用 JSON：顶层直接为段落 ID 到文本的对象映射，不携带 `translations` 包装。正文逐组生成严格 JSON Schema，禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验同时执行。使用标准库编码和解析；模型 HTTP 信封、内部检查点及发给节点的 `translations` 包装分别遵循各自协议。
 
 Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.strict=true`；Responses 发送 `text.format` 中的同等定义。OpenRouter 同时发送 `provider.require_parameters=true`，只向支持请求参数的端点路由。正文供应商必须支持严格结构化输出；不支持时按上游错误终止，不静默移除约束。漫画名及其他未传 Schema 的通用调用保持原请求参数。[OpenAI 结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)、[OpenRouter 结构化输出](https://openrouter.ai/docs/guides/features/structured-outputs)
 
@@ -98,7 +98,7 @@ Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.stri
 
 漫画名使用每用户滚动 60 秒 30 次的独立业务限速，缓存命中也计入该业务限速，超限返回 429。缓存未命中而所选供应商的本地上游配额已满时，返回 503 与 `Retry-After`，不发送模型请求，也不改选供应商。漫画名共享供应商的连接、协议、超时与输出上限设置，不进入正文队列或成本账本。漫画名缓存不包含供应商、权重或模型版本，修改分流比例、上游 RPM 和模型配置仍复用已有结果（包括 null）。
 
-默认每次超时 60 秒、每组最多 3 次请求、分组 1800 字节、输出上限 1024 token。计价单位为人民币／百万 token（等值于微元／token），默认输入 5、输出 30，只是运营估价。输入／输出单价均支持小数及 0，例如 `0.15 / 0.625`；拒绝负数、非有限值及非数字类型。单次输入与输出成本使用十进制计算，合计后向上取整到整数微元（百万分之一元），预占与实际用量采用同一规则，旧整数单价结果不变。未知消耗保守预占，实际子请求逐次计量；用户页数结算与供应商成本分开。供应商与版本进入缓存身份，不能跨不同有效配置复用译图。
+默认每次超时 60 秒、每组最多 3 次请求、分组 1800 字节、输出上限 1024 token。计价单位为人民币／百万 token（等值于微元／token），默认输入 5、输出 30，只是运营估价。输入／输出单价均支持小数及 0，例如 `0.15 / 0.625`；拒绝负数、非有限值及非数字类型。单次输入与输出成本使用十进制计算，合计后向上取整到整数微元（百万分之一元），预占与实际用量采用同一规则。未知消耗保守预占，实际子请求逐次计量；用户页数结算与供应商成本分开。供应商与版本进入缓存身份，不能跨不同有效配置复用译图。
 
 密钥只存于后端版本记录，不返回管理 API、不进入任务 JSON、计算节点载荷或日志。数据库与备份包含敏感凭据，须限制访问；历史版本保留用于任务继续执行。当前不提供物理删除供应商或历史凭据的 API，停用用于撤销后续调用资格。
 
@@ -113,11 +113,11 @@ Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.stri
 | `PUT /v1/admin/translation-providers/{id}` | 编辑名称、启停、正文套餐范围、正文／漫画名权重、上游 RPM、参数与密钥 |
 | `PATCH /v1/admin/translation-providers/{id}` | 更新 `enabled` |
 
-创建和完整编辑请求在顶层传入 `text_weight`、`title_weight`、`requests_per_minute`，与 `config` 内的模型参数分开；省略时两项权重均按 1、上游 RPM 按 60 处理。旧的 `/default`、`/title-default` 选择接口已移除。
+创建和完整编辑请求在顶层传入 `text_weight`、`title_weight`、`requests_per_minute`，与 `config` 内的模型参数分开；省略时两项权重均按 1、上游 RPM 按 60 处理。
 
 `text_plan_ids` 同样位于顶层，新建省略表示全部套餐，编辑省略则保留原限制，显式 `null` 才清除限制。列表响应的 `plans` 返回可选套餐 ID 与名称；每项供应商返回当前 `text_plan_ids`，不返回密钥。
 
-数据库当前版本与升级顺序见[部署规范](DEPLOYMENT.md)。`text_plan_routing_0013` 为供应商新增可空的正文套餐范围，已有记录保持 `null`，保留原分流、不可变版本、任务与缓存；不自动绑定商业套餐或选择真实模型。所有 API、worker、maintenance 和管理后台升级后再配置限制，旧代码不能执行套餐筛选，不可混跑或仅回退旧镜像。
+数据库版本与升级顺序见[部署规范](DEPLOYMENT.md)。API、worker、maintenance 和管理后台必须共同支持套餐筛选；配置限制前完成全部升级，不与缺少权限筛选的版本混跑，也不能仅回退其中一个镜像。商业套餐和真实模型由管理员明确配置。
 
 验证入口：`backend/.venv/Scripts/python.exe -m pytest backend/tests/test_translation_providers.py backend/tests/test_text_adapter.py backend/tests/test_classic.py backend/tests/test_classic_parallel.py backend/tests/test_cluster_scheduler.py -q`；管理后台在 `backend/admin-ui` 执行 `npm run build`。测试使用隔离数据库和模拟供应商，无真实付费模型调用。
 

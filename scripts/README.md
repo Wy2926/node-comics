@@ -78,7 +78,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明、首次提示、焦点恢复和 16 语大字号布局。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |
 | `verify_translation_overlay.mjs` | 真实 Chromium 像素、透明度、EXIF/ICC/首帧规范化、摘要与 bbox 校验；可使用实际 LLM 产物验证合成和导出 |
-| `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取；另以自制 800×30000 漫画比较旧 PNG／新 JPEG 的体积、单次耗时、文字像素误差及截图。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
+| `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取；另以自制 800×30000 漫画比较 PNG／JPEG 的体积、单次耗时、文字像素误差及截图。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
 | `verify_overlay_live.py` | 隔离 Docker 中心 + 本机 GPU + 真实文本 LLM；支持静态规范图片或整章目录，逐页保存 UUID、结果与统计，检查结果鉴权和 UUID 重放 |
 | `verify_overlay_chapter.mjs <运行目录>` | Vite 5176 + 真实 Chromium 逐页合成真实批次产物，走产品导入与流式 CBZ 导出，独立解包校验全部页面 SHA；不调用 API/LLM |
 | `smoke_api.py` | API／计算服务；`smoke_api --translate` 才发起付费翻译，未知请求先核实 |
@@ -108,11 +108,11 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 | `verify_website_languages.mjs` | 17 语公开页面、14 档宽度导航防挤压／遮挡、RTL、无 JS 导航、桌面键盘操作、Android Chromium／iPhone WebKit 触控语言与导航菜单、返回恢复、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；`--header-only` 只检查导航布局，`--menus-only` 检查布局与菜单交互，触控检查需安装与 Playwright 匹配的 WebKit，不调用真实身份、计费或模型服务 |
 | `verify_website_guides.mjs` | 构建预览中的 17 语教程目录及六篇图文教程、桌面／320px 窄屏、四语截图源文件摘要匹配与放大链接、中日韩英桌面／手机截图、无 JavaScript 与断图降级；不调用身份、计费或翻译服务 |
 | `verify_website_download.mjs` | 17 语下载页；指向公开服务时真实下载并核对摘要 |
-| `verify_website_pricing.mjs` | 17 语无 JavaScript 公示月价与年总价、Free／Lite 三列九项权益对照及可聚焦／悬停／点按的信息提示、模拟 API 报价／额度接管与月年付切换、加载／空目录／失败保留价格、桌面和手机布局 |
-| `verify_website_compare.mjs` | 17 语首页单张真实对照图、锚点和三浏览器入口，原生月／年套餐预览与语言链接；桌面和手机布局 |
+| `verify_website_pricing.mjs` | 17 语有／无 JavaScript 的套餐卡与权益提示、PLUS 季付／年付报价及每月额度、模拟 API 报价／额度接管与周期切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |
 | `verify_website_translation_tiles.mjs` | 先构建官网并启动上述夹具 `--port 4323`；验证单边 100000 的长／宽图、分块跨边界文字像素、完整下载、本地历史恢复、同 UUID 重放、能力缺失及普通翻译；仅允许本机回环地址 |
 | `verify_website_account.mjs` | 先在官网目录运行 `npx vite --config tests/account-fixture.config.ts`，固定 5193；模拟账户、赠送顺延、取消续费、回执丢失后刷新、定价入口、并行首屏与手动同步、退出／换号，覆盖 17 语及窄屏 |
+| `backend/tests/manual_membership_server.py` | 先构建官网和后台，再从仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_membership_server.py`；定价页为 `http://127.0.0.1:4322/pricing/`，后台为 `/console-preview/`、用户名 `admin`。独立 SQLite 和内存 Redis，仅用于套餐／模型配置预览，不调用真实支付或模型 |
 
 完整同源账户流程见[官网 README](../backend/website/README.md)。模拟响应验证交互，真实身份、付款和模型效果分别验证。
 
@@ -140,7 +140,7 @@ services/classic-engine/.venv-lama/Scripts/python.exe scripts/verify_overlay_liv
 
 私有配置仅读取 `TEXT_BASE_URL`、`TEXT_MODEL`、`TEXT_API_KEY`，协议由 `--protocol chat_completions|responses` 指定。脚本实际调用付费文本服务，限制每组一次尝试；先保存 UUID，再发送输入。按实际文件格式发送 MIME，仅接收不需要 EXIF／ICC／首帧转换的静态规范输入；目录按页名自然排序，忽略导出清单，原始文件不改动。
 
-真实图片先经过插件预处理：启动插件 Vite 5176，配置 `PLAYWRIGHT_MODULE`、`TEST_CHROMIUM`，执行 `node scripts/verify_translation_inputs.mjs <图片目录> <artifacts 下的输出目录>`。脚本限最多 16 张，通过实际规范化与高质量 WebP 代码生成 `inputs/`，另保留第一张的未压缩基线；`preparation.json` 记录大小、尺寸、预处理耗时和主线程定时器间隔，不把测试文件序列化计入 UI 耗时。将 `inputs/` 作为真实验证器的 `--source`；尺寸准入由中心统一判断，验证器不保留旧的 8192 上限。
+真实图片先经过插件预处理：启动插件 Vite 5176，配置 `PLAYWRIGHT_MODULE`、`TEST_CHROMIUM`，执行 `node scripts/verify_translation_inputs.mjs <图片目录> <artifacts 下的输出目录>`。脚本限最多 16 张，通过实际规范化与高质量 WebP 代码生成 `inputs/`，另保留第一张的未压缩基线；`preparation.json` 记录大小、尺寸、预处理耗时和主线程定时器间隔，不把测试文件序列化计入 UI 耗时。将 `inputs/` 作为真实验证器的 `--source`；尺寸准入由中心统一判断。
 
 批次使用一个测试供应商和物理 GPU 节点。只停用同名旧测试供应商，检测到其他供应商则拒绝运行；复用同一测试 GPU 的节点身份，存在活动租约则拒绝旋转凭据。隔离中心每日额度调至至少页数加 100，并为批次创建新测试读者；供应商测试配置为 60 RPM、8192 输出 token、1800 字节分组和单次尝试。它不调整供应商实际账户配置。
 
@@ -151,5 +151,3 @@ services/classic-engine/.venv-lama/Scripts/python.exe scripts/verify_overlay_liv
 脚本隔离安全检查：`python scripts/tests/test_overlay_live.py`。产物和凭据不提交仓库。验收后仅清理该 Compose 项目及其专用卷；其他 Docker 环境不受影响。
 
 `translation_client.py`、`local_import_helpers.mjs` 是脚本共享模块；`generate_import_fixtures.py` 只生成自制样本。脚本使用的数据、profile 和结果不提交仓库。
-
-新套餐本地验收：构建 `backend/website` 和 `backend/admin-ui`，从仓库根目录执行 `backend/.venv/Scripts/python.exe backend/tests/manual_membership_server.py`。页面 `http://127.0.0.1:4322/pricing/`，后台 `/console-preview/` 用户名 `admin`；临时数据库、内存 Redis，不调用真实支付或模型。

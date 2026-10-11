@@ -18,7 +18,7 @@
 
 前端的 `src/…` 均相对于 `apps/extension/`。文件上传读取和用户公开字段分别复用 `backend/app/assets.py`、`backend/app/auth.py`，运营路由不依赖 `main.py`。
 
-## 已接入的检查
+## 代码检查
 
 在仓库根目录：
 

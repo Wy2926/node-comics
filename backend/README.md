@@ -14,7 +14,7 @@ FastAPI + SQLAlchemy + PostgreSQL + Redis 8 控制服务。API、control-worker�
 ./scripts/bootstrap.ps1 -Start
 ```
 
-本地 API 默认 `http://127.0.0.1:18088`；环境配置位于 `deploy/.env.local`，后台路径取其中的 `ADMIN_WEB_PATH`。首次安装准备专用空库；数据库当前版本、已有数据升级与 Redis 切换顺序统一见[部署规范](../docs/DEPLOYMENT.md)。
+本地 API 默认 `http://127.0.0.1:18088`；后台路径取 `deploy/.env.local` 中的 `ADMIN_WEB_PATH`。首次安装准备专用空库；数据库版本、升级及共享 Redis 配置统一见[部署规范](../docs/DEPLOYMENT.md)。
 
 直接运行需要 Python 3.11+、Redis 8 和 [requirements.txt](requirements.txt)，并向各进程注入数据库、Redis、身份和存储配置；`REDIS_URL` 指定直连地址（本机通常为 `redis://127.0.0.1:6379/0`），`REDIS_NAMESPACE` 隔离环境，同一环境所有 API、worker 和 maintenance 必须一致；本地调试显式设置 `APP_ENV=development`。在本目录的三个终端分别执行：
 
@@ -24,7 +24,7 @@ python -m app.workers
 python -m app.dispatcher
 ```
 
-首次运行及结构升级前单独执行 `python -m app.migrate`；上述进程只检查数据库兼容性，不自动迁移。后端 Docker 镜像不再包含页面；生产官网、管理后台通过 `Dockerfile.static` 独立构建并由 OpenResty 提供。本地 `bootstrap.ps1 -Start` 单独运行两个前端的 npm 构建，并由根 Compose 只读挂载到 API，需安装 Node.js；直接运行 Python 时将官网产物放到 `app/website_dist`，后台产物由现有构建脚本生成。服务器直接复用统一 Redis，不启动新 Redis 容器。双槽位切换、后台排空和本地演练见[部署规范](../docs/DEPLOYMENT.md)。
+首次运行及结构升级前单独执行 `python -m app.migrate`；上述进程只检查数据库兼容性，不自动迁移。后端 Docker 镜像不包含页面；生产官网、管理后台通过 `Dockerfile.static` 独立构建并由 OpenResty 提供。本地 `bootstrap.ps1 -Start` 单独运行两个前端的 npm 构建，并由根 Compose 只读挂载到 API，需安装 Node.js；直接运行 Python 时将官网产物放到 `app/website_dist`，后台产物由现有构建脚本生成。双槽位切换、后台排空和本地演练见[部署规范](../docs/DEPLOYMENT.md)。
 
 ## 开发入口
 
@@ -35,30 +35,7 @@ python -m app.dispatcher
 | 账户与支付 | [身份](../docs/PRODUCTION_IDENTITY.md)、[会员](../docs/MEMBERSHIP_AND_QUOTAS.md)、[支付](../docs/STRIPE_BILLING.md) |
 | 管理与配置 | [后台](../docs/ADMIN_CONSOLE.md)、[系统设置](../docs/SYSTEM_SETTINGS.md)、[文本供应商](../docs/TRANSLATION_PROVIDERS.md)、[配置模板](../.env.example) |
 | 存储与运维 | [文件存储](../docs/OBJECT_STORAGE.md)、[备份与恢复](../docs/OPERATIONS.md) |
-
-## 漫画名翻译 API
-
-`POST /v1/comic-titles/translate`，使用登录 Bearer Token。请求示例：
-
-```json
-{"name":"进击的巨人","target_language":"en-US"}
-```
-
-返回 `{"name":"Attack on Titan","target_language":"en"}`。漫画名限制 1–60 个 Unicode 字符，不接受空白名称或控制字符。语言代码仅校验格式，不做白名单限制或本地映射，原样交给 LLM。模型优先选择已知的本地化常用译名或别名；不知道已有名称时，按标题含义自然翻译到目标语言，保留原意和专名，不补充剧情、副标题或其他信息。可识别的专名优先使用目标语言的惯用写法，必要时音译；中日韩使用对应文字。不因作品冷门或不知道官方名称而返回空，仅无法将输入合理理解为标题或无法识别目标语言时返回 `{"name":null,"target_language":null}`。响应的 `target_language` 是 LLM 返回的实际语言代码。
-
-普通登录用户与 PLUS 均可用，不扣翻译页数额度，无每日或累计次数限制。每用户滚动 60 秒内最多 30 次，缓存命中、无匹配名称和模型失败也计次；超限返回 429 和 `Retry-After`。限速状态存 Redis，各 API 进程共享。在后台“翻译供应商”中设置漫画名权重，与正文权重分别配置；缓存未命中时按规范化名称和目标语言，在已启用且漫画名权重大于 0 的供应商中稳定按比例选择，规则见[文本供应商](../docs/TRANSLATION_PROVIDERS.md)。实际模型调用与正文共享所选供应商的上游 RPM，独立于用户业务限流和模型参数；缓存命中不占上游配额，本地上游配额已满时返回 503 与 `Retry-After`。结果可能是已知名称或模型自然翻译，不保证是官方名称，也不保证能匹配站点搜索。未命中缓存且漫画名供应商不可用时返回 503，模型调用失败或响应无效返回 502，不在请求内自动重试或改选供应商。模型输出仅接受固定 JSON：两个字段必须同时为字符串或同时为 null，拒绝额外字段、Markdown 和格式错误。
-
-全部 API 进程通过 Redis 共享 8 个漫画名查询执行位，覆盖缓存等待与模型调用；查询使用独立线程池，准入只执行短 Redis 操作。满额时返回 503 `COMIC_TITLE_BUSY` 和 `Retry-After: 1`，不排队、不创建缓存租约，也不计入用户分钟次数。执行位使用 210 秒租约、每 30 秒续期；HTTP 等待取消后，已开始的调用继续持有执行位直到完成，旧令牌不能释放新调用。服务关闭时等待已接收的调用结束。
-
-缓存使用单表 `comic_title_cache`，保存输入名称、请求语言、返回名称、实际语言和生成结果的 `created_by` 用户 ID。所有登录用户共享；用户 ID 仅记录来源，不参与查询、匹配或权限筛选，命中时不更新生成者，也不记录访问用户。
-
-先按输入名称和目标语言查询；输入为已有返回名时，沿已保存的输入／输出名称对应关系查找其他语言结果，不创建漫画实体或合并记录。名称仅去首尾空白并统一 Unicode NFC，不模糊匹配；语言代码仅忽略大小写，不推断地区回退。多个已有返回名冲突时交给 LLM 判断。直接命中为一次只读查询，输出名反查最多两次只读查询，输入键／语言、输出键均有索引。
-
-`null` 按名称和目标语言持久缓存，不扩展到所有语言；网络、格式和供应商错误不缓存。缓存身份不包含供应商、模型版本或分流权重，修改这些配置仍复用已有结果。同一输入名称和语言的并发请求由该记录的租约去重，等待超过 10 秒返回 503 `COMIC_TITLE_PENDING` 和 `Retry-After: 1`。调用期间每 30 秒将有效租约续至数据库当前时间之后 210 秒，覆盖完整模型调用及结果保存；进程中断后租约自然过期，可重新领取。过期或已被接管的租约不能续期或写入结果，原请求返回 503 `COMIC_TITLE_LEASE_LOST`。漫画名缓存由数据库持久保存，短期限流表已迁移至 Redis；供应商分流升级保留已有缓存和业务数据，迁移规则见[文本供应商](../docs/TRANSLATION_PROVIDERS.md#api-与部署)。
-
-## 插件产品分析
-
-插件自愿分析通过 `POST /v1/analytics/events` 受限中继至 GA4，官网不采集。配置、同意与数据边界、事件口径和发布顺序统一见 [GA4 插件使用分析](../docs/ANALYTICS.md)。
+| 搜索与分析 | [漫画名翻译 API](../docs/COMIC_SEARCH_DESIGN.md)、[GA4 插件使用分析](../docs/ANALYTICS.md) |
 
 ## 验证
 

@@ -11,7 +11,7 @@
 - 只发送有限分类和数量：界面、版本、语言、来源类别、阅读方式、翻译渠道类别、结果、耗时和错误类别。排除账户信息、漫画名、搜索词、文件名／路径、图片／OCR／译文、图片哈希、源站或签名地址、自定义渠道名与地址、Cookie、令牌和原始异常；不向 Google 转发用户 IP 或 UA。
 - 本机随机标识属于假名标识，不等于完全匿名；不关联登录账户、订单、官网访问或跨设备 User-ID，不同步到云端。不同设备、重装或清除标识可能被计作不同观察对象，GA4 人数不是全部安装量或去重后的自然人数。
 
-五语隐私政策、插件说明和商店数据收集声明须保持一致。官网承载隐私政策，但页面本身不埋点。
+各语言隐私政策、插件说明和商店数据收集声明须保持一致。官网承载隐私政策，但页面本身不埋点。
 
 ## 事件口径
 
@@ -48,13 +48,13 @@
 
 ## GA4 资源与报表
 
-使用 NodeLane 账号下的[插件媒体资源](https://analytics.google.com/analytics/web/#/a409676032p556145674/admin)，专用 Web 数据流为 `NodeLane Extension`，衡量 ID 为 `G-Z2EZ7RRTSS`，报表时区为中国 GMT+8。Web 是数据流类型，不代表采集官网。
+为插件配置独立 Web 数据流，衡量 ID 与 API secret 对应同一数据流，报表时区使用中国 GMT+8。实际媒体资源、数据流与访问权限由部署环境维护；Web 是数据流类型，不代表采集官网。
 
 用户级和事件级保留期为 14 个月，不随新活动重置；汇总报告不受此期限限制。Google Signals、用户提供的数据、广告个性化、精细位置／设备收集及增强型衡量关闭；`reader_activated` 为无货币价值的关键事件，开发者调试流量排除。Measurement Protocol 数据可能缺失常规网页标签的归因或地域信息，不为补齐报表扩大采集范围。
 
-已有事件级维度为 `surface`、`screen`、`extension_version`、`ui_language`、`browser`、`source_type`、`format`、`mode`、`channel`、`target_language`、`layout`、`outcome`、`search_mode`、`error_code`、`entry_point`。当前业务报表使用 `active_ms`、`pages_viewed`、`duration_ms` 指标；新增参数需按分析需要注册定义，不将用户／任务／漫画 ID 用作维度。
+事件级维度使用 `surface`、`screen`、`extension_version`、`ui_language`、`browser`、`source_type`、`format`、`mode`、`channel`、`target_language`、`layout`、`outcome`、`search_mode`、`error_code`、`entry_point`。业务报表使用 `active_ms`、`pages_viewed`、`duration_ms` 指标；参数需按分析需要注册定义，不将用户／任务／漫画 ID 用作维度。
 
-已保存[NodeLane · 插件使用分析](https://analytics.google.com/analytics/web/#/analysis/a409676032p556145674/edit/oHc_vQo9QAuk-t-VBcuKtw)，默认过去 28 天：
+报表按以下口径划分：
 
 | 标签 | 用途与解读 |
 | --- | --- |
@@ -64,7 +64,7 @@
 | 导入、搜索与离线结果 | 按事件及结果查看次数和人数，覆盖范围以上述事件口径为准 |
 | 激活与升级意向 | 查看观察起点、首次有效阅读、额度障碍和升级意向；点击不等于付款 |
 
-这五个标签是概览表，顺序漏斗和留存需另建探索。报表及自定义定义有处理延迟；解读时注明日期和样本量，不把拒绝分析者视为零使用，也不把调试事件当成产品样本。
+概览不能代替顺序漏斗和留存探索。报表及自定义定义有处理延迟；解读时注明日期和样本量，不把拒绝分析者视为零使用，也不把调试事件当成产品样本。
 
 ## 中继与发布
 
@@ -72,9 +72,9 @@
 
 中继无需登录，不接收账户凭据、不混用翻译额度、不持久排队；安装标识由客户端声明，不是可信业务事实。服务端通过 Redis 共享速率、8 个中继执行位和短期去重，不使用进程内限流锁；IP 仅保存共享随机盐的 HMAC，事件仅保存去重摘要，不存正文。请求桶自动过期，去重最多 20,000 个标记并保留最多 24 小时，正常 API 重启和增加副本不会重置。Redis 不可用时丢弃事件，数据丢失或达到去重容量仍可能造成遗漏或重复。UUID 本机标识仅为满足 Web 数据流格式而稳定派生为 GA4 双数字段标识，仍不关联账户。代理来源地址边界遵循[部署规范](DEPLOYMENT.md)。
 
-首次上线先更新 API 镜像及镜像内的五语隐私政策，在私密 `.env.server` 中设置 `GA4_ENABLED=true`、`GA4_EXTENSION_MEASUREMENT_ID` 和 `GA4_EXTENSION_API_SECRET`，然后重建 API 容器。生产 `GA4_DEBUG_MODE` 保持 false 或不设置；API 需能出站访问 Google HTTPS。同步 OpenResty 模板的来源地址覆盖规则并检查、重载代理。
+上线时独立发布 API 和官网隐私政策，在私密 `.env.server` 中设置 `GA4_ENABLED=true`、`GA4_EXTENSION_MEASUREMENT_ID` 和 `GA4_EXTENSION_API_SECRET`，然后按[部署规范](DEPLOYMENT.md)更新 API。生产 `GA4_DEBUG_MODE` 保持 false 或不设置；API 需能出站访问 Google HTTPS。核对 OpenResty 模板的来源地址覆盖规则。
 
-分析无需新数据库迁移、新依赖或后台任务，单独上线本功能只需更新 API 服务，不要求升级控制 worker、maintenance 或翻译计算节点。确认中继、隐私披露及商店声明就绪，再发布插件并核实明确同意后的真实入库。旧 API 的 404，以及关闭／缺配置中继的 204，均不能留待以后回放；健康检查和 HTTP 成功码不代表 GA4 入库。
+中继不依赖控制 worker、maintenance 或翻译计算节点。确认中继、隐私披露及商店声明就绪，再发布插件并核实明确同意后的真实入库。API 的 404，以及关闭／缺配置中继的 204，均不能留待以后回放；健康检查和 HTTP 成功码不代表 GA4 入库。
 
 ## 验证
 
