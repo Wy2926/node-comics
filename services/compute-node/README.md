@@ -16,7 +16,7 @@ node.exe run
 
 `init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 单图任务直接从中心读取临时原图并提交无损 WebP 覆盖层。文件任务的 `document_protocol:2` 仅在支持非特权解析沙箱的 Linux 宿主启用：输入一次下载，中间页留本地持久目录，最终 ZIP 上传 R2。Windows 不声明该能力，普通单图不受影响。节点只拿限定对象的短期签名，不配置 R2／LLM 凭据。`doctor` 校验文件与 GPU，并输出引擎版本；构建指纹仅用于追溯；兼容节点可直接接单，无需修改中心构建版本配置。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
 
-文件 OCR／渲染与单图共用同一身份、GPU runtime、线程池和内存预算；后台 `document_slots` 默认 1（0 停用），仍占原有最大在途数，交互任务优先领取。OCR 检查点本地落盘、只回传文本后释放租约，整本 LLM 等待不占节点页缓冲；PDF／ZIP 解析与打包也由此宿主执行，中央 document-worker 只处理整本文本。协议及升级边界见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)，旧任务排空后配套升级中心与节点。
+文件 OCR／渲染与单图共用同一身份、GPU runtime、固定执行池和内存预算；后台 `document_slots` 为保守并发，优先级与闲时借位见[文件调度规则](../../docs/DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。OCR 检查点本地落盘、只回传文本后释放租约，整本 LLM 等待不占节点页缓冲；PDF／ZIP 解析与打包也由此宿主执行，中央 document-worker 只处理整本文本。协议及升级边界见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)，旧任务排空后配套升级中心与节点。
 
 长期运行在管理员终端安装 Windows 服务：
 

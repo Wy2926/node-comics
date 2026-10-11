@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import {existsSync, readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 
 // Exercise the exported formatting functions from their real TSX modules without
@@ -25,6 +26,21 @@ const {columnText} = load('../src/AdminResource.tsx');
 const {billingStatus} = load('../src/billing.ts');
 const {auditChanges, flat} = load('../src/AuditLog.tsx');
 const {taskTimingRows} = load('../src/timings.ts');
+const {NodeConfigFields, parseConfig} = load('../src/NodeConfigFields.tsx');
+
+test('document slots describe conservative concurrency and keep zero as closed', () => {
+  const schema = {defaults: {execution_slots: 4, document_slots: 1}, pool_limits: {}, node: {properties: {
+    execution_slots: {type: 'integer', minimum: 1, maximum: 32},
+    document_slots: {type: 'integer', minimum: 0, maximum: 32},
+  }}};
+  const value = parseConfig('{"document_slots":0}', schema);
+  assert.deepEqual(value, {execution_slots: 4, document_slots: 0});
+  const html = renderToStaticMarkup(NodeConfigFields({value, schema, onChange() {}}));
+  assert.match(html, /文件保守并发（0 为关闭）/);
+  assert.equal([...html.matchAll(/type="number"/g)].length, 2);
+  assert.match(html, /min="0" max="32" step="1" value="0"/);
+  assert.throws(() => parseConfig('{"document_slots":33}', schema), /文件保守并发（0 为关闭） 的数值或范围无效/);
+});
 
 test('node substage timings are displayed but protocol version is not a duration', () => {
   assert.deepEqual(taskTimingRows({node: {render: 1.9, render_encode: .7, ocr_lock_wait: .2}, delivery: {protocol: 3}}), [

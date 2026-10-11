@@ -316,6 +316,223 @@ def test_document_admission_and_json_residency_share_classic_budget(agent):
     assert page.completion['error'] == 'INPUT_MEMORY_EXCEEDED'
 
 
+def test_idle_document_window_uses_shared_pools_and_returns_to_baseline(agent):
+    agent.config.update(document_slots=1, execution_slots=8)
+    agent.local['max_leases'] = 6
+    # Two compute slots plus one render slot, not six/eight prefetched pages.
+    for index in range(3):
+        assert agent.documents.capacity() == 1
+        add_document(agent, str(index)).step = 'text'
+    assert agent.documents.capacity() == 0
+    del agent.documents.pages['2']
+    assert agent.documents.capacity() == 1
+    ordinary = add_page(agent, 'ordinary')
+    ordinary.step = 'text'
+    assert agent.documents.capacity() == 0
+    # Lowering the limit never discards already accepted pages.
+    agent.config.update(document_slots=0, execution_slots=1)
+    assert agent.documents.capacity() == 0 and len(agent.documents.pages) == 2
+    agent.config.update(document_slots=1, execution_slots=8)
+    agent.pages.clear()
+    agent.local['max_leases'] = 2
+    assert agent.documents.capacity() == 0
+    agent.local['max_leases'] = 6
+    agent.config['execution_slots'] = 2
+    assert agent.documents.capacity() == 0
+
+
+def test_idle_borrowing_counts_document_inputs_awaiting_memory(agent):
+    agent.config.update(document_slots=1, execution_slots=8)
+    page = add_document(agent)
+    page.lease['input'].update(width=24_000_000, height=1)
+    agent.pipeline.limit = agent.pipeline.input_reservation(page)
+    assert page.reserved == agent.pipeline.used == 0
+    assert agent.documents.capacity() == agent.claim_capacity() == 0
+
+
+def document_control(agent):
+    agent.config['document_slots'] = 1
+    agent.documents._protocol = 2
+    agent.documents.control.shutdown(wait=True)
+    agent.documents.control = PendingPool()
+    agent.documents.next_sync = float('inf')
+
+
+@pytest.mark.parametrize('document', [False, True])
+def test_shared_claim_gate_blocks_other_future_but_not_heartbeat_or_updates(agent, document):
+    document_control(agent)
+    if document:
+        agent.next_claim = float('inf')  # Ordinary polling has already returned empty.
+        agent.documents.poll_control()
+    else:
+        agent.poll_control()
+    agent.poll_control()
+    agent.documents.poll_control()
+    assert len(agent.claim_pool.calls) == (0 if document else 1)
+    assert len(agent.documents.control.calls) == (1 if document else 0)
+    assert agent.heartbeat_future is not None and agent.notice_future is not None
+    # Do not spin readiness subscriptions while another claim owns the gate.
+    assert agent.notice_pool.calls[-1][2][1]['can_claim'] is False
+
+
+@pytest.mark.parametrize('ordinary_due', [False, True])
+def test_document_claim_refill_respects_due_ordinary_poll(agent, ordinary_due):
+    document_control(agent)
+    agent.next_claim = float('inf')
+    agent.documents.poll_control()
+    agent.documents.control.finish(response=True)
+    if ordinary_due:
+        agent.next_claim = 0  # Ordinary readiness arrived during the document request.
+    agent.poll_control()
+    agent.documents.poll_control()
+    if not ordinary_due:
+        assert len(agent.documents.control.calls) == 2 and not agent.claim_future
+        return
+    assert len(agent.documents.control.calls) == 1 and not agent.claim_future
+    agent.poll_control()
+    agent.documents.poll_control()
+    assert len(agent.claim_pool.calls) == len(agent.documents.control.calls) == 1
+
+
+@pytest.mark.parametrize('document', [False, True])
+def test_ambiguous_claim_blocks_new_ids_until_original_receipt_replayed(agent, document):
+    document_control(agent)
+    agent.config['execution_slots'], agent.local['max_leases'] = 8, 2
+    requests = []
+    runner = agent.documents if document else agent
+    key = 'document-claim' if document else 'claim'
+    def post(_, body):
+        requests.append(dict(body))
+        if len(requests) == 1:
+            raise ControlFailure('CONTROL_UNAVAILABLE')
+        server, _ = clock()
+        return {'request_id': body['request_id'], 'server_time': server, 'leases': []}
+    agent.transport.post = agent.transport.document_post = post
+    with pytest.raises(ControlFailure):
+        runner.claim()
+    # The HTTP future can already be gone, with a lease held only on the server.
+    assert not agent.claim_available(document=not document)
+    assert not agent.claim_available(new_only=True)
+    assert agent.journal.get(key) == requests[0]
+    runner.next_claim = 0
+    agent.config.update(enabled=False, document_slots=0, version=2)
+    agent.poll_control()
+    agent.documents.poll_control()
+    pool = agent.documents.control if document else agent.claim_pool
+    pool.finish()
+    assert requests == [requests[0], requests[0]] and agent.journal.get(key) is None
+    assert len(agent.claim_pool.calls) == (0 if document else 1)
+    assert len(agent.documents.control.calls) == (1 if document else 0)
+
+
+def test_restart_replays_both_old_claims_before_any_new_id(agent):
+    document_control(agent)
+    pending = {'request_id': 'ordinary-before-restart', 'config_version': 1, 'count': 4}
+    document_pending = {'request_id': 'doc_before-restart', 'config_version': 1, 'count': 1}
+    agent.journal.put('claim', pending)
+    agent.journal.put('document-claim', document_pending)
+    # Reopen the durable journal, as on process restart.
+    root = agent.journal.root
+    agent.journal.close()
+    from classic_node.journal import Journal
+    agent.journal = Journal(root)
+    requests = []
+    def post(_, body):
+        requests.append(dict(body))
+        server, _ = clock()
+        return {'request_id': body['request_id'], 'server_time': server, 'leases': []}
+    agent.transport.post = agent.transport.document_post = post
+    try:
+        agent.config.update(enabled=False, document_slots=0, version=2)
+        agent.poll_control()
+        agent.documents.poll_control()
+        assert not agent.documents.claim_future
+        agent.claim_pool.finish()
+        agent.poll_control()
+        agent.documents.poll_control()
+        assert agent.documents.claim_future and len(agent.claim_pool.calls) == 1
+        agent.documents.control.finish()
+        agent.documents.poll_control()
+        assert requests == [pending, document_pending]
+        assert agent.journal.get('claim') is agent.journal.get('document-claim') is None
+    finally:
+        # The shared fixture owns its original Journal instance.
+        agent.journal.close()
+
+
+def test_claim_replay_does_not_replace_a_document_already_restored_by_sync(agent):
+    page = add_document(agent)
+    page.step, page.future = 'analyze', Future()
+    existing_future = page.future
+    pending = {'request_id': 'doc_saved', 'config_version': 1, 'count': 1}
+    agent.journal.put('document-claim', pending)
+    server, _ = clock()
+    agent.transport.document_post = lambda *_: {'request_id': pending['request_id'], 'server_time': server, 'leases': [page.lease]}
+    agent.config.update(document_slots=0, enabled=False)
+    assert agent.documents.claim()
+    assert agent.documents.pages['document'] is page and page.future is existing_future
+
+
+def test_completed_document_future_is_advanced_before_shared_slot_dispatch(agent):
+    pending_pools(agent)
+    agent.local['local_pages'] = 1
+    ordinary = add_page(agent)
+    ordinary.step = 'inpaint'
+    page = add_document(agent, action='doc_render')
+    page.step, page.future = 'inpaint', Future()
+    page.analysis = analysis_for(page)
+    page.future.set_result(np.zeros((10, 10, 3), dtype=np.uint8))
+    agent.pipeline.tick()
+    assert ordinary.future is agent.pipeline.compute.calls[0][0]
+    assert page.step == 'render' and page.future is agent.pipeline.render.calls[0][0]
+
+
+@pytest.mark.parametrize('step', ['analyze', 'inpaint', 'render'])
+def test_shared_dispatch_drains_old_documents_amid_new_ordinary_work(agent, step):
+    pending_pools(agent)
+    agent.local['local_pages'] = 1
+    ordinary = add_page(agent)
+    ordinary.step, ordinary.ready_at = ('render' if step == 'render' else 'inpaint'), 3
+    older_analysis = add_page(agent, 'older-analysis')
+    older_analysis.step, older_analysis.ready_at = 'analyze', 1
+    page = add_document(agent, action='doc_render' if step != 'analyze' else 'doc_ocr')
+    page.step, page.ready_at, page.analysis = step, 2, analysis_for(page)
+    ordinary.analysis = analysis_for(page)
+    pool = agent.pipeline.render if step == 'render' else agent.pipeline.compute
+    agent.pipeline.tick()
+    assert page.future is pool.calls[0][0] and ordinary.future is None
+    # A busy shared pool has no executor backlog, even with newer ordinary work.
+    for index in range(4):
+        incoming = add_page(agent, f'new-{index}')
+        incoming.step, incoming.ready_at, incoming.analysis = ordinary.step, 4 + index, ordinary.analysis
+        agent.pipeline.tick()
+    assert len(pool.calls) == 1
+    if step != 'render':
+        # Once the older doc drains, retain ordinary inpaint-before-analysis.
+        page.future, page.step = None, 'text'
+        agent.pipeline.tick()
+        assert ordinary.future is pool.calls[1][0] and older_analysis.future is None
+
+
+def test_mixed_render_batch_reserves_ipc_and_cache_once_for_both_kinds(agent):
+    pending_pools(agent)
+    agent.pipeline.render_workers = 2
+    agent.runtime.render_ipc_bytes = lambda w, h, **_: w * h * 8
+    ordinary, document = add_page(agent), add_document(agent, action='doc_render')
+    for page in (ordinary, document):
+        page.step = 'render'
+        page.analysis = {'bubble_mask': 'fixture'}
+        page.translations = {'translations': {'0': 'one', '1': 'two'}}
+        agent.pipeline.resize_reservation(page, 1024)
+    agent.pipeline.limit = agent.pipeline.used + 1800  # Two IPC buffers + one cache mask each.
+    agent.pipeline.tick()
+    assert len(agent.pipeline.render.calls) == 2
+    assert agent.pipeline.used == agent.pipeline.limit
+    for page in (ordinary, document):
+        assert page.timings['render_ipc_bytes'] == 800
+        assert page.timings['render_cache_budget_bytes'] == 100
+
+
 def test_document_gpu_work_cannot_bypass_interactive_compute_pool(agent):
     pending_pools(agent)
     agent.local['local_pages'] = 1
@@ -323,11 +540,103 @@ def test_document_gpu_work_cannot_bypass_interactive_compute_pool(agent):
     classic.step, classic.future = 'analyze', Future()
     page = add_document(agent)
     page.step = 'analyze'
-    agent.documents.tick()
+    agent.pipeline.tick()
     assert page.future is None and agent.pipeline.compute.calls == []
     classic.future, classic.step = None, 'text'
-    agent.documents.tick()
+    agent.pipeline.tick()
     assert page.future is agent.pipeline.compute.calls[0][0]
+
+
+@pytest.mark.parametrize('slots,expected', [(None, 4), (2, 2)])
+def test_inpaint_ceiling_is_shared_by_ordinary_and_document_pages(agent, slots, expected):
+    pending_pools(agent)
+    agent.local['local_pages'] = 4
+    if slots is not None:
+        agent.local['inpaint_slots'] = slots
+    pages = [add_document(agent, 'document-first', action='doc_render'), add_page(agent, 'ordinary-first'),
+             add_document(agent, 'document-next', action='doc_render'), add_page(agent, 'ordinary-next')]
+    for index, page in enumerate(pages):
+        page.step, page.ready_at = 'inpaint', index + 1
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.compute.calls) == expected
+    assert all(page.future is not None for page in pages[:expected])
+    assert all(page.future is None for page in pages[expected:])
+    # Repeated dispatch cannot enqueue extra work behind the stage ceiling.
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.compute.calls) == expected
+
+
+def test_capped_inpaint_heads_do_not_block_ocr_or_change_waiting_age(agent):
+    pending_pools(agent)
+    agent.local.update(local_pages=4, inpaint_slots=2)
+    running = [add_page(agent, 'running-ordinary'), add_document(agent, 'running-document', action='doc_render')]
+    for page in running:
+        page.step, page.future = 'inpaint', Future()
+    waiting = [add_page(agent, 'waiting-ordinary'), add_document(agent, 'waiting-document', action='doc_render')]
+    for index, page in enumerate(waiting):
+        page.step, page.ready_at = 'inpaint', index + 1
+    analyzing = [add_page(agent, 'ocr-ordinary'), add_document(agent, 'ocr-document')]
+    for index, page in enumerate(analyzing):
+        page.step, page.ready_at = 'analyze', index + 3
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.compute.calls) == 2
+    assert all(page.future is not None for page in analyzing)
+    assert [(page.future, page.ready_at) for page in waiting] == [(None, 1), (None, 2)]
+    # Once the owners have drained, the skipped heads still have their old age.
+    for page in running + analyzing:
+        page.step, page.future = 'text', None
+    agent.pipeline.dispatch()
+    assert waiting[0].future is agent.pipeline.compute.calls[2][0]
+    assert waiting[1].future is agent.pipeline.compute.calls[3][0]
+
+
+def test_inpaint_ceiling_does_not_reduce_four_way_ocr(agent):
+    pending_pools(agent)
+    agent.local.update(local_pages=4, inpaint_slots=2)
+    pages = [add_page(agent, 'ocr-ordinary'), *[add_document(agent, f'ocr-document-{index}') for index in range(3)]]
+    for page in pages:
+        page.step = 'analyze'
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.compute.calls) == 4 and all(page.future is not None for page in pages)
+
+
+def test_last_inpaint_slot_is_not_assigned_to_both_queues(agent):
+    pending_pools(agent)
+    agent.local.update(local_pages=4, inpaint_slots=2)
+    running = add_page(agent, 'running')
+    running.step, running.future = 'inpaint', Future()
+    document = add_document(agent, action='doc_render')
+    ordinary = add_page(agent, 'waiting')
+    document.step, document.ready_at = 'inpaint', 1
+    ordinary.step, ordinary.ready_at = 'inpaint', 2
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.compute.calls) == 1
+    assert document.future is not None and ordinary.future is None
+
+
+def test_four_render_slots_are_independent_of_inpaint_ceiling(agent):
+    pending_pools(agent)
+    agent.local.update(local_pages=4, inpaint_slots=2)
+    agent.pipeline.render_workers = 4
+    pages = [add_page(agent, 'ordinary'), *[add_document(agent, f'document-{index}', action='doc_render') for index in range(3)]]
+    for page in pages:
+        page.step, page.analysis = 'render', analysis_for(pages[1])
+    agent.pipeline.dispatch()
+    assert len(agent.pipeline.render.calls) == 4 and all(page.future is not None for page in pages)
+    assert agent.pipeline.compute.calls == []
+
+
+@pytest.mark.parametrize('state', ['stopped', 'terminal', 'pending_error'])
+def test_undrained_inpaint_keeps_stage_slot_after_stop_or_error(agent, state):
+    pending_pools(agent)
+    agent.local.update(local_pages=4, inpaint_slots=1)
+    running = add_document(agent, 'running', action='doc_render')
+    running.step, running.future = 'inpaint', Future()
+    setattr(running, state, True)
+    waiting = add_page(agent, 'waiting')
+    waiting.step = 'inpaint'
+    agent.pipeline.dispatch()
+    assert waiting.future is None and agent.pipeline.compute.calls == []
 
 
 @pytest.mark.parametrize('prepared', [False, True])
@@ -572,7 +881,7 @@ def test_unexpected_page_failure_isolated_and_never_logs_private_error_body(agen
     other.step = 'analyze'
     agent.network_log.failed = lambda *_: pytest.fail('Raw exceptions must not reach NetworkLog')
     with caplog.at_level(logging.ERROR, logger='classic-node'):
-        agent.documents.tick()
+        agent.pipeline.tick()
     assert failed.completion['error'] == code and failed.step == 'deliver'
     assert other.future is not None and len(agent.pipeline.compute.calls) == 1
     assert 'event=page_failed' in caplog.text and f'code={code}' in caplog.text
@@ -748,7 +1057,7 @@ def test_document_render_uses_lease_page_limit_from_its_workspace(agent):
     page.analysis, page.translations = analysis_for(page), page.lease['translations']
     calls = []
     agent.runtime.render = lambda *args, **kwargs: calls.append(kwargs)
-    agent.documents.tick()
+    agent.pipeline.tick()
     agent.pipeline.render.finish()
     assert page.future.result() is None and len(calls) == 1
     assert calls[0]['full_image_max_bytes'] == workspace.limits.max_page_bytes == 4096

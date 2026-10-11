@@ -21,8 +21,8 @@ from ..node_config import NodeConfig
 from ..providers import digest
 from ..queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from ..request_models import RequestBody
-from ..scheduler import (current_lease, has_claimable_work, lock_scheduler, release_lease,
-                         remaining_capacity, start_lease, touch_job)
+from ..scheduler import (current_lease, has_eligible_work, lock_scheduler, release_lease,
+                         start_lease, touch_job)
 from .config import get_document_settings
 from .models import Document, DocumentPage
 from .storage import DocumentStoreError, get_document_store
@@ -219,13 +219,27 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
         if node.config_version != body.config_version:
             problem('NODE_CONFIG_CONFLICT', '节点配置已更新', 409)
         cfg = NodeConfig.model_validate(node.desired_config)
-        busy = db.scalar(select(func.count()).select_from(ExecutionLease).join(JobStage).where(
-            ExecutionLease.node_id == node_id, ExecutionLease.completed_at.is_(None), JobStage.name.in_(NODE_STAGES)))
         leases = []
         # Ownership is not a capacity lease. Every short operation competes
         # through the existing node gate; no GPU slot is held while text runs.
-        if (node.enabled and busy < cfg.document_slots and remaining_capacity(db, node)
-                and not has_claimable_work(db, node_id, ['page'])):
+        if node.enabled and cfg.document_slots:
+            # One locked snapshot counts every unfinished lease, including ones
+            # awaiting expiry recovery. Only ordinary pages on this GPU prohibit
+            # borrowing; a separate control-text pool does not occupy this node.
+            busy = db.execute(select(func.count().label('total'),
+                func.count().filter(JobStage.name.in_(NODE_STAGES)).label('documents'),
+                func.count().filter(JobStage.name == 'page').label('ordinary'))
+                .select_from(ExecutionLease).join(JobStage).where(
+                    ExecutionLease.node_id == node_id, ExecutionLease.completed_at.is_(None))).one()
+            limit = cfg.document_slots if busy.ordinary else node.capacity
+        else:
+            busy, limit = None, 0
+        if (limit and busy.total < node.capacity and busy.documents < limit
+                and not has_eligible_work(db, node, ['page'])):
+            # Parsing/packing retain the conservative budget. Idle borrowed
+            # capacity is exclusively for OCR/render; FIFO among eligible stages
+            # and the existing one-stage claim receipt remain unchanged.
+            stages = NODE_STAGES if busy.documents < cfg.document_slots else ('doc_ocr', 'doc_render')
             row = db.execute(select(JobStage, Job, Document).join(Job, Job.id == JobStage.job_id)
                 .join(Document, Document.job_id == Job.id).where(
                     Job.workflow_kind == 'document', Job.status.in_(['preflight', 'queued', 'running']),
@@ -233,7 +247,7 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
                         and_(Document.owner_node_id.is_(None), JobStage.name == 'doc_prepare')),
                     or_(JobStage.name == 'doc_prepare', Document.reserved_at.is_not(None)),
                     Job.cancel_requested.is_(False), Job.discard_output.is_(False),
-                    JobStage.name.in_(NODE_STAGES), JobStage.name.in_(node.capabilities), JobStage.status == 'ready',
+                    JobStage.name.in_(stages), JobStage.name.in_(node.capabilities), JobStage.status == 'ready',
                     JobStage.available_at <= now(), Job.target_language.in_(node.supported_languages))
                 .order_by(JobStage.available_at, JobStage.id).limit(1)).first()
             if row:

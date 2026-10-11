@@ -1,4 +1,5 @@
 """Bounded page state, with computation independent of network and text waits."""
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import re
@@ -295,6 +296,15 @@ class Pipeline:
                 self.submit(page, self.download, 'download', lambda p=page: self.agent.input_bytes(p))
             elif page.step == 'deliver':
                 self.submit(page, self.delivery, 'deliver', lambda p=page: self.agent.deliver(p, p.completion))
+        # Drain both state machines before counting shared running slots or
+        # selecting ready work. DocumentRunner owns local I/O, not image pools.
+        self.agent.documents.tick()
+        self.dispatch()
+
+    def dispatch(self):
+        pages = self.agent.active_pages()
+        inpaint_available = self.agent.local.get('inpaint_slots', self.agent.local['local_pages']) - sum(
+            bool(p.future and p.step == 'inpaint') for p in pages)
         # Submit only available slots, not an unbounded executor backlog. A page
         # owns its buffers until its future drains; waits retain the same lease
         # and resident-byte reservation. No lock spans either execution pool.
@@ -302,14 +312,35 @@ class Pipeline:
         # of downloads cannot postpone the first result until all are analyzed.
         for stages, pool, capacity in (({'analyze', 'inpaint'}, self.compute, self.agent.local['local_pages']),
                                        ({'render'}, self.render, self.render_workers)):
-            running = sum(bool(p.future and p.step in stages) for p in self.agent.active_pages())
-            ready = sorted((p for p in pages if not p.future and not p.pending_error
-                            and not p.stopped and not p.terminal and p.step in stages),
-                           key=lambda p: (p.step == 'analyze', p.ready_at))
-            ready = ready[:max(0, capacity - running)]
+            running = sum(bool(p.future and p.step in stages) for p in pages)
+            eligible = [p for p in pages if not p.future and not p.pending_error
+                        and not p.stopped and not p.terminal and p.step in stages]
+            ordinary = deque(sorted((p for p in eligible if 'action' not in p.lease),
+                                    key=lambda p: (p.step == 'analyze', p.ready_at)))
+            documents = deque(sorted((p for p in eligible if 'action' in p.lease), key=lambda p: p.ready_at))
+            ready = []
+            # Preserve ordinary images' internal order, but compare heads by
+            # age: newly admitted ordinary work cannot starve a held doc lease.
+            for _ in range(max(0, capacity - running)):
+                # This is a stage ceiling inside the shared compute pool, not
+                # another executor. Leave capped pages ready without blocking
+                # OCR behind them or changing their age for the next dispatch.
+                for queue in (ordinary, documents):
+                    while queue and queue[0].step == 'inpaint' and inpaint_available <= 0:
+                        queue.popleft()
+                if not ordinary and not documents:
+                    break
+                queue = documents if documents and (not ordinary or documents[0].ready_at < ordinary[0].ready_at) else ordinary
+                page = queue.popleft()
+                ready.append(page)
+                if page.step == 'inpaint':
+                    inpaint_available -= 1
             reservations = self.reserve_render_batch(ready) if stages == {'render'} else {}
             for page in ready:
-                if page.step == 'analyze':
+                if 'action' in page.lease:
+                    ipc, cache_bytes = reservations.get(page, (0, 0))
+                    operation = lambda p=page, ipc=ipc, budget=cache_bytes: self.agent.documents.run_image_stage(p, ipc=ipc, cache_bytes=budget)
+                elif page.step == 'analyze':
                     operation = lambda p=page: self.prepare(p)
                 elif page.step == 'inpaint':
                     operation = lambda p=page: self.agent.runtime.inpaint(p.rgb, p.analysis, masks=p.masks)

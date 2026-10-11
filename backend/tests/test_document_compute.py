@@ -250,7 +250,11 @@ def test_concurrent_claim_receipt_and_configuration_replay(documents):
         replies = list(pool.map(lambda _: claim(documents, 'lost-response'), range(4)))
     assert all(reply.status_code == 200 for reply in replies)
     ids = [reply.json()['leases'][0]['lease_id'] for reply in replies]
-    assert len(set(ids)) == 1 and claim(documents).json()['leases'] == []
+    assert len(set(ids)) == 1
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(ExecutionLease).where(
+            ExecutionLease.node_id == documents.v3['node']['node_id'],
+            ExecutionLease.completed_at.is_(None))) == 1
     with session_factory()() as db:
         node = db.get(ComputeNode, documents.v3['node']['node_id'])
         node.enabled, node.config_version = False, 2

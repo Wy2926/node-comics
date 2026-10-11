@@ -137,6 +137,16 @@ def remaining_capacity(db, node):
     return max(0, node.capacity - busy)
 
 
+def has_eligible_work(db, node, stages):
+    """Queue existence only; callers that need capacity check it once themselves."""
+    stages = set(node.capabilities) & set(stages)
+    if not node.enabled or not stages:
+        return False
+    eligible = _eligible_stages(node, stages, now(), blocked_providers=_blocked_providers(db, node, stages))
+    # Advisory only: claim retires missing local inputs. Never stat a backlog here.
+    return bool(db.scalar(select(eligible.exists())))
+
+
 def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None):
     """An advisory read for long-poll wakeups; claim_batch remains authoritative."""
     with db.no_autoflush:
@@ -146,9 +156,7 @@ def has_claimable_work(db, node_id, allowed_stages=None, *, config_version=None)
         stages = set(node.capabilities) & set(allowed_stages or node.capabilities)
         if not stages or not remaining_capacity(db, node):
             return False
-        eligible = _eligible_stages(node, stages, now(), blocked_providers=_blocked_providers(db, node, stages))
-        # Advisory only: claim retires missing local inputs. Never stat an entire backlog here.
-        return bool(db.scalar(select(eligible.exists())))
+        return has_eligible_work(db, node, stages)
 
 
 def next_control_delay(db, maximum=5):

@@ -182,7 +182,7 @@ multipart 请求体接收受 `upload_body_timeout_seconds` 总时限约束，持
 | `POST /leases/{id}/uploads` | 仅 ZIP 阶段可冻结 `output_ref` 并签发精确 PUT；成功重放返回原回执 |
 | `POST /leases/{id}/complete` | 令牌与目录代次，加该阶段的清单／内联文本／描述符，或固定 error 代码；返回稳定终态 |
 
-首次 prepare 领取原子固定 `Document.owner_node_id`；所有后续节点阶段只给该宿主。租约同时包含阶段 `generation` 和独立的 `workspace_generation`，写入时核对用户任务、节点、令牌、两类代次及期限。目录归属不占执行位：prepare、每页 OCR／render、ZIP 都是独立短期租约，全文 LLM 等待期间没有 GPU 租约。`document_slots` 默认 1、范围 0–32，0 停止新文件阶段领取；它是同节点 `execution_slots` 之内的上限，不是额外容量。领取在同一调度锁内确认没有可领取的交互单图；到期但未回收租约仍计入容量。两条流程共用原有下载、计算、嵌字、交付池、GPU runtime、CPU 和内存门禁，已开始操作不被抢占，低优先级不保证交互零等待或文件无饥饿。
+首次 prepare 领取原子固定 `Document.owner_node_id`；所有后续节点阶段只给该宿主。租约同时包含阶段 `generation` 和独立的 `workspace_generation`，写入时核对用户任务、节点、令牌、两类代次及期限。目录归属不占执行位：prepare、每页 OCR／render、ZIP 都是独立短期租约，全文 LLM 等待期间没有 GPU 租约。`document_slots` 表示同节点总执行位内的文件保守并发，0 关闭新文件阶段领取。普通单图优先、闲时借位、共享池与在途窗口统一遵循[文件调度规则](DOCUMENT_TRANSLATION.md#共享调度与闲时借位)，不增加协议字段、压力通知或抢占操作。
 
 所有节点阶段的领取与同步负载均携带 `file_limits`，页面读取、恢复和打包使用中心下发的文件预算，不回退到宿主默认值。阶段专属字段如下：
 

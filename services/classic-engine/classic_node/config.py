@@ -36,6 +36,7 @@ def load(path):
         raise ValueError('Unknown local engine option')
     value['engine'] = defaults | value.get('engine', {})
     value.setdefault('local_pages', 2)
+    value.setdefault('inpaint_slots', value['local_pages'])
     value.setdefault('render_workers', 'auto')
     value.setdefault('max_leases', 8)
     value.setdefault('download_workers', 4)
@@ -48,6 +49,8 @@ def load(path):
     if (not all(type(value[k]) is int for k in ('local_pages', 'max_leases'))
             or not 1 <= value['local_pages'] <= value['max_leases'] <= 32):
         raise ValueError('Require 1 <= local_pages <= max_leases <= 32')
+    if type(value['inpaint_slots']) is not int or not 1 <= value['inpaint_slots'] <= value['local_pages']:
+        raise ValueError('inpaint_slots must be between 1 and local_pages')
     if value['render_workers'] != 'auto' and (type(value['render_workers']) is not int
                                             or not 1 <= value['render_workers'] <= value['max_leases']):
         raise ValueError('render_workers must be auto or between 1 and max_leases')

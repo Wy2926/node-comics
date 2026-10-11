@@ -142,9 +142,15 @@ class DocumentRunner:
         config = self.agent.config or {}
         if self._protocol is None or not config.get('enabled') or self.agent.stop.is_set():
             return 0
-        maximum = config.get('document_slots', 0)
+        baseline = config.get('document_slots', 0)
+        window = min(config.get('execution_slots', 0), self.agent.local['max_leases'],
+                     self.agent.local['local_pages'] + self.agent.pipeline.render_workers)
+        # The center authorizes borrowing only for OCR/render, after checking
+        # ordinary ready work. Locally bound already-claimed work, not each book.
+        maximum = min(baseline, window) if self.agent.pages else window
         slots = min(config.get('execution_slots', 0), self.agent.local['max_leases']) - len(self.agent.active_pages())
-        return int(len(self.pages) < maximum and slots > 0 and self.agent.pipeline.claim_capacity() > 0)
+        return int(baseline > 0 and len(self.pages) < maximum and slots > 0
+                   and self.agent.pipeline.claim_capacity() > 0)
 
     def sync(self):
         from .document_workspace import DocumentWorkspace
@@ -268,8 +274,8 @@ class DocumentRunner:
             self.next_sync = at + max(30, self.agent.config['poll_seconds'])
             self.sync_future = self.control.submit(self.sync)
             self.sync_future.add_done_callback(lambda _: self.agent.wake.set())
-        if (self.claim_future is None and not self.agent.stop.is_set() and at >= self.next_claim
-                and self.agent.claim_future is None and (self.agent.journal.get('document-claim') or self.capacity())):
+        if (not self.agent.stop.is_set() and at >= self.next_claim and self.agent.claim_available(document=True)
+                and (self.agent.journal.get('document-claim') or self.capacity())):
             self.claim_future = self.control.submit(self.claim)
             self.claim_future.add_done_callback(lambda _: self.agent.wake.set())
 
@@ -299,6 +305,16 @@ class DocumentRunner:
         page.data = None
         self.agent.runtime.restore_masks(page.analysis, (page.lease['input']['width'], page.lease['input']['height']), page.masks)
         return self.agent.runtime.inpaint(page.rgb, page.analysis, masks=page.masks)
+
+    def run_image_stage(self, page, *, ipc=0, cache_bytes=0):
+        if page.step == 'analyze':
+            return self.analyze(page)
+        if page.step == 'inpaint':
+            return self.inpaint(page)
+        return self.agent.runtime.render(
+            page.rgb, page.cleaned, page.analysis, page.translations, page.lease['language'], page.alpha,
+            use_render_pool=bool(ipc), mask_cache_bytes=cache_bytes, check_cancelled=page.check, masks=page.masks,
+            full_image_max_bytes=self.workspace(page).limits.max_page_bytes)
 
     def persist(self, page):
         workspace = self.workspace(page)
@@ -474,22 +490,6 @@ class DocumentRunner:
                 if sum(bool(p.future and p.step in ('download', 'prepare', 'package')) for p in self.agent.active_pages()) >= self.agent.local.get('download_workers', 4):
                     continue
                 pipeline.submit(page, pipeline.download, page.step, lambda p=page: getattr(self, p.step)(p))
-            elif page.step in ('analyze', 'inpaint', 'render'):
-                stages = {'render'} if page.step == 'render' else {'analyze', 'inpaint'}
-                capacity = pipeline.render_workers if page.step == 'render' else self.agent.local['local_pages']
-                if sum(bool(p.future and p.step in stages) for p in self.agent.active_pages()) >= capacity:
-                    continue
-                if page.step == 'analyze':
-                    operation = lambda p=page: self.analyze(p)
-                elif page.step == 'inpaint':
-                    operation = lambda p=page: self.inpaint(p)
-                else:
-                    ipc, cache = pipeline.reserve_render_batch([page])[page]
-                    operation = lambda p=page, cache=cache, ipc=ipc: self.agent.runtime.render(
-                        p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
-                        use_render_pool=bool(ipc), mask_cache_bytes=cache, check_cancelled=p.check, masks=p.masks,
-                        full_image_max_bytes=self.workspace(p).limits.max_page_bytes)
-                pipeline.submit(page, pipeline.render if page.step == 'render' else pipeline.compute, page.step, operation)
             elif page.step in ('persist', 'deliver'):
                 if sum(bool(p.future and p.step in ('persist', 'deliver')) for p in self.agent.active_pages()) < self.agent.local.get('delivery_workers', 4):
                     pipeline.submit(page, pipeline.delivery, page.step, lambda p=page: getattr(self, p.step)(p))

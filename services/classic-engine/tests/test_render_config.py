@@ -32,12 +32,56 @@ def test_missing_cpu_configuration_resolves_auto_counts(tmp_path, cpu_capacity):
     path = tmp_path / 'node.json'
     path.write_text(json.dumps(config))
     resolved = load(path)
+    assert resolved['inpaint_slots'] == resolved['local_pages'] == 2
     assert resolved['engine']['threads'] == 3 and resolved['render_workers'] == 5
     assert resolved['_render_threads'] == resolved['_cpu_resources']['render_threads'] == 1
     assert resolved['_cpu_resources']['allocated_cpu_slots'] == 11
     assert resolved['_cpu_resources']['mixed_render_cpu_slots'] == 13
     assert not resolved['_cpu_resources']['oversubscribed'] and resolved['_cpu_resources']['warnings'] == []
     assert 'render_threads' not in resolved['engine']  # Execution policy, not model/output identity.
+
+
+@pytest.mark.parametrize('pages', [1, 4, 32])
+def test_missing_inpaint_limit_preserves_shared_compute_capacity(tmp_path, cpu_capacity, pages):
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps({**configuration(), 'local_pages': pages, 'max_leases': max(8, pages)}))
+    resolved = load(path)
+    assert resolved['inpaint_slots'] == resolved['local_pages'] == pages
+
+
+@pytest.mark.parametrize('slots', [0, -1, 5, True, False, 1.5, '2', 'auto', None])
+def test_inpaint_limit_requires_integer_within_shared_compute_capacity(tmp_path, slots):
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps({**configuration(), 'local_pages': 4, 'inpaint_slots': slots}))
+    with pytest.raises(ValueError, match='inpaint_slots'):
+        load(path)
+
+
+@pytest.mark.parametrize('slots', [1, 2, 4])
+def test_inpaint_limit_keeps_four_page_auto_cpu_budget(tmp_path, cpu_capacity, slots):
+    cpu_capacity.update(quota_cpus=5.76, effective_cpus=5.76, budget_cpus=5)
+    config = {**configuration(), 'local_pages': 4, 'max_leases': 4, 'inpaint_slots': slots,
+              'engine': {'threads': 'auto'}, 'render_workers': 'auto'}
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(config))
+    resolved = load(path)
+    assert resolved['inpaint_slots'] == slots and resolved['local_pages'] == 4
+    assert resolved['engine']['threads'] == resolved['render_workers'] == resolved['_render_threads'] == 1
+    assert resolved['_cpu_resources']['allocated_cpu_slots'] == 5
+    assert not resolved['_cpu_resources']['oversubscribed'] and resolved['_cpu_resources']['warnings'] == []
+
+
+def test_explicit_four_render_workers_preserve_counts_and_cpu_overcommit_warning(tmp_path, cpu_capacity):
+    cpu_capacity.update(quota_cpus=5.76, effective_cpus=5.76, budget_cpus=5)
+    config = {**configuration(), 'local_pages': 4, 'max_leases': 4, 'inpaint_slots': 2,
+              'engine': {'threads': 'auto'}, 'render_workers': 4}
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(config))
+    resolved = load(path)
+    assert resolved['local_pages'] == resolved['render_workers'] == 4 and resolved['inpaint_slots'] == 2
+    assert resolved['engine']['threads'] == resolved['_render_threads'] == 1
+    assert resolved['_cpu_resources']['allocated_cpu_slots'] == 8
+    assert resolved['_cpu_resources']['oversubscribed'] and resolved['_cpu_resources']['warnings']
 
 
 @pytest.mark.parametrize('threads,workers,expected', [

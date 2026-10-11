@@ -121,6 +121,21 @@ class Agent:
         slots = min(self.config['execution_slots'], self.local['max_leases']) - len(self.active_pages())
         return max(0, min(slots, self.pipeline.claim_capacity()))
 
+    def claim_available(self, *, document=False, new_only=False):
+        # Both pollers run on the agent loop. Keep the gate until the response
+        # has been adopted; a failed future alone does not resolve its receipt.
+        if self.claim_future is not None or self.documents.claim_future is not None:
+            return False
+        if self.journal.get('claim'):
+            return not new_only and not document
+        if self.journal.get('document-claim'):
+            return not new_only and document
+        # A document response may finish between the two pollers. Let a due
+        # ordinary poll take the newly free gate before refilling documents.
+        if document and time.monotonic() >= self.next_claim and self.claim_capacity():
+            return False
+        return True
+
     def request_claim(self):
         with self.config_lock:
             self.claim_wake_version += 1
@@ -267,7 +282,6 @@ class Agent:
 
     def reap(self):
         self.pipeline.tick()
-        self.documents.tick()
         for key, page in list(self.pages.items()):
             if page.future or page.analysis_future:
                 continue
@@ -346,7 +360,7 @@ class Agent:
             self.last_heartbeat = time.monotonic()
             self.heartbeat_future = self.heartbeat_pool.submit(self.heartbeat)
             self.heartbeat_future.add_done_callback(lambda _: self.wake.set())
-        if (not self.claim_future and not self.stop.is_set() and time.monotonic() >= self.next_claim
+        if (not self.stop.is_set() and time.monotonic() >= self.next_claim and self.claim_available()
                 and (self.journal.get('claim') or self.claim_capacity())):
             self.claim_generation += 1
             with self.config_lock:
@@ -361,7 +375,8 @@ class Agent:
             self.notice_future = self.notice_pool.submit(self.transport.post,
                 f'/nodes/{self.local["node_id"]}/updates', {'revision': self.revision,
                     'wait_seconds': min(20, max(0, self.config['request_seconds'] - 2)),
-                    'config_version': self.config['version'], 'can_claim': bool(self.claim_capacity()),
+                    'config_version': self.config['version'],
+                    'can_claim': bool(self.claim_capacity()) and self.claim_available(new_only=True),
                     'leases': self.lease_entries()})
             self.notice_future.add_done_callback(lambda _: self.wake.set())
 
