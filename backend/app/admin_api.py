@@ -35,7 +35,8 @@ class CompensationRequest(RequestBody):
 
 @router.get("/v1/admin/jobs")
 def admin_jobs(status: str | None = Query(None, max_length=24), offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), user: User = Depends(admin), db: Session = Depends(get_db)):
-    query = select(Job)
+    # Legacy image-result view; document execution is exposed by monitor/tasks.
+    query = select(Job).where(Job.workflow_kind == 'image')
     if status:
         query = query.where(Job.status == status)
     total = db.scalar(select(func.count()).select_from(query.subquery()))

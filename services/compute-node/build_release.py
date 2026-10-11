@@ -34,6 +34,7 @@ class Builder:
 
     def requirements(self, project, target):
         run([self.uv, 'export', '--project', project, '--frozen', '--no-dev', '--no-emit-project',
+             '--no-emit-package', 'comic-document-files',
              '--no-editable', '--no-header', '--no-annotate', '--output-file', target], cwd=ROOT, env=self.env, capture=True)
         content = target.read_text(encoding='utf-8')
         # uv export omits index URLs. Keep CUDA artifacts tied directly
@@ -101,6 +102,10 @@ class Builder:
         remove_unused_launchers(runtime / 'Lib/site-packages')
         for package in ('classic_node', 'mtu_engine'):
             copy_sources(ENGINE / package, self.output / 'engine' / package)
+        # Local first-party source is copied with the engine, not fed to pip's
+        # hash-required third-party requirements. PDFium stays lockfile-pinned.
+        copy_sources(ENGINE.parent.parent / 'backend/document_files/comic_document_files',
+                     self.output / 'engine/comic_document_files')
         for name in ('LICENSE', 'THIRD_PARTY.md', 'uv.lock', 'pyproject.toml'):
             shutil.copy2(ENGINE / name, self.output / 'engine' / name)
         for directory in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation'):
@@ -119,6 +124,8 @@ class Builder:
 
     def package_sources(self):
         source = self.output / 'source'
+        # Preserve ../../backend/document_files as referenced by the engine lock.
+        copy_sources(ENGINE.parent.parent / 'backend/document_files', self.output / 'backend/document_files')
         host = source / 'compute-node'
         host.mkdir(parents=True)
         for pattern in ('*.go', '*.py', '*.ps1', '*.json', 'go.mod', 'go.sum', 'README.md', 'LICENSE'):

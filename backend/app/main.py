@@ -16,6 +16,10 @@ from .guests import router as guest_router
 from .comic_titles import TitleExecutor, router as comic_titles_router
 from .analytics import router as analytics_router
 from .compute_v3 import router as compute_v3_router
+from .documents.api import router as documents_router
+from .documents.compute import router as document_compute_router
+from .documents.admin import router as document_admin_router
+from .documents.storage import DocumentStoreError
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
 from .db import get_db, session_factory
@@ -65,6 +69,9 @@ app.include_router(guest_router)
 app.include_router(comic_titles_router)
 app.include_router(analytics_router)
 app.include_router(compute_v3_router)
+app.include_router(documents_router)
+app.include_router(document_compute_router)
+app.include_router(document_admin_router)
 app.include_router(reader_router)
 app.include_router(support_requests_router)
 app.include_router(grants_router)
@@ -132,6 +139,12 @@ async def storage_error(request, exc):
 async def admission_error(request, exc):
     return JSONResponse(status_code=503, headers={'Retry-After': '2'}, content={'error': {
         'code': exc.code, 'message': '请求准入服务暂时不可用，请稍后重试', 'request_id': request.state.request_id}})
+
+
+@app.exception_handler(DocumentStoreError)
+async def document_storage_error(request, exc):
+    return JSONResponse(status_code=503, content={'error': {'code': exc.code,
+        'message': '文件存储暂时不可用，请稍后重试', 'request_id': request.state.request_id}})
 
 
 class DevLogin(RequestBody):

@@ -71,7 +71,7 @@ def _eligible_stages(node, stages, at, *, stage_ids=None, blocked_providers=()):
     image_stage = JobStage.name.in_(IMAGE_STAGES)
     eligible = (select(JobStage.id).select_from(JobStage).join(Job, Job.id == JobStage.job_id)
         .outerjoin(Asset, Asset.id == Job.input_asset_id)
-        .where(JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
+        .where(Job.workflow_kind == 'image', JobStage.status == "ready", JobStage.name.in_(stages), JobStage.available_at <= at,
             Job.status.in_(["queued", "running", "validating_upload"]),
             Job.cancel_requested.is_(False), Job.discard_output.is_(False),
             or_(JobStage.name == "validate_upload", and_(Asset.id.is_not(None), Asset.deleted_at.is_(None),
@@ -241,7 +241,7 @@ def claim_batch(db, node_id, allowed_stages=None, *, limit=CLAIM_BATCH_LIMIT, ex
     for stage, job in _claimable_candidates(db, node, allowed_stages, at, candidates_before_lock, blocked):
         if len(leases) == limit:
             break
-        leases.append(_start_lease(db, node, stage, job, at, executor_id))
+        leases.append(start_lease(db, node, stage, job, at, executor_id))
     return leases
 
 
@@ -272,7 +272,7 @@ def _claimable_candidates(db, node, allowed_stages, at, candidates_before_lock, 
         and (stage.name == "validate_upload" or available_sources.get(job.input_asset_id, False))]
 
 
-def _start_lease(db, node, stage, job, at, executor_id):
+def start_lease(db, node, stage, job, at, executor_id=None):
     cfg = settings()
     if not job.attempt_id:
         job.attempt_id = uid()

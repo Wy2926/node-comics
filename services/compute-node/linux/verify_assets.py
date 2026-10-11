@@ -1,4 +1,5 @@
-"""Offline build-time verification; target-host check still requires an NVIDIA GPU."""
+"""Verify installed model hashes, native imports and fonts before GPU warmup."""
+import argparse
 import json
 from pathlib import Path
 
@@ -30,4 +31,6 @@ def verify(root):
 
 
 if __name__ == '__main__':
-    verify(Path('/opt/node'))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--bundle-root', type=Path, default=Path('/opt/node'))
+    verify(parser.parse_args().bundle_root)

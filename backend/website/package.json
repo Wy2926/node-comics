@@ -9,6 +9,7 @@
   "scripts": {
     "notices": "tsx scripts/write-notices.ts",
     "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "dev:documents": "vite --config tests/document-live.config.ts",
     "check": "astro check",
     "build": "astro check && astro build && tsx scripts/check-build.ts",
     "preview": "astro preview --host 127.0.0.1 --port 4321",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@astrojs/react": "6.0.6",
+    "@noble/hashes": "2.4.0",
     "@zip.js/zip.js": "2.15.0",
     "astro": "7.3.3",
     "oidc-client-ts": "3.5.0",

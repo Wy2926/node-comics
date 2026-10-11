@@ -1,0 +1,11 @@
+# Text-only document control worker: never parses or stores page image files.
+FROM python:3.11-slim-bookworm
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home comics
+COPY app ./app
+ARG RELEASE_ID=development
+ENV RELEASE_ID=${RELEASE_ID} SERVE_STATIC=false
+USER comics
+CMD ["python", "-m", "app.documents.worker"]

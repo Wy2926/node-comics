@@ -69,6 +69,7 @@ class Job(Base):
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now, index=True)
     output_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
     mode: Mapped[str] = mapped_column(String(20))
+    workflow_kind: Mapped[str] = mapped_column(String(16), server_default='image')
     target_language: Mapped[str] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
     phase: Mapped[str] = mapped_column(String(40), default="queued")
@@ -94,6 +95,8 @@ class Job(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
+                     CheckConstraint("workflow_kind IN ('image', 'document')", name='ck_job_workflow'),
+                     Index('ix_jobs_owner_workflow_created', 'owner_id', 'workflow_kind', 'created_at', 'id'),
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
                      Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"),
                      Index("ix_jobs_guest_expiry", "completed_at",
@@ -155,8 +158,8 @@ class TextCall(Base):
     model: Mapped[str] = mapped_column(String(120))
     request_id: Mapped[str | None] = mapped_column(String(200))
     usage: Mapped[dict | None] = mapped_column(JSON)
-    reserved_micros: Mapped[int] = mapped_column(Integer)
-    accounted_micros: Mapped[int] = mapped_column(Integer)
+    reserved_micros: Mapped[int] = mapped_column(BigInteger)
+    accounted_micros: Mapped[int] = mapped_column(BigInteger)
     cost_state: Mapped[str] = mapped_column(String(24), default="unknown")
     error_code: Mapped[str | None] = mapped_column(String(60))
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)

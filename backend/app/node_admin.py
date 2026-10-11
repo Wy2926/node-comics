@@ -14,7 +14,7 @@ from .db import get_db
 from .errors import problem
 from .models import User
 from .node_config import NodeConfig
-from .control_pools import POOL_LIMITS
+from .control_pools import DOCUMENT_POOL_LIMITS, POOL_LIMITS
 from .queue_models import ComputeNode
 from .request_models import RequestBody
 from .scheduler import lock_scheduler
@@ -63,7 +63,8 @@ def compute_node(db, node_id, *, image_only=False):
 @router.get('/config-schema')
 def config_schema(user: User = Depends(admin)):
     return {'node': NodeConfig.model_json_schema(),
-            'defaults': NodeConfig().model_dump(exclude_none=True), 'pool_limits': POOL_LIMITS}
+            'defaults': NodeConfig().model_dump(exclude_none=True),
+            'pool_limits': {**POOL_LIMITS, **DOCUMENT_POOL_LIMITS}}
 
 
 @router.post('', status_code=201)
@@ -105,7 +106,7 @@ def update(node_id: str, body: NodeUpdate, user: User = Depends(admin), db: Sess
         raise RequestValidationError([{**item, 'loc': ('body', 'config', *item['loc'])}
                                       for item in error.errors()]) from None
     if pool:
-        maximum = POOL_LIMITS[node.capabilities[0]]
+        maximum = {**POOL_LIMITS, **DOCUMENT_POOL_LIMITS}.get(node.capabilities[0], 1)
         if config.execution_slots > maximum:
             problem('NODE_CONFIG_INVALID', f'此资源池执行位须为 1–{maximum} 的整数', 422)
     else:

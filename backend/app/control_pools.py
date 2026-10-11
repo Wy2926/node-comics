@@ -5,6 +5,7 @@ from .queue_models import ComputeNode
 from .scheduler import lock_scheduler
 
 POOL_LIMITS = {'text': 100, 'validate_upload': 32}
+DOCUMENT_POOL_LIMITS = {'doc_text': 4}
 POOL_LABELS = {'text': '文本翻译', 'validate_upload': '上传校验'}
 
 

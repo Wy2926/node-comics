@@ -1286,7 +1286,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClaimRequest"
+                "$ref": "#/components/schemas/app__compute_v3__ClaimRequest"
               }
             }
           }
@@ -1450,7 +1450,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/HeartbeatRequest"
+                "$ref": "#/components/schemas/app__compute_v3__HeartbeatRequest"
               }
             }
           }
@@ -2016,7 +2016,984 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompletionRequest"
+                "$ref": "#/components/schemas/app__compute_v3__CompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/capabilities": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Capabilities",
+        "operationId": "document_capabilities_v1_documents_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/documents/{request_id}": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Document",
+        "operationId": "create_document_v1_documents__request_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Document",
+        "operationId": "get_document_v1_documents__request_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/{request_id}/upload-parts": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Parts",
+        "operationId": "upload_parts_v1_documents__request_id__upload_parts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadParts"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/{request_id}/complete-upload": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Complete Upload",
+        "operationId": "complete_upload_v1_documents__request_id__complete_upload_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/{request_id}/resume": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Resume Document",
+        "operationId": "resume_document_v1_documents__request_id__resume_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/{request_id}/cancel": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Cancel Document",
+        "operationId": "cancel_document_v1_documents__request_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document History",
+        "operationId": "document_history_v1_documents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documents/{request_id}/download": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Download Document",
+        "operationId": "download_document_v1_documents__request_id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/nodes/{node_id}/sync": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_internal_documents_compute_v2_nodes__node_id__sync_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/nodes/{node_id}/claim": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Claim",
+        "operationId": "claim_internal_documents_compute_v2_nodes__node_id__claim_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__documents__compute__ClaimRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/nodes/{node_id}/heartbeat": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Heartbeat",
+        "operationId": "heartbeat_internal_documents_compute_v2_nodes__node_id__heartbeat_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__documents__compute__HeartbeatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/leases/{lease_id}/inputs": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Inputs",
+        "operationId": "inputs_internal_documents_compute_v2_leases__lease_id__inputs_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/leases/{lease_id}/uploads": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Uploads",
+        "operationId": "uploads_internal_documents_compute_v2_leases__lease_id__uploads_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/documents/compute/v2/leases/{lease_id}/complete": {
+      "post": {
+        "tags": [
+          "document compute"
+        ],
+        "summary": "Complete",
+        "operationId": "complete_internal_documents_compute_v2_leases__lease_id__complete_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lease Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-node-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Node-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__documents__compute__CompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/documents/{job_id}/resolve-unknown": {
+      "post": {
+        "tags": [
+          "documents-admin"
+        ],
+        "summary": "Resolve Unknown",
+        "operationId": "resolve_unknown_v1_admin_documents__job_id__resolve_unknown_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveUnknown"
               }
             }
           }
@@ -4837,7 +5814,10 @@
                     "succeeded",
                     "no_text",
                     "failed",
-                    "cancelled"
+                    "cancelled",
+                    "uploading",
+                    "preflight",
+                    "awaiting_quota"
                   ],
                   "type": "string"
                 },
@@ -4863,6 +5843,26 @@
                 }
               ],
               "title": "Mode"
+            }
+          },
+          {
+            "name": "workflow_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "image",
+                    "document"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflow Kind"
             }
           },
           {
@@ -7410,6 +8410,32 @@
         ],
         "title": "AnalysisRequest"
       },
+      "ArtifactsRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "workspace_generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Workspace Generation"
+          },
+          "output_ref": {
+            "$ref": "#/components/schemas/ZipReference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "workspace_generation",
+          "output_ref"
+        ],
+        "title": "ArtifactsRequest"
+      },
       "BindingRequest": {
         "properties": {
           "id": {
@@ -7723,36 +8749,6 @@
         ],
         "title": "CheckoutRequest"
       },
-      "ClaimRequest": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "Request Id"
-          },
-          "config_version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Config Version"
-          },
-          "count": {
-            "type": "integer",
-            "maximum": 32.0,
-            "minimum": 1.0,
-            "title": "Count"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "request_id",
-          "config_version",
-          "count"
-        ],
-        "title": "ClaimRequest"
-      },
       "CompensationRequest": {
         "properties": {
           "kind": {
@@ -7784,58 +8780,6 @@
           "note"
         ],
         "title": "CompensationRequest"
-      },
-      "CompletionRequest": {
-        "properties": {
-          "lease_token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Lease Token"
-          },
-          "error": {
-            "$ref": "#/components/schemas/NodeError"
-          },
-          "timings": {
-            "additionalProperties": {
-              "type": "number",
-              "maximum": 86400.0,
-              "minimum": 0.0
-            },
-            "propertyNames": {
-              "enum": [
-                "download",
-                "download_queue",
-                "analyze",
-                "analyze_queue",
-                "inpaint",
-                "inpaint_queue",
-                "render",
-                "render_queue",
-                "analysis_submit",
-                "text_wait",
-                "local_total",
-                "output_put",
-                "render_areas",
-                "render_layout",
-                "render_diff",
-                "render_encode",
-                "detect_lock_wait",
-                "ocr_lock_wait",
-                "inpaint_lock_wait"
-              ]
-            },
-            "type": "object",
-            "title": "Timings"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "lease_token",
-          "error"
-        ],
-        "title": "CompletionRequest"
       },
       "DefaultProviderRequest": {
         "properties": {
@@ -7871,6 +8815,82 @@
           "username"
         ],
         "title": "DevLogin"
+      },
+      "DocumentInput": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "zip",
+              "pdf"
+            ],
+            "title": "Source Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "maximum": 200000000.0,
+            "minimum": 1.0,
+            "title": "Byte Size"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          },
+          "target_language": {
+            "type": "string",
+            "enum": [
+              "zh-Hans",
+              "zh-Hant",
+              "ja",
+              "en",
+              "ko",
+              "fr",
+              "es",
+              "pt-BR",
+              "de",
+              "it",
+              "ru",
+              "pl",
+              "uk",
+              "tr",
+              "vi",
+              "id",
+              "ar"
+            ],
+            "title": "Target Language"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "source_type",
+          "byte_size",
+          "sha256",
+          "target_language"
+        ],
+        "title": "DocumentInput"
       },
       "EntitlementsResponse": {
         "properties": {
@@ -8267,6 +9287,35 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HeartbeatEntry": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "workspace_generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Workspace Generation"
+          },
+          "lease_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "workspace_generation",
+          "lease_id"
+        ],
+        "title": "HeartbeatEntry"
+      },
       "HeartbeatItem": {
         "properties": {
           "lease_token": {
@@ -8316,30 +9365,6 @@
           "lease_id"
         ],
         "title": "HeartbeatItem"
-      },
-      "HeartbeatRequest": {
-        "properties": {
-          "config_version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Config Version"
-          },
-          "leases": {
-            "items": {
-              "$ref": "#/components/schemas/HeartbeatItem"
-            },
-            "type": "array",
-            "maxItems": 32,
-            "title": "Leases"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "config_version",
-          "leases"
-        ],
-        "title": "HeartbeatRequest"
       },
       "ImageDescriptor": {
         "properties": {
@@ -8396,6 +9421,28 @@
           "label"
         ],
         "title": "LanguageCapability"
+      },
+      "LeaseRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "workspace_generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Workspace Generation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "workspace_generation"
+        ],
+        "title": "LeaseRequest"
       },
       "LoginResponse": {
         "properties": {
@@ -8573,6 +9620,13 @@
             "title": "Execution Slots",
             "default": 1
           },
+          "document_slots": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 0.0,
+            "title": "Document Slots",
+            "default": 1
+          },
           "poll_seconds": {
             "type": "number",
             "maximum": 30.0,
@@ -8696,6 +9750,37 @@
           "config"
         ],
         "title": "NodeUpdate"
+      },
+      "OCRText": {
+        "properties": {
+          "page_index": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Index"
+          },
+          "analysis_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Analysis Hash"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Segments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "page_index",
+          "analysis_hash",
+          "segments"
+        ],
+        "title": "OCRText"
       },
       "PeriodResponse": {
         "properties": {
@@ -8841,6 +9926,32 @@
           "provider"
         ],
         "title": "PortalRequest"
+      },
+      "PreparedPage": {
+        "properties": {
+          "page_index": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Index"
+          },
+          "source_name": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Source Name"
+          },
+          "input_ref": {
+            "$ref": "#/components/schemas/Reference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "page_index",
+          "source_name",
+          "input_ref"
+        ],
+        "title": "PreparedPage"
       },
       "PriceRequest": {
         "properties": {
@@ -9417,6 +10528,64 @@
         "type": "object",
         "title": "ReconcileRequest"
       },
+      "Reference": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          },
+          "byte_size": {
+            "type": "integer",
+            "maximum": 536870912.0,
+            "minimum": 1.0,
+            "title": "Byte Size"
+          },
+          "mime": {
+            "type": "string",
+            "enum": [
+              "application/json",
+              "image/png"
+            ],
+            "title": "Mime"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sha256",
+          "byte_size",
+          "mime"
+        ],
+        "title": "Reference",
+        "description": "Identity of an immutable local file, never a path or remote object key."
+      },
       "Registration": {
         "properties": {
           "protocol_version": {
@@ -9473,6 +10642,21 @@
           "ready": {
             "type": "boolean",
             "title": "Ready"
+          },
+          "document_protocol": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Protocol"
           },
           "result_formats": {
             "items": {
@@ -9607,6 +10791,46 @@
         "title": "RequestLimits",
         "description": "One immutable operation snapshot; PUT requires every supported field."
       },
+      "ResolveUnknown": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "confirmed_no_deliverable_result": {
+            "type": "boolean",
+            "title": "Confirmed No Deliverable Result"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Note"
+          },
+          "accounted_micros": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000000000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accounted Micros"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "call_id",
+          "confirmed_no_deliverable_result",
+          "note"
+        ],
+        "title": "ResolveUnknown"
+      },
       "RetryEventRequest": {
         "properties": {
           "operation_key": {
@@ -9739,6 +10963,29 @@
           "id"
         ],
         "title": "RevisionRequest"
+      },
+      "Segment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "source"
+        ],
+        "title": "Segment"
       },
       "SessionInput": {
         "properties": {
@@ -9873,6 +11120,23 @@
           "created_at"
         ],
         "title": "SupportRequestReceipt"
+      },
+      "SyncRequest": {
+        "properties": {
+          "workspace_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 36,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Workspace Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SyncRequest"
       },
       "SystemSettingsUpdate": {
         "properties": {
@@ -10509,6 +11773,26 @@
         ],
         "title": "UpdatesRequest"
       },
+      "UploadParts": {
+        "properties": {
+          "part_numbers": {
+            "items": {
+              "type": "integer",
+              "minimum": 1.0
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Part Numbers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "part_numbers"
+        ],
+        "title": "UploadParts"
+      },
       "UsageDay": {
         "properties": {
           "date": {
@@ -10771,6 +12055,292 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ZipReference": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          },
+          "byte_size": {
+            "type": "integer",
+            "maximum": 4294967296.0,
+            "minimum": 1.0,
+            "title": "Byte Size"
+          },
+          "mime": {
+            "type": "string",
+            "const": "application/zip",
+            "title": "Mime"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "sha256",
+          "byte_size",
+          "mime"
+        ],
+        "title": "ZipReference"
+      },
+      "app__compute_v3__ClaimRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Request Id"
+          },
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "config_version",
+          "count"
+        ],
+        "title": "ClaimRequest"
+      },
+      "app__compute_v3__CompletionRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "error": {
+            "$ref": "#/components/schemas/NodeError"
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "number",
+              "maximum": 86400.0,
+              "minimum": 0.0
+            },
+            "propertyNames": {
+              "enum": [
+                "download",
+                "download_queue",
+                "analyze",
+                "analyze_queue",
+                "inpaint",
+                "inpaint_queue",
+                "render",
+                "render_queue",
+                "analysis_submit",
+                "text_wait",
+                "local_total",
+                "output_put",
+                "render_areas",
+                "render_layout",
+                "render_diff",
+                "render_encode",
+                "detect_lock_wait",
+                "ocr_lock_wait",
+                "inpaint_lock_wait"
+              ]
+            },
+            "type": "object",
+            "title": "Timings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "error"
+        ],
+        "title": "CompletionRequest"
+      },
+      "app__compute_v3__HeartbeatRequest": {
+        "properties": {
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
+          },
+          "leases": {
+            "items": {
+              "$ref": "#/components/schemas/HeartbeatItem"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Leases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config_version",
+          "leases"
+        ],
+        "title": "HeartbeatRequest"
+      },
+      "app__documents__compute__ClaimRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Request Id"
+          },
+          "config_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Config Version"
+          },
+          "count": {
+            "type": "integer",
+            "const": 1,
+            "title": "Count",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "config_version"
+        ],
+        "title": "ClaimRequest"
+      },
+      "app__documents__compute__CompletionRequest": {
+        "properties": {
+          "lease_token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Token"
+          },
+          "workspace_generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Workspace Generation"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreparedPage"
+                },
+                "type": "array",
+                "maxItems": 200,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "analysis_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OCRText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reference"
+              },
+              {
+                "$ref": "#/components/schemas/ZipReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Ref"
+          },
+          "no_text": {
+            "type": "boolean",
+            "title": "No Text",
+            "default": false
+          },
+          "quality_flags": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z_]{1,60}$"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Quality Flags"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]{0,59}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_token",
+          "workspace_generation"
+        ],
+        "title": "CompletionRequest"
+      },
+      "app__documents__compute__HeartbeatRequest": {
+        "properties": {
+          "leases": {
+            "items": {
+              "$ref": "#/components/schemas/HeartbeatEntry"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Leases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "leases"
+        ],
+        "title": "HeartbeatRequest"
       }
     },
     "securitySchemes": {

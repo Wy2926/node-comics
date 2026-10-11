@@ -51,7 +51,7 @@ def parsed(value):
 
 def config_payload(node):
     config = NodeConfig.model_validate(node.desired_config)
-    keys = ('execution_slots', 'poll_seconds', 'heartbeat_seconds',
+    keys = ('execution_slots', 'document_slots', 'poll_seconds', 'heartbeat_seconds',
             'request_seconds', 'page_seconds', 'text_wait_seconds', 'delivery_seconds')
     return {'version': node.config_version, 'enabled': node.enabled,
             **{key: getattr(config, key) for key in keys}}
@@ -146,6 +146,7 @@ class Registration(RequestBody):
     device: str = Field(min_length=1, max_length=80)
     supported_languages: list[Language] = Field(min_length=1, max_length=len(LANGUAGES))
     ready: bool
+    document_protocol: Literal[1, 2] | None = None
     result_formats: list[Literal['overlay-v1', 'overlay-tiles-v1']] = Field(default_factory=lambda: ['overlay-v1'], max_length=2)
 
 
@@ -155,13 +156,16 @@ def register(body: Registration, identity=Depends(node_auth), db: Session = Depe
     node = scoped_node(db, identity)
     if body.resource_id != node.resource_id or body.engine_version == 'control':
         problem('NODE_RESOURCE_MISMATCH', '节点资源或引擎身份不匹配', 409)
-    leases = list(db.scalars(select(ExecutionLease).where(
-        ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None))))
+    leases = list(db.scalars(select(ExecutionLease).join(JobStage, JobStage.id == ExecutionLease.stage_id).where(
+        ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None), JobStage.name == 'page')))
     node.engine_version, node.device = body.engine_version, body.device
     node.capabilities = ['page'] if body.ready else []
+    if body.ready and body.document_protocol == 2:
+        node.capabilities += ['doc_prepare', 'doc_ocr', 'doc_render', 'doc_zip']
     node.supported_languages = list(dict.fromkeys(body.supported_languages))
     node.runtime_report = {'protocol_version': 3, 'ready': body.ready, 'languages': body.supported_languages,
-        'overlay_tiles': body.ready and 'overlay-tiles-v1' in body.result_formats}
+        'overlay_tiles': body.ready and 'overlay-tiles-v1' in body.result_formats,
+        'document_protocol': body.document_protocol if body.ready else None}
     node.applied_config_version, node.config_error, node.heartbeat_at = node.config_version, None, now()
     result = {'protocol_version': 3, 'config': config_payload(node), 'server_time': stamp(now()),
               'leases': [lease_payload(db, lease) for lease in leases]}

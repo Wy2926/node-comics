@@ -110,7 +110,7 @@ class Operations:
                 'phase': self.phase, 'loop_age_seconds': round(time.monotonic() - self.last_pulse, 1),
                 'heartbeat_at': last, 'heartbeat_age_seconds': round(age, 1) if age is not None else None,
                 'connected': bool(age is not None and age < 60 and self.phase == 'running'),
-                'active_leases': len(agent.pages) if agent else 0,
+                'active_leases': len(agent.active_pages()) if agent else 0,
                 'cpu_resources': self.cpu_resources,
                 'config_version': agent.config['version'] if agent and agent.config else None}
 

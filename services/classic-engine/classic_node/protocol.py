@@ -83,6 +83,34 @@ def pack_result(final, original, alpha, version, analysis, translated, *, allow_
     return {'output_bytes': data, 'result': result}
 
 
+def pack_full_image(final, alpha, *, max_bytes):
+    """Encode finished document pixels directly, without an overlay round trip."""
+    if type(max_bytes) is not int or max_bytes < 1:
+        raise NodeFailure('CLASSIC_OUTPUT_TOO_LARGE')
+    out = BytesIO()
+    height, width = final.shape[:2]
+    try:
+        with Image.fromarray(final) as image:
+            if alpha is not None:
+                import numpy as np
+                with Image.fromarray(np.asarray(alpha, dtype=np.uint8)) as channel:
+                    image.putalpha(channel)
+            with stage('render_encode'):
+                image.save(out, format='PNG', compress_level=3)
+        data = out.getvalue()
+        if len(data) > max_bytes:
+            raise NodeFailure('CLASSIC_OUTPUT_TOO_LARGE')
+        with Image.open(BytesIO(data)) as check:
+            if check.format != 'PNG' or check.size != (width, height) or getattr(check, 'n_frames', 1) != 1:
+                raise ValueError('Invalid full page encoding')
+            check.load()
+    except (OSError, ValueError) as error:
+        raise NodeFailure('CLASSIC_OUTPUT_ENCODE_FAILED') from error
+    return {'output_bytes': data, 'result': {'representation': 'full-image', 'output': {
+        'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data),
+        'width': width, 'height': height, 'mime': 'image/png'}}}
+
+
 def _pack_tiled(final, original, alpha, result, workers):
     import numpy as np
     height, width = final.shape[:2]

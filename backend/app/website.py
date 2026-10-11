@@ -5,11 +5,13 @@ import hashlib
 import json
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 from starlette.exceptions import HTTPException
 from starlette.staticfiles import StaticFiles
 from starlette.responses import FileResponse, RedirectResponse, Response
 from .config import settings
+from .documents.config import get_document_settings
 
 ROOT = Path(__file__).parent / 'website_dist'
 RELEASES = json.loads((Path(__file__).parent.parent / 'extension-release.json').read_text(encoding='utf-8'))['releases']
@@ -42,6 +44,17 @@ def script_hashes(path: str, modified: int):
     parser = _Scripts()
     parser.feed(Path(path).read_text(encoding='utf-8'))
     return ' '.join("'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'" for script in parser.scripts)
+
+
+def document_connect_source():
+    config = get_document_settings()
+    if not config.enabled:
+        return ''
+    origin = config.r2_endpoint_url
+    match = re.fullmatch(r'https://[A-Za-z0-9.-]+(?::([0-9]{1,5}))?', origin)
+    if not match or (match[1] and not 1 <= int(match[1]) <= 65535):
+        raise ValueError('DOCUMENT_R2_ENDPOINT_URL must be a bare HTTPS origin')
+    return ' ' + origin
 
 
 class WebsiteFiles(StaticFiles):
@@ -106,9 +119,10 @@ class WebsiteFiles(StaticFiles):
             identity_origin = f'{identity.scheme}://{identity.netloc}' if identity.scheme in {'https', 'http'} and identity.netloc else ''
             challenge = ' https://challenges.cloudflare.com' if 'translate' in segments else ''
             blobs = ' blob:' if 'translate' in segments else ''
+            documents = document_connect_source() if 'translate' in segments else ''
             frames = challenge.strip() or "'none'"
             response.headers['Content-Security-Policy'] = (
                 f"default-src 'self'; script-src 'self'{challenge} {hashes}; style-src 'self' 'unsafe-inline'; "
-                f"img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; connect-src 'self' {identity_origin}{challenge}; "
+                f"img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; connect-src 'self' {identity_origin}{challenge}{documents}; "
                 f"object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
         return response

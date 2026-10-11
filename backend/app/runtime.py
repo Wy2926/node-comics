@@ -5,7 +5,7 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'subscription_customer_0016'})
+SUPPORTED_SCHEMAS = frozenset({'document_workspaces_0018'})
 
 
 def check_schema(connection):

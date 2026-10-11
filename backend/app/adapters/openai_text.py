@@ -9,7 +9,7 @@ from pydantic import Field, field_validator, model_validator
 from ..errors import ProcessingError
 from .transport import read_bounded
 from .transport import CheckedTransport
-from .llm import LLMConfig, Message, TextError, TextResponse
+from .llm import LLMConfig, Message, RequestLimits, TextError, TextResponse
 
 MAX_RESPONSE_BYTES = 1024 * 1024
 OPENROUTER_HOSTS = {'openrouter.ai', 'eu.openrouter.ai', 'us.openrouter.ai'}
@@ -50,13 +50,19 @@ class OpenAITextConfig(LLMConfig):
 
 
 def call_messages(messages: list[Message], profile: dict, api_key: str, *,
-                  json_schema: dict | None = None) -> TextResponse:
+                  json_schema: dict | None = None, limits: RequestLimits | None = None) -> TextResponse:
+    timeout = limits.timeout_seconds if limits else profile['timeout_seconds']
+    output_tokens = limits.max_output_tokens if limits else profile['max_output_tokens']
+    response_bytes = limits.max_response_bytes if limits else MAX_RESPONSE_BYTES
+    # Documents have one bounded whole-request budget. Existing single-image /
+    # title callers retain their prior per-read plus bounded-body timeout.
+    deadline = time.monotonic() + timeout if limits else None
     chat = profile["protocol"] == "chat_completions"
     payload = {"model": profile["model"], "stream": False, "store": False}
     if chat:
-        payload.update(messages=messages, max_completion_tokens=profile["max_output_tokens"])
+        payload.update(messages=messages, max_completion_tokens=output_tokens)
     else:
-        payload.update(input=messages, max_output_tokens=profile["max_output_tokens"])
+        payload.update(input=messages, max_output_tokens=output_tokens, truncation='disabled')
     if json_schema is not None:
         if chat:
             payload['response_format'] = {'type': 'json_schema', 'json_schema': json_schema}
@@ -82,7 +88,7 @@ def call_messages(messages: list[Message], profile: dict, api_key: str, *,
     headers = {"Authorization": "Bearer " + api_key, "User-Agent": profile["user_agent"]}
     try:
         with httpx.Client(transport=CheckedTransport(), trust_env=False, follow_redirects=False,
-                          timeout=profile["timeout_seconds"]) as client:
+                          timeout=timeout) as client:
             with client.stream("POST", endpoint, json=payload, headers=headers) as response:
                 request_id = response.headers.get("x-request-id", "")[:200] or None
                 if response.status_code != 200:
@@ -91,7 +97,7 @@ def call_messages(messages: list[Message], profile: dict, api_key: str, *,
                             'TEXT_AUTH_FAILED' if response.status_code in (401, 403) else 'TEXT_PROVIDER_REJECTED')
                     raise TextError(code, "文本服务拒绝请求，请检查模型、接口协议、余额与密钥",
                                     retryable=retryable, retry_after=retry_delay(response.headers.get("retry-after")), request_id=request_id)
-                raw = read_bounded(response, MAX_RESPONSE_BYTES, time.monotonic() + profile["timeout_seconds"])
+                raw = read_bounded(response, response_bytes, deadline if deadline is not None else time.monotonic() + timeout)
         data = json.loads(raw)
         usage = safe_usage(data.get("usage"))
         request_id = request_id or (data.get("id", "")[:200] if isinstance(data.get("id"), str) else None)

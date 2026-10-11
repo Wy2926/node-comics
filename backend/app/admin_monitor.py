@@ -21,8 +21,11 @@ from .scheduler import ACTIVE
 router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
 Mode = Literal["classic"]
 Status = Literal["active", "attention", "awaiting_upload", "validating_upload", "queued", "running",
-                 "outcome_unknown", "unknown_released", "succeeded", "no_text", "failed", "cancelled"]
-STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "text"])}
+                 "outcome_unknown", "unknown_released", "succeeded", "no_text", "failed", "cancelled",
+                 "uploading", "preflight", "awaiting_quota"]
+MONITOR_ACTIVE = ACTIVE | {"uploading", "preflight", "awaiting_quota"}
+STAGE_ORDER = {name: i for i, name in enumerate(["validate_upload", "page", "text",
+    "doc_prepare", "doc_ocr", "doc_text", "doc_render", "doc_zip"])}
 
 
 def seconds(start, end):
@@ -41,7 +44,7 @@ def lease_rows(db, job_ids):
         ExecutionLease.node_id, ExecutionLease.executor_id, ExecutionLease.generation,
         ExecutionLease.started_at, ExecutionLease.expires_at,
         ExecutionLease.completed_at, ExecutionLease.outcome, JobStage.name.label("stage"),
-        ComputeNode.name.label("node_name")).join(JobStage, JobStage.id == ExecutionLease.stage_id).join(
+        JobStage.page_index, ComputeNode.name.label("node_name")).join(JobStage, JobStage.id == ExecutionLease.stage_id).join(
         ComputeNode, ComputeNode.id == ExecutionLease.node_id).where(ExecutionLease.job_id.in_(job_ids))
     grouped = defaultdict(list)
     for row in db.execute(query.order_by(ExecutionLease.started_at, ExecutionLease.id)):
@@ -77,10 +80,11 @@ def timing(job, leases, at):
 def task_json(job, owner_name, leases, at):
     live = [r for r in leases if not r.completed_at and r.expires_at > at]
     final = [r for r in leases if r.outcome == "succeeded" and (
-        r.stage in {"page"} if job.status == "succeeded" else
+        r.stage in {"page", "doc_zip"} if job.status == "succeeded" else
         job.status == "no_text" and r.stage in {"page"})]
     completed_by = final[-1] if final else None
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
+            "workflow_kind": job.workflow_kind,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
@@ -98,15 +102,18 @@ def task_query():
 
 @router.get("/tasks")
 def tasks(status: Status | None = None, mode: Mode | None = None,
+          workflow_kind: Literal['image', 'document'] | None = None,
           owner_id: str | None = Query(None, max_length=36), node_id: str | None = Query(None, max_length=80),
           q: str = Query("", max_length=120), offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
           db: Session = Depends(get_db)):
     at, query = now(), task_query()
     if status:
-        statuses = ACTIVE if status == "active" else {"outcome_unknown", "unknown_released", "failed"} if status == "attention" else {status}
+        statuses = MONITOR_ACTIVE if status == "active" else {"outcome_unknown", "unknown_released", "failed"} if status == "attention" else {status}
         query = query.where(Job.status.in_(statuses))
     if mode:
         query = query.where(Job.mode == mode)
+    if workflow_kind:
+        query = query.where(Job.workflow_kind == workflow_kind)
     if owner_id:
         query = query.where(Job.owner_id == owner_id)
     if node_id:
@@ -129,9 +136,9 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
     at = now()
     job, name = row
     leases = lease_rows(db, [job.id])[job.id]
-    stages = db.execute(select(JobStage.id, JobStage.name, JobStage.status, JobStage.attempts,
+    stages = db.execute(select(JobStage.id, JobStage.name, JobStage.page_index, JobStage.status, JobStage.attempts,
         JobStage.available_at, JobStage.completed_at).where(JobStage.job_id == job.id)).all()
-    executions = [{"id": r.id, "stage": r.stage, "generation": r.generation, "node_id": r.node_id,
+    executions = [{"id": r.id, "stage": r.stage, "page_index": r.page_index, "generation": r.generation, "node_id": r.node_id,
         "node_name": r.node_name, "executor_id": r.executor_id,
         "started_at": iso(r.started_at), "completed_at": iso(r.completed_at), "expires_at": iso(r.expires_at),
         "seconds": seconds(r.started_at, lease_end(r, at)),
@@ -143,9 +150,9 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
     return {**task_json(job, name, leases, at), "generated_at": iso(at), "error_message": job.error_message,
         "timings": db.scalar(select(ClassicState.timings).where(ClassicState.job_id == job.id)) or {},
         "provider": {"id": provider.provider_id, "cost_state": provider.cost_state} if provider else None,
-        "stages": [{"name": s.name, "status": s.status, "attempts": s.attempts,
+        "stages": [{"name": s.name, "page_index": s.page_index, "status": s.status, "attempts": s.attempts,
                     "available_at": iso(s.available_at), "completed_at": iso(s.completed_at)}
-                   for s in sorted(stages, key=lambda s: STAGE_ORDER.get(s.name, 99))],
+                   for s in sorted(stages, key=lambda s: (STAGE_ORDER.get(s.name, 99), s.page_index))],
         "executions": executions, "text_cost_micros": sum(c.accounted_micros for c in calls),
         "text_calls": [{"id": c.id, "model": c.model, "provider_id": c.provider_id, "sequence": c.sequence,
             "group": c.group_index, "started_at": iso(c.started_at), "completed_at": iso(c.completed_at),
@@ -157,14 +164,14 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
 def overview(db: Session = Depends(get_db)):
     at = now()
     since = at - timedelta(hours=24)
-    groups = db.execute(select(Job.mode, Job.status, func.count(), func.min(Job.created_at))
-        .where(Job.status.in_(ACTIVE)).group_by(Job.mode, Job.status)).all()
-    queues = [{"mode": mode, "status": status, "count": count,
-               "oldest_seconds": seconds(oldest, at)} for mode, status, count, oldest in groups]
-    recent = db.execute(select(Job.mode, Job.status, func.count(),
-        func.avg(duration_sql(db, Job.created_at, Job.completed_at))).where(Job.completed_at >= since).group_by(Job.mode, Job.status)).all()
+    groups = db.execute(select(Job.mode, Job.workflow_kind, Job.status, func.count(), func.min(Job.created_at))
+        .where(Job.status.in_(MONITOR_ACTIVE)).group_by(Job.mode, Job.workflow_kind, Job.status)).all()
+    queues = [{"mode": mode, "workflow_kind": kind, "status": status, "count": count,
+               "oldest_seconds": seconds(oldest, at)} for mode, kind, status, count, oldest in groups]
+    recent = db.execute(select(Job.mode, Job.workflow_kind, Job.status, func.count(),
+        func.avg(duration_sql(db, Job.created_at, Job.completed_at))).where(Job.completed_at >= since).group_by(Job.mode, Job.workflow_kind, Job.status)).all()
     stages = db.execute(select(JobStage.name, JobStage.status, func.count()).join(Job, Job.id == JobStage.job_id).where(
-        Job.status.in_(ACTIVE)).group_by(JobStage.name, JobStage.status)).all()
+        Job.status.in_(MONITOR_ACTIVE)).group_by(JobStage.name, JobStage.status)).all()
     nodes = db.execute(select(ComputeNode.enabled, ComputeNode.heartbeat_at)).all()
     online = sum(bool(enabled and heartbeat and heartbeat > at - timedelta(seconds=settings().cluster_node_timeout_seconds)) for enabled, heartbeat in nodes)
     lease_status = case((ExecutionLease.expires_at > at, "running"), else_="expired")
@@ -177,8 +184,8 @@ def overview(db: Session = Depends(get_db)):
         "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).join(User, User.id == Job.owner_id).where(Job.created_at >= since, User.kind == 'registered'))},
         "nodes": {"total": len(nodes), "online_enabled": online}, "leases": dict(lease_counts),
         "queues": queues, "stages": [{"name": name, "status": status, "count": count} for name, status, count in stages],
-        "completed_24h": [{"mode": mode, "status": status, "count": count, "avg_elapsed_seconds": round(max(0, avg), 3)}
-                          for mode, status, count, avg in recent],
+        "completed_24h": [{"mode": mode, "workflow_kind": kind, "status": status, "count": count, "avg_elapsed_seconds": round(max(0, avg), 3)}
+                          for mode, kind, status, count, avg in recent],
         "submitted_24h": db.scalar(select(func.count()).select_from(Job).where(Job.created_at >= since))}
 
 
@@ -232,7 +239,7 @@ def users(q: str = Query("", max_length=120), plan: str | None = Query(None, max
         latest = dict(db.execute(select(Job.owner_id, func.max(Job.created_at)).where(Job.owner_id.in_(ids)).group_by(Job.owner_id)).all())
     return {"items": [{**user_json(u), "created_at": iso(u.created_at), "plan": membership_benefits(db, u, at)['plan'],
         "plus_expires_at": iso(plus_dates(db, u, at)[1]), "last_submitted_at": iso(latest.get(u.id)),
-        "jobs": stats[u.id], "active_jobs": sum(stats[u.id].get(s, 0) for s in ACTIVE)} for u in rows],
+        "jobs": stats[u.id], "active_jobs": sum(stats[u.id].get(s, 0) for s in MONITOR_ACTIVE)} for u in rows],
         "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}
 
 

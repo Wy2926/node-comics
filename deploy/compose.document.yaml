@@ -1,0 +1,44 @@
+name: node-comics-documents
+
+# Text-only central document worker. No image spool, parser, GPU or public port.
+# The execution node owns persistent state/documents and its parser sandbox.
+services:
+  document-worker:
+    image: ${DOCUMENT_WORKER_IMAGE:?Set an immutable document-worker image}
+    env_file: [.env.document]
+    environment:
+      APP_ENV: production
+      DEV_AUTH: "false"
+      SERVE_STATIC: "false"
+      DOCUMENT_ENABLED: "true"
+      DOCUMENT_WORKER_SLOTS: "1"
+    command: [python, -m, app.documents.worker]
+    networks: [infrastructure]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2.0
+    mem_limit: 2g
+    pids_limit: 64
+    ulimits:
+      nofile: {soft: 1024, hard: 1024}
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=0700,size=32m
+    restart: unless-stopped
+    stop_grace_period: 31m
+    healthcheck:
+      test: [CMD, python, -m, app.health, document-worker]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  infrastructure:
+    external: true
+    name: ${INFRA_NETWORK:-1panel-network}

@@ -4,7 +4,7 @@ FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de9
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04@sha256:ac55d124da4882b497f732d8dfd9a702d5447a5f29d08d56da6f64f0a1eb34bc AS base
 RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-    python3 python3-venv ca-certificates libgl1 libegl1 libglib2.0-0 libgomp1 zlib1g libfontconfig1 libfreetype6 libxkbcommon0 \
+    python3 python3-venv ca-certificates libseccomp2 libgl1 libegl1 libglib2.0-0 libgomp1 zlib1g libfontconfig1 libfreetype6 libxkbcommon0 \
     && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONUTF8=1 \
     UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy QT_QPA_PLATFORM=offscreen
@@ -24,6 +24,7 @@ RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 instal
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /opt/node/engine
 COPY services/classic-engine/pyproject.toml services/classic-engine/uv.lock ./
+COPY backend/document_files/ /opt/backend/document_files/
 ENV UV_PROJECT_ENVIRONMENT=/opt/node/venv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project --python /usr/bin/python3
@@ -48,11 +49,15 @@ COPY services/classic-engine/classic_node/ /opt/node/engine/classic_node/
 COPY services/classic-engine/mtu_engine/ /opt/node/engine/mtu_engine/
 COPY services/classic-engine/LICENSE services/classic-engine/THIRD_PARTY.md services/classic-engine/pyproject.toml services/classic-engine/uv.lock /opt/node/engine/
 COPY services/classic-engine/tools/prepare_mtu.py /opt/node/source/classic-engine/tools/
+COPY backend/document_files/ /opt/node/backend/document_files/
 COPY services/compute-node/build_support.py services/compute-node/toolchain.lock.json services/compute-node/assets.json /opt/node/source/compute-node/
-COPY services/compute-node/linux/build_assets.py services/compute-node/linux/entrypoint.py services/compute-node/linux/export_runtime.py services/compute-node/linux/healthcheck.py services/compute-node/linux/vast_bootstrap.py services/compute-node/linux/verify_assets.py services/compute-node/linux/Dockerfile services/compute-node/linux/Dockerfile.dockerignore services/compute-node/linux/compose.yaml services/compute-node/linux/node.example.json services/compute-node/linux/vast-template.json services/compute-node/linux/install_runtime.sh services/compute-node/linux/node-comics.supervisor.conf services/compute-node/linux/README.md /opt/node/source/compute-node/linux/
+COPY services/compute-node/linux/build_assets.py services/compute-node/linux/entrypoint.py services/compute-node/linux/healthcheck.py services/compute-node/linux/vast_bootstrap.py services/compute-node/linux/verify_assets.py services/compute-node/linux/Dockerfile services/compute-node/linux/Dockerfile.dockerignore services/compute-node/linux/compose.yaml services/compute-node/linux/node.example.json services/compute-node/linux/vast-template.json services/compute-node/linux/node-comics.supervisor.conf services/compute-node/linux/README.md /opt/node/source/compute-node/linux/
+COPY services/compute-node/linux/preflight.py services/compute-node/linux/service.py services/compute-node/linux/prepare_template.py /opt/node/source/compute-node/linux/
 RUN --mount=type=bind,source=.,target=/src,ro \
     python -m unittest discover -s /src/services/compute-node/linux -p test_container.py \
     && python -m unittest discover -s /src/services/compute-node/linux -p test_vast_bootstrap.py \
+    && python -m unittest discover -s /src/services/compute-node/linux -p test_bootstrap_transactions.py \
+    && python -m unittest discover -s /src/services/compute-node/linux -p test_prepare_template.py \
     && python /opt/node/source/compute-node/linux/verify_assets.py
 WORKDIR /data
 USER 10001:10001

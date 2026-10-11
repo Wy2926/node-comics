@@ -2,6 +2,8 @@ import type {ReactNode} from 'react';
 
 export const labels: Record<string, string> = {
   classic: '常规翻译', awaiting_upload: '待上传', validating_upload: '校验上传',
+  image: '单图', document: '整本文件', uploading: '上传中', preflight: '文件预检', awaiting_quota: '等待补额',
+  doc_prepare: '文件预检', doc_ocr: '逐页 OCR', doc_text: '整本文本翻译', doc_render: '逐页译图', doc_zip: 'ZIP 打包',
   queued: '排队中', running: '执行中', outcome_unknown: '结果待核实', unknown_released: '未知结果已释放',
   succeeded: '已完成', no_text: '无文字', failed: '失败', cancelled: '已取消', ready: '待执行', waiting: '等待依赖',
   expired: '租约已过期', page: '整页执行与交付', analyze: '文字检测 / OCR', text: '文本翻译',

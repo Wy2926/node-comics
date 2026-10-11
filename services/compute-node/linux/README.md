@@ -1,84 +1,139 @@
-# Linux NVIDIA 计算节点
+# Vast NVIDIA 节点在线部署
 
-Vast 扩容采用 **固定 CUDA 基础模板 + 版本化运行包 + 每实例独立身份**。不上传完整 CUDA 镜像，不在目标机重新转换模型或安装 Python 依赖；复用官方基础镜像的 Ubuntu、Python、CUDA/cuDNN 与平台管理服务。检测、气泡分割、抹字及日文 OCR 使用 PyTorch CUDA，PP-OCRv5 试读与中韩英识别使用 ONNX Runtime CUDA，嵌字使用 MTU 的 Qt 离屏渲染，`nvidia-smi` 成功不等于节点就绪。
+Vast 使用 **已有 CUDA 基础环境 + 固定源码版本 + 目标机在线安装**。不导出、上传或分发 Python／CUDA 环境包，不从开发机搬运 venv、模型或镜像。普通 Linux Docker 运行方式见末节；Vast 不需要 Docker-in-Docker。
 
-## Vast 扩容
+## 新增节点
 
-[vast-template.json](vast-template.json) 是无凭据模板定义：固定 `vastai/base-image` 的 Linux amd64 digest，使用 SSH 启动方式和指定 on-start 脚本。运行包和安装入口来自 GitHub Release 附件，并分别锁定 SHA-256；大文件不进入 Git 历史。模板源文件不等于账号内已经保存或新实例验收成功，部署时须分别确认。
+1. 在中心后台预先创建独立节点，中心执行位设为 **8**。
+2. 用已发布的完整 Git commit 生成并保存 [Vast 模板](vast-template.json)，每个实例填写自己的身份。
+3. 启动后等待依赖、模型、字体下载和 GPU 预热，确认中心新鲜心跳及真实任务结果。
 
-仓库模板中的 bootstrap／运行包 URL 和 SHA-256 为待填写占位符，不能直接用于实例启动。发布运行包后须填入版本化附件地址和摘要；Vast 镜像字段使用纯 digest 引用，保存后重新打开确认完整摘要。
-
-新增节点：
-
-1. 在中心后台创建独立节点，中心执行位设为 **8**。
-2. 在 Vast 选择该模板，填写下表身份变量，选择满足筛选条件的机器并启动。
-3. 等待首次运行包下载、摘要校验及 GPU 预热完成，确认中心新鲜心跳和真实任务交付。
-
-| 环境变量 | 内容 |
+| 实例环境变量 | 内容 |
 | --- | --- |
-| `NODE_CONTROL_URL` | 中心 HTTPS origin，默认 `https://comics.nodelane.net` |
-| `NODE_ID` | 新节点 ID |
-| `NODE_TOKEN` | 新节点令牌 |
-| `NODE_RESOURCE_ID` | 与中心登记一致的唯一资源 ID |
+| NODE_CONTROL_URL | 中心 HTTPS origin，默认 https://comics.nodelane.net |
+| NODE_ID | 新节点 ID |
+| NODE_TOKEN | 新节点令牌 |
+| NODE_RESOURCE_ID | 与中心登记一致的唯一资源 ID |
 
-**真实身份只填到该实例，不保存进共享模板或账号级变量。** Vast 会收到实例环境变量，控制台访问者也可能读取它们；节点自身仅以 0600 权限保存身份。不要把旧节点身份复制给扩容节点。
+共享模板不保存真实身份，不给扩容实例复制旧节点身份。Vast 会收到这些实例变量；节点配置保存为 /var/lib/node-comics/node.json，权限 0600。
 
-默认检测／OCR／抹字计算 **2**、在途 **8**、下载 **6**、交付 **6**，页缓冲预算 2 GiB。嵌字进程与 CPU 算子线程默认 `auto`，共同按 CPU 亲和性、可见 cgroup 配额和在途上限分配；既有私有配置的显式整数保持不变。页级并发不等于共享模型同时运行次数，两计算池仍共用在途与内存预算。模板筛选 x86_64、单 GPU ≥8 GB、内存 ≥16 GB、兼容 CUDA 12.8，磁盘 48 GB。必须验证 CUDA 模型及 Qt 系统库；这些筛选不是实际吞吐或显存峰值保证。
+模板固定 vastai/base-image 的 amd64 digest，采用 SSH 启动方式。当前支持 Ubuntu 24.04、Python 3.12、NVIDIA CUDA 12 驱动；模板筛选 CUDA 12.8、单 GPU ≥8 GB、内存 ≥16 GB、磁盘 48 GB。这些筛选不是实际吞吐或显存峰值保证。
 
-启动脚本先校验身份和基础库，再下载并校验运行包，安装到 `/opt/node`，生成 `/var/lib/node-comics/node.json`，由现有 Supervisor 托管 `node-comics`。身份从后续启动环境移除，不传给基础镜像的环境导出步骤。运行用户 UID/GID 10001，私有状态目录 0700。既有安装版本或身份不一致时拒绝覆盖；网络中断可重试，同版本重启不重新下载运行包。新实例运行需要网络下载，首次启动时间取决于带宽。
+## 一条在线安装路径
 
-基础环境固定 Ubuntu 24.04、系统 Python 3.12、CUDA 12.8/cuDNN 9，运行包携带锁定的 Python venv、PyTorch CUDA 依赖、MTU 源码、原生权重、词典、字体及许可；基础镜像需提供 EGL、GL、fontconfig、freetype、xkbcommon 和 D-Bus 系统库。bootstrap 校验这些库，不自动安装系统包。venv 引用 `/usr/bin/python3`，因此不能在任意 Linux 模板上直接复用。无需安装 Docker-in-Docker，也不改动 Vast 的 Caddy、portal、tunnel 管理服务；不新增应用公开端口，保留 SSH 运维。
+[vast_bootstrap.py](vast_bootstrap.py) 负责：
 
-## 状态与恢复
+1. 检查基础环境、CUDA 驱动和文件解析能力，apt 只补齐缺少的 Python 构建、Qt 与 libseccomp 系统库，**不安装或替换 CUDA 和 NVIDIA 驱动**。
+2. 在服务器拉取固定 commit 的必要源码。
+3. 下载固定版本 uv，按 uv.lock 执行 uv sync --locked，在该版本自己的 venv 中安装依赖。
+4. 复用 [资产准备器](../../classic-engine/tools/prepare_mtu.py)，在线下载带摘要的原生模型、上游源码、字体、词典及许可；不进行模型转换。
+5. 新版本验证解析、模型摘要、Python 原生依赖、Qt 字体及真实 GPU 预热，通过后才切换并交给 Supervisor。当前已完成版本重跑仅检查身份、配置和服务状态，不重复资产全量校验、GPU 预热或 Supervisor 重载；真正启动工作进程仍执行完整运行预检。
 
-```sh
+PyTorch／ONNX Runtime 等仍需要匹配的 Python 包；这些包在目标机按锁文件拉取，不复制 Vast 的 CUDA 环境。首次安装依赖网络与磁盘，后续复用缓存。节点保持正常出网，不加防火墙或主进程断网限制，也不改变 Vast 的 Caddy、portal、tunnel 服务。
+
+模板源文件带占位符，不能直接启动。源码提交并发布后生成模板：
+
+~~~sh
+python services/compute-node/linux/prepare_template.py --revision COMMIT_SHA --output /absolute/path/vast-template.json
+~~~
+
+生成器从指定 commit 读取模板和 bootstrap 的原始 Git blob，计算摘要并下载同一公开 URL 逐字节核对；未发布、内容不一致、旧环境包协议模板或网络验证失败均拒绝生成。脏工作区、Windows CRLF 和选择旧 commit 不影响摘要。生成模板不等于推送代码、保存平台模板、购买实例或完成新节点冷启动验收。Vast 镜像字段采用纯 digest 引用，保存后重新打开确认完整摘要。
+
+已有 Vast 容器也使用同一入口：
+
+~~~sh
+python3 vast_bootstrap.py --revision COMMIT_SHA --config /absolute/private/node.json --start
+~~~
+
+首次也可由四个 NODE_* 实例变量生成配置。重复执行同一版本保留身份、状态、依赖和下载缓存。省略 --start 只准备和验证版本，不切换链接、不修改或启动 Supervisor；准备不同版本仍要求先排空和停服务，避免与旧工作进程同时预热占用显存。只保留 Python 安装入口，不再套一层 shell 安装脚本。
+
+### 临时开发版本
+
+支持不提交、不推送的临时版本。把本次运行所需源码放到**测试节点上的**独立检出目录，再运行该目录的安装器；不要传输本地 venv、模型、凭据或状态目录，也不要用生产节点身份启动第二个测试实例。
+
+~~~sh
+python3 /absolute/checkout/services/compute-node/linux/vast_bootstrap.py \
+  --source-dir /absolute/checkout --expected-current CURRENT_VERSION --start
+~~~
+
+首次安装省略 expected-current，并提供该测试节点自己的 --config 或四个 NODE_* 变量。已有节点先按下节停止领取、排空、停服务。源码只采集一次，版本号和安装内容共用这份快照；只选择运行源码和明确列出的配置模板，拒绝目录／文件链接，排除私有配置。相同内容复用 local-* 版本，内容改变产生新版本；依赖和模型仍由目标机按锁文件在线安装、复用缓存。临时版本不能冒充正式 commit，也不能生成正式 Vast 模板。
+
+## 缓存、状态与版本
+
+| 路径 | 内容 |
+| --- | --- |
+| /opt/node | 当前版本链接 |
+| /opt/node-releases/VERSION | 该版本源码、venv 和模型 |
+| /var/cache/node-comics | Git、uv、模型与字体下载缓存 |
+| /var/lib/node-comics | 独立身份、恢复库、工作目录和日志 |
+
+安装失败保留下载缓存；uv 重试网络请求，模型／字体下载支持 Range 续传，不支持 Range 的源自动重新下载。安装器显式启用 uv 缓存并通过硬链接复用，覆盖基础镜像可能设置的 UV_NO_CACHE 和复制模式，避免同机升级反复下载、复制同一批 Python 包。校验完成前不切换当前版本。
+
+配置、资产清单和版本完成标记原子发布。配置校验统一在已安装的锁定 venv 中执行，不依赖宿主系统 Python 恰好装有 psutil；私有配置相对路径按最终状态目录解析，发布前验证。未写入完成标记的版本重试时从校验缓存重建资产，不把一个存在但截断的 release.json 当作完成；已完成版本禁止就地重建。这个恢复分支可能重做本地解压／校验，只在未完成安装重试时发生。
+
+状态与代码独立。已有实际持久卷可通过 --data-dir 指定专用状态目录；/workspace 这个路径本身不代表持久卷。stop/start 保留实例文件，recycle/destroy 是否保留取决于实际卷；回收前必须排空并备份身份和状态。document_spool_bytes 是应用预算，不是磁盘硬配额。
+
+默认检测／OCR／抹字计算 2、在途 8、下载 6、交付 6，页缓冲预算 2 GiB。CPU 与嵌字线程根据亲和性及 cgroup 配额分配。已有私有配置保持不变，详见[节点配置](../../../docs/NODE_CONFIGURATION.md)。
+
+## 升级与回滚
+
+不静默更新到 main 或 latest。升级前确认中心／节点协议和数据库兼容，在中心停止领取并排空任务，再停止服务：
+
+~~~sh
+supervisorctl stop node-comics
+cat /opt/node/.source-revision
+python3 vast_bootstrap.py --revision NEW_COMMIT --expected-current OLD_COMMIT --start
+~~~
+
+安装器检查待交付记录和文件工作目录，不能将等待 LLM 的无租约任务当作排空。新版本校验及服务配置预写通过后，原子切换 /opt/node；旧版本目录保留。切换后捕获到配置发布或 Supervisor 启动错误，会停止候选服务并恢复旧链接和配置，保留停止状态供检查后重试；回退自身失败明确报告 rollback_failed，必须人工检查。断电／SIGKILL 不能由异常处理保证回退，恢复后先核对实际链接、配置和服务状态，不自动猜测版本。
+
+回滚使用相同入口，把目标和 expected 对调：
+
+~~~sh
+supervisorctl stop node-comics
+python3 vast_bootstrap.py --revision OLD_COMMIT --expected-current NEW_COMMIT --start
+~~~
+
+已有目标版本复用其环境，身份和状态不删除。跨协议／数据库版本仍需配套回滚中心，不能只切换节点程序。不要同时运行两个相同身份。
+
+## 运行、恢复与排障
+
+~~~sh
 supervisorctl status node-comics
 cat /var/lib/node-comics/state/status.json
 tail -n 50 /var/lib/node-comics/supervisor.log
-```
+~~~
 
-以 `phase=running`、`connected=true`、新鲜中心心跳和真实结果交付确认可用，不以进程 RUNNING 代替 GPU 验收。业务日志位于 `/var/lib/node-comics/state/logs`，Supervisor 日志有大小上限。预热失败不会注册接单。网络断开由节点重连，异常退出由 Supervisor 重启。
+以 phase=running、connected=true、新鲜中心心跳和真实结果交付确认就绪；进程 RUNNING 或 nvidia-smi 成功不代表模型已预热。业务日志在 state/logs，Supervisor 日志有大小上限。
 
-停止前在中心停止领取，排空租约和待交付记录，再执行 `supervisorctl stop node-comics`。stop/start 保留容器文件；没有实际挂载持久卷时 recycle/destroy 会丢失身份与未交付状态，必须先安全备份到实例外。`/workspace` 路径本身不代表持久卷。不能让同一身份在两台机器同时运行，也不能删除恢复库来绕过失败。
+控制面暂不可达或工作进程异常时，服务入口按 5–60 秒退避重试；已运行节点的网络故障由原有协议重连。正常停止不自动拉起。安装脚本失败仍执行 Vast 原有平台入口，保留 SSH／控制台排障能力。
 
-模板不进行静默就地升级。发布新版本使用新标签、摘要和模板；旧实例保持原版本。替换节点应先排空和停用旧节点，再启用新身份。复用旧状态升级需要独立检查协议兼容性。
+预检代码区分 NODE_CONFIG_INVALID、NODE_STATE_DISK_LOW、NODE_GPU_DRIVER_UNAVAILABLE、NODE_PARSER_SANDBOX_UNAVAILABLE、NODE_CONTROL_TLS_UNREACHABLE，不输出令牌、签名地址或文件内容。早于工作进程启动的错误还记录在 /var/lib/node-comics/startup-logs。model_warmup=pending 不能作为 GPU 验收。
 
-## 构建与发布运行包
-
-构建机使用 Docker Linux 容器模式，镜像只是可重复打包环境，无需推送镜像仓库。以干净已提交源码构建：
-
-```sh
-docker build --platform linux/amd64 -f services/compute-node/linux/Dockerfile --build-arg VERSION=VERSION --build-arg REVISION=COMMIT_SHA -t node-comics-compute:VERSION .
-python services/compute-node/linux/export_runtime.py --image node-comics-compute:VERSION --output /absolute/release/node-comics-runtime-VERSION-linux-amd64.tar.gz
-```
-
-导出器仅提取 `/opt/node`，同时生成 `.tar.gz.json`，记录包大小、SHA-256、源镜像 ID、平台要求。将运行包、元数据、`vast_bootstrap.py` 和最终模板发布为 GitHub Release 附件；用最终文件的 SHA-256 更新模板 on-start 脚本，不能替换已发布版本的附件。源码和模板进入 Git，运行包不进入 Git。
-
-构建不要求 GPU。基础镜像和 uv 固定 digest，Python 使用 `uv.lock`；MTU 原始源码、模型、词典、字体和许可按摘要锁定，Windows／Linux 共用资产准备。运行包包含原生 PyTorch CUDA 和 Qt，不进行自研模型转换。`mtu-assets.json`、`release.json` 记录资产摘要，源码及来源随包保留。Ubuntu apt 软件源可能变化，不承诺跨时间重建逐字节相同；扩容复用同一次发布归档。
-
-## 普通 Linux Docker 主机
-
-非 Vast 的普通主机可以直接运行构建镜像，需 Docker/Compose、NVIDIA Container Toolkit 和 NVIDIA CUDA 驱动。复制 `compose.yaml` 与 `node.example.json` 到独立部署目录，将配置命名为 `node.local.json` 并填写身份，权限设为 UID/GID 10001 可读、0600。
-
-```sh
-export NODE_IMAGE=node-comics-compute:VERSION
-export GPU_DEVICE=0
-docker compose -p gpu-node-01 run --rm node check --config /data/node.json --bundle-root /opt/node
-docker compose -p gpu-node-01 up -d
-```
-
-不同节点使用不同 Compose project 和命名状态卷。`check` 校验资产及 GPU，不连接中心；`run` 才注册接单。Docker 健康检查只读状态，不重新加载模型。不要执行 `down -v`。已有 Vast 容器的手动首次安装入口为 `install_runtime.sh ARCHIVE SHA256 PRIVATE_NODE_CONFIG`，拒绝覆盖已有目录、账户和服务，不承担升级职责。
-
-多进程嵌字通过共享内存传递图像，不复制 CUDA 模型。Compose 默认 `/dev/shm` 上限为 2 GiB，可用 `NODE_SHM_SIZE` 覆盖；这是容量上限而非预先占用，也不自动扩大容器内存限额。共享缓冲纳入 `resident_bytes`，解释器／字体常驻内存另计；具体计费统一见[节点配置](../../../docs/NODE_CONFIGURATION.md)。Vast 使用实例自身的共享内存挂载，仍须检查实际容量。Linux 分配前预留共享段后备页，预留失败则走本地串行绘制并告警，避免仅检查空闲量后并发写入导致 SIGBUS。
+PDF／ZIP 解析仅在子进程内使用 Landlock ABI ≥3 与 libseccomp，不依赖用户命名空间、privileged 或 SYS_ADMIN；节点主进程正常连接中心和存储。每次启动实测解析及越界拒绝能力。宿主内核不支持时应更换合适宿主，安装脚本不修改宿主内核。文件工作目录在等待 LLM 时保留，详见[整本文件翻译](../../../docs/DOCUMENT_TRANSLATION.md)。
 
 ## 验证
 
-正式回归测试只在构建阶段执行，不复制到运行包；`source/` 仅保留必要构建源码和来源信息。运行包不包含压测工具、本机 WSL 实验配置、测试图片或测试报告。
-
-```sh
+~~~sh
 python -m unittest discover -s services/compute-node/linux -p test_container.py
 python -m unittest discover -s services/compute-node/linux -p test_vast_bootstrap.py
-docker compose -f services/compute-node/linux/compose.yaml config --quiet
-```
+python -m unittest discover -s services/compute-node/linux -p test_bootstrap_transactions.py
+python -m unittest discover -s services/compute-node/linux -p test_prepare_template.py
+NODE_TEST_SANDBOX=1 python services/compute-node/linux/test_parser_sandbox.py
+~~~
 
-Linux bootstrap 测试在 Windows 跳过，在构建镜像中执行。离线测试不代表新 Vast 实例启动、GPU 并发压测或中心联调通过；生产验收需要真实新实例、代表性页面和恢复场景。配置与协议见[节点配置](../../../docs/NODE_CONFIGURATION.md)、[计算协议](../../../docs/COMPUTE_PROTOCOL.md)。
+Linux bootstrap 测试在 Windows 跳过。离线测试与真实部署验收分别报告：首次在线安装、同版本重跑、失败续传、升级／回滚、进程异常恢复、正常停止及真实 GPU 任务。测试机接入隔离中心不代表生产切换或新租实例冷启动已验收。
+
+## 普通 Linux Docker 主机
+
+普通 Docker 主机可在目标主机从源码构建 [Dockerfile](Dockerfile)，配合 NVIDIA Container Toolkit 和 [Compose](compose.yaml) 运行；不导出环境包搬运到 Vast。构建固定 CUDA 镜像和 uv digest，依赖、模型与字体由构建机在线拉取。
+
+~~~sh
+docker build --platform linux/amd64 -f services/compute-node/linux/Dockerfile -t node-comics-compute:VERSION .
+docker compose -p gpu-node-01 run --rm node check --config /data/node.json --bundle-root /opt/node
+docker compose -p gpu-node-01 up -d
+~~~
+
+复制 compose.yaml 与 node.example.json 到独立部署目录，按 Compose 约定设置 NODE_IMAGE、GPU_DEVICE 和私有 node.local.json。每个节点使用不同 project 和状态卷，不执行 down -v。Compose 默认共享内存上限 2 GiB；Vast 使用实例自身挂载。容量上限不等于预分配内存或真实吞吐。
+
+平台参考：[Vast Docker 环境](https://docs.vast.ai/guides/instances/docker-environment)、[模板启动脚本](https://docs.vast.ai/guides/templates/advanced-setup)。

@@ -171,6 +171,8 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
 
 
 def cancel_job(db, job):
+    if job.workflow_kind != 'image':
+        problem('WORKFLOW_MISMATCH', '文件任务必须通过文件工作流处理', 409)
     if job.status in TERMINAL:
         return
     lock_scheduler(db)

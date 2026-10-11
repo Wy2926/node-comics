@@ -22,7 +22,7 @@ import {Empty, href, label, Pagination, time} from './ui';
 
 const views = {
   overview: ['运行概览', 'LIVE OPERATIONS', '从用户提交到译图交付，掌握当前运行情况。', '◫'],
-  tasks: ['翻译任务', 'TRANSLATION TASKS', '逐页查看执行状态、等待时间与节点履历。', '≡'],
+  tasks: ['翻译任务', 'TRANSLATION TASKS', '查看单图与整本文件的状态、等待时间及节点履历。', '≡'],
   nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
   'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
   users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
@@ -87,7 +87,8 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
   }}>
     <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '任务 ID / 用户名称' : '用户名称 / ID'}/></label>
     {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic'])}
-      {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
+      {select('workflow_kind', '任务类型', ['image', 'document'])}
+      {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'uploading', 'preflight', 'awaiting_quota', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
       </> :
       <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="lite">Lite</option><option value="plus">PLUS</option></select></label>}
     <button className="primary">筛选</button><button type="button" className="secondary" onClick={() => onChange({})}>重置</button>
@@ -119,7 +120,7 @@ function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}
   const [detail, setDetail] = useState<Target>();
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
-  const allowed = view === 'tasks' ? ['mode', 'status', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
+  const allowed = view === 'tasks' ? ['mode', 'workflow_kind', 'status', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
   for (const key of allowed) if (params.get(key)) query.set(key, params.get(key)!);
   const {data, busy, error, reload} = useResource<OverviewData | NodesData | Page<Task> | Page<AdminUser>>(`/v1/admin/monitor/${view}?${query}`, onUnauthorized, auto && !detail);
   const page = data as Page<Task> | Page<AdminUser> | undefined;

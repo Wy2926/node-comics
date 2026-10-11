@@ -43,6 +43,8 @@ def _finished(db, lease_id, token, node_id, result_hash=None):
 
 
 def finish_job(db, job, status, *, error=None):
+    if job.workflow_kind != 'image':
+        raise ProcessingError('WORKFLOW_MISMATCH', '文件任务必须通过文件工作流结算')
     job.status, job.phase, job.completed_at = status, "completed" if status in {"succeeded", "no_text"} else status, now()
     job.error_code, job.error_message = (error.code, error.message) if error else (None, None)
     for stage in db.scalars(select(JobStage).where(JobStage.job_id == job.id, JobStage.status.in_(["waiting", "ready"]))):

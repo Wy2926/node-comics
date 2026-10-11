@@ -44,3 +44,5 @@ uv sync --locked --extra test
 - [v3 计算协议](../../docs/COMPUTE_PROTOCOL.md)、[第三方来源](THIRD_PARTY.md)
 
 结果使用稀疏无损 WebP，已协商的超长页面使用分块包。二值覆盖 alpha 和 `source-atop` 保留原图透明度；SQLite 原子冻结结果与完成记录，终态回执后清除。检查点兼容与升级要求见[运行与恢复](docs/NODE_OPERATIONS.md#升级与验收)。
+
+通过 Linux Landlock ABI ≥3 与 libseccomp 沙箱启动探测的节点声明 `document_protocol:2`，支持[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)，不依赖用户命名空间或特权容器；无此能力的 Windows／Linux 宿主仍可接普通 v3 单图。后台 `document_slots` 默认 1（0 停用），在现有执行位内低优先级领取准备、OCR、译图或 ZIP；复用同一模型、计算／渲染池与内存预算。原文件只下载一次，规范化页、分析与译图保存在私有 `state/documents/{job}/{generation}`，OCR 仅回传文本后释放租约，最终 ZIP 一次流式上传 R2。中央负责唯一 LLM 调用和额度，不向节点下发 LLM／R2 密钥。工作目录须持久化并设置磁盘硬配额，同机重启可续跑，丢盘后不自动重发已发送 LLM。升级前排空旧文件任务并迁移 0018，不与旧 v1 混跑。

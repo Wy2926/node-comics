@@ -1,5 +1,5 @@
 {
-  "name": "Node Comics MTU CUDA - release draft",
+  "name": "Node Comics MTU CUDA - online source",
   "image": "vastai/base-image@sha256",
   "tag": "613382a2fd4238cadc8348389523c90201b131c530a430f46b313441d3280fbb",
   "runtype": "ssh",
@@ -8,7 +8,7 @@
   "ssh_direct": true,
   "private": true,
   "env": "-e NVIDIA_DRIVER_CAPABILITIES=compute,utility -e NODE_CONTROL_URL=https://comics.nodelane.net -e NODE_ID=REPLACE_WITH_NODE_ID -e NODE_TOKEN=REPLACE_WITH_NODE_TOKEN -e NODE_RESOURCE_ID=REPLACE_WITH_RESOURCE_ID",
-  "onstart": "set +x\nset -e\numask 077\nif ! printf 'REPLACE_WITH_BOOTSTRAP_SHA256  /opt/node-comics-bootstrap.py\\n' | sha256sum --status -c -; then\n  bootstrap_tmp=$(mktemp /tmp/node-comics-bootstrap.XXXXXX)\n  trap 'rm -f -- \"$bootstrap_tmp\"' EXIT\n  curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --retry 5 --connect-timeout 30 --max-time 120 -o \"$bootstrap_tmp\" REPLACE_WITH_VERSIONED_BOOTSTRAP_URL\n  printf 'REPLACE_WITH_BOOTSTRAP_SHA256  %s\\n' \"$bootstrap_tmp\" | sha256sum -c -\n  install -m 700 \"$bootstrap_tmp\" /opt/node-comics-bootstrap.py\n  rm -f -- \"$bootstrap_tmp\"\n  trap - EXIT\nfi\n/usr/bin/python3 /opt/node-comics-bootstrap.py --url REPLACE_WITH_VERSIONED_RUNTIME_URL --sha256 REPLACE_WITH_RUNTIME_SHA256\nunset NODE_CONTROL_URL NODE_ID NODE_TOKEN NODE_RESOURCE_ID\nexec entrypoint.sh --no-update-portal --no-update-vast",
+  "onstart": "set +x\numask 077\nbash -e <<'NODE_COMICS_BOOTSTRAP'\nif ! printf 'REPLACE_WITH_BOOTSTRAP_SHA256  /opt/node-comics-bootstrap.py\\n' | sha256sum --status -c -; then\n  bootstrap_tmp=$(mktemp /tmp/node-comics-bootstrap.XXXXXX)\n  trap 'rm -f -- \"$bootstrap_tmp\"' EXIT\n  curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --retry 5 --connect-timeout 30 --max-time 120 -o \"$bootstrap_tmp\" REPLACE_WITH_VERSIONED_BOOTSTRAP_URL\n  printf 'REPLACE_WITH_BOOTSTRAP_SHA256  %s\\n' \"$bootstrap_tmp\" | sha256sum -c -\n  install -m 700 \"$bootstrap_tmp\" /opt/node-comics-bootstrap.py\n  rm -f -- \"$bootstrap_tmp\"\n  trap - EXIT\nfi\n/usr/bin/python3 /opt/node-comics-bootstrap.py --revision REPLACE_WITH_SOURCE_COMMIT\nNODE_COMICS_BOOTSTRAP\nnode_bootstrap_status=$?\nunset NODE_CONTROL_URL NODE_ID NODE_TOKEN NODE_RESOURCE_ID\nif [ \"$node_bootstrap_status\" -ne 0 ]; then printf 'Node bootstrap failed (exit %s); inspect instance logs and retry after resolving the reported stage.\\n' \"$node_bootstrap_status\"; fi\nexec entrypoint.sh --no-update-portal --no-update-vast",
   "recommended_disk_space": 48,
   "extra_filters": {
     "cpu_arch": {
@@ -27,7 +27,7 @@
       "gte": 12.8
     }
   },
-  "desc": "Release draft: fill the published MTU runtime and bootstrap URLs and SHA-256 values before use.",
+  "desc": "Source template: pin a published commit and bootstrap checksum; dependencies and assets download on the server.",
   "href": "https://github.com/Wy2926/node-comics/releases",
-  "readme": "Use SSH launch mode and the supplied on-start script. Fill a NEW independent NODE_ID, NODE_TOKEN and NODE_RESOURCE_ID before renting; center execution_slots=8. Never save real credentials into the template or account-wide variables. Runtime downloads once and verifies SHA-256; subsequent starts reuse it and refuse identity changes. GPU warmup precedes registration; inspect /var/lib/node-comics/state/status.json and center heartbeat. Requires Ubuntu 24.04 x86_64, Python 3.12, CUDA 12.8/cuDNN 9 and NVIDIA CUDA drivers and Qt offscreen system libraries. No application inbound ports. Stop/start preserves state; recycle/destroy without a volume loses it: drain and back up first. No in-place automatic upgrades."
+  "readme": "Use the supplied SSH on-start script. Give every instance its own NODE_ID, NODE_TOKEN and NODE_RESOURCE_ID. The server pulls pinned source, installs locked Python dependencies, downloads verified models/fonts, and reuses the Vast CUDA/driver environment. No environment export or upload. Cache is reused after interruption. Supervisor starts and recovers the node. Drain before explicit upgrades or rollbacks; keep /var/lib/node-comics on persistent storage. Preserve the Vast platform entrypoint and normal outbound network."
 }

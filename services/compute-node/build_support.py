@@ -1,6 +1,7 @@
-"""Standard-library helpers for isolated Windows builds."""
+"""Shared online asset downloads and isolated Windows build helpers."""
 import csv
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -8,6 +9,7 @@ import shutil
 import subprocess
 import time
 import urllib.request
+import urllib.error
 import zipfile
 
 
@@ -28,15 +30,32 @@ def download(url, checksum, target):
         temporary = target.with_name(target.name + '.partial')
         for attempt in range(3):
             try:
-                request = urllib.request.Request(url, headers={'User-Agent': 'NodeComics-Build/1'})
-                with urllib.request.urlopen(request, timeout=120) as response, temporary.open('wb') as output:
-                    shutil.copyfileobj(response, output, 1024 * 1024)
+                offset = temporary.stat().st_size if temporary.exists() else 0
+                headers = {'User-Agent': 'NodeComics-Build/1'}
+                if offset:
+                    headers['Range'] = f'bytes={offset}-'
+                request = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    resumed = offset and getattr(response, 'status', None) == 206
+                    if resumed and not response.headers.get('Content-Range', '').startswith(f'bytes {offset}-'):
+                        raise ValueError(f'Invalid download range: {target.name}')
+                    with temporary.open('ab' if resumed else 'wb') as output:
+                        shutil.copyfileobj(response, output, 1024 * 1024)
                 break
-            except OSError:
+            except urllib.error.HTTPError as error:
+                if error.code == 416 and temporary.exists() and sha256(temporary) == checksum:
+                    break
+                if error.code == 416:
+                    temporary.unlink(missing_ok=True)
+                if attempt == 2:
+                    raise
+                time.sleep(2 ** attempt)
+            except (OSError, http.client.HTTPException):
                 if attempt == 2:
                     raise
                 time.sleep(2 ** attempt)
         if sha256(temporary) != checksum:
+            temporary.unlink()
             raise ValueError(f'Download checksum mismatch: {target.name}')
         temporary.replace(target)
     if sha256(target) != checksum:
@@ -55,7 +74,7 @@ def safe_extract_zip(archive, destination):
 
 
 def copy_sources(source, target):
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.env*', '*.log', '*.sqlite*'))
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.egg-info', '.env*', '*.log', '*.sqlite*'))
     # Git autocrlf must not change engine identity.
     for path in Path(target).rglob('*'):
         if path.is_file() and path.suffix in ('.py', '.go', '.json', '.toml', '.md', '.txt', '.lock'):

@@ -51,6 +51,7 @@ PySide6-Essentials / Shiboken6 are required by upstream utility imports; their o
 
 ## Runtime and data
 
+- Document PDF rendering uses [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) 5.14.0 (BSD-3-Clause / Apache-2.0). Wheel URLs and SHA-256 are pinned in `uv.lock`; bundled PDFium and third-party notices remain in the distribution. The first-party `comic-document-files` package contains the shared bounded PDF/ZIP adapter, not copied PDFium implementation. Linux parsing requires kernel Landlock ABI >=3 and the distribution-maintained libseccomp library; user namespaces and privileged containers are not required. Unsupported hosts do not advertise document capability.
 - PyTorch and TorchVision CUDA distributions: upstream package notices and NVIDIA runtime notices are retained in wheel metadata. Qt rendering executes on the CPU.
 - ONNX Runtime GPU 1.23.2 executes all three PP-OCRv5 sessions with the CUDA 12 provider; its package metadata retains Microsoft's MIT notice and bundled dependency notices.
 - PyQt6 / Qt6: original package licenses remain in the distribution. DenseCRF uses the MTU author's platform wheels, with URLs and SHA-256 locked in `uv.lock`.

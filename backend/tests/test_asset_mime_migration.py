@@ -1,4 +1,4 @@
-from sqlalchemy import inspect
+from sqlalchemy import MetaData, Table, inspect
 from sqlalchemy.orm import Session
 
 from app.models import Asset, Job, User
@@ -22,7 +22,11 @@ def test_mime_upgrade_preserves_asset_parent_and_job_result_references(isolated_
             byte_size=50, representation='overlay-v1', bbox={'x': 1, 'y': 2, 'width': 3, 'height': 4})
         db.add(output)
         db.flush()
-        db.add(Job(id='mime-job', owner_id=source.owner_id, input_asset_id=source.id, output_asset_id=output.id,
+        # Seed the historical table, not the current ORM's RETURNING columns.
+        legacy_jobs = Table('jobs', MetaData(), autoload_with=db.connection())
+        defaults = {column.name: column.default.arg(None) if column.default.is_callable else column.default.arg
+                    for column in Job.__table__.columns if column.name in legacy_jobs.c and column.default is not None}
+        db.execute(legacy_jobs.insert(), defaults | dict(id='mime-job', owner_id=source.owner_id, input_asset_id=source.id, output_asset_id=output.id,
             mode='classic', target_language='en', status='succeeded', phase='completed', idempotency_key='mime-request',
             operation='translation', request_hash='c' * 64, cache_key='d' * 64, config={}, quota_pages=1,
             quota_kind='classic_daily', settlement='settled', result_description={'representation': 'overlay-v1'}))
@@ -32,6 +36,7 @@ def test_mime_upgrade_preserves_asset_parent_and_job_result_references(isolated_
     assert columns['mime']['type'].length == 128
     with Session(engine) as db:
         job, output = db.get(Job, 'mime-job'), db.get(Asset, 'mime-output')
+        assert job.workflow_kind == 'image'
         assert (job.input_asset_id, job.output_asset_id, job.settlement) == ('mime-input', 'mime-output', 'settled')
         assert output.parent_id == 'mime-input' and output.mime == 'image/webp'
         assert output.bbox == {'x': 1, 'y': 2, 'width': 3, 'height': 4}

@@ -1,6 +1,6 @@
 # 总中心与计算节点协议
 
-本文描述仓库中的 **v3 整页计算协议**。中心实现为 [compute_v3.py](../backend/app/compute_v3.py)，节点为 [classic-engine](../services/classic-engine/README.md)。部署需配套更新中心、节点和客户端；旧节点协议不提供兼容入口。
+本文描述仓库中的 **v3 单图整页协议**及独立的 **v2 固定宿主文件协议**。单图中心实现为 [compute_v3.py](../backend/app/compute_v3.py)，节点为 [classic-engine](../services/classic-engine/README.md)。部署需配套更新中心、节点和客户端；旧节点协议不提供兼容入口。
 
 ## 职责与执行位
 
@@ -32,7 +32,7 @@ sequenceDiagram
 
 ## 传输与信任边界
 
-所有路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；节点只接受当前租约的精确相对输入路径，不接受外部 URL、任意跳转或源站凭据。原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。
+本节单图路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；单图输入只接受当前租约的精确相对路径，不接受外部 URL、任意跳转或源站凭据。单图原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。文件任务的 R2 传输独立见下节，不改变单图链路。
 
 原图 GET 额外携带 `X-Lease-Token`，中心核对节点、租约令牌、代次、取消状态和期限后直接返回字节。已经开始的流式读取有界完成或被客户端中断；取消立即阻止后续读取和交付，不能召回已经下载的字节。节点验证长度与 SHA-256，缓存不延长执行权。
 
@@ -169,8 +169,48 @@ multipart 请求体接收受 `upload_body_timeout_seconds` 总时限约束，持
 
 无关全局通知不立即结束长轮询；配置、租约集合、具体租约或真实可领取状态变化可触发增量。claim_ready 只是提示，节点忽略早于最新领取尝试的旧提示。中心文本和上传恢复池继续独立有界，调度规则见[集群设计](TRANSLATION_CLUSTER_DESIGN.md#按就绪顺序领取)。
 
+## 文件页协议
+
+[文件翻译](DOCUMENT_TRANSLATION.md)把 PDF／ZIP 预检、规范化、逐页 OCR／渲染和完整 ZIP 放在同一个持久计算宿主，中央 document-worker 只执行一次整本文本调用。节点必须具备共享解析包，并实际通过 Linux Landlock ABI ≥3 与 libseccomp 禁网沙箱探测，才能在既有 v3 注册中报告 `document_protocol:2`，取得 `doc_prepare`、`doc_ocr`、`doc_render`、`doc_zip` 能力。沙箱不依赖用户命名空间或特权容器；Windows 或未通过探测的 Linux 宿主不得声明 v2，可继续单图服务，不提供关闭沙箱的兼容路径。文件前缀为 `/internal/documents/compute/v2`，使用原节点身份与令牌，不新建 GPU 节点或资源池。
+
+| 操作 | 内容 |
+| --- | --- |
+| `POST /nodes/{id}/sync` | 提交最多 200 个 `workspace_ids`，返回本身份活动租约、配置和明确的目录状态；只有 prepare 返回源下载授权 |
+| `POST /nodes/{id}/claim` | 持久 request_id、config_version、count=1；重复请求返回原租约或终态 |
+| `POST /nodes/{id}/heartbeat` | 最多 32 项 lease_id、lease_token、workspace_generation，逐项续期／停止／终态，不能延长领取时固定截止 |
+| `POST /leases/{id}/inputs` | 仅 prepare 可刷新源文件 R2 GET 授权 |
+| `POST /leases/{id}/uploads` | 仅 ZIP 阶段可冻结 `output_ref` 并签发精确 PUT；成功重放返回原回执 |
+| `POST /leases/{id}/complete` | 令牌与目录代次，加该阶段的清单／内联文本／描述符，或固定 error 代码；返回稳定终态 |
+
+首次 prepare 领取原子固定 `Document.owner_node_id`；所有后续节点阶段只给该宿主。租约同时包含阶段 `generation` 和独立的 `workspace_generation`，写入时核对用户任务、节点、令牌、两类代次及期限。目录归属不占执行位：prepare、每页 OCR／render、ZIP 都是独立短期租约，全文 LLM 等待期间没有 GPU 租约。`document_slots` 默认 1、范围 0–32，0 停止新文件阶段领取；它是同节点 `execution_slots` 之内的上限，不是额外容量。领取在同一调度锁内确认没有可领取的交互单图；到期但未回收租约仍计入容量。两条流程共用原有下载、计算、嵌字、交付池、GPU runtime、CPU 和内存门禁，已开始操作不被抢占，低优先级不保证交互零等待或文件无饥饿。
+
+所有节点阶段的领取与同步负载均携带 `file_limits`，页面读取、恢复和打包使用中心下发的文件预算，不回退到宿主默认值。阶段专属字段如下：
+
+| 阶段 | 领取数据 | 成功 complete 数据 |
+| --- | --- | --- |
+| `doc_prepare` | source 的精确 R2 描述与 GET 签名、source_type | 完整有序 `pages:[{page_index,source_name,input_ref}]` |
+| `doc_ocr` | 本地 `input` 描述 | `analysis_ref`、内联 `text:{page_index,analysis_hash,segments}`、no_text、quality_flags |
+| `doc_render` | 本地 input／analysis_ref、内联 `{analysis_hash,language,translations,revision}` | 本地 `output_ref`、quality_flags |
+| `doc_zip` | 完整有序的页 output_ref 与中心指定 output_key | 已 PUT 的最终 ZIP `output_ref` |
+
+本地文件描述只含 `{sha256,byte_size,mime,width?,height?}`，不能携带路径、R2 key 或签名。源和最终 ZIP 才含中心分配的 R2 key。完整 analysis JSON／掩膜留在宿主，单页分析及完成检查点最多 4 MiB；OCR 内联文本最多 200 段，每段原文最多 4000 字符、唯一 ID 最多 80 字符。API 不下载 analysis、不解析图像，应用层仍在 LLM 前校验完整 OCR 契约。无文字页提交空 segments 与 no_text，复用本地规范化原图，跳过 LLM／render 对该页的处理。
+
+全部 OCR 页完成后，中央才汇总一次 LLM。完整发送意图和请求先提交数据库，完整响应与调用状态／成本同事务持久化，再分发各页内联译文；这些私有正文列延迟加载，不进入默认监控或普通任务列表。请求身份或段落覆盖不匹配即拒绝，不截断、拆分或自动重发。未知调用保留预占；已有 DB 响应可恢复逐页检查点而不再次请求模型。具体文字、额度与人工核实规则以[文件翻译](DOCUMENT_TRANSLATION.md#整本-llm)为准。
+
+宿主用 `state_dir/documents/{job_id}/{workspace_generation}/` 持久保存源文件、原图、analysis、译图和最终 ZIP；共享字节预算包含全部活动目录，目录和原子清单绑定宿主身份，拒绝链接与路径穿越。逐页 complete 只交元数据／文本，没有 R2 PUT 或 HEAD。正常无重试流程为一次源 GET、一次最终 ZIP PUT；最终 PNG 保留单页编码上限 88 MiB，不经过单图覆盖层再合成。
+
+R2 使用独立无默认授权的 HTTPS 客户端，不跟随重定向、不继承代理或中心 Bearer。源 GET 流式验证长度和 SHA，下载过的本地源按摘要复用；领取签名到期或传输重试时才刷新，403 最多重新签名一次。ZIP PUT 绑定长度、MIME、SHA 元数据和 `If-None-Match:*`；412 由最终 complete 的 HEAD 核对同一描述。签名只驻内存，不写日志或恢复数据库；重试受原租约截止约束。中心只在 ZIP 完成时于锁外 HEAD，随后短事务重新验证宿主、令牌、期限、代次和完整页清单，发布 ZIP 并一次结算；HEAD 元数据不是中心已解码像素的证据。
+
+节点按 `document-lease:` 原子冻结完成 JSON 与已有数值计时，不再把页产物 BLOB 塞入租约日志。丢回执重交相同完成描述，中心返回稳定原回执；同租约不同内容冲突。阶段终态删除租约记录，不删整本本地文件。`sync` 明确返回终态／revoked 或更高目录代次，且本地无活动操作后才授权回收；缺项和暂时断网都不是删除指令。
+
+目录完整的重启从同宿主检查点继续。LLM 前失盘可递增目录代次并在原宿主重建，清单必须匹配、页额度不得重复预占；LLM sending／unknown 时失盘进入待核实，不重发；收到完整响应后失盘则明确失败释放用户额度，保留供应商成本。不自动迁到另一节点或让旧代次回写。协议升级必须先排空旧文档：迁移 `document_workspaces_0018` 拒绝任何非终态 v1 文档，旧 R2 中间检查点不兼容本地 v2。
+
+已预占且无活动租约的任务，其固定宿主超过配置的恢复宽限无心跳时，中央维护有界扫描并在锁内重验：未发 LLM／已有明确响应则 `DOCUMENT_OWNER_UNAVAILABLE` 失败释放；sending／unknown 保留预占转待核实。心跳恢复或出现活动租约后不能误判离线终结。宽限与其他生命周期规则见[文件翻译](DOCUMENT_TRANSLATION.md#宿主恢复与本地文件)。
+
 ## 验证边界
 
 回归入口：[中心](../backend/tests/test_compute_v3.py)、[长轮询](../backend/tests/test_compute_updates.py)、[节点联调](../backend/tests/test_compute_node_v3.py)、[PostgreSQL](../backend/tests/test_compute_v3_postgres.py)、[节点调度](../services/classic-engine/tests/test_node_scheduling.py)、[节点传输](../services/classic-engine/tests/test_node_transport.py)。
+
+文件的 SQL 领取／双代次／阶段屏障见 [test_document_compute.py](../backend/tests/test_document_compute.py)，共享资源、签名隔离和节点恢复见 [test_document_node.py](../services/classic-engine/tests/test_document_node.py)，持久目录、完整 ZIP 与清理见 [test_document_workspace.py](../services/classic-engine/tests/test_document_workspace.py)。全文唯一调用与 DB 断点见 [test_document_workflow.py](../backend/tests/test_document_workflow.py)。这些夹具不调用真实 R2、供应商或 GPU，不代表真实图像效果与生产吞吐已验收。
 
 模拟文本和隔离中心验证协议、并发、丢回执、终态清理及恢复；真实 GPU 的检测/抹字/覆盖像素、真实文本服务、公网吞吐与目标机 Windows 服务另行验收。通过本地单一样图不能推断所有页面的压缩率或翻译效果。

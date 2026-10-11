@@ -1,7 +1,7 @@
 """Paginated user entitlement history; no account mutation or object access."""
 from typing import Literal
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 from .auth import admin
 from .db import get_db
@@ -79,9 +79,14 @@ def membership_history(user_id: str, offset: int = Query(0, ge=0), limit: int = 
 def reserved_jobs(user_id: str, offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
                   period_id: str | None = Query(None, max_length=64), db: Session = Depends(get_db)):
     require_user(db, user_id)
-    query = select(Job.id, Job.mode, Job.status, Job.quota_pages, Job.quota_period_id, Job.created_at).where(
+    query = select(Job.id, Job.workflow_kind, Job.mode, Job.status, Job.quota_pages, Job.quota_period_id, Job.created_at).where(
         Job.owner_id == user_id, Job.settlement == "reserved")
     if period_id:
-        query = query.where(Job.quota_period_id == period_id)
+        from .documents.models import DocumentQuotaAllocation
+        document_period = select(DocumentQuotaAllocation.id).where(
+            DocumentQuotaAllocation.job_id == Job.id, DocumentQuotaAllocation.period_id == period_id,
+            DocumentQuotaAllocation.reserved > 0).exists()
+        query = query.where(or_(and_(Job.workflow_kind == 'image', Job.quota_period_id == period_id),
+                                and_(Job.workflow_kind == 'document', document_period)))
     return page(db, query.order_by(Job.created_at.desc(), Job.id.desc()), offset, limit,
                 lambda row: {**row._asdict(), "created_at": iso(row.created_at)})

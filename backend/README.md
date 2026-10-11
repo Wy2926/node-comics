@@ -2,7 +2,7 @@
 
 FastAPI + SQLAlchemy + PostgreSQL + Redis 8 控制服务。API、control-worker、maintenance 分别负责请求、任务执行与维护；图像计算由独立节点完成，原图临时保存于中心共享磁盘，常规译文以稀疏覆盖层交付；任务终态立即清理原图。
 
-[集群架构](../docs/TRANSLATION_CLUSTER_DESIGN.md)使用服务器文件保存结果，PostgreSQL 保存任务、译文与权限；所有图片传输直连中心 HTTPS。
+[单图集群](../docs/TRANSLATION_CLUSTER_DESIGN.md)使用服务器文件保存结果，图片传输直连中心 HTTPS。[整本文件翻译](../docs/DOCUMENT_TRANSLATION.md)为独立付费 PDF / ZIP 入口：浏览器直传私有 R2，同一计算宿主完成受限解析、逐页 OCR／译图和打包，中间产物仅落本地持久工作目录；中央文档 worker 只汇总一次 LLM，完整 ZIP 最后上传 R2。API 不解析或代理大文件，两类任务共用持久化租约和额度账本。
 
 ## 运行
 
@@ -32,6 +32,7 @@ python -m app.dispatcher
 | --- | --- |
 | 公开 API | [翻译契约](../docs/READING_TRANSLATION_CONTRACT.md)、[OpenAPI](../contracts/README.md)；运行时 `/docs` 与 `/openapi.json` |
 | 任务执行 | [调度](../docs/TRANSLATION_CLUSTER_DESIGN.md)、[计算协议](../docs/COMPUTE_PROTOCOL.md)、[节点配置](../docs/NODE_CONFIGURATION.md) |
+| PDF / ZIP 文件任务 | [架构与部署](../docs/DOCUMENT_TRANSLATION.md)、[独立 worker 镜像](Dockerfile.document) |
 | 账户与支付 | [身份](../docs/PRODUCTION_IDENTITY.md)、[会员](../docs/MEMBERSHIP_AND_QUOTAS.md)、[支付](../docs/STRIPE_BILLING.md) |
 | 管理与配置 | [后台](../docs/ADMIN_CONSOLE.md)、[系统设置](../docs/SYSTEM_SETTINGS.md)、[文本供应商](../docs/TRANSLATION_PROVIDERS.md)、[配置模板](../.env.example) |
 | 存储与运维 | [文件存储](../docs/OBJECT_STORAGE.md)、[备份与恢复](../docs/OPERATIONS.md) |

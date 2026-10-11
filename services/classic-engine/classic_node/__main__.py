@@ -45,7 +45,7 @@ def execute(args):
         from .journal import Journal
         journal = Journal(config['state_dir'])
         try:
-            return 1 if journal.leases() or journal.get('claim') else 0
+            return 1 if journal.leases() or journal.get('claim') or journal.leases('document-lease:') or journal.get('document-claim') else 0
         finally:
             journal.close()
     # Delay heavy imports so environment/dependency failures reach the log.

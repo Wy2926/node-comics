@@ -15,6 +15,23 @@ from classic_node.protocol import ControlFailure, NodeFailure
 from classic_node.transport import Transport
 
 
+@pytest.fixture(autouse=True)
+def preserve_node_logger():
+    level, propagate, handlers = LOG.level, LOG.propagate, tuple(LOG.handlers)
+    try:
+        yield
+    finally:
+        for handler in tuple(LOG.handlers):
+            if handler not in handlers:
+                LOG.removeHandler(handler)
+                handler.close()
+        for handler in handlers:
+            if handler not in LOG.handlers:
+                LOG.addHandler(handler)
+        LOG.setLevel(level)
+        LOG.propagate = propagate
+
+
 def make_agent(tmp_path, handler):
     config = {'node_id': 'node-test', 'node_token': 'private-token',
               'control_url': 'https://control.example.test',
@@ -181,7 +198,7 @@ def test_transport_retains_only_safe_network_error_type(tmp_path):
 def test_watchdog_distinguishes_outage_stall_and_operator_stop(tmp_path):
     exits = []
     operations = Operations(tmp_path, Event(), hard_exit=exits.append)
-    operations.agent = SimpleNamespace(heartbeat_at=None, heartbeat_monotonic=0, pages={}, config=None)
+    operations.agent = SimpleNamespace(heartbeat_at=None, heartbeat_monotonic=0, active_pages=lambda: [], config=None)
     operations.phase = 'running'
     operations.check()
     operations.write()

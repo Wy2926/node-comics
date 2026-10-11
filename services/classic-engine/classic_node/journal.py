@@ -9,6 +9,7 @@ class Journal:
     def __init__(self, directory):
         root = Path(directory)
         root.mkdir(parents=True, exist_ok=True)
+        self.root = root.resolve()
         self.process_lock = sqlite3.connect(root / 'owner.sqlite3', timeout=0)
         self.process_lock.execute('CREATE TABLE IF NOT EXISTS owner (id INTEGER PRIMARY KEY)')
         self.process_lock.commit()
@@ -54,10 +55,10 @@ class Journal:
             row = self.db.execute('SELECT data FROM outputs WHERE key=?', (key,)).fetchone()
             return row[0] if row else None
 
-    def leases(self):
+    def leases(self, prefix='lease:'):
         with self.lock:
-            return {key.removeprefix('lease:'): json.loads(value)
-                    for key, value in self.db.execute("SELECT key,value FROM journal WHERE key LIKE 'lease:%'")}
+            return {key.removeprefix(prefix): json.loads(value)
+                    for key, value in self.db.execute('SELECT key,value FROM journal WHERE key LIKE ?', (prefix + '%',))}
 
     def close(self):
         self.db.close()

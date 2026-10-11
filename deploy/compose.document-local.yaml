@@ -1,0 +1,43 @@
+name: node-comics-document-local
+
+# Isolated development state only. Never extend the production or 18088 stack.
+# State survives restart; `down` keeps volumes. Do not use `down -v` while jobs
+# or remote workers still refer to this database.
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: document_local
+      POSTGRES_PASSWORD: ${DOCUMENT_LOCAL_DB_PASSWORD:?Set a private local database password}
+      POSTGRES_DB: nodecomics_document_local
+    ports: ["127.0.0.1:54329:5432"]
+    volumes: [document-postgres:/var/lib/postgresql/data]
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U document_local -d nodecomics_document_local"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+  redis:
+    image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
+    command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    ports: ["127.0.0.1:6389:6379"]
+    volumes: [document-redis:/data]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+
+volumes:
+  document-postgres:
+  document-redis:

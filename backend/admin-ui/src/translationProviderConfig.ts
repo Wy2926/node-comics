@@ -1,4 +1,4 @@
-import type {TranslationChannel, TranslationProtocol, TranslationProvider, TranslationProviderConfig, TranslationProviderInput, TranslationReasoningEffort} from './types';
+import type {DocumentModelLimits, TranslationChannel, TranslationProtocol, TranslationProvider, TranslationProviderConfig, TranslationProviderInput, TranslationReasoningEffort} from './types';
 
 export const providerEndpoint = '/v1/admin/translation-providers';
 export const protocolLabels: Record<TranslationProtocol, string> = {
@@ -27,15 +27,25 @@ const defaults: TranslationProviderConfig = {
   input_rate: 5, output_rate: 30, pricing_version: 'operator-estimate-v1',
   openrouter_providers: [],
 };
-export type ProviderDraft = Record<keyof TranslationProviderConfig | 'name' | 'channel' | 'api_key' | 'text_weight' | 'title_weight' | 'requests_per_minute', string> & {enabled: boolean; text_plan_ids: string[] | null};
-export type ProviderField = Exclude<keyof ProviderDraft, 'enabled' | 'text_plan_ids'>;
-export type ProviderErrors = Partial<Record<ProviderField | 'text_plan_ids', string>>;
+export const documentDefaults: DocumentModelLimits = {enabled: false, context_tokens: 128000,
+  max_input_tokens: 96000, max_output_tokens: 32000, timeout_seconds: 600, max_response_bytes: 8388608};
+export const documentFields = [
+  {key: 'context_tokens', title: '模型上下文容量（token）', min: 1024, max: 2000000},
+  {key: 'max_input_tokens', title: '整本输入预算（token）', min: 512, max: 2000000},
+  {key: 'max_output_tokens', title: '整本最大输出（token）', min: 128, max: 1000000},
+  {key: 'timeout_seconds', title: '整本请求超时（秒）', min: 30, max: 3600},
+  {key: 'max_response_bytes', title: '整本响应上限（字节）', min: 1024, max: 134217728},
+] as const;
+export type ProviderDraft = Record<Exclude<keyof TranslationProviderConfig, 'document'> | 'name' | 'channel' | 'api_key' | 'text_weight' | 'title_weight' | 'requests_per_minute', string> & {enabled: boolean; text_plan_ids: string[] | null; document: DocumentModelLimits};
+export type ProviderField = Exclude<keyof ProviderDraft, 'enabled' | 'text_plan_ids' | 'document'>;
+export type ProviderErrors = Partial<Record<ProviderField | 'text_plan_ids' | 'document', string>>;
 
 export function providerDraft(provider?: TranslationProvider): ProviderDraft {
   const config = {...defaults, ...provider?.config};
   return {
     ...Object.fromEntries(Object.keys(defaults).map(key => [key, String(config[key as keyof TranslationProviderConfig])])) as Record<keyof TranslationProviderConfig, string>,
     openrouter_providers: (config.openrouter_providers ?? []).join('\n'),
+    document: {...documentDefaults, ...provider?.config.document},
     name: provider?.name ?? '', channel: provider?.channel ?? 'openai', enabled: provider?.enabled ?? true, api_key: '',
     text_weight: String(provider?.text_weight ?? 1),
     text_plan_ids: provider?.text_plan_ids ?? null,
@@ -91,6 +101,12 @@ export function validateProvider(draft: ProviderDraft, channels: TranslationChan
       errors[field.key] = `请输入 ${field.min}–${field.max} 范围内的${field.integer ? '整数' : '数值'}。`;
     }
   }
+  if (documentFields.some(field => !Number.isInteger(draft.document[field.key]) ||
+      draft.document[field.key] < field.min || draft.document[field.key] > field.max)) {
+    errors.document = '请在各整本参数的范围内填写整数。';
+  } else if (draft.document.max_input_tokens + draft.document.max_output_tokens > draft.document.context_tokens) {
+    errors.document = '输入预算与最大输出之和不能超过模型上下文容量。';
+  }
   return errors;
 }
 
@@ -102,6 +118,7 @@ export function providerInput(draft: ProviderDraft): TranslationProviderInput {
     text_plan_ids: draft.text_plan_ids,
     requests_per_minute: Number(draft.requests_per_minute),
     config: {
+      document: {...draft.document},
       base_url: draft.base_url.trim(), model: draft.model.trim(), protocol: draft.protocol as TranslationProtocol,
       reasoning_effort: draft.reasoning_effort as TranslationReasoningEffort,
       openrouter_providers: providerSlugs(draft.openrouter_providers),

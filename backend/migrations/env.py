@@ -13,6 +13,7 @@ from app import feedback_review_models
 from app import support_requests
 from app import comic_title_cache
 from app import comic_title_limits
+from app.documents import models as document_models
 
 if context.is_offline_mode():
     from app.config import settings

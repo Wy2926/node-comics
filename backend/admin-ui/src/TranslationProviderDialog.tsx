@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState, type InputHTMLAttributes} from 'react';
 import {ApiError, authError, errorText, sendRequest} from './api';
 import type {TranslationChannel, TranslationPlan, TranslationProvider} from './types';
-import {channelProtocols, isOpenRouterUrl, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
+import {channelProtocols, documentFields, isOpenRouterUrl, numericFields, protocolLabels, reasoningLabels, routingFields, upstreamLimit, providerDraft, providerEndpoint, providerInput, textLimits, validateProvider, type ProviderField} from './translationProviderConfig';
 import {time} from './ui';
 
 export function TranslationProviderDialog({provider, channels, plans, onClose, onSaved, onRefresh, onUnauthorized}: {
@@ -157,6 +157,22 @@ export function TranslationProviderDialog({provider, channels, plans, onClose, o
             </fieldset>
             <div className="settings-fields">{routingFields.map(({key, label}) => field(key, `${label}分流权重`,
               `0 表示不参与${label}分流；大于 0 时按启用供应商的权重比例分配。范围 0–10000，整数。`, {type: 'number', min: 0, max: 10000, step: 1}))}</div>
+          </section>
+          <section className="config-section provider-section" aria-labelledby="provider-document-title">
+            <h3 id="provider-document-title">整本文档翻译</h3>
+            <p className="muted">仅在核实模型能力后启用。PDF / ZIP 汇总全部 OCR，一次请求；不套用单页分组、截断或自动重发。输入采用包含结构开销的保守 UTF-8 token 上界。</p>
+            <label className="provider-enabled"><input type="checkbox" checked={draft.document.enabled}
+              onChange={event => setDraft(current => ({...current, document: {...current.document, enabled: event.target.checked}}))}/>
+              此模型支持整本文档</label>
+            <div className="settings-fields">{documentFields.map(({key, title, min, max}) => <div className="settings-field" key={key}>
+              <label htmlFor={'provider-document-' + key}>{title}</label>
+              <input id={'provider-document-' + key} type="number" min={min} max={max} step={1}
+                aria-invalid={!!errors.document} aria-describedby="provider-document-help"
+                value={draft.document[key]} onChange={event => setDraft(current => ({...current,
+                  document: {...current.document, [key]: Number(event.target.value)}}))}/>
+            </div>)}</div>
+            <p id="provider-document-help" className={errors.document ? 'settings-field-error' : 'muted'}>
+              {errors.document || '这些参数独立于单图，随模型版本冻结；输入加输出必须在实际上下文内。输出不完整会明确失败，不交付缺页 ZIP。'}</p>
           </section>
           <section className="config-section provider-section" aria-labelledby="provider-upstream-title">
             <h3 id="provider-upstream-title">上游调用保护</h3>

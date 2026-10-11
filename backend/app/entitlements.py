@@ -393,6 +393,30 @@ def require_entitlement(user, mode, *, db, policy):
     return kind
 
 
+def reserve_period(db, period_id, pages, at):
+    """Conditionally reserve finite pages; the caller owns the account transaction."""
+    if pages < 1:
+        raise ValueError('Reservation must contain pages')
+    updated = db.execute(update(QuotaPeriod).where(QuotaPeriod.id == period_id,
+        QuotaPeriod.revoked_at.is_(None), QuotaPeriod.starts_at <= at,
+        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at),
+        QuotaPeriod.granted - QuotaPeriod.used - QuotaPeriod.reserved >= pages)
+        .values(reserved=QuotaPeriod.reserved + pages))
+    if updated.rowcount != 1:
+        problem('QUOTA_CONFLICT', '额度正在变化，请刷新后重试', 409)
+
+
+def finish_period(db, period_id, reserved_pages, used_pages):
+    """Settle the original bucket even after expiry/revocation, never a new period."""
+    if not 0 <= used_pages <= reserved_pages or reserved_pages < 1:
+        raise ValueError('Invalid settlement page count')
+    updated = db.execute(update(QuotaPeriod).where(QuotaPeriod.id == period_id,
+        QuotaPeriod.reserved >= reserved_pages).values(
+            reserved=QuotaPeriod.reserved - reserved_pages, used=QuotaPeriod.used + used_pages))
+    if updated.rowcount != 1:
+        problem('QUOTA_CONFLICT', '额度结算状态不一致', 409)
+
+
 def reserve(db, user, job, at=None, *, policy=None):
     """The caller holds the user lock and has resolved cache/in-flight reuse."""
     at = at or now()
@@ -420,13 +444,7 @@ def reserve(db, user, job, at=None, *, policy=None):
     if period not in db:
         db.add(period)
         db.flush()
-    updated = db.execute(update(QuotaPeriod).where(QuotaPeriod.id == period.id,
-        QuotaPeriod.revoked_at.is_(None), QuotaPeriod.starts_at <= at,
-        or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at),
-        QuotaPeriod.granted - QuotaPeriod.used - QuotaPeriod.reserved >= 1)
-        .values(reserved=QuotaPeriod.reserved + 1))
-    if updated.rowcount != 1:
-        problem("QUOTA_CONFLICT", "额度正在变化，请刷新后重试", 409)
+    reserve_period(db, period.id, 1, at)
     job.quota_period_id, job.quota_pages, job.settlement, job.quota_kind = period.id, 1, "reserved", period.kind
     db.add(Ledger(owner_id=user.id, job_id=job.id, period_id=period.id, quota_kind=period.kind,
                   transaction_key=f"{job.id}:reserve", kind="reserve", amount=1))
@@ -445,10 +463,7 @@ def settle(db, job, *, success):
         schedule_input_cleanup(db, job)
     if job.settlement != "reserved":
         return
-    changes = {"reserved": QuotaPeriod.reserved - job.quota_pages}
-    if success:
-        changes["used"] = QuotaPeriod.used + job.quota_pages
-    db.execute(update(QuotaPeriod).where(QuotaPeriod.id == job.quota_period_id).values(**changes))
+    finish_period(db, job.quota_period_id, job.quota_pages, job.quota_pages if success else 0)
     operation = "settle" if success else "release"
     db.add(Ledger(owner_id=job.owner_id, job_id=job.id, period_id=job.quota_period_id,
                   quota_kind=job.quota_kind, transaction_key=f"{job.id}:{operation}", kind=operation,

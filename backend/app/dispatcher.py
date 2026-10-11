@@ -30,12 +30,17 @@ def recover_lease(lease_id):
         if not lease or lease.completed_at or lease.expires_at > now():
             return
         job, stage = db.get(Job, lease.job_id), db.get(JobStage, lease.stage_id)
+        document_lease = job.workflow_kind == 'document'
         expired_page = False
         invalid_source = False
         if stage.name == 'page':
             from .compute_v3 import lease_deadline
             expired_page = lease_deadline(db, lease) <= now()
             invalid_source = not available(db.get(Asset, job.input_asset_id))
+    if document_lease:
+        from .documents.workflow import fail_lease
+        fail_lease(lease_id, ProcessingError('WORKER_LEASE_EXPIRED', '文件节点失联，恢复可重复阶段'), recovering=True)
+        return
     if invalid_source and stage.name == 'page':
         with session_factory()() as db:
             lock_scheduler(db)

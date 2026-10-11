@@ -8,7 +8,7 @@ import {taskTimingRows} from './timings';
 export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
   return <>
-    <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {j.target_language}</p></div><Badge value={j.status}/></div>
+    <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {label(j.workflow_kind)} · {j.target_language}</p></div><Badge value={j.status}/></div>
     <div className="detail-stats"><Stat title="总耗时" value={duration(j.elapsed_seconds)} note="从创建到结束 / 当前"/>
       <Stat title="首次等待" value={duration(j.initial_wait_seconds)} note="创建至首次领取"/>
       <Stat title="执行占用" value={duration(j.execution_seconds)} note="并行阶段合并"/>
@@ -20,10 +20,10 @@ export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: 
     {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
     {j.expired_leases > 0 && <p className="attention">{j.expired_leases} 个租约已过期，等待回收。</p>}
     <h3 className="detail-heading">阶段进度</h3><div className="stage-flow">{j.stages.length ? j.stages.map(s =>
-      <div key={s.name}><b>{label(s.name)}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
+      <div key={`${s.name}:${s.page_index}`}><b>{label(s.name)}{s.page_index > 0 && ` · 第 ${s.page_index} 页`}</b><Badge value={s.status}/><small>已领取 {s.attempts} 次</small></div>) : <p className="muted">尚无执行阶段</p>}</div>
     <h3 className="detail-heading">执行履历 <span>{j.executions.length} 次</span></h3>
     {j.executions.length ? <Table heads={['阶段 / 代次', '节点 / 执行机', '开始 / 结束', '占用时长', '结果']}>
-      {j.executions.map(e => <tr key={e.id}><td>{label(e.stage)}<small>第 {e.generation} 代</small></td>
+      {j.executions.map(e => <tr key={e.id}><td>{label(e.stage)}{e.page_index > 0 && ` · 第 ${e.page_index} 页`}<small>第 {e.generation} 代</small></td>
         <td>{e.node_name}<small>{e.executor_id || '执行机未记录'}</small></td>
         <td>{time(e.started_at)}<small>{e.completed_at ? time(e.completed_at) : e.outcome === 'expired' ? `过期于 ${time(e.expires_at)}` : '尚未结束'}</small></td>
         <td className="numeric">{duration(e.seconds)}</td><td><Badge value={e.outcome}/></td></tr>)}

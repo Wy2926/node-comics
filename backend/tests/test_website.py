@@ -11,6 +11,7 @@ from app.website import WebsiteFiles
 def website(tmp_path, monkeypatch):
     from app import website as module
     monkeypatch.setattr(module, 'settings', lambda: SimpleNamespace(oidc_token_endpoint='https://identity.example/token'))
+    monkeypatch.setattr(module, 'get_document_settings', lambda: SimpleNamespace(enabled=False, r2_endpoint_url=''))
     for name in ['index.html', 'pricing/index.html', 'en/pricing/index.html', 'uninstall/index.html', 'en/uninstall/index.html', 'account/index.html', 'auth/callback/index.html', 'payment/success/index.html', 'en/payment/success/index.html', 'translate/index.html', 'en/translate/index.html', '404.html']:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,6 +71,45 @@ def test_challenge_and_blob_policy_is_confined_to_workbench(website):
         csp = website.get(path).headers['content-security-policy']
         assert 'challenges.cloudflare.com' not in csp and 'blob:' not in csp
         assert "frame-src 'none'" in csp
+
+
+@pytest.mark.parametrize('origin', ['https://account.r2.cloudflarestorage.com', 'https://account.r2.cloudflarestorage.com:443'])
+def test_document_r2_csp_is_exact_and_confined_to_translate_connect(website, monkeypatch, origin):
+    from app import website as module
+    monkeypatch.setattr(module, 'get_document_settings', lambda: SimpleNamespace(enabled=True, r2_endpoint_url=origin))
+    for path in ['/translate/', '/en/translate/']:
+        csp = website.get(path).headers['content-security-policy']
+        sources = [directive.strip() for directive in csp.split(';') if origin in directive]
+        assert sources == [f"connect-src 'self' https://identity.example https://challenges.cloudflare.com {origin}"]
+        assert 'https:;' not in csp and '*.r2.cloudflarestorage.com' not in csp
+    for path in ['/', '/pricing/', '/account/', '/auth/callback/', '/payment/success/']:
+        assert origin not in website.get(path).headers['content-security-policy']
+
+
+def test_document_r2_csp_is_disabled_by_default_even_when_endpoint_is_configured(website, monkeypatch):
+    from app import website as module
+    origin = 'https://account.r2.cloudflarestorage.com'
+    monkeypatch.setattr(module, 'get_document_settings', lambda: SimpleNamespace(enabled=False, r2_endpoint_url=origin))
+    csp = website.get('/translate/').headers['content-security-policy']
+    assert origin not in csp
+    assert "connect-src 'self' https://identity.example https://challenges.cloudflare.com;" in csp
+
+
+@pytest.mark.parametrize('origin', ['', 'http://account.r2.cloudflarestorage.com',
+    'https://user:secret@account.r2.cloudflarestorage.com', 'https://@account.r2.cloudflarestorage.com',
+    'https://account.r2.cloudflarestorage.com/', 'https://account.r2.cloudflarestorage.com/bucket',
+    'https://account.r2.cloudflarestorage.com?private=1', 'https://account.r2.cloudflarestorage.com?',
+    'https://account.r2.cloudflarestorage.com#fragment', 'https://*.r2.cloudflarestorage.com',
+    'https://account.r2.cloudflarestorage.com; connect-src *',
+    'https://account.r2.cloudflarestorage.com\n', 'https://account.r2.cloudflarestorage.com:0',
+    'https://account.r2.cloudflarestorage.com:65536'])
+def test_document_r2_csp_rejects_non_origin_configuration(website, monkeypatch, origin):
+    from app import website as module
+    monkeypatch.setattr(module, 'get_document_settings', lambda: SimpleNamespace(enabled=True, r2_endpoint_url=origin))
+    with pytest.raises(ValueError, match='bare HTTPS origin'):
+        website.get('/translate/')
+    # Unrelated static pages never consult this optional document setting.
+    assert website.get('/').status_code == 200
 
 
 def test_canonical_redirects_and_localized_real_404(website):

@@ -197,7 +197,8 @@ class Runtime:
             analysis['regions'], **({'cache': masks} if masks is not None else {}))
 
     def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False,
-               mask_cache_bytes=None, use_render_pool=True, check_cancelled=None, masks=None):
+               mask_cache_bytes=None, use_render_pool=True, check_cancelled=None, masks=None,
+               full_image_max_bytes=None):
         if check_cancelled:
             check_cancelled()
         self.validate_analysis(analysis)
@@ -220,6 +221,8 @@ class Runtime:
                    'analysis': {'input_hash': analysis['input_hash']},
                    'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']},
                    'allow_tiles': allow_tiles, 'mask_cache_bytes': mask_cache_bytes}
+        if full_image_max_bytes is not None:
+            options['full_image_max_bytes'] = full_image_max_bytes
         if prepared:
             options['bubble_prepared'] = True
             if 'bubble_labels' in masks:

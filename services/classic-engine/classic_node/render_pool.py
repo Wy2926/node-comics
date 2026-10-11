@@ -10,7 +10,7 @@ import sys
 from threading import BoundedSemaphore, Condition, Lock, Thread
 from time import perf_counter
 
-from .protocol import NodeFailure, pack_result, tiled_output
+from .protocol import NodeFailure, pack_result, pack_full_image, tiled_output
 from .timing import collect, record
 
 
@@ -35,7 +35,8 @@ def ipc_bytes(width, height, components=0):
 
 def render_page(renderer, original, cleaned, regions, translations, language, bubble_mask, *,
                 alpha, version, analysis, translated, allow_tiles=False, mask_cache_bytes=None,
-                check_cancelled=None, bubble_prepared=False, bubble_components=None, output_budget=None):
+                check_cancelled=None, bubble_prepared=False, bubble_components=None, output_budget=None,
+                full_image_max_bytes=None):
     """The same whole-page operation serves child workers and local fallback."""
     import numpy as np
     started = perf_counter()
@@ -50,6 +51,8 @@ def render_page(renderer, original, cleaned, regions, translations, language, bu
         check_cancelled()
     if not isinstance(rendered, np.ndarray) or rendered.shape != original.shape or rendered.dtype != np.uint8:
         raise RenderPoolError()
+    if full_image_max_bytes is not None:
+        return pack_full_image(rendered, alpha, max_bytes=full_image_max_bytes)
     if output_budget is None or not allow_tiles or not tiled_output(original.shape[1], original.shape[0]):
         return pack_result(rendered, original, alpha, version, analysis, translated, allow_tiles=allow_tiles)
     with output_budget() as workers:
@@ -153,7 +156,8 @@ def _views(segment, shape, components=0):
 
 
 def _render_shared(name, shape, regions, translations, language, mask_cache_bytes, has_alpha,
-                   version, analysis, translated, allow_tiles, bubble_prepared=False, components=0):
+                   version, analysis, translated, allow_tiles, bubble_prepared=False, components=0,
+                   full_image_max_bytes=None):
     segment, arrays, packed, timings, error_code = None, {}, None, {}, None
     try:
         segment = SharedMemory(name=name)
@@ -166,7 +170,8 @@ def _render_shared(name, shape, regions, translations, language, mask_cache_byte
                 translations, language, arrays['mask'], alpha=arrays['alpha'] if has_alpha else None,
                 version=version, analysis=analysis, translated=translated,
                 allow_tiles=allow_tiles, mask_cache_bytes=mask_cache_bytes, bubble_prepared=bubble_prepared,
-                bubble_components=(arrays['labels'], arrays['stats']) if components else None, output_budget=_output_cpu)
+                bubble_components=(arrays['labels'], arrays['stats']) if components else None,
+                output_budget=_output_cpu, full_image_max_bytes=full_image_max_bytes)
     except NodeFailure as error:
         error_code = error.code if error.code in _OUTPUT_ERRORS else 'CLASSIC_RENDER_WORKER_FAILED'
     except BaseException:
@@ -276,7 +281,8 @@ class RenderPool:
 
     def render(self, original, cleaned, regions, translations, language, bubble_mask, *,
                alpha=None, version, analysis, translated, allow_tiles=False,
-               mask_cache_bytes=None, check_cancelled=None, bubble_prepared=False, bubble_components=None):
+               mask_cache_bytes=None, check_cancelled=None, bubble_prepared=False, bubble_components=None,
+               full_image_max_bytes=None):
         import numpy as np
         has_alpha = alpha is not None
         components = len(bubble_components[1]) if bubble_components is not None else 0
@@ -338,7 +344,8 @@ class RenderPool:
                 try:
                     future = pool.submit(_render_shared, segment.name, original.shape[:2], regions,
                                          translations, language, mask_cache_bytes, has_alpha,
-                                         version, analysis, translated, allow_tiles, bubble_prepared, components)
+                                         version, analysis, translated, allow_tiles, bubble_prepared, components,
+                                         full_image_max_bytes)
                 except (BrokenProcessPool, RuntimeError):
                     # Retire outside this non-reentrant lifecycle lock.
                     pass

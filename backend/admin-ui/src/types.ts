@@ -1,10 +1,15 @@
 export type Mode = 'classic';
 export type TranslationProtocol = 'chat_completions' | 'responses';
 export type TranslationReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'provider_default';
+export type DocumentModelLimits = {
+  enabled: boolean; context_tokens: number; max_input_tokens: number; max_output_tokens: number;
+  timeout_seconds: number; max_response_bytes: number;
+};
 export type TranslationProviderConfig = {
   base_url: string; model: string; protocol: TranslationProtocol; user_agent: string;
   reasoning_effort?: TranslationReasoningEffort;
   openrouter_providers?: string[];
+  document?: DocumentModelLimits;
   timeout_seconds: number; max_attempts: number; max_output_tokens: number; group_bytes: number;
   input_rate: number; output_rate: number; pricing_version: string;
 };
@@ -28,13 +33,13 @@ export type Overview = {
   users: {total: number; plus: number; submitted_24h: number};
   nodes: {total: number; online_enabled: number};
   leases: {running?: number; expired?: number};
-  queues: {mode: Mode; status: string;  count: number; oldest_seconds: number}[];
+  queues: {mode: Mode; workflow_kind: 'image' | 'document'; status: string;  count: number; oldest_seconds: number}[];
   stages: {name: string; status: string; count: number}[];
-  completed_24h: {mode: Mode; status: string; count: number; avg_elapsed_seconds: number}[];
+  completed_24h: {mode: Mode; workflow_kind: 'image' | 'document'; status: string; count: number; avg_elapsed_seconds: number}[];
 };
 export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
-  status: string; phase: string;
+  workflow_kind: 'image' | 'document'; status: string; phase: string;
   created_at: string; completed_at: string | null; settlement: string;
   quota_pages: number; error_code: string | null; cancel_requested: boolean; discard_output: boolean;
   elapsed_seconds: number; execution_seconds: number; non_execution_seconds: number;
@@ -46,8 +51,8 @@ export type TaskDetail = Task & {
   timings?: {node?: Record<string, number>; delivery?: Record<string, number>};
   error_message: string | null;
   generated_at: string; provider: {id: string; cost_state: string} | null;
-  stages: {name: string; status: string; attempts: number; available_at: string; completed_at: string | null}[];
-  executions: {id: string; stage: string; generation: number; node_id: string; node_name: string;
+  stages: {name: string; page_index: number; status: string; attempts: number; available_at: string; completed_at: string | null}[];
+  executions: {id: string; stage: string; page_index: number; generation: number; node_id: string; node_name: string;
     executor_id: string | null;  started_at: string; completed_at: string | null;
     expires_at: string; seconds: number; outcome: string}[];
   text_cost_micros: number;

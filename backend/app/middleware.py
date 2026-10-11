@@ -33,6 +33,11 @@ class BodyLimitMiddleware:
             limit = settings().translation_max_body_bytes
         if scope.get('path') == '/v1/support-requests':
             limit = 16384
+        if path.startswith(('/v1/documents', '/v1/admin/documents', '/internal/documents/')):
+            limit = 65536  # Metadata only. File bytes travel directly to R2.
+        if path.startswith('/internal/documents/compute/v2/leases/') and path.endswith('/complete'):
+            # Bounded OCR text or a <=200-page manifest, never images/masks/files.
+            limit = 4 * 1024 * 1024 + 4096
         if scope.get('path', '').startswith('/internal/compute/v3/leases/') and scope['path'].endswith('/analysis'):
             limit = 4 * 1024 * 1024 + 4096
 

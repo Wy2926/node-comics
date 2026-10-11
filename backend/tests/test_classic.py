@@ -59,6 +59,7 @@ def text_database(tmp_path, monkeypatch):
 @pytest.fixture
 def text_case(text_database, monkeypatch):
     from app.classic_config import snapshot
+    from app.entitlements import reserve
     job_id, attempt_id, lease_id = uid(), uid(), uid()
     owner_id, asset_id, stage_id = uid(), uid(), uid()
     with session_factory()() as db:
@@ -77,6 +78,8 @@ def text_case(text_database, monkeypatch):
                    quota_kind='classic', config=config, operation='translate', request_hash='r' * 64,
                    idempotency_key=uid(), cache_key='c' * 64))
         db.flush()
+        # Terminal control failures release the same real reservation as production.
+        reserve(db, db.get(User, owner_id), db.get(Job, job_id))
         db.add(Attempt(id=attempt_id, job_id=job_id, provider_id=provider_id, lease_expires_at=now() + timedelta(minutes=5)))
         db.add(JobStage(id=stage_id, job_id=job_id, name='text', status='running', generation=1))
         db.add(ClassicState(job_id=job_id, analysis=analysis()))

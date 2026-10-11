@@ -1,13 +1,18 @@
 ---
 import Base from '../layouts/Base.astro';
 import TranslationWorkbench from './TranslationWorkbench';
+import DocumentWorkbench from './DocumentWorkbench';
+import { documentCopy } from '../i18n/documents';
 import { translationCopy } from '../i18n/translate';
 import type { Locale } from '../i18n';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = translationCopy[locale];
+const documents = documentCopy(locale);
 ---
 <Base title={t.title} description={t.intro} noindex>
-  <TranslationWorkbench client:load locale={locale} copy={t} />
+  <nav class="container translation-kind-nav" lang={documents.lang}><a href="#images">{documents.navImage}</a><a href="#documents">{documents.navDocument}</a></nav>
+  <div id="images"><TranslationWorkbench client:load locale={locale} copy={t} /></div>
+  <DocumentWorkbench client:load locale={locale} />
   <noscript><p class="container translation-noscript">{t.local}</p></noscript>
 </Base>

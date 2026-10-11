@@ -134,6 +134,25 @@ def test_spawn_preserves_inputs_pixels_and_persistent_workers(pool, inputs):
         render(instance, inputs)
 
 
+def test_document_full_image_uses_the_same_spawn_pool_and_releases_shared_memory(pool, inputs):
+    instance, names = pool
+    alpha = np.full(inputs[0].shape[:2], 90, dtype=np.uint8)
+    result = render(instance, inputs, alpha=alpha, full_image_max_bytes=1024)
+    expected = np.bitwise_xor(inputs[0], inputs[1])
+    expected[:, :, 0] ^= inputs[2]
+    expected[0, 0, 1] = 0
+    assert result == rp.pack_full_image(expected, alpha, max_bytes=1024)
+    assert result['result']['representation'] == 'full-image'
+    assert isinstance(result['output_bytes'], bytes)
+    assert_removed(names)
+    exact_size = len(result['output_bytes'])
+    assert render(instance, inputs, alpha=alpha, full_image_max_bytes=exact_size) == result
+    with pytest.raises(rp.NodeFailure, match='CLASSIC_OUTPUT_TOO_LARGE'):
+        render(instance, inputs, alpha=alpha, full_image_max_bytes=exact_size - 1)
+    assert_removed(names)
+    assert render(instance, inputs)['result']['representation'] == 'overlay-v1'
+
+
 def test_prepared_component_arrays_cross_shared_memory_readonly(pool, inputs):
     instance, _ = pool
     labels = np.ones(inputs[2].shape, np.int32)

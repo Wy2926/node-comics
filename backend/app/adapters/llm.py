@@ -31,10 +31,22 @@ class TextResponse:
     request_id: str | None
 
 
-def call_messages(messages: list[Message], profile: dict, *, json_schema: dict | None = None) -> TextResponse:
+@dataclass(frozen=True)
+class RequestLimits:
+    """Trusted workflow override; never taken from a public translation request."""
+    timeout_seconds: int
+    max_output_tokens: int
+    max_response_bytes: int
+
+
+def call_messages(messages: list[Message], profile: dict, *, json_schema: dict | None = None,
+                  limits: RequestLimits | None = None) -> TextResponse:
     from ..translation_channels import CHANNELS
     from ..translation_providers import resolve_credentials
     channel = CHANNELS.get(profile['channel'])
     if channel is None:
         raise TextError('TEXT_CHANNEL_UNSUPPORTED', '文本渠道尚未实现')
-    return channel.call(messages, profile, resolve_credentials(profile), json_schema=json_schema)
+    options = {'json_schema': json_schema}
+    if limits is not None:
+        options['limits'] = limits
+    return channel.call(messages, profile, resolve_credentials(profile), **options)

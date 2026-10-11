@@ -1,6 +1,6 @@
 # Node Comics Node
 
-Linux NVIDIA 部署使用[Vast CUDA 模板与版本化运行包](linux/README.md)，填写独立身份后自动安装启动；以下为 Windows 独立包。
+Linux NVIDIA 部署使用[Vast 在线安装模板](linux/README.md)，复用平台 CUDA，在目标机拉取源码、依赖与模型，填写独立身份后自动启动；不导出上传环境包。以下为 Windows 独立包。
 
 Windows x64 独立计算节点。发布包内置原生 `node.exe`、Python 运行时、推理模型与固定字体；目标电脑需要 Windows 10/11 和 支持 CUDA 12.6 的 NVIDIA 显卡驱动。
 
@@ -14,7 +14,9 @@ node.exe doctor
 node.exe run
 ```
 
-`init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 节点直接从中心读取临时原图，向中心提交无损 WebP 覆盖层；不配置对象存储。`doctor` 校验文件与 GPU，并输出引擎版本；构建指纹仅用于追溯；兼容的 v3 节点可直接接单，无需修改中心版本配置。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
+`init` 交互读取中心 HTTPS origin 和节点身份，凭据不回显。v3 单图任务直接从中心读取临时原图并提交无损 WebP 覆盖层。文件任务的 `document_protocol:2` 仅在支持非特权解析沙箱的 Linux 宿主启用：输入一次下载，中间页留本地持久目录，最终 ZIP 上传 R2。Windows 不声明该能力，普通单图不受影响。节点只拿限定对象的短期签名，不配置 R2／LLM 凭据。`doctor` 校验文件与 GPU，并输出引擎版本；构建指纹仅用于追溯；兼容节点可直接接单，无需修改中心构建版本配置。`run` 前台运行；临时后台使用 `start`、`status`、`stop`。
+
+文件 OCR／渲染与单图共用同一身份、GPU runtime、线程池和内存预算；后台 `document_slots` 默认 1（0 停用），仍占原有最大在途数，交互任务优先领取。OCR 检查点本地落盘、只回传文本后释放租约，整本 LLM 等待不占节点页缓冲；PDF／ZIP 解析与打包也由此宿主执行，中央 document-worker 只处理整本文本。协议及升级边界见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)，旧任务排空后配套升级中心与节点。
 
 长期运行在管理员终端安装 Windows 服务：
 
@@ -43,7 +45,7 @@ node.exe status
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File services/compute-node/build.ps1
 ```
 
-构建自动下载锁定的 Go、CPython、uv、MTU 原始源码、CUDA 原生模型、词典和字体。来源与 SHA-256 由 `toolchain.lock.json`、`assets.json`、`mtu_engine/upstream.lock.json` 和 `uv.lock` 固定。Windows／Linux 共用资产准备代码，运行包携带 PyTorch CUDA、Qt 及来源声明。
+Windows 构建自动下载锁定的 Go、CPython、uv、MTU 原始源码、CUDA 原生模型、词典和字体。来源与 SHA-256 由 `toolchain.lock.json`、`assets.json`、`mtu_engine/upstream.lock.json` 和 `uv.lock` 固定。Windows 包携带 PyTorch CUDA、Qt 及来源声明；Linux 在目标机在线安装，共用资产准备代码。
 
 可传 `-Version`、`-OutputDirectory`、`-WorkDirectory`；默认输出到本模块 `artifacts/dist/`，缓存位于 `.build/`。输出目录必须不存在；同一工作目录只运行一个构建。发布清单包含逐文件摘要，随包保留源码与许可。
 

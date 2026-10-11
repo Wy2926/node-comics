@@ -9,6 +9,7 @@ description = "Node Comics compute v3 adapter for Manga Translator UI on NVIDIA 
 requires-python = ">=3.12,<3.13"
 license = "GPL-3.0-only"
 dependencies = [
+    "comic-document-files==1.0.0",
     "torch==2.13.0", "torchvision==0.28.0", "onnxruntime-gpu==1.23.2", "numpy>=2,<2.3",
     "opencv-python>=4.11", "Pillow==12.3.0", "PyQt6==6.9.1",
     "PyHyphen==4.0.4", "fonttools>=4.60,<5", "langcodes==3.5.0",
@@ -45,6 +46,7 @@ url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [tool.uv.sources]
+comic-document-files = { path = "../../backend/document_files" }
 torch = { index = "pytorch-cu126" }
 torchvision = { index = "pytorch-cu126" }
 pydensecrf = [

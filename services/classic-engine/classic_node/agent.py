@@ -90,13 +90,18 @@ class Agent:
         self.heartbeat_monotonic = 0
         self.heartbeat_logged = 0
         self.last_heartbeat = 0
+        from .document_runner import DocumentRunner
+        self.documents = DocumentRunner(self)
+
+    def active_pages(self):
+        return list(self.pages.values()) + list(self.documents.pages.values())
 
     def connected(self, action):
         self.network_log.succeeded(action)
         self.heartbeat_at = utc_now()
         self.heartbeat_monotonic = time.monotonic()
         if action == 'registration' or self.heartbeat_monotonic - self.heartbeat_logged >= 60:
-            LOG.info('event=%s config_version=%s active_leases=%s', action, self.config['version'], len(self.pages))
+            LOG.info('event=%s config_version=%s active_leases=%s', action, self.config['version'], len(self.active_pages()))
             self.heartbeat_logged = self.heartbeat_monotonic
 
     def apply_config(self, config):
@@ -113,7 +118,7 @@ class Agent:
     def claim_capacity(self):
         if not self.config['enabled'] or self.stop.is_set():
             return 0
-        slots = min(self.config['execution_slots'], self.local['max_leases']) - len(self.pages)
+        slots = min(self.config['execution_slots'], self.local['max_leases']) - len(self.active_pages())
         return max(0, min(slots, self.pipeline.claim_capacity()))
 
     def request_claim(self):
@@ -164,7 +169,8 @@ class Agent:
         response = self.transport.post('/nodes/register', {'protocol_version': 3,
             'engine_version': self.runtime.version, 'resource_id': self.local['resource_id'],
             'device': 'cuda:' + str(self.local['engine']['gpu']),
-            'supported_languages': self.runtime.languages, 'ready': True, 'result_formats': ['overlay-v1', 'overlay-tiles-v1']})
+            'supported_languages': self.runtime.languages, 'ready': True, 'result_formats': ['overlay-v1', 'overlay-tiles-v1'],
+            'document_protocol': self.documents.protocol()})
         if response['protocol_version'] != 3:
             raise NodeFailure('PROTOCOL_MISMATCH')
         self.apply_config(response['config'])
@@ -177,6 +183,8 @@ class Agent:
             self.adopt(lease, response['server_time'], sent_at)
         self.last_heartbeat = sent_at
         self.connected('registration')
+        if self.documents.protocol() == 2:
+            self.documents.sync()
 
     def heartbeat(self):
         entries = self.lease_entries(phases=True)
@@ -259,6 +267,7 @@ class Agent:
 
     def reap(self):
         self.pipeline.tick()
+        self.documents.tick()
         for key, page in list(self.pages.items()):
             if page.future or page.analysis_future:
                 continue
@@ -287,11 +296,13 @@ class Agent:
             self.operations.stopping()
         self.claim_pool.shutdown(wait=True)
         self.heartbeat_pool.shutdown(wait=True)
-        for page in list(self.pages.values()):
+        for page in self.active_pages():
             page.stopped = True
         self.wake.set()
         self.notice_pool.shutdown(wait=True)
+        self.documents.close_control()
         self.pipeline.close()
+        self.documents.close()
 
     def poll_control(self):
         if self.claim_future and self.claim_future.done():
@@ -370,13 +381,14 @@ class Agent:
                     self.stop.wait(delay)
                     delay = min(30, delay * 2)
             self.next_claim = 0
-            while not self.stop.is_set() or self.pages:
+            while not self.stop.is_set() or self.active_pages():
                 if self.operations:
                     self.operations.pulse()
                 try:
                     self.poll_control()
+                    self.documents.poll_control()
                     self.reap()
-                    if self.stop.is_set() and all(not p.future and not p.analysis_future for p in self.pages.values()):
+                    if self.stop.is_set() and all(not p.future and not p.analysis_future for p in self.active_pages()):
                         break  # Keep uncertain deliveries in the journal for startup reconciliation.
                 except NodeFailure as error:
                     self.network_log.failed('control', error)

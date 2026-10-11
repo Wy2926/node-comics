@@ -7,6 +7,7 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
 .pytest_cache/
 .wxt/
 .output/
@@ -18,6 +19,7 @@ data/
 !backend/website/src/data/
 !backend/website/src/data/*.ts
 artifacts/
+document-spool/
 test-results/
 playwright-report/
 engines/

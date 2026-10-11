@@ -4,7 +4,8 @@ export type ConfigSchema = {
   pool_limits: Record<string, number>;
 };
 const labels: Record<string, string> = {
-  execution_slots: '最大在途页数', poll_seconds: '领取兜底检查间隔（秒）', heartbeat_seconds: '心跳间隔（秒）',
+  execution_slots: '最大在途页数', document_slots: '文件页最大在途数（0 为停用）',
+  poll_seconds: '领取兜底检查间隔（秒）', heartbeat_seconds: '心跳间隔（秒）',
   request_seconds: '控制请求超时（秒）',
   page_seconds: '整页处理时限（秒）', text_wait_seconds: '等待译文时限（秒）',
   delivery_seconds: '结果交付时限（秒）',
@@ -51,6 +52,6 @@ export function NodeConfigFields({value, onChange, schema, pool}: {
   return <>
     <div className="config-grid">{fields(pool ? {execution_slots: {type: 'integer', minimum: 1, maximum: schema.pool_limits[pool]}} : schema.node.properties, value)}</div>
 
-    {!pool && <details><summary>高级超时设置</summary><div className="config-grid">{fields(schema.node.properties, value, true)}</div></details>}
+    {!pool && <details><summary>高级设置</summary><div className="config-grid">{fields(schema.node.properties, value, true)}</div></details>}
   </>;
 }

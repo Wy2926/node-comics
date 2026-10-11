@@ -55,13 +55,18 @@ def block(uri, body):
     return f'location = {uri} {{\n    if ($request_method !~ "^(GET|HEAD)$") {{ return 405; }}\n{body}\n}}\n'
 
 
-def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oidc_origin='', manifest=None):
+def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oidc_origin='',
+            document_r2_origin='', manifest=None):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', release):
         raise ValueError('Invalid release ID')
     if not re.fullmatch(r'/[A-Za-z0-9_/-]+', nginx_root) or '..' in PurePosixPath(nginx_root).parts:
         raise ValueError('nginx-root must be an absolute safe container-visible path')
     if oidc_origin and not re.fullmatch(r'https://[A-Za-z0-9.-]+(?::[0-9]+)?', oidc_origin):
         raise ValueError('OIDC origin must be a bare HTTPS origin')
+    if document_r2_origin:
+        match = re.fullmatch(r'https://[A-Za-z0-9.-]+(?::([0-9]{1,5}))?', document_r2_origin)
+        if not match or (match[1] and not 1 <= int(match[1]) <= 65535):
+            raise ValueError('Document R2 origin must be a bare HTTPS origin')
     reserved = {'admin', 'v1', 'internal', 'health', 'docs', 'redoc', 'api', 'openapi', 'account', 'auth',
                 'features', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
                 'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'ar', 'webhooks', 'billing', 'payment',
@@ -135,10 +140,11 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
                 parser.feed(path.read_text(encoding='utf-8'))
                 challenge = ' https://challenges.cloudflare.com' if 'translate' in segments else ''
                 blobs = ' blob:' if 'translate' in segments else ''
+                documents = ' ' + document_r2_origin if document_r2_origin and 'translate' in segments else ''
                 frames = challenge.strip() or "'none'"
                 csp = (f"default-src 'self'; script-src 'self'{challenge} " + ' '.join(parser.hashes) +
                        f"; style-src 'self' 'unsafe-inline'; img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; " +
-                       f"connect-src 'self' {oidc_origin}{challenge}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
+                       f"connect-src 'self' {oidc_origin}{challenge}{documents}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
                 response_headers = headers(release, private=private, csp=csp)
                 canonical = uri[:-10] if relative.endswith('index.html') else uri
                 if relative == '404.html' or '404' in segments:
@@ -185,10 +191,12 @@ def main():
     parser.add_argument('--release', required=True)
     parser.add_argument('--admin-path', default='')
     parser.add_argument('--oidc-origin', default='')
+    parser.add_argument('--document-r2-origin', default='', help='Exact HTTPS R2 origin for document translation pages only')
     parser.add_argument('--manifest', type=Path)
     args = parser.parse_args()
     path = prepare(args.kind, args.source, args.destination, args.release, args.nginx_root,
-                   admin_path=args.admin_path, oidc_origin=args.oidc_origin, manifest=args.manifest)
+                   admin_path=args.admin_path, oidc_origin=args.oidc_origin,
+                   document_r2_origin=args.document_r2_origin, manifest=args.manifest)
     print('Prepared independent static release:', path)
 
 

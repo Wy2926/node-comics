@@ -41,6 +41,7 @@ def load(path):
     value.setdefault('download_workers', 4)
     value.setdefault('delivery_workers', 4)
     value.setdefault('resident_bytes', 1024 * 1024 * 1024)
+    value.setdefault('document_spool_bytes', 6 * 1024 ** 3)
     value['state_dir'] = str((path.parent / value.get('state_dir', 'state')).resolve())
     value['engine']['models'] = str((path.parent / value['engine']['models']).resolve())
     value['engine']['font'] = [str((path.parent / font).resolve()) for font in value['engine']['font']]
@@ -54,6 +55,8 @@ def load(path):
         raise ValueError('Network worker counts must be between 1 and 16')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
         raise ValueError('Reserve at least 512 MiB for page buffers')
+    if type(value['document_spool_bytes']) is not int or not 256 * 1024 ** 2 <= value['document_spool_bytes'] <= 16 * 1024 ** 3:
+        raise ValueError('document_spool_bytes must be between 256 MiB and 16 GiB')
     if value['engine']['threads'] != 'auto' and (type(value['engine']['threads']) is not int or value['engine']['threads'] < 1):
         raise ValueError('engine.threads must be auto or a positive integer')
     if type(value['engine']['gpu']) is not int or value['engine']['gpu'] < 0:

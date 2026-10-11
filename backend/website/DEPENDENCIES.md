@@ -6,6 +6,7 @@
 | --- | --- | --- | --- | --- |
 | @astrojs/check | 0.9.9 | MIT | [npm source](https://registry.npmjs.org/@astrojs/check/-/check-0.9.9.tgz) | `sha512-A5UW8uIuErLWEoRQvzgXpO1gTjUFtK8r7nU2Z7GewAMxUb7bPvpk11qaKKgxqXlHJWlAvaaxy+Xg28A6bmQ1Tg==` |
 | @astrojs/react | 6.0.6 | MIT | [npm source](https://registry.npmjs.org/@astrojs/react/-/react-6.0.6.tgz) | `sha512-TQ9G2m2tIx9c105GmvjRAcTk+kV0QER5MsEPKUbK1Jm8SBYKzIzR89xh4L2vXAxI2zMfTMmsR7vln1TOLZpckw==` |
+| @noble/hashes | 2.4.0 | MIT | [npm source](https://registry.npmjs.org/@noble/hashes/-/hashes-2.4.0.tgz) | `sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==` |
 | @types/node | 22.20.4 | MIT | [npm source](https://registry.npmjs.org/@types/node/-/node-22.20.4.tgz) | `sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA==` |
 | @types/react | 19.3.0 | MIT | [npm source](https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz) | `sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==` |
 | @types/react-dom | 19.3.0 | MIT | [npm source](https://registry.npmjs.org/@types/react-dom/-/react-dom-19.3.0.tgz) | `sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==` |

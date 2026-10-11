@@ -29,7 +29,10 @@ class Pipeline:
         pixels = metadata.get('width', 0) * metadata.get('height', 0)
         # 16P working/output plus 6P persistent masks: inset, int32 labels and
         # bounded component stats after inpaint replace the three raw masks.
-        return pixels * 22 + metadata.get('byte_size', 0) * 3 + MAX_CHECKPOINT_BYTES * 6
+        # Document render pages load their local analysis JSON. Encoded bytes,
+        # decoded text and parsed values count against the same resident gate.
+        auxiliary = page.lease.get('analysis_ref', {}).get('byte_size', 0)
+        return pixels * 22 + metadata.get('byte_size', 0) * 3 + auxiliary * 4 + MAX_CHECKPOINT_BYTES * 6
 
     @staticmethod
     def delivery_reservation(body):
@@ -117,7 +120,7 @@ class Pipeline:
         return reservations
 
     def claim_capacity(self):
-        pages = list(self.agent.pages.values())
+        pages = self.agent.active_pages()
         downloading = [page for page in pages if page.step == 'download' and not page.stopped and not page.terminal]
         # Count accepted pages before they acquire buffers, too. Their known
         # demand must not disappear merely because they await the memory gate.
@@ -191,7 +194,7 @@ class Pipeline:
         self.release_render_buffers(page)
         self.retain_masks(page)
         self.resize_reservation(page, 0)
-        page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.completion = None
+        page.data = page.rgb = page.cleaned = page.analysis = page.alpha = page.translations = page.completion = None
 
     def error(self, page, error):
         if not page.future and not page.analysis_future:
@@ -299,7 +302,7 @@ class Pipeline:
         # of downloads cannot postpone the first result until all are analyzed.
         for stages, pool, capacity in (({'analyze', 'inpaint'}, self.compute, self.agent.local['local_pages']),
                                        ({'render'}, self.render, self.render_workers)):
-            running = sum(bool(p.future and p.step in stages) for p in pages)
+            running = sum(bool(p.future and p.step in stages) for p in self.agent.active_pages())
             ready = sorted((p for p in pages if not p.future and not p.pending_error
                             and not p.stopped and not p.terminal and p.step in stages),
                            key=lambda p: (p.step == 'analyze', p.ready_at))

@@ -50,6 +50,7 @@ def initialize():
     from . import feedback_review_models  # noqa: F401
     from . import support_requests  # noqa: F401
     from . import comic_title_cache  # noqa: F401
+    from .documents import models as document_models  # noqa: F401
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

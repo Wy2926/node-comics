@@ -1,0 +1,9 @@
+# Offline parser development/tests only, run from backend/. The central text
+# worker uses requirements.txt; production parsing belongs to the GPU host.
+-r requirements.txt
+# https://pypi.org/project/pypdfium2/5.14.0/ ; https://github.com/pypdfium2-team/pypdfium2
+# BSD-3-Clause / Apache-2.0; bundled PDFium and its third-party notices ship in the wheel.
+# Windows x64 wheel sha256: 149fd5c6397b8df8bf7911a93506eff0be874f877afe7ac936cf5d37d21a6a06
+# Linux manylinux x64 wheel sha256: 11f281613fa22313d9c7ab89947665e84eccf8ebe40e1198a84a88352305648d
+# sdist sha256: c5f009b3157f10e97dceb55963f5910eff92feb00587ba10a76f12b87ce1a4b6
+./document_files

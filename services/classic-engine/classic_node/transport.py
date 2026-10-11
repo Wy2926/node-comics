@@ -53,6 +53,12 @@ class Transport:
         except httpx.HTTPError as error:
             raise self.network_error(error) from None
 
+    def document_post(self, path, body):
+        try:
+            return self.reply(self.control.post('/internal/documents/compute/v2' + path, json=body))
+        except httpx.HTTPError as error:
+            raise self.network_error(error) from None
+
     @staticmethod
     def lease_path(lease_id, operation):
         if not isinstance(lease_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', lease_id):

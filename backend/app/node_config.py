@@ -8,6 +8,7 @@ from .request_models import RequestBody
 class NodeConfig(RequestBody):
     schema_version: Literal[1] = 1
     execution_slots: int = Field(default=1, ge=1, le=32, strict=True)
+    document_slots: int = Field(default=1, ge=0, le=32, strict=True)
     poll_seconds: float = Field(default=20, ge=1, le=30, allow_inf_nan=False)
     heartbeat_seconds: float = Field(default=10, ge=.1, le=30, allow_inf_nan=False)
     request_seconds: float = Field(default=30, ge=1, le=120, allow_inf_nan=False)

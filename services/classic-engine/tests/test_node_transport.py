@@ -18,6 +18,21 @@ def config():
             'control_url': 'https://control.example.test'}
 
 
+def test_document_control_uses_v2_and_keeps_authorization_on_center():
+    body = {'lease_token': 'lease-secret', 'workspace_generation': 2, 'error': 'LEASE_STOPPED'}
+    def center(request):
+        assert request.url.host == 'control.example.test'
+        assert request.url.path == '/internal/documents/compute/v2/leases/test/complete'
+        assert request.headers['authorization'] == 'Bearer control-only-token'
+        assert json.loads(request.content) == body
+        return httpx.Response(200, json={'status': 'terminal'})
+    client = Transport(config(), control_transport=httpx.MockTransport(center))
+    try:
+        assert client.document_post('/leases/test/complete', body) == {'status': 'terminal'}
+    finally:
+        client.close()
+
+
 def metadata(data=b'image', path=PREFIX + '/leases/test/input'):
     return {'path': path, 'byte_size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
 

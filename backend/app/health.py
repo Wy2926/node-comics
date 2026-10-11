@@ -18,7 +18,7 @@ from .models import Job, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage
 
 ROLES = ("control-worker", "maintenance")
-REPORT_ROLES = (*ROLES, "oidc")
+REPORT_ROLES = (*ROLES, "oidc", "document-worker")
 log = logging.getLogger("node_comics.health")
 
 
@@ -99,9 +99,15 @@ def queue_alerts(db):
     # Count at most 1000 matches per query
     # without loading jobs into the ORM or acquiring the scheduler lock.
     overdue = select(JobStage.id).join(Job, Job.id == JobStage.job_id).where(
+        Job.workflow_kind == 'image',
         JobStage.status == "ready", JobStage.available_at < cutoff, Job.status.in_(["queued", "running"]),
         Job.cancel_requested.is_(False))
-    return {"outcome_unknown": count(select(Job.id).where(Job.status == "outcome_unknown")),
+    document_overdue = select(JobStage.id).join(Job, Job.id == JobStage.job_id).where(
+        Job.workflow_kind == 'document', JobStage.status == 'ready', JobStage.available_at < at - timedelta(hours=1),
+        Job.status.in_(['preflight', 'queued', 'running']))
+    return {"document_overdue_ready_stages": count(document_overdue),
+            "document_outcome_unknown": count(select(Job.id).where(Job.workflow_kind == 'document', Job.status == 'outcome_unknown')),
+            "outcome_unknown": count(select(Job.id).where(Job.status == "outcome_unknown")),
             "unknown_released": count(select(Job.id).where(Job.status == "unknown_released")),
             "overdue_ready_stages": count(overdue),
             "expired_leases": count(select(ExecutionLease.id).where(ExecutionLease.completed_at.is_(None), ExecutionLease.expires_at < at)),
@@ -129,11 +135,17 @@ def readiness(*, role=None, instance=None):
     checks = {"database": "unavailable"}
     alerts = {}
     try:
-        deadline = now() - timedelta(seconds=settings().cluster_node_timeout_seconds)
+        cfg = settings()
+        deadline = now() - timedelta(seconds=cfg.cluster_node_timeout_seconds)
+        document_enabled = False
+        if role is None:
+            from .documents.config import get_document_settings
+            document_enabled = get_document_settings().enabled
         with session_factory()() as db:
             db.execute(text("SELECT 1"))
             checks["database"] = "ready"
-            required_roles = (*ROLES, "oidc") if not settings().dev_auth else ROLES
+            required_roles = (*ROLES, *(("oidc",) if not cfg.dev_auth else ()),
+                              *(("document-worker",) if document_enabled else ()))
             for required in (role,) if role else required_roles:
                 statement = select(ServiceHeartbeat).where(ServiceHeartbeat.role == required)
                 if instance:
@@ -147,14 +159,24 @@ def readiness(*, role=None, instance=None):
                     ["control-text", "control-validate_upload"]))).all()
                 checks["control-pools"] = "ready" if len(pools) == 2 and all(
                     node.heartbeat_at and node.heartbeat_at > deadline for node in pools) else "unavailable"
-                if settings().classic_enabled:
-                    online = db.scalar(select(ComputeNode.id).where(ComputeNode.enabled.is_(True),
+                if cfg.classic_enabled or document_enabled:
+                    online = select(ComputeNode.id).where(ComputeNode.enabled.is_(True),
                         ComputeNode.engine_version != 'control',
                         ComputeNode.runtime_report['protocol_version'].as_integer() == 3,
                         ComputeNode.runtime_report['ready'].as_boolean().is_(True),
                         ComputeNode.applied_config_version == ComputeNode.config_version,
-                        ComputeNode.config_error.is_(None), ComputeNode.heartbeat_at > deadline).limit(1))
-                    checks["compute-nodes"] = "ready" if online else "unavailable"
+                        ComputeNode.config_error.is_(None), ComputeNode.heartbeat_at > deadline)
+                    # One bounded existence query for both capabilities. Busy
+                    # leases do not make a healthy executor unavailable.
+                    node_checks = {}
+                    if cfg.classic_enabled:
+                        node_checks['compute-nodes'] = online.exists()
+                    if document_enabled:
+                        node_checks['document-nodes'] = online.where(
+                            ComputeNode.runtime_report['document_protocol'].as_integer() == 2,
+                            func.coalesce(ComputeNode.desired_config['document_slots'].as_integer(), 1) > 0).exists()
+                    row = db.execute(select(*(value.label(key) for key, value in node_checks.items()))).one()
+                    checks.update({key: 'ready' if available else 'unavailable' for key, available in row._mapping.items()})
                 alerts = queue_alerts(db)
     except Exception as error:
         log_failure("readiness", error)
@@ -170,7 +192,7 @@ def readiness(*, role=None, instance=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Check this container's durable progress heartbeat")
-    parser.add_argument("role", choices=ROLES)
+    parser.add_argument("role", choices=(*ROLES, 'document-worker'))
     parser.add_argument("--pid", type=int, default=1)
     args = parser.parse_args()
     payload, ready = readiness(role=args.role, instance=instance_id(args.pid))

@@ -46,7 +46,9 @@ def service_health(db: Session = Depends(get_db)):
         data['status'] = 'healthy' if row.last_success_at and row.last_success_at > at - timedelta(seconds=timeout) and row.consecutive_failures == 0 else 'unhealthy'
         services.append(data)
     present = {row['role'] for row in services}
-    for role in ('control-worker', 'maintenance', *(() if settings().dev_auth else ('oidc',))):
+    from .documents.config import get_document_settings
+    for role in ('control-worker', 'maintenance', *(() if settings().dev_auth else ('oidc',)),
+            *(('document-worker',) if get_document_settings().enabled else ())):
         if role not in present:
             services.append({'role': role, 'instance_id': '—', 'status': 'missing', 'age_seconds': None,
                 'heartbeat_at': None, 'last_success_at': None, 'consecutive_failures': 0,
@@ -133,7 +135,8 @@ def results(owner_id: str | None = Query(None, max_length=36), q: str | None = Q
         TranslationRequest.job_id == Job.id, TranslationRequest.owner_id == Job.owner_id,
         TranslationRequest.revoked_at.is_(None)).correlate(Job).scalar_subquery()
     query = select(*columns(Job, 'id owner_id source_sha256 mode target_language version status input_asset_id output_asset_id'),
-        Job.completed_at.label('generated_at'), request_count.label('request_count')).where(Job.status.in_(['succeeded', 'no_text']))
+        Job.completed_at.label('generated_at'), request_count.label('request_count')).where(
+            Job.workflow_kind == 'image', Job.status.in_(['succeeded', 'no_text']))
     if q:
         query = query.where(or_(Job.id == q, Job.source_sha256 == q))
     if owner_id:
@@ -149,9 +152,10 @@ def statistics(days: int = Query(7, ge=1, le=90), provider_id: str | None = Quer
     at = now()
     since = at.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)
     day = func.date(Job.completed_at)
-    jobs = db.execute(select(day.label('day'), Job.mode, Job.status, func.count().label('count'),
+    jobs = db.execute(select(day.label('day'), Job.mode, Job.workflow_kind, Job.status, func.count().label('count'),
         func.avg(duration_sql(db, Job.created_at, Job.completed_at)).label('avg_seconds'))
-        .where(Job.completed_at >= since, Job.completed_at <= at).group_by(day, Job.mode, Job.status).order_by(day, Job.mode, Job.status))
+        .where(Job.completed_at >= since, Job.completed_at <= at).group_by(day, Job.mode, Job.workflow_kind, Job.status)
+        .order_by(day, Job.mode, Job.workflow_kind, Job.status))
     text_day = func.date(TextCall.started_at)
     calls = select(text_day.label('day'), TextCall.provider_id, TextCall.model, func.count().label('calls'),
         func.sum(TextCall.accounted_micros).label('accounted_micros'),

@@ -93,7 +93,7 @@
 | [后端](backend/README.md) | API、持久任务、账户、会员与管理后台 |
 | [官网](backend/website/README.md) | 17 语介绍、图片翻译、匿名体验、本地历史、下载与账户页面 |
 | [Drive 连接页](apps/drive-connect/README.md) | Google 授权与文件选择 |
-| [计算节点](services/compute-node/README.md) | Windows 独立包与 Linux NVIDIA 镜像的安装、运行与构建 |
+| [计算节点](services/compute-node/README.md) | Windows 独立包与 Linux NVIDIA 节点的部署、运行与构建 |
 | [图像引擎](services/classic-engine/README.md) | 检测、OCR、LaMa 抹字与嵌字开发 |
 
 各模块 README 提供环境要求和运行命令；验证工具见[脚本入口](scripts/README.md)。
@@ -104,7 +104,7 @@
 | --- | --- |
 | 产品与阅读 | [产品设计](docs/PRODUCT_DESIGN.md)、[单来源阅读](docs/SIMPLE_COMIC_READING_DESIGN.md)、[整本缓存设计](docs/OFFLINE_CACHE_DESIGN.md) |
 | 架构与数据 | [系统架构](docs/ARCHITECTURE.md)、[来源与缓存](docs/COMIC_SOURCE_ARCHITECTURE.md) |
-| 翻译与计算 | [翻译契约](docs/READING_TRANSLATION_CONTRACT.md)、[模型选择设计](docs/TRANSLATION_MODEL_SELECTION_DESIGN.md)、[计算协议](docs/COMPUTE_PROTOCOL.md)、[集群架构](docs/TRANSLATION_CLUSTER_DESIGN.md) |
+| 翻译与计算 | [翻译契约](docs/READING_TRANSLATION_CONTRACT.md)、[整本文件翻译](docs/DOCUMENT_TRANSLATION.md)、[模型选择设计](docs/TRANSLATION_MODEL_SELECTION_DESIGN.md)、[计算协议](docs/COMPUTE_PROTOCOL.md)、[集群架构](docs/TRANSLATION_CLUSTER_DESIGN.md) |
 | 网站与界面 | [网站适配](docs/SITE_ADAPTERS.md)、[漫画发现](docs/DISCOVERY.md)、[跨语言搜索设计](docs/COMIC_SEARCH_DESIGN.md)、[界面国际化](docs/UI_INTERNATIONALIZATION.md)、[品牌文案](docs/BRAND_AND_STORE_LISTING.md) |
 | 账户与运营 | [会员额度](docs/MEMBERSHIP_AND_QUOTAS.md)、[支付](docs/STRIPE_BILLING.md)、[管理后台](docs/ADMIN_CONSOLE.md)、[GA4 插件使用分析](docs/ANALYTICS.md) |
 | 部署与维护 | [部署](docs/DEPLOYMENT.md)、[备份与恢复](docs/OPERATIONS.md)、[代码规范](docs/CODE_QUALITY.md)、[API 契约](contracts/README.md) |

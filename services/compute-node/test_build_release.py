@@ -71,6 +71,28 @@ def test_download_checks_cached_inputs(tmp_path):
         download(source.as_uri(), sha256(source), target)
 
 
+def test_download_resumes_partial_and_restarts_when_range_is_ignored(tmp_path, monkeypatch):
+    from io import BytesIO
+    import hashlib
+    import build_support
+    payload = b'complete verified model'
+    checksum = hashlib.sha256(payload).hexdigest()
+    for status in (200, 206):
+        target = tmp_path / str(status)
+        target.with_name(target.name + '.partial').write_bytes(payload[:8])
+
+        def open_url(request, **kwargs):
+            assert request.get_header('Range') == 'bytes=8-'
+            response = BytesIO(payload[8:] if status == 206 else payload)
+            response.status = status
+            response.headers = {'Content-Range': f'bytes 8-{len(payload) - 1}/{len(payload)}'}
+            return response
+
+        monkeypatch.setattr(build_support.urllib.request, 'urlopen', open_url)
+        download('https://example.com/model', checksum, target)
+        assert target.read_bytes() == payload
+
+
 def test_tool_archive_cannot_escape_destination(tmp_path):
     archive = tmp_path / 'tool.zip'
     with zipfile.ZipFile(archive, 'w') as package:
@@ -85,9 +107,12 @@ def test_source_copy_normalizes_git_line_endings(tmp_path):
     source.mkdir()
     (source / 'module.py').write_bytes(b'value = 1\r\n')
     (source / '.env').write_text('never package')
+    (source / 'local.egg-info').mkdir()
+    (source / 'local.egg-info/SOURCES.txt').write_text('generated local build metadata')
     copy_sources(source, tmp_path / 'copied')
     assert (tmp_path / 'copied/module.py').read_bytes() == b'value = 1\n'
     assert not (tmp_path / 'copied/.env').exists()
+    assert not (tmp_path / 'copied/local.egg-info').exists()
 
 
 def test_unused_absolute_launchers_are_removed_from_runtime(tmp_path):

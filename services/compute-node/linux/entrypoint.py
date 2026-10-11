@@ -11,44 +11,50 @@ IDENTITY = {'NODE_CONTROL_URL': 'control_url', 'NODE_ID': 'node_id',
             'NODE_TOKEN': 'node_token', 'NODE_RESOURCE_ID': 'resource_id'}
 
 
-def prepare_config(directory, environ):
+def prepare_config(directory, environ, supplied_path=None):
     from classic_node.config import load, origin
     path = Path(directory) / 'node.json'
     supplied = {field: environ.get(env, '').strip() for env, field in IDENTITY.items()}
     if supplied['control_url']:
         supplied['control_url'] = origin(supplied['control_url'])
-    if path.is_file():
-        existing = load(path)
-        # Never silently reuse recovery state for a different node/center/resource.
-        for env, field in IDENTITY.items():
-            if supplied[field] and supplied[field] != existing[field]:
-                raise ValueError('Existing identity differs: ' + env)
-        return path
-    for env, field in IDENTITY.items():
-        value = supplied[field]
-        if not value or value.startswith('REPLACE_') or any(char.isspace() for char in value):
-            raise ValueError('Set per-instance ' + env)
-    supplied['control_url'] = origin(supplied['control_url'])
-    if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,120}', supplied['resource_id']):
-        raise ValueError('Invalid NODE_RESOURCE_ID')
-    value = json.loads(Path(__file__).with_name('node.example.json').read_text())
-    value.update(supplied)
-    value['state_dir'] = str(Path(directory) / 'state')
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    # A nonempty state directory without its identity requires operator recovery.
-    state = Path(value['state_dir'])
-    if state.exists() and any(state.iterdir()):
-        raise ValueError('Existing state has no identity; restore its original config')
+    value = json.loads(Path(supplied_path).read_text(encoding='utf-8-sig')) if supplied_path else None
+    existing = path.is_file()
+    if existing and supplied_path and json.loads(path.read_text(encoding='utf-8-sig')) != value:
+        raise ValueError('Existing config differs')
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
-                                         prefix='.node-', delete=False) as output:
-            temporary = Path(output.name)
-            json.dump(value, output)
-            output.flush()
-            os.fsync(output.fileno())
-        load(temporary)
-        os.link(temporary, path)  # Atomic no-clobber publish; mode remains 0600.
+        if not existing:
+            if supplied_path is None:
+                value = json.loads(Path(__file__).with_name('node.example.json').read_text())
+                value.update(supplied)
+                value['state_dir'] = str(Path(directory) / 'state')
+            if not isinstance(value, dict):
+                raise ValueError('Node config must be an object')
+            for env, field in IDENTITY.items():
+                identity = value.get(field)
+                if (not isinstance(identity, str) or not identity or identity.startswith('REPLACE_')
+                        or any(char.isspace() for char in identity)):
+                    raise ValueError('Set per-instance ' + env)
+            if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,120}', value['resource_id']):
+                raise ValueError('Invalid NODE_RESOURCE_ID')
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                             prefix='.node-', delete=False) as output:
+                temporary = Path(output.name)
+                json.dump(value, output)
+                output.flush()
+                os.fsync(output.fileno())
+        # Validate from the destination directory: relative CA/state/model paths
+        # must have the same meaning before and after publishing node.json.
+        config = load(path if existing else temporary)
+        for env, field in IDENTITY.items():
+            if supplied[field] and supplied[field] != config[field]:
+                raise ValueError('Existing identity differs: ' + env)
+        if not existing:
+            state = Path(config['state_dir'])
+            if state.exists() and any(state.iterdir()):
+                raise ValueError('Existing state has no identity; restore its original config')
+            os.link(temporary, path)  # Atomic no-clobber publish; mode remains 0600.
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -59,6 +65,11 @@ def main():
     os.umask(0o077)
     args = sys.argv[1:]
     try:
+        if args[:1] == ['prepare-config']:
+            if len(args) not in (2, 3):
+                raise ValueError('Expected destination directory and optional private config')
+            prepare_config(args[1], json.load(sys.stdin), args[2] if len(args) == 3 else None)
+            return 0
         if not args:
             # Do not let the legacy NODE_TOKEN override hide an identity mismatch.
             supplied = dict(os.environ)

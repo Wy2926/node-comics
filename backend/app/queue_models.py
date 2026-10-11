@@ -31,13 +31,15 @@ class JobStage(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
     name: Mapped[str] = mapped_column(String(24))
+    page_index: Mapped[int] = mapped_column(Integer, server_default='0')
     status: Mapped[str] = mapped_column(String(20), default="waiting", index=True)
     generation: Mapped[int] = mapped_column(Integer, default=0)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     available_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     result: Mapped[dict] = mapped_column(JSON, default=dict)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    __table_args__ = (UniqueConstraint("job_id", "name"), Index("ix_stage_ready", "status", "name", "available_at", "id"))
+    __table_args__ = (UniqueConstraint('job_id', 'name', 'page_index', name='uq_job_stage_page'),
+                     Index("ix_stage_ready", "status", "name", "available_at", "id"))
 
 
 class ExecutionLease(Base):

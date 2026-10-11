@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comic-document-files"
+version = "1.0.0"
+description = "Bounded local PDF and image archive preparation for Node Comics"
+requires-python = ">=3.11"
+dependencies = ["Pillow==12.3.0", "pypdfium2==5.14.0"]
+license = "GPL-3.0-only"
+
+[tool.setuptools.packages.find]
+include = ["comic_document_files*"]
