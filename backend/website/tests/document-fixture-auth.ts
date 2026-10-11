@@ -69,7 +69,7 @@ export async function authenticatedFetch(path: string, options: RequestInit, ide
     }
     return json(task);
   }
-  if (path === '/v1/documents/capabilities') return json({ enabled: params.get('scenario') !== 'disabled', paid_allowed: params.get('scenario') !== 'free',
+  if (path === '/v1/documents/capabilities') return json({ enabled: params.get('scenario') !== 'disabled',
     limits: { max_bytes: 200_000_000, max_pages: 200, part_bytes: 16 * 1024 * 1024, waiting_hours: 24 }, languages: [{ id: 'zh-Hans', label: '简体中文' }, { id: 'en', label: 'English' }, { id: 'zh-Hant', label: '繁體中文' }], models: params.get('scenario') === 'no-models' ? [] : [base.model] });
   if (path.startsWith('/v1/documents?')) return json({ items: rows(), next_cursor: null });
   const match = path.match(/^\/v1\/documents\/([a-f0-9-]+)(?:\/(.+))?$/);

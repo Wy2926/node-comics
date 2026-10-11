@@ -26,12 +26,12 @@ test('one input routes mixed files by metadata without reading or copying any Bl
 
 test('mixed submissions only offer models allowed by both APIs; image-only choices stay unchanged', () => {
   const images = [{ id: 'image', name: 'Image', requires_paid: false, available: true }, { id: 'both', name: 'Both', requires_paid: true, available: true }];
-  const caps = { enabled: true, paid_allowed: true, models: [{ id: 'both', name: 'Both' }, { id: 'doc', name: 'Document' }] } as DocumentCapabilities;
+  const caps = { enabled: true, models: [{ id: 'both', name: 'Both' }, { id: 'doc', name: 'Document' }] } as DocumentCapabilities;
   assert.equal(workbenchModels(images, caps, true, false), images);
   assert.deepEqual(workbenchModels(images, caps, true, true)?.map(item => item.available), [true, false]);
   assert.deepEqual(workbenchModels(images, caps, false, true)?.map(item => item.available), [true, true]);
   assert.ok(workbenchModels(images, { ...caps, enabled: false }, false, true)?.every(item => !item.available));
-  assert.ok(workbenchModels(images, { ...caps, paid_allowed: false }, false, true)?.every(item => !item.available));
+  assert.deepEqual(workbenchModels(images, caps, false, true)?.map(item => item.requires_paid), [true, false]);
 });
 
 const row: DocumentTask = { id: 'one', filename: 'book.pdf', status: 'running', phase: 'doc_ocr', version: 1,
@@ -55,6 +55,13 @@ test('all site locales have complete unified copy and preserve file limits', () 
     assert.match(workbenchCopy[locale].documentHint, /200/);
     assert.match(workbenchCopy[locale].downloadImages, /ZIP/);
   }
+});
+test('document access uses existing trial and gifted quota without a separate paid gate', () => {
+  assert.match(documentCopy('zh-CN').access, /试用和赠送额度同样可用/);
+  assert.match(documentCopy('en').access, /including trial and gifted quota/);
+  for (const path of ['../src/components/TranslationWorkbench.tsx', '../src/lib/use-document-tasks.ts', '../src/lib/workbench-files.ts'])
+    assert.doesNotMatch(readFileSync(new URL(path, import.meta.url), 'utf8'), /paid_allowed|documentText\.paid/);
+  assert.match(workbenchCopy['zh-CN'].documentHint, /登录使用/);
 });
 test('production mounts only one workbench and lazily loads the original document transport', () => {
   const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');

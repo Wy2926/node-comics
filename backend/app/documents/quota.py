@@ -1,9 +1,9 @@
 """Atomic whole-document reservations over the existing page allowance buckets."""
 from datetime import datetime
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from ..billing_models import BillingOrder, BillingPlanRevision, BillingPrice, BillingTerm
 from ..entitlement_models import QuotaPeriod
-from ..entitlements import DAILY, MONTHLY, _automatic_period, finish_period, locked_user, reserve_period
+from ..entitlements import DAILY, MONTHLY, _automatic_period, finish_period, is_operator_plus, locked_user, reserve_period
 from ..errors import problem
 from ..models import Job, Ledger, now, uid
 from ..scheduler import lock_scheduler, touch_job
@@ -28,19 +28,6 @@ def _purchases(owner_id, at):
             QuotaPeriod.revoked_at.is_(None), QuotaPeriod.starts_at <= at,
             or_(QuotaPeriod.ends_at.is_(None), QuotaPeriod.ends_at > at),
             QuotaPeriod.granted > QuotaPeriod.used + QuotaPeriod.reserved)
-
-
-def require_paid(db, user, at=None):
-    """Paid identity is not a plan label: trials and operator gifts do not qualify."""
-    at = at or now()
-    if user.kind != 'registered':
-        problem('DOCUMENT_PAID_REQUIRED', '文件翻译仅对付费用户开放', 403)
-    paid = db.execute(_active_terms(user.id, at).where(BillingTerm.kind == 'paid').limit(1)).first()
-    purchase = None if paid else db.execute(_purchases(user.id, at).limit(1)).first()
-    if not paid and not purchase:
-        problem('DOCUMENT_PAID_REQUIRED', '文件翻译需要有效付费订阅或可用购买额度', 403)
-    return ({'billing_term_id': paid[0].id, 'plan': paid[1].plan_id} if paid else
-            {'purchase_period_id': purchase[0].id, 'plan': 'free'})
 
 
 def _eligible(scope, plan):
@@ -72,16 +59,20 @@ def _options(db, user, scope, at):
     for option in sorted(free, key=_order):
         yield option
 
-    # An eligible paid unlimited term supplies the remaining pages before any
+    # An eligible unlimited membership supplies the remaining pages before any
     # finite subscription or purchase, without creating an artificial balance.
-    query = _active_terms(user.id, at).where(BillingTerm.kind == 'paid',
-        BillingPlanRevision.monthly_classic_pages.is_(None))
+    query = _active_terms(user.id, at).where(or_(
+        and_(BillingTerm.kind == 'paid', BillingPlanRevision.monthly_classic_pages.is_(None)),
+        and_(BillingTerm.kind == 'trial', BillingPlanRevision.trial_classic_pages.is_(None))))
     if scope is not None and 'free' not in scope:
         query = query.where(func.coalesce(BillingPlanRevision.service_plan_id, BillingPlanRevision.plan_id).in_(scope))
     unlimited = db.execute(query.order_by(BillingTerm.ends_at, BillingTerm.id).limit(1)).first()
     if unlimited:
         term, revision = unlimited
         yield None, term, revision.service_plan_id or revision.plan_id, revision
+        return
+    if _eligible(scope, 'plus') and is_operator_plus(user, at) and user.plus_monthly_pages is None:
+        yield None, None, 'plus', None
         return
 
     query = select(QuotaPeriod, BillingPlanRevision).join(BillingTerm,
@@ -129,11 +120,6 @@ def reserve_document(db, job):
     at = now()
     if document.expires_at <= at:
         problem('DOCUMENT_EXPIRED', '文件暂存已过期，请重新上传', 410)
-    # File acceptance froze actual paid access. Expiry or another task spending
-    # the last page only changes the funding options, not that accepted identity.
-    paid = (job.entitlement or {}).get('document_paid_access')
-    if not paid:
-        problem('DOCUMENT_PAID_REQUIRED', '文件任务缺少已核实的付费授权', 403)
     pages = list(db.scalars(select(DocumentPage).where(DocumentPage.job_id == job.id).order_by(DocumentPage.page_index)))
     count = document.page_count
     if not count or not 1 <= count <= MAX_PAGES or len(pages) != count or [p.page_index for p in pages] != list(range(1, count + 1)):
@@ -161,6 +147,17 @@ def reserve_document(db, job):
 
     offset = 0
     for period, term, service, revision, amount in plan:
+        if period is None and term is None:
+            # Operator gifts have neither a billing term nor a finite bucket.
+            # Freeze their execution usage in the existing job snapshot; pages
+            # without an allocation belong to this one unlimited gift.
+            job.entitlement = {**job.entitlement, 'document_unlimited_gift': {
+                'membership_id': user.membership_id, 'pages': amount,
+                'reserved': amount, 'used': 0, 'released': 0}}
+            db.add(Ledger(owner_id=job.owner_id, job_id=job.id, quota_kind='classic_unlimited',
+                transaction_key=f'document:{job.id}:gift:reserve', kind='reserve', amount=amount))
+            offset += amount
+            continue
         if period:
             if period not in db:
                 db.add(period)
@@ -181,12 +178,26 @@ def reserve_document(db, job):
             kind='reserve', amount=amount))
     document.reserved_at = at
     job.quota_pages, job.quota_kind, job.settlement = count, 'document_pages', 'reserved'
-    job.entitlement = {**job.entitlement, 'document_paid_access': paid, 'accepted_at': at.isoformat() + 'Z',
+    job.entitlement = {**job.entitlement, 'accepted_at': at.isoformat() + 'Z',
                        'priority': 0, 'pages': count}
     job.status, job.phase, job.error_code, job.error_message = 'queued', 'doc_ocr', None, None
     touch_job(db, job)
     db.flush()
     return True
+
+
+def _settle_pages(db, job, pages, allocation_id, period_id, kind, reserved, success):
+    used = sum(1 for page in pages if page.allocation_id == allocation_id and success and
+               page.billable and page.status == 'translated' and 'unrecognized_regions' not in page.quality_flags)
+    released = reserved - used
+    if period_id:
+        finish_period(db, period_id, reserved, used)
+    for operation, amount in (('settle', used), ('release', released)):
+        if amount:
+            db.add(Ledger(owner_id=job.owner_id, job_id=job.id, period_id=period_id,
+                quota_kind=kind, transaction_key=f'document:{job.id}:{allocation_id or "gift"}:{operation}',
+                kind=operation, amount=amount))
+    return used, released
 
 
 def settle_document(db, job, *, success=True):
@@ -199,19 +210,17 @@ def settle_document(db, job, *, success=True):
     allocations = list(db.scalars(select(DocumentQuotaAllocation).where(
         DocumentQuotaAllocation.job_id == job.id).order_by(DocumentQuotaAllocation.id).with_for_update()))
     pages = list(db.scalars(select(DocumentPage).where(DocumentPage.job_id == job.id)))
-    if sum(item.reserved for item in allocations) != job.quota_pages:
+    gift = (job.entitlement or {}).get('document_unlimited_gift', {})
+    if (sum(item.reserved for item in allocations) + gift.get('reserved', 0) != job.quota_pages or
+            sum(page.allocation_id is None for page in pages) != gift.get('pages', 0)):
         problem('QUOTA_CONFLICT', '文件预占账本不完整', 409)
     for allocation in allocations:
-        used = sum(1 for page in pages if page.allocation_id == allocation.id and success and
-                   page.billable and page.status == 'translated' and 'unrecognized_regions' not in page.quality_flags)
-        released = allocation.reserved - used
-        if allocation.period_id:
-            finish_period(db, allocation.period_id, allocation.reserved, used)
-        for operation, amount in (('settle', used), ('release', released)):
-            if amount:
-                db.add(Ledger(owner_id=job.owner_id, job_id=job.id, period_id=allocation.period_id,
-                    quota_kind=allocation.entitlement['kind'], transaction_key=f'document:{job.id}:{allocation.id}:{operation}',
-                    kind=operation, amount=amount))
+        used, released = _settle_pages(db, job, pages, allocation.id, allocation.period_id,
+                                      allocation.entitlement['kind'], allocation.reserved, success)
         allocation.reserved, allocation.used, allocation.released = 0, used, released
+    if gift:
+        used, released = _settle_pages(db, job, pages, None, None, 'classic_unlimited', gift['reserved'], success)
+        job.entitlement = {**job.entitlement, 'document_unlimited_gift': {
+            **gift, 'reserved': 0, 'used': used, 'released': released}}
     job.settlement = 'settled' if success else 'released'
     touch_job(db, job)

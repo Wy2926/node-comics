@@ -2,7 +2,6 @@ import { ApiError, assertSession, authenticatedFetch, type AuthIdentity } from '
 
 export interface DocumentCapabilities {
   enabled: boolean;
-  paid_allowed: boolean;
   limits: { max_bytes: number; max_pages: number; part_bytes: number; waiting_hours: number };
   languages: { id: string; label: string }[];
   models: { id: string; name: string }[];

@@ -144,10 +144,9 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     let documentIssue = '';
     if (selected.documents.length) {
       if (selected.documents.length > 1 || documents.file) documentIssue = w.oneDocument;
-      else if (isGuestScope) documentIssue = documentText.paid;
+      else if (isGuestScope) documentIssue = documentText.access;
       else if (!documents.caps) documentIssue = documentText.loading;
       else if (!documents.caps.enabled) documentIssue = documentText.disabled;
-      else if (!documents.caps.paid_allowed) documentIssue = documentText.paid;
       else if (!documents.caps.models.length) documentIssue = documentText.noModels;
       else if (!selected.documents[0].size || selected.documents[0].size > Math.min(documents.caps.limits.max_bytes, 200_000_000)) documentIssue = documentText.errors.file;
     }
@@ -731,7 +730,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     (documents.frozen || selectedModelAvailable(availableModels, effectiveModelId)) &&
     (!pendingImages.length || selectedModelAvailable(caps?.translation_models, effectiveModelId)) &&
     (!pendingImages.length || !isGuestScope || guest?.enabled) &&
-    (!documents.file || documents.caps?.enabled && (documents.frozen || documents.caps.paid_allowed));
+    (!documents.file || documents.caps?.enabled);
   function start() {
     if (!canStart) return;
     // Separate executors, shared user intent. Neither lane waits for the other's backend processing.
@@ -830,7 +829,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
           <span className="ui-icon icon-arrow" aria-hidden="true" />
         </button>
         </div>
-        <div className="workbench-composer-notes"><p>{w.documentHint} {(isGuestScope || documents.caps?.enabled && !documents.caps.paid_allowed) && <a href={localPath('/pricing/', locale)}>{documentText.pricing}</a>}</p><p>{modelsCopy.hint}</p></div>
+        <div className="workbench-composer-notes"><p>{w.documentHint}</p><p>{modelsCopy.hint}</p></div>
         {documents.file && <p className="translation-note" lang={documentText.lang}>{documentText.quotaRule}</p>}
         {documents.file && !documents.frozen && !selectedModelAvailable(availableModels, effectiveModelId) && <p className="translation-error" role="status">{modelsCopy.not_allowed}</p>}
         {account && documents.caps && !documents.caps.enabled && <p className="translation-note" lang={documentText.lang}>{documentText.disabled}</p>}
@@ -940,7 +939,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
         <summary>{w.details}</summary>
         <div className="translation-notes-body">
           <div><strong>{w.local}</strong><p>{t.formats}</p><p>{t.local}</p><p>{t.retention}</p></div>
-          <div lang={documentText.lang}><strong>{w.cloud}</strong><p>{documentText.limits}</p><p>{documentText.paid}</p><p>{documentText.quotaRule}</p><p>{documentText.privacy}</p><a href={localPath('/pricing/', locale)}>{documentText.pricing}</a></div>
+          <div lang={documentText.lang}><strong>{w.cloud}</strong><p>{documentText.limits}</p><p>{documentText.access}</p><p>{documentText.quotaRule}</p><p>{documentText.privacy}</p><a href={localPath('/pricing/', locale)}>{documentText.pricing}</a></div>
         </div>
         <div className="translation-storage">
           <p><span>{t.storage}</span><strong>{(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB</strong></p>

@@ -107,7 +107,7 @@ def reserve(job_id):
         return accepted
 
 
-def paid_term(case, *, unlimited=True, kind='paid', service='plus'):
+def paid_term(case, *, unlimited=True, kind='paid', service='plus', trial_pages=None):
     from app.billing_models import BillingCheckout, BillingPlan, BillingPlanRevision, BillingPrice, BillingPriceBinding, BillingSubscription, BillingTerm
     with session_factory()() as db:
         if not db.get(BillingPlan, service):
@@ -116,7 +116,7 @@ def paid_term(case, *, unlimited=True, kind='paid', service='plus'):
         version = (db.scalar(select(func.max(BillingPlanRevision.version)).where(BillingPlanRevision.plan_id == service)) or 0) + 1
         revision = BillingPlanRevision(plan_id=service, version=version, name=service,
             service_plan_id=service, monthly_classic_pages=None if unlimited else 0,
-            trial_days=7, trial_classic_pages=None)
+            trial_days=7, trial_classic_pages=trial_pages)
         db.add(revision)
         db.flush()
         price = BillingPrice(plan_id=service, plan_revision_id=revision.id, environment='test',
@@ -140,28 +140,51 @@ def paid_term(case, *, unlimited=True, kind='paid', service='plus'):
         term = BillingTerm(id=uid(), owner_id=case.owner, subscription_id=sub.id, price_id=price.id,
             kind=kind, starts_at=now() - timedelta(days=1), ends_at=now() + timedelta(days=29))
         db.add(term)
+        if kind == 'trial' and trial_pages:
+            db.flush()
+            db.add(QuotaPeriod(id=uid(), owner_id=case.owner, billing_term_id=term.id,
+                kind='classic_monthly', mode='classic', source='subscription', source_key='term:' + term.id,
+                starts_at=term.starts_at, ends_at=term.ends_at, granted=trial_pages, used=0, reserved=0))
         db.commit()
         return term.id
 
 
-def test_paid_gate_excludes_free_and_operator_gifts(document_case):
+@pytest.mark.parametrize('source', ['daily', 'grant', 'membership'])
+def test_free_and_gifted_quota_can_fund_documents(document_case, source):
     case = document_case
-    for auth in (case.auth, login_plus(case.client, 'operator-gift')):
-        result = case.client.put('/v1/documents/' + str(uuid4()), headers=auth, json=body(case))
-        assert result.status_code == 403 and result.json()['error']['code'] == 'DOCUMENT_PAID_REQUIRED'
-    assert not case.store.created
+    if source == 'daily':
+        configure_system_limits(free_daily_pages=3)
+    elif source == 'membership':
+        login_plus(case.client, pages=3)
+    else:
+        with session_factory()() as db:
+            db.add(QuotaPeriod(id=uid(), owner_id=case.owner, kind='classic_grant', mode='classic',
+                source='grant', source_key='document-gift', starts_at=now() - timedelta(days=1),
+                granted=3, used=0, reserved=0))
+            db.commit()
+    key = create(case)
+    job_id = prepare(case, key, 3)
+    assert reserve(job_id) and reserve(job_id)
+    with session_factory()() as db:
+        period = db.scalar(select(QuotaPeriod).where(QuotaPeriod.source == source))
+        assert period.reserved == 3
+        for page in db.scalars(select(DocumentPage)):
+            page.status, page.billable = 'translated', True
+        settle_document(db, db.get(Job, job_id))
+        db.commit()
+        assert (period.reserved, period.used) == (0, 3)
+    assert case.client.get('/v1/documents/' + key, headers=case.auth).json()['quota']['used'] == 3
 
 
-def test_capabilities_are_authenticated_paid_and_document_model_specific(document_case):
+def test_capabilities_are_authenticated_and_document_model_specific(document_case):
     from app.translation_models import TranslationProvider
     case = document_case
     assert case.client.get('/v1/documents/capabilities').status_code == 401
     result = case.client.get('/v1/documents/capabilities', headers=case.auth)
     assert result.status_code == 200
-    assert result.json()['paid_allowed'] is False
-    purchase(case, 1)
-    caps = case.client.get('/v1/documents/capabilities', headers=case.auth).json()
-    assert caps['paid_allowed'] is True
+    assert case.client.put('/v1/documents/' + str(uuid4()), json=body(case)).status_code == 401
+    caps = result.json()
+    assert caps['enabled'] and 'paid_allowed' not in caps
     assert caps['limits']['max_bytes'] == 200_000_000 and caps['limits']['max_pages'] == 200
     assert [item['id'] for item in caps['models']] == [case.provider]
     assert not any(word in str(caps) for word in ('api_key', 'endpoint', 'revision_id'))
@@ -171,16 +194,42 @@ def test_capabilities_are_authenticated_paid_and_document_model_specific(documen
     assert case.client.get('/v1/documents/capabilities', headers=case.auth).json()['models'] == []
 
 
-def test_trial_unlimited_does_not_open_paid_document_feature(document_case):
+@pytest.mark.parametrize('gifted_membership', [False, True])
+def test_open_document_access_does_not_unlock_higher_tier_models(document_case, gifted_membership):
+    from app.translation_models import TranslationProvider
     case = document_case
-    paid_term(case, kind='trial')
+    configure_system_limits(free_daily_pages=100)
+    if gifted_membership:
+        login_plus(case.client)
+    with session_factory()() as db:
+        db.get(TranslationProvider, case.provider).text_plan_ids = ['pro']
+        db.commit()
+    assert case.client.get('/v1/documents/capabilities', headers=case.auth).json()['models'] == []
     response = case.client.put('/v1/documents/' + str(uuid4()), headers=case.auth, json=body(case))
-    assert response.status_code == 403 and response.json()['error']['code'] == 'DOCUMENT_PAID_REQUIRED'
+    assert response.status_code == 403 and response.json()['error']['code'] == 'MODEL_DOCUMENT_UNSUPPORTED'
+    assert not case.store.created
 
 
-def test_paid_unlimited_tracks_all_200_processing_pages_without_finite_bucket(document_case):
+@pytest.mark.parametrize('trial_pages', [0, 2])
+def test_finite_trial_is_not_mistaken_for_its_unlimited_paid_plan(document_case, trial_pages):
     case = document_case
-    term_id = paid_term(case)
+    paid_term(case, kind='trial', trial_pages=trial_pages)
+    job_id = prepare(case, create(case), 3, scope=['plus'])
+    assert not reserve(job_id)
+    with session_factory()() as db:
+        assert db.get(Job, job_id).entitlement['document_quota']['available'] == trial_pages
+        assert db.scalar(select(func.count()).select_from(DocumentQuotaAllocation)) == 0
+    if trial_pages:
+        funded = prepare(case, create(case), trial_pages, scope=['plus'])
+        assert reserve(funded)
+        with session_factory()() as db:
+            assert db.scalar(select(QuotaPeriod.reserved)) == trial_pages
+
+
+@pytest.mark.parametrize('kind', ['paid', 'trial'])
+def test_unlimited_term_tracks_all_200_processing_pages_without_finite_bucket(document_case, kind):
+    case = document_case
+    term_id = paid_term(case, kind=kind)
     job_id = prepare(case, create(case), 200, scope=['plus'])
     assert reserve(job_id)
     with session_factory()() as db:
@@ -194,6 +243,56 @@ def test_paid_unlimited_tracks_all_200_processing_pages_without_finite_bucket(do
         db.commit()
         assert (allocation.reserved, allocation.used, allocation.released) == (0, 200, 0)
         assert db.scalar(select(func.sum(Ledger.amount)).where(Ledger.kind == 'settle')) == 200
+
+
+@pytest.mark.parametrize('success', [True, False])
+@pytest.mark.parametrize('daily_pages', [0, 1])
+def test_unlimited_gift_reserves_and_settles_without_a_finite_bucket(document_case, success, daily_pages):
+    case = document_case
+    login_plus(case.client)
+    configure_system_limits(free_daily_pages=daily_pages)
+    key = create(case)
+    job_id = prepare(case, key, 3)
+    assert reserve(job_id) and reserve(job_id)
+    assert case.client.get('/v1/documents/' + key, headers=case.auth).json()['quota']['reserved'] == 3
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        gift = job.entitlement['document_unlimited_gift']
+        assert gift['membership_id'] == db.get(User, case.owner).membership_id
+        assert gift['reserved'] == 3 - daily_pages
+        assert db.scalar(select(func.count()).select_from(QuotaPeriod)) == daily_pages
+        pages = list(db.scalars(select(DocumentPage).order_by(DocumentPage.page_index)))
+        for page in pages:
+            page.status, page.billable = 'translated', True
+        pages[-1].status, pages[-1].billable = 'no_text', False
+        db.get(User, case.owner).plus_expires_at = now() - timedelta(seconds=1)
+        settle_document(db, job, success=success)
+        db.commit()
+        settle_document(db, job, success=success)
+        db.commit()
+        assert db.scalar(select(func.sum(Ledger.amount)).where(Ledger.kind == 'reserve')) == 3
+        assert db.scalar(select(func.sum(Ledger.amount)).where(Ledger.kind == 'release')) == (1 if success else 3)
+    quota = case.client.get('/v1/documents/' + key, headers=case.auth).json()['quota']
+    assert (quota['reserved'], quota['used'], quota['released']) == ((0, 2, 1) if success else (0, 0, 3))
+    history = case.client.get('/v1/documents', headers=case.auth).json()
+    assert history['items'][0]['quota'] == quota
+    assert case.client.post('/v1/documents/' + key + '/cancel', headers=case.auth).status_code == 409
+
+
+@pytest.mark.parametrize('restriction', ['expired', 'pending', 'scope'])
+def test_unlimited_gift_still_requires_active_and_model_eligible_membership(document_case, restriction):
+    case = document_case
+    login_plus(case.client)
+    job_id = prepare(case, create(case), 2, scope=['pro'] if restriction == 'scope' else ['plus'])
+    with session_factory()() as db:
+        user = db.get(User, case.owner)
+        if restriction == 'expired': user.plus_expires_at = now() - timedelta(seconds=1)
+        if restriction == 'pending': user.plus_pending = True
+        db.commit()
+    assert not reserve(job_id)
+    with session_factory()() as db:
+        assert 'document_unlimited_gift' not in db.get(Job, job_id).entitlement
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'reserve')) == 0
 
 
 def test_unlimited_lower_plan_does_not_pay_higher_plan_model(document_case):
@@ -401,7 +500,7 @@ def test_seal_replay_and_metadata_only_history(document_case):
     assert 'https://r2.example' not in history.text and 'source_key' not in history.text
 
 
-def test_accepted_paid_access_survives_purchase_exhaustion_and_needs_explicit_resume(document_case):
+def test_purchase_exhaustion_needs_explicit_resume_without_blocking_document_access(document_case):
     case = document_case
     period_id = purchase(case, 1)
     key = create(case)
@@ -409,7 +508,7 @@ def test_accepted_paid_access_survives_purchase_exhaustion_and_needs_explicit_re
     with session_factory()() as db:
         db.get(QuotaPeriod, period_id).used = 1
         db.commit()
-    assert case.client.get('/v1/documents/capabilities', headers=case.auth).json()['paid_allowed'] is False
+    assert case.client.get('/v1/documents/capabilities', headers=case.auth).json()['models']
     assert reserve(job_id) is False
     snapshot = case.client.get('/v1/documents/' + key, headers=case.auth).json()
     assert snapshot['status'] == 'awaiting_quota' and snapshot['quota']['available'] == 0

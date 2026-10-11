@@ -2,7 +2,7 @@
 
 FastAPI + SQLAlchemy + PostgreSQL + Redis 8 控制服务。API、control-worker、maintenance 分别负责请求、任务执行与维护；图像计算由独立节点完成，原图临时保存于中心共享磁盘，常规译文以稀疏覆盖层交付；任务终态立即清理原图。
 
-[单图集群](../docs/TRANSLATION_CLUSTER_DESIGN.md)使用服务器文件保存结果，图片传输直连中心 HTTPS。[整本文件翻译](../docs/DOCUMENT_TRANSLATION.md)为独立付费 PDF / ZIP 入口：浏览器直传私有 R2，同一计算宿主完成受限解析、逐页 OCR／译图和打包，中间产物仅落本地持久工作目录；中央文档 worker 只汇总一次 LLM，完整 ZIP 最后上传 R2。API 不解析或代理大文件，两类任务共用持久化租约和额度账本。
+[单图集群](../docs/TRANSLATION_CLUSTER_DESIGN.md)使用服务器文件保存结果，图片传输直连中心 HTTPS。[整本文件翻译](../docs/DOCUMENT_TRANSLATION.md)为登录账户提供 PDF / ZIP 后台任务，沿用现有额度（含试用、赠送）和模型权限：浏览器直传私有 R2，同一计算宿主完成受限解析、逐页 OCR／译图和打包，中间产物仅落本地持久工作目录；中央文档 worker 只汇总一次 LLM，完整 ZIP 最后上传 R2。API 不解析或代理大文件，两类任务共用持久化租约和额度账本。
 
 ## 运行
 

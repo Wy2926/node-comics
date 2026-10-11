@@ -91,7 +91,7 @@ export function useDocumentTasks(account: Account | undefined, locale: Locale) {
     setError(''); setNotice(''); setProgress(undefined); setFile(selected);
   }
   async function upload(language: string, modelId: string) {
-    if (!identity || !file || !caps?.enabled || working.current || (!draft.current && !caps.paid_allowed)) return;
+    if (!identity || !file || !caps?.enabled || working.current) return;
     const context = scope.current!, controller = new AbortController();
     const signal = AbortSignal.any([context.controller.signal, controller.signal]);
     uploadController.current = controller; working.current = true;

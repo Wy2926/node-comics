@@ -9,7 +9,10 @@ from test_document_quota_api import (document_case,  # noqa: F401
     test_multi_bucket_reservation_rolls_back_as_one_transaction,
     test_multi_bucket_settlement_exactly_once_original_buckets_and_no_text,
     test_model_scope_cannot_borrow_rights_from_another_bucket,
-    test_paid_unlimited_tracks_all_200_processing_pages_without_finite_bucket)
+    test_unlimited_term_tracks_all_200_processing_pages_without_finite_bucket,
+    test_unlimited_gift_reserves_and_settles_without_a_finite_bucket,
+    test_free_and_gifted_quota_can_fund_documents,
+    test_finite_trial_is_not_mistaken_for_its_unlimited_paid_plan)
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
     reason='Requires the dedicated nodecomics_concurrency_test database')

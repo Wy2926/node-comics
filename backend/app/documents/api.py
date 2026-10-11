@@ -3,7 +3,7 @@ from datetime import timedelta
 import math
 from typing import Annotated, Literal
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field, field_validator
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
@@ -25,7 +25,7 @@ from ..translation_routing import choose_provider
 from ..translation_selection import policy_resolver
 from .config import MAX_PAGES, MAX_SOURCE_BYTES, get_document_settings
 from .models import Document, DocumentPage, DocumentQuotaAllocation
-from .quota import require_paid, reserve_document
+from .quota import reserve_document
 from .storage import DocumentStoreError, get_document_store
 
 router = APIRouter(prefix='/v1/documents', tags=['documents'])
@@ -118,6 +118,8 @@ def _snapshot_context(db, job_ids):
 def document_json(db, job, document, *, context=None):
     progress, quota = context if context is not None else _snapshot_context(db, [job.id])
     totals = quota.get(job.id, (0, 0, 0))
+    gift = (job.entitlement or {}).get('document_unlimited_gift', {})
+    totals = tuple(amount + gift.get(field, 0) for amount, field in zip(totals, ('reserved', 'used', 'released')))
     checked_quota = (job.entitlement or {}).get('document_quota', {})
     cfg = get_document_settings()
     return {'id': job.idempotency_key, 'status': job.status, 'phase': job.phase, 'version': job.version,
@@ -170,14 +172,7 @@ def _model(db, user, body):
 @router.get('/capabilities')
 def document_capabilities(user: User = Depends(guarded_user), db: Session = Depends(get_db)):
     cfg = get_document_settings()
-    try:
-        require_paid(db, user)
-        paid_allowed = True
-    except HTTPException as error:
-        if error.status_code != 403 or error.detail.get('code') != 'DOCUMENT_PAID_REQUIRED':
-            raise
-        paid_allowed = False
-    return {'enabled': cfg.enabled, 'paid_allowed': paid_allowed,
+    return {'enabled': cfg.enabled,
         'limits': {'max_bytes': MAX_SOURCE_BYTES, 'max_pages': MAX_PAGES,
                    'part_bytes': cfg.upload_part_bytes, 'waiting_hours': cfg.waiting_retention_hours},
         'source_types': ['pdf', 'zip', 'cbz'], 'output_type': 'zip',
@@ -221,15 +216,14 @@ def create_document(request_id: UUID, body: DocumentInput, user: User = Depends(
             problem('IDEMPOTENCY_CONFLICT', '此操作编号已用于其他文件或参数', 409)
         job, document = previous, db.get(Document, previous.id)
     else:
-        paid = require_paid(db, user)
         config, policy = _model(db, user, body)
         at = now()
         job = Job(id=uid(), owner_id=user.id, mode='classic', workflow_kind='document',
             target_language=body.target_language, operation=OPERATION, idempotency_key=str(request_id),
             source_sha256=body.sha256, request_hash=request_hash, cache_key=digest([user.id, request_hash]),
             config=config, quota_pages=0, quota_kind='document_pages', settlement='unreserved',
-            entitlement={'plan': policy.plan, 'service_plan': policy.service_plan, 'priority': 0,
-                         'document_paid_access': paid}, version=1, status='uploading', phase='uploading', created_at=at)
+            entitlement={'plan': policy.plan, 'service_plan': policy.service_plan, 'priority': 0},
+            version=1, status='uploading', phase='uploading', created_at=at)
         db.add(job)
         db.flush()
         document = Document(job_id=job.id, filename=body.filename, source_type=body.source_type,

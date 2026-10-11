@@ -14,7 +14,7 @@ export function splitWorkbenchFiles(files: File[]) {
 /** A mixed submission must use a model supported by both existing APIs. */
 export function workbenchModels(images: TranslationModelChoice[] | undefined, documents: DocumentCapabilities | undefined, hasImages: boolean, hasDocument: boolean) {
   if (!hasDocument) return images;
-  return (documents?.models ?? []).map(model => ({ ...model, requires_paid: true,
-    available: !!documents?.enabled && !!documents.paid_allowed && (!hasImages || images?.some(image => image.id === model.id && image.available) === true),
+  return (documents?.models ?? []).map(model => ({ ...model, requires_paid: images?.find(image => image.id === model.id)?.requires_paid ?? false,
+    available: !!documents?.enabled && (!hasImages || images?.some(image => image.id === model.id && image.available) === true),
   }));
 }

@@ -174,7 +174,6 @@ def test_paid_seed_is_idempotent_and_uses_real_entitlement_rules(client, provide
     from app.billing_models import BillingOrder, BillingPlanRevision
     from app.db import session_factory
     from app.documents import api
-    from app.documents.quota import require_paid
     from app.entitlement_models import QuotaPeriod
     from app.models import User
     from app.translation_models import TranslationProvider
@@ -184,10 +183,9 @@ def test_paid_seed_is_idempotent_and_uses_real_entitlement_rules(client, provide
         db.commit()
         users = list(db.scalars(select(User).where(User.name.in_(live.PAID_USERS))))
         assert len(users) == 2 and all(user.role == 'user' for user in users)
-        for user in users:
-            assert 'purchase_period_id' in require_paid(db, user)
         periods = list(db.scalars(select(QuotaPeriod).where(QuotaPeriod.source_key.like('document-local:%'))))
         assert len(periods) == 2 and all(row.granted == 2000 for row in periods)
+        assert {row.owner_id for row in periods} == {user.id for user in users}
         periods[0].used = 7
         db.commit()
         live.seed_local_accounts(db, providers, run_id)
@@ -206,10 +204,10 @@ def test_paid_seed_is_idempotent_and_uses_real_entitlement_rules(client, provide
         upload_part_bytes=16 * 1024 * 1024, waiting_retention_hours=24))
     capability = client.get('/v1/documents/capabilities', headers={
         'Authorization': 'Bearer ' + response.json()['access_token']}).json()
-    assert capability['paid_allowed'] and capability['models'][0]['name'] == providers[0].name
+    assert capability['enabled'] and capability['models'][0]['name'] == providers[0].name
     unpaid = client.post('/v1/auth/dev', json={'username': 'document-local-unpaid'}).json()
     assert client.get('/v1/documents/capabilities', headers={
-        'Authorization': 'Bearer ' + unpaid['access_token']}).json()['paid_allowed'] is False
+        'Authorization': 'Bearer ' + unpaid['access_token']}).json()['models'] == []
 
 
 def test_disjoint_model_scopes_do_not_get_privilege_widening(client, providers_file):
