@@ -26,7 +26,7 @@ test('live entry keeps native document requests and only aliases local test auth
   assert.match(config, /host: '127\.0\.0\.1', port: 5195, strictPort: true, open: false/);
   assert.match(config, /proxy: \{ '\/v1': \{ target: 'http:\/\/127\.0\.0\.1:4324'/);
   assert.match(config, /document-live-auth\.ts/);
-  assert.match(entry, /import DocumentWorkbench from '\.\.\/src\/components\/DocumentWorkbench'/);
+  assert.match(entry, /import TranslationWorkbench from '\.\.\/src\/components\/TranslationWorkbench'/);
   assert.match(entry, /R2 存储、传输与 LLM 请求都是真实调用/);
   assert.match(entry, /尚未接入测试 GPU 时任务会正常排队/);
   assert.match(entry, /付费资格和初始额度由隔离启动器在本地数据库预置/);

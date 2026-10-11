@@ -1,6 +1,8 @@
 .document-live-panel{width:min(880px,calc(100% - 36px));margin:28px auto;padding:24px;border:var(--comic-border);border-radius:var(--comic-panel-radius);background:var(--surface);color:var(--ink);display:grid;gap:14px;overflow-wrap:anywhere}
 .document-live-panel h1{font-size:clamp(1.5rem,4vw,2rem)}
 .document-live-panel p{font-size:.9rem;line-height:1.7}
+.document-live-panel .document-kicker{color:var(--muted);font-size:.8rem;font-weight:700}
+.document-live-panel .document-error{color:var(--danger)}
 .document-live-cost{border-inline-start:4px solid var(--accent);padding-inline-start:12px}
 .document-live-controls,.document-live-actions{display:flex;flex-wrap:wrap;gap:12px}
 .document-live-controls label{display:grid;gap:5px;min-width:140px}

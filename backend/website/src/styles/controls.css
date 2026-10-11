@@ -1,5 +1,5 @@
 /* Website controls share one vocabulary; page styles only arrange them. */
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close) {
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -17,7 +17,6 @@
 .billing-plan-card,
 .account-refresh,
 .account-signout, .account-upgrade > summary,
-.translation-records li > button,
 .record-actions button.text-link,
 .translation-verification-close {
   --control-bg: var(--surface);
@@ -60,11 +59,10 @@
 .hero-store,
 .account-refresh,
 .account-signout, .account-upgrade > summary,
-.translation-records li > button,
 .record-actions :is(.button, button.text-link),
 .translation-identity .button,
 .translation-alert .button,
-.image-dropzone[data-compact='true'] .button {
+.file-dropzone[data-compact='true'] .button {
   --comic-control-height: var(--comic-control-height-compact);
   --comic-control-padding: var(--comic-control-padding-compact);
   --comic-control-font-size: var(--comic-control-font-size-compact);
@@ -84,7 +82,7 @@
   font-size: 1.25rem;
 }
 
-:where(.billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .translation-records li > button) {
+:where(.billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card) {
   justify-content: flex-start;
   text-align: left;
 }
@@ -95,7 +93,6 @@
 }
 
 .billing-plan-card[aria-pressed='true'],
-.translation-records li > button[aria-current='true'],
 .billing-cycle label:not(.price-card .billing-cycle-card)[data-selected='true'],
 .account-link[aria-current],
 .language-menu[open] summary,
@@ -105,29 +102,29 @@
   box-shadow: var(--comic-shadow-small);
 }
 
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
   background: var(--control-hover-bg);
   box-shadow: var(--control-hover-shadow);
 }
 
-:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+:where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
   box-shadow: var(--comic-shadow-active);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):hover:not(:disabled):not([aria-disabled='true']),
   .billing-cycle label:not(.price-card .billing-cycle-card):hover:not([data-disabled='true']):not(:has(input:disabled)) {
     transform: translate(var(--comic-control-hover-translate));
   }
-  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
+  :where(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):active:not(:disabled):not([aria-disabled='true']),
   .billing-cycle label:not(.price-card .billing-cycle-card):active:not([data-disabled='true']):not(:has(input:disabled)) {
     transform: translate(var(--comic-control-active-translate));
   }
 }
 
-:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):focus-visible,
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):focus-visible,
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:focus-visible) {
   outline: var(--comic-focus-ring);
   outline-offset: var(--comic-focus-offset);
@@ -135,7 +132,7 @@
 
 .billing-cycle input:focus-visible { outline: none; }
 
-:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close):is(:disabled, [aria-disabled='true']),
+:is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close):is(:disabled, [aria-disabled='true']),
 .billing-cycle label:not(.price-card .billing-cycle-card)[data-disabled='true'],
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled),
 .billing-cycle:disabled label:not(.price-card .billing-cycle-card) {
@@ -151,7 +148,7 @@
 .billing-cycle label:not(.price-card .billing-cycle-card):has(input:disabled) :is(strong, small, .annual-badge),
 .billing-cycle:disabled label:not(.price-card .billing-cycle-card) :is(strong, small, .annual-badge) { color: var(--comic-control-disabled-ink); }
 
-:is(.translation-settings select, .document-settings select, .translation-model-picker summary) {
+:is(.translation-settings select, .translation-model-picker summary) {
   min-height: var(--comic-control-height);
   padding: 10px 32px 10px 12px;
   border: var(--comic-input-border);
@@ -163,8 +160,8 @@
   transition: border-color var(--comic-control-duration), background var(--comic-control-duration);
 }
 .translation-model-picker summary { padding-inline-end: 14px; }
-:is(.translation-settings select, .document-settings select, .translation-model-picker summary):focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
-:is(.translation-settings select, .document-settings select):disabled { background: var(--comic-control-disabled-bg); color: var(--comic-control-disabled-ink); border-color: var(--comic-control-disabled-border); cursor: not-allowed; }
+:is(.translation-settings select, .translation-model-picker summary):focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
+.translation-settings select:disabled { background: var(--comic-control-disabled-bg); color: var(--comic-control-disabled-ink); border-color: var(--comic-control-disabled-border); cursor: not-allowed; }
 
 .button > svg,
 .account-link > svg,
@@ -175,7 +172,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .translation-records li > button, .record-actions button.text-link, .translation-verification-close, .translation-settings select) { transition: none; }
+  :is(.button, .github-link, .hero-store, .language-menu summary, .mobile-nav summary, .account-link, .mobile-nav .mobile-download, .billing-cycle label:not(.price-card .billing-cycle-card), .billing-plan-card, .account-refresh, .account-signout, .account-upgrade > summary, .record-actions button.text-link, .translation-verification-close, .translation-settings select) { transition: none; }
 }
 
 /* Folder tabs select a view; they do not use action-button motion or shadows. */

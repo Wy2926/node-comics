@@ -1,12 +1,12 @@
 # NodeLane 官网
 
-Astro + React + TypeScript。公开页面输出静态 HTML，图片翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，依次展示当前标签页翻译、黑白／彩色多语言对照、适配网站搜索和安装入口；不展示套餐，完整功能、定价、FAQ 与条款留在独立页面。网页图片翻译由顶部导航和页脚进入 `/translate/`，流程为批量上传（每次最多 10 张）、选择目标语言、翻译、下载。文件列表显示进度、失败重试与恢复；支持逐张下载及将当前列表已完成译图打包为 ZIP，不提供预览、缩放或原译对照。本地记录按账户隔离，存储说明折叠展示。ZIP 库按需加载，逐张读取结果并直接打包，不重复压缩图片。
+Astro + React + TypeScript。公开页面输出静态 HTML，翻译工作台和账户使用 React 岛，与后端共用域名和 API。首页以漫画翻译浏览器插件为主入口，依次展示当前标签页翻译、黑白／彩色多语言对照、适配网站搜索和安装入口；不展示套餐，完整功能、定价、FAQ 与条款留在独立页面。网页翻译由顶部导航和页脚进入 `/translate/`：同一个选择／拖放入口接收图片、PDF、ZIP / CBZ，保留图片粘贴；语言、模型、启动按钮和任务／结果列表共用，不切换独立模式。每次最多 10 张图片、同时保留一份待上传的整份文件；混合选择使用两条链路共同支持的模型，设置仅影响新任务，恢复沿用已冻结的语言与模型。
 
-翻译页另有[整本文件工作台](../../docs/DOCUMENT_TRANSLATION.md)，仅付费账户使用 PDF / ZIP / CBZ：增量摘要与两路分片直传 R2，封存确认后可离开，服务端保存任务历史，最终直接下载完整译图 ZIP；不复用单图浏览器图片合成、本地历史或前端打包路径。功能默认关闭，须完成对应后端、文件 worker、R2 与节点配置后启用。
+任务列表混排两类记录，图片保留本地进度、失败重试、恢复、逐张下载及已完成图片的 ZIP 打包，不提供预览、缩放或原译对照。图片记录按账户隔离，ZIP 库按需加载，逐张读取结果，不重复压缩图片。[整本文件翻译](../../docs/DOCUMENT_TRANSLATION.md)仅付费账户可用：文件模块按需加载，增量摘要与两路分片直传 R2；封存确认后可离开，服务端历史每次读取 20 条，只对当前有在途任务的列表做单路刷新，页面隐藏时停止。最终直接下载完整译图 ZIP，不复用图片合成、本地历史或前端打包路径；取消、补额继续与下载按钮按服务器权限显示。功能默认关闭，界面整合不改变后端开关、计费或恢复规则。
 
 ## 运行
 
-翻译页支持文件选择、拖放和页面内图片粘贴；不拦截输入框中的文字粘贴。“清空本地缓存”确认后一次性移除当前历史列表的原图、送译副本、译图和记录，不影响其他账户、登录或服务器任务；导入、翻译同步和下载期间禁用。语言菜单支持内部 Tab 导航，焦点离开、点击外部或 Esc 时收起。首页顶部下载按钮不可见、不可聚焦，但保留与内页相同的布局空间，切页时导航不移位；窄桌面精简品牌与账户区，1280px 及以下使用折叠菜单。
+翻译页不拦截输入框中的文字粘贴。“清理图片缓存”确认后一次性移除当前图片历史列表的原图、送译副本、译图和记录，不影响其他账户、登录或整份文件任务；图片导入、翻译同步和下载期间禁用。格式、额度和保存方式折叠展示；公共工作台文案覆盖 17 语，整份文件详细状态沿用简中／繁中及显式英文回退，保留页面 RTL 布局。语言菜单支持内部 Tab 导航，焦点离开、点击外部或 Esc 时收起。首页顶部下载按钮不可见、不可聚焦，但保留与内页相同的布局空间，切页时导航不移位；窄桌面精简品牌与账户区，1280px 及以下使用折叠菜单。
 
 订阅与一次性额度包都只在定价页购买，插件和账户页只保留权益、订阅管理与定价入口。`tests/checkout-fixture.html` 使用账户隔离夹具（Vite 配置 `tests/account-fixture.config.ts`，端口 5193）检查购买、原请求恢复与模拟登录，不创建真实订单。额度规则见[会员与额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)，独立额度订单、订阅结账与恢复规则统一维护在[支付规范](../../docs/STRIPE_BILLING.md)。
 
@@ -21,6 +21,8 @@ npm run preview
 ```
 
 整本文件真实联调运行 `npm run dev:documents`，打开 `http://127.0.0.1:5195/`。页面复用正式工作台，仅替换本地开发登录；任务、R2 上传下载和 LLM 均使用真实后端，不产生模拟译图。须先按[本地真实联调](../../docs/DOCUMENT_TRANSLATION.md#本地真实联调)启动隔离 API、文件 worker 与测试 GPU。测试账户的付费资格是本地造数，真实服务调用仍可能计费。
+
+统一工作台的隔离预览：`npx vite --config tests/document-fixture.config.ts`，打开 `http://127.0.0.1:5194/tests/document-fixture.html`。复用正式组件，支持 `scenario=empty`／`free`／`disabled`／`signed-out`、`locale=ar`、`theme=light` 以及 `fail-once=1` 模拟上传确认丢失。合成图片和文件只使用本地模拟响应；真实增量哈希与分片不代表真实 R2、OCR 或模型效果验收。
 
 `dev` / `preview` 用于公开页面。完整账户流程先构建，再从仓库根目录启动隔离服务：
 
@@ -43,7 +45,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 
 图片翻译浏览器验收：构建后在仓库根目录运行 `backend/.venv/Scripts/python.exe backend/tests/manual_website_translation_server.py`，打开 `http://127.0.0.1:4322/`；可用 `--port` 指定独立端口，避免与账户夹具冲突。服务生成 `artifacts/website-translation/` 合成图片，提供模拟身份、人机验证、普通覆盖和 WebP 分块结果。`POST /__state` 可设置 `tiles_enabled`、`max_dimension`、`fail_create_response_once`、`events_truncate_once`、`events_reconnect_once`、`result_failure_once`，以及 `widget_delay_ms`、`events_delay_ms`、`result_delay_ms`（0–30000 毫秒）；`reset: true` 清空模拟任务和计数。`GET /__state` 返回每个 UUID 的创建、上传、查询、下载与 SSE 计数，用于核实恢复不会重复提交。自动分块验收见[脚本入口](../../scripts/README.md#官网验收)，不会访问真实 Cloudflare、数据库或模型。正式匿名体验配置见[部署规范](../../docs/DEPLOYMENT.md#官网匿名图片体验)。
 
-- 图片工作台只接收 JPG、PNG、WebP，不导入漫画容器、远程网址或书架。送译缩放、编码、摘要和普通／分块结果的完整图合成复用 [shared/translation-images](../shared/translation-images)。像素处理按需启动单 Worker，跨标签页使用 Web Locks 串行；首页不加载像素处理模块或验证脚本。尺寸、能力协商与冻结恢复规则见[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md#官网图片工作台)。
+- 图片执行链只接收 JPG、PNG、WebP；PDF / ZIP / CBZ 交给独立文件执行链，不导入远程网址或书架。送译缩放、编码、摘要和普通／分块结果的完整图合成复用 [shared/translation-images](../shared/translation-images)。像素处理按需启动单 Worker，跨标签页使用 Web Locks 串行；首页不加载像素处理模块或验证脚本。尺寸、能力协商与冻结恢复规则见[翻译契约](../../docs/READING_TRANSLATION_CONTRACT.md#官网图片工作台)。
 - 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。
 
 - [src/i18n](src/i18n)：简中、繁中、英、日、韩、法、西、巴西葡萄牙、德、意、俄、波兰、乌克兰、土耳其、越南、印尼、阿拉伯语独立字典；常规公开页面或文案同步 17 语。语言由 URL 决定，切换保留当前页面；[官网语言选择](../../docs/WEBSITE_LANGUAGE_DESIGN.md)定义浏览器语言提示、手动偏好和匹配规则。

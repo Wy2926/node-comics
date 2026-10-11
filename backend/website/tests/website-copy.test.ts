@@ -103,8 +103,6 @@ test('the workbench starts one translation workflow and preserves existing resul
   assert.match(source, /translationArchive\(records, readResult\)/);
   assert.doesNotMatch(source, /function Preview|<Preview|setView|setZoom|type="range"/);
   for (const locale of locales) {
-    assert.ok(translationCopy[locale].files);
-    assert.match(translationCopy[locale].downloadAll, /ZIP/);
     assert.equal('previewTitle' in translationCopy[locale], false);
   }
 });

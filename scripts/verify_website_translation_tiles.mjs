@@ -23,8 +23,8 @@ async function records(page){return page.evaluate(async()=>{
   try{return await new Promise((resolve,reject)=>{const request=db.transaction('records').objectStore('records').getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
   finally{db.close();}
 });}
-async function ready(page){await page.locator('.image-dropzone button').waitFor();await page.waitForFunction(()=>!document.querySelector('.image-dropzone button')?.disabled);}
-async function add(page,name){await ready(page);await page.locator('.image-dropzone input[type="file"]').setInputFiles(path.join(sources,name+'-source.png'));await page.locator('.record-copy strong').filter({hasText:name+'-source.png'}).waitFor();}
+async function ready(page){await page.locator('.file-dropzone button').waitFor();await page.waitForFunction(()=>!document.querySelector('.file-dropzone button')?.disabled);}
+async function add(page,name){await ready(page);await page.locator('.file-dropzone input[type="file"]').setInputFiles(path.join(sources,name+'-source.png'));await page.locator('.record-copy strong').filter({hasText:name+'-source.png'}).waitFor();}
 async function start(page,name){await add(page,name);await page.getByRole('button',{name:'开始翻译',exact:true}).click();}
 async function waitState(page,wanted){await page.waitForFunction(value=>document.querySelector('.translation-records li')?.getAttribute('data-state')===value,wanted,{timeout:60000});}
 async function oneRecord(page){const rows=await records(page);assert.equal(rows.length,1);return rows[0];}
@@ -143,7 +143,7 @@ try{
   });
 
   await scenario('batch',{},async page=>{
-    await page.locator('.image-dropzone input[type="file"]').setInputFiles(['ordinary','wide'].map(name=>path.join(sources,name+'-source.png')));
+    await page.locator('.file-dropzone input[type="file"]').setInputFiles(['ordinary','wide'].map(name=>path.join(sources,name+'-source.png')));
     await page.waitForFunction(()=>document.querySelectorAll('.translation-records li').length===2);
     await page.getByRole('button',{name:'开始翻译',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.translation-records li[data-state="succeeded"]').length===2,undefined,{timeout:60000});

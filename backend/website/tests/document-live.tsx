@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import DocumentWorkbench from '../src/components/DocumentWorkbench';
+import TranslationWorkbench from '../src/components/TranslationWorkbench';
+import { translationCopy } from '../src/i18n/translate';
+import { workbenchCopy } from '../src/i18n/workbench';
 import { languageNames, locales, type Locale } from '../src/i18n/locales';
 import { ApiError, checkLocalApi, liveAccounts, localAccountName, loginAs, requireLiveOrigin, signOut, subscribeAuth } from './document-live-auth';
 import '../src/styles/global.css';
 import '../src/styles/controls.css';
 import '../src/styles/public-site.css';
 import '../src/styles/marketing.css';
+import '../src/styles/rtl.css';
 import './document-live.css';
 
 requireLiveOrigin();
@@ -28,6 +31,7 @@ function App() {
   useEffect(() => { void check(); return subscribeAuth(() => setAccount(localAccountName())); }, []);
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
     document.body.dataset.siteTheme = dark ? 'midnight' : 'paper';
     const query = new URLSearchParams(location.search);
     query.set('locale', locale); query.set('theme', dark ? 'dark' : 'light');
@@ -61,7 +65,7 @@ function App() {
         {error && <p className="document-error" role="alert">{error}</p>}
       </section>
     </header>
-    <DocumentWorkbench locale={locale}/>
+    <TranslationWorkbench locale={locale} copy={translationCopy[locale]} workbench={workbenchCopy[locale]}/>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

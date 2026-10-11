@@ -1,4 +1,4 @@
-import {useRef} from 'react';
+import {useEffect, useRef} from 'react';
 import type {TranslationModelChoice} from '../../../shared/translation-models';
 import {translationModelChoices} from '../../../shared/translation-models';
 import type {ModelCopy} from '../i18n/translation-models';
@@ -21,6 +21,7 @@ export default function TranslationModelPicker({
   const root = useRef<HTMLDetailsElement>(null),
     selected = models?.find((model) => model.id === value);
   const choices = translationModelChoices(models, t.automatic, value);
+  useEffect(() => { if (disabled && root.current) root.current.open = false; }, [disabled]);
   return (
     <div className="translation-model-picker">
       <span>{t.label}</span>
@@ -35,7 +36,8 @@ export default function TranslationModelPicker({
           }
         }}
       >
-        <summary aria-label={t.label}>{value ? (selected?.name ?? value) : t.automatic}</summary>
+        <summary aria-label={t.label} aria-disabled={disabled} tabIndex={disabled ? -1 : 0}
+          onClick={event => { if (disabled) event.preventDefault(); }}>{value ? (selected?.name ?? value) : t.automatic}</summary>
         <div className="translation-model-options" role="group" aria-label={t.label}>
           {choices.map((model) => {
             const content = (

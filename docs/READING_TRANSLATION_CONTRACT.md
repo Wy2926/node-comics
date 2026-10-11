@@ -12,6 +12,8 @@
 
 ### 官网图片工作台
 
+官网 `/translate/` 使用统一的上传、设置与任务列表，图片按以下单图协议执行；PDF / ZIP / CBZ 接入[整本文件翻译](DOCUMENT_TRANSLATION.md)的独立后台链路。界面统一不改变单图身份、本地结果缓存、整本预占或取消语义；浏览器不预先解析整本文件，后台文件结果不进入图片缓存或浏览器打包流程。
+
 官网与插件复用 `backend/shared/translation-images` 的缩放、压缩、摘要和合成实现，保留高分辨率原文件；送译副本遵循[创建与上传](#3-创建与上传)的统一编码与准入规则。官网选图允许单边最多 100000、不设独立总像素限制，文件最多 32 MiB，并受本地历史存储预算约束。选图与 Worker 均在像素解码前读取有界图片头，按需 Worker 串行处理。
 
 注册用户调用现有 Bearer `/v1/translations`；游客调用同结构 Cookie `/v1/guest/translations`，均要求 `X-Translation-Protocol: overlay-v1`。游客额外使用 `X-Guest-Request: 1`，新 UUID 携带 `X-Turnstile-Token`（action=`guest_translate`）；`POST /v1/guest/session` 的 token 对应 `guest_session`。服务端校验 Turnstile hostname/action，不把前端成功当作准入。身份与限额见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。

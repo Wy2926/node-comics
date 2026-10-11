@@ -73,7 +73,7 @@ test('Chinese copy and explicit English fallback preserve manual resume and canc
   assert.match(documentCopy('zh-TW').manualResume, /不會自動啟動/);
   for (const locale of locales) {
     const copy = documentCopy(locale);
-    assert.ok(copy.title && copy.errors.generic && documentError('DOCUMENT_NOT_CANCELLABLE', copy));
+    assert.ok(copy.output && copy.errors.generic && documentError('DOCUMENT_NOT_CANCELLABLE', copy));
     if (!locale.startsWith('zh-')) assert.equal(copy.lang, 'en');
   }
   assert.equal(documentFormat('{needed}/{difference}', { needed: 200, difference: 3 }), '200/3');

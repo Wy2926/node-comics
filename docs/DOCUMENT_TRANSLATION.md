@@ -106,7 +106,10 @@ LLM 尚未发送且工作目录丢失时，可以在同一宿主提高目录代�
 | `documents/text.py` | 整本提示词、唯一调用意图、响应完整性与成本；复用渠道适配器 |
 | `documents/compute.py`、`classic_node/document_runner.py`／`document_workspace.py` | v2 固定宿主协议、本地文件与恢复、低优先级阶段、源／最终 ZIP 直连 R2 |
 | `documents/admin.py`、现有监控模块 | 人工核实、按任务类型查询、页号与资源池配置 |
-| `backend/website/src/components/DocumentWorkbench.tsx` | 独立文件工作台、增量摘要、有限上传并发、服务端历史 |
+| `backend/website/src/components/TranslationWorkbench.tsx`、`DocumentTaskRow.tsx` | 统一上传／设置／任务列表，分别显示图片与整份文件的状态和结果；按服务端权限提供操作 |
+| `backend/website/src/lib/use-document-tasks.ts`、`document-api.ts` | 账户隔离的文件状态、按需传输模块、增量摘要、有限上传并发与分页服务端历史 |
+
+官网同一入口接收图片与整份文件，共用语言和模型位置、启动入口及任务列表；混合提交只使用两条链路共同可用的模型。图片缓存清理与图片 ZIP 打包仅作用于图片记录，不删除或打包文件任务；整份文件结果仍由 R2 直接下载。文件列表每次 20 条，不加载逐页正文、缩略图或大 Blob；仅在有在途任务且页面可见时每 5 秒刷新一次，无逐页连接。
 
 不把文件状态堆进原单图 API，不复制会员规则、LLM HTTP 实现或图像模型进程。原单图接口、结果格式和本地历史保持独立；管理统计明确“任务数”，一个文件不会被误计成一张图片。
 

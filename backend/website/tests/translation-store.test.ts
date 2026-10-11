@@ -49,7 +49,7 @@ test('a failed clearing transaction rolls back records and images together', asy
 test('all 17 locales explain local-only cache clearing and supply success feedback', () => {
   assert.deepEqual(Object.keys(translationCacheCopy).sort(), [...locales].sort());
   for (const copy of Object.values(translationCacheCopy)) {
-    assert.ok(copy.clear && copy.confirm && copy.cleared);
-    assert.ok(copy.confirm.length > copy.clear.length);
+    assert.ok(copy.confirm && copy.cleared);
+    assert.ok(copy.confirm.length > copy.cleared.length);
   }
 });

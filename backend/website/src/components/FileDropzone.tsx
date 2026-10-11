@@ -1,45 +1,34 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { translationError } from '../i18n/translation-error';
-import type { TranslationCopy } from '../i18n/translate';
-import { localPath, type Locale } from '../i18n/locales';
-import { importImages } from '../lib/translation-store';
+import type { WorkbenchCopy } from '../i18n/workbench';
 import { bindImageImport } from '../lib/image-import-events';
 import '../styles/translate.css';
-export default function ImageDropzone({
-  locale,
+export default function FileDropzone({
   copy: t,
-  onAdded,
+  busyLabel,
   onBusyChange,
   disabled = false,
   compact = false,
+  onFiles,
 }: {
-  locale: Locale;
-  copy: TranslationCopy;
-  onAdded?: () => Promise<void>;
+  copy: Pick<WorkbenchCopy, 'select' | 'drop'>;
+  busyLabel: string;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
   compact?: boolean;
+  onFiles: (files: File[]) => Promise<void>;
 }) {
   const input = useRef<HTMLInputElement>(null),
     descriptionId = useId();
   const importing = useRef(false);
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
     [drag, setDrag] = useState(false);
   async function add(files: File[]) {
     if (importing.current || disabled) return;
     importing.current = true;
     setBusy(true);
     onBusyChange?.(true);
-    setError('');
     try {
-      await importImages(files);
-      if (onAdded) await onAdded();
-      else location.assign(localPath('/translate/', locale));
-    } catch (error) {
-      setError(
-        translationError(error instanceof Error ? error.message : '', t),
-      );
+      await onFiles(files); // Routing and errors belong to the unified workbench.
     } finally {
       importing.current = false;
       setBusy(false);
@@ -47,10 +36,10 @@ export default function ImageDropzone({
     }
   }
   useEffect(() => bindImageImport(document, files => { setDrag(false); void add(files); }),
-    [disabled, locale, onAdded, onBusyChange]);
+    [disabled, onBusyChange, onFiles]);
   return (
     <div
-      className="image-dropzone"
+      className="file-dropzone"
       data-drag={drag}
       data-compact={compact}
       aria-busy={busy}
@@ -91,12 +80,12 @@ export default function ImageDropzone({
         disabled={busy || disabled}
         onClick={() => input.current?.click()}
       >
-        {busy ? t.busy : compact ? t.newImages : t.select}
+        {busy ? busyLabel : t.select}
       </button>
       <input
         ref={input}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,.pdf,.zip,.cbz,application/pdf,application/zip,application/x-cbz"
         multiple
         hidden
         onChange={(event) => {
@@ -104,15 +93,10 @@ export default function ImageDropzone({
           event.target.value = '';
         }}
       />
-      <div className="image-dropzone-copy">
+      <div className="file-dropzone-copy">
         <p>{t.drop}</p>
-        <small id={descriptionId}>{t.formats}</small>
+        <small id={descriptionId}>JPG · PNG · WebP · PDF · ZIP · CBZ</small>
       </div>
-      {error && (
-        <p role="alert" className="translation-error">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

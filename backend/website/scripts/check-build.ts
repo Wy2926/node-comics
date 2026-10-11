@@ -138,7 +138,10 @@ for (const file of htmlFiles) {
   if (basePath(route) === '/manga-translator/') errors.push(`${label}: removed advertising landing page remains in output`);
   if (basePath(route) === '/translate/') {
     if (!noindex || $('.translation-workbench').length !== 1 || $('.translation-composer input[type=file]').length !== 1) errors.push(`${label}: translator must be a private, usable work surface`);
-    if (!$('.translation-composer input[type=file]').is('[multiple]') || $('.translation-files').length !== 1 || $('button[data-download-all][disabled]').length !== 1 || $('button[data-clear-cache][disabled]').length !== 1) errors.push(`${label}: translator needs batch upload, file list, disabled ZIP download and local cache clearing`);
+    const upload = $('.translation-composer input[type=file]');
+    const accepted = (upload.attr('accept') ?? '').split(',');
+    if (!upload.is('[multiple]') || !['image/jpeg', 'image/png', 'image/webp', '.pdf', '.zip', '.cbz'].every(type => accepted.includes(type)) || $('.translation-files').length !== 1 || $('.document-workbench, .translation-kind-nav').length) errors.push(`${label}: translator needs one mixed-file upload and one task list`);
+    if ($('button[data-download-all], button[data-clear-cache]').length) errors.push(`${label}: empty translator must not show image-only history actions`);
     if ($('.translation-workbench img, .translation-viewer, .translation-canvas, .translation-workbench input[type=range]').length) errors.push(`${label}: translator must not include image previews, comparison or zoom controls`);
   }
   if (basePath(route) === '/pricing/') {

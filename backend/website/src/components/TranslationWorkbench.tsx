@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import ImageDropzone from './ImageDropzone';
+import FileDropzone from './FileDropzone';
 import Turnstile from './Turnstile';
 import TranslationModelPicker from './TranslationModelPicker';
+import DocumentTaskRow from './DocumentTaskRow';
+import { useDocumentTasks } from '../lib/use-document-tasks';
+import { splitWorkbenchFiles, workbenchModels } from '../lib/workbench-files';
+import type { WorkbenchCopy } from '../i18n/workbench';
+import { documentCopy } from '../i18n/documents';
 import {modelCopy} from '../i18n/translation-models';
 import {selectedModelAvailable} from '../../../shared/translation-models';
 import { translationError } from '../i18n/translation-error';
@@ -11,6 +16,7 @@ import { localPath, type Locale } from '../i18n/locales';
 import { signIn, subscribeAuth } from '../lib/auth';
 import {
   blobBytes,
+  importImages,
   draftScope,
   listRecords,
   localSnapshotState,
@@ -62,7 +68,8 @@ const delay = (ms: number, signal: AbortSignal) =>
     else signal.addEventListener('abort', cancel, { once: true });
   });
 
-export default function TranslationWorkbench({ locale, copy: t }: { locale: Locale; copy: TranslationCopy }) {
+export default function TranslationWorkbench({ locale, copy: t, workbench: w }: { locale: Locale; copy: TranslationCopy; workbench: WorkbenchCopy }) {
+  const documentText = documentCopy(locale);
   const cacheCopy = translationCacheCopy[locale];
   const modelsCopy = modelCopy[locale];
   const [modelId,setModelId] = useState<string>();
@@ -114,14 +121,43 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   const [hasGuestHistory, setHasGuestHistory] = useState(false);
   const [usedBytes, setUsedBytes] = useState(0);
   const isGuestScope = showGuest || !account;
-  const languages =
+  const documents = useDocumentTasks(isGuestScope ? undefined : account, locale);
+  const hasNewImages = rows.some(row => !row.requestId && (row.state === 'draft' || row.state === 'preparing'));
+  const availableModels = workbenchModels(caps?.translation_models, documents.caps, hasNewImages, !!documents.file);
+  const effectiveModelId = documents.frozen?.model_id ?? (documents.file ? modelId ?? availableModels?.find(model => model.available)?.id : modelId);
+  const workingNow = busy || documents.busy;
+  const imageLanguages =
     caps?.languages.filter((item) =>
       caps.modes.find((item) => item.id === 'classic')?.languages.includes(item.id),
     ) ?? [];
+  const languages = documents.file
+    ? documents.caps?.languages.filter(item => !hasNewImages || imageLanguages.some(language => language.id === item.id)) ?? []
+    : imageLanguages;
   useEffect(() => {
-    if (caps && !languages.some((item) => item.id === language))
+    if (caps && !documents.frozen && !languages.some((item) => item.id === language))
       setLanguage(languages[0]?.id ?? '');
-  }, [caps]);
+  }, [caps, documents.file, documents.caps, hasNewImages]);
+  async function addFiles(files: File[]) {
+    const version = scopeVersion.current;
+    setError('');
+    const selected = splitWorkbenchFiles(files);
+    let documentIssue = '';
+    if (selected.documents.length) {
+      if (selected.documents.length > 1 || documents.file) documentIssue = w.oneDocument;
+      else if (isGuestScope) documentIssue = documentText.paid;
+      else if (!documents.caps) documentIssue = documentText.loading;
+      else if (!documents.caps.enabled) documentIssue = documentText.disabled;
+      else if (!documents.caps.paid_allowed) documentIssue = documentText.paid;
+      else if (!documents.caps.models.length) documentIssue = documentText.noModels;
+      else if (!selected.documents[0].size || selected.documents[0].size > Math.min(documents.caps.limits.max_bytes, 200_000_000)) documentIssue = documentText.errors.file;
+    }
+    try {
+      if (selected.images.length) { await importImages(selected.images); await refresh(); }
+      if (version !== scopeVersion.current) return;
+      if (selected.documents.length && !documentIssue) documents.selectFile(selected.documents[0]);
+      if (documentIssue) setError(documentIssue);
+    } catch (error) { fail(error); }
+  }
   async function refresh() {
     const [found, used] = await Promise.all([
       listRecords(scopes.current),
@@ -313,7 +349,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   }
   async function run(candidates: RecordMeta[]) {
     if (!candidates.length || running.current || removing.current || importing || !caps || !ready) return;
-    const batchModel=modelId,batchLanguage=language;
+    const batchModel=effectiveModelId,batchLanguage=language;
     if(candidates.some(row=>!row.requestId)&&!selectedModelAvailable(caps.translation_models,batchModel)){
       setError(modelsCopy.not_allowed);return;
     }
@@ -622,7 +658,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
   }
   async function again(meta: RecordMeta,regenerate=false) {
     if (meta.mode !== 'classic' || (regenerate?meta.state!=='succeeded':meta.state!=='failed')) return;
-    if(regenerate&&!selectedModelAvailable(caps?.translation_models,modelId)){setError(modelsCopy.not_allowed);return;}
+    if(regenerate&&!selectedModelAvailable(caps?.translation_models,effectiveModelId)){setError(modelsCopy.not_allowed);return;}
     if (!meta.requestId) {
       await run([meta]);
       return;
@@ -639,7 +675,7 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           updated: Date.now(),
           state: 'submitting',
           requestId: crypto.randomUUID(),
-          modelId:regenerate?modelId:meta.modelId,
+          modelId:regenerate?effectiveModelId:meta.modelId,
           intent: regenerate?{regenerate_of:meta.requestId}:{ retry_of: meta.requestId },
           snapshot: undefined,
           error: undefined,
@@ -684,6 +720,24 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
         : row.scope === 'user:' + account?.id),
   );
   const completed = displayed.filter((row) => row.state === 'succeeded' || row.id === volatile?.id);
+  const tasks = [
+    ...displayed.map(row => ({ kind: 'image' as const, row, id: row.id, created: row.created })),
+    ...documents.rows.map(row => ({ kind: 'document' as const, row, id: row.id, created: Date.parse(row.created_at) })),
+  ].sort(recordOrder);
+  const showDocumentDraft = !!documents.file && !documents.rows.some(row => row.id === documents.draftId);
+  const pendingImages = displayed.filter(row => !row.requestId && (row.state === 'draft' || row.state === 'preparing'));
+  const canStart = ready && !workingNow && !clearing && !importing && !!language &&
+    (pendingImages.length > 0 || !!documents.file) &&
+    (documents.frozen || selectedModelAvailable(availableModels, effectiveModelId)) &&
+    (!pendingImages.length || selectedModelAvailable(caps?.translation_models, effectiveModelId)) &&
+    (!pendingImages.length || !isGuestScope || guest?.enabled) &&
+    (!documents.file || documents.caps?.enabled && (documents.frozen || documents.caps.paid_allowed));
+  function start() {
+    if (!canStart) return;
+    // Separate executors, shared user intent. Neither lane waits for the other's backend processing.
+    if (documents.file) void documents.upload(language, effectiveModelId!);
+    if (pendingImages.length) void run(pendingImages);
+  }
   async function clearCache() {
     if (running.current || exporting.current || removing.current || importing || !displayed.length) return;
     if (!confirm(cacheCopy.confirm)) return;
@@ -707,11 +761,11 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
     }
   }
   return (
-    <section className="translation-workbench container" data-has-images={!!displayed.length}>
+    <section className="translation-workbench container">
       <header className="translation-heading">
         <div className="translation-heading-copy">
-          <h1>{t.title}</h1>
-          <p>{t.intro}</p>
+          <h1>{w.title}</h1>
+          <p>{w.intro}</p>
         </div>
         <div className="translation-identity">
           <strong>{isGuestScope ? t.guest : account?.name || t.account}</strong>
@@ -732,31 +786,31 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           )}
         </div>
       </header>
-      {error && (
+      {(error || documents.error) && (
         <div className="translation-alert" role="alert">
           <span className="translation-alert-mark" aria-hidden="true">!</span>
-          <div><strong>{t.errorTitle}</strong><p>{error}</p></div>
+          <div><strong>{t.errorTitle}</strong><p>{error || documents.error}</p></div>
           {!ready && <button className="button secondary" onClick={() => location.reload()}>{t.reload}</button>}
         </div>
       )}
       {isGuestScope && guest && !guest.enabled && (
         <p className="translation-availability">{t.disabled}</p>
       )}
-      <section className="translation-composer" aria-label={t.uploadTitle}>
-        <ImageDropzone
-          copy={t}
-          locale={locale}
-          compact={!!displayed.length}
-          disabled={busy || clearing || !ready}
-          onAdded={refresh}
+      <section className="translation-composer" aria-label={w.select}>
+        <FileDropzone
+          copy={w}
+          busyLabel={t.busy}
+          compact={!!tasks.length || !!documents.file}
+          disabled={workingNow || clearing || !ready}
+          onFiles={addFiles}
           onBusyChange={(value) => { setImporting(value); if (value) setCacheNotice(''); }}
         />
         <div className="translation-settings">
         <label>
           {t.language}
           <select
-            value={language}
-            disabled={busy}
+            value={documents.frozen?.target_language ?? language}
+            disabled={workingNow || !!documents.frozen}
             onChange={(event) => setLanguage(event.target.value)}
           >
             {languages.map((item) => (
@@ -766,43 +820,20 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
             ))}
           </select>
         </label>
-        <TranslationModelPicker models={caps?.translation_models} value={modelId} onChange={chooseModel} copy={modelsCopy} upgradeUrl={localPath('/pricing/',locale)} disabled={!ready}/>
+        <TranslationModelPicker models={availableModels} value={effectiveModelId} onChange={chooseModel} copy={modelsCopy} upgradeUrl={localPath('/pricing/',locale)} disabled={!ready || workingNow || !!documents.frozen}/>
         <button
           className="button"
-          disabled={
-            !ready ||
-            clearing || importing ||
-            busy ||
-            !language ||
-            !selectedModelAvailable(caps?.translation_models,modelId) ||
-            (isGuestScope && !guest?.enabled) ||
-            !displayed.some(
-              (row) => row.state === 'draft' || row.state === 'preparing',
-            )
-          }
-          onClick={() =>
-            void run(
-              displayed.filter(
-                (row) =>
-                  !row.requestId &&
-                  (row.state === 'draft' || row.state === 'preparing'),
-              ),
-            )
-          }
+          disabled={!canStart}
+          onClick={start}
         >
-          {busy ? t.busy : t.start}
+          {workingNow ? t.busy : documents.frozen ? documentText.retryUpload : t.start}
           <span className="ui-icon icon-arrow" aria-hidden="true" />
         </button>
-        {busy && (
-          <button
-            className="button secondary"
-            onClick={pause}
-          >
-            {t.cancel}
-          </button>
-        )}
         </div>
-        <p className="translation-note">{modelsCopy.hint}</p>
+        <div className="workbench-composer-notes"><p>{w.documentHint} {(isGuestScope || documents.caps?.enabled && !documents.caps.paid_allowed) && <a href={localPath('/pricing/', locale)}>{documentText.pricing}</a>}</p><p>{modelsCopy.hint}</p></div>
+        {documents.file && <p className="translation-note" lang={documentText.lang}>{documentText.quotaRule}</p>}
+        {documents.file && !documents.frozen && !selectedModelAvailable(availableModels, effectiveModelId) && <p className="translation-error" role="status">{modelsCopy.not_allowed}</p>}
+        {account && documents.caps && !documents.caps.enabled && <p className="translation-note" lang={documentText.lang}>{documentText.disabled}</p>}
       </section>
       {check && (
         <div className="translation-verification-overlay">
@@ -823,30 +854,32 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
           </div>
         </div>
       )}
-      <section className="translation-files" aria-label={t.files}>
+      <section className="translation-files" aria-label={w.files}>
         <div className="translation-files-heading">
-          <h2>{t.files} <span className="translation-history-count">{displayed.length}</span></h2>
+          <div><h2>{w.files} <span className="translation-history-count">{tasks.length + Number(showDocumentDraft)}</span></h2><p className="translation-note">{w.background}</p></div>
           <div className="translation-file-actions">
-          <button className="button secondary" data-download-all disabled={downloading || clearing || !completed.length}
+          {!!displayed.length && <><button className="button secondary" data-download-all disabled={downloading || clearing || !completed.length}
             onClick={() => void download(completed, true)}>
-            {downloading ? t.busy : t.downloadAll}
+            {downloading ? t.busy : w.downloadImages}
           </button>
           <button className="button secondary" data-clear-cache disabled={busy || downloading || importing || clearing || !displayed.length}
-            onClick={() => void clearCache()}>{clearing ? t.busy : cacheCopy.clear}</button>
+            onClick={() => void clearCache()}>{clearing ? t.busy : w.clearImages}</button></>}
+          {account && !showGuest && <button className="button secondary" disabled={documents.loading} onClick={() => { void documents.refreshAll(); }}>{documentText.refresh}</button>}
           </div>
         </div>
           {cacheNotice && <p role="status" className="translation-cache-notice">{cacheNotice}</p>}
+          {documents.notice && <p role="status" className="workbench-confirmed" lang={documentText.lang}>{documents.notice}</p>}
           {account && (hasGuestHistory || showGuest) && (
             <div className="translation-tabs" role="group" aria-label={t.history}>
               <button
-                disabled={busy || downloading || importing || clearing}
+                disabled={workingNow || !!documents.file || downloading || importing || clearing}
                 aria-pressed={!showGuest}
                 onClick={() => void changeHistory(false).catch(fail)}
               >
                 {t.myHistory}
               </button>
               <button
-                disabled={busy || downloading || importing || clearing}
+                disabled={workingNow || !!documents.file || downloading || importing || clearing}
                 aria-pressed={showGuest}
                 onClick={() => void changeHistory(true).catch(fail)}
               >
@@ -854,22 +887,25 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
               </button>
             </div>
           )}
-          {!!displayed.length && (
-            <div className="translation-progress">
-              <span role="status">{t.succeeded} {completed.length} / {displayed.length}</span>
-              <progress max={displayed.length} value={completed.length} aria-label={t.succeeded} />
-            </div>
-          )}
           <ol className="translation-records">
-            {displayed.map((row, index) => (
+            {showDocumentDraft && <li data-state="draft">
+              <span className="record-kind" aria-hidden="true">{/\.pdf$/i.test(documents.file!.name) ? 'PDF' : 'ZIP'}</span>
+              <div className="record-copy"><strong>{documents.file!.name}</strong><small><span>{documents.busy ? documentText[documents.progress?.phase ?? 'hashing'] : t.draft}</span><span>{(documents.file!.size / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })} MB</span><span>{w.cloud}</span><span>{documentText.output}</span></small>
+                {documents.progress && <div className="translation-progress" role="status"><span>{documents.progress.percent}%</span><progress max={100} value={documents.progress.percent} aria-label={documentText[documents.progress.phase]}/></div>}
+              </div>
+              {!documents.frozen && <div className="record-actions"><button className="text-link" lang={documentText.lang} disabled={documents.busy} onClick={() => documents.selectFile(undefined)}>{documentText.remove}</button></div>}
+            </li>}
+            {tasks.map(task => {
+              if (task.kind === 'document') return <DocumentTaskRow key={'document:' + task.id} row={task.row} locale={locale} disabled={!!documents.actionId} onAction={(row, operation) => { void documents.action(row, operation); }} uploadProgress={documents.busy && documents.draftId === task.id ? documents.progress : undefined}/>;
+              const row = task.row;
+              return (
               <li key={row.id} data-state={row.state}>
-                  <span className="record-number">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
+                  <span className="record-kind" aria-hidden="true">{row.name.split('.').pop()?.toUpperCase().slice(0, 4) || 'IMG'}</span>
                   <div className="record-copy">
                     <strong title={row.name}>{row.name}</strong>
                     <small>
                       <span className="record-state" data-state={row.state}>{t[row.state as keyof typeof t] ?? t.paused}</span>
+                      <span>{w.local}</span>
                       {row.state !== 'draft' && <span>{row.language}</span>}
                       {row.state !== 'draft' && <span>{row.snapshot?.model?.name??(row.modelId?caps?.translation_models?.find(model=>model.id===row.modelId)?.name??row.modelId:modelsCopy.automatic)}</span>}
                       {row.snapshot?.result?.kind === 'no_text' && <span>{t.noText}</span>}
@@ -878,10 +914,11 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                     {row.error && <p className="translation-error">{errorText(row.error)}</p>}
                   </div>
                   <div className="record-actions">
+                    {busy && active.has(row.state) && runningIds.current.includes(row.id) && <button className="button secondary" onClick={pause}>{t.cancel}</button>}
                     {(row.state === 'succeeded' || volatile?.id === row.id) && (
                       <button className="button secondary" disabled={downloading || clearing} onClick={() => void download([row])}>{t.download}</button>
                     )}
-                    {row.state==='succeeded'&&<button className="button secondary" disabled={busy||importing||clearing||!selectedModelAvailable(caps?.translation_models,modelId)} onClick={()=>void again(row,true)}>{modelsCopy.retranslate}</button>}
+                    {row.state==='succeeded'&&<button className="button secondary" disabled={busy||importing||clearing||!selectedModelAvailable(caps?.translation_models,effectiveModelId)} onClick={()=>void again(row,true)}>{modelsCopy.retranslate}</button>}
                     {row.requestId && !['failed', 'succeeded'].includes(row.state) && (
                       <button className="button secondary" disabled={busy || importing || clearing} onClick={() => void run([row])}>{t.resume}</button>
                     )}
@@ -893,15 +930,17 @@ export default function TranslationWorkbench({ locale, copy: t }: { locale: Loca
                     }}>{t.remove}</button>
                   </div>
               </li>
-            ))}
+              );
+            })}
           </ol>
-          {!displayed.length && <p className="translation-history-empty">{t.historyEmpty}</p>}
+          {!tasks.length && !showDocumentDraft && <p className="translation-history-empty">{documents.loading ? documentText.loading : w.empty}</p>}
+          <nav className="workbench-pagination" aria-label={documentText.history} lang={documentText.lang}>{documents.before && <button className="button secondary" disabled={documents.loading} onClick={() => documents.page(null)}>{documentText.latest}</button>}{documents.nextCursor && <button className="button secondary" disabled={documents.loading || documents.busy} onClick={() => documents.page(documents.nextCursor)}>{documentText.older}</button>}</nav>
       </section>
       <details className="translation-notes translation-details">
-        <summary>{t.localTitle} · {t.serverTitle}</summary>
+        <summary>{w.details}</summary>
         <div className="translation-notes-body">
-          <div><strong>{t.localTitle}</strong><p>{t.local}</p></div>
-          <div><strong>{t.serverTitle}</strong><p>{t.retention}</p></div>
+          <div><strong>{w.local}</strong><p>{t.formats}</p><p>{t.local}</p><p>{t.retention}</p></div>
+          <div lang={documentText.lang}><strong>{w.cloud}</strong><p>{documentText.limits}</p><p>{documentText.paid}</p><p>{documentText.quotaRule}</p><p>{documentText.privacy}</p><a href={localPath('/pricing/', locale)}>{documentText.pricing}</a></div>
         </div>
         <div className="translation-storage">
           <p><span>{t.storage}</span><strong>{(usedBytes / 1024 / 1024).toFixed(1)} / 256 MiB</strong></p>

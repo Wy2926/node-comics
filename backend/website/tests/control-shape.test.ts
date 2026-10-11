@@ -19,6 +19,6 @@ test('page controls and upload surfaces reuse the shared shape tokens, not pill 
     assert.doesNotMatch(css(file),/border-radius:\s*(?:99|999)px|--comic-control-radius:\s*999px/,file);
   }
   assert.match(css('translate.css'),/\.translation-composer\s*\{[^}]*border-radius:\s*var\(--comic-panel-radius\)/);
-  assert.match(css('translate.css'),/\.image-dropzone\s*\{[^}]*border-radius:\s*var\(--comic-card-radius\)/);
+  assert.match(css('translate.css'),/\.file-dropzone\s*\{[^}]*border-radius:\s*var\(--comic-card-radius\)/);
   assert.match(css('controls.css'),/\.billing-cycle\.billing-cycle-segmented\s*\{[^}]*border-radius:\s*var\(--comic-card-radius\)/);
 });
