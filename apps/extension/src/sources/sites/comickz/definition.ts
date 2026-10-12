@@ -14,8 +14,8 @@ export function location(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'comickz', name: 'ComicK (comickz)', installation,
-  sites: [{id: 'comickz', name: 'ComicK (comickz)', url: origin + '/home', icon, adaptedOn: '2026-10-09',
-    primaryLanguages: ['en'], contentTags: ['manga', 'manhwa', 'manhua'], search: true}],
+  sites: [{id: 'comickz', name: 'ComicK (comickz)', url: origin + '/home', icon, adaptedOn: '2026-10-09', pricing: 'unknown', isRaw: false,
+    primaryLanguages: ['en'], contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

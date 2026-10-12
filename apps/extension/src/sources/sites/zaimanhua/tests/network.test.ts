@@ -20,7 +20,7 @@ describe('再漫画 isolated source adapter', () => {
     expect(definition.embeddedEntry).toBe('floating');
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
     expect(definition.installation.optionalContentMatches).toHaveLength(4);
-    expect(definition.sites!.every(site => site.search && !site.isFree)).toBe(true);
+    expect(definition.sites!.every(site => site.search && site.pricing === 'unknown')).toBe(true);
   });
   it('recognizes verified URL forms and namespaces with strict hosts and numeric identities', () => {
     expect(definition.identify(new URL(original))?.catalog?.key).toBe('zaimanhua:original:fixture');

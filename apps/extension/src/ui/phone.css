@@ -110,7 +110,7 @@
     .nc-app .nc-search-result-list { gap: 10px; }
 
     /* Adapted sites are full-width horizontal rows. Keep access/date metadata. */
-    .nc-app .nc-sites-page .nc-site-request-shortcut { width: auto; margin-inline-start: auto; align-items: center; }
+    .nc-app .nc-sites-page .nc-site-request-shortcut { display: inline-flex; flex-shrink: 0; width: auto; margin-inline-start: auto; align-items: center; }
     .nc-app .nc-site-link-import { padding: 12px; margin-bottom: 16px; }
     .nc-app .nc-site-link-import label { font-size: var(--text-small); margin-bottom: 6px; }
     .nc-app .nc-site-link-import>div { flex-direction: row; gap: 8px; }
@@ -118,19 +118,19 @@
     .nc-app .nc-site-link-import .button { width: auto; flex: none; max-width: 45%; }
     .nc-app .nc-site-link-import p { margin-top: 8px; font-size: var(--text-caption); }
     .nc-app .nc-sites-section-heading { padding-bottom: 12px; }
-    .nc-app .nc-sites-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .nc-app .nc-sites-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
     .nc-app .nc-site-card { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; height: auto; padding: 10px; }
     .nc-app .nc-site-card-top, .nc-app .nc-site-card-footer { display: contents; }
     .nc-app .nc-site-monogram { grid-column: 1; grid-row: 1/5; margin-top: 2px; }
     .nc-app .nc-site-card h3 { grid-column: 2; grid-row: 1; min-width: 0; }
-    .nc-app .nc-site-languages { grid-column: 3; grid-row: 1; justify-content: flex-end; gap: 4px; max-width: 72px; }
+    .nc-app .nc-site-languages { grid-column: 3; grid-row: 1; justify-content: flex-end; gap: 4px; max-width: 96px; }
     .nc-app .nc-site-domain { grid-column: 2; grid-row: 2; margin: 0; }
     .nc-app .nc-site-tags { grid-column: 2/-1; grid-row: 3; gap: 4px; margin: 0; }
     .nc-app .nc-site-card-footer>.nc-site-adapted { grid-column: 2/-1; grid-row: 4; display: flex; justify-content: space-between; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
     .nc-app .nc-site-adapted>span { gap: 4px; }
     .nc-app .nc-site-supported { gap: 3px; font-size: var(--text-caption); }
     .nc-app .nc-site-adapted time { white-space: nowrap; }
-    .nc-app .nc-site-card-footer>.nc-icon { grid-column: 3; grid-row: 2; justify-self: end; align-self: center; }
+    .nc-app .nc-site-card-footer>.nc-icon { display: none; }
     .nc-app .nc-site-request { padding: 12px; }
 
     /* Secondary pages have compact sections, with their existing actions. */

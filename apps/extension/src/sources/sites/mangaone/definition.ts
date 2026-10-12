@@ -17,8 +17,8 @@ export function location(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'mangaone', name: 'マンガワン', installation,
-  sites: [{id: 'mangaone', name: 'マンガワン · Manga One', url: origin + '/', icon, adaptedOn: '2026-10-03',
-    primaryLanguages: ['ja'], contentTags: ['manga'], accessTags: ['paid-content'], search: true}],
+  sites: [{id: 'mangaone', name: 'マンガワン · Manga One', url: origin + '/', icon, adaptedOn: '2026-10-03', pricing: 'freemium', isRaw: true,
+    primaryLanguages: ['ja'], contentTags: ['manga'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

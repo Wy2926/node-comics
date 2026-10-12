@@ -14,7 +14,7 @@ describe('Zebrack identity and capabilities', () => {
   it('recognizes title, complete chapter list and reader identities with a bound work', () => {
     expect(definition.identify(new URL(workUrl + '/chapter/list#chapter2231'))).toMatchObject({kind: 'catalog', pageKey: 'zebrack:title:9', catalog: {url: workUrl}});
     expect(definition.identify(new URL(readerUrl + '?from=detail'))).toMatchObject({kind: 'reader', pageKey: 'zebrack:title:9:chapter:2231', catalog: {url: workUrl}});
-    expect(definition.sites![0]).toMatchObject({search: true, primaryLanguages: ['ja'], accessTags: ['paid-content']});
+    expect(definition.sites![0]).toMatchObject({search: true, primaryLanguages: ['ja'], pricing: 'freemium', isRaw: true});
     expect(definition.installation.optionalContentMatches).toEqual(['https://zebrack-comic.shueisha.co.jp/*']);
   });
   it.each(['http://zebrack-comic.shueisha.co.jp/title/9', 'https://zebrack-comic.shueisha.co.jp.evil.test/title/9',

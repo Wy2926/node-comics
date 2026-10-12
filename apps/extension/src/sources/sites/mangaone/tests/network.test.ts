@@ -19,7 +19,7 @@ describe('Manga One identity and generic recognition', () => {
     expect(location(new URL(readerUrl))).toEqual({work: '9', chapter: '11'});
     expect(definition).toMatchObject({inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720}, embeddedEntry: 'floating',
       capabilities: {importable: true, pages: true, completePageList: true}});
-    expect(definition.sites![0]).toMatchObject({search: true, adaptedOn: '2026-10-03', primaryLanguages: ['ja'], accessTags: ['paid-content']});
+    expect(definition.sites![0]).toMatchObject({search: true, adaptedOn: '2026-10-03', primaryLanguages: ['ja'], pricing: 'freemium', isRaw: true});
     expect(definition.installation.optionalContentMatches).toEqual(['https://manga-one.com/*']);
   });
   it.each(['http://manga-one.com', 'https://manga-one.com.evil.test', 'https://app.manga-one.com',

@@ -9,7 +9,7 @@ export function comixLocation(url:URL) {
 }
 export const definition:SourceDefinition={
   id:'comix',name:'Comix',
-  sites:[{id:'comix',name:'Comix',url:'https://comix.to/',icon:icon, adaptedOn: '2026-09-23', isFree: true, contentTags: ['manga', 'manhwa'], primaryLanguages: ['en'], search: true }],
+  sites:[{id:'comix',name:'Comix',url:'https://comix.to/',icon:icon, adaptedOn: '2026-09-23', pricing: 'free', isRaw: false, contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], primaryLanguages: ['en'], search: true }],
   capabilities:{importable:true,pages:true,inline:true,catalog:true,completePageList:true},
   catalogSync:{intervalMinutes:720},
   installation,

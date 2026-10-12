@@ -15,8 +15,8 @@ export function location(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'zebrack', name: 'ゼブラック · Zebrack', installation,
-  sites: [{id: 'zebrack', name: 'ゼブラック · Zebrack', url: origin + '/', icon, adaptedOn: '2026-10-12',
-    primaryLanguages: ['ja'], contentTags: ['manga'], accessTags: ['paid-content'], search: true}],
+  sites: [{id: 'zebrack', name: 'ゼブラック · Zebrack', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'freemium', isRaw: true,
+    primaryLanguages: ['ja'], contentTags: ['manga'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

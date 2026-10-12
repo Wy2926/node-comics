@@ -29,9 +29,9 @@ export const definition: SourceDefinition = {
   id: 'mangacopy',
   name: 'MangaCopy',
   sites: [
-    { id: 'copy4000', name: '拷贝漫画', url: 'https://www.copy4000.com/', icon: '/site-icons/mangacopy.svg', adaptedOn: '2026-09-15', contentTags: ['manga', 'manhwa', 'doujin'], primaryLanguages: ['zh-Hans'],
+    { id: 'copy4000', name: '拷贝漫画', url: 'https://www.copy4000.com/', icon: '/site-icons/mangacopy.svg', adaptedOn: '2026-09-15', pricing: 'unknown', isRaw: false, contentTags: ['manga', 'manhwa', 'doujin'], primaryLanguages: ['zh-Hans'],
       search: true },
-    { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg', adaptedOn: '2026-09-14', contentTags: ['manga', 'manhwa', 'doujin'], primaryLanguages: ['zh-Hans'],
+    { id: 'mangacopy', name: 'MangaCopy', url: 'https://www.mangacopy.com/', icon: '/site-icons/mangacopy.svg', adaptedOn: '2026-09-14', pricing: 'unknown', isRaw: false, contentTags: ['manga', 'manhwa', 'doujin'], primaryLanguages: ['zh-Hans'],
       search: true },
   ],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },

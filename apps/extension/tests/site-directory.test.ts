@@ -1,14 +1,15 @@
 import {existsSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {listSupportedSites} from '../src/sources/registry/sites';
+import {listSupportedSites, matchesSiteFilters, type SiteFilters} from '../src/sources/registry/sites';
+import type {SourceSite} from '../src/sources/contracts/definition';
 import {definitions} from '../src/sources/registry/definitions';
 
 describe('adapter-owned website directory', () => {
   it('flattens multiple sites from one adapter without coupling the view to its id', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites = listSupportedSites([{...adapter, id: 'custom-adapter', sites: [
-      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg', primaryLanguages: ['en', 'ja'], adaptedOn: '2026-09-23', contentTags: ['manga']},
-      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg', primaryLanguages: ['ko'], adaptedOn: '2026-09-23', contentTags: ['manhwa', 'webtoon']},
+      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg', primaryLanguages: ['en', 'ja'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'free', isRaw: false},
+      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg', primaryLanguages: ['ko'], adaptedOn: '2026-09-23', contentTags: ['manhwa', 'webtoon'], pricing: 'freemium', isRaw: true},
     ]}]);
     expect(sites.map(site => [site.key, site.name, site.icon])).toEqual([
       ['custom-adapter:one', 'One', '/one.svg'], ['custom-adapter:two', 'Two', '/two.svg'],
@@ -18,17 +19,17 @@ describe('adapter-owned website directory', () => {
   });
   it('orders dates newest first across adapters and preserves equal-date entry order', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
-    const sites = [
-      {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', isFree: true},
+    const sites: SourceSite[] = [
+      {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', pricing: 'free'},
       {...adapter.sites![0], id: 'new', adaptedOn: '2026-10-04'},
-      {...adapter.sites![0], id: 'same-day', adaptedOn: '2026-10-04', isFree: false},
+      {...adapter.sites![0], id: 'same-day', adaptedOn: '2026-10-04', pricing: 'freemium'},
     ];
     const result = listSupportedSites([
       {...adapter, sites: sites.slice(0, 2)},
       {...adapter, id: 'other', sites: sites.slice(2)},
     ]);
-    expect(result.map(site => [site.key, site.isFree])).toEqual([
-      ['mangacopy:new', undefined], ['other:same-day', false], ['mangacopy:old', true],
+    expect(result.map(site => [site.key, site.pricing])).toEqual([
+      ['mangacopy:new', 'unknown'], ['other:same-day', 'freemium'], ['mangacopy:old', 'free'],
     ]);
     expect(sites.map(site => site.id)).toEqual(['old', 'new', 'same-day']);
   });
@@ -41,11 +42,13 @@ describe('adapter-owned website directory', () => {
       expect(site.adaptedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(new Date(site.adaptedOn + 'T00:00:00Z').toISOString().slice(0, 10)).toBe(site.adaptedOn);
       expect(site.contentTags.length).toBeGreaterThan(0);
-      expect(site.contentTags.length).toBeLessThanOrEqual(3);
       expect(new Set(site.contentTags).size).toBe(site.contentTags.length);
+      for (const tag of site.contentTags) expect(['manga', 'manhwa', 'manhua', 'webtoon', 'doujin', 'illustration']).toContain(tag);
       expect(new Set(site.accessTags).size).toBe(site.accessTags?.length ?? 0);
-      for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web', 'paid-content']).toContain(tag);
-      if (site.isFree) expect(site.accessTags ?? []).not.toContain('paid-content');
+      for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web']).toContain(tag);
+      expect(['free', 'freemium', 'unknown']).toContain(site.pricing);
+      expect(typeof site.isRaw).toBe('boolean');
+      expect(site).not.toHaveProperty('isFree');
       if(site.icon.startsWith('data:image/svg+xml,')) {
         expect(decodeURIComponent(site.icon.slice('data:image/svg+xml,'.length))).toMatch(/^<svg\b/);
       } else {
@@ -53,5 +56,49 @@ describe('adapter-owned website directory', () => {
         expect(existsSync(new URL('../public' + site.icon, import.meta.url))).toBe(true);
       }
     }
+  });
+  it('marks original-language sites explicitly and does not infer raw from manga type', () => {
+    const sites = listSupportedSites();
+    for (const id of ['rawotaku', 'rawlazy', 'klmanga', 'hachiraw', 'naver', 'comicdays', 'comicwalker', 'pixiv']) {
+      expect(sites.find(site => site.adapterId === id)?.isRaw, id).toBe(true);
+    }
+    for (const id of ['mangacopy', 'mangapill', 'comickz', 'zaimanhua']) {
+      expect(sites.filter(site => site.adapterId === id).every(site => !site.isRaw), id).toBe(true);
+    }
+    expect(sites.find(site => site.adapterId === 'comicdays')?.pricing).toBe('freemium');
+    expect(sites.find(site => site.adapterId === 'mangadot')?.contentTags).toContain('manhua');
+    expect(sites.find(site => site.adapterId === 'pixiv')?.contentTags).toContain('illustration');
+  });
+});
+
+describe('website directory multi-select filters', () => {
+  const empty: SiteFilters = {content: [], pricing: [], raw: [], access: []};
+  const sites = listSupportedSites();
+  const filter = (selection: Partial<SiteFilters>) => sites.filter(site => matchesSiteFilters(site, {...empty, ...selection}));
+
+  it('keeps every entry and date order when no filters are selected', () => {
+    expect(filter({})).toEqual(sites);
+  });
+  it('uses OR inside each group and AND between groups without duplicate cards', () => {
+    const selected = filter({content: ['manga', 'webtoon'], pricing: ['free', 'freemium'], raw: [true]});
+    expect(selected.length).toBeGreaterThan(0);
+    expect(selected).toEqual(sites.filter(site => site.isRaw && site.pricing !== 'unknown' && site.contentTags.some(tag => tag === 'manga' || tag === 'webtoon')));
+    expect(new Set(selected.map(site => site.key)).size).toBe(selected.length);
+    expect(filter({raw: [true, false]})).toEqual(sites);
+    expect(filter({pricing: ['free', 'freemium', 'unknown']})).toEqual(sites);
+  });
+  it('keeps unknown separate from free and combines access conditions', () => {
+    expect(filter({pricing: ['unknown']}).every(site => site.pricing === 'unknown')).toBe(true);
+    expect(filter({access: ['login-required', 'partial-web']})).toEqual(sites.filter(site => (site.accessTags?.length ?? 0) > 0));
+    expect(filter({content: ['illustration'], pricing: ['freemium']})).toEqual([]);
+    expect(filter({content: ['illustration'], pricing: ['free'], raw: [true], access: ['login-required']})).toHaveLength(1);
+  });
+  it('filters a representative directory locally with bounded work', () => {
+    const selection: SiteFilters = {content: ['manga', 'webtoon'], pricing: ['free', 'freemium'], raw: [true], access: []};
+    const start = performance.now();
+    for (let i = 0; i < 10000; i++) sites.filter(site => matchesSiteFilters(site, selection));
+    const elapsed = performance.now() - start;
+    console.info(`Directory filtering: ${sites.length} sites, 10000 passes, ${elapsed.toFixed(1)} ms total`);
+    expect(elapsed).toBeLessThan(2000);
   });
 });

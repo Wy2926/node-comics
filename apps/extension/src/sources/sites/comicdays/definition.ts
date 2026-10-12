@@ -23,7 +23,7 @@ export function comicDaysLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'comicdays', name: 'Comic DAYS', installation,
   sites: [{id: 'comicdays', name: 'Comic DAYS', url: origin + '/', icon,
-    adaptedOn: '2026-10-03', contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
+    adaptedOn: '2026-10-03', pricing: 'freemium', isRaw: true, accessTags: ['login-required'], contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720},
   identify(url) {

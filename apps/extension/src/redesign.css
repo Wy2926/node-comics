@@ -2123,7 +2123,7 @@ button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outli
   .nc-app .nc-page-heading p { margin-top: 8px; line-height: 1.6; }
   .nc-app .nc-page-heading>.nc-inline { width: auto; margin-inline-start: auto; }
   .nc-app .nc-page-heading>.nc-inline>.button { flex: none; min-width: 0; min-height: 44px; white-space: normal; }
-  .nc-app :is(.nc-library,.nc-sites-page,.nc-remote-library)>.nc-page-heading p { display: none; }
+  .nc-app :is(.nc-library,.nc-remote-library)>.nc-page-heading p { display: none; }
   .nc-app .nc-main :is(.nc-library,.nc-remote-library,.nc-download-center) .nc-empty { min-height: 0; padding: 24px 0; gap: 12px; border: 0; background: none; box-shadow: none; }
   .nc-app .nc-main .nc-import-empty>.nc-empty-symbol,.nc-app .nc-main .nc-import-empty>h2 { display: none; }
   .nc-app .nc-main .nc-import-empty p { margin: 0; }

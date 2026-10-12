@@ -28,7 +28,7 @@ describe("HERO'S Web comici adapter", () => {
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
     expect(definition.installation.optionalContentMatches).toEqual([origin + '/*']);
     expect(definition.sites?.[0]).toMatchObject({search: true, adaptedOn: '2026-10-09', primaryLanguages: ['ja']});
-    expect(definition.sites?.[0].isFree).not.toBe(true);
+    expect(definition.sites?.[0].pricing).toBe('freemium');
     expect(definition.identify(new URL(base + '/new'))?.catalog?.key).toBe('heros:series:fixture');
     expect(definition.identify(new URL(url))?.pageKey).toBe('heros:episode:first');
     expect(definition.identify(new URL(episodeUrl(episode)))?.catalog).toBeUndefined();

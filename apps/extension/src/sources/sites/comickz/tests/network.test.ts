@@ -34,7 +34,7 @@ describe('ComicK ownership and metadata', () => {
       capabilities: {importable: true, pages: true, catalog: true, completePageList: true, inline: true}});
     expect(definition.installation.optionalContentMatches).toEqual([origin + '/*']);
     expect(definition.sites![0]).toMatchObject({url: origin + '/home', search: true, adaptedOn: '2026-10-09', primaryLanguages: ['en']});
-    expect(definition.sites![0].isFree).toBeUndefined();
+    expect(definition.sites![0].pricing).toBe('unknown');
   });
   it.each(['https://comickz.co.uk.evil.test', 'http://comickz.co.uk', 'ftp://comickz.co.uk', 'https://comickz.co.uk:444', 'https://u:p@comickz.co.uk', 'https://comick.io'])
     ('rejects unrelated origin %s', host => expect(definition.identify(new URL(host + '/comic/fixture-work'))).toBeNull());

@@ -19,7 +19,7 @@ const hit = (extra: Partial<SourceSearchHit> = {}): SourceSearchHit => ({catalog
 const definition = (): SourceDefinition => ({id: 'fixture', name: 'Fixture',
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: false},
   installation: {autoContentMatches: []},
-  sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'],
+  sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'unknown', isRaw: false,
     search: true}],
   identify(url) {
     if (!['fixture.test', 'mirror.test'].includes(url.hostname)) return null;

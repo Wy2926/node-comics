@@ -24,7 +24,7 @@ export function mangaDotLocation(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'mangadot', name: 'MangaDot', installation,
-  sites: [{id: 'mangadot', name: 'MangaDot', url: origin + '/', icon, adaptedOn: '2026-09-26', isFree: true, contentTags: ['manga', 'manhwa'], primaryLanguages: ['en', 'fr', 'es'],
+  sites: [{id: 'mangadot', name: 'MangaDot', url: origin + '/', icon, adaptedOn: '2026-09-26', pricing: 'free', isRaw: false, contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], primaryLanguages: ['en', 'fr', 'es'],
     search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},
