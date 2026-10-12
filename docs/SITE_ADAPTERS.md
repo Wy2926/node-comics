@@ -100,6 +100,7 @@ npm run build
 | [WEBTOON 国际站](../apps/extension/src/sources/sites/webtoons/README.md) | 七语言 Originals／Canvas 搜索、HTTP 完整公开目录／正文／封面与 12 小时更新；网页导入及已加载正文原位翻译 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |
+| [再漫画](../apps/extension/src/sources/sites/zaimanhua/README.md) | 原创／日漫名称搜索、完整网页分组目录、公开免费正文／封面与 12 小时更新；作品／章节浮动导入，标签页识图复用通用规则，不自动购买或解锁 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | HTTP 完整分页目录／章节、图片还原、12 小时更新；嵌入作品导入入口；网页已渲染 canvas 原位翻译 |
 | [HERO'S Web](../apps/extension/src/sources/sites/heros/README.md) | HTTP 名称搜索、完整编号目录／正文／封面、12 小时更新；裸章节归属和浮动导入入口，与 Comic PASH 复用 Comici 图片还原及正文 canvas 识别 |
 | [MangaDex](../apps/extension/src/sources/sites/mangadex/README.md) | HTTP 多语言目录与章节、同话候选、作品封面、12 小时更新；章节 UUID 独立身份，图片内容标识不依赖临时服务器地址 |
