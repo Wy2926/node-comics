@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Bir sonraki hikayenizi halihazırda kullandığınız tarayıcıda açın.",
     "storeUnavailable": "Mağaza incelemesi bekleniyor",
     "directDownloadTitle": "Uzantıyı doğrudan indirin",
-    "directDownloadDescription": "Paketi tarayıcınızın kartından indirin, çıkartın ve aşağıdaki adımları izleyin.",
+    "directDownloadDescription": "Resmi mağazadan kurulum önerilir. İndirme düğmeleri özgün resmi CRX dosyalarını veya AMO imzalı XPI dosyalarını sunar.",
     "packageUnavailable": "Paket indirilemiyor",
     "downloadZip": "ZIP indir",
-    "installTitle": "Chrome / Edge için manuel kurulum",
-    "installStepDownload": "ZIP dosyasını indirin ve çıkarın. Çıkarılan klasörü saklayın.",
-    "installStepBrowser": "Adres çubuğunda chrome://extensions (Chrome) veya edge://extensions (Edge) öğesini açın ve Geliştirici modunu açın.",
-    "installStepLoad": "Paketlenmemiş yükle'ye tıklayın, manifest.json içeren klasörü seçin ve ardından uzantıyı araç çubuğunuza sabitleyin.",
-    "manualUpdateNote": "Manuel kurulumlar otomatik olarak güncellenmez. Yeni sürümü indirin, dosyaları orijinal klasöre yerleştirin ve uzantılar sayfasında Yeniden Yükle'ye tıklayın. Kurulum klasörünü yerinde tutun.",
+    "installTitle": "Kurulum ve resmi dosyalar",
+    "installStepDownload": "Kurulum ve otomatik güncellemeler için tarayıcınızın resmi mağaza bağlantısını kullanın.",
+    "installStepBrowser": "Chrome / Edge: CRX dosyaları resmi özgün dosyaların yedekleri veya desteklenen yönetilen kurulumlar içindir. Tarayıcı ve platform politikaları geçerlidir; kurulum reddedilirse mağazayı kullanın.",
+    "installStepLoad": "Firefox: AMO üzerinden kurun veya eklenti yöneticisinde “Dosyadan eklenti yükle…” seçeneğiyle imzalı XPI dosyasını seçin.",
+    "manualUpdateNote": "Bir dosyayı indirmek, doğrudan kuruluma izin verildiği anlamına gelmez. Windows/macOS üzerinde kendi sunucunuzdan Chrome kurulumu kurumsal politika gerektirir; kurulum ve güncellemeler mağaza veya yönetim politikalarına tabidir.",
     "downloadXpi": "İmzalı XPI indir",
     "storeHeading": "Tarayıcı mağazası bağlantıları",
     "storeNote": "Chrome, Edge veya Firefox resmi mağazasından yükleyin ya da tarayıcınıza uygun paketi kullanın. Geri bildirim:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: daha akıcı görüntü iyileştirme (mağazalarda yayınlanmayı bekliyor)",
+        "items": [
+          "Görüntü iyileştirme ve çeviri, siz okurken sonraki sayfaları hazırlamak için aynı ön hazırlık aralığını kullanır.",
+          "İyileştirme sırada beklerken veya çalışırken mevcut çeviriler hemen gösterilir. İşlem bittiğinde sonuç, okuma konumunu değiştirmeden görüntünün yerini alır.",
+          "İyileştirme önbelleği ve görevleri yeniden kullanılır; okuyucuyu tekrar açmak yinelenen iyileştirme istekleri göndermez.",
+          "Chrome, Edge ve Firefox için 0.12.0 mağaza gönderim paketleri hazırdır ancak henüz yayınlanmamıştır. Web sitesinde şu anda Chrome 0.11.3, Edge 0.10.2 ve Firefox 0.11.3 (AMO imzalı) sunulmaktadır."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

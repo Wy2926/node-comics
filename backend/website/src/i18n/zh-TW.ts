@@ -102,14 +102,14 @@ export default {
     "storeDescription": "在熟悉的瀏覽器裡，打開下一段故事。",
     "storeUnavailable": "商店審核中",
     "directDownloadTitle": "直接下載安裝包",
-    "directDownloadDescription": "請在對應瀏覽器卡片下下載安裝包，解壓縮後依下列步驟安裝。",
+    "directDownloadDescription": "建議透過官方商店安裝；下載按鈕提供官方原始 CRX 或 AMO 已簽署 XPI 檔案。",
     "packageUnavailable": "安裝包暫不可下載",
     "downloadZip": "下載 ZIP 安裝包",
-    "installTitle": "Chrome / Edge 手動安裝",
-    "installStepDownload": "下載並解壓縮 ZIP，保留解壓縮後的資料夾。",
-    "installStepBrowser": "在網址列開啟 chrome://extensions（Chrome）或 edge://extensions（Edge），啟用「開發人員模式」。",
-    "installStepLoad": "點選「載入未封裝項目」，選取包含 manifest.json 的資料夾，再將擴充功能固定到工具列。",
-    "manualUpdateNote": "手動安裝版本不會自動更新。更新時下載新版，覆蓋原資料夾中的檔案，再到擴充功能管理頁點選「重新載入」；請勿刪除安裝資料夾。",
+    "installTitle": "安裝與官方檔案",
+    "installStepDownload": "點選對應瀏覽器的官方商店入口安裝，並透過商店取得自動更新。",
+    "installStepBrowser": "Chrome / Edge：CRX 供官方原始檔案備份或受支援的受管理安裝使用，受瀏覽器及平台政策限制；安裝遭拒時請改用商店。",
+    "installStepLoad": "Firefox：透過 AMO 安裝，或在附加元件管理員中選擇「從檔案安裝附加元件」，再選取已簽署的 XPI。",
+    "manualUpdateNote": "成功下載檔案不代表瀏覽器允許直接安裝。Windows/macOS 上的 Chrome 自行託管安裝需要企業政策；安裝與更新以商店或管理政策為準。",
     "downloadXpi": "下載已簽署 XPI",
     "storeHeading": "瀏覽器商店入口",
     "storeNote": "Chrome、Edge、Firefox 均可從官方商店安裝，也可下載對應安裝套件。回饋與建議：",
@@ -721,6 +721,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0：增強更順暢（待商店發布）",
+        "items": [
+          "增強與翻譯共用提前準備視窗，在閱讀目前頁面時準備後續頁面。",
+          "增強排隊或處理中，既有譯圖立即顯示；增強完成後原位替換，保留閱讀位置。",
+          "重用既有增強快取與工作，重新進入閱讀器不會重複提交增強請求。",
+          "Chrome、Edge、Firefox 的 0.12.0 商店提交套件已備妥，尚未上架；官網目前提供 Chrome 0.11.3、Edge 0.10.2 與 Firefox 0.11.3（AMO 已簽署）。"
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

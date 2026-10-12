@@ -102,14 +102,14 @@ export default {
     "storeDescription": "使い慣れたブラウザーで、新しい物語を開きましょう。",
     "storeUnavailable": "ストア審査中",
     "directDownloadTitle": "拡張機能を直接ダウンロード",
-    "directDownloadDescription": "お使いのブラウザーのカードからZIPをダウンロードし、展開して次の手順でインストールしてください。",
+    "directDownloadDescription": "公式ストアからのインストールを推奨します。ダウンロードボタンでは、公式の原本 CRX または AMO 署名済み XPI を提供します。",
     "packageUnavailable": "パッケージは現在ダウンロードできません",
     "downloadZip": "ZIP をダウンロード",
-    "installTitle": "Chrome / Edge の手動インストール",
-    "installStepDownload": "ZIP をダウンロードして展開し、展開したフォルダーを保存します。",
-    "installStepBrowser": "アドレスバーで chrome://extensions（Chrome）または edge://extensions（Edge）を開き、デベロッパーモードをオンにします。",
-    "installStepLoad": "「パッケージ化されていない拡張機能を読み込む」を選び、manifest.json を含むフォルダーを指定して、拡張機能をツールバーに固定します。",
-    "manualUpdateNote": "手動インストール版は自動更新されません。新版をダウンロードして元のフォルダー内のファイルを置き換え、拡張機能の管理画面で再読み込みしてください。インストール先フォルダーは削除しないでください。",
+    "installTitle": "インストールと公式ファイル",
+    "installStepDownload": "お使いのブラウザーの公式ストアリンクからインストールすると、ストア経由で自動更新されます。",
+    "installStepBrowser": "Chrome / Edge：CRX は公式原本のバックアップ、または対応する管理下でのインストール用です。ブラウザーやプラットフォームのポリシーにより拒否される場合は、ストアをご利用ください。",
+    "installStepLoad": "Firefox：AMO からインストールするか、アドオンマネージャーの「ファイルからアドオンをインストール」で署名済み XPI を選択してください。",
+    "manualUpdateNote": "ダウンロードできても直接インストールできるとは限りません。Windows/macOS の Chrome で自己ホストの拡張機能をインストールするには企業ポリシーが必要です。インストールと更新はストアまたは管理ポリシーに従います。",
     "downloadXpi": "署名済み XPI をダウンロード",
     "storeHeading": "ブラウザーストアへのリンク",
     "storeNote": "Chrome・Edge・Firefox の公式ストアからインストールするか、対応するブラウザ用パッケージをご利用ください。お問い合わせ：",
@@ -628,6 +628,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0：よりスムーズな画像強化（ストア公開待ち）",
+        "items": [
+          "画像強化と翻訳で先読み範囲を統一し、現在のページを読んでいる間に後続ページを準備します。",
+          "画像強化が待機中や処理中でも、既存の翻訳画像をすぐに表示します。完了後は読書位置を保ったまま強化画像に置き換えます。",
+          "画像強化のキャッシュとタスクを再利用し、リーダーを開き直しても強化リクエストを重複送信しません。",
+          "Chrome、Edge、Firefox 向けの 0.12.0 ストア提出用パッケージは準備済みですが、まだ公開されていません。公式サイトでは現在 Chrome 0.11.3、Edge 0.10.2、Firefox 0.11.3（AMO 署名済み）を提供しています。"
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

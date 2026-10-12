@@ -102,14 +102,14 @@ export default {
     "storeDescription": "즐겨 쓰는 브라우저에서 새로운 이야기를 열어 보세요.",
     "storeUnavailable": "스토어 심사 중",
     "directDownloadTitle": "확장 프로그램 직접 다운로드",
-    "directDownloadDescription": "사용 중인 브라우저 카드에서 ZIP을 내려받고 압축을 푼 다음 아래 단계에 따라 설치하세요.",
+    "directDownloadDescription": "공식 스토어를 통한 설치를 권장합니다. 다운로드 버튼은 공식 원본 CRX 또는 AMO 서명 XPI 파일을 제공합니다.",
     "packageUnavailable": "설치 파일을 다운로드할 수 없습니다",
     "downloadZip": "ZIP 다운로드",
-    "installTitle": "Chrome / Edge 수동 설치",
-    "installStepDownload": "ZIP을 다운로드하고 압축을 푼 뒤 해당 폴더를 보관하세요.",
-    "installStepBrowser": "주소 표시줄에서 chrome://extensions(Chrome) 또는 edge://extensions(Edge)를 열고 개발자 모드를 켜세요.",
-    "installStepLoad": "압축해제된 확장 프로그램을 로드합니다를 누르고 manifest.json이 있는 폴더를 선택한 다음 도구 모음에 확장 프로그램을 고정하세요.",
-    "manualUpdateNote": "수동 설치 버전은 자동 업데이트되지 않습니다. 새 버전을 다운로드하여 기존 폴더의 파일을 교체하고 확장 프로그램 관리 페이지에서 새로고침하세요. 설치 폴더를 삭제하지 마세요.",
+    "installTitle": "설치 및 공식 파일",
+    "installStepDownload": "해당 브라우저의 공식 스토어 링크로 설치하면 스토어를 통해 자동 업데이트를 받을 수 있습니다.",
+    "installStepBrowser": "Chrome / Edge: CRX는 공식 원본 파일의 백업 또는 지원되는 관리형 설치용입니다. 브라우저와 플랫폼 정책에 따라 제한되므로 설치가 거부되면 스토어를 이용하세요.",
+    "installStepLoad": "Firefox: AMO에서 설치하거나 부가 기능 관리자에서 “파일에서 부가 기능 설치”를 선택한 뒤 서명된 XPI를 선택하세요.",
+    "manualUpdateNote": "파일을 다운로드해도 직접 설치가 허용되는 것은 아닙니다. Windows/macOS의 Chrome에서 자체 호스팅 확장 프로그램을 설치하려면 기업 정책이 필요합니다. 설치와 업데이트는 스토어 또는 관리 정책을 따릅니다.",
     "downloadXpi": "서명된 XPI 다운로드",
     "storeHeading": "브라우저 스토어 링크",
     "storeNote": "Chrome·Edge·Firefox 공식 스토어에서 설치하거나 해당 브라우저의 설치 파일을 이용하세요. 의견 보내기:",
@@ -628,6 +628,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: 더 매끄러운 이미지 개선 (스토어 출시 대기)",
+        "items": [
+          "이미지 개선과 번역이 같은 미리 준비 범위를 사용하여 현재 페이지를 읽는 동안 다음 페이지들을 준비합니다.",
+          "이미지 개선이 대기 중이거나 처리 중이어도 기존 번역 이미지를 즉시 표시하고, 완료되면 읽던 위치를 유지한 채 개선 이미지로 교체합니다.",
+          "이미지 개선 캐시와 작업을 재사용하여 뷰어를 다시 열어도 개선 요청을 중복 전송하지 않습니다.",
+          "Chrome, Edge, Firefox용 0.12.0 스토어 제출 패키지는 준비되었지만 아직 출시되지 않았습니다. 공식 웹사이트에서는 현재 Chrome 0.11.3, Edge 0.10.2, Firefox 0.11.3(AMO 서명)을 제공합니다."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

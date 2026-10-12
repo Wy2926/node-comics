@@ -24,6 +24,10 @@ try{
    assert.equal(await link.getAttribute('href'),release.download_url);
    assert.equal(await link.getAttribute('download'),release.filename);
    assert.ok((await card.innerText()).includes('v'+release.version));
+   const format=release.filename.split('.').at(-1).toUpperCase();
+   assert.ok((await link.innerText()).includes(format));
+   assert.ok((await link.getAttribute('aria-label')).includes(format));
+   assert.ok((await card.locator('.package-meta').innerText()).includes(format));
    const storeBox=await card.locator('.store-link').boundingBox(),downloadBox=await link.boundingBox();
    assert(downloadBox.y>=storeBox.y+storeBox.height,'Package download must appear below its own store button');
   }

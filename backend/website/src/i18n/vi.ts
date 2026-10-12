@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Mở câu chuyện tiếp theo của bạn trong trình duyệt mà bạn đã thích.",
     "storeUnavailable": "Đang chờ xem xét cửa hàng",
     "directDownloadTitle": "Tải xuống tiện ích mở rộng trực tiếp",
-    "directDownloadDescription": "Tải gói xuống từ thẻ trình duyệt của bạn, giải nén nó, sau đó làm theo các bước sau.",
+    "directDownloadDescription": "Nên cài đặt từ cửa hàng chính thức. Các nút tải xuống cung cấp tệp CRX gốc chính thức hoặc XPI đã được AMO ký.",
     "packageUnavailable": "Tải xuống gói không có sẵn",
     "downloadZip": "Tải ZIP",
-    "installTitle": "Cài đặt thủ công cho Chrome / Edge",
-    "installStepDownload": "Tải xuống và giải nén ZIP. Giữ thư mục đã giải nén.",
-    "installStepBrowser": "Mở chrome://extensions (Chrome) hoặc edge://extensions (Edge) trên thanh địa chỉ và bật Chế độ nhà phát triển.",
-    "installStepLoad": "Nhấp vào Tải giải nén, chọn thư mục chứa manifest.json, sau đó ghim tiện ích mở rộng vào thanh công cụ của bạn.",
-    "manualUpdateNote": "Cài đặt thủ công không tự động cập nhật. Tải xuống phiên bản mới, thay thế các tệp trong thư mục gốc, sau đó nhấp vào Tải lại trên trang tiện ích mở rộng. Giữ thư mục cài đặt tại chỗ.",
+    "installTitle": "Cài đặt và tệp chính thức",
+    "installStepDownload": "Dùng liên kết cửa hàng chính thức của trình duyệt để cài đặt và nhận cập nhật tự động.",
+    "installStepBrowser": "Chrome / Edge: CRX dùng để sao lưu tệp gốc chính thức hoặc cho hình thức cài đặt được quản lý có hỗ trợ. Chính sách trình duyệt và nền tảng có thể hạn chế việc cài đặt; nếu bị từ chối, hãy dùng cửa hàng.",
+    "installStepLoad": "Firefox: cài đặt qua AMO, hoặc chọn “Cài đặt tiện ích từ tệp…” trong trình quản lý tiện ích rồi chọn XPI đã ký.",
+    "manualUpdateNote": "Tải xuống tệp không có nghĩa là được phép cài đặt trực tiếp. Cài đặt tiện ích Chrome tự lưu trữ trên Windows/macOS cần chính sách doanh nghiệp; việc cài đặt và cập nhật tuân theo chính sách cửa hàng hoặc quản lý.",
     "downloadXpi": "Tải XPI đã ký",
     "storeHeading": "Liên kết cửa hàng trình duyệt",
     "storeNote": "Cài từ cửa hàng chính thức của Chrome, Edge hoặc Firefox, hoặc dùng gói phù hợp với trình duyệt. Phản hồi:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: cải thiện hình ảnh mượt hơn (chờ phát hành trên cửa hàng)",
+        "items": [
+          "Cải thiện hình ảnh và dịch dùng chung phạm vi chuẩn bị trước, chuẩn bị các trang tiếp theo trong lúc bạn đọc.",
+          "Ảnh đã dịch hiển thị ngay khi quá trình cải thiện đang chờ hoặc đang chạy. Khi hoàn tất, kết quả thay thế tại chỗ mà không đổi vị trí đọc.",
+          "Tái sử dụng bộ nhớ đệm và tác vụ cải thiện để không gửi yêu cầu trùng lặp khi mở lại trình đọc.",
+          "Các gói 0.12.0 cho Chrome, Edge và Firefox đã sẵn sàng để gửi lên cửa hàng nhưng chưa được phát hành. Trang web hiện cung cấp Chrome 0.11.3, Edge 0.10.2 và Firefox 0.11.3 (đã ký bởi AMO)."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

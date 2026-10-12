@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Buka cerita Anda berikutnya di browser yang Anda sukai.",
     "storeUnavailable": "Peninjauan toko tertunda",
     "directDownloadTitle": "Unduh ekstensinya secara langsung",
-    "directDownloadDescription": "Unduh paket dari kartu browser Anda, ekstrak, lalu ikuti langkah-langkah berikut.",
+    "directDownloadDescription": "Pemasangan melalui toko resmi direkomendasikan. Tombol unduh menyediakan berkas CRX resmi asli atau XPI bertanda tangan AMO.",
     "packageUnavailable": "Unduhan paket tidak tersedia",
     "downloadZip": "Unduh ZIP",
-    "installTitle": "Instalasi manual untuk Chrome / Edge",
-    "installStepDownload": "Unduh dan ekstrak ZIP. Simpan folder hasil ekstraknya.",
-    "installStepBrowser": "Buka chrome://extensions (Chrome) atau edge://extensions (Edge) di bilah alamat dan aktifkan mode Pengembang.",
-    "installStepLoad": "Klik Load unpacked, pilih folder yang berisi manifest.json, lalu sematkan ekstensi ke toolbar Anda.",
-    "manualUpdateNote": "Penginstalan manual tidak diperbarui secara otomatis. Unduh versi baru, ganti file di folder asli, lalu klik Muat Ulang di halaman ekstensi. Simpan folder instalasi di tempatnya.",
+    "installTitle": "Pemasangan dan berkas resmi",
+    "installStepDownload": "Gunakan tautan toko resmi browser Anda untuk memasang dan menerima pembaruan otomatis.",
+    "installStepBrowser": "Chrome / Edge: berkas CRX merupakan cadangan berkas resmi asli atau paket untuk pemasangan terkelola yang didukung. Kebijakan browser dan platform berlaku; jika pemasangan ditolak, gunakan toko.",
+    "installStepLoad": "Firefox: pasang melalui AMO, atau pilih “Pasang Pengaya dari Berkas…” di pengelola pengaya lalu pilih XPI yang telah ditandatangani.",
+    "manualUpdateNote": "Mengunduh berkas tidak menjamin pemasangan langsung diizinkan. Pemasangan ekstensi Chrome yang dihosting sendiri pada Windows/macOS memerlukan kebijakan perusahaan; pemasangan dan pembaruan mengikuti kebijakan toko atau pengelolaan.",
     "downloadXpi": "Unduh XPI bertanda tangan",
     "storeHeading": "Tautan toko browser",
     "storeNote": "Pasang dari toko resmi Chrome, Edge, atau Firefox, atau gunakan paket yang sesuai dengan browser Anda. Umpan balik:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: peningkatan gambar lebih lancar (menunggu rilis di toko)",
+        "items": [
+          "Peningkatan gambar dan terjemahan menggunakan rentang persiapan awal yang sama untuk menyiapkan halaman berikutnya saat Anda membaca.",
+          "Terjemahan yang sudah ada langsung ditampilkan meskipun peningkatan masih mengantre atau berjalan. Setelah selesai, hasilnya menggantikan gambar tanpa mengubah posisi baca.",
+          "Cache dan tugas peningkatan digunakan kembali sehingga membuka ulang pembaca tidak mengirim permintaan peningkatan duplikat.",
+          "Paket 0.12.0 untuk Chrome, Edge, dan Firefox sudah siap diajukan ke toko, tetapi belum dirilis. Situs saat ini menyediakan Chrome 0.11.3, Edge 0.10.2, dan Firefox 0.11.3 (ditandatangani AMO)."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

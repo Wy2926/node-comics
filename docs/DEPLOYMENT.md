@@ -176,15 +176,15 @@ python scripts/tests/rehearse_deployment.py
 ## 插件安装包
 
 1. 在 `apps/extension` 设置正式 `VITE_API_BASE`、`VITE_DRIVE_CONNECT_URL`，更新版本并完成 `npm run check`、`npm test`。
-2. 分别生成 Chrome／Edge 手动安装包与无 `manifest.key` 的商店包。Firefox 审核包运行 `npx --no-install web-ext lint --source-dir .output/firefox-mv3`；公开下载使用 AMO 已签名 XPI。
-3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、版本、文件名、大小、SHA-256 和该安装包的 `download_url`。通过外部工具将包上传到公开 R2 后，粘贴完整、永久、无签名的 HTTPS URL；不根据桶名、域名或文件名猜测地址。保留已有 `/downloads/...` 的 `path`，更新 `current` 与 `current_by_browser` 中已就绪版本。Firefox 公开入口必须指向已取得 AMO 签名的兼容包。
+2. 分别生成 Chrome／Edge 无 `manifest.key` 的商店提交 ZIP；需要手动安装 ZIP 时保留对应平台的固定 `manifest.key`。Firefox 审核包运行 `npx --no-install web-ext lint --source-dir .output/firefox-mv3`。本地提交包不代表商店已发布版本；镜像当前商店文件时，Chrome／Edge 保留官方原始 CRX，Firefox 保留 AMO 已签名 XPI，不改名、解包重打或用本地包替代。
+3. 在 [extension-release.json](../backend/extension-release.json) 追加平台、实际版本、文件名、大小、SHA-256 和该安装包的 `download_url`。CRX 的 `content_type` 为 `application/x-chrome-extension`，XPI 为 `application/x-xpinstall`；ZIP 默认为 `application/zip`。通过外部工具将包上传到公开 R2 后，粘贴完整、永久、无签名的 HTTPS URL；不根据桶名、域名或文件名猜测地址。保留已有 `/downloads/...` 的 `path`，按平台实际就绪版本更新 `current` 与 `current_by_browser`。Firefox 公开入口必须指向已取得 AMO 签名的兼容包。
 4. 从仓库根目录校验本地包、清单，以及已填写下载 URL 对应的公开文件：
 
 ```powershell
 python scripts/verify_extension_release.py --browser <chrome|edge|firefox> --zip <安装包路径> --manifest backend/extension-release.json
 ```
 
-脚本只校验，不执行上传。它核验包身份及正式 API，Firefox 另核对 AMO 官方摘要与签名；已填写的公开文件须与清单大小和 SHA-256 一致。独立重建并发布官网以更新发行清单和下载重定向，无需重启后端；商店提交包不作为手动安装包交付。
+脚本只校验，不执行上传，`--zip` 同时接受 ZIP、CRX 与 XPI。它核验包结构及正式 API：手动 ZIP 验证固定公钥身份；CRX 验证 CRX3 文件头并匹配官方 HTTPS 更新接口返回的插件 ID、版本和 SHA-256（版本仅允许末尾 `.0` 等价）；Firefox 核对 AMO 官方摘要与签名文件。已填写的公开文件须与清单大小和 SHA-256 一致。独立重建并发布官网以更新发行清单和下载重定向，无需重启后端；推荐从商店安装，原始 CRX 下载不保证浏览器允许直接安装，商店提交包不作为手动安装包交付。
 
 官网按钮直接链接各包的 `download_url`，`/downloads/...` 路径仅返回到同一 URL 的静态 308。后端不签名、不代理包文件，不需要 R2 密钥或本地安装包卷。未填写有效 URL 时，各语言官网显示暂不可下载，下载路径返回 503；填写并验真后再提供下载，不使用占位地址。
 

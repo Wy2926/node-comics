@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Apri la tua prossima storia nel browser che già ti piace.",
     "storeUnavailable": "In attesa di approvazione dello store",
     "directDownloadTitle": "Scarica direttamente l'estensione",
-    "directDownloadDescription": "Scarica il pacchetto dalla scheda del tuo browser, estrailo, quindi segui questi passaggi.",
+    "directDownloadDescription": "Si consiglia l’installazione dallo store ufficiale. I pulsanti di download forniscono i file CRX ufficiali originali o XPI firmati da AMO.",
     "packageUnavailable": "Download del pacchetto non disponibile",
     "downloadZip": "Scarica ZIP",
-    "installTitle": "Installazione manuale per Chrome / Edge",
-    "installStepDownload": "Scarica ed estrai il file ZIP. Conserva la cartella estratta.",
-    "installStepBrowser": "Apri chrome://extensions (Chrome) o edge://extensions (Edge) nella barra degli indirizzi e attiva la modalità sviluppatore.",
-    "installStepLoad": "Fai clic su Carica decompresso, seleziona la cartella contenente manifest.json, quindi aggiungi l'estensione alla barra degli strumenti.",
-    "manualUpdateNote": "Le installazioni manuali non si aggiornano automaticamente. Scarica la nuova versione, sostituisci i file nella cartella originale, quindi fai clic su Ricarica nella pagina delle estensioni. Mantieni la cartella di installazione in posizione.",
+    "installTitle": "Installazione e file ufficiali",
+    "installStepDownload": "Usa il collegamento allo store ufficiale del browser per installare e ricevere aggiornamenti automatici.",
+    "installStepBrowser": "Chrome / Edge: i CRX sono copie dei file ufficiali o pacchetti per installazioni gestite supportate. Si applicano le regole del browser e della piattaforma; se l’installazione viene rifiutata, usa lo store.",
+    "installStepLoad": "Firefox: installa tramite AMO oppure scegli «Installa componente aggiuntivo da file…» nel gestore dei componenti aggiuntivi e seleziona l’XPI firmato.",
+    "manualUpdateNote": "Scaricare un file non garantisce che sia consentita l’installazione diretta. L’installazione auto-ospitata di Chrome su Windows/macOS richiede una politica aziendale; installazione e aggiornamenti seguono le regole dello store o di gestione.",
     "downloadXpi": "Scarica firmato XPI",
     "storeHeading": "Collegamenti al negozio del browser",
     "storeNote": "Installa dallo store ufficiale di Chrome, Edge o Firefox, oppure usa il pacchetto per il tuo browser. Feedback:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: miglioramento più fluido (pubblicazione negli store in attesa)",
+        "items": [
+          "Il miglioramento delle immagini e la traduzione condividono la stessa finestra di preparazione anticipata per preparare le pagine successive durante la lettura.",
+          "Le traduzioni esistenti vengono mostrate subito anche quando il miglioramento è in coda o in corso. Al termine, il risultato le sostituisce senza spostare la posizione di lettura.",
+          "La cache e le attività di miglioramento vengono riutilizzate, evitando richieste duplicate quando si riapre il lettore.",
+          "I pacchetti 0.12.0 per Chrome, Edge e Firefox sono pronti per l’invio agli store, ma non sono ancora pubblicati. Il sito offre attualmente Chrome 0.11.3, Edge 0.10.2 e Firefox 0.11.3 (firmato da AMO)."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

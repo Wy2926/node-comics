@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Open your next story in the browser you already enjoy.",
     "storeUnavailable": "Store review pending",
     "directDownloadTitle": "Download the extension directly",
-    "directDownloadDescription": "Download the package from your browser’s card, extract it, then follow these steps.",
+    "directDownloadDescription": "Installing from the official store is recommended. Download buttons provide original official CRX or AMO-signed XPI files.",
     "packageUnavailable": "Package download unavailable",
     "downloadZip": "Download ZIP",
-    "installTitle": "Manual installation for Chrome / Edge",
-    "installStepDownload": "Download and extract the ZIP. Keep the extracted folder.",
-    "installStepBrowser": "Open chrome://extensions (Chrome) or edge://extensions (Edge) in the address bar and turn on Developer mode.",
-    "installStepLoad": "Click Load unpacked, select the folder containing manifest.json, then pin the extension to your toolbar.",
-    "manualUpdateNote": "Manual installations do not update automatically. Download the new version, replace the files in the original folder, then click Reload on the extensions page. Keep the installation folder in place.",
+    "installTitle": "Installation and official files",
+    "installStepDownload": "Use your browser’s official store link to install and receive automatic updates.",
+    "installStepBrowser": "Chrome / Edge: CRX files are official-file backups or packages for supported managed installations. Browser and platform policies apply; use the store if installation is refused.",
+    "installStepLoad": "Firefox: install through AMO, or choose “Install Add-on From File…” in the add-ons manager and select the signed XPI.",
+    "manualUpdateNote": "Downloading a file does not guarantee that direct installation is allowed. Self-hosted Chrome installation on Windows/macOS requires enterprise policy; installation and updates follow store or management policies.",
     "downloadXpi": "Download signed XPI",
     "storeHeading": "Browser store links",
     "storeNote": "Install from the official Chrome, Edge or Firefox store, or use the matching browser package. Feedback:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: Smoother enhancement (pending store release)",
+        "items": [
+          "Enhancement and translation share the same lookahead window, preparing upcoming pages while you read.",
+          "Existing translations display immediately while enhancement is queued or running, then update in place when it finishes without moving your reading position.",
+          "Reuse enhancement caches and tasks so reopening the reader does not submit duplicate enhancement requests.",
+          "Version 0.12.0 packages for Chrome, Edge and Firefox are ready for store submission but are not yet available in stores. The website currently offers Chrome 0.11.3, Edge 0.10.2 and Firefox 0.11.3 (AMO-signed)."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

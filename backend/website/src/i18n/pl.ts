@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Otwórz następną historię w przeglądarce, z której już korzystasz.",
     "storeUnavailable": "Oczekuje na recenzję sklepu",
     "directDownloadTitle": "Pobierz rozszerzenie bezpośrednio",
-    "directDownloadDescription": "Pobierz pakiet z karty przeglądarki, rozpakuj go, a następnie wykonaj poniższe kroki.",
+    "directDownloadDescription": "Zalecamy instalację z oficjalnego sklepu. Przyciski pobierania udostępniają oryginalne oficjalne pliki CRX lub XPI podpisane przez AMO.",
     "packageUnavailable": "Pobieranie pakietu jest niedostępne",
     "downloadZip": "Pobierz ZIP",
-    "installTitle": "Ręczna instalacja dla Chrome / Edge",
-    "installStepDownload": "Pobierz i wyodrębnij plik ZIP. Zachowaj wyodrębniony folder.",
-    "installStepBrowser": "Otwórz chrome://extensions (Chrome) lub edge://extensions (Edge) w pasku adresu i włącz tryb programisty.",
-    "installStepLoad": "Kliknij opcję Załaduj rozpakowane, wybierz folder zawierający manifest.json, a następnie przypnij rozszerzenie do paska narzędzi.",
-    "manualUpdateNote": "Instalacje ręczne nie aktualizują się automatycznie. Pobierz nową wersję, zastąp pliki w oryginalnym folderze, a następnie kliknij Załaduj ponownie na stronie rozszerzeń. Zachowaj folder instalacyjny na miejscu.",
+    "installTitle": "Instalacja i oficjalne pliki",
+    "installStepDownload": "Użyj łącza do oficjalnego sklepu swojej przeglądarki, aby zainstalować rozszerzenie i otrzymywać automatyczne aktualizacje.",
+    "installStepBrowser": "Chrome / Edge: pliki CRX to kopie oficjalnych oryginałów lub pakiety do obsługiwanych instalacji zarządzanych. Obowiązują zasady przeglądarki i platformy; jeśli instalacja zostanie odrzucona, użyj sklepu.",
+    "installStepLoad": "Firefox: zainstaluj przez AMO albo wybierz „Zainstaluj dodatek z pliku…” w menedżerze dodatków i wskaż podpisany plik XPI.",
+    "manualUpdateNote": "Pobranie pliku nie gwarantuje możliwości bezpośredniej instalacji. Instalacja samodzielnie hostowanych rozszerzeń Chrome w Windows/macOS wymaga zasad firmowych; instalacją i aktualizacjami rządzą zasady sklepu lub zarządzania.",
     "downloadXpi": "Pobierz podpisany XPI",
     "storeHeading": "Linki do sklepu przeglądarki",
     "storeNote": "Zainstaluj z oficjalnego sklepu Chrome, Edge lub Firefox albo użyj pakietu dla swojej przeglądarki. Opinie:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: płynniejsze ulepszanie obrazów (oczekuje na publikację w sklepach)",
+        "items": [
+          "Ulepszanie obrazów i tłumaczenie korzystają z tego samego okna przygotowania kolejnych stron podczas czytania.",
+          "Gotowe tłumaczenia wyświetlają się od razu, nawet gdy ulepszanie oczekuje w kolejce lub trwa. Po zakończeniu wynik zastępuje obraz bez zmiany pozycji czytania.",
+          "Pamięć podręczna i zadania ulepszania są wykorzystywane ponownie, więc ponowne otwarcie czytnika nie wysyła powtórnych żądań ulepszenia.",
+          "Pakiety 0.12.0 dla Chrome, Edge i Firefox są gotowe do przesłania do sklepów, ale nie zostały jeszcze opublikowane. Witryna udostępnia obecnie Chrome 0.11.3, Edge 0.10.2 i Firefox 0.11.3 (podpisany przez AMO)."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",

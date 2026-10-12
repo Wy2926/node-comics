@@ -64,10 +64,37 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
-test('0.10.0 leads every locale with all seven extension highlights',()=>{
+test('0.12.0 leads every locale with four highlights and an explicit pending store release',()=>{
+  const pending:Record<string,string>={'zh-CN':'待商店发布','zh-TW':'待商店發布',en:'pending store release',ja:'ストア公開待ち',ko:'스토어 출시 대기',fr:'publication en boutique en attente',es:'pendiente de publicación en las tiendas','pt-BR':'publicação nas lojas pendente',de:'Store-Veröffentlichung ausstehend',it:'pubblicazione negli store in attesa',ru:'ожидает публикации в магазинах',pl:'oczekuje na publikację w sklepach',uk:'очікує публікації в магазинах',tr:'mağazalarda yayınlanmayı bekliyor',vi:'chờ phát hành trên cửa hàng',id:'menunggu rilis di toko',ar:'بانتظار النشر في المتاجر'};
   for(const locale of locales){
     const release=dictionaries[locale].documents.releases[0];
-    assert.equal(release.id,'0.10.0',locale);
+    assert.equal(release.id,'0.12.0',locale);
+    assert.equal(release.date,'2026-10-13',locale);
+    assert.ok(release.title.includes('0.12.0')&&release.title.includes(pending[locale]),locale);
+    assert.equal(release.items.length,4,locale);
+    assert.equal(new Set(release.items).size,4,locale);
+    assert.ok(release.items.every(item=>item.trim().length>0),locale);
+    for(const term of ['0.12.0','Chrome 0.11.3','Edge 0.10.2','Firefox 0.11.3','AMO'])
+      assert.ok(release.items[3].includes(term),`${locale}: ${term}`);
+  }
+});
+
+test('official package instructions distinguish restricted CRX and signed Firefox installation',()=>{
+  for(const locale of locales){
+    const ui=dictionaries[locale].ui;
+    const steps=[ui.installStepDownload,ui.installStepBrowser,ui.installStepLoad];
+    assert.ok(steps.every(step=>step.trim().length>0),locale);
+    for(const term of ['Chrome','Edge','CRX'])assert.ok(steps[1].includes(term),`${locale}: ${term}`);
+    for(const term of ['Firefox','AMO','XPI'])assert.ok(steps[2].includes(term),`${locale}: ${term}`);
+    assert.ok(ui.manualUpdateNote.includes('Windows/macOS')&&ui.manualUpdateNote.includes('Chrome'),locale);
+    assert.doesNotMatch([ui.installTitle,ui.directDownloadDescription,...steps,ui.manualUpdateNote].join(' '),/ZIP|manifest\.json|chrome:\/\/extensions|edge:\/\/extensions/,locale);
+  }
+});
+
+test('0.10.0 remains in every locale with all seven extension highlights',()=>{
+  for(const locale of locales){
+    const release=dictionaries[locale].documents.releases.find(release=>release.id==='0.10.0');
+    assert.ok(release,locale);
     assert.equal(release.date,'2026-10-04',locale);
     assert.ok(release.title.includes('0.10.0'),locale);
     assert.equal(release.items.length,8,locale);

@@ -102,14 +102,14 @@ export default {
     "storeDescription": "Öffnen Sie Ihre nächste Story in dem Browser, der Ihnen bereits gefällt.",
     "storeUnavailable": "Store-Überprüfung steht noch aus",
     "directDownloadTitle": "Laden Sie die Erweiterung direkt herunter",
-    "directDownloadDescription": "Laden Sie das Paket von der Karte Ihres Browsers herunter, extrahieren Sie es und befolgen Sie dann diese Schritte.",
+    "directDownloadDescription": "Die Installation aus dem offiziellen Store wird empfohlen. Die Download-Schaltflächen liefern unveränderte offizielle CRX-Dateien oder von AMO signierte XPI-Dateien.",
     "packageUnavailable": "Paket-Download nicht verfügbar",
     "downloadZip": "ZIP herunterladen",
-    "installTitle": "Manuelle Installation für Chrome / Edge",
-    "installStepDownload": "Laden Sie ZIP herunter und extrahieren Sie es. Behalten Sie den extrahierten Ordner.",
-    "installStepBrowser": "Öffnen Sie chrome://extensions (Chrome) oder edge://extensions (Edge) in der Adressleiste und aktivieren Sie den Entwicklermodus.",
-    "installStepLoad": "Klicken Sie auf „Entpackt laden“, wählen Sie den Ordner aus, der „manifest.json“ enthält, und heften Sie dann die Erweiterung an Ihre Symbolleiste.",
-    "manualUpdateNote": "Manuelle Installationen werden nicht automatisch aktualisiert. Laden Sie die neue Version herunter, ersetzen Sie die Dateien im Originalordner und klicken Sie dann auf der Erweiterungsseite auf Neu laden. Behalten Sie den Installationsordner bei.",
+    "installTitle": "Installation und offizielle Dateien",
+    "installStepDownload": "Installieren Sie über den offiziellen Store-Link Ihres Browsers und erhalten Sie automatische Updates über den Store.",
+    "installStepBrowser": "Chrome / Edge: CRX-Dateien dienen als Sicherung der offiziellen Originaldateien oder für unterstützte verwaltete Installationen. Browser- und Plattformrichtlinien gelten; verwenden Sie bei einer abgelehnten Installation den Store.",
+    "installStepLoad": "Firefox: Installieren Sie über AMO oder wählen Sie in der Add-on-Verwaltung „Add-on aus Datei installieren…“ und anschließend die signierte XPI-Datei.",
+    "manualUpdateNote": "Ein Download garantiert nicht, dass eine direkte Installation erlaubt ist. Selbst gehostete Chrome-Installationen unter Windows/macOS erfordern eine Unternehmensrichtlinie; Installation und Updates richten sich nach den Store- oder Verwaltungsrichtlinien.",
     "downloadXpi": "Signiert herunterladen XPI",
     "storeHeading": "Browser-Store-Links",
     "storeNote": "Installiere aus dem offiziellen Chrome-, Edge- oder Firefox-Store oder nutze das passende Browserpaket. Feedback:",
@@ -640,6 +640,17 @@ export default {
       }
     ],
     "releases": [
+      {
+        "id": "0.12.0",
+        "date": "2026-10-13",
+        "title": "0.12.0: flüssigere Bildverbesserung (Store-Veröffentlichung ausstehend)",
+        "items": [
+          "Bildverbesserung und Übersetzung nutzen dasselbe Vorausladefenster und bereiten während des Lesens die nächsten Seiten vor.",
+          "Vorhandene Übersetzungen werden sofort angezeigt, auch wenn die Bildverbesserung wartet oder läuft. Nach Abschluss wird das Bild an derselben Stelle ersetzt, ohne die Leseposition zu ändern.",
+          "Cache und Aufgaben der Bildverbesserung werden wiederverwendet, sodass beim erneuten Öffnen des Readers keine doppelten Verbesserungsanfragen gesendet werden.",
+          "Die Pakete 0.12.0 für Chrome, Edge und Firefox sind zur Einreichung in den Stores vorbereitet, aber noch nicht veröffentlicht. Die Website bietet derzeit Chrome 0.11.3, Edge 0.10.2 und Firefox 0.11.3 (von AMO signiert) an."
+        ]
+      },
       {
         "id": "0.10.0",
         "date": "2026-10-04",
