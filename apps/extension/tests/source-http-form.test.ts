@@ -32,6 +32,40 @@ beforeEach(() => {
 });
 afterEach(() => {vi.unstubAllGlobals();});
 
+describe('bounded source binary POST', () => {
+  const body = new Uint8Array([0, 128, 255, 10]);
+  it('roundtrips bytes, copies input, and does not consume GET replay', async () => {
+    const replay = [{url: endpoint, referer: source, body: 'GET replay'}];
+    fetcher.mockResolvedValueOnce(new Response(new Uint8Array([255, 0, 128])));
+    const input = body.slice(), context = createSourceNetworkContext(undefined, replay);
+    const pending = context.requestBytes!(endpoint, {referer: source, body: input}); input.fill(9);
+    expect(await pending).toEqual(new Uint8Array([255, 0, 128]));
+    expect(fetcher.mock.calls[0][1]).toMatchObject({method: 'POST', body, credentials: 'include',
+      headers: {Accept: 'application/octet-stream', 'Content-Type': 'application/octet-stream'}});
+    expect(replay).toHaveLength(1);
+    expect(permission).toHaveBeenCalledExactlyOnceWith({origins: ['https://fixture.test/*']});
+  });
+  it('checks body size, address, referer, permission and cancellation', async () => {
+    const context = createSourceNetworkContext();
+    await expect(context.requestBytes!(endpoint, {referer: source, body: new Uint8Array(1024 * 1024 + 1)})).rejects.toMatchObject({kind: 'request-denied'});
+    await expect(context.requestBytes!('file:///x', {referer: source, body})).rejects.toMatchObject({kind: 'request-denied'});
+    await expect(context.requestBytes!(endpoint, {referer: 'data:x', body})).rejects.toMatchObject({kind: 'request-denied'});
+    permission.mockResolvedValueOnce(false);
+    await expect(context.requestBytes!(endpoint, {referer: source, body})).rejects.toMatchObject({kind: 'permission-required'});
+    const controller = new AbortController(); controller.abort(Error('cancelled'));
+    await expect(createSourceNetworkContext(controller.signal).requestBytes!(endpoint, {referer: source, body})).rejects.toThrow('cancelled');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('preserves HTTP failures, rate limits and response budget', async () => {
+    fetcher.mockResolvedValueOnce(new Response('denied', {status: 403}));
+    await expect(createSourceNetworkContext().requestBytes!(endpoint, {referer: source, body})).rejects.toMatchObject({kind: 'http', details: {status: 403}});
+    fetcher.mockResolvedValueOnce(new Response('limited', {status: 429, headers: {'Retry-After': '7'}}));
+    await expect(createSourceNetworkContext().requestBytes!(endpoint, {referer: source, body})).rejects.toMatchObject({details: {status: 429, retryAfter: 7}});
+    fetcher.mockResolvedValueOnce(new Response(new Uint8Array(8 * 1024 * 1024 + 1)));
+    await expect(createSourceNetworkContext().requestBytes!(endpoint, {referer: source, body})).rejects.toMatchObject({kind: 'invalid-response'});
+  });
+});
+
 describe('bounded source form POST', () => {
   it('encodes string fields as UTF-8 form data, including spaces, punctuation and non-ASCII text', async () => {
     const form = Object.assign(Object.create(null), {action: 'load pages', chapter: '日本語 + &=', 'pages[]': '7'});

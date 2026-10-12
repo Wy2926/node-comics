@@ -9,7 +9,7 @@ export const createPage: CreateSourcePage = context => {
     containers: '#root', attributes: ['alt'],
     snapshot: () => ({url: context.location.url, adapter: 'mangadot', title: context.document.title,
       direction: 'rtl', note: '', discoveryComplete: false, items: []}),
-    targets: () => renderedImages(context.document, context.location.url, '#root img[alt^="Page "]')
+    targets: () => context.location.kind !== 'reader' ? [] : renderedImages(context.document, context.location.url, '#root img[alt^="Page "]')
       .filter(({element, url}) => 'alt' in element && /^Page [1-9]\d*$/.test(element.alt) && element.complete && element.naturalWidth > 0 && element.naturalHeight > 0 &&
         new URL(url).origin === origin && /^\/chapters\/manga_\d+\//.test(new URL(url).pathname))
       .map(image => ({...image, key: `${image.element.getAttribute('alt')}:${image.url}`})),

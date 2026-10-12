@@ -8,6 +8,8 @@ export interface SourceNetworkContext {
   onCatalogProgress?(snapshot: SourceCatalogSnapshot): Promise<void>;
   /** Adapter-selected Referer, parseable error statuses and bounded form POST apply only to this request. */
   request(url:string, options?:{referer:string; acceptStatuses?:readonly number[]; form?:Readonly<Record<string,string>>}):Promise<string>;
+  /** Direct HTTP only: bounded binary POST for read-only source APIs; never replayed or sent through a page session. */
+  requestBytes?(url:string, options:{referer:string; body:Uint8Array}):Promise<Uint8Array>;
 }
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {

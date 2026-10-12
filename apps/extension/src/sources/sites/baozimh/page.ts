@@ -10,7 +10,7 @@ export const createPage: CreateSourcePage = context => {
     containers: '.comic-contain, .comics-detail', attributes: ['amp-img-id'],
     snapshot: () => ({url: context.location.url, adapter: 'baozimh', title: context.document.title,
       direction: 'ltr', note: '', discoveryComplete: false, items: []}),
-    targets: () => renderedImages(context.document, context.location.url, '.comic-contain amp-img.comic-contain__item > img[amp-img-id]')
+    targets: () => context.location.kind !== 'reader' ? [] : renderedImages(context.document, context.location.url, '.comic-contain amp-img.comic-contain__item > img[amp-img-id]')
       .filter(({element, url}) => {
         const img = element as HTMLImageElement;
         if (!img.complete || !img.naturalWidth || !img.naturalHeight || !/^chapter-img-\d+-\d+$/.test(img.getAttribute('amp-img-id') ?? '')) return false;

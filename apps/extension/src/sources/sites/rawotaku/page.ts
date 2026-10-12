@@ -9,7 +9,7 @@ export const createPage: CreateSourcePage = context => {
     containers: '#vertical-content, #horizontal-content, .iv-card, .hr-manga, .manga-buttons', attributes: ['alt', 'data-src'],
     snapshot: () => ({url: context.location.url, adapter: 'rawotaku', title: context.document.title,
       direction: 'rtl', note: '', discoveryComplete: false, items: []}),
-    targets: () => renderedImages(context.document, context.location.url,
+    targets: () => context.location.kind !== 'reader' ? [] : renderedImages(context.document, context.location.url,
       '#vertical-content > .iv-card > img.image-vertical, #horizontal-content > .iv-card > img.image-vertical').flatMap(image => {
       const img = image.element as HTMLImageElement;
       if (!img.complete || !img.naturalWidth || !img.naturalHeight || !/^\d{1,4}$/.test(img.alt)) return [];

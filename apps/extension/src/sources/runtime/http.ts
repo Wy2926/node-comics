@@ -50,14 +50,12 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
 }
 /** Packaged adapters choose request hosts; the transport checks browser access and resource budgets. */
 export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportResponse[] = []): SourceNetworkContext {
-  return {signal, async request(url, options) {
-    const body = await authorizeSourceRequest(url,options,signal);
-    const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer) : -1;
-    if (cached >= 0) return replay.splice(cached, 1)[0].body;
+  async function read(url: string, options: Parameters<SourceNetworkContext['request']>[1], body?: string | Uint8Array<ArrayBuffer>) {
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
-      const response = await fetch(url, {credentials: 'include', headers: {Accept: 'application/json, text/html',
-        ...(body === undefined ? {} : {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
+      const binary = body instanceof Uint8Array;
+      const response = await fetch(url, {credentials: 'include', headers: {Accept: binary ? 'application/octet-stream' : 'application/json, text/html',
+        ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})});
       // Some sources return a structured empty result with a non-success status.
       // Only explicitly requested error responses reach the owning parser.
@@ -83,7 +81,20 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       const bytes = new Uint8Array(length);
       let offset = 0;
       for (const chunk of chunks) {bytes.set(chunk, offset); offset += chunk.length;}
-      return new TextDecoder().decode(bytes);
+      return bytes;
     });
+  }
+  return {signal, async request(url, options) {
+    const body = await authorizeSourceRequest(url,options,signal);
+    const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer) : -1;
+    if (cached >= 0) return replay.splice(cached, 1)[0].body;
+    return new TextDecoder().decode(await read(url, options, body));
+  }, async requestBytes(url, options) {
+    // Copy before asynchronous authorization so caller mutation cannot change the approved request.
+    if (!(options?.body instanceof Uint8Array) || options.body.byteLength > 1024 * 1024)
+      throw new SourceHttpError('request-denied', '来源二进制请求无效或超过限制。');
+    const body = new Uint8Array(options.body);
+    await authorizeSourceRequest(url, {referer: options.referer}, signal);
+    return read(url, {referer: options.referer}, body);
   }};
 }

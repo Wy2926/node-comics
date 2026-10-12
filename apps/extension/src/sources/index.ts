@@ -42,9 +42,9 @@ export const canFindAlternatives = (url?: string) => !url || sourceFor(url).defi
 /** Validate against the resolved source, never a caller-supplied adapter flag. */
 export function inlineImageSize(width:number,height:number,url:string) {
   const {definition,location}=sourceFor(url);
-  if(!definition.capabilities.inline||location.kind!=='reader')return false;
+  if(!definition.capabilities.inline)return false;
   return definition.id==='generic'||definition.inlineRecognition==='generic' ? comicSize(width,height)
-    : Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0;
+    : location.kind==='reader'&&Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0;
 }
 export const sourceLocation = (url: string) => {
   try {

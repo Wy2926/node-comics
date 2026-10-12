@@ -7,6 +7,7 @@ import {imageSession} from '../session';
 export function gigaViewerPage(context: SourcePageContext, parsePages: (value: unknown, url: string) => SourceSnapshot) {
   let cached: {raw: string; value?: SourceSnapshot} | undefined;
   function targets(): PageImage[] {
+    if (context.location.kind !== 'reader') return [];
     const raw = context.document.querySelector('#episode-json')?.getAttribute('data-value') ?? '';
     if (cached?.raw !== raw) {
       // Cache invalid metadata as well: a waiting/unsupported page must not be parsed on every scan.

@@ -82,7 +82,7 @@ export function comiciPage(context: SourcePageContext, location: ComiciSite['loc
   const session = imageSession(context, {
     attributes: ['data-comici-viewer-id'],
     containers: '#comici-viewer, .-cv-page, .series-act, .episode-header',
-    targets: () => images(context.document),
+    targets: () => context.location.kind === 'reader' ? images(context.document) : [],
     snapshot() {
       const doc = context.document,
         url = context.location.url;

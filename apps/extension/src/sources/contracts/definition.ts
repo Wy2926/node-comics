@@ -34,7 +34,7 @@ export interface SourceDefinition {
   capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean; findAlternatives?: boolean };
   /** Use the shared floating import entry when the site has no stable inline anchor. */
   embeddedEntry?: 'floating';
-  /** Explicit reuse of loaded-image recognition; HTTP catalog/pages remain authoritative. */
+  /** Reuse generic recognition on every claimed page, independently of its import kind; HTTP catalog/pages remain authoritative. */
   inlineRecognition?: 'generic';
   /** Explicit opt-in: only adapters with a verified complete directory may refresh it automatically. */
   catalogSync?: { intervalMinutes: number };

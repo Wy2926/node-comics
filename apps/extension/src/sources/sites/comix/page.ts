@@ -33,6 +33,7 @@ export const createPage: CreateSourcePage = context => {
     return changed;
   };
   function images(): PageImage[] {
+    if (context.location.kind !== 'reader') return [];
     revisions(observer?.takeRecords() ?? []);
     const doc = context.document;
     const ordinary = new Map(renderedImages(doc, context.location.url,

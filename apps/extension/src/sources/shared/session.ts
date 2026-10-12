@@ -7,6 +7,7 @@ export function imageSession(
   options: {
     snapshot: () => SourceSnapshot;
     read?: () => Promise<SourceSnapshot>;
+    /** Recognition owns its page scope; import kind must not gate a generic scanner. */
     targets: SourcePageSession['inlineTargets'];
     attributes?: string[];
     containers?: string;
@@ -43,7 +44,7 @@ export function imageSession(
     },
     inlineTargets() {
       active();
-      return context.location.kind === 'reader' ? options.targets() : [];
+      return options.targets();
     },
     observe(changed) {
       active();

@@ -35,7 +35,7 @@ export async function readSourceArtwork(sourceId:string,url:string,pageUrl:strin
 export async function readInlineSourceImage(url:string,pageUrl:string,signal?:AbortSignal,referrerPolicy?:ReferrerPolicy,explicitImage=false):Promise<Blob> {
   signal?.throwIfAborted();
   const {definition,location}=resolveSource(pageUrl,definitions);
-  if((!explicitImage&&(!definition.capabilities.inline||location.kind!=='reader'))||safeImageUrl(url,pageUrl)!==url)
+  if((!explicitImage&&(!definition.capabilities.inline||definition.inlineRecognition!=='generic'&&location.kind!=='reader'))||safeImageUrl(url,pageUrl)!==url)
     throw Error('SOURCE_RESOURCE_EXPIRED');
   const adapter=sourceImages[definition.id];
   const headers=typeof adapter?.headers==='function'?adapter.headers(url):adapter?.headers;

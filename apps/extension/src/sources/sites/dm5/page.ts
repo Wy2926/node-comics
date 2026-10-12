@@ -12,7 +12,7 @@ export const createPage: CreateSourcePage = context => {
     containers: `${catalogAnchor}, #cp_img, #showimage`,
     snapshot: () => ({url: context.location.url, adapter: 'dm5', title: context.document.title,
       direction: 'ltr', note: '', discoveryComplete: false, items: []}),
-    targets: () => renderedImages(context.document, context.location.url, selector)
+    targets: () => context.location.kind !== 'reader' ? [] : renderedImages(context.document, context.location.url, selector)
       .filter(({element}) => 'naturalWidth' in element && element.complete && element.naturalWidth > 0 && element.naturalHeight > 0),
   });
   return {...session, direction: 'ltr',

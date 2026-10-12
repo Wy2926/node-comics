@@ -10,7 +10,7 @@ export const createPage: CreateSourcePage = context => {
     attributes: ['alt'],
     snapshot: () => ({url: context.location.url, adapter: 'jf00', title: context.document.title,
       direction: 'ltr', note: '', discoveryComplete: false, items: []}),
-    targets: () => renderedImages(context.document, context.location.url, '.comic-content > img.comic-image')
+    targets: () => context.location.kind !== 'reader' ? [] : renderedImages(context.document, context.location.url, '.comic-content > img.comic-image')
       .filter(({element, url}) => {
         const img = element as HTMLImageElement;
         if (!img.complete || !img.naturalWidth || !img.naturalHeight || !/^.+ - 第[1-9]\d*张图$/.test(img.alt)) return false;
