@@ -9,6 +9,7 @@ import { sourceRangeCache } from '../../storage/source-ranges';
 import { thumbnailCache } from '../../storage/thumbnails';
 import { translationCache } from '../../storage/translations';
 import { downloadStore } from '../../storage/downloads';
+import {blockProcessingOwner, removeProcessingOwner} from '../../image-processing/storage';
 import { estimateStorage, relieveStoragePressure } from '../../storage/pressure';
 import { recoverContainerImports, listContainerImports, listContainerReferences, releaseContainer } from '../../storage/containers';
 import { registerLocalContainer, importSourceFiles } from './import-service';
@@ -98,6 +99,7 @@ export async function inspectSourceRemoval(connectionId:string):Promise<SourceRe
 async function prepareEntryCleanup(connectionId:string,entry:Entry) {
   const id=sourceCleanupKey('entry',connectionId,entry.id);
   await blockSourceTranslationEntry(entry.id);
+  await blockProcessingOwner(entry.id);
   if(await catalog.get('metadata',id))return;
   const resultRefs=await inspectSourceTranslationEntry(entry.id);
   await catalog.put('metadata',{id,entryId:entry.id,contentId:entry.contentId,containerId:entry.containerId,resultRefs});
@@ -105,6 +107,7 @@ async function prepareEntryCleanup(connectionId:string,entry:Entry) {
 async function cleanupEntry(journal:SourceEntryCleanup) {
   await blockSourceTranslationEntry(journal.entryId);
   await removeSourceTranslationEntry(journal.entryId);
+  await removeProcessingOwner(journal.entryId);
   await Promise.all([
     sourcePageCache.deleteOwner(journal.entryId,true),sourceRangeCache.deleteOwner(journal.entryId,true),
     thumbnailCache.deleteOwner(journal.entryId,true),downloadStore.deleteOwner(journal.entryId,true),

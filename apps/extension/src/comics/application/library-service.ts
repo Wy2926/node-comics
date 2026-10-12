@@ -8,6 +8,7 @@ import {sourcePageCache} from '../../storage/source-pages';
 import {sourceRangeCache} from '../../storage/source-ranges';
 import {thumbnailCache} from '../../storage/thumbnails';
 import {downloadStore} from '../../storage/downloads';
+import {removeProcessingOwner} from '../../image-processing/storage';
 import type {LibraryViewModel,SourceCatalog} from './types';
 import {mergeJobs} from '../../reader/jobs';
 import {sourceCoverOwner} from './cover-access';
@@ -162,7 +163,7 @@ export async function removeComic(id:string,removalConnectionId?:string) {
   const entries=await catalog.deleteComic(id,removalConnectionId);
   if(!removalConnectionId)await thumbnailCache.deleteOwner(sourceCoverOwner(id),true);
   for(const entry of entries) {
-    await Promise.all([sourcePageCache.deleteOwner(entry.id,true),sourceRangeCache.deleteOwner(entry.id,true),thumbnailCache.deleteOwner(entry.id,true),downloadStore.deleteOwner(entry.id,true)]);
+    await Promise.all([sourcePageCache.deleteOwner(entry.id,true),sourceRangeCache.deleteOwner(entry.id,true),thumbnailCache.deleteOwner(entry.id,true),downloadStore.deleteOwner(entry.id,true),removeProcessingOwner(entry.id)]);
     if(entry.containerId)await releaseContainer(entry.containerId,entry.contentId);
   }
 }

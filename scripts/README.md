@@ -64,6 +64,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_translation_status.mjs` | Vite 5176；真实 640×20000 合成图片与模拟服务，检查长图视口内提示、解码等待／失败后仅重载、无文字显式重译及重复点击保护、显示反馈、工具栏与阅读位置；不调用真实翻译模型 |
 | `verify_reading_api.mjs` | 临时 API／worker 与合成供应商，启动顺序见[翻译契约](../docs/READING_TRANSLATION_CONTRACT.md#9-验证入口) |
 | `verify_translation_channels.mjs` / `verify_translation_channel_host.mjs` | 渠道设置、模拟 MTU、后台中断与缓存，见[渠道规范](../docs/TRANSLATION_CHANNELS.md#验证) |
+| `verify_image_enhancement.mjs` | Vite 5176 渠道夹具；完整译图字节再增强、两页窗口、开关、缓存、独立重试、并排对照与窄屏设置。只使用模拟 MTU／nunif 响应，不调用模型，见[图像增强](../docs/IMAGE_ENHANCEMENT.md#验证) |
 | `verify_translation_channel_live.mjs` | 真实回环 MTU；使用 `MTU_USERNAME`、`MTU_PASSWORD`、可选 `MTU_BASE_URL`，实际调用服务端引擎 |
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
 | `node --test apps/extension/tests/shortcuts.browser.mjs` | Vite 5181 的隔离阅读器与选择器夹具；左侧锚点与连续滚动、固定标题／关闭／底栏、组合键录制／恢复、主题令牌、弹层保护与阅读位置恢复。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，不代替已安装扩展或原生划图授权验证 |
@@ -73,7 +74,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
 | `verify_extension_mobile.mjs` | Vite 5181 或回环 `TEST_READER_URL`；Chromium／Firefox／WebKit 的 320–430px 与横屏、导航、弹框、CBZ 实际导入、阅读工具及位置恢复，含模拟软键盘视口、Popup 和无 OffscreenCanvas 的 20000px 长图。`MOBILE_BROWSER` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，外部 HTTP 全部模拟，截图写入 `artifacts/mobile-validation/`；不是 Firefox Android／Orion 真机验收 |
-| `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试及同 CFI 续读。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网。WebKit 段内像素级恢复精度单列严格 TODO，不等同真机通过 |
+| `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复及同 CFI 续读。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网。WebKit 段内像素级恢复精度单列严格 TODO，不等同真机通过 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明、首次提示、焦点恢复和 16 语大字号布局。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |

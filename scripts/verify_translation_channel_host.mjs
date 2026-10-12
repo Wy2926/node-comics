@@ -21,8 +21,9 @@ await build({configFile: false, root: path.resolve('apps/extension'), logLevel: 
   lib: {entry: probeEntry, formats: ['es'], fileName: () => 'result-probe.js'}}});
 const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const checks = [], failures = [], requests = [];
-let context, page, probe, source, output, releaseResponse, translationStartedAt, silentMs;
+let context, page, probe, source, output, enhanced, releaseResponse, translationStartedAt, silentMs;
 let translations = 0;
+let enhancements = 0;
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://fixture');
@@ -46,6 +47,15 @@ const server = createServer(async (req, res) => {
       assert(text.includes('"target_lang":"CHS"'));
       await new Promise(resolve => {releaseResponse = resolve;});
       res.writeHead(200, {'Content-Type': 'image/png', 'Cache-Control': 'no-store'}); res.end(output); return;
+    }
+    if (url.pathname === '/api') {
+      enhancements++;
+      const chunks=[];for await(const chunk of req)chunks.push(chunk);
+      const form=await new Response(Buffer.concat(chunks),{headers:{'Content-Type':req.headers['content-type']}}).formData();
+      assert.deepEqual(Buffer.from(await form.get('file').arrayBuffer()),output);
+      assert.deepEqual(Object.fromEntries(['style','noise','scale','format'].map(key=>[key,form.get(key)])),{style:'art',noise:'-1',scale:'2',format:'0'});
+      assert.equal(req.headers.authorization,undefined);assert.equal(req.headers.cookie,undefined);assert.equal(req.headers['x-session-token'],undefined);
+      res.writeHead(200,{'Content-Type':'image/png'});res.end(enhanced);return;
     }
     res.writeHead(404); res.end();
   } catch (error) {failures.push(error.message); res.writeHead(500); res.end('fixture failure');}
@@ -75,9 +85,9 @@ try {
       ctx.font = '42px sans-serif'; ctx.fillStyle = '#223451'; ctx.fillText(text, 70, 150);
       return [...new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer())];
     }
-    return {source: await image('#fff3df', 'HELLO LOCAL GPU'), output: await image('#e2f4ff', '你好，本地算力')};
+    return {source: await image('#fff3df', 'HELLO LOCAL GPU'), output: await image('#e2f4ff', '你好，本地算力'),enhanced:await image('#d8f0cf','ENHANCED FULL TRANSLATION')};
   });
-  source = Buffer.from(panels.source); output = Buffer.from(panels.output);
+  source = Buffer.from(panels.source); output = Buffer.from(panels.output);enhanced=Buffer.from(panels.enhanced);
   await probe.evaluate(async base => {
     await chrome.storage.local.remove('nc-auth');
     await chrome.storage.local.set({
@@ -153,6 +163,40 @@ try {
   await page.waitForFunction(() => document.querySelector('#comic').style.content.includes('blob:'), undefined, {timeout: 20000});
   assert.equal(translations, 1);
   check('Reloading the source page reuses the completed translation without a second MTU call');
+  const geometry=await page.locator('#comic').evaluate(image=>{const r=image.getBoundingClientRect();return {top:r.top,width:r.width,height:r.height};});
+  async function enableEnhancement(enabled) {
+    await probe.evaluate(async({base,enabled})=>chrome.storage.local.set({'nc-image-processing':{enabled,activeId:'isolated-nunif',cacheLimitMb:128,
+      profiles:[{id:'isolated-nunif',adapterId:'nunif',name:'Synthetic nunif',revision:1,settings:{url:base+'/',style:'art',scale:'2',noise:'-1'}}]}}),{base,enabled});
+  }
+  async function displayedBytes() {
+    return page.locator('#comic').evaluate(async image=>{
+      const url=/url\(["']?(blob:[^"')]+)["']?\)/.exec(image.style.content)?.[1];
+      if(!url)return [];
+      try{return [...new Uint8Array(await(await fetch(url)).arrayBuffer())];}catch{return [];}
+    });
+  }
+  await enableEnhancement(true);
+  await until(()=>enhancements===1);
+  await until(async()=>Buffer.from(await displayedBytes()).equals(enhanced));
+  assert.equal(translations,1);
+  assert.deepEqual(await page.locator('#comic').evaluate(image=>{const r=image.getBoundingClientRect();return {top:r.top,width:r.width,height:r.height};}),geometry);
+  await page.screenshot({path:path.join(out,'inline-enhanced.png')});
+  const sourceReads=requests.filter(request=>request.path==='/original.png').length,
+    displayedContent=await page.locator('#comic').evaluate(image=>image.style.content);
+  await probe.evaluate(async()=>{
+    const key='nc-image-processing',settings=(await chrome.storage.local.get(key))[key];
+    await chrome.storage.local.set({[key]:{...settings,cacheLimitMb:512,profiles:settings.profiles.map(profile=>({...profile,name:'Renamed synthetic nunif'}))}});
+  });
+  await pause(500);
+  assert.equal(requests.filter(request=>request.path==='/original.png').length,sourceReads);
+  assert.equal(await page.locator('#comic').evaluate(image=>image.style.content),displayedContent);
+  assert.equal(enhancements,1);assert.equal(translations,1);
+  check('Changing only the enhancement name and cache budget preserves the displayed bitmap and does not reload source images');
+  await enableEnhancement(false);await until(async()=>Buffer.from(await displayedBytes()).equals(output));
+  await enableEnhancement(true);await until(async()=>Buffer.from(await displayedBytes()).equals(enhanced));
+  assert.equal(enhancements,1);assert.equal(translations,1);
+  await enableEnhancement(false);await until(async()=>Buffer.from(await displayedBytes()).equals(output));
+  check('Production inline enhancement sends the full translation to nunif without MTU credentials, preserves geometry, and restores either cached display without rerunning a service');
   await until(() => host.isClosed(), 15_000);
   check('The idle execution host closes itself after delivery');
   const secondProbe = await context.newPage(); await secondProbe.goto(`chrome-extension://${extensionId}/host-probe.html`);
@@ -178,7 +222,7 @@ try {
   assert.equal(translations, 1); await secondProbe.close();
   check('Clearing the shared cache epoch prevents either context from reviving bytes through memory messaging and does not resubmit translation');
   assert.deepEqual(failures, []);
-  await writeFile(path.join(out, 'results.json'), JSON.stringify({checks, failures, requests, translations, silentMs,
+  await writeFile(path.join(out, 'results.json'), JSON.stringify({checks, failures, requests, translations, enhancements, silentMs,
     browser: context.browser()?.version(), syntheticMtu: true, realMtuEngine: false}, null, 2));
   console.log('Artifacts: ' + out);
 } catch (error) {

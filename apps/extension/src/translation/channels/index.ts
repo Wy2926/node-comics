@@ -4,7 +4,7 @@ import {channelDefinition,channelDefinitions} from './registry';
 import {channelSettingsKey,defaultChannel,deleteChannelSecrets,readChannelCredentials,readChannelSecrets,readChannelSettings,subscribeChannelSettings,writeChannelSecrets,updateChannelSettings} from './configuration';
 import type {ChannelConnection,ChannelConnectionInput,ChannelProfile,LocalTranslationResultReference} from './contracts';
 import {blockEntryDirectOperations,readEntryDirectOperations,removeEntryDirectOperations,transferDirectOperation,type DirectOperationOwner} from './transport/operations';
-import {removeTransferReceipts} from './transport/receipts';
+import {removeTransferReceipts} from '../../image-transfer/receipts';
 import {resultBlobKey} from '../../storage/translations/results';
 export type {ChannelConnection,ChannelDefinition,ChannelField,ChannelProfile,ChannelRuntime,TranslationScope} from './contracts';
 export {channelSettingsKey};

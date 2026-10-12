@@ -6,6 +6,7 @@ import {LanguageFlag} from '../ui/LanguageFlag';
 import {Select, SelectOption} from '../ui/Select';
 import {TranslationModelPicker} from '../ui/TranslationModelPicker';
 import type {ModelSelection} from '../translation/channels/contracts';
+import {EnhancementToggle} from '../ui/EnhancementSettings';
 
 export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, modelSelection, note}: {
   settings: Settings;
@@ -80,6 +81,7 @@ export function ReaderSettings({settings, setSettings, onLayout, sizing, childre
     <ReaderChoice label={msg('阅读背景')} value={settings.readerBackground}
       options={[{id: 'gray', label: msg('浅灰')}, {id: 'paper', label: msg('纸白')}, {id: 'night', label: msg('夜色')}]} onChange={readerBackground => setSettings(value => ({...value, readerBackground}))}/>
     {children}
+    <EnhancementToggle configure/>
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>
     </div>

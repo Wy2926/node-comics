@@ -31,7 +31,7 @@ async function imageBody(response: Response): Promise<Blob> {
   return blob;
 }
 
-/** The receipt is committed before fetch; another context must observe it, never resend. */
+/** Shared by translation and enhancement. A durable receipt always precedes fetch. */
 export async function executeImageTransfer(id: string, request: ImageTransferRequest, onAccepted?: () => void): Promise<void> {
   if (!validateTransferRequest(request)) throw new ImageTransferError('INVALID_REQUEST');
   await withTransferLock(id, async () => {

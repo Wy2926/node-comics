@@ -1,8 +1,9 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {Page, Job} from '../src/types';
-const mocks = vi.hoisted(() => ({acquire:vi.fn(), prepare:vi.fn()}));
+const mocks = vi.hoisted(() => ({acquire:vi.fn(), prepare:vi.fn(), enhance:vi.fn()}));
 vi.mock('../src/comics/application/image-access', () => ({acquireImage:mocks.acquire}));
 vi.mock('../src/reader/prepare-image', () => ({prepareReaderImage:mocks.prepare}));
+vi.mock('../src/image-processing/runtime', () => ({enhanceImage:mocks.enhance}));
 import {EpubImageWindow} from '../src/reader/epub-images';
 import {epubImageId} from '../src/comics/domain/epub-images';
 
@@ -19,6 +20,7 @@ beforeEach(() => {
   revoke = vi.fn(); vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revoke);
   mocks.acquire.mockImplementation(async () => ({blob:new Blob(['pixels']),release:vi.fn()}));
   mocks.prepare.mockResolvedValue(undefined);
+  mocks.enhance.mockResolvedValue(new Blob(['enhanced']));
 });
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();});
 
@@ -44,6 +46,94 @@ function page(href:string):Page {
 function visible(images:Element[],at:number) {intersect(images.map((target,i)=>({target,isIntersecting:i===at,intersectionRect:{width:i===at?240:0,height:i===at?360:0}})));}
 
 describe('EPUB embedded image window', () => {
+  const processing = () => ({owner:'entry-a',settings:{enabled:true,activeId:'local',cacheLimitMb:512,
+    profiles:[{id:'local',adapterId:'nunif',revision:1,name:'Local',settings:{url:'http://localhost/'}}]}});
+  it('enhances only complete translations in a two-image window and preserves the author box', async () => {
+    const {document,images}=artwork(),window=new EpubImageWindow(vi.fn(),vi.fn());window.add(document);visible(images,0);
+    const pages=images.map(image=>page(image.getAttribute('data-nc-epub-image')!));
+    window.show(pages.map(page=>({...page,outputBlobs:{}})),true,'classic','en','account-a',processing());
+    expect(mocks.enhance).not.toHaveBeenCalled();
+    window.show(pages,true,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
+    expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual(['result:OPS/0.png','result:OPS/1.png']);
+    expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
+    window.show(pages,true,'classic','en','account-a',{...processing(),settings:{...processing().settings,enabled:false}});
+    await vi.waitFor(()=>expect(images[0].getAttribute('src')).not.toBe('blob:original-0'));
+    expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
+  });
+  it('keeps a full translation on enhancement failure and explicitly retries enhancement only', async () => {
+    mocks.enhance.mockRejectedValueOnce(Error('Enhancement failed'));
+    const errors=vi.fn(),{document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),errors);window.add(document);visible(images,0);
+    window.show([page('OPS/0.png')],true,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')).toEqual({phase:'error',message:'Enhancement failed'}));
+    expect(errors).not.toHaveBeenCalledWith('OPS/0.png','Enhancement failed');
+    const base=images[0].getAttribute('src');expect(base).toMatch(/^blob:translated/);
+    window.retry('OPS/0.png');
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
+    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);
+    await vi.waitFor(()=>expect(images[0].getAttribute('src')).not.toBe(base));window.close();
+  });
+  it('exposes original-image enhancement progress and an independent retryable error', async () => {
+    const pending=Promise.withResolvers<Blob>();
+    mocks.enhance.mockImplementationOnce((_input,_profile,_signal,onState) => {onState({phase:'running'});return pending.promise;});
+    const changed=vi.fn(),errors=vi.fn(),{document,images}=artwork(['OPS/0.png']);
+    const window=new EpubImageWindow(vi.fn(),errors,changed);window.add(document);visible(images,0);
+    window.show([page('OPS/0.png')],false,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('running'));
+    expect(mocks.enhance.mock.calls[0][0].key).toBe('source:OPS/0.png');
+    const base=images[0].getAttribute('src');
+    pending.reject(Error('Enhancement unavailable'));
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')).toEqual({phase:'error',message:'Enhancement unavailable'}));
+    expect(images[0].getAttribute('src')).toBe(base);
+    expect(errors).not.toHaveBeenCalledWith('OPS/0.png','Enhancement unavailable');
+    window.retry('OPS/0.png');
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
+    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);
+    expect(changed).toHaveBeenCalled();window.close();
+  });
+  it('retains a prefetched enhancement failure when its artwork becomes the current image', async () => {
+    let failed=false;
+    mocks.enhance.mockImplementation(async input => {
+      if(input.key==='result:OPS/1.png'&&!failed){failed=true;throw Error('Prefetch failed');}
+      return new Blob(['enhanced']);
+    });
+    const changed=vi.fn(),{document,images}=artwork(),window=new EpubImageWindow(changed,vi.fn());
+    const pages=images.map(image=>page(image.getAttribute('data-nc-epub-image')!));
+    window.add(document);visible(images,0);window.show(pages,true,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/1.png')?.phase).toBe('error'));
+    visible(images,1);
+    // Reapplying refreshed page metadata must not clear the retained processing state.
+    window.show(pages.map(page=>({...page})),true,'classic','en','account-a',processing());
+    expect(changed).toHaveBeenLastCalledWith(['OPS/1.png','OPS/2.png','OPS/3.png','OPS/4.png']);
+    expect(window.enhancementState('OPS/1.png')).toEqual({phase:'error',message:'Prefetch failed'});
+    expect(mocks.enhance.mock.calls.filter(([input])=>input.key==='result:OPS/1.png')).toHaveLength(1);
+    window.retry('OPS/1.png');
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/1.png')?.phase).toBe('ready'));
+    expect(mocks.enhance.mock.calls.filter(([input])=>input.key==='result:OPS/1.png')).toHaveLength(2);window.close();
+  });
+  it('reports an original parent-image read failure through enhancement status and retries the read', async () => {
+    mocks.acquire.mockRejectedValueOnce(Error('Parent image unavailable'));
+    const errors=vi.fn(),{document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),errors);
+    window.add(document);visible(images,0);window.show([page('OPS/0.png')],false,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')).toEqual({phase:'error',message:'Parent image unavailable'}));
+    expect(images[0].getAttribute('src')).toBe('blob:original-0');
+    expect(errors).not.toHaveBeenCalledWith('OPS/0.png','Parent image unavailable');
+    expect(mocks.enhance).not.toHaveBeenCalled();
+    window.retry('OPS/0.png');
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
+    expect(mocks.acquire).toHaveBeenCalledTimes(3);expect(mocks.enhance).toHaveBeenCalledOnce();window.close();
+  });
+  it('does not reload the displayed enhancement when only its name or cache budget changes', async () => {
+    const {document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),vi.fn());
+    const pages=[page('OPS/0.png')],config=processing();
+    window.add(document);visible(images,0);window.show(pages,true,'classic','en','account-a',config);
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
+    const displayed=images[0].getAttribute('src'),reads=mocks.acquire.mock.calls.length;
+    window.show(pages,true,'classic','en','account-a',{...config,settings:{...config.settings,cacheLimitMb:128,
+      profiles:config.settings.profiles.map(profile=>({...profile,name:'Renamed'}))}});
+    expect(images[0].getAttribute('src')).toBe(displayed);
+    expect(mocks.acquire).toHaveBeenCalledTimes(reads);expect(mocks.enhance).toHaveBeenCalledOnce();window.close();
+  });
   it('starts at visible artwork, bounds translation to four unique assets, and never translates off-screen-only chapters', () => {
     const changed=vi.fn(),{document,images}=artwork();const window=new EpubImageWindow(changed,vi.fn());window.add(document);
     expect(changed).not.toHaveBeenCalled();expect(mocks.acquire).not.toHaveBeenCalled();

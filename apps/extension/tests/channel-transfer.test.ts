@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {startImageTransfer, interruptAbandonedTransfer, HOST_MESSAGE} from '../src/translation/channels/transport/client';
-import {executeImageTransfer, validateTransferRequest} from '../src/translation/channels/transport/execute';
-import {readTransferReceipt, saveTransferReceipt} from '../src/translation/channels/transport/receipts';
-import {registerImageTransferHost, trustedHostSender} from '../src/translation/channels/transport/host';
-import {transferLock, type ImageTransferRequest} from '../src/translation/channels/transport/types';
+import {startImageTransfer, interruptAbandonedTransfer, HOST_MESSAGE} from '../src/image-transfer/client';
+import {executeImageTransfer, validateTransferRequest} from '../src/image-transfer/execute';
+import {readTransferReceipt, saveTransferReceipt} from '../src/image-transfer/receipts';
+import {registerImageTransferHost, trustedHostSender} from '../src/image-transfer/host';
+import {transferLock, type ImageTransferRequest} from '../src/image-transfer/types';
 import {decodedImage, transferLocks} from './channel-transfer-fixture';
 
 const recipe = (): ImageTransferRequest => ({url: 'http://localhost:8000/translate/image', headers: {'X-Test-Token': 'fixture-secret'}, imageField: 'image', fields: {config: '{}'}});

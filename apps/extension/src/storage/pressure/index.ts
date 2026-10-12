@@ -2,11 +2,12 @@ import { sourcePageCache } from '../source-pages';
 import { sourceRangeCache } from '../source-ranges';
 import { thumbnailCache } from '../thumbnails';
 import { translationCache } from '../translations';
+import { processingCache } from '../../image-processing/storage';
 
 /** One bounded cleanup pass. Retained source containers/downloads are deliberately not registered. */
 export async function relieveStoragePressure(bytes: number): Promise<number> {
   let remaining = Math.max(0, bytes), released = 0;
-  for (const cache of [thumbnailCache, sourceRangeCache, sourcePageCache, translationCache]) {
+  for (const cache of [thumbnailCache, sourceRangeCache, sourcePageCache, processingCache, translationCache]) {
     if (remaining <= 0) break;
     const amount = await cache.trim(remaining); released += amount; remaining -= amount;
   }

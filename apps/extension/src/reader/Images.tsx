@@ -16,13 +16,15 @@ export function Thumbnail({blobKey,alt='',className='',retryKey=0,onError}:{blob
 }
 export type ShownImage={scope:string;key:string;job?:Job};
 type PreparedImage=ShownImage&{url:string;attempt:number};
-export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl}:{scope:string;blobKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string}){
+export type BlobPictureProps={scope:string;blobKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;override?:Blob;onOriginal?:(blob:Blob)=>void};
+export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,override,onOriginal}:BlobPictureProps){
   const [loaded,setLoaded]=useState<PreparedImage>();const [candidate,setCandidate]=useState<PreparedImage>();const [failure,setFailure]=useState('');const [retry,setRetry]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
   const request=useRef<{url:string;signal:AbortSignal}|undefined>(undefined);
   const [dismissed,setDismissed]=useState<string>();const retryButton=useRef<HTMLButtonElement>(null);
   const callback=useRef(onShown);callback.current=onShown;
   const loadCallback=useRef(onLoadState);loadCallback.current=onLoadState;
+  const originalCallback=useRef(onOriginal);originalCallback.current=onOriginal;
   const reloadAction=useRef({onReload,reloadBusy});reloadAction.current={onReload,reloadBusy};
   const reload=useCallback(()=>{if(reloadAction.current.reloadBusy)return;if(!blobKey&&reloadAction.current.onReload)reloadAction.current.onReload();else setRetry(value=>value+1);},[blobKey]);
   const missingError=blobKey?undefined:error;
@@ -34,15 +36,16 @@ export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,
   useEffect(()=>{if(dismissed===failureSignature)retryButton.current?.focus({preventScroll:true});},[dismissed,failureSignature]);
   useEffect(()=>{let active=true;setFailure('');setDismissed(undefined);setCandidate(undefined);setPreparing('reading');if(!blobKey){setLoaded(undefined);setFailure(missingError||msg("本地图片已清理，请重新导入原图。"));return;}
     const controller=new AbortController(),loading={url:'',signal:controller.signal};request.current=loading;let release:(()=>void)|undefined;
-    void acquireImage(blobKey,controller.signal).then(async lease=>{
+    void (override?Promise.resolve({blob:override,release(){}}):acquireImage(blobKey,controller.signal)).then(async lease=>{
       release=lease.release;const blob=lease.blob;if(!active){release();return;}if(!blob)throw Error(msg("本地图片已清理，请恢复图片后重试。"));
+      if(!override)originalCallback.current?.(blob);
       loading.url=URL.createObjectURL(blob);urls.current.add(loading.url);
       setPreparing('decoding');
       await prepareReaderImage(loading.url,controller.signal);
       if(active){setCandidate({scope,key:blobKey,job,url:loading.url,attempt:retry});setPreparing('displaying');}else revoke(loading.url);
     }).catch(e=>{if(active)setFailure((e as Error).message);revoke(loading.url);loading.url='';});
     return()=>{active=false;controller.abort();release?.();if(request.current===loading)request.current=undefined;if(displayed.current?.url!==loading.url)revoke(loading.url);};
-  },[scope,blobKey,retry,missingError]);
+  },[scope,blobKey,retry,missingError,override,onOriginal]);
   useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url&&url!==candidate?.url&&url!==request.current?.url)revoke(url);},[loaded,candidate]);
   useEffect(()=>()=>{for(const url of urls.current)URL.revokeObjectURL(url);urls.current.clear();},[]);
   const isCurrent=(image:PreparedImage)=>pending===image&&request.current?.url===image.url&&!request.current.signal.aborted;

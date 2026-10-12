@@ -1,6 +1,6 @@
 import {msg} from '../../../../i18n/runtime';
 import type {Mode} from '../../../../types';
-import {ImageTransferError, type ImageTransferRequest} from '../../transport/types';
+import {ImageTransferError, type ImageTransferRequest} from '../../../../image-transfer/types';
 
 // hgmzhn/manga-translator-ui @ 2130ccb: translators/common.py VALID_LANGUAGES.
 export const languages: Readonly<Record<string, string>> = {

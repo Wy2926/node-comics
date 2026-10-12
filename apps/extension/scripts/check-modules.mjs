@@ -242,10 +242,12 @@ for (const filename of modules) {
     checkTransitiveBoundary(filename, target => /^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/|discovery\/)/.test(target) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target), 'text adapter/service depends on UI, account, image translation or website services', new Set(), 'Text translation');
   if (name === 'src/translation/channels/contracts.ts')
     checkTransitiveBoundary(filename, target => /^src\/translation\/channels\/(?!contracts\.ts$)/.test(target), 'contracts depend on composition or execution', new Set(), 'Translation');
-  if (name.startsWith('src/translation/channels/transport/'))
+  if (name.startsWith('src/translation/channels/transport/') || name.startsWith('src/image-transfer/'))
     checkTransitiveBoundary(filename, target => /^src\/translation\/channels\/(?:adapters\/|registry\.ts$|index\.ts$)/.test(target) || /^src\/(?:auth\/|api\.ts$)/.test(target) || channelUi(target), 'transport depends on an adapter, UI or official account/API', new Set(), 'Translation');
   if (channelAdapter(filename))
     checkTransitiveBoundary(filename, channelUi, 'adapter depends on UI implementation', new Set(), 'Translation');
+  if (name.startsWith('src/image-processing/'))
+    checkTransitiveBoundary(filename, target => /^src\/(?:translation\/|api\.ts$|auth\/|reader\/|ui\/)/.test(target), 'enhancement depends on translation or a reading surface', new Set(), 'Enhancement');
   const concreteSource = target => /^src\/comics\/sources\/[^/]+\//.test(target);
   if (name.startsWith('src/comics/formats/')) checkTransitiveBoundary(filename, target => concreteSource(target) || /^src\/(?:translation|storage\/translations)\//.test(target), 'format transitive source/translation dependency');
   if (name === 'src/App.tsx' || /^src\/(?:comics\/(?:application|domain|pages|repositories)|ui|reader|translation|export|storage)\//.test(name) ||

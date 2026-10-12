@@ -1,11 +1,14 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ChannelConnection,ChannelRuntime,RuntimeOptions} from '../src/translation/channels/contracts';
 import type {Job} from '../src/types';
+import type {ProcessingSettings} from '../src/image-processing/settings';
+import type {InlineResponse} from '../src/inline/protocol';
+import {readingBatch} from '../src/inline/window';
 
 const mocks=vi.hoisted(()=>({
   getTab:vi.fn(),tabMessage:vi.fn(),localSettings:vi.fn(),openChannel:vi.fn(),init:vi.fn(),
   automatic:vi.fn(),registerAutomatic:vi.fn(),subscribe:vi.fn(),readImage:vi.fn(),prepareImage:vi.fn(),
-  inlineSize:vi.fn(),rememberOriginal:vi.fn(),
+  inlineSize:vi.fn(),rememberOriginal:vi.fn(),enhance:vi.fn(),
 }));
 vi.mock('../src/i18n/runtime',()=>({msg:(text:string)=>text}));
 vi.mock('../src/inline/auto-tabs',()=>({automaticTabsAllowed:mocks.automatic,registerAutomaticTabs:mocks.registerAutomatic}));
@@ -19,18 +22,20 @@ vi.mock('../src/sources',()=>({
 }));
 vi.mock('../src/comics/pages/normalize',()=>({prepareComicPage:mocks.prepareImage}));
 vi.mock('../src/translation/channels',()=>({openActiveChannel:mocks.openChannel,subscribeChannels:mocks.subscribe}));
+vi.mock('../src/image-processing/runtime',()=>({enhanceImage:mocks.enhance}));
 
 type Listener=(message:unknown,sender:chrome.runtime.MessageSender,respond:(value:Reply)=>void)=>unknown;
 type Reply={ok:boolean;data?:unknown;error?:string};
 const url='https://source.test/chapter';
 const tab={id:7,url,active:true,windowId:1} as chrome.tabs.Tab;
 const sender:chrome.runtime.MessageSender={id:'test',url,frameId:0,documentId:'doc-7',tab};
-const request=(generation=1)=>({type:'NC_INLINE_TICK',navigationId:'nav-7',generation,
-  images:[{id:'image-7',url:'https://source.test/image.png',width:500,height:700}]});
+const request=(generation=1,images=[{id:'image-7',url:'https://source.test/image.png',width:500,height:700}])=>({
+  type:'NC_INLINE_TICK',navigationId:'nav-7',generation,images,readingImages:images});
 const imageClick=()=>({menuItemId:'nc-translate-image',editable:false,frameId:0,mediaType:'image',
   srcUrl:request().images[0].url,pageUrl:url}) as chrome.contextMenus.OnClickData;
 const gate=()=>{let finish!:()=>void;const promise=new Promise<void>(resolve=>{finish=resolve;});return {promise,finish};};
 let listener:Listener,removed:(id:number)=>void,connected:(port:chrome.runtime.Port)=>void;
+let storageListeners:Array<(changes:Record<string,unknown>,area:string)=>void>;
 let session:Record<string,unknown>,cores:ChannelRuntime[],channels:ChannelConnection[],options:RuntimeOptions[];
 let background:typeof import('../src/inline/background');
 let locks:ReturnType<typeof vi.fn<(name:string,run:()=>Promise<unknown>)=>Promise<unknown>>>;
@@ -45,7 +50,7 @@ function imagePort(resultKey:string,generation=1){
 }
 
 beforeEach(async()=>{
-  vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];
+  vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];storageListeners=[];
   session={'nc-inline:7':{url,navigationId:'nav-7',documentId:'doc-7',automatic:false}};
   mocks.getTab.mockImplementation(async()=>({...tab}));
   mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_REGION_IDENTITY'
@@ -80,7 +85,7 @@ beforeEach(async()=>{
       onMessage:{addListener(fn:Listener){listener=fn;}},onConnect:{addListener(fn:typeof connected){connected=fn;}}},
     storage:{local:{get:mocks.localSettings},session:{
       get:async(key:string)=>structuredClone({[key]:session[key]}),set:async(value:Record<string,unknown>)=>Object.assign(session,structuredClone(value)),
-      remove:async(key:string)=>{delete session[key];}},onChanged:{addListener(){}}},
+      remove:async(key:string)=>{delete session[key];}},onChanged:{addListener(fn:typeof storageListeners[number]){storageListeners.push(fn);}}},
     tabs:{get:mocks.getTab,sendMessage:mocks.tabMessage,create:vi.fn(),query:async()=>[],onRemoved:{addListener(fn:typeof removed){removed=fn;}}},
     scripting:{executeScript:vi.fn(async()=>[{documentId:'doc-7'}])},
   });
@@ -89,6 +94,117 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('enhances completed full translations, returns base first, and retries enhancement without retranslating',async()=>{
+    mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]}});
+    await send(request());expect(mocks.enhance).not.toHaveBeenCalled();
+    const full=new Blob(['full translated image']),enhanced=new Blob(['enhanced image']);
+    vi.mocked(channels[0].readResult).mockResolvedValue(full);
+    mocks.enhance.mockRejectedValueOnce(Error('Enhancement failed')).mockResolvedValue(enhanced);
+    const completed:Job={id:'completed',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'complete',recoverable:true}};
+    await options[0].onJobs([completed]);
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledOnce());
+    expect(mocks.enhance.mock.calls[0][0].blob).toBe(full);
+    const failed=await send({...request(),type:'NC_INLINE_WAIT'});
+    expect(failed).toMatchObject({ok:true,data:{items:[{resultKey:expect.not.stringContaining(':enhanced:'),enhancement:{phase:'error'}}]}});
+    await send({...request(2),retryEnhancementId:'image-7'});
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
+    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);expect(cores[0].manual).not.toHaveBeenCalled();
+    await vi.waitFor(async()=>expect(await send({...request(2),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{resultKey:expect.stringContaining(':enhanced:'),enhancement:{phase:'ready'}}]}}));
+    const read=await send({...request(2),type:'NC_INLINE_WAIT'}),key=(read!.data as {items:{resultKey:string}[]}).items[0].resultKey;
+    const port=imagePort(key,2);try{await vi.waitFor(()=>expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'image',size:enhanced.size})));}finally{port.close();}
+  });
+  it('keeps a manual enhancement retry in the reading window when the translation batch refills',async()=>{
+    mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]}});
+    const images=Array.from({length:4},(_,i)=>({...request().images[0],id:`page-${i}`,url:`https://source.test/${i}.png`}));
+    mocks.readImage.mockImplementation(async(url:string)=>new Blob([url]));
+    mocks.prepareImage.mockImplementation(async({blob}:{blob:Blob})=>{
+      const url=await blob.text();return {blob,width:500,height:700,imageSha256:String(images.findIndex(image=>image.url===url)+1).repeat(64)};
+    });
+    await send(request(1,images));
+    const held=gate(),full=new Blob(['full translated image']),enhanced=new Blob(['enhanced']);let retrySignal:AbortSignal|undefined;
+    vi.mocked(channels[0].readResult).mockResolvedValue(full);
+    mocks.enhance.mockImplementation(async(input:{key:string},_profile:unknown,signal:AbortSignal,_state:unknown,retry:boolean)=>{
+      if(input.key.includes('job-0')){
+        if(!retry)throw Error('Enhancement failed');
+        retrySignal=signal;await held.promise;signal.throwIfAborted();
+      }
+      return enhanced;
+    });
+    await options[0].onJobs(images.slice(0,2).map((_,i)=>({id:`job-${i}`,status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:String(i+1).repeat(64),result:{key:`full-${i}`,recoverable:true}})));
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
+    const items=images.map(image=>({...image,checked:false,pending:false}));
+    await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:2,keepIds:images.map(image=>image.id)});
+    const manual=readingBatch(items,images[0].id);
+    try{
+      const response=await send({...request(2,manual),readingImages:images,retryEnhancementId:images[0].id});
+      expect(response).toMatchObject({ok:true});
+      await vi.waitFor(()=>expect(retrySignal).toBeDefined());
+      for(const result of (response!.data as InlineResponse).items){const item=items.find(image=>image.id===result.id)!;item.checked=true;item.pending=!!result.pending;}
+      const refill=readingBatch(items);expect(refill.map(image=>image.id)).toEqual(['page-2','page-3']);
+      expect(await send({...request(2,refill),readingImages:images})).toMatchObject({ok:true});
+      expect(retrySignal!.aborted).toBe(false);expect(mocks.enhance).toHaveBeenCalledTimes(3);
+      held.finish();
+      await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_UPDATE',generation:2,
+        data:expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:'page-0',resultKey:expect.stringContaining(':enhanced:'),enhancement:{phase:'ready'}})])})}),expect.anything()));
+      expect(cores[0].manual).not.toHaveBeenCalled();expect(mocks.readImage).toHaveBeenCalledTimes(4);
+    }finally{held.finish();}
+  });
+  it('updates only enhancement for processing changes and ignores profile names and cache budgets',async()=>{
+    let processing:ProcessingSettings={enabled:true,activeId:'local',cacheLimitMb:512,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]};
+    mocks.localSettings.mockImplementation(async()=>({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':processing}));
+    await send(request());
+    vi.mocked(channels[0].readResult).mockResolvedValue(new Blob(['full translation']));mocks.enhance.mockResolvedValue(new Blob(['enhanced']));
+    await options[0].onJobs([{id:'completed',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'full',recoverable:true}}]);
+    const lastUpdate=()=>mocks.tabMessage.mock.calls.filter(([,message])=>message.type==='NC_INLINE_UPDATE').at(-1)?.[1];
+    await vi.waitFor(()=>expect(lastUpdate()?.data.items[0].enhancement?.phase).toBe('ready'));
+    const change=async(next:ProcessingSettings)=>{
+      const oldValue=processing;processing=next;
+      for(const listener of storageListeners)listener({'nc-image-processing':{oldValue,newValue:next}},'local');
+      await new Promise(resolve=>setTimeout(resolve,10));
+    };
+    mocks.tabMessage.mockClear();
+    await change({...processing,profiles:processing.profiles.map(profile=>({...profile,name:'Renamed'}))});
+    await change({...processing,cacheLimitMb:128});
+    expect(mocks.enhance).toHaveBeenCalledOnce();expect(mocks.tabMessage).not.toHaveBeenCalled();
+    await change({...processing,enabled:false});
+    await vi.waitFor(()=>expect(lastUpdate()?.data.items[0]).toMatchObject({resultKey:expect.not.stringContaining(':enhanced:')}));
+    expect(lastUpdate()?.data.items[0].enhancement).toBeUndefined();
+    await change({...processing,enabled:true});
+    await vi.waitFor(()=>expect(lastUpdate()?.data.items[0].enhancement?.phase).toBe('ready'));
+    expect(mocks.enhance).toHaveBeenCalledTimes(2);
+    expect(mocks.openChannel).toHaveBeenCalledOnce();expect(mocks.readImage).toHaveBeenCalledOnce();
+    expect(cores[0].restore).toHaveBeenCalledOnce();expect(cores[0].submit).toHaveBeenCalledOnce();
+    expect(cores[0].dispose).not.toHaveBeenCalled();expect(channels[0].dispose).not.toHaveBeenCalled();
+    expect(mocks.tabMessage.mock.calls.some(([,message])=>message.type==='NC_INLINE_CONFIG_CHANGED')).toBe(false);
+  });
+  it('does not let an old settings read overwrite a change while the inline context is opening',async()=>{
+    const held=gate(),settings={enabled:true,activeId:'local',cacheLimitMb:512,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]};
+    let reads=0;
+    mocks.localSettings.mockImplementation(async(key:unknown)=>{
+      if(key!=='nc-image-processing')return {'nc-reader-settings':{language:'zh-Hans'}};
+      if(++reads===1){await held.promise;return {'nc-image-processing':{...settings,enabled:false}};}
+      return {'nc-image-processing':settings};
+    });
+    const opening=send(request());
+    try{
+      await vi.waitFor(()=>expect(reads).toBe(1));
+      for(const listener of storageListeners)listener({'nc-image-processing':{newValue:settings}},'local');
+      await vi.waitFor(()=>expect(reads).toBe(2));
+      held.finish();expect(await opening).toMatchObject({ok:true});
+      vi.mocked(channels[0].readResult).mockResolvedValue(new Blob(['full']));mocks.enhance.mockResolvedValue(new Blob(['enhanced']));
+      await options[0].onJobs([{id:'completed',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+        created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'full',recoverable:true}}]);
+      await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledOnce());
+      expect(mocks.openChannel).toHaveBeenCalledOnce();
+    }finally{held.finish();await opening;}
+  });
   it('waits for local receipts before reading a still-valid restored result',async()=>{
     const restoring=gate(),open=mocks.openChannel.getMockImplementation()!;
     const completed:Job={id:'cached-result',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
@@ -152,7 +268,7 @@ describe('inline activation lifetime',()=>{
   });
   it('still rejects execution messages larger than five images',async()=>{
     const images=Array.from({length:6},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
-    expect(await send({...request(),images})).toMatchObject({ok:false});
+    expect(await send(request(1,images))).toMatchObject({ok:false});
     expect(mocks.readImage).not.toHaveBeenCalled();
   });
   it('admits prepared images incrementally and preserves the whole five-image window',async()=>{
@@ -160,22 +276,22 @@ describe('inline activation lifetime',()=>{
     mocks.prepareImage.mockImplementation(async({blob}:{blob:Blob})=>({blob,width:500,height:700,imageSha256:String(++number).repeat(64)}));
     mocks.readImage.mockImplementation(async(url:string)=>{if(url.endsWith('/2.png'))await pending.promise;return new Blob([url]);});
     const images=Array.from({length:5},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
-    const response=send({...request(),images});
+    const response=send(request(1,images));
     await vi.waitFor(()=>expect(vi.mocked(cores[0].submit).mock.lastCall?.[0]).toHaveLength(4));
     expect(mocks.readImage).toHaveBeenCalledTimes(5);
     expect(vi.mocked(cores[0].submit).mock.calls.every(([targets])=>targets.length<=4)).toBe(true);
     pending.finish();expect(await response).toMatchObject({ok:true});
     expect(vi.mocked(cores[0].submit).mock.lastCall?.[0]).toHaveLength(5);
-    expect(await send({...request(),images})).toMatchObject({ok:true});
+    expect(await send(request(1,images))).toMatchObject({ok:true});
     expect(mocks.readImage).toHaveBeenCalledTimes(5);
     expect(vi.mocked(cores[0].submit).mock.lastCall?.[0]).toHaveLength(5);
-    expect(await send({...request(),images:[...images,{...images[0],id:'sixth'}]})).toMatchObject({ok:false});
+    expect(await send(request(1,[...images,{...images[0],id:'sixth'}]))).toMatchObject({ok:false});
   });
   it('stops old source preparation after a jump without reading its remaining tail',async()=>{
     const signals:AbortSignal[]=[];
     mocks.readImage.mockImplementation((_url:string,_page:string,signal:AbortSignal)=>new Promise((_resolve,reject)=>{signals.push(signal);signal.addEventListener('abort',()=>reject(signal.reason),{once:true});}));
     const images=Array.from({length:5},(_,i)=>({id:`image-${i}`,url:`https://source.test/${i}.png`,width:500,height:700}));
-    const old=send({...request(),images});await vi.waitFor(()=>expect(mocks.readImage).toHaveBeenCalledTimes(3));
+    const old=send(request(1,images));await vi.waitFor(()=>expect(mocks.readImage).toHaveBeenCalledTimes(3));
     await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:2});
     expect(signals.every(signal=>signal.aborted)).toBe(true);expect(await old).toMatchObject({ok:false});
     expect(mocks.prepareImage).not.toHaveBeenCalled();expect(mocks.readImage).toHaveBeenCalledTimes(3);expect(cores[0].submit).not.toHaveBeenCalled();
@@ -193,7 +309,7 @@ describe('inline activation lifetime',()=>{
       signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
     }).finally(()=>{active--;}));
     const images=Array.from({length:3},(_,i)=>({...request().images[0],id:'new-'+i,url:`https://source.test/new-${i}.png`}));
-    const preparing=send({...request(2),images});await vi.waitFor(()=>expect(reads).toHaveLength(3));
+    const preparing=send(request(2,images));await vi.waitFor(()=>expect(reads).toHaveLength(3));
     const recovered=restore();await Promise.resolve();expect(reads).toHaveLength(3);
     reads[0].finish();await vi.waitFor(()=>expect(reads).toHaveLength(4));
     await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:3,keepIds:[]});
@@ -238,7 +354,7 @@ describe('inline activation lifetime',()=>{
       vi.mocked(cores[0].submit).mockImplementation(async()=>{await options[0].onJobs([{id:'done',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',created_at:'2026-01-01',version:1,quota_pages:0,cache_hit:true,image_sha256:'a'.repeat(64),result:{key:'done-result',recoverable:true}}]);});
       return channel;
     });
-    let settled=false;const done=send({...request(),images}).then(value=>{settled=true;return value;});
+    let settled=false;const done=send(request(1,images)).then(value=>{settled=true;return value;});
     await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_UPDATE',generation:1,data:expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:'image-7',resultKey:expect.any(String)})])})}),{frameId:0,documentId:'doc-7'}));
     expect(settled).toBe(false);slow.finish();expect(await done).toMatchObject({ok:true});
   });
@@ -287,7 +403,7 @@ describe('inline activation lifetime',()=>{
       return channel;
     });
     const images=Array.from({length:5},(_,i)=>({...request().images[0],id:'page-'+i,url:`https://source.test/${i}.png`}));
-    const done=send({...request(),images,refreshRights:true});
+    const done=send({...request(1,images),refreshRights:true});
     await vi.waitFor(()=>expect(mocks.prepareImage).toHaveBeenCalledTimes(5));
     await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_UPDATE',data:expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:'page-0',resultKey:expect.any(String)})])})}),expect.anything()));
     expect(cores[0].refresh).toHaveBeenCalledOnce();policy.finish();expect(await done).toMatchObject({ok:true});
@@ -300,7 +416,7 @@ describe('inline activation lifetime',()=>{
     });
     mocks.readImage.mockImplementation(async(url:string)=>{if(url.endsWith('slow.png'))await slow.promise;return new Blob([url]);});
     const images=[request().images[0],{...request().images[0],id:'slow',url:'https://source.test/slow.png'}];
-    expect(await send({...request(),images,refreshRights:true})).toMatchObject({ok:false,error:'offline'});
+    expect(await send({...request(1,images),refreshRights:true})).toMatchObject({ok:false,error:'offline'});
     slow.finish();await vi.waitFor(()=>expect(mocks.prepareImage).toHaveBeenCalledTimes(2));
     expect(cores[0].refresh).toHaveBeenCalledOnce();expect(cores[0].submit).not.toHaveBeenCalled();
   });
@@ -449,7 +565,7 @@ describe('selected image activation',()=>{
     const image=request().images[0];
     session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
     const changed={...image,[field]:field==='id'?'another-image':'https://source.test/another.png'};
-    expect(await send({...request(),images:[changed]})).toMatchObject({ok:false});
+    expect(await send(request(1,[changed]))).toMatchObject({ok:false});
     expect(mocks.openChannel).not.toHaveBeenCalled();
     expect(mocks.readImage).not.toHaveBeenCalled();
   });
@@ -466,7 +582,7 @@ describe('selected image activation',()=>{
   it('allows a small selected image while retaining the normal page recognition threshold',async()=>{
     const image={...request().images[0],width:64,height:32};
     mocks.inlineSize.mockImplementation((width:number,height:number)=>width>=240&&height>=180);
-    const message={...request(),images:[image]};
+    const message=request(1,[image]);
     expect(await send(message)).toMatchObject({ok:false});
     expect(mocks.inlineSize).toHaveBeenCalledWith(64,32,url);
     expect(mocks.readImage).not.toHaveBeenCalled();
@@ -481,7 +597,7 @@ describe('selected image activation',()=>{
     'rejects invalid geometry for a selected image: %j',async dimensions=>{
       const image={...request().images[0],...dimensions};
       session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,image:{id:image.id,url:image.url}};
-      expect(await send({...request(),images:[image]})).toMatchObject({ok:false});
+      expect(await send(request(1,[image]))).toMatchObject({ok:false});
       expect(mocks.readImage).not.toHaveBeenCalled();
     });
 
@@ -494,7 +610,7 @@ describe('selected image activation',()=>{
     background=await import('../src/inline/background');
     background.registerInlineBackground();
     const reads=mocks.readImage.mock.calls.length;
-    expect(await send({...request(),images:[{...image,id:'another-image'}]})).toMatchObject({ok:false});
+    expect(await send(request(1,[{...image,id:'another-image'}]))).toMatchObject({ok:false});
     expect(mocks.readImage).toHaveBeenCalledTimes(reads);
     expect(await send(request())).toMatchObject({ok:true});
     expect(mocks.readImage).toHaveBeenCalledTimes(reads+1);

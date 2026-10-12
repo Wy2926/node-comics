@@ -5,6 +5,7 @@ import {epubImageId} from '../comics/domain/epub-images';
 import type {Mode, Page, ReadingEntry} from '../types';
 import type {ReadingTarget} from '../translation/automatic';
 import {EpubImageWindow} from './epub-images';
+import {useProcessingSettings, useEnhancementVisible} from '../image-processing/react';
 
 export function useEpubImages({copy, update, translated, mode, language, scope, onReadingWindow}: {
   copy: ReadingEntry;
@@ -16,7 +17,10 @@ export function useEpubImages({copy, update, translated, mode, language, scope, 
   onReadingWindow(targets: ReadingTarget[], visible: Page[], immediate?: boolean): void;
 }) {
   const [hrefs, setHrefs] = useState<string[]>([]);
+  const processing = useProcessingSettings();
+  const visible = useEnhancementVisible();
   const [failures, setFailures] = useState<Record<string, string | undefined>>({});
+  const [, refreshEnhancement] = useState(0);
   const [retry, setRetry] = useState(0);
   const manager = useRef<EpubImageWindow | undefined>(undefined);
   const latest = useRef({copy, update, translated, mode, language, scope});
@@ -26,7 +30,8 @@ export function useEpubImages({copy, update, translated, mode, language, scope, 
     manager.current?.close();
     setHrefs([]);
     setFailures({});
-    const current = new EpubImageWindow(setHrefs, (href, error) => setFailures(values => values[href] === error ? values : {...values, [href]: error}));
+    const current = new EpubImageWindow(setHrefs, (href, error) => setFailures(values => values[href] === error ? values : {...values, [href]: error}),
+      () => refreshEnhancement(value => value + 1));
     manager.current = current;
     current.connect(view);
     signal.addEventListener('abort', () => {
@@ -57,8 +62,8 @@ export function useEpubImages({copy, update, translated, mode, language, scope, 
 
   // Revoke a different account/language's result before the next paint.
   useLayoutEffect(() => {
-    manager.current?.show(copy.pages, translated, mode, language, scope);
-  }, [copy.pages, translated, mode, language, scope]);
+    manager.current?.show(copy.pages, translated, mode, language, scope, {owner: copy.id, settings: {...processing, enabled: processing.enabled && visible}});
+  }, [copy.id, copy.pages, translated, mode, language, scope, processing, visible]);
 
   const pages = hrefs.flatMap(href => {
     const page = copy.pages.find(value => value.id === epubImageId(href));
@@ -69,7 +74,9 @@ export function useEpubImages({copy, update, translated, mode, language, scope, 
   }, [copy.id, copy.pages, hrefs, mode, translated, onReadingWindow]);
   useEffect(() => () => {manager.current?.close(); onReadingWindow([], []);}, [onReadingWindow]);
 
-  return {connect, page: pages[0], error: failures[hrefs[0]], retry() {
+  return {connect, page: pages[0], error: failures[hrefs[0]], enhancement: manager.current?.enhancementState(hrefs[0]), retryEnhancement() {
+    if (hrefs[0]) manager.current?.retry(hrefs[0]);
+  }, retry() {
     if (hrefs[0]) manager.current?.retry(hrefs[0]);
     setRetry(value => value + 1);
   }};

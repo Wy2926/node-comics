@@ -17,7 +17,7 @@ async function modules(){
   const [catalog,cleanup,directStore,officialStore,receipts,cache,results]=await Promise.all([
     import('../src/comics/repositories'),import('../src/comics/application/source-translation-removal'),
     import('../src/translation/channels/transport/operations'),import('../src/translation/channels/adapters/nodelane/store'),
-    import('../src/translation/channels/transport/receipts'),import('../src/storage/translations'),import('../src/storage/translations/results'),
+    import('../src/image-transfer/receipts'),import('../src/storage/translations'),import('../src/storage/translations/results'),
   ]);
   return {...catalog,...cleanup,...directStore,...officialStore,...receipts,...cache,...results};
 }

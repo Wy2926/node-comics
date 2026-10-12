@@ -9,6 +9,9 @@ import type {Api} from '../api';
 import {languageLabel,modeLabels,supportsLanguage,type Capabilities,type ReadingEntry,type Job,type Mode,type Page,type Settings} from '../types';
 
 import {BlobPicture,type ShownImage} from './Images';
+import {EnhancedPicture} from './EnhancedPicture';
+import {useProcessingSettings, useEnhancementVisible} from '../image-processing/react';
+import {activeProcessingProfile} from '../image-processing/settings';
 import {canRetryPage,displayTranslationState,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
 import {pageWindow} from './virtual-window';
@@ -72,6 +75,9 @@ useEffect(()=>{if(!viewport.current)return;const observer=new ResizeObserver(([e
 const frame=(p:Page)=>pageFrame(p,viewportSize,fit,zoom,compare);
 const windows=useMemo(()=>pageWindow(stream,copy.id,index,p=>frame(p).height,settings.layout==='single'?1:DECODED_PAGE_WINDOW),[stream,copy.id,index,viewportSize,fit,zoom,compare,settings.layout]);
 const decodedSet=useMemo(()=>new Set(windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).map(p=>pageKey(chapter,p.id)))),[windows,resourceVersion]);
+const processingSettings=useProcessingSettings(),processingProfile=activeProcessingProfile(processingSettings),enhancementVisible=useEnhancementVisible();
+const enhancementStart=streamPages.findIndex(item=>item.key===pageKey(copy,page?.id??''));
+const enhancementWindow=new Set(enhancementStart<0?[]:streamPages.slice(enhancementStart,enhancementStart+2).map(item=>item.key));
 geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=stream.reduce((width,chapter)=>chapter.pages.reduce((width,page)=>Math.max(width,frame(page).width),width),0);
 useLayoutEffect(()=>{restore();},[viewportSize,fit,zoom,compare,settings.layout,!!page]);
@@ -168,7 +174,8 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 <div className="nc-reading-surface" style={{minWidth:contentWidth+24}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter)&&(settings.layout==='continuous'||index===copy.pages.length-1);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
 const load=imageLoad(chapter,p,targetKey),state=displayTranslationState(translationState(chapter.id,p,pageView.mode),load,targetJob?targetKey:undefined);
 const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey} ref={node=>{if(node)cells.current.set(cellKey,node);else cells.current.delete(cellKey);}} data-page-id={p.id} data-page-index={n} style={{width}}>
-<div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture scope={`${cellKey}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}/></div>}<div className="nc-comparison-pane"><BlobPicture scope={identity} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}
+<div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture scope={`${cellKey}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}/></div>}<div className="nc-comparison-pane"><EnhancedPicture scope={identity} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}
+profile={!wantTranslation||targetJob?processingProfile:undefined} owner={chapter.id} eligible={enhancementVisible&&enhancementWindow.has(cellKey)} revision={processingSettings.cacheRevision}
 onLoadState={state=>setLoads(prev=>{if(prev[cellKey]===state)return prev;const next={...prev};if(state)next[cellKey]=state;else delete next[cellKey];return next;})}
 onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellKey]?.key===image?.key&&prev[cellKey]?.scope===image?.scope)return prev;const next={...prev};if(image)next[cellKey]=image;else delete next[cellKey];return next;});}}/></div></>:<div className="nc-image-placeholder"><Icon name="image"/><span>{msg("正在准备页面…")}</span></div>}</div>
 {decodedSet.has(cellKey)&&wantTranslation&&<div className="nc-image-status-layer"><ImageTranslationStatus state={state} onUpgrade={onUpgrade} onLogin={onLogin} onRetry={()=>load?.phase==='error'?load.retry():onRetry(p,pageView.mode,chapter.id)}/></div>}

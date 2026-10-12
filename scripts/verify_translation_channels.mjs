@@ -117,6 +117,7 @@ try{
   check('clearing local images does not submit requests; explicit retranslation submits once');
   await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false}));
   await page.getByLabel('跳转页码',{exact:true}).fill('10');
+  await page.getByLabel('跳转页码',{exact:true}).press('Enter');
   await page.waitForFunction(count=>window.channelFixture.requests.length===count,initialRequests+6);
   await page.waitForTimeout(1200);
   assert.equal((await read()).requests.length,initialRequests+6);
@@ -224,7 +225,7 @@ try{
   });
   await page.getByRole('button',{name:'连接并使用',exact:true}).click();
   await page.getByRole('alert').filter({hasText:'synthetic channel configuration write failed'}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.nc-channel-form button[type="submit"]')?.disabled===false);
+  await page.waitForFunction(()=>document.querySelector('.nc-channel-dialog button[type="submit"]')?.disabled===false);
   assert.equal(destinationBLogins,1);
   assert.equal(await page.evaluate(()=>window.channelFixture.configurationWriteFailures),1);
   assert.deepEqual((await read()).channels,beforeInterruptedWrite);

@@ -13,7 +13,8 @@
 | `channels/registry.ts` | 唯一具体适配器装配入口，只导入各适配器的 `definition.ts` |
 | `channels/adapters/nodelane/` | 官方登录、能力与权益、UUID 请求、补传、状态查询、恢复和结果下载 |
 | `channels/adapters/manga-translator-ui/` | MTU 登录、语言映射、表单与错误映射 |
-| `channels/transport/` | 与协议无关的直传执行、本地排程、执行回执和长请求宿主 |
+| `channels/transport/` | 直传翻译的本地排程、操作记录与运行器 |
+| `image-transfer/` | 翻译与增强共用的图片 HTTP 执行、执行回执与长请求宿主，不依赖翻译领域 |
 | `translation/automatic.ts`、`useAutomaticTranslation.ts` | 页内进度驱动的最多五页窗口、渠道运行器调用及显示更新 |
 | `translation/input/` | 准备送译字节；上传与结果读取共用缓存读取、缺失重建和摘要校验，不管理任务状态或来源资源释放 |
 | `storage/translations/` | 按渠道作用域持久缓存完整译图，首次加载校验，后续直接读取并保留有限内存缓存 |
@@ -28,6 +29,8 @@
 官方 `operations.ts` 只根据已准备好的图片信息同步构造请求记录，不读取图片或推断送译摘要。来源读取回调与资源释放由调用方提供，输入恢复函数不依赖官方请求记录或通用 `Job`。
 
 官方正文模型选择见[模型选择规范](TRANSLATION_MODEL_SELECTION_DESIGN.md)。模型是渠道内部的可选能力，不新增一个渠道或每模型账户作用域；MTU 的服务端默认配置保持不变。
+
+清晰度优化属于独立的[插件图像增强](IMAGE_ENHANCEMENT.md)，以渠道返回的完整译图为输入，不改写翻译结果或额度。
 
 公共层不按协议 ID 分支执行。界面按适配器字段描述渲染配置；适配器不得互相依赖或引用界面实现；契约不得依赖装配/执行层；直传层不得依赖具体适配器或官方账号/API。`check:modules` 检查这些边界、传递依赖、运行时循环及未被使用的模块。
 

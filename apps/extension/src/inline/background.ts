@@ -6,6 +6,7 @@ import { mergeJobs } from '../reader/jobs';
 import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
 import { safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
+import {MAX_COMIC_IMAGES} from '../sources/shared/geometry';
 import {MAX_READING_TARGETS,type ReadingTarget} from '../translation/automatic';
 import { matchesPage } from '../translation/sync';
 import { defaults, type Job, type Page, type Settings } from '../types';
@@ -18,13 +19,18 @@ import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
 import {regionActivationKey} from '../region/protocol';
 import {imageWork} from '../translation/input/work';
+import {enhanceImage} from '../image-processing/runtime';
+import {readProcessingSettings, activeProcessingProfile, processingIdentity, subscribeProcessingSettings} from '../image-processing/settings';
+import type {ProcessingProfile, ProcessingState} from '../image-processing/contracts';
 
 interface WindowRequest {request:InlineRequest;sender:chrome.runtime.MessageSender;activity:RequestActivity;refreshRights:boolean;}
 interface Preparation {id:string;controller:AbortController;promise:Promise<void>;}
+interface Enhancement {key:string;controller:AbortController;blob?:Blob;state:ProcessingState;}
 interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;waitIds?:string;active:boolean;abort:AbortController;explicitImage:boolean;
-  id:string;revision:number;readingIds:Set<string>;window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;}
+  id:string;revision:number;readingIds:Set<string>;window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;
+  processing?:ProcessingProfile;processingKey:string;enhancements:Map<string,Enhancement>;}
 interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;}
-const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0;
+const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0,processingGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
 function activationEpoch(tabId:number){
   let epoch=activationEpochs.get(tabId);
@@ -117,9 +123,14 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
     for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,translationScope:channel.scope.key,jobs:mergeJobs(page.jobs,incoming)});}
     publish(ctx);
   };
-  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,id:crypto.randomUUID(),revision:0,readingIds:new Set(),preparing:new Map(),sources:new RequestPool(3),submitAgain:false};
+  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,id:crypto.randomUUID(),revision:0,readingIds:new Set(),preparing:new Map(),sources:new RequestPool(3),submitAgain:false,processingKey:'',enhancements:new Map()};
+  // Register before reading so a concurrent setting event can update this context too.
+  contexts.set(tabId,ctx);
+  const processingVersion=processingGeneration,processingSettings=await readProcessingSettings();
+  assertCurrent(activity.current);assertCurrent(current);
+  if(processingVersion===processingGeneration){ctx.processing=activeProcessingProfile(processingSettings);ctx.processingKey=processingIdentity(processingSettings);}
   if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:key=>originals.read(key),isCurrent:current,onJobs:attach,onChange:()=>{if(ctx)publish(ctx);},onInputConsumed:key=>originals.uploaded(key)});
-  contexts.set(tabId,ctx);await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
+  await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
   }catch(error){
     if(ctx){if(contexts.get(tabId)===ctx)contexts.delete(tabId);disposeContext(ctx);}else channel.dispose();
     throw error;
@@ -133,6 +144,7 @@ function publish(ctx:Context){
   ctx.publishTimer=setTimeout(()=>{
     ctx.publishTimer=undefined;const view=ctx.window;
     if(!view||!ctx.active||!view.activity.current())return;
+    scheduleEnhancements(ctx);
     // New UUIDs must join the feed immediately, including while another PUT is slow.
     if(ctx.waiting&&ctx.waitIds!==ctx.core?.waitingIds.join(','))ctx.waiting.abort();
     void chrome.tabs.sendMessage(view.sender.tab!.id!,{type:'NC_INLINE_UPDATE',navigationId:view.request.navigationId,generation:view.request.generation,data:response(ctx,view.request)},
@@ -142,7 +154,39 @@ function publish(ctx:Context){
 function cancelSources(ctx:Context,keepIds:readonly string[]){
   const keep=ctx.readingIds=new Set(keepIds);
   for(const [key,work] of ctx.preparing)if(!keep.has(work.id)){work.controller.abort();ctx.preparing.delete(key);}
+  for(const [id,work] of ctx.enhancements)if(!keepIds.slice(0,2).includes(id)){work.controller.abort();ctx.enhancements.delete(id);}
 }
+
+/** Only completed, full translated images enter enhancement. Originals never leave this path. */
+function scheduleEnhancements(ctx:Context) {
+  const view=ctx.window,profile=ctx.processing;
+  if(!profile||!view||!ctx.active||!view.activity.current())return;
+  for(const image of view.request.readingImages!.slice(0,2)) {
+    if(!ctx.readingIds.has(image.id))continue;
+    const page=ctx.pages.get(pageKey(view.request,image)),job=page&&pageResult(ctx,page);
+    if(!page||!job?.result||ctx.missingResults.has(job.id))continue;
+    const key=JSON.stringify([resultScope(ctx),job.id,job.result.key]);
+    const previous=ctx.enhancements.get(image.id);
+    if(previous?.key===key)continue;
+    previous?.controller.abort();
+    const work:Enhancement={key,controller:new AbortController(),state:{phase:'queued'}};
+    ctx.enhancements.set(image.id,work);
+    const signal=AbortSignal.any([ctx.abort.signal,work.controller.signal]);
+    const retry=view.request.retryEnhancementId===image.id;
+    if(retry)view.request={...view.request,retryEnhancementId:undefined};
+    void ctx.channel.readResult(job,signal,()=>page.blobKey?ctx.originals.read(page.blobKey,signal):Promise.resolve(undefined)).then(async blob=>{
+      signal.throwIfAborted();
+      // Stable translation scope owns cached derived images, never the current tab or source URL.
+      work.blob=await enhanceImage({blob,key,owner:'inline:'+ctx.channel.scope.key},profile,signal,state=>{
+        if(!signal.aborted){work.state=state;publish(ctx);}
+      },retry);
+      signal.throwIfAborted();work.state={phase:'ready'};publish(ctx);
+    }).catch(error=>{
+      if(!signal.aborted){work.state={phase:'error',message:(error as Error).message};publish(ctx);}
+    });
+  }
+}
+const enhancedKey=(work:Enhancement,ctx:Context)=>work.key+':enhanced:'+ctx.processing!.id+':'+ctx.processing!.revision;
 
 const pageKey=(request:InlineRequest,image:InlineRequest['images'][number])=>JSON.stringify([request.navigationId,image.id,image.url]);
 async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRequest['images'][number],sender:chrome.runtime.MessageSender,signal=ctx.abort.signal){
@@ -219,7 +263,13 @@ function pageResult(ctx:Context,page:Page){
 function response(ctx:Context,request:InlineRequest):InlineResponse{
   const mode='classic',language=ctx.settings.language,scope=resultScope(ctx);
   const items:InlineResult[]=[];
-  for(const image of request.images){
+  // Completed pages leave the translation batch, not the display/processing window.
+  const images=new Map(request.images.map(image=>[image.id,image]));
+  for(const image of request.readingImages??[]){
+    const page=ctx.pages.get(pageKey(request,image));
+    if(page&&pageResult(ctx,page))images.set(image.id,image);
+  }
+  for(const image of images.values()){
     if(!ctx.channel.available){items.push({id:image.id,state:ctx.channel.unavailable});continue;}
     const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);items.push({id:image.id,state:error??{kind:'waiting',message:msg('正在准备页面…')},pending:!error});continue;}
     const result=pageResult(ctx,page),state=ctx.core?.stateFor({entryId:'inline',page,mode},true);
@@ -228,7 +278,11 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     const waiting=state?.kind==='waiting'||state?.kind==='translating';
     const item:InlineResult={id:image.id,pending:!!pageTranslation(page,mode,language,ctx.channel.scope.key).pending||
       waiting&&!result};
-    if(result?.result&&!ctx.missingResults.has(result.id)){item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;}
+    if(result?.result&&!ctx.missingResults.has(result.id)){
+      item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;
+      const enhanced=ctx.enhancements.get(image.id);
+      if(enhanced?.key===item.resultKey){item.enhancement=enhanced.state;if(enhanced.blob)item.resultKey=enhancedKey(enhanced,ctx);}
+    }
     else item.state=state;
     items.push(item);
   }
@@ -249,12 +303,14 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   const notReady=()=>Object.assign(Error(msg('正在准备页面…')),{code:'INLINE_RESULT_NOT_READY'});
   if(!page)throw notReady();
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.result?.key]);
-  if(!job?.result||key!==request.resultKey){
+  const enhanced=ctx.enhancements.get(request.images[0].id);
+  const output=enhanced&&enhanced.key===key&&enhanced.blob&&request.resultKey===enhancedKey(enhanced,ctx)?enhanced.blob:undefined;
+  if(!job?.result||key!==request.resultKey&&!output){
     if(pageTranslation(page,'classic',ctx.settings.language,ctx.channel.scope.key).expired)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
     throw notReady();
   }
   let blob:Blob;
-  try{blob=await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
+  try{blob=output??await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
     if((error as {code?:string}).code==='RESULT_NOT_CACHED'&&current()&&page){ctx.missingResults.add(job.id);ctx.pages.set(pageKey(request,request.images[0]),{...page,translationError:(error as Error).message});}
     throw error;
   }
@@ -287,7 +343,8 @@ async function checkedRequest(message:InlineRequest,sender:chrome.runtime.Messag
   const activity={active,current:()=>active()&&(message.type==='NC_INLINE_IMAGE'||message.generation===(windowGenerations.get(tabId)??0))};
   const explicitImage=!!activation.image;
   if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity,explicitImage};
-  if(!Array.isArray(message.images)||message.images.length>MAX_READING_TARGETS||explicitImage&&(message.images.length!==1||message.images[0]?.id!==activation.image!.id||message.images[0]?.url!==activation.image!.url)||message.images.some((i:unknown)=>{const v=i as {id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown};return !v||typeof v.id!=='string'||v.id.length>80||typeof v.url!=='string'||v.url!=='page-image:'+v.id&&safeImageUrl(v.url,activation.url)!==v.url||v.referrerPolicy!==undefined&&!isImageReferrerPolicy(v.referrerPolicy)||(explicitImage?!(Number.isFinite(v.width)&&Number.isFinite(v.height)&&v.width>0&&v.height>0):!inlineImageSize(v.width,v.height,activation.url));}))throw Error(msg('图片范围无效。'));
+  const validImages=(images:unknown,limit:number)=>Array.isArray(images)&&images.length<=limit&&(!explicitImage||images.length===1&&images[0]?.id===activation.image!.id&&images[0]?.url===activation.image!.url)&&images.every((v:{id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown})=>v&&typeof v.id==='string'&&v.id.length<=80&&typeof v.url==='string'&&(v.url==='page-image:'+v.id||safeImageUrl(v.url,activation.url)===v.url)&&(v.referrerPolicy===undefined||isImageReferrerPolicy(v.referrerPolicy))&&(explicitImage?Number.isFinite(v.width)&&Number.isFinite(v.height)&&v.width>0&&v.height>0:inlineImageSize(v.width,v.height,activation.url)));
+  if(!validImages(message.images,MAX_READING_TARGETS)||(message.type==='NC_INLINE_TICK'||message.readingImages!==undefined)&&!validImages(message.readingImages,MAX_COMIC_IMAGES))throw Error(msg('图片范围无效。'));
   if(message.type==='NC_INLINE_IMAGE'&&(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048))throw Error(msg('图片范围无效。'));
   return {tabId,tab,...activity,explicitImage};
 }
@@ -303,7 +360,9 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender,ac
   }else {
     ctx.waiting?.abort();
     ctx.window={request,sender,activity,refreshRights:!!request.refreshRights};
-    cancelSources(ctx,request.images.map(image=>image.id));
+    cancelSources(ctx,request.readingImages!.map(image=>image.id));
+    if(request.retryEnhancementId){const previous=ctx.enhancements.get(request.retryEnhancementId);previous?.controller.abort();ctx.enhancements.delete(request.retryEnhancementId);}
+    scheduleEnhancements(ctx);
     let failed=false;
     await Promise.all(request.images.map(async image=>{
       await prepareOne(ctx,request,image,sender);
@@ -334,6 +393,19 @@ export function registerInlineBackground(){
   registerAutomaticTabs(activateInline,stopAutomaticInline);
   const invalidate=()=>{configGeneration++;for(const id of transfers.keys())closeTransfers(id);for(const ctx of contexts.values())disposeContext(ctx);contexts.clear();void chrome.tabs.query({}).then(tabs=>Promise.allSettled(tabs.filter(t=>t.id!=null).map(t=>chrome.tabs.sendMessage(t.id!,{type:'NC_INLINE_CONFIG_CHANGED'},{frameId:0}))));};
   subscribeChannels(invalidate);
+  subscribeProcessingSettings(()=>{
+    const generation=++processingGeneration;
+    void readProcessingSettings().then(settings=>{
+      if(generation!==processingGeneration)return;
+      const key=processingIdentity(settings);
+      for(const ctx of contexts.values()){
+        if(!ctx.active||ctx.processingKey===key)continue;
+        ctx.processing=activeProcessingProfile(settings);ctx.processingKey=key;
+        for(const work of ctx.enhancements.values())work.controller.abort();
+        ctx.enhancements.clear();publish(ctx);
+      }
+    }).catch(()=>{});
+  });
   chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&before?.language!==after?.language)invalidate();});
   chrome.tabs.onRemoved.addListener(tabId=>{closeTransfers(tabId);invalidateTab(tabId);activationEpochs.delete(tabId);void navigator.locks.request('nc-inline-activation:'+tabId,()=>chrome.storage.session.remove(activationKey(tabId)));});
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{

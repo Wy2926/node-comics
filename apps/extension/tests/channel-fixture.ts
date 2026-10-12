@@ -7,6 +7,9 @@ import {listChannels,selectChannel} from '../src/translation/channels';
 import {clearStorage} from '../src/comics/application/source-lifecycle';
 import {catalog} from '../src/comics/repositories';
 import {retainContainer} from '../src/storage/containers';
+import {hashFile} from '../src/importers/hash';
+import {readProcessingSettings, updateProcessingSettings} from '../src/image-processing/settings';
+import {clearProcessingCache} from '../src/image-processing/storage';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a fresh profile on the isolated fixture origin.');
 await saveSettings({...defaults,uiLanguage:'zh-CN',appearance:'light'});
@@ -26,11 +29,25 @@ const listPages=catalog.listPages;
 catalog.listPages=(contentId,options)=>{pageReads.push(contentId);return listPages(contentId,options);};
 const originalFetch=window.fetch.bind(window);
 const output=await (await originalFetch('/samples/starlight-bookshop.png')).blob();
+const outputSha256=await hashFile(output),bitmap=await createImageBitmap(output);
+const enhancedCanvas=new OffscreenCanvas(bitmap.width*2,bitmap.height*2),enhancedContext=enhancedCanvas.getContext('2d')!;
+enhancedContext.drawImage(bitmap,0,0,enhancedCanvas.width,enhancedCanvas.height);bitmap.close();
+const enhancedOutput=await enhancedCanvas.convertToBlob({type:'image/png'});enhancedCanvas.width=enhancedCanvas.height=1;
 const state={loginCount:0,requests:[] as {language:string;token:boolean;hasImage:boolean}[],officialTranslations:0,fail:false,
+  enhancements:[] as {sha256:string;bytes:number;fields:Record<string,string>;startedAt:number;duration?:number}[],enhancementFail:false,enhancementDelay:180,
+  outputSha256,readProcessingSettings,updateProcessingSettings,clearProcessingCache,
   listChannels,selectChannel,readAuth,chapterContentIds,pageReads,clearCache:()=>clearStorage('translations')};
 Object.assign(window,{channelFixture:state});
 window.fetch=async(input,init={})=>{
   const url=new URL(String(input),location.origin);
+  if(url.pathname==='/fixture-nunif/api'){
+    const form=init.body as FormData,blob=form.get('file') as Blob;
+    const entry={sha256:await hashFile(blob),bytes:blob.size,fields:Object.fromEntries(['style','noise','scale','format'].map(key=>[key,String(form.get(key))])),startedAt:performance.now(),duration:0};
+    state.enhancements.push(entry);
+    await new Promise(resolve=>setTimeout(resolve,state.enhancementDelay));entry.duration=performance.now()-entry.startedAt;
+    if(state.enhancementFail)return new Response('synthetic enhancement failure',{status:503});
+    return new Response(enhancedOutput,{headers:{'Content-Type':'image/png'}});
+  }
   if(url.pathname==='/fixture-mtu/auth/login'){
     state.loginCount++;
     const input=JSON.parse(String(init.body));

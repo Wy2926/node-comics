@@ -2,7 +2,7 @@ import {HOST_MESSAGE} from './client';
 import {executeImageTransfer, validateTransferRequest} from './execute';
 import {readTransferReceipt} from './receipts';
 
-/** No content-script callers, externally_connectable surface, or endpoint supplied by a web page. */
+/** Trusted extension callers only, for both translation and enhancement requests. */
 export function trustedHostSender(sender: chrome.runtime.MessageSender) {
   if (sender.id !== chrome.runtime.id) return false;
   if (sender.url) return sender.url.startsWith(chrome.runtime.getURL('/'));

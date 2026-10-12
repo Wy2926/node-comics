@@ -13,8 +13,8 @@ afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 async function modules(){
   const [repository,cleanup,operations,receipts,runtime,client,hash,results]=await Promise.all([
     import('../src/comics/repositories'),import('../src/comics/application/source-translation-removal'),
-    import('../src/translation/channels/transport/operations'),import('../src/translation/channels/transport/receipts'),
-    import('../src/translation/channels/transport/runtime'),import('../src/translation/channels/transport/client'),
+    import('../src/translation/channels/transport/operations'),import('../src/image-transfer/receipts'),
+    import('../src/translation/channels/transport/runtime'),import('../src/image-transfer/client'),
     import('../src/importers/hash'),import('../src/storage/translations/results'),
   ]);
   return {...repository,...cleanup,...operations,...receipts,...runtime,...client,...hash,...results};

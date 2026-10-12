@@ -1,6 +1,6 @@
 import {msg} from '../../src/i18n/runtime';
 import {initializeUiLanguage} from '../../src/i18n/load';
-import {registerImageTransferHost} from '../../src/translation/channels/transport/host';
+import {registerImageTransferHost} from '../../src/image-transfer/host';
 import './style.css';
 
 const status = document.getElementById('status')!;

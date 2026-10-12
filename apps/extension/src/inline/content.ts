@@ -27,6 +27,7 @@ interface Candidate {
   rect: DOMRect;
   display: ReturnType<typeof imageDisplay>;
   state?: InlineResult['state'];
+  enhancement?: InlineResult['enhancement'];
   checked?: boolean;
   pending?: boolean;
   resultKey?: string;
@@ -60,6 +61,7 @@ export function installInline() {
     sequence = 0,
     scope = '',
     retryId: string | undefined;
+  let retryEnhancementId: string | undefined;
   let failures = 0, retryAt = 0;
   let readingWindow = new ReadingWindow<Candidate>(item=>item.id), readingProgress = new ReadingProgress();
   let refreshRights = true, hasPending = false;
@@ -179,7 +181,12 @@ export function installInline() {
     const visible = new Set<string>();
     for (const item of windowImages) {
       const rect = item.image.getBoundingClientRect(),
-        state = item.loadError ?? (item.loading ? { kind: 'translating' as const, message: msg('正在读取译图') } : item.state);
+        state = item.loadError ?? (item.loading ? { kind: 'translating' as const, message: msg('正在读取译图') }
+          : item.enhancement && item.enhancement.phase !== 'ready'
+            ? item.enhancement.phase === 'error'
+              ? {kind:'error' as const,message:item.enhancement.message ?? msg('增强失败，保留当前图片。'),retryLabel:msg('重试增强')}
+              : {kind:'waiting' as const,message:item.enhancement.phase === 'running' ? msg('增强中…') : msg('等待增强')}
+            : item.state);
       if (!state || rect.bottom <= 0 || rect.top >= innerHeight || rect.right <= 0 || rect.left >= innerWidth)
         continue;
       visible.add(item.id);
@@ -230,7 +237,8 @@ export function installInline() {
             return;
           }
           item.loadError = undefined;
-          retryId = item.id;
+          if (item.enhancement?.phase === 'error') retryEnhancementId = item.id;
+          else retryId = item.id;
           retryAt = 0;
           invalidate();
           item.state = { kind: 'translating', message: msg('重试中…') };
@@ -316,6 +324,7 @@ export function installInline() {
     const changed=nextWindow.length!==windowImages.length||nextWindow.some((item,index)=>item!==windowImages[index]);
     windowImages=nextWindow;
     if(retryId&&!windowImages.some(item=>item.id===retryId))retryId=undefined;
+    if(retryEnhancementId&&!windowImages.some(item=>item.id===retryEnhancementId))retryEnhancementId=undefined;
     retained=document.hidden||!windowImages.length?new Set():retainedImages(candidates,innerWidth,innerHeight);
     for (const item of candidates) if (!retained.has(item)) {cancelResult(item);item.display.restore();}
     readingWindow.update(windowImages);
@@ -401,7 +410,7 @@ export function installInline() {
       paint();
     }).catch(()=>{});
   }
-  function apply(data: InlineResponse, targets: Candidate[], stamp: number, observedAt: number) {
+  function apply(data: InlineResponse, stamp: number, observedAt: number) {
     if (stamp !== generation || !enabled || location.href !== initialUrl) return;
     // TICK/WAIT replies and pushed updates travel independently. A late queued
     // snapshot must never cancel a result delivered by a newer completion.
@@ -416,9 +425,10 @@ export function installInline() {
       '1': languageLabel(data.language),
     });
     for (const result of data.items) {
-      const item = targets.find((t) => t.id === result.id);
+      const item = windowImages.find((t) => t.id === result.id);
       if (!item || !item.image.isConnected || !current(item)) continue;
       item.state = result.state;
+      item.enhancement = result.enhancement;
       // A late progress snapshot must not erase the retry scheduled by a failed control request.
       item.checked = !(result.state?.kind==='error'&&retryAt>performance.now());
       item.pending = result.pending;
@@ -462,7 +472,7 @@ export function installInline() {
             retry = value?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++);
             break;
           }
-          if (value.data) apply(value.data, targets, stamp, observedAt);
+          if (value.data) apply(value.data, stamp, observedAt);
           refill();
           if (!hasPending) break;
           failures = 0;
@@ -483,17 +493,20 @@ export function installInline() {
     if (!windowImages.length) return;
     const stamp = generation, observedAt = Date.now();
     if(performance.now()<readingWindow.readyAt){schedule(readingWindow.readyAt-performance.now());return;}
-    const targets=readingBatch(windowImages,retryId);
+    const targets=readingBatch(windowImages,retryEnhancementId ?? retryId);
     if(!targets.length){refill();return;}
     activeImages = targets;
     running = stamp;
     const retry = retryId;
     retryId = undefined;
+    const retryEnhancement = retryEnhancementId;
+    retryEnhancementId = undefined;
     try {
       // Continue local restoration during backoff; the background gates only remote work.
       // Report offline separately so a local channel can still run without internet.
       const deferRemote=retryAt>performance.now()?'backoff':navigator.onLine===false?'offline':undefined;
-      const response = await send('NC_INLINE_TICK', { ...payload(targets), retryId: retry, refreshRights, deferRemote });
+      const response = await send('NC_INLINE_TICK', { ...payload(targets), readingImages: payload(windowImages).images,
+        retryId: retry, retryEnhancementId: retryEnhancement, refreshRights, deferRemote });
       if (stamp !== generation || !enabled || location.href !== initialUrl) return;
       if (!response?.ok) {
         const delay=response?.retryAfterMs ?? Math.min(30000, 1000 * 2 ** failures++);
@@ -502,7 +515,7 @@ export function installInline() {
       }
       const data = response.data as InlineResponse | undefined;
       if (!data) return;
-      apply(data, targets, stamp, observedAt);
+      apply(data, stamp, observedAt);
       if(!deferRemote||deferRemote==='offline'&&!data.requiresInternet){refreshRights=false;failures=0;}
       if(retryAt>performance.now())schedule(retryAt-performance.now());
     } catch (error) {
@@ -527,6 +540,7 @@ export function installInline() {
       originals.textContent = msg('恢复原图');
       // Explicit activation replaces the background context (including permission checks).
       retryAt = 0;
+      retryEnhancementId = undefined;
       invalidate();
       schedule();
       paint();
@@ -605,7 +619,7 @@ export function installInline() {
     if (enabled && initialUrl !== location.href) stop();
     if(message?.type==='NC_INLINE_UPDATE'){
       if(enabled&&!paused&&!original&&!document.hidden&&message.navigationId===navigationId&&message.generation===generation){
-        apply(message.data,windowImages,generation,Date.now());refill();void watch();
+        apply(message.data,generation,Date.now());refill();void watch();
       }
       return;
     }
@@ -663,11 +677,13 @@ export function installInline() {
       latestResponse = undefined;
       translatedView = undefined;
       retryAt = 0;
+      retryEnhancementId = undefined;
       for(const item of tracked.values())cancelResult(item);
       invalidate();
       for (const item of tracked.values()) {
         item.display.restore();
         item.state = { kind: 'waiting', message: msg('准备翻译…') };
+        item.enhancement = undefined;
         item.resultKey = undefined;
         item.loadError = undefined;
       }

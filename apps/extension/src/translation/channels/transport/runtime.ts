@@ -7,10 +7,10 @@ import {translationCache} from '../../../storage/translations';
 import type {Job, Mode} from '../../../types';
 import {MAX_READING_TARGETS,targetKey, type ReadingTarget, type TranslationState} from '../../automatic';
 import type {ChannelRuntime, RuntimeOptions, TranslationScope} from '../contracts';
-import {interruptAbandonedTransfer} from './client';
+import {interruptAbandonedTransfer} from '../../../image-transfer/client';
 import {readDirectOperation, readDirectOperations, saveDirectOperation, updateDirectOperation, type DirectOperation} from './operations';
-import {readTransferReceipt, releaseTransferBytes} from './receipts';
-import {ImageTransferError, withTransferLock} from './types';
+import {readTransferReceipt, releaseTransferBytes} from '../../../image-transfer/receipts';
+import {ImageTransferError, withTransferLock} from '../../../image-transfer/types';
 
 export interface DirectImageDriver {
   start(id: string, blob: Blob, mode: Mode, language: string): Promise<void>;

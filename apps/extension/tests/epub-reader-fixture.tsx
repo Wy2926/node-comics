@@ -20,6 +20,8 @@ import type {ChannelConnection} from '../src/translation/channels/contracts';
 import {saveResultBlob} from '../src/storage/translations/results';
 import {pageTranslation} from '../src/reader/presentation';
 import type {ReadingTarget} from '../src/translation/automatic';
+import {hashFile} from '../src/importers/hash';
+import {saveProcessingProfile, updateProcessingSettings} from '../src/image-processing/settings';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
@@ -54,6 +56,25 @@ const submitted: string[] = [];
 const attempts: string[] = [];
 const events: string[] = [];
 const failures = new Set<string>();
+const enhancementParents = new Map<string, string>();
+const enhancementFixture = {requests: [] as {href: string; sha256: string; failed: boolean}[], failHref: '', failures: 0,
+  async enable() {
+    await saveProcessingProfile('nunif', 'EPUB enhancement fixture', {url: location.origin + '/fixture-nunif/'});
+    await updateProcessingSettings(value => ({...value, enabled: true}));
+  }};
+Object.assign(window, {epubEnhancementFixture: enhancementFixture});
+const originalFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+  if (new URL(String(input), location.origin).pathname !== '/fixture-nunif/api') return originalFetch(input, init);
+  const blob = (init.body as FormData).get('file') as Blob, sha256 = await hashFile(blob);
+  const href = enhancementParents.get(sha256) ?? 'unknown';
+  const failed = href === enhancementFixture.failHref && enhancementFixture.failures > 0;
+  if (failed) enhancementFixture.failures--;
+  enhancementFixture.requests.push({href, sha256, failed});
+  await new Promise(resolve => setTimeout(resolve, 350));
+  return failed ? new Response('Synthetic enhancement failure', {status: 503})
+    : new Response(blob, {headers: {'Content-Type': 'image/png'}});
+};
 
 function mockChannel(account: string, changed: () => void): ChannelConnection {
   const scope = {key: (failFirst ? 'epub-fixture-failure:' : 'epub-fixture:') + account};
@@ -97,7 +118,9 @@ function mockChannel(account: string, changed: () => void): ChannelConnection {
       context.fillStyle = account === 'A' ? '#c6eadb' : '#ead6f5'; context.fillRect(0, 0, 120, 180);
       context.fillStyle = '#202d43'; context.font = 'bold 14px sans-serif'; context.fillText(job.target_language === 'en' ? 'TRANSLATED' : '中文译图', 8, 65);
       context.font = '12px sans-serif'; context.fillText('Account ' + account, 8, 98); context.fillText(job.result!.key.split('/').at(-1)!, 8, 126);
-      return saveResultBlob({scope, job, isCurrent: () => true, blob: await canvas.convertToBlob({type: 'image/png'})});
+      const blob = await canvas.convertToBlob({type: 'image/png'});
+      enhancementParents.set(await hashFile(blob), job.result!.key.replace(/^epub-image:/, ''));
+      return saveResultBlob({scope, job, isCurrent: () => true, blob});
     },
     dispose() {},
   };
@@ -109,6 +132,7 @@ function Fixture() {
   const [, render] = useState(0);
   const [status, setStatus] = useState<ReadingProgressStatus>();
   const [window, setWindow] = useState<string[]>([]);
+  const [visibleImages, setVisibleImages] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
   const progress = useMemo(() => new ReadingProgress(() => {}, setStatus), []);
   const copyRef = useRef(copy); copyRef.current = copy;
@@ -118,9 +142,13 @@ function Fixture() {
   const translation = useAutomaticTranslation({channel, copies: [copy], updateEntry: update, language: settings.language, currentId: mounted ? copy.id : undefined});
   const onWindow = useCallback((targets: ReadingTarget[], visible: ReadingTarget['page'][]) => {
     setWindow(previous => JSON.stringify(previous) === JSON.stringify(targets.map(value => value.page.id)) ? previous : targets.map(value => value.page.id));
+    setVisibleImages(previous => JSON.stringify(previous) === JSON.stringify(visible.map(value => value.id)) ? previous : visible.map(value => value.id));
     translation.onReadingWindow(targets, visible);
   }, [translation.onReadingWindow]);
-  useEffect(() => onMaterialized(identity => setCopy(previous => ({...previous, pages: previous.pages.map(page => page.id === identity.pageId ? {...page, imageSha256: identity.imageSha256, width: identity.width, height: identity.height, imageByteSize: identity.byteSize, imageMime: identity.mime} : page)}))), []);
+  useEffect(() => onMaterialized(identity => {
+    enhancementParents.set(identity.imageSha256, identity.pageId.replace(/^epub-image:/, ''));
+    setCopy(previous => ({...previous, pages: previous.pages.map(page => page.id === identity.pageId ? {...page, imageSha256: identity.imageSha256, width: identity.width, height: identity.height, imageByteSize: identity.byteSize, imageMime: identity.mime} : page)}));
+  }), []);
   useEffect(() => {
     if (mounted) void progress.open(copyRef.current).catch(error => {if (error?.name !== 'AbortError') throw error;});
     return () => {void progress.close();};
@@ -136,6 +164,7 @@ function Fixture() {
       <summary role="button">验收数据（仅本地模拟）</summary>
       <button onClick={() => setAccount(value => value === 'A' ? 'B' : 'A')}>切换模拟账号 {account}</button>
       <output aria-label="翻译窗口">{window.join(' | ') || '无翻译目标'}</output><br/>
+      <output aria-label="图片窗口">{JSON.stringify(visibleImages)}</output><br/>
       <output aria-label="已提交图片">{submitted.join(' | ') || '尚未提交'}</output><br/>
       <output aria-label="准备图片">{attempts.join(' | ') || '尚未准备'}</output><br/>
       <output aria-label="模拟状态">{events.slice(-12).join(' | ')}</output><br/>

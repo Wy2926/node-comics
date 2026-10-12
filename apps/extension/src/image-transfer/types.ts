@@ -1,4 +1,4 @@
-/** A request recipe exists only in trusted extension memory; never persist headers or URLs. */
+/** Protocol-neutral recipe, kept only in trusted extension memory; no persisted URLs or headers. */
 export interface ImageTransferRequest {
   url: string;
   headers: Record<string, string>;

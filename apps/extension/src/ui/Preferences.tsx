@@ -9,6 +9,7 @@ import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
 import { PageTitle, SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
+import {EnhancementSettings} from './EnhancementSettings';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
 import {TranslationModelPicker} from './TranslationModelPicker';
 import type {ModelSelection} from '../translation/channels/contracts';
@@ -39,6 +40,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
       </SettingRow>
     </section>}
     <TranslationChannels/>
+    <EnhancementSettings/>
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
@@ -71,7 +73,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
       </SettingRow>
       <div className="privacy-note">
         <Icon name="shield" />
-        <p>{msg('图片仅发送至所选翻译渠道；译图缓存保存在本机。本地服务的译图缓存清理后需要重新翻译。')}</p>
+        <p>{msg('图片仅发送至所选翻译或增强渠道；译图缓存保存在本机。本地服务的译图缓存清理后需要重新翻译。')}</p>
       </div>
       <AnalyticsConsent/>
     </section>

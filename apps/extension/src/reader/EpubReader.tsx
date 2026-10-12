@@ -24,6 +24,7 @@ import {ReaderSettings, ReaderScale, ReaderTranslationSettings} from './ReaderSe
 import {PageTranslationBar} from './PageTranslationBar';
 import {EpubDirectory} from './EpubDirectory';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
+import {EnhancementStatus} from './EnhancementStatus';
 import {useReaderControls} from './useReaderControls';
 import {useEpubImages} from './useEpubImages';
 import {readReadingView, saveReadingView} from './view';
@@ -448,6 +449,7 @@ export function EpubReader({
       {!disabled && view.preference === 'translation' && (images.page || images.error) &&
         <ImageTranslationStatus state={images.error ? {kind: 'error', message: images.error} : translationState(copy.id, images.page!, view.mode)}
           onLogin={onLogin} onUpgrade={onUpgrade} onRetry={() => images.error ? images.retry() : onRetry(images.page!, view.mode)}/>}
+      {!disabled && <EnhancementStatus state={images.enhancement} onRetry={images.retryEnhancement}/>}
     </main>
     {panel && <ReaderDrawer kind={panel} title={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}
       label={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译选项')}[panel]} onClose={closePanel}>

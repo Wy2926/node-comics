@@ -30,7 +30,7 @@ async function ensureHost() {
   await withTransferLock('host-creation', ensure);
 }
 
-/** Starts quickly. Credentials are passed in trusted messaging, never written to IndexedDB. */
+/** Shared image HTTP transport. Credentials stay in trusted messages, never IndexedDB. */
 export async function startImageTransfer(id: string, scope: string, input: Blob, request: ImageTransferRequest) {
   // Do not wait behind the execution lock of a receipt already accepted by another context.
   if (await readTransferReceipt(id)) return;

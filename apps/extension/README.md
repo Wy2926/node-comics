@@ -42,6 +42,7 @@ Orion 本地安装复用 Firefox MV3 ZIP，不另设浏览器业务分支。打�
 | 网站适配 | [适配器边界与站点入口](../../docs/SITE_ADAPTERS.md) |
 | 导入、远程书库、阅读、缓存与导出 | [来源架构与 OPDS](../../docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式模块](src/comics/formats/README.md)、[导出](../../docs/COMIC_EXPORT_DESIGN.md) |
 | 翻译 | [渠道](../../docs/TRANSLATION_CHANNELS.md)、[官方契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[原位翻译](../../docs/IN_PAGE_TRANSLATION.md) |
+| 清晰度优化 | [图像增强协议、顺序与缓存](../../docs/IMAGE_ENHANCEMENT.md) |
 | UI | [共享主题](../../docs/POPUP_AND_THEME.md)、[快捷键](../../docs/POPUP_AND_THEME.md#快捷键)、[国际化](../../docs/UI_INTERNATIONALIZATION.md) |
 | 发现与搜索 | [AniList 发现](../../docs/DISCOVERY.md)、[跨语言网站搜索](../../docs/COMIC_SEARCH_DESIGN.md) |
 | 身份与账户 | [身份配置](../../docs/PRODUCTION_IDENTITY.md)、[会员规则](../../docs/MEMBERSHIP_AND_QUOTAS.md) |

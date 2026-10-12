@@ -1,0 +1,31 @@
+import type {ImageTransferRequest} from '../image-transfer/types';
+
+export interface ProcessingProfile {
+  id: string;
+  adapterId: string;
+  name: string;
+  revision: number;
+  settings: Record<string, string>;
+}
+export interface ProcessingField {
+  key: string;
+  label: string;
+  defaultValue: string;
+  options?: readonly {value: string; label: string}[];
+}
+/** Adapters describe an image protocol, never translation, model execution or reader state. */
+export interface ProcessingAdapter {
+  id: string;
+  label: string;
+  guideUrl: string;
+  fields: readonly ProcessingField[];
+  normalize(settings: Record<string, string>): Record<string, string>;
+  request(settings: Record<string, string>): ImageTransferRequest;
+}
+export type ProcessingState = {phase: 'queued' | 'running' | 'ready' | 'error'; message?: string};
+export interface ProcessingInput {
+  blob: Blob;
+  /** Parent identity includes translation account, UUID and result revision when translated. */
+  key: string;
+  owner: string;
+}

@@ -83,9 +83,10 @@ async function mobileGeometry(page) {
 }
 
 for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').split(',')) {
-  for (const scenario of ['navigation-and-reopen', 'close-while-loading', 'single-image-failure']) {
+  for (const scenario of ['navigation-and-reopen', 'close-while-loading', 'single-image-failure', 'original-enhancement-failure', 'prefetched-enhancement-failure']) {
     test(`${engine}: mobile EPUB ${scenario}`, {timeout: 180_000}, async t => {
-      const browser = await playwright[engine].launch({headless: true});
+      const browser = await playwright[engine].launch({headless: true,
+        ...(engine === 'chromium' && process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {})});
       const context = await browser.newContext({viewport: {width: 390, height: 844}, hasTouch: true,
         ...(engine === 'firefox' ? {} : {isMobile: true}), locale: 'zh-CN', reducedMotion: 'reduce'});
       const errors = [], external = [];
@@ -167,7 +168,7 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           await visibleContent(page);
           await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
           await page.getByRole('button', {name: '重开阅读器', exact: true}).waitFor();
-        } else {
+        } else if (scenario === 'single-image-failure') {
           const saved = await location(page);
           await page.getByRole('button', {name: '翻译', exact: true}).click();
           const retry = page.locator('.nc-image-translation.error .nc-image-translation-action');
@@ -177,6 +178,50 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           await page.waitForFunction(() => document.querySelector('output[aria-label="已提交图片"]').textContent.includes('image-1.png'));
           await retry.waitFor({state: 'detached'});
           assert.equal((await location(page)).cfi, saved.cfi, 'Retry must preserve the reading anchor');
+        } else {
+          const prefetch = scenario === 'prefetched-enhancement-failure', href = `OPS/image-${prefetch ? 2 : 1}.png`;
+          if (prefetch) {
+            await page.getByRole('button', {name: '翻译', exact: true}).click();
+            await page.waitForFunction(() => JSON.parse(document.querySelector('output[aria-label="图片状态"]').textContent)
+              .filter(page => /image-[12]\.png$/.test(page.id)).filter(page => page.outputs.length).length === 2);
+          }
+          await page.evaluate(async href => {
+            window.epubEnhancementFixture.failHref = href; window.epubEnhancementFixture.failures = 1;
+            await window.epubEnhancementFixture.enable();
+          }, href);
+          await page.locator('[data-enhancement-state="queued"], [data-enhancement-state="running"]').waitFor();
+          // Wait for the failed record, not just a request reaching the simulated service.
+          await page.waitForFunction(() => new Promise(resolve => {
+            const failed = window.epubEnhancementFixture.requests.find(request => request.failed);
+            if (!failed) {resolve(false); return;}
+            const request = indexedDB.open('node-comics-reading-v2-image-processing-requests');
+            request.onsuccess = () => {
+              const db = request.result, records = db.transaction('records').objectStore('records').getAll();
+              records.onsuccess = () => {resolve(records.result.some(record => record.inputSha256 === failed.sha256 && record.state === 'failed')); db.close();};
+            };
+          }));
+          if (prefetch) {
+            assert.equal(await page.getByRole('button', {name: '重试增强', exact: true}).count(), 0, 'A prefetched failure must not replace the current image status');
+            await page.evaluate(href => {
+              for (const frame of document.querySelectorAll('.nc-epub-viewport iframe')) {
+                const artwork = frame.contentDocument?.querySelector(`img[data-nc-epub-image="${href}"]`);
+                if (artwork) {artwork.scrollIntoView({block: 'start'}); return;}
+              }
+              throw Error('Prefetched artwork is not mounted');
+            }, href);
+            await page.waitForFunction(href => JSON.parse(document.querySelector('output[aria-label="图片状态"]').textContent)[0]?.id === 'epub-image:' + href, href);
+          }
+          const retry = page.getByRole('button', {name: '重试增强', exact: true});
+          await retry.waitFor();
+          await page.screenshot({path: path.join(output, `${engine}-${scenario}.png`)});
+          const saved = await location(page), submissions = await page.locator('output[aria-label="已提交图片"]').textContent();
+          await retry.click();
+          await page.waitForFunction(href => window.epubEnhancementFixture.requests.filter(request => request.href === href).length === 2, href);
+          await retry.waitFor({state: 'detached'});
+          await page.locator('[data-enhancement-state]').waitFor({state: 'detached'});
+          assert.equal(await page.locator('output[aria-label="已提交图片"]').textContent(), submissions, 'Enhancement retry must not submit another translation');
+          assert.equal((await location(page)).cfi, saved.cfi, 'Enhancement retry must preserve the reading anchor');
+          assert.equal(await page.evaluate(() => window.epubEnhancementFixture.requests.some(request => request.href === 'unknown')), false, 'Enhancement inputs must match known original or full translated images');
         }
         assert.deepEqual(errors, [], 'Reader lifecycle must not emit unhandled errors');
         assert.deepEqual(external, [], 'Only the local fixture may be requested');

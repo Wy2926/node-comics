@@ -1,4 +1,4 @@
-import {openSourceDatabase} from '../../../storage/database';
+import {openSourceDatabase} from '../storage/database';
 import type {ImageTransferReceipt} from './types';
 
 let opening: Promise<IDBDatabase> | undefined;

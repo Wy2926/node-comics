@@ -2,9 +2,9 @@ import {msg} from '../../../../i18n/runtime';
 import {loadResultBlob} from '../../../../storage/translations/results';
 import {fallbackLanguages, type Capabilities} from '../../../../types';
 import type {ChannelDefinition, ChannelField} from '../../contracts';
-import {startImageTransfer} from '../../transport/client';
+import {startImageTransfer} from '../../../../image-transfer/client';
 import {DirectImageRuntime} from '../../transport/runtime';
-import {ImageTransferError} from '../../transport/types';
+import {ImageTransferError} from '../../../../image-transfer/types';
 import {MAX_READING_TARGETS} from '../../../automatic';
 import {languages, login, safeError, serviceBase, translationRequest} from './protocol';
 
