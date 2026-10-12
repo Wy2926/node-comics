@@ -7,21 +7,29 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('release notes first use', () => {
-  it('ships the current model, pricing, quota and source changes with one package version', async () => {
+  it('ships changes since 0.11.3 with one package version', async () => {
     const {releaseNotes} = await import('../src/ui/release-notes/content');
+    expect(version).toBe('0.12.0');
+    expect(releaseNotes.version).toBe(version);
     expect(lock.version).toBe(version);
     expect(lock.packages[''].version).toBe(version);
     expect(releaseNotes.highlights.map(item => item.title)).toEqual([
-      'releaseNotes.models.title', 'releaseNotes.subscription.title', 'releaseNotes.packs.title',
-      'releaseNotes.account.title', 'releaseNotes.sources.title',
+      'releaseNotes.enhancement.title', 'releaseNotes.directory.title', 'releaseNotes.documents.title',
+      'releaseNotes.sources.title', 'releaseNotes.reliability.title',
     ]);
-    expect(releaseNotes.highlights.at(-1)).toMatchObject({sites: ['ComicK (comickz)', 'ComicWalker', "HERO'S Web"]});
-    expect(zh['releaseNotes.subscription.title']).toContain('资费大幅降低');
-    expect(zh['releaseNotes.hint']).toContain('官网定价页');
-    expect(Object.keys(zh).filter(key => /^releaseNotes\.(remote|ocr|prefetch|epub|region|shortcuts)\./.test(key))).toEqual([]);
+    expect(releaseNotes.highlights.find(item => 'sites' in item)).toMatchObject({
+      sites: ['COMIC FUZ', 'Zebrack', '再漫画', 'Manga One', 'Hachiraw', 'MangaTaro', 'WebtoonScan'],
+    });
+    for (const item of releaseNotes.highlights) expect(zh[item.description].trim()).not.toBe('');
+    expect(zh['releaseNotes.intro']).toBe('v{version} · 本次更新亮点。');
+    expect(Object.entries(zh).filter(([key]) => key.startsWith('releaseNotes.')).some(([, value]) => value.includes('0.11.3'))).toBe(false);
+    expect(zh['releaseNotes.enhancement.description']).toContain('nunif / waifu2x');
+    expect(zh['releaseNotes.documents.title']).toContain('官网');
+    expect(zh['releaseNotes.hint']).toContain('默认关闭');
+    expect(Object.keys(zh).filter(key => /^releaseNotes\.(models|subscription|packs|account)\./.test(key))).toEqual([]);
   });
 
-  it.each([null, `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
+  it.each([null, '0.11.3', `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
     const setItem = vi.fn();
     vi.stubGlobal('localStorage', {getItem: () => saved, setItem});
     const notes = await import('../src/ui/release-notes/content');

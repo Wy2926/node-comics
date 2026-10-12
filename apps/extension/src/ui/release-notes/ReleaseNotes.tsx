@@ -68,6 +68,7 @@ function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShow
           <div className="nc-release-feature-art"><ReleaseFeatureArtwork kind={item.artwork}/></div>
         </> : <div className="nc-release-feature-icon"><Icon name={item.icon} size={24}/></div>}
         <div className="nc-release-feature-text"><h3>{msg(item.title)}</h3>
+          <p>{msg(item.description)}</p>
           {'sites' in item && <ul className="nc-release-sites">{item.sites.map(site => <li key={site}>{site}</li>)}</ul>}
         </div>
       </li>)}</ol>
@@ -80,24 +81,24 @@ function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShow
 
 function ReleaseFeatureFrame({kind}: {kind: ReleaseFeatureKind}) {
   const shape = {
-    models: 'M16 6H557L594 34V137L581 152H18L6 139V20Z',
-    subscription: 'M20 7H560L593 33V137L574 152H20L7 134V23Z',
-    packs: 'M24 7H572L594 26V55L584 67L594 79V134L572 152H19L7 134V25Z',
+    enhancement: 'M16 6H557L594 34V137L581 152H18L6 139V20Z',
+    directory: 'M20 7H560L593 33V137L574 152H20L7 134V23Z',
+    documents: 'M24 7H572L594 26V55L584 67L594 79V134L572 152H19L7 134V25Z',
   }[kind];
   return <svg className="nc-release-panel-frame" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <path d={shape} fill="var(--comic-shadow-color)" transform="translate(3 4)"/>
     <path d={shape} fill="var(--release-panel-paper)" stroke="var(--comic-stroke)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
-    {kind === 'models' && <path d="M557 7v27h35" fill="var(--surface)" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
-    {kind === 'subscription' && <path d="M18 46V18h90m474 87v37h-88" fill="none" stroke="var(--release-panel-color)" strokeWidth="4" vectorEffect="non-scaling-stroke"/>}
-    {kind === 'packs' && <path d="m15 104 11-3m-10 12 18-4m-18 14 26-5" fill="none" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity=".45"/>}
+    {kind === 'enhancement' && <path d="M557 7v27h35" fill="var(--surface)" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
+    {kind === 'directory' && <path d="M18 46V18h90m474 87v37h-88" fill="none" stroke="var(--release-panel-color)" strokeWidth="4" vectorEffect="non-scaling-stroke"/>}
+    {kind === 'documents' && <path d="m15 104 11-3m-10 12 18-4m-18 14 26-5" fill="none" stroke="var(--comic-stroke)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity=".45"/>}
   </svg>;
 }
 
 function ReleaseFeatureBadge({kind, number, icon}: {kind: ReleaseFeatureKind; number: number; icon: string}) {
   const shape = {
-    models: 'M8 6h55l8 8-5 8 5 8-8 9H8l-5-8 5-9-5-8Z',
-    subscription: 'M10 5h47l14 13v13L58 41H11L3 32V15Z',
-    packs: 'm10 4 10 5 10-5 10 5 13-5 8 10 11 5-5 10 3 10-15 1-9 6-11-5-13 3-8-8-11-4 5-12-6-7Z',
+    enhancement: 'M8 6h55l8 8-5 8 5 8-8 9H8l-5-8 5-9-5-8Z',
+    directory: 'M10 5h47l14 13v13L58 41H11L3 32V15Z',
+    documents: 'm10 4 10 5 10-5 10 5 13-5 8 10 11 5-5 10 3 10-15 1-9 6-11-5-13 3-8-8-11-4 5-12-6-7Z',
   }[kind];
   return <div className="nc-release-feature-badge" aria-hidden="true">
     <svg viewBox="0 0 80 48" focusable="false">

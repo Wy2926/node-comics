@@ -4,11 +4,12 @@ import {version} from '../../../package.json';
 export const releaseNotes = {
   version,
   highlights: [
-    {icon: 'translate', title: 'releaseNotes.models.title', artwork: 'models'},
-    {icon: 'crown', title: 'releaseNotes.subscription.title', artwork: 'subscription'},
-    {icon: 'pricing', title: 'releaseNotes.packs.title', artwork: 'packs'},
-    {icon: 'user', title: 'releaseNotes.account.title'},
-    {icon: 'globe', title: 'releaseNotes.sources.title', sites: ['ComicK (comickz)', 'ComicWalker', "HERO'S Web"]},
+    {icon: 'image', title: 'releaseNotes.enhancement.title', description: 'releaseNotes.enhancement.description', artwork: 'enhancement'},
+    {icon: 'search', title: 'releaseNotes.directory.title', description: 'releaseNotes.directory.description', artwork: 'directory'},
+    {icon: 'translate', title: 'releaseNotes.documents.title', description: 'releaseNotes.documents.description', artwork: 'documents'},
+    {icon: 'globe', title: 'releaseNotes.sources.title', description: 'releaseNotes.sources.description',
+      sites: ['COMIC FUZ', 'Zebrack', '再漫画', 'Manga One', 'Hachiraw', 'MangaTaro', 'WebtoonScan']},
+    {icon: 'check', title: 'releaseNotes.reliability.title', description: 'releaseNotes.reliability.description'},
   ],
 } as const;
 

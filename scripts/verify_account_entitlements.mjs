@@ -5,6 +5,7 @@ import {mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const origin='http://127.0.0.1:5186';
+const {version}=JSON.parse(await readFile('apps/extension/package.json','utf8'));
 const output=path.resolve('artifacts/account-entitlements');
 await mkdir(output,{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM});
@@ -42,20 +43,24 @@ async function checkRelease(){
   const checkArtwork=async()=>assert(await page.locator('.nc-release-featured').evaluateAll(cards=>cards.every(card=>{
     const text=card.querySelector('.nc-release-feature-text').getBoundingClientRect();
     const art=card.querySelector('.nc-release-feature-art').getBoundingClientRect();
-    return text.right+8<=art.left;
+    return text.right+8<=art.left || art.bottom+4<=text.top;
   })),'Release text and artwork must not overlap.');
   await page.goto(`${origin}/tests/account-fixture.html?scenario=member#account`);
-  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','0.10.3'));
+  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','0.11.3'));
   await page.reload();
-  const dialog=page.getByRole('dialog'),trigger=page.getByRole('button',{name:'版本更新 · v0.11.0',exact:true});
+  const dialog=page.getByRole('dialog'),trigger=page.getByRole('button',{name:`版本更新 · v${version}`,exact:true});
   await dialog.waitFor();
-  assert((await dialog.innerText()).includes('v0.11.0'));
+  assert((await dialog.innerText()).includes(`v${version}`));
   assert.equal(await dialog.locator('.nc-release-highlights>li').count(),5);
-  for(const text of ['多模型翻译','资费大幅降低','新增额度包','ComicK (comickz)','ComicWalker',"HERO'S Web"])
+  for(const text of ['清晰度优化','nunif / waifu2x','网站目录','官网','PDF','ZIP / CBZ','COMIC FUZ','Zebrack','再漫画','Manga One','Hachiraw','MangaTaro','WebtoonScan'])
     assert((await dialog.innerText()).includes(text));
-  assert(!(await dialog.innerText()).includes('OPDS'));
+  assert(!(await dialog.innerText()).includes('资费大幅降低'));
+  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),5);
   await checkArtwork();
-  await shot('release-0.11.0');
+  await shot(`release-${version}`);
+  await dialog.locator('.nc-release-content').evaluate(element=>element.scrollTop=element.scrollHeight);
+  assert(await dialog.locator('.nc-release-footer button').isVisible());
+  await shot(`release-${version}-details`);
   const position=await page.evaluate(()=>scrollY);
   await page.keyboard.press('Escape');
   await dialog.waitFor({state:'detached'});
@@ -73,10 +78,11 @@ async function checkRelease(){
     await dialog.waitFor();
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkArtwork();
-    await shot(`release-0.11.0-mobile-${theme}`);
+    await shot(`release-${version}-mobile-${theme}`);
     await page.getByRole('button',{name:'知道了',exact:true}).click();
     await dialog.waitFor({state:'detached'});
   }
+  await page.setViewportSize({width:320,height:844});
   for(const locale of ['zh-CN','zh-TW','en','ja','ko','fr','de','es','pt-BR','it','ru','uk','pl','tr','vi','id']){
     const dictionary=JSON.parse(await readFile(`apps/extension/src/i18n/dictionaries/${locale}.json`,'utf8'));
     await page.goto(`${origin}/tests/account-fixture.html?scenario=member&locale=${locale}&largeText=1#account`);
@@ -85,18 +91,20 @@ async function checkRelease(){
     await page.locator('.nc-release-trigger').click();
     await dialog.waitFor();
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
+    assert(!(await dialog.innerText()).includes('0.11.3'));
     assert.equal(await dialog.locator('.nc-release-highlights>li').count(),5);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkArtwork();
-    if(locale==='en')await shot('release-0.11.0-mobile-en');
+    if(locale==='en')await shot(`release-${version}-mobile-en`);
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push('0.11.0 replaces old highlights, reopens after upgrade once, restores focus/scroll, and fits mobile light/dark large text in 16 locales.');
+  checks.push(`${version} includes changes since 0.11.3, reopens after upgrade once, restores focus/scroll, and fits 320px large text in 16 locales.`);
 }
 try{
   await checkRelease();
+  if(!process.argv.includes('--release-only')){
   await visit();
   assert.equal(await page.getByRole('tab').count(),0);
   assert.equal(await page.locator('.nc-rights-card').count(),3);
@@ -208,6 +216,7 @@ try{
     await open();await checkStyle();
   }
   checks.push('Header SVG actions have names, keyboard focus and 44px targets. Pack cards share balance-card tokens across six accents, light/dark, and 320px large text.');
+  }
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({checks,screenshots:output},null,2));
 }finally{await browser.close();}
