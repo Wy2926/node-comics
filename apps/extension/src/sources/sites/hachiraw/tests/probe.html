@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Hachiraw parser probe</title><body>
+<h1>Hachiraw 真实响应解析</h1><p>只在本机解析公开响应；不执行源站脚本，不请求翻译服务。</p>
+<label>操作<select id="mode"><option value="catalog">catalog</option><option value="pages">pages</option><option value="search">search</option></select></label>
+<label>来源 URL<input id="url" size="90"></label><label>搜索词<input id="query" value="kingdom"></label><label>游标<input id="cursor"></label>
+<p><label>原始响应<textarea id="body" rows="8" cols="100"></textarea></label></p><button id="parse">解析并校验</button><pre id="result"></pre>
+<script type="module" src="./probe.ts"></script></body></html>

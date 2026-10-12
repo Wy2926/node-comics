@@ -4,6 +4,7 @@ import { catalog } from '../src/comics/repositories';
 import type { Entry, PageDescriptor } from '../src/comics/domain';
 import type { PageManifest } from '../src/sources/contracts/source';
 import { downloadKey, downloadStore } from '../src/storage/downloads';
+import {sourceVerificationError} from '../src/sources/runtime/http';
 
 const mocks = vi.hoisted(() => ({ acquire: vi.fn(), discover: vi.fn() }));
 vi.mock('../src/comics/pages/service', () => ({ acquirePage: mocks.acquire }));
@@ -36,6 +37,16 @@ async function fixture(pageCount = 2, complete = true, id: string = crypto.rando
 }
 
 describe('explicit website download intents', () => {
+  it.each([200,403,503])('blocks on a Cloudflare challenge at HTTP %s until explicit retry', async status => {
+    const f = await fixture(1);
+    mocks.acquire.mockRejectedValueOnce(sourceVerificationError(status));
+    await queueDownloads([f.document.id]); await runDownloads(); await runDownloads();
+    expect(mocks.acquire).toHaveBeenCalledOnce();
+    expect((await listDownloads())[0]).toMatchObject({status:'failed',reason:'source',completed:0});
+    await queueDownloads([f.document.id]); await runDownloads();
+    expect(mocks.acquire).toHaveBeenCalledTimes(2);
+    expect((await listDownloads())[0]).toMatchObject({status:'complete',completed:1});
+  });
   it('discovers page metadata without silently creating a download task or fetching images', async () => {
     const f = await fixture(0, false);
     const manifest = { id: 'snapshot', title: 'Test', url: 'https://example.org/comic', items: [{ id: 'source-page', url: 'https://example.org/image.png', width: 10, height: 20, order: 0 }], discoveryComplete: true } as PageManifest;

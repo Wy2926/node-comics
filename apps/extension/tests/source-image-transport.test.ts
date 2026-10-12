@@ -13,6 +13,12 @@ afterEach(()=>vi.unstubAllGlobals());
 const source='https://reader.test/chapter/1?key=test#page-2',image='https://cdn.test/page.png';
 
 describe('common image request context',()=>{
+  it.each([200,403,503])('reports Cloudflare HTTP %s without decoding or retrying a challenge document',async status=>{
+    const cancel=vi.fn(),fetch=vi.fn(async()=>new Response(new ReadableStream({cancel}),{status,headers:{'cf-mitigated':'challenge','content-type':'text/html'}}));
+    vi.stubGlobal('fetch',fetch);
+    await expect(fetchSourceImage(image,undefined,undefined,{pageUrl:source})).rejects.toMatchObject({kind:'verification-required',details:{status},message:expect.stringContaining('Cloudflare')});
+    expect(fetch).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledOnce();
+  });
   it('reads a generic cross-origin image with page origin, independently of adapters',async()=>{
     const fetch=vi.fn(async()=>new Response('image'));vi.stubGlobal('fetch',fetch);
     expect(await(await fetchSourceImage(image,undefined,undefined,{pageUrl:source})).blob.text()).toBe('image');

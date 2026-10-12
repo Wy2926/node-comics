@@ -33,6 +33,17 @@ beforeEach(() => {
 afterEach(() => {vi.unstubAllGlobals();});
 
 describe('bounded source binary POST', () => {
+  it.each([200, 403, 503])('classifies Cloudflare HTTP %s before parsing text, accepted statuses or binary data', async status => {
+    for (const binary of [false, true]) {
+      const cancel = vi.fn();
+      fetcher.mockResolvedValueOnce(new Response(new ReadableStream({cancel}), {status, headers: {'cf-mitigated': 'challenge'}}));
+      const context = createSourceNetworkContext();
+      await expect(binary ? context.requestBytes!(endpoint, {referer: source}) : context.request(endpoint, {referer: source, acceptStatuses: [status]}))
+        .rejects.toMatchObject({kind: 'verification-required', details: {status}, message: expect.stringContaining('Cloudflare')});
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
   const body = new Uint8Array([0, 128, 255, 10]);
   it('reads binary GET without POST headers or text replay', async () => {
     const replay = [{url: endpoint, referer: source, body: 'GET text replay'}];

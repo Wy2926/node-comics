@@ -178,9 +178,9 @@ describe('opt-in source-page catalog transport', () => {
     expect(chrome.tabs.remove).toHaveBeenCalledOnce();
     expect(records).toEqual({});
   });
-  it.each([401, 403])('reports HTTP %s verification without retries or switching to HTTP', async (status) => {
+  it.each([200, 401, 403, 503])('reports HTTP %s verification without retries or switching to HTTP', async (status) => {
     response = { ...response, status, challenge: true };
-    await expect(read()).rejects.toThrow('验证');
+    await expect(read()).rejects.toMatchObject({kind: 'verification-required', details: {status}, message: expect.stringContaining('Cloudflare')});
     expect(inject).toHaveBeenCalledTimes(2);
     expect(fetch).not.toHaveBeenCalled();
     expect(chrome.tabs.remove).toHaveBeenCalledOnce();

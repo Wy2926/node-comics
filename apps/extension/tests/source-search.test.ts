@@ -43,6 +43,11 @@ afterEach(() => {
 });
 
 describe('name-only search and candidate authority', () => {
+  it('maps even a successful-status Cloudflare challenge to the verification action', async () => {
+    fixture.networks.fixture.search = async (_request, context) => {await context.request('https://fixture.test/search'); return {items: []};};
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('challenge', {headers: {'cf-mitigated': 'challenge'}})));
+    await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_VERIFICATION_REQUIRED'});
+  });
   it('lists capable sites without language filtering or match status', () => {
     expect(listSearchSites()).toHaveLength(1);
     expect(listSearchSites()[0]).toMatchObject({id: 'main', primaryLanguages: ['en']});

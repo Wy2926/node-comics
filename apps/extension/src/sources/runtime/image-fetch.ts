@@ -4,7 +4,7 @@ import {requireImagePermissions} from './permissions';
 import {safeImageUrl} from '../shared/urls';
 import {imageReferer} from '../shared/referrer';
 import {observeImageRedirect} from './image-redirect';
-import {SourceHttpError,sourceRetryAfter} from './http';
+import {SourceHttpError,sourceRetryAfter,sourceVerificationError} from './http';
 export interface ImageRequestContext {pageUrl:string;referrerPolicy?:ReferrerPolicy;}
 /** Source reads are cancellable; translation input limits belong to the translation entry point. */
 export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:Readonly<Record<string,string>>,context?:ImageRequestContext) {
@@ -44,6 +44,10 @@ export async function sourceImage(url:string,signal?:AbortSignal):Promise<Blob> 
   return (await fetchSourceImage(url,signal)).blob;
 }
 async function readResponse(response:Response,signal:AbortSignal) {
+  if(response.headers.get('cf-mitigated')==='challenge'){
+    await response.body?.cancel();
+    throw sourceVerificationError(response.status);
+  }
   if (!response.ok){
     await response.body?.cancel();
     throw new SourceHttpError('http',msg('来源图片获取失败（HTTP {0}），可重新解析后补齐。', { '0': response.status }),

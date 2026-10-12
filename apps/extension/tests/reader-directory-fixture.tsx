@@ -7,6 +7,7 @@ import {Api} from '../src/api';
 import {defaults,type ReadingEntry,type Settings} from '../src/types';
 import type {ReadingDirectory} from '../src/comics/application/library-service';
 import {sourcePageCache} from '../src/storage/source-pages';
+import {sourceVerificationError} from '../src/sources/runtime/http';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
@@ -21,21 +22,25 @@ const initial:ReadingEntry[]=Array.from({length:620},(_,chapter)=>({id:`chapter-
 function Fixture(){
  const [copies,setCopies]=useState(initial),[id,setId]=useState('chapter-250'),[config,setConfig]=useState<Settings>({...defaults,layout:'continuous',fit:'window'}),[mounted,setMounted]=useState(true);
  const [grouped,setGrouped]=useState(false),[status,setStatus]=useState('可以阅读'),[empty,setEmpty]=useState(false);
+ const [sourceError,setSourceError]=useState<string>(),[reloading,setReloading]=useState(false),[reloaded,setReloaded]=useState('');
  const copy=copies.find(item=>item.id===id)!;
  const directory=useMemo<ReadingDirectory>(()=>({title:'620 章 · 目录定位验收',sourceUrl:'https://fixture.invalid/comic',entries:copies.map(item=>({id:item.id,title:item.title,tags:[],current:item.id===id,read:false,readable:true,total:item.pages.length,status})),chapters:copies.map((item,index)=>({id:item.id,title:item.title,entryIds:[item.id],selectedEntryId:item.id,groupIds:grouped?['group-'+Math.floor(index/100)]:[],current:item.id===id,readable:true})),groups:grouped?[{id:'root',title:'来源分类',entryIds:[]},{id:'later',title:'后续分类',entryIds:[]},...Array.from({length:7},(_,n)=>({id:'group-'+n,parentId:n<4?'root':'later',title:`分组 ${n+1}`,entryIds:copies.slice(n*100,(n+1)*100).map(item=>item.id)}))]:[]}),[copies,id,grouped,status]);
  const update=useCallback((next:ReadingEntry)=>setCopies(previous=>previous.map(item=>item.id===next.id?next:item)),[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async()=>{},[]);
  const navigate=useCallback((value:string)=>setId(value),[]);
+ const reload=(entryId=id)=>{if(reloading)return;setReloading(true);setReloaded(entryId);setTimeout(()=>{setCopies(previous=>previous.map(item=>item.id===entryId?{...item,pages:item.pages.map(page=>({...page,blobKey:'inline-original:directory-fixture',fetchError:undefined}))}:item));setSourceError(undefined);setEmpty(false);setReloading(false);},500);};
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:8,display:'flex',gap:12,background:'white',zIndex:20}}>
    <button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭阅读器':'重开阅读器'}</button>
    <button onClick={()=>setGrouped(value=>!value)}>切换分组</button>
    <button data-directory-revision={status==='状态已刷新'?1:0} onClick={()=>setStatus(value=>value==='可以阅读'?'状态已刷新':'可以阅读')}>刷新目录状态</button>
    <button onClick={()=>setEmpty(value=>!value)}>切换页面就绪</button>
+   <button onClick={()=>setSourceError(sourceVerificationError(403).message)}>模拟 CF 验证</button>
+   <output aria-label="重载章节">{reloaded}</output>
    <label>章节<input aria-label="验收章节" type="number" min={1} max={620} value={Number(id.slice(8))} onChange={e=>navigate('chapter-'+e.target.value)}/></label>
    <output aria-label="保存位置">{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>
   </div>
-  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={empty?{...copy,pages:[]}:copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={noop} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} api={api} busy={false}/>}
+  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={{...copy,sourceUrl:'https://fixture.invalid/comic',...(empty?{pages:[]}:{})}} sequence={copies} sourceStatus={sourceError} onReload={reload} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={noop} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} api={api} busy={reloading}/>}
  </div>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

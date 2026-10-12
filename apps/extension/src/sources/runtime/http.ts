@@ -5,11 +5,15 @@ import {withImageHeaders} from './image-headers';
 import type {ImportResponse} from './import-responses';
 
 export class SourceHttpError extends Error {
-  constructor(readonly kind: 'request-denied' | 'permission-required' | 'http' | 'invalid-response', message: string,
+  constructor(readonly kind: 'request-denied' | 'permission-required' | 'verification-required' | 'http' | 'invalid-response', message: string,
     readonly details: {status?: number; retryAfter?: number} = {}) {
     super(message);
     this.name = 'SourceHttpError';
   }
+}
+
+export function sourceVerificationError(status: number) {
+  return new SourceHttpError('verification-required', msg('源站要求 Cloudflare 验证。请在同一浏览器打开来源网页，完成验证后返回并重新载入。'), {status});
 }
 
 export function sourceRetryAfter(value: string | null): number | undefined {
@@ -57,6 +61,11 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       const response = await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
         ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})});
+      // The explicit challenge header is authoritative, including HTTP 200 and accepted error statuses.
+      if (response.headers.get('cf-mitigated') === 'challenge') {
+        await response.body?.cancel();
+        throw sourceVerificationError(response.status);
+      }
       // Some sources return a structured empty result with a non-success status.
       // Only explicitly requested error responses reach the owning parser.
       if (!response.ok && !(response.status >= 400 && response.status <= 599 && options?.acceptStatuses?.includes(response.status))) {

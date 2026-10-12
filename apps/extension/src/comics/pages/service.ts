@@ -61,7 +61,7 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
       catch(error){
         const details=(error as {details?:{status?:number;retryAfter?:number}})?.details;
         if(signal.aborted||error instanceof ImagePermissionsRequired||error instanceof SourceDatabaseSchemaError||
-          error instanceof DOMException&&error.name==='AbortError'||(error as {kind?:string})?.kind==='permission-required'||
+          error instanceof DOMException&&error.name==='AbortError'||['permission-required','verification-required'].includes((error as {kind?:string})?.kind??'')||
           details?.status===429||details?.retryAfter||typeof descriptor.locator.contentKey!=='string')throw error;
         await assertSourceCurrent();
         const renewed=await refreshWebsitePage(doc,descriptor,signal);

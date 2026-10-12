@@ -1,7 +1,7 @@
 import type { SourceNetworkContext } from '../contracts/network';
 import { resolveSource } from '../core/resolve';
 import { definitions } from '../registry/definitions';
-import { authorizeSourceRequest, SourceHttpError, sourceRetryAfter } from './http';
+import { authorizeSourceRequest, SourceHttpError, sourceRetryAfter, sourceVerificationError } from './http';
 import { requestInSourcePage } from './page-request';
 import { withPageDocument } from './page-document';
 import { msg } from '../../i18n/runtime';
@@ -42,7 +42,8 @@ export async function withPageNetworkContext<T>(url: string, signal: AbortSignal
       if (result.error && result.status === 0)
         throw new SourceHttpError('http', '来源网络请求失败或超时，请稍后重试。');
       const accepted = result.status >= 400 && result.status <= 599 && options?.acceptStatuses?.includes(result.status);
-      if (result.challenge || (result.status === 401 || result.status === 403) && !accepted)
+      if (result.challenge) throw sourceVerificationError(result.status);
+      if ((result.status === 401 || result.status === 403) && !accepted)
         throw new SourceHttpError('http', `来源请求失败（HTTP ${result.status}），请打开来源页面完成登录或验证后重试。`, { status: result.status });
       if ((result.status < 200 || result.status >= 300) && !accepted)
         throw new SourceHttpError('http', `来源请求失败（HTTP ${result.status}），请稍后重试。`, { status: result.status, retryAfter: sourceRetryAfter(result.retryAfter) });

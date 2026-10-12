@@ -16,21 +16,23 @@ export function Thumbnail({blobKey,alt='',className='',retryKey=0,onError}:{blob
 }
 export type ShownImage={scope:string;key:string;job?:Job};
 type PreparedImage=ShownImage&{url:string;attempt:number};
-export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,error,sourceUrl}:{scope:string;blobKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;error?:string;sourceUrl?:string}){
+export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl}:{scope:string;blobKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string}){
   const [loaded,setLoaded]=useState<PreparedImage>();const [candidate,setCandidate]=useState<PreparedImage>();const [failure,setFailure]=useState('');const [retry,setRetry]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
   const request=useRef<{url:string;signal:AbortSignal}|undefined>(undefined);
   const [dismissed,setDismissed]=useState<string>();const retryButton=useRef<HTMLButtonElement>(null);
   const callback=useRef(onShown);callback.current=onShown;
   const loadCallback=useRef(onLoadState);loadCallback.current=onLoadState;
-  const reload=useCallback(()=>setRetry(value=>value+1),[]);
+  const reloadAction=useRef({onReload,reloadBusy});reloadAction.current={onReload,reloadBusy};
+  const reload=useCallback(()=>{if(reloadAction.current.reloadBusy)return;if(!blobKey&&reloadAction.current.onReload)reloadAction.current.onReload();else setRetry(value=>value+1);},[blobKey]);
+  const missingError=blobKey?undefined:error;
   const [preparing,setPreparing]=useState<'reading'|'decoding'|'displaying'>('reading');
   const shown=loaded?.scope===scope?loaded:undefined;
   const pending=candidate?.scope===scope&&candidate.key===blobKey&&candidate.attempt===retry?candidate:undefined;
   const revoke=(url:string)=>{if(url&&urls.current.delete(url))URL.revokeObjectURL(url);};
   const failureSignature=JSON.stringify([scope,blobKey,retry,failure]);
   useEffect(()=>{if(dismissed===failureSignature)retryButton.current?.focus({preventScroll:true});},[dismissed,failureSignature]);
-  useEffect(()=>{let active=true;setFailure('');setDismissed(undefined);setCandidate(undefined);setPreparing('reading');if(!blobKey){setLoaded(undefined);setFailure(error||msg("本地图片已清理，请重新导入原图。"));return;}
+  useEffect(()=>{let active=true;setFailure('');setDismissed(undefined);setCandidate(undefined);setPreparing('reading');if(!blobKey){setLoaded(undefined);setFailure(missingError||msg("本地图片已清理，请重新导入原图。"));return;}
     const controller=new AbortController(),loading={url:'',signal:controller.signal};request.current=loading;let release:(()=>void)|undefined;
     void acquireImage(blobKey,controller.signal).then(async lease=>{
       release=lease.release;const blob=lease.blob;if(!active){release();return;}if(!blob)throw Error(msg("本地图片已清理，请恢复图片后重试。"));
@@ -40,7 +42,7 @@ export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,
       if(active){setCandidate({scope,key:blobKey,job,url:loading.url,attempt:retry});setPreparing('displaying');}else revoke(loading.url);
     }).catch(e=>{if(active)setFailure((e as Error).message);revoke(loading.url);loading.url='';});
     return()=>{active=false;controller.abort();release?.();if(request.current===loading)request.current=undefined;if(displayed.current?.url!==loading.url)revoke(loading.url);};
-  },[scope,blobKey,retry]);
+  },[scope,blobKey,retry,missingError]);
   useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url&&url!==candidate?.url&&url!==request.current?.url)revoke(url);},[loaded,candidate]);
   useEffect(()=>()=>{for(const url of urls.current)URL.revokeObjectURL(url);urls.current.clear();},[]);
   const isCurrent=(image:PreparedImage)=>pending===image&&request.current?.url===image.url&&!request.current.signal.aborted;
@@ -57,5 +59,5 @@ export function BlobPicture({scope,blobKey,job,alt,onShown,onLoadState,onImport,
   // Cached bytes are not a displayed result. Report preparation through the actual DOM load.
   const phase=failure?'error':shown&&shown.key===blobKey&&shown.attempt===retry?'ready':preparing;
   useLayoutEffect(()=>{loadCallback.current?.({scope,key:blobKey,phase,error:failure||undefined,retry:reload});return()=>loadCallback.current?.(undefined);},[scope,blobKey,phase,failure,reload]);
-  return <>{[shown,pending].map(image=>image&&<img key={image.url} className={image===pending?'nc-page-image-pending':'nc-page-image'} src={image.url} alt={image===pending?'':`${alt}${image.job?msg("译图"):msg("原图")}`} aria-hidden={image===pending||undefined} style={image===pending?{position:'absolute',visibility:'hidden',pointerEvents:'none'}:undefined} data-result-job={image.job?.id??'original'} onLoad={event=>confirm(image,event.currentTarget)} onError={()=>fail(image)}/>)}{!shown&&!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&(shown&&dismissed===failureSignature?<button ref={retryButton} className="nc-image-failure-retry" title={failure} aria-label={msg('重试')} onClick={e=>{e.stopPropagation();setRetry(v=>v+1);}}><Icon name="refresh" size={16}/></button>:<div className={`nc-image-failure ${shown?'over-image':''}`} role="status">{shown&&<button className="nc-image-failure-dismiss" aria-label={msg('关闭错误提示')} onClick={e=>{e.stopPropagation();setDismissed(failureSignature);}}><Icon name="close" size={16}/></button>}<Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><button className="button secondary" onClick={()=>setRetry(v=>v+1)}>{msg('重试')}</button><button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>{sourceUrl&&<a href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div>)}</>;
+  return <>{[shown,pending].map(image=>image&&<img key={image.url} className={image===pending?'nc-page-image-pending':'nc-page-image'} src={image.url} alt={image===pending?'':`${alt}${image.job?msg("译图"):msg("原图")}`} aria-hidden={image===pending||undefined} style={image===pending?{position:'absolute',visibility:'hidden',pointerEvents:'none'}:undefined} data-result-job={image.job?.id??'original'} onLoad={event=>confirm(image,event.currentTarget)} onError={()=>fail(image)}/>)}{!shown&&!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&(shown&&dismissed===failureSignature?<button ref={retryButton} className="nc-image-failure-retry" title={failure} aria-label={msg('重试')} disabled={reloadBusy} onClick={e=>{e.stopPropagation();reload();}}><Icon name="refresh" size={16}/></button>:<div className={`nc-image-failure ${shown?'over-image':''}`} role="status">{shown&&<button className="nc-image-failure-dismiss" aria-label={msg('关闭错误提示')} onClick={e=>{e.stopPropagation();setDismissed(failureSignature);}}><Icon name="close" size={16}/></button>}<Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><div className="nc-image-failure-actions">{blobKey&&<button className="button secondary" disabled={reloadBusy} onClick={reload}>{msg('重试')}</button>}{onReload&&<button className="button secondary" disabled={reloadBusy} onClick={onReload}><Icon name="refresh" size={16}/>{msg('重新载入')}</button>}{!sourceUrl&&<button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>}{sourceUrl&&<a className="button secondary" href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div></div>)}</>;
 }

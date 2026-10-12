@@ -63,6 +63,12 @@
   background: var(--surface);
   color: var(--danger);
 }
+.nc-image-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
 .nc-image-translation-action:focus-visible,
 .nc-image-translation-dismiss:focus-visible,
 .nc-image-failure-dismiss:focus-visible,

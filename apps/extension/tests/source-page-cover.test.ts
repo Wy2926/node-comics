@@ -184,9 +184,9 @@ describe('opt-in image-document cover transport', () => {
     await rejected;
     expect(chrome.tabs.remove).toHaveBeenCalledOnce();
   });
-  it.each([401, 403])('reports HTTP %s once without direct HTTP fallback', async (status) => {
+  it.each([200, 401, 403, 503])('reports a verification challenge at HTTP %s without direct HTTP fallback', async (status) => {
     response = { ...response, status, challenge: true, data: '' };
-    await expect(readPageCover(url)).rejects.toMatchObject({ details: { status } });
+    await expect(readPageCover(url)).rejects.toMatchObject({kind: 'verification-required', details: { status } });
     expect(inject).toHaveBeenCalledTimes(2);
     expect(fetch).not.toHaveBeenCalled();
     expect(chrome.tabs.remove).toHaveBeenCalledOnce();

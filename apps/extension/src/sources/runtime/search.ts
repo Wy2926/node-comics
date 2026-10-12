@@ -81,6 +81,7 @@ export async function searchSource(sourceId: string, input: SourceSearchRequest,
       const {status, retryAfter} = error.details;
       throw new SourceSearchError(error.kind === 'request-denied' ? 'SOURCE_SEARCH_REQUEST_DENIED' :
         error.kind === 'permission-required' ? 'SOURCE_SEARCH_PERMISSION_REQUIRED' :
+        error.kind === 'verification-required' ? 'SOURCE_SEARCH_VERIFICATION_REQUIRED' :
         error.kind === 'invalid-response' ? 'SOURCE_SEARCH_INVALID' :
         status === 429 ? 'SOURCE_SEARCH_RATE_LIMITED' :
         status === 401 || status === 403 ? 'SOURCE_SEARCH_VERIFICATION_REQUIRED' : 'SOURCE_SEARCH_HTTP_ERROR', retryAfter);
