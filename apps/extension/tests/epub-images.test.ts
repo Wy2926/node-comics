@@ -1,7 +1,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {Page, Job} from '../src/types';
 const mocks = vi.hoisted(() => ({acquire:vi.fn(), prepare:vi.fn(), enhance:vi.fn()}));
-vi.mock('../src/comics/application/image-access', () => ({acquireImage:mocks.acquire}));
+vi.mock('../src/comics/application/image-access', () => ({acquireImage:mocks.acquire,
+  processingInput:(key:string,owner:string)=>({key,owner,validate:async()=>{},load:(signal:AbortSignal)=>mocks.acquire(key,signal)})}));
 vi.mock('../src/reader/prepare-image', () => ({prepareReaderImage:mocks.prepare}));
 vi.mock('../src/image-processing/runtime', () => ({enhanceImage:mocks.enhance}));
 import {EpubImageWindow} from '../src/reader/epub-images';
@@ -20,7 +21,9 @@ beforeEach(() => {
   revoke = vi.fn(); vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revoke);
   mocks.acquire.mockImplementation(async () => ({blob:new Blob(['pixels']),release:vi.fn()}));
   mocks.prepare.mockResolvedValue(undefined);
-  mocks.enhance.mockResolvedValue(new Blob(['enhanced']));
+  mocks.enhance.mockImplementation(async(input,_profile,signal,options)=>{
+    const lease=await input.load(signal);try{await options.onParent?.(lease.blob);return new Blob(['enhanced']);}finally{lease.release();}
+  });
 });
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();});
 
@@ -48,6 +51,16 @@ function visible(images:Element[],at:number) {intersect(images.map((target,i)=>(
 describe('EPUB embedded image window', () => {
   const processing = () => ({owner:'entry-a',settings:{enabled:true,activeId:'local',cacheLimitMb:512,
     profiles:[{id:'local',adapterId:'nunif',revision:1,name:'Local',settings:{url:'http://localhost/'}}]}});
+  it('displays a warm enhancement without reading a parent or waiting for the original element to load',async()=>{
+    mocks.enhance.mockResolvedValue(new Blob(['cached enhancement']));mocks.acquire.mockRejectedValue(Error('Parent unavailable'));
+    const {document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),vi.fn());
+    Object.assign(images[0],{complete:false,naturalWidth:0,naturalHeight:0});
+    window.add(document);visible(images,0);window.show([page('OPS/0.png')],true,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
+    expect(images[0].getAttribute('src')).toMatch(/^blob:translated/);
+    expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
+    expect(mocks.acquire).not.toHaveBeenCalled();expect(mocks.prepare).toHaveBeenCalledOnce();window.close();
+  });
   it('enhances only complete translations in a two-image window and preserves the author box', async () => {
     const {document,images}=artwork(),window=new EpubImageWindow(vi.fn(),vi.fn());window.add(document);visible(images,0);
     const pages=images.map(image=>page(image.getAttribute('data-nc-epub-image')!));
@@ -56,13 +69,15 @@ describe('EPUB embedded image window', () => {
     window.show(pages,true,'classic','en','account-a',processing());
     await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
     expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual(['result:OPS/0.png','result:OPS/1.png']);
-    expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
+    await vi.waitFor(()=>expect(images[0].getAttribute('width')).toBe('240'));expect(images[0].getAttribute('height')).toBe('360');
     window.show(pages,true,'classic','en','account-a',{...processing(),settings:{...processing().settings,enabled:false}});
     await vi.waitFor(()=>expect(images[0].getAttribute('src')).not.toBe('blob:original-0'));
     expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
   });
   it('keeps a full translation on enhancement failure and explicitly retries enhancement only', async () => {
-    mocks.enhance.mockRejectedValueOnce(Error('Enhancement failed'));
+    mocks.enhance.mockImplementationOnce(async(input,_profile,signal,options)=>{
+      const lease=await input.load(signal);try{await options.onParent(lease.blob);throw Error('Enhancement failed');}finally{lease.release();}
+    });
     const errors=vi.fn(),{document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),errors);window.add(document);visible(images,0);
     window.show([page('OPS/0.png')],true,'classic','en','account-a',processing());
     await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')).toEqual({phase:'error',message:'Enhancement failed'}));
@@ -70,12 +85,12 @@ describe('EPUB embedded image window', () => {
     const base=images[0].getAttribute('src');expect(base).toMatch(/^blob:translated/);
     window.retry('OPS/0.png');
     await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
-    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);
+    expect(mocks.enhance.mock.lastCall?.[3].retry).toBe(true);
     await vi.waitFor(()=>expect(images[0].getAttribute('src')).not.toBe(base));window.close();
   });
   it('exposes original-image enhancement progress and an independent retryable error', async () => {
     const pending=Promise.withResolvers<Blob>();
-    mocks.enhance.mockImplementationOnce((_input,_profile,_signal,onState) => {onState({phase:'running'});return pending.promise;});
+    mocks.enhance.mockImplementationOnce((_input,_profile,_signal,options) => {options.onState({phase:'running'});return pending.promise;});
     const changed=vi.fn(),errors=vi.fn(),{document,images}=artwork(['OPS/0.png']);
     const window=new EpubImageWindow(vi.fn(),errors,changed);window.add(document);visible(images,0);
     window.show([page('OPS/0.png')],false,'classic','en','account-a',processing());
@@ -88,7 +103,7 @@ describe('EPUB embedded image window', () => {
     expect(errors).not.toHaveBeenCalledWith('OPS/0.png','Enhancement unavailable');
     window.retry('OPS/0.png');
     await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
-    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);
+    expect(mocks.enhance.mock.lastCall?.[3].retry).toBe(true);
     expect(changed).toHaveBeenCalled();window.close();
   });
   it('retains a prefetched enhancement failure when its artwork becomes the current image', async () => {
@@ -118,10 +133,10 @@ describe('EPUB embedded image window', () => {
     await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')).toEqual({phase:'error',message:'Parent image unavailable'}));
     expect(images[0].getAttribute('src')).toBe('blob:original-0');
     expect(errors).not.toHaveBeenCalledWith('OPS/0.png','Parent image unavailable');
-    expect(mocks.enhance).not.toHaveBeenCalled();
+    expect(mocks.enhance).toHaveBeenCalledOnce();
     window.retry('OPS/0.png');
     await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
-    expect(mocks.acquire).toHaveBeenCalledTimes(3);expect(mocks.enhance).toHaveBeenCalledOnce();window.close();
+    expect(mocks.acquire).toHaveBeenCalledTimes(2);expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
   });
   it('does not reload the displayed enhancement when only its name or cache budget changes', async () => {
     const {document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),vi.fn());
@@ -146,11 +161,14 @@ describe('EPUB embedded image window', () => {
     window.show(images.map(image=>page(image.getAttribute('data-nc-epub-image')!)),true,'classic','en','account-a');
     await vi.waitFor(()=>expect(images[0].getAttribute('src')).toBe('blob:translated-1'));
     expect(mocks.acquire).toHaveBeenCalledTimes(4);
+    const leases=await Promise.all(mocks.acquire.mock.results.map(result=>result.value));
+    for(const lease of leases)expect(lease.release).toHaveBeenCalledOnce();
     expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
     expect(document.textContent).toBe('Body and captions remain original');expect(images[4].getAttribute('src')).toBe('blob:original-4');
     window.show([],false,'classic','en','account-a');
     expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(images[0].getAttribute('width')).toBeNull();
     expect(revoke).toHaveBeenCalledTimes(4);expect(revoke.mock.calls.every(([url])=>url.startsWith('blob:translated'))).toBe(true);window.close();
+    for(const lease of leases)expect(lease.release).toHaveBeenCalledOnce();
   });
 
   it('does not let delayed results cross an account/language change or disposed chapter', async () => {
@@ -160,6 +178,7 @@ describe('EPUB embedded image window', () => {
     await vi.waitFor(()=>expect(mocks.prepare).toHaveBeenCalledOnce());
     window.show([page('OPS/0.png')],true,'classic','en','account-b');ready.resolve();
     await vi.waitFor(()=>expect(revoke).toHaveBeenCalledWith('blob:translated-1'));
+    expect((await mocks.acquire.mock.results[0].value).release).toHaveBeenCalledOnce();
     expect(images[0].getAttribute('src')).toBe('blob:original-0');
     window.show([page('OPS/0.png')],true,'classic','fr','account-a');expect(mocks.acquire).toHaveBeenCalledOnce();window.close();
   });

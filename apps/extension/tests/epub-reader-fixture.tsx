@@ -113,6 +113,7 @@ function mockChannel(account: string, changed: () => void): ChannelConnection {
       return {init: async () => {events.push('init'); changed();}, restore:async()=>{}, submit, manual: async target => {attempted.delete(target.page.id); errors.delete(target.page.id); await submit([target]);}, wait: async () => false,
         hasPending: false, waitingIds: [], retryDelay: 0, stateFor: (target, _active, error) => errors.has(target.page.id) || error ? {kind: 'error', message: errors.get(target.page.id) ?? error!} : undefined, refresh: async () => {}, dispose() {}};
     },
+    async validateResult() {},
     async readResult(job) {
       const canvas = new OffscreenCanvas(120, 180), context = canvas.getContext('2d')!;
       context.fillStyle = account === 'A' ? '#c6eadb' : '#ead6f5'; context.fillRect(0, 0, 120, 180);

@@ -13,6 +13,8 @@ import {LocalImportQueue} from '../src/comics/application/import-queue';
 import type {Job} from '../src/types';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
 import {acquirePage,materializationId} from '../src/comics/pages/service';
+import {processingInput} from '../src/comics/application/image-access';
+import {registerResultReader,resultBlobKey} from '../src/storage/translations/results';
 import {sourcePageCache} from '../src/storage/source-pages';
 import {downloadKey,downloadStore} from '../src/storage/downloads';
 import {planExport} from '../src/export/plan';
@@ -24,6 +26,19 @@ beforeEach(()=>{mocks.index.mockReset().mockResolvedValue({kind:'images',pages:[
 afterEach(()=>dispose());
 const file=(name=crypto.randomUUID()+'.cbz',content=crypto.randomUUID())=>new File(['PK',content],name,{type:'application/zip'});
 describe('single-file comic imports',()=>{
+ it('checks each enhanced result owner without opening either parent, even for a shared translation',async()=>{
+  const a=await loadEntry((await importLocalFile(file())).id),b=await loadEntry((await importLocalFile(file())).id);
+  const scope={key:crypto.randomUUID()},job:Job={id:'shared',status:'succeeded',result:{key:'v1',recoverable:true},mode:'classic',target_language:'en',phase:'done',created_at:'2026-10-12',version:1,cache_hit:false,quota_pages:0};
+  const read=vi.fn(async()=>new Blob(['parent'])),authorize=vi.fn(async()=>{}),release=registerResultReader(scope,job,read,authorize);
+  try{
+   const key=resultBlobKey(scope,job),left=processingInput(key,a.id,a.pages[0].blobKey),right=processingInput(key,b.id,b.pages[0].blobKey);
+   await left.validate();await right.validate();expect(read).not.toHaveBeenCalled();expect(mocks.materialize).not.toHaveBeenCalled();
+   const comic=(await catalog.get('comics',b.comicId!))!;
+   await catalog.patch('comics',comic.id,{source:{...comic.source,status:'revoked',generation:comic.source.generation+1}});
+   await expect(right.validate()).rejects.toThrow('访问被撤销');await left.validate();
+   expect(read).not.toHaveBeenCalled();expect(mocks.materialize).not.toHaveBeenCalled();
+  }finally{release();}
+ });
  it('isolates the new PDF render profile while retaining old cached pages, translations and reading position',async()=>{
   const input=new File(['%PDF-',crypto.randomUUID()],crypto.randomUUID()+'.pdf'),created=await importLocalFile(input),copy=await loadEntry(created.id),page=copy.pages[0];
   const oldRef={entryId:copy.id,contentId:copy.contentId!,pageId:page.id,renderProfileId:RENDER_PROFILE},newRef={...oldRef,renderProfileId:PDF_RENDER_PROFILE};

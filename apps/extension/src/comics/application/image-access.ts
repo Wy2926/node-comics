@@ -1,6 +1,7 @@
-import { acquirePage, type PageLease } from '../pages/service';
+import { acquirePage, pageAccess, type PageLease } from '../pages/service';
 import { parsePageReference } from '../pages/identity';
-import { resultInMemory,readMaterializedResult } from '../../storage/translations/results';
+import { resultInMemory,readMaterializedResult,validateMaterializedResult } from '../../storage/translations/results';
+import type {ProcessingInput} from '../../image-processing/contracts';
 import { translationCache } from '../../storage/translations';
 import { sourcePageCache } from '../../storage/source-pages';
 import { thumbnailCache } from '../../storage/thumbnails';
@@ -9,11 +10,21 @@ import {openSourceCover} from './cover-access';
 import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
 
 const thumbnails=new RequestPool(2);
+export function processingInput(key:string,owner:string,sourceKey=key):ProcessingInput{
+  const reference=parsePageReference(sourceKey);
+  let access:Promise<()=>Promise<void>>|undefined;
+  return {key,owner,load:signal=>acquireImage(key,signal),async validate(){
+    if(reference)await(await(access??=pageAccess(reference)))();
+    if(key.startsWith('result:'))await validateMaterializedResult(key);
+  }};
+}
 export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<PageLease,'blob'|'release'>>{
   const reference=parsePageReference(key);
   if(reference)return acquirePage({...reference,signal,purpose:'reading'});
   signal?.throwIfAborted();
-  const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key):resultInMemory(key)??await readMaterializedResult(key)??await translationCache.get(key);
+  const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key)
+    :key.startsWith('result:')?await readMaterializedResult(key,signal):resultInMemory(key)??await translationCache.get(key);
+  signal?.throwIfAborted();
   if(!blob)throw Error('图片缓存已清理，请重新加载。');
   return {blob,release(){}};
 }

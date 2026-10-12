@@ -1,6 +1,6 @@
 import type Rendition from 'epubjs/types/rendition';
 import type Contents from 'epubjs/types/contents';
-import {acquireImage} from '../comics/application/image-access';
+import {acquireImage,processingInput} from '../comics/application/image-access';
 import {epubImageId} from '../comics/domain/epub-images';
 import type {Page, Mode} from '../types';
 import {readingImage} from './presentation';
@@ -23,8 +23,7 @@ interface Result {
   key: string;
   controller: AbortController;
   url?: string;
-  release?: () => void;
-  enhancement?: AbortController;
+  processing: boolean;
   enhancementState?: ProcessingState;
 }
 
@@ -35,6 +34,7 @@ export class EpubImageWindow {
   private window: string[] = [];
   private results = new Map<string, Result>();
   private desired = new Map<string, string>();
+  private pages = new Map<string, Pick<Page, 'width' | 'height' | 'blobKey'>>();
   private scope = '';
   private profile?: ProcessingProfile;
   private owner = '';
@@ -113,6 +113,7 @@ export class EpubImageWindow {
     }
     this.profile = processing && activeProcessingProfile(processing.settings);
     this.owner = processing?.owner ?? '';
+    this.pages = new Map(pages.map(page => [page.id, {width: page.width, height: page.height, blobKey: page.blobKey}]));
     this.enhanceable.clear();
     this.desired = new Map(pages.flatMap(page => {
       const result = readingImage(page, mode, translated, language, scope);
@@ -128,17 +129,9 @@ export class EpubImageWindow {
       const key = this.desired.get(epubImageId(href));
       return key ? [[href, key]] : [];
     }));
-    for (const [href, result] of this.results) if (wanted.get(href) !== result.key) this.release(href);
+    for (const [href, result] of this.results) if (wanted.get(href) !== result.key || result.processing !== this.shouldEnhance(href)) this.release(href);
     for (const [href, key] of wanted) {
       if (!this.results.has(href)) this.load(href, key);
-      const result = this.results.get(href)!;
-      if (!this.window.slice(0, 2).includes(href)) {
-        result.enhancement?.abort(); result.enhancement = undefined;
-        if (result.enhancementState?.phase === 'queued' || result.enhancementState?.phase === 'running') this.setEnhancementState(result);
-      } else if (result.url && this.profile && this.enhanceable.has(epubImageId(href)) && !result.enhancement
-        && result.enhancementState?.phase !== 'ready' && result.enhancementState?.phase !== 'error') {
-        this.enhance(result);
-      }
     }
     for (const artwork of this.artwork) {
       const result = this.results.get(artwork.href);
@@ -146,38 +139,50 @@ export class EpubImageWindow {
       const {element, attribute} = artwork;
       if (element.localName === 'img') {
         const img = element as HTMLImageElement;
-        if (!img.complete || !img.naturalWidth) continue;
         // Keep the author's intrinsic image box when a channel delivers a smaller bitmap.
         if (artwork.width === null && artwork.height === null && attribute.value === artwork.original) {
-          element.setAttribute('width', String(img.naturalWidth));
-          element.setAttribute('height', String(img.naturalHeight));
+          const size = this.pages.get(epubImageId(artwork.href));
+          const width = img.naturalWidth || size?.width, height = img.naturalHeight || size?.height;
+          if (width && height) {element.setAttribute('width', String(width)); element.setAttribute('height', String(height));}
         }
       }
       if (attribute.value !== result.url) element.setAttributeNS(attribute.namespaceURI, attribute.name, result.url);
     }
   }
 
-  private load(href: string, key: string) {
-    const result: Result = {key, controller: new AbortController()};
+  private shouldEnhance(href: string) {return !!this.profile && this.window.slice(0, 2).includes(href) && this.enhanceable.has(epubImageId(href));}
+
+  private load(href: string, key: string, retry = false) {
+    const result: Result = {key, controller: new AbortController(), processing: this.shouldEnhance(href)};
     this.results.set(href, result);
     this.onError(href);
-    let url: string | undefined;
-    void acquireImage(key, result.controller.signal).then(async lease => {
-      result.release = lease.release;
-      result.controller.signal.throwIfAborted();
-      url = URL.createObjectURL(lease.blob);
-      await prepareReaderImage(url, result.controller.signal);
-      result.controller.signal.throwIfAborted();
-      result.url = url;
-      this.apply();
-    }).catch(error => {
-      if (url && result.url !== url) URL.revokeObjectURL(url);
-      if (!result.controller.signal.aborted) {
+    const signal = result.controller.signal;
+    const show = async (blob: Blob) => {
+      signal.throwIfAborted();
+      const url = URL.createObjectURL(blob);
+      try {
+        await prepareReaderImage(url, signal); signal.throwIfAborted();
+        const previous = result.url; result.url = url;
+        this.apply(); if (previous) URL.revokeObjectURL(previous);
+      } finally {if (result.url !== url) URL.revokeObjectURL(url);}
+    };
+    void (async () => {
+      if (result.processing) {
+        const blob = await enhanceImage(processingInput(key, this.owner, this.pages.get(epubImageId(href))?.blobKey), this.profile!, signal, {retry, onParent: show, onState: state => {
+          if (!signal.aborted && state.phase !== 'ready') this.setEnhancementState(result, state);
+        }});
+        await show(blob); this.setEnhancementState(result, {phase: 'ready'});
+      } else {
+        const lease = await acquireImage(key, signal);
+        try {await show(lease.blob);} finally {lease.release();}
+      }
+    })().catch(error => {
+      if (!signal.aborted) {
         const message = (error as Error).message;
-        if (this.profile) this.setEnhancementState(result, {phase: 'error', message});
+        if (result.processing) this.setEnhancementState(result, {phase: 'error', message});
         else this.onError(href, message);
       }
-    }).finally(() => result.release?.());
+    });
   }
 
   private restore({element, attribute, original, width, height}: Artwork) {
@@ -186,36 +191,6 @@ export class EpubImageWindow {
       if (value === null) element.removeAttribute(key);
       else if (element.getAttribute(key) !== value) element.setAttribute(key, value);
     }
-  }
-
-  private enhance(result: Result, retry = false) {
-    if (!this.profile) return;
-    const controller = result.enhancement = new AbortController(), profile = this.profile;
-    const signal = AbortSignal.any([controller.signal, result.controller.signal]);
-    let release: (() => void) | undefined, url: string | undefined;
-    this.setEnhancementState(result, {phase: 'queued'});
-    void acquireImage(result.key, signal).then(async lease => {
-      release = lease.release;
-      const blob = await enhanceImage({blob: lease.blob, key: result.key, owner: this.owner}, profile, signal, state => {
-        // A service result is ready for display only after its bitmap has decoded.
-        if (!signal.aborted && state.phase !== 'ready') this.setEnhancementState(result, state);
-      }, retry);
-      signal.throwIfAborted();
-      url = URL.createObjectURL(blob);
-      await prepareReaderImage(url, signal);
-      signal.throwIfAborted();
-      const previous = result.url;
-      result.url = url;
-      this.setEnhancementState(result, {phase: 'ready'});
-      this.apply();
-      if (previous) URL.revokeObjectURL(previous);
-    }).catch(error => {
-      if (url && result.url !== url) URL.revokeObjectURL(url);
-      if (!signal.aborted) this.setEnhancementState(result, {phase: 'error', message: (error as Error).message});
-    }).finally(() => {
-      release?.();
-      if (result.enhancement === controller) result.enhancement = undefined;
-    });
   }
 
   private setEnhancementState(result: Result, state?: ProcessingState) {
@@ -230,19 +205,16 @@ export class EpubImageWindow {
     const result = this.results.get(href);
     if (!result) return;
     result.controller.abort();
-    result.enhancement?.abort();
     for (const artwork of this.artwork) if (artwork.href === href) this.restore(artwork);
     if (result.url) URL.revokeObjectURL(result.url);
-    result.release?.();
     this.results.delete(href);
     if (result.enhancementState) this.onEnhancementChange();
   }
 
   retry(href: string) {
     const result = this.results.get(href);
-    if (result?.url && this.profile && this.enhanceable.has(epubImageId(href))) {
-      result.enhancement?.abort(); this.enhance(result, true);
-    } else {this.release(href); this.apply();}
+    this.release(href);
+    if (result) this.load(href, result.key, true); else this.apply();
   }
 
   close() {
@@ -254,5 +226,6 @@ export class EpubImageWindow {
     this.byElement.clear();
     this.window = [];
     this.desired.clear();
+    this.pages.clear();
   }
 }

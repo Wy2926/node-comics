@@ -4,8 +4,8 @@ import {decodedImage, transferLocks} from './channel-transfer-fixture';
 import {nunifAdapter} from '../src/image-processing/adapters/nunif';
 import {enhanceImage} from '../src/image-processing/runtime';
 import {activeProcessingProfile, processingDefaults, processingIdentity, saveProcessingProfile, readProcessingSettings, updateProcessingSettings} from '../src/image-processing/settings';
-import {clearProcessingCache, removeProcessingOwner, removeProcessingProfile, processingCache, readServiceLane} from '../src/image-processing/storage';
-import {readTransferReceipt} from '../src/image-transfer/receipts';
+import {clearProcessingCache, removeProcessingOwner, removeProcessingProfile, processingCache, readServiceLane,findProcessingRecord} from '../src/image-processing/storage';
+import {readTransferReceipt,saveTransferReceipt,trimTransferReceipts} from '../src/image-transfer/receipts';
 import {hashFile} from '../src/importers/hash';
 import type {ProcessingProfile} from '../src/image-processing/contracts';
 
@@ -20,7 +20,11 @@ async function selected(): Promise<ProcessingProfile> {
   await updateProcessingSettings(value => ({...value, enabled: true}));
   return (await readProcessingSettings()).profiles[0];
 }
-const input = () => ({owner: crypto.randomUUID(), key: 'complete-translation:account:language:job', blob: new Blob(['complete translated pixels'], {type: 'image/png'})});
+const input = () => {
+  const blob = new Blob(['complete translated pixels'], {type: 'image/png'});
+  return {owner: crypto.randomUUID(), key: 'complete-translation:account:language:job', blob, validate:vi.fn(async()=>{}),
+    load:vi.fn(async(_signal:AbortSignal)=>({blob,release:vi.fn()}))};
+};
 const signal = () => new AbortController().signal;
 const output = () => new Response(new Blob(['enhanced pixels'], {type: 'image/png'}));
 
@@ -71,12 +75,15 @@ it('sends the full parent bytes unchanged, deduplicates concurrent readers and r
   expect(fetcher).toHaveBeenCalledOnce();
   expect(reads).toHaveBeenCalledOnce();
 });
-it('separates parent identity and bytes, and never reuses another account or language result', async () => {
+it('uses stable parent identity without reopening bytes, and isolates account, language and owner', async () => {
   const profile = await selected(), original = input();
   const fetcher = vi.fn(async () => output()); vi.stubGlobal('fetch', fetcher);
   await enhanceImage(original,profile,signal());
   await enhanceImage({...original,key:'complete-translation:other-account:language:job'},profile,signal());
-  await enhanceImage({...original,blob:new Blob(['x'.repeat(original.blob.size)], {type: original.blob.type})},profile,signal());
+  const unavailable={...original,load:vi.fn(async()=>{throw Error('parent no longer available');})};
+  expect(await(await enhanceImage(unavailable,profile,signal())).text()).toBe('enhanced pixels');
+  expect(unavailable.load).not.toHaveBeenCalled();
+  await enhanceImage({...original,owner:crypto.randomUUID()},profile,signal());
   expect(fetcher).toHaveBeenCalledTimes(3);
 });
 it('does not rerun after cache eviction or clearing without an explicit enhancement retry', async () => {
@@ -84,7 +91,14 @@ it('does not rerun after cache eviction or clearing without an explicit enhancem
   await enhanceImage(original,profile,signal()); await clearProcessingCache();
   await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'RESULT_MISSING'});
   expect(fetcher).toHaveBeenCalledOnce();
-  await enhanceImage(original,profile,signal(),undefined,true); expect(fetcher).toHaveBeenCalledTimes(2);
+  await enhanceImage(original,profile,signal(),{retry:true}); expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('delivers once when disk admission fails, then reports missing cache without repeating the service',async()=>{
+  const profile=await selected(),original=input(),fetcher=vi.fn(async()=>output());vi.stubGlobal('fetch',fetcher);
+  const put=vi.spyOn(processingCache,'put').mockResolvedValue(false);
+  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'RESULT_MISSING'});
+  expect(fetcher).toHaveBeenCalledOnce();expect(original.load).toHaveBeenCalledOnce();put.mockRestore();
 });
 it('preserves HTTP failure, does not downsample or auto-retry, and sanitizes remote error content', async () => {
   const profile = await selected(), original = input(), fetcher = vi.fn(async () => new Response('private OCR response',{status:413})); vi.stubGlobal('fetch', fetcher);
@@ -114,7 +128,52 @@ it('stops automatic admission to an uncertain service until a manual retry confi
   await expect(enhanceImage(input(),profile,signal())).rejects.toMatchObject({code:'INTERRUPTED'});
   expect(fetcher).toHaveBeenCalledOnce();
   fetcher.mockImplementation(async () => output());
-  await enhanceImage(original,profile,signal(),undefined,true); expect(fetcher).toHaveBeenCalledTimes(2);
+  await enhanceImage(original,profile,signal(),{retry:true}); expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('publishes after every UI leaves and survives receipt expiry without rereading the parent', async () => {
+  const profile=await selected(),original=input(),pending=Promise.withResolvers<Response>();
+  const fetcher=vi.fn(()=>pending.promise);vi.stubGlobal('fetch',fetcher);
+  const controller=new AbortController(),work=enhanceImage(original,profile,controller.signal);
+  const stopped=expect(work).rejects.toMatchObject({name:'AbortError'});
+  await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce());controller.abort();await stopped;
+  pending.resolve(output());
+  const service=await hashFile(new Blob([nunifAdapter().request(profile.settings).url]));
+  const lane=(await readServiceLane(service))!;
+  await vi.waitFor(async()=>expect((await readTransferReceipt(lane.requestId))?.output).toBeUndefined());
+  await vi.waitFor(async()=>expect(await processingCache.inventory([original.owner])).toHaveLength(1));
+  const receipt=(await readTransferReceipt(lane.requestId))!;
+  await saveTransferReceipt({...receipt,updatedAt:Date.now()-25*60*60*1000});await trimTransferReceipts();
+  expect(await readTransferReceipt(lane.requestId)).toBeUndefined();
+  original.load.mockRejectedValue(Error('parent unavailable'));
+  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  expect(original.load).toHaveBeenCalledOnce();expect(fetcher).toHaveBeenCalledOnce();
+  expect((await readServiceLane(service))?.settled).toBe(true);
+});
+it('revalidates access on a cache hit without opening the revoked parent', async () => {
+  const profile=await selected(),original=input();vi.stubGlobal('fetch',vi.fn(async()=>output()));
+  await enhanceImage(original,profile,signal());original.load.mockClear();
+  original.validate.mockRejectedValue(Error('access revoked'));
+  await expect(enhanceImage(original,profile,signal())).rejects.toThrow('access revoked');
+  expect(original.load).not.toHaveBeenCalled();
+});
+it('recovers a terminal receipt after publication failed, without loading or resubmitting the parent',async()=>{
+  const profile=await selected(),original=input(),pending=Promise.withResolvers<Response>();
+  const fetcher=vi.fn(()=>pending.promise);vi.stubGlobal('fetch',fetcher);
+  const controller=new AbortController(),work=enhanceImage(original,profile,controller.signal);
+  const stopped=expect(work).rejects.toMatchObject({name:'AbortError'});
+  await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce());controller.abort();await stopped;
+  const put=vi.spyOn(processingCache,'put').mockRejectedValueOnce(Error('publication interrupted'));
+  pending.resolve(output());await vi.waitFor(()=>expect(put).toHaveBeenCalledOnce());put.mockRestore();
+  const lookup=await hashFile(new Blob([JSON.stringify([original.owner,original.key,profile.id,profile.revision])]));
+  expect((await findProcessingRecord(lookup))?.state).toBe('running');
+  original.load.mockRejectedValue(Error('parent unavailable'));
+  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  expect(original.load).toHaveBeenCalledOnce();expect(fetcher).toHaveBeenCalledOnce();
+});
+it('stops a large input digest between chunks on cancellation', async () => {
+  const blob=new Blob([new Uint8Array(8*1024*1024)]),reads=vi.spyOn(blob,'slice'),controller=new AbortController();
+  await expect(hashFile(blob,()=>controller.abort(),controller.signal)).rejects.toMatchObject({name:'AbortError'});
+  expect(reads).toHaveBeenCalledOnce();
 });
 it('removes only the deleted profile cache and leaves other in-flight profile results usable', async () => {
   const inactive = await selected(), prior = input();
@@ -161,6 +220,6 @@ it.each(['owner','profile'] as const)('fences late results and future uploads af
   if (kind === 'owner') await removeProcessingOwner(original.owner); else await removeProcessingProfile(profile.id);
   pending.resolve(output()); await failed;
   expect(await processingCache.inventory([original.owner])).toHaveLength(0);
-  await expect(enhanceImage(original,profile,signal(),undefined,true)).rejects.toBeDefined();
+  await expect(enhanceImage(original,profile,signal(),{retry:true})).rejects.toBeDefined();
   expect(fetcher).toHaveBeenCalledOnce();
 });

@@ -70,7 +70,7 @@ beforeEach(async()=>{
   channel={key:'channel-session-1',scope:{key:'account-1'},label:'Fixture',available:true,requiresInternet:true,allowsFeedback:true,isCurrent:()=>true,
     capabilities:{modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'zh-Hans',label:'Chinese'}],
       limits:{max_bytes:128*1024*1024,max_dimension:100000,max_pixels:100000**2,max_translation_ids:32},entitlements:null},
-    createRuntime:vi.fn((_options:RuntimeOptions)=>core),readResult:vi.fn(async()=>source),dispose:vi.fn()};
+    createRuntime:vi.fn((_options:RuntimeOptions)=>core),validateResult:vi.fn(async()=>{}),readResult:vi.fn(async()=>source),dispose:vi.fn()};
   mocks.openChannel.mockResolvedValue(channel);mocks.serve.mockImplementation((_port,_load,onClose)=>vi.fn(onClose));
   mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'}});
   mocks.sessionGet.mockImplementation(async key=>key===null?{...session}:{[key]:session[key]});mocks.tabGet.mockImplementation(async()=>({...tab}));

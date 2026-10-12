@@ -11,17 +11,28 @@ export {resultInMemory} from './memory';
 
 interface ResultRequest {scope:TranslationScope;job:Job;isCurrent:()=>boolean}
 const downloads=new Map<string,{promise:Promise<Blob>;isCurrent:()=>boolean}>();
-const readers=new Map<string,{owner:string;read:()=>Promise<Blob>}>();
-export function registerResultReader(scope:TranslationScope,job:Job,read:()=>Promise<Blob>){readers.set(resultBlobKey(scope,job),{owner:scope.key,read});}
-export function releaseResultReaders(scope:TranslationScope){for(const [key,value] of readers)if(value.owner===scope.key)readers.delete(key);}
-export async function readMaterializedResult(key:string){return readers.get(key)?.read();}
+const readers=new Map<string,{read:(signal?:AbortSignal)=>Promise<Blob>;validate:()=>Promise<void>}>();
+export function registerResultReader(scope:TranslationScope,job:Job,read:(signal?:AbortSignal)=>Promise<Blob>,validate:()=>Promise<void>){
+  const key=resultBlobKey(scope,job),reader={read,validate};readers.set(key,reader);
+  return ()=>{if(readers.get(key)===reader)readers.delete(key);};
+}
+function resultReader(key:string){
+  const reader=readers.get(key);
+  if(!reader)throw new DOMException('Result reader unavailable','AbortError');
+  return reader;
+}
+export async function validateMaterializedResult(key:string){await resultReader(key).validate();}
+export async function readMaterializedResult(key:string,signal?:AbortSignal){
+  const reader=resultReader(key);await reader.validate();
+  const blob=await reader.read(signal);await reader.validate();return blob;
+}
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
 export const resultBlobKey=(scope:TranslationScope,job:Job)=>'result:'+JSON.stringify([scope.key,job.id,job.result?.key]);
 export class LocalResultUnavailableError extends Error {
   readonly code='RESULT_NOT_CACHED';
   constructor(){super(msg('本地译图缓存已清理，请手动重新翻译。'));this.name='LocalResultUnavailableError';}
 }
-function assertResult({job,isCurrent}:ResultRequest){
+export function assertResult({job,isCurrent}:ResultRequest){
   assertCurrent(isCurrent);
   if(job.status!=='succeeded'||!job.result?.key||job.result_expired||job.result_available===false)
     throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));

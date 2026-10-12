@@ -77,6 +77,11 @@ try {
   });
   let worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const extensionId = new URL(worker.url()).hostname;
+  // First installation opens reader.html. Let it mount, then close this fixture-owned
+  // welcome tab before setting policy; its initial defaults must not overwrite the test.
+  await until(()=>context.pages().some(page=>page.url()===`chrome-extension://${extensionId}/reader.html`));
+  const welcome=context.pages().find(page=>page.url()===`chrome-extension://${extensionId}/reader.html`);
+  await welcome.locator('.nc-app').waitFor();await welcome.close();
   probe = await context.newPage(); await probe.goto(`chrome-extension://${extensionId}/host-probe.html`);
   const panels = await probe.evaluate(async () => {
     async function image(color, text) {

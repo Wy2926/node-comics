@@ -62,6 +62,8 @@ export interface ChannelConnection {
   allowsFeedback: boolean;
   isCurrent: ()=>boolean;
   createRuntime(options:RuntimeOptions):ChannelRuntime;
+  /** Current local authorization only, without downloading or composing result pixels. */
+  validateResult():Promise<void>;
   /** Read/validate/cache delivered bytes; never starts a translation. Safe for reader, inline and export. */
   readResult(job:Job,signal?:AbortSignal,original?:()=>Promise<Blob|undefined>):Promise<Blob>;
   dispose():void;

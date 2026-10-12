@@ -69,7 +69,7 @@ beforeEach(async()=>{
     const channel:ChannelConnection={key:'test-channel',scope:{key:'test-scope'},label:'Fixture',
       capabilities:{modes:[{id:'classic',label:'Classic',enabled:true,languages:['zh-Hans']}],languages:[{id:'zh-Hans',label:'Chinese'}],
         limits:{max_bytes:40000000,max_pixels:60000000,max_dimension:20000,max_translation_ids:32},entitlements:null},
-      available:true,requiresInternet:true,allowsFeedback:false,isCurrent:()=>!disposed&&current(),
+      available:true,requiresInternet:true,allowsFeedback:false,isCurrent:()=>!disposed&&current(),validateResult:vi.fn(async()=>{}),
       createRuntime:vi.fn((value:RuntimeOptions)=>{options.push(value);return core;}),readResult:vi.fn(),dispose:vi.fn(()=>{disposed=true;})};
     cores.push(core);channels.push(channel);return channel;
   });
@@ -94,23 +94,43 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('waits for the enhancement cache lookup before offering a parent and never reads it on a hit',async()=>{
+    mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]}});
+    await send(request());
+    const cached=Promise.withResolvers<Blob>(),enhanced=new Blob(['cached enhanced pixels']);
+    mocks.enhance.mockImplementation(async input=>{await input.validate();return cached.promise;});
+    vi.mocked(channels[0].readResult).mockRejectedValue(Error('Parent unavailable'));
+    await options[0].onJobs([{id:'cached',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'complete',recoverable:true}}]);
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledOnce());
+    const waiting=await send({...request(),type:'NC_INLINE_WAIT'});
+    expect((waiting!.data as {items:{resultKey?:string}[]}).items[0].resultKey).toBeUndefined();
+    cached.resolve(enhanced);
+    await vi.waitFor(async()=>expect(await send({...request(),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{resultKey:expect.stringContaining(':enhanced:')}]}}));
+    const shown=await send({...request(),type:'NC_INLINE_WAIT'}),key=(shown!.data as {items:{resultKey:string}[]}).items[0].resultKey;
+    const port=imagePort(key,1);try{await vi.waitFor(()=>expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'image',size:enhanced.size})));}finally{port.close();}
+    expect(channels[0].readResult).not.toHaveBeenCalled();expect(cores[0].manual).not.toHaveBeenCalled();
+  });
   it('enhances completed full translations, returns base first, and retries enhancement without retranslating',async()=>{
     mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,
       profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]}});
     await send(request());expect(mocks.enhance).not.toHaveBeenCalled();
     const full=new Blob(['full translated image']),enhanced=new Blob(['enhanced image']);
     vi.mocked(channels[0].readResult).mockResolvedValue(full);
-    mocks.enhance.mockRejectedValueOnce(Error('Enhancement failed')).mockResolvedValue(enhanced);
+    mocks.enhance.mockImplementationOnce(async(input,_profile,signal,options)=>{
+      const parent=await input.load(signal);await options.onParent(parent.blob);parent.release();throw Error('Enhancement failed');
+    }).mockResolvedValue(enhanced);
     const completed:Job={id:'completed',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
       created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'complete',recoverable:true}};
     await options[0].onJobs([completed]);
     await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledOnce());
-    expect(mocks.enhance.mock.calls[0][0].blob).toBe(full);
+    expect(channels[0].readResult).toHaveBeenCalledOnce();
     const failed=await send({...request(),type:'NC_INLINE_WAIT'});
     expect(failed).toMatchObject({ok:true,data:{items:[{resultKey:expect.not.stringContaining(':enhanced:'),enhancement:{phase:'error'}}]}});
     await send({...request(2),retryEnhancementId:'image-7'});
     await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
-    expect(mocks.enhance.mock.lastCall?.[4]).toBe(true);expect(cores[0].manual).not.toHaveBeenCalled();
+    expect(mocks.enhance.mock.lastCall?.[3].retry).toBe(true);expect(cores[0].manual).not.toHaveBeenCalled();
     await vi.waitFor(async()=>expect(await send({...request(2),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{resultKey:expect.stringContaining(':enhanced:'),enhancement:{phase:'ready'}}]}}));
     const read=await send({...request(2),type:'NC_INLINE_WAIT'}),key=(read!.data as {items:{resultKey:string}[]}).items[0].resultKey;
     const port=imagePort(key,2);try{await vi.waitFor(()=>expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'image',size:enhanced.size})));}finally{port.close();}
@@ -126,7 +146,7 @@ describe('inline activation lifetime',()=>{
     await send(request(1,images));
     const held=gate(),full=new Blob(['full translated image']),enhanced=new Blob(['enhanced']);let retrySignal:AbortSignal|undefined;
     vi.mocked(channels[0].readResult).mockResolvedValue(full);
-    mocks.enhance.mockImplementation(async(input:{key:string},_profile:unknown,signal:AbortSignal,_state:unknown,retry:boolean)=>{
+    mocks.enhance.mockImplementation(async(input:{key:string},_profile:unknown,signal:AbortSignal,{retry}:{retry:boolean})=>{
       if(input.key.includes('job-0')){
         if(!retry)throw Error('Enhancement failed');
         retrySignal=signal;await held.promise;signal.throwIfAborted();

@@ -9,7 +9,7 @@ import type {ChannelDefinition,ChannelConnection,ChannelRuntime,RuntimeOptions} 
 import {TranslationCoordinator,translationJob} from './coordinator';
 import {translationState} from './state';
 import {translationScope,readEntryOperations,blockEntryOperations,removeEntryOperations,readImageJobsPage} from './store';
-import {loadDeliveredResult,registerResultReader,releaseResultReaders,resultBlobKey} from '../../../../storage/translations/results';
+import {loadDeliveredResult,resultBlobKey} from '../../../../storage/translations/results';
 import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from '../../../input/limits';
 import {loadTranslationInput} from '../../../input/load';
 import {readChannelSettings,updateChannelSettings} from '../../configuration';
@@ -84,19 +84,21 @@ export const definition:ChannelDefinition={
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
       requiresInternet:true,allowsFeedback:true,analyticsCategory:'official',isCurrent:live,
-      async readResult(job,signal,original){
+      async validateResult(){
         assertCurrent(live);if(!session)throw Error(msg('请先登录'));
+        await authorization!.current();assertCurrent(live);
+      },
+      async readResult(job,signal,original){
         // Reading an existing result must never submit a new translation.
         signal?.throwIfAborted();
-        await authorization!.current();
-        registerResultReader(scope,job,()=>connection.readResult(job,undefined,original));
+        await connection.validateResult();
         const current=()=>live()&&!signal?.aborted;
         const input=async()=>{
           const result=job.delivery;if(!result)return undefined;
           return loadTranslationInput(scope.key,{sha256:result.input_sha256,sourceSha256:job.source_image_sha256,profile:job.input_profile,size:result},async()=>original?.(),current);
         };
         const blob=await loadDeliveredResult({scope,job,original:input,download:()=>api.translationImage(job.id,signal),isCurrent:current});
-        await authorization!.current();assertCurrent(live);return blob;
+        await connection.validateResult();return blob;
       },
       createRuntime(options:RuntimeOptions){
         let active=true;
@@ -134,7 +136,7 @@ export const definition:ChannelDefinition={
         };
         runtimes.add(runtime);return runtime;
       },
-      dispose(){disposed=true;releaseResultReaders(scope);for(const runtime of runtimes)runtime.dispose();runtimes.clear();},
+      dispose(){disposed=true;for(const runtime of runtimes)runtime.dispose();runtimes.clear();},
     };
     return connection;
   },

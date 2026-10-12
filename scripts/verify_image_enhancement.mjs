@@ -8,6 +8,19 @@ const origin='http://127.0.0.1:5176',out=path.resolve('artifacts/image-enhanceme
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 const page=await browser.newPage({viewport:{width:1360,height:960}}),checks=[],errors=[];
+await page.addInitScript(()=>{
+  const probe=window.enhancementCacheProbe={reads:[],displays:[]},keys=new WeakMap();
+  const get=IDBObjectStore.prototype.get,put=IDBObjectStore.prototype.put,create=URL.createObjectURL;
+  IDBObjectStore.prototype.get=function(key){
+    const request=get.call(this,key);
+    if(this.name==='objects'&&typeof key==='string'){
+      probe.reads.push(key);request.addEventListener('success',()=>{if(request.result instanceof Blob)keys.set(request.result,key);});
+    }
+    return request;
+  };
+  IDBObjectStore.prototype.put=function(value,...args){if(value instanceof Blob&&typeof args[0]==='string')keys.set(value,args[0]);return put.call(this,value,...args);};
+  URL.createObjectURL=function(blob){const key=keys.get(blob);if(key)probe.displays.push(key);return create.call(this,blob);};
+});
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const first=()=>page.locator('.nc-manga-page[data-page-index="0"]').first();
@@ -77,6 +90,24 @@ try {
   await toggle();await waitWidth(baseWidth);await toggle();await waitWidth(baseWidth*2);
   assert.equal((await read()).enhancement.length,2);
   check('disable restores full translation; re-enable uses cached enhancement without another service call');
+  await page.waitForFunction(base=>[...document.querySelectorAll('.nc-manga-page')].slice(0,2).every(page=>page.querySelector('img.nc-page-image')?.naturalWidth===base*2),baseWidth);
+  const cachedJobs=await page.locator('.nc-manga-page img.nc-page-image').evaluateAll(images=>images.slice(0,2).map(image=>image.dataset.resultJob));
+  await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+  await page.getByRole('button',{name:/^打开漫画 /}).waitFor();
+  await page.evaluate(jobs=>{
+    window.channelFixture.parentReads.length=0;window.channelFixture.blockedParentJobs=jobs;
+    window.enhancementCacheProbe.reads.length=0;window.enhancementCacheProbe.displays.length=0;
+  },cachedJobs);
+  await page.getByRole('button',{name:/^打开漫画 /}).click();
+  await waitWidth(baseWidth*2);
+  const warm=await page.evaluate(()=>({parents:window.channelFixture.parentReads,sourceKeys:window.channelFixture.parentSourceKeys,reads:window.enhancementCacheProbe.reads,displays:window.enhancementCacheProbe.displays}));
+  const isParent=key=>warm.sourceKeys.includes(key)||key.startsWith('result:')&&cachedJobs.includes(JSON.parse(key.slice(7))[1]);
+  assert(!warm.parents.some(id=>cachedJobs.includes(id)),JSON.stringify(warm));
+  assert(!warm.reads.some(isParent),JSON.stringify(warm));assert(!warm.displays.some(isParent),JSON.stringify(warm));
+  assert.equal((await read()).enhancement.length,2);assert.equal((await read()).translation,5);
+  assert.deepEqual(await geometry(),before);
+  await page.evaluate(()=>{window.channelFixture.blockedParentJobs=[];});
+  check('reopening cached enhancements reads/decodes neither source nor translation, works with unavailable parents, preserves position and sends no POST');
   await page.evaluate(()=>window.channelFixture.clearProcessingCache());
   await first().getByRole('button',{name:'重试增强'}).waitFor();await waitWidth(baseWidth);
   assert.equal((await read()).enhancement.length,2);

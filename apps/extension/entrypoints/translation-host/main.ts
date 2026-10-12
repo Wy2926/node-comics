@@ -1,6 +1,7 @@
 import {msg} from '../../src/i18n/runtime';
 import {initializeUiLanguage} from '../../src/i18n/load';
 import {registerImageTransferHost} from '../../src/image-transfer/host';
+import '../../src/image-processing/storage';
 import './style.css';
 
 const status = document.getElementById('status')!;

@@ -1,5 +1,5 @@
 import {readTransferReceipt, saveTransferReceipt} from './receipts';
-import {ImageTransferError, withTransferLock, type ImageTransferRequest} from './types';
+import {ImageTransferError, withTransferLock, finalizeImageTransfer, type ImageTransferRequest} from './types';
 
 export function validateTransferRequest(value: unknown): value is ImageTransferRequest {
   if (!value || typeof value !== 'object') return false;
@@ -67,5 +67,9 @@ export async function executeImageTransfer(id: string, request: ImageTransferReq
     if (typeof navigator !== 'undefined' && navigator.locks)
       await navigator.locks.request('nc-channel-execution:' + receipt.scope, run);
     else await run();
+    // Publication errors leave the terminal receipt recoverable; they do not turn a
+    // successful remote POST into an uncertain network failure or trigger another POST.
+    const terminal = await readTransferReceipt(id);
+    if (terminal) await finalizeImageTransfer(terminal).catch(() => {});
   });
 }

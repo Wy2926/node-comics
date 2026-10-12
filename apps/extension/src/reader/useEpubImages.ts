@@ -62,6 +62,7 @@ export function useEpubImages({copy, update, translated, mode, language, scope, 
 
   // Revoke a different account/language's result before the next paint.
   useLayoutEffect(() => {
+    if (!processing.ready) return;
     manager.current?.show(copy.pages, translated, mode, language, scope, {owner: copy.id, settings: {...processing, enabled: processing.enabled && visible}});
   }, [copy.id, copy.pages, translated, mode, language, scope, processing, visible]);
 

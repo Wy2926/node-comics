@@ -29,8 +29,7 @@ export {downloadKey} from '../../storage/downloads';
 export const materializationId=(ref:PageReference)=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId]);
 export const onMaterialized=(listener:(identity:PageMaterialization)=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
 
-async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
-  signal.throwIfAborted();
+async function pageContext(request:PageReference){
   const [storedDescriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
   const descriptor=doc?.format==='epub'?epubImageDescriptor(doc.document,request.contentId,request.pageId):storedDescriptor;
   if(!descriptor||!doc||doc.contentId!==request.contentId)throw Error('页面已移除或来源内容已变化。');
@@ -43,6 +42,13 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
     const [currentComic,currentConnection,currentEntry]=await Promise.all([catalog.get('comics',comic.id),catalog.get('connections',connection.id),catalog.get('entries',doc.id)]);
     if(!currentComic||!currentConnection||!currentEntry||currentEntry.contentId!==request.contentId||currentEntry.generation!==doc.generation||currentComic.source.generation!==binding.generation||currentConnection.generation!==connection.generation||currentComic.source.status!=='active'||currentConnection.status==='revoked'||currentConnection.status==='disconnected')throw Error('页面来源已变化或访问被撤销，请重新打开。');
   };
+  return {descriptor,doc,binding,connection,assertSourceCurrent};
+}
+/** Validates catalog identity and access without opening the source or reading image bytes. */
+export async function pageAccess(request:PageReference){return (await pageContext(request)).assertSourceCurrent;}
+async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
+  signal.throwIfAborted();
+  const {descriptor,doc,binding,connection,assertSourceCurrent}=await pageContext(request);
   const cachePages=getSourceDriver(connection.provider)?.cachePages!==false;
   const cacheToken=cachePages&&request.purpose!=='download'?await sourcePageCache.token(doc.id).catch(cacheUnavailable):undefined;
   const id=materializationId(request),known=await catalog.get('materializations',id);

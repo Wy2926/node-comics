@@ -10,6 +10,7 @@ import {retainContainer} from '../src/storage/containers';
 import {hashFile} from '../src/importers/hash';
 import {readProcessingSettings, updateProcessingSettings} from '../src/image-processing/settings';
 import {clearProcessingCache} from '../src/image-processing/storage';
+import {definition as localTranslation} from '../src/translation/channels/adapters/manga-translator-ui/definition';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a fresh profile on the isolated fixture origin.');
 await saveSettings({...defaults,uiLanguage:'zh-CN',appearance:'light'});
@@ -34,10 +35,21 @@ const enhancedCanvas=new OffscreenCanvas(bitmap.width*2,bitmap.height*2),enhance
 enhancedContext.drawImage(bitmap,0,0,enhancedCanvas.width,enhancedCanvas.height);bitmap.close();
 const enhancedOutput=await enhancedCanvas.convertToBlob({type:'image/png'});enhancedCanvas.width=enhancedCanvas.height=1;
 const state={loginCount:0,requests:[] as {language:string;token:boolean;hasImage:boolean}[],officialTranslations:0,fail:false,
+  parentReads:[] as string[],blockedParentJobs:[] as string[],parentSourceKeys:copies[0].pages.slice(0,2).map(page=>page.blobKey),
   enhancements:[] as {sha256:string;bytes:number;fields:Record<string,string>;startedAt:number;duration?:number}[],enhancementFail:false,enhancementDelay:180,
   outputSha256,readProcessingSettings,updateProcessingSettings,clearProcessingCache,
   listChannels,selectChannel,readAuth,chapterContentIds,pageReads,clearCache:()=>clearStorage('translations')};
 Object.assign(window,{channelFixture:state});
+const openTranslation=localTranslation.open;
+localTranslation.open=async(...args)=>{
+  const channel=await openTranslation(...args),read=channel.readResult;
+  channel.readResult=async(job,...rest)=>{
+    state.parentReads.push(job.id);
+    if(state.blockedParentJobs.includes(job.id))throw Error('Synthetic parent image is unavailable');
+    return read(job,...rest);
+  };
+  return channel;
+};
 window.fetch=async(input,init={})=>{
   const url=new URL(String(input),location.origin);
   if(url.pathname==='/fixture-nunif/api'){

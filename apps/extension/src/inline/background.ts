@@ -22,10 +22,11 @@ import {imageWork} from '../translation/input/work';
 import {enhanceImage} from '../image-processing/runtime';
 import {readProcessingSettings, activeProcessingProfile, processingIdentity, subscribeProcessingSettings} from '../image-processing/settings';
 import type {ProcessingProfile, ProcessingState} from '../image-processing/contracts';
+import {resultBlobKey} from '../storage/translations/results';
 
 interface WindowRequest {request:InlineRequest;sender:chrome.runtime.MessageSender;activity:RequestActivity;refreshRights:boolean;}
 interface Preparation {id:string;controller:AbortController;promise:Promise<void>;}
-interface Enhancement {key:string;controller:AbortController;blob?:Blob;state:ProcessingState;}
+interface Enhancement {key:string;controller:AbortController;blob?:Blob;parent?:Blob;state:ProcessingState;}
 interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;waitIds?:string;active:boolean;abort:AbortController;explicitImage:boolean;
   id:string;revision:number;readingIds:Set<string>;window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;
   processing?:ProcessingProfile;processingKey:string;enhancements:Map<string,Enhancement>;}
@@ -164,7 +165,7 @@ function scheduleEnhancements(ctx:Context) {
   for(const image of view.request.readingImages!.slice(0,2)) {
     if(!ctx.readingIds.has(image.id))continue;
     const page=ctx.pages.get(pageKey(view.request,image)),job=page&&pageResult(ctx,page);
-    if(!page||!job?.result||ctx.missingResults.has(job.id))continue;
+    if(!page||!job?.result)continue;
     const key=JSON.stringify([resultScope(ctx),job.id,job.result.key]);
     const previous=ctx.enhancements.get(image.id);
     if(previous?.key===key)continue;
@@ -174,13 +175,17 @@ function scheduleEnhancements(ctx:Context) {
     const signal=AbortSignal.any([ctx.abort.signal,work.controller.signal]);
     const retry=view.request.retryEnhancementId===image.id;
     if(retry)view.request={...view.request,retryEnhancementId:undefined};
-    void ctx.channel.readResult(job,signal,()=>page.blobKey?ctx.originals.read(page.blobKey,signal):Promise.resolve(undefined)).then(async blob=>{
-      signal.throwIfAborted();
-      // Stable translation scope owns cached derived images, never the current tab or source URL.
-      work.blob=await enhanceImage({blob,key,owner:'inline:'+ctx.channel.scope.key},profile,signal,state=>{
-        if(!signal.aborted){work.state=state;publish(ctx);}
-      },retry);
-      signal.throwIfAborted();work.state={phase:'ready'};publish(ctx);
+    void enhanceImage({key:resultBlobKey(ctx.channel.scope,job),owner:'inline:'+ctx.channel.scope.key,
+      async validate(){
+        await ctx.channel.validateResult();
+        const latest=ctx.pages.get(pageKey(view.request,image)),selected=latest&&pageResult(ctx,latest);
+        assertCurrent(()=>!signal.aborted&&ctx.active&&view.activity.current()&&ctx.channel.isCurrent()&&selected?.id===job.id&&selected.result?.key===job.result?.key);
+      },
+      async load(signal){return {blob:await ctx.channel.readResult(job,signal,()=>page.blobKey?ctx.originals.read(page.blobKey,signal):Promise.resolve(undefined)),release(){}};},
+    },profile,signal,{retry,onParent:blob=>{if(!signal.aborted){work.parent=blob;publish(ctx);}},onState:state=>{
+      if(!signal.aborted){work.state=state;publish(ctx);}
+    }}).then(blob=>{
+      signal.throwIfAborted();work.blob=blob;work.parent=undefined;work.state={phase:'ready'};publish(ctx);
     }).catch(error=>{
       if(!signal.aborted){work.state={phase:'error',message:(error as Error).message};publish(ctx);}
     });
@@ -278,10 +283,14 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     const waiting=state?.kind==='waiting'||state?.kind==='translating';
     const item:InlineResult={id:image.id,pending:!!pageTranslation(page,mode,language,ctx.channel.scope.key).pending||
       waiting&&!result};
-    if(result?.result&&!ctx.missingResults.has(result.id)){
+    const enhanced=ctx.enhancements.get(image.id);
+    if(result?.result&&(!ctx.missingResults.has(result.id)||enhanced)){
       item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;
-      const enhanced=ctx.enhancements.get(image.id);
-      if(enhanced?.key===item.resultKey){item.enhancement=enhanced.state;if(enhanced.blob)item.resultKey=enhancedKey(enhanced,ctx);}
+      if(enhanced?.key===item.resultKey){
+        item.enhancement=enhanced.state;
+        if(enhanced.blob)item.resultKey=enhancedKey(enhanced,ctx);
+        else if(!enhanced.parent&&enhanced.state.phase!=='error')item.resultKey=undefined;
+      }
     }
     else item.state=state;
     items.push(item);
@@ -304,13 +313,13 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
   if(!page)throw notReady();
   const key=job&&JSON.stringify([resultScope(ctx),job.id,job.result?.key]);
   const enhanced=ctx.enhancements.get(request.images[0].id);
-  const output=enhanced&&enhanced.key===key&&enhanced.blob&&request.resultKey===enhancedKey(enhanced,ctx)?enhanced.blob:undefined;
+  const output=enhanced&&enhanced.key===key?(request.resultKey===enhancedKey(enhanced,ctx)?enhanced.blob:request.resultKey===key?enhanced.parent:undefined):undefined;
   if(!job?.result||key!==request.resultKey&&!output){
     if(pageTranslation(page,'classic',ctx.settings.language,ctx.channel.scope.key).expired)throw Error(msg('图片已过期或无法访问，请保留本地副本或重新上传。'));
     throw notReady();
   }
   let blob:Blob;
-  try{blob=output??await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
+  try{await ctx.channel.validateResult();blob=output??await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
     if((error as {code?:string}).code==='RESULT_NOT_CACHED'&&current()&&page){ctx.missingResults.add(job.id);ctx.pages.set(pageKey(request,request.images[0]),{...page,translationError:(error as Error).message});}
     throw error;
   }

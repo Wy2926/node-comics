@@ -6,6 +6,7 @@ import {startImageTransfer} from '../../../../image-transfer/client';
 import {DirectImageRuntime} from '../../transport/runtime';
 import {ImageTransferError} from '../../../../image-transfer/types';
 import {MAX_READING_TARGETS} from '../../../automatic';
+import {assertCurrent} from '../../../../concurrency';
 import {languages, login, safeError, serviceBase, translationRequest} from './protocol';
 
 function capabilities(): Capabilities {
@@ -42,6 +43,7 @@ export const definition: ChannelDefinition = {
       key: scope.key, scope, label: profile.name, capabilities: capabilities(), available: !!token,
       unavailable: token ? undefined : {kind: 'error', message: msg('请在渠道设置中连接翻译服务。'), retryable: false},
       requiresInternet: false, allowsFeedback: false, analyticsCategory:'local', isCurrent: current,
+      async validateResult(){assertCurrent(current);if(!token)throw Error(msg('请在渠道设置中连接翻译服务。'));},
       createRuntime: options => new DirectImageRuntime(scope, {...options, isCurrent: () => current() && options.isCurrent()}, {
         start: (id, blob, mode, language) => {
           if(blob.size>capabilities().limits.max_bytes)throw new ImageTransferError('IMAGE_TOO_LARGE');

@@ -24,8 +24,10 @@ export interface ProcessingAdapter {
 }
 export type ProcessingState = {phase: 'queued' | 'running' | 'ready' | 'error'; message?: string};
 export interface ProcessingInput {
-  blob: Blob;
   /** Parent identity includes translation account, UUID and result revision when translated. */
   key: string;
   owner: string;
+  /** Metadata/authorization only. Cache hits must not materialize the parent image. */
+  validate(): Promise<void>;
+  load(signal: AbortSignal): Promise<{blob: Blob; release(): void}>;
 }

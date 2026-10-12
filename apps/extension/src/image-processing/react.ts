@@ -12,12 +12,13 @@ export function useEnhancementVisible() {
 }
 
 export function useProcessingSettings() {
-  const [settings, setSettings] = useState(processingDefaults);
+  const [settings, setSettings] = useState(() => ({...processingDefaults(), ready: false}));
   useEffect(() => {
     let active = true, generation = 0;
     const load = () => {
       const version = ++generation;
-      void readProcessingSettings().then(value => {if (active && version === generation) setSettings(value);}).catch(() => {});
+      void readProcessingSettings().then(value => {if (active && version === generation) setSettings({...value, ready: true});})
+        .catch(() => {if (active && version === generation) setSettings(value => ({...value, ready: true}));});
     };
     load(); const stop = subscribeProcessingSettings(load);
     return () => {active = false; stop();};

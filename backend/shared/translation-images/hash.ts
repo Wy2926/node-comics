@@ -60,14 +60,19 @@ export class Sha256 {
     return Array.from(this.state, word => word.toString(16).padStart(8, '0')).join('');
   }
 }
-export async function hashFile(file: Blob, onProgress?: (done: number, total: number) => void): Promise<string> {
+export async function hashFile(file: Blob, onProgress?: (done: number, total: number) => void, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const hash = new Sha256();
   const chunkSize = 1024 * 1024;
   for (let offset = 0; offset < file.size; offset += chunkSize) {
-    hash.update(new Uint8Array(await file.slice(offset, offset + chunkSize).arrayBuffer()));
+    signal?.throwIfAborted();
+    const bytes = await file.slice(offset, offset + chunkSize).arrayBuffer();
+    signal?.throwIfAborted();
+    hash.update(new Uint8Array(bytes));
     onProgress?.(Math.min(file.size, offset + chunkSize), file.size);
     // Let painting and reader input run even when Blob reads resolve immediately.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
+  signal?.throwIfAborted();
   return hash.digest();
 }
