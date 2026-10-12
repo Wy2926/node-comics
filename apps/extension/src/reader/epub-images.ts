@@ -8,6 +8,7 @@ import {prepareReaderImage} from './prepare-image';
 import {enhanceImage} from '../image-processing/runtime';
 import {activeProcessingProfile, processingIdentity, type ProcessingSettings} from '../image-processing/settings';
 import type {ProcessingProfile, ProcessingState} from '../image-processing/contracts';
+import {ReadingWindow, READING_TARGETS} from '../reading-window';
 
 interface Artwork {
   section: number;
@@ -32,6 +33,8 @@ export class EpubImageWindow {
   private artwork: Artwork[] = [];
   private byElement = new Map<Element, Artwork>();
   private window: string[] = [];
+  private reading = new ReadingWindow<string>(href => href);
+  private timer?: ReturnType<typeof setTimeout>;
   private results = new Map<string, Result>();
   private desired = new Map<string, string>();
   private pages = new Map<string, Pick<Page, 'width' | 'height' | 'blobKey'>>();
@@ -96,10 +99,11 @@ export class EpubImageWindow {
   private select() {
     const start = this.artwork.findIndex(value => value.visible);
     const selected = new Set<string>();
-    for (let index = start; index >= 0 && index < this.artwork.length && selected.size < 4; index++) selected.add(this.artwork[index].href);
+    for (let index = start; index >= 0 && index < this.artwork.length && selected.size < READING_TARGETS; index++) selected.add(this.artwork[index].href);
     const next = [...selected];
     if (JSON.stringify(next) !== JSON.stringify(this.window)) {
       this.window = next;
+      this.reading.update(next);
       this.apply();
       this.onWindow(next);
     }
@@ -126,13 +130,16 @@ export class EpubImageWindow {
 
   private apply() {
     if (this.closed) return;
+    clearTimeout(this.timer);
+    const ready = new Set(this.reading.ready()), delay = this.reading.delay();
+    if (this.profile && delay > 0) this.timer = setTimeout(() => this.apply(), delay);
     const wanted = new Map(this.window.flatMap(href => {
       const key = this.desired.get(epubImageId(href));
       return key ? [[href, key]] : [];
     }));
     for (const [href, result] of this.results) if (wanted.get(href) !== result.key || result.processing !== this.shouldEnhance(href)) this.release(href);
     for (const [href, key] of wanted) {
-      if (!this.results.has(href)) this.load(href, key);
+      if (!this.results.has(href) && (!this.shouldEnhance(href) || ready.has(href))) this.load(href, key);
     }
     for (const artwork of this.artwork) {
       const result = this.results.get(artwork.href);
@@ -151,7 +158,7 @@ export class EpubImageWindow {
     }
   }
 
-  private shouldEnhance(href: string) {return !!this.profile && this.window.slice(0, 2).includes(href) && this.enhanceable.has(epubImageId(href));}
+  private shouldEnhance(href: string) {return !!this.profile && this.enhanceable.has(epubImageId(href));}
 
   private load(href: string, key: string, retry = false) {
     const result: Result = {key, controller: new AbortController(), processing: this.shouldEnhance(href)};
@@ -220,6 +227,7 @@ export class EpubImageWindow {
 
   close() {
     this.closed = true;
+    clearTimeout(this.timer);
     this.observer.disconnect();
     for (const document of new Set(this.artwork.map(value => value.element.ownerDocument))) document.removeEventListener('load', this.loaded, true);
     for (const href of this.results.keys()) this.release(href);

@@ -60,11 +60,11 @@ describe('EPUB embedded image window', () => {
     });
     window.show(pages,true,'classic','en','account-a',processing());
     await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
-    expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual(['source:OPS/0.png','source:OPS/1.png']);
+    await vi.waitFor(()=>expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual([0,1,2,3].map(i=>`source:OPS/${i}.png`)));
     expect(images[0].getAttribute('src')).toMatch(/^blob:translated/);
     expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
     window.show(pages,true,'classic','en','account-a',{...processing(),settings:{...processing().settings,enabled:false}});
-    expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
+    expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(mocks.enhance).toHaveBeenCalledTimes(4);window.close();
   });
   it('displays a warm enhancement without reading a parent or waiting for the original element to load',async()=>{
     mocks.enhance.mockResolvedValue(new Blob(['cached enhancement']));mocks.acquire.mockRejectedValue(Error('Parent unavailable'));
@@ -76,18 +76,18 @@ describe('EPUB embedded image window', () => {
     expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
     expect(mocks.acquire).not.toHaveBeenCalled();expect(mocks.prepare).toHaveBeenCalledOnce();window.close();
   });
-  it('enhances only complete translations in a two-image window and preserves the author box', async () => {
+  it('enhances only complete translations in the shared four-image EPUB window and preserves the author box', async () => {
     const {document,images}=artwork(),window=new EpubImageWindow(vi.fn(),vi.fn());window.add(document);visible(images,0);
     const pages=images.map(image=>page(image.getAttribute('data-nc-epub-image')!));
     window.show(pages.map(page=>({...page,outputBlobs:{}})),true,'classic','en','account-a',processing());
     expect(mocks.enhance).not.toHaveBeenCalled();
     window.show(pages,true,'classic','en','account-a',processing());
-    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(2));
-    expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual(['result:OPS/0.png','result:OPS/1.png']);
+    await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledTimes(4));
+    expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual([0,1,2,3].map(i=>`result:OPS/${i}.png`));
     await vi.waitFor(()=>expect(images[0].getAttribute('width')).toBe('240'));expect(images[0].getAttribute('height')).toBe('360');
     window.show(pages,true,'classic','en','account-a',{...processing(),settings:{...processing().settings,enabled:false}});
     await vi.waitFor(()=>expect(images[0].getAttribute('src')).not.toBe('blob:original-0'));
-    expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
+    expect(mocks.enhance).toHaveBeenCalledTimes(4);window.close();
   });
   it('keeps a full translation on enhancement failure and explicitly retries enhancement only', async () => {
     mocks.enhance.mockImplementationOnce(async(input,_profile,signal,options)=>{

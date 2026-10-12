@@ -11,12 +11,12 @@ const page=await browser.newPage({viewport:{width:1180,height:850}}),errors=[],c
 page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
 await page.addInitScript(()=>{
-  const live=new Map(),blobKeys=new WeakMap(),urls=[],decodes=[],events=[],heldDom=new Map(),heldDecodes=new Map();
+  const live=new Map(),blobKeys=new WeakMap(),reads=[],urls=[],decodes=[],events=[],heldDom=new Map(),heldDecodes=new Map();
   let nextDecode='normal',nextDomKey='',sequence=0;
   const get=IDBObjectStore.prototype.get;
   IDBObjectStore.prototype.get=function(key){
     const request=get.call(this,key);
-    if(this.name==='objects'&&typeof key==='string'&&key.startsWith('inline-original:reader-images-'))request.addEventListener('success',()=>{if(request.result instanceof Blob)blobKeys.set(request.result,key);});
+    if(this.name==='objects'&&typeof key==='string'&&key.startsWith('inline-original:reader-images-')){reads.push(key);request.addEventListener('success',()=>{if(request.result instanceof Blob)blobKeys.set(request.result,key);});}
     return request;
   };
   const create=URL.createObjectURL,revoke=URL.revokeObjectURL;
@@ -52,7 +52,7 @@ await page.addInitScript(()=>{
     releaseDom(url){const target=heldDom.get(url);if(!target)throw Error('No held DOM image');heldDom.delete(url);target.dispatchEvent(new Event('load'));},
     breakDom(url){const target=heldDom.get(url);if(!target)throw Error('No held DOM image');heldDom.delete(url);target.src='data:image/png;base64,AA==';},
     releaseDecode(id,reject=false){const held=heldDecodes.get(id);if(!held)throw Error('No held decode');heldDecodes.delete(id);reject?held.reject():held.resolve();},
-    metrics(){return {live:[...live].map(([url,key])=>({url,key})),urls,decodes,events,heldDom:[...heldDom.keys()]};}
+    metrics(){return {live:[...live].map(([url,key])=>({url,key})),reads,urls,decodes,events,heldDom:[...heldDom.keys()]};}
   };
 });
 const key=kind=>`inline-original:reader-images-${kind}`;
@@ -140,7 +140,37 @@ try{
   await page.evaluate(()=>window.readerImageTest.armDecode('deferred'));await page.getByTestId('translated').click();const closingDecode=await heldDecode();await liveCount(2);
   await page.getByTestId('mount').click();await liveCount(0);await settle();assert.equal(await shown(),null);assert.equal(await page.locator('section img').count(),0);
   await page.evaluate(id=>window.readerImageTest.releaseDecode(id),closingDecode.id);await settle();await liveCount(0);assert.equal(await shown(),null);assert.equal(await page.locator('section img').count(),0);
-  checks.push('Closing during decode clears onShown, releases every Blob URL and ignores a late completion');await sample('closed');assert.deepEqual(errors,[]);
+  checks.push('Closing during decode clears onShown, releases every Blob URL and ignores a late completion');await sample('closed');
+
+  await page.getByTestId('enhancement-cache').click();const cacheStart=await metrics();
+  await page.getByTestId('mount').click();await settle();assert.equal(await shown(),null);await liveCount(0);
+  assert.equal((await metrics()).reads.length,cacheStart.reads.length);assert.equal((await metrics()).decodes.length,cacheStart.decodes.length);
+  await page.getByTestId('enhancement-ready').click();await displayed('translated');await liveCount(1);
+  assert.equal((await metrics()).reads.length,cacheStart.reads.length);assert.equal((await metrics()).decodes.length,cacheStart.decodes.length+1);
+  checks.push('An enhancement cache lookup waits without parent reads, then a warm result decodes only the enhanced image');await sample('enhancement-warm-cache');
+
+  for(const label of ['first','reopened']){
+    await page.getByTestId('mount').click();await liveCount(0);await page.getByTestId('enhancement-queued').click();const queuedStart=await metrics();
+    await page.getByTestId('mount').click();await displayed('translated');await liveCount(1);
+    const queuedImage=await actualImage(),queuedIdentity=await shown(),queuedReady=await metrics();
+    assert.equal(queuedReady.reads.length,queuedStart.reads.length+1);assert.equal(queuedReady.decodes.length,queuedStart.decodes.length+1);
+    assert.equal(queuedReady.decodes.at(-1).key,key('translated'));
+    for(const phase of ['running','error']){await page.getByTestId(`enhancement-${phase}`).click();await page.locator(`[data-enhancement-state="${phase}"]`).waitFor();await settle();await unchanged(queuedIdentity,queuedImage.url);}
+    assert.equal(await page.locator('.nc-image-failure').count(),0);assert.equal(await page.locator('.nc-image-placeholder').count(),0);
+    await page.getByRole('button',{name:'重试增强',exact:true}).click();await page.locator('[data-enhancement-state="queued"]').waitFor();await settle();
+    assert.equal((await metrics()).reads.length,queuedReady.reads.length);assert.equal((await metrics()).decodes.length,queuedReady.decodes.length);
+    checks.push(`A ${label} queued enhancement displays the translation; running, failure and enhancement retry never reread or decode it`);await sample(`enhancement-${label}`);
+  }
+  await page.screenshot({path:path.join(out,'queued-enhancement-shows-translation.png')});
+
+  await page.getByTestId('mount').click();await liveCount(0);await page.evaluate(()=>window.readerImageTest.armDecode('deferred'));
+  await page.getByTestId('mount').click();const lateParent=await heldDecode();assert.equal(lateParent.key,key('translated'));
+  await page.getByTestId('enhancement-ready').click();await displayed('translated');await liveCount(1);const enhanced=await actualImage(),enhancedIdentity=await shown();
+  assert.notEqual(enhanced.url,lateParent.url);assert(!(await metrics()).live.some(item=>item.url===lateParent.url));
+  await page.evaluate(id=>window.readerImageTest.releaseDecode(id),lateParent.id);await settle();await unchanged(enhancedIdentity,enhanced.url);
+  assert.equal(await page.locator('.nc-image-failure').count(),0);
+  checks.push('An arriving enhanced result cancels parent decoding, releases its URL and ignores its late completion');await sample('enhancement-cancels-parent');
+  await page.getByTestId('mount').click();await liveCount(0);assert.equal(await shown(),null);assert.deepEqual(errors,[]);
   const report={checks,errors,samples,metrics:await metrics(),browser:await browser.version(),synthetic:true,nativePngLoading:true,controlledDecodeRejection:true,controlledDomLoadDelivery:true,externalServices:false};
   await writeFile(path.join(out,'results.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({out,checks,errors,samples}));
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});await writeFile(path.join(out,'failure.json'),JSON.stringify({error:String(error),errors,checks,samples,metrics:await metrics()},null,2));throw error;}finally{await browser.close();}

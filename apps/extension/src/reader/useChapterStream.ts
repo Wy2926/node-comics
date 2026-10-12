@@ -5,7 +5,7 @@ import {scrollAnchorFor} from './model';
 import {completePageList} from '../comics/application/library-service';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
 import {ChapterResourceWindow} from './chapter-resources';
-import {ReadingProgress,READING_TARGETS} from '../translation/automatic';
+import {ReadingProgress,READING_TARGETS} from '../reading-window';
 
 export const pageKey=(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`;
 export const completeManifest=completePageList;

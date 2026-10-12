@@ -3,7 +3,7 @@ import { RequestPool } from '../concurrency';
 import { safeImageUrl, sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
 import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
-import { ReadingProgress, ReadingWindow } from '../translation/automatic';
+import { ReadingProgress, ReadingWindow } from '../reading-window';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
 import { imageDisplay, inlineStyles } from './display';

@@ -64,7 +64,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_translation_status.mjs` | Vite 5176；真实 640×20000 合成图片与模拟服务，检查长图视口内提示、解码等待／失败后仅重载、无文字显式重译及重复点击保护、显示反馈、工具栏与阅读位置；不调用真实翻译模型 |
 | `verify_reading_api.mjs` | 临时 API／worker 与合成供应商，启动顺序见[翻译契约](../docs/READING_TRANSLATION_CONTRACT.md#9-验证入口) |
 | `verify_translation_channels.mjs` / `verify_translation_channel_host.mjs` | 渠道设置、模拟 MTU、后台中断与缓存，见[渠道规范](../docs/TRANSLATION_CHANNELS.md#验证) |
-| `verify_image_enhancement.mjs` | Vite 5176 渠道夹具；完整译图字节再增强、两页窗口、开关、缓存、独立重试、并排对照与窄屏设置。只使用模拟 MTU／nunif 响应，不调用模型，见[图像增强](../docs/IMAGE_ENHANCEMENT.md#验证) |
+| `verify_image_enhancement.mjs` | Vite 5176 渠道夹具；完整译图字节再增强、同翻译窗口、单页预取与滚动补位、串行执行、开关、缓存、独立重试、并排对照与窄屏设置。只使用模拟 MTU／nunif 响应，不调用模型，见[图像增强](../docs/IMAGE_ENHANCEMENT.md#验证) |
 | `verify_translation_channel_live.mjs` | 真实回环 MTU；使用 `MTU_USERNAME`、`MTU_PASSWORD`、可选 `MTU_BASE_URL`，实际调用服务端引擎 |
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
 | `node --test apps/extension/tests/shortcuts.browser.mjs` | Vite 5181 的隔离阅读器与选择器夹具；左侧锚点与连续滚动、固定标题／关闭／底栏、组合键录制／恢复、主题令牌、弹层保护与阅读位置恢复。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，不代替已安装扩展或原生划图授权验证 |

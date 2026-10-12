@@ -34,9 +34,12 @@ const outputSha256=await hashFile(output),bitmap=await createImageBitmap(output)
 const enhancedCanvas=new OffscreenCanvas(bitmap.width*2,bitmap.height*2),enhancedContext=enhancedCanvas.getContext('2d')!;
 enhancedContext.drawImage(bitmap,0,0,enhancedCanvas.width,enhancedCanvas.height);bitmap.close();
 const enhancedOutput=await enhancedCanvas.convertToBlob({type:'image/png'});enhancedCanvas.width=enhancedCanvas.height=1;
+const enhancementWaiters:(()=>void)[]=[];
 const state={loginCount:0,requests:[] as {language:string;token:boolean;hasImage:boolean}[],officialTranslations:0,fail:false,
   parentReads:[] as string[],blockedParentJobs:[] as string[],parentSourceKeys:copies[0].pages.slice(0,2).map(page=>page.blobKey),
   enhancements:[] as {sha256:string;bytes:number;fields:Record<string,string>;startedAt:number;duration?:number}[],enhancementFail:false,enhancementDelay:180,
+  holdEnhancements:false,get heldEnhancements(){return enhancementWaiters.length;},
+  releaseEnhancements:()=>{state.holdEnhancements=false;for(const release of enhancementWaiters.splice(0))release();},
   outputSha256,readProcessingSettings,updateProcessingSettings,clearProcessingCache,
   listChannels,selectChannel,readAuth,chapterContentIds,pageReads,clearCache:()=>clearStorage('translations')};
 Object.assign(window,{channelFixture:state});
@@ -56,6 +59,7 @@ window.fetch=async(input,init={})=>{
     const form=init.body as FormData,blob=form.get('file') as Blob;
     const entry={sha256:await hashFile(blob),bytes:blob.size,fields:Object.fromEntries(['style','noise','scale','format'].map(key=>[key,String(form.get(key))])),startedAt:performance.now(),duration:0};
     state.enhancements.push(entry);
+    if(state.holdEnhancements)await new Promise<void>(resolve=>enhancementWaiters.push(resolve));
     await new Promise(resolve=>setTimeout(resolve,state.enhancementDelay));entry.duration=performance.now()-entry.startedAt;
     if(state.enhancementFail)return new Response('synthetic enhancement failure',{status:503});
     return new Response(enhancedOutput,{headers:{'Content-Type':'image/png'}});

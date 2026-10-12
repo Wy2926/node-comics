@@ -9,8 +9,9 @@ import type {Api} from '../api';
 import {languageLabel,modeLabels,supportsLanguage,type Capabilities,type ReadingEntry,type Job,type Mode,type Page,type Settings} from '../types';
 
 import {BlobPicture,type ShownImage} from './Images';
-import {useProcessingSettings, useEnhancementVisible} from '../image-processing/react';
+import {useProcessingSettings, useEnhancementVisible, useProcessingWindow} from '../image-processing/react';
 import {activeProcessingProfile} from '../image-processing/settings';
+import {processingInput} from '../comics/application/image-access';
 import {canRetryPage,displayTranslationState,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
 import {pageWindow} from './virtual-window';
@@ -75,8 +76,15 @@ const frame=(p:Page)=>pageFrame(p,viewportSize,fit,zoom,compare);
 const windows=useMemo(()=>pageWindow(stream,copy.id,index,p=>frame(p).height,settings.layout==='single'?1:DECODED_PAGE_WINDOW),[stream,copy.id,index,viewportSize,fit,zoom,compare,settings.layout]);
 const decodedSet=useMemo(()=>new Set(windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).map(p=>pageKey(chapter,p.id)))),[windows,resourceVersion]);
 const processingSettings=useProcessingSettings(),processingProfile=activeProcessingProfile(processingSettings),enhancementVisible=useEnhancementVisible();
-const enhancementStart=streamPages.findIndex(item=>item.key===pageKey(copy,page?.id??''));
-const enhancementWindow=new Set(enhancementStart<0?[]:streamPages.slice(enhancementStart,enhancementStart+2).map(item=>item.key));
+const readingTargets=useMemo(()=>{
+ const start=streamPages.findIndex(item=>item.key===pageKey(copy,page?.id??''));
+ return start<0?[]:streamPages.slice(start,start+readingAhead).map(item=>({...item,mode}));
+},[streamPages,copy.id,page?.id,readingAhead,mode]);
+const processingTargets=useMemo(()=>readingTargets.map(({key,entryId,page})=>{
+ const translated=preference!=='original',image=readingImage(page,mode,translated,settings.language,translationScope);
+ return {id:key,sourceKey:page.blobKey,input:image.key&&(!translated||image.job||image.originalResult)?processingInput(image.key,entryId,page.blobKey):undefined};
+}),[readingTargets,preference,mode,settings.language,translationScope]);
+const enhancedImages=useProcessingWindow(processingTargets,enhancementVisible?processingProfile:undefined,processingSettings.cacheRevision,navigationReason.current==='direct');
 geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=stream.reduce((width,chapter)=>chapter.pages.reduce((width,page)=>Math.max(width,frame(page).width),width),0);
 useLayoutEffect(()=>{restore();},[viewportSize,fit,zoom,compare,settings.layout,!!page]);
@@ -105,10 +113,8 @@ useShortcuts({
  'reader.find':()=>{if(!onFind)return false;findComic();},
 },{enabled:!searchOpen&&!feedback&&!analyticsBlocked});
 useEffect(()=>{
- const start=streamPages.findIndex(p=>p.key===pageKey(copy,page?.id??''));
- const targets=preference==='original'||start<0?[]:streamPages.slice(start,start+readingAhead).map(p=>({...p,mode}));
- onReadingWindow(targets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page),navigationReason.current==='direct');
-},[index,copy.id,streamPages,decodedSet,mode,preference,onReadingWindow,readingAhead]);
+ onReadingWindow(preference==='original'?[]:readingTargets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page),navigationReason.current==='direct');
+},[readingTargets,streamPages,decodedSet,preference,onReadingWindow]);
 useEffect(()=>()=>onReadingWindow([],[]),[onReadingWindow]);
 function navigate(offset:number){if(!page)return false;jump(indexRef.current+offset);}
 function reloadContent(chapter:ReadingEntry){if(busy||!onReload)return;preserve();persist();onReload(chapter.id);}
@@ -170,11 +176,11 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 <PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} allowsFeedback={allowsFeedback} selectedView={preference==='original'?'original':mode} shownJob={allowsFeedback?shownJob:undefined} onView={selectView} onFeedback={()=>shownJob&&setFeedback({job:{...shownJob},number:index+1})} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
 {sourceStatus&&panel!=='directory'&&<div className="nc-source-status nc-source-action nc-reader-controls" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}
 <div className="nc-reading-viewport" data-scrollbar-mode="hidden" ref={viewport} onScroll={scroll} data-decoded-pages={decodedSet.size} data-page-count={copy.pages.length} onClick={e=>{if((e.target as Element).closest('button,a,input,select,textarea,[role="button"]')||window.getSelection()?.toString())return;if(panel)setPanel(undefined);else reveal();}}>
-<div className="nc-reading-surface" style={{minWidth:contentWidth+24}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter)&&(settings.layout==='continuous'||index===copy.pages.length-1);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob,originalResult}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
+<div className="nc-reading-surface" style={{minWidth:contentWidth+24}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter)&&(settings.layout==='continuous'||index===copy.pages.length-1);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
 const load=imageLoad(chapter,p,targetKey),state=displayTranslationState(translationState(chapter.id,p,pageView.mode),load,targetJob?targetKey:undefined);
 const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey} ref={node=>{if(node)cells.current.set(cellKey,node);else cells.current.delete(cellKey);}} data-page-id={p.id} data-page-index={n} style={{width}}>
 <div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture scope={`${cellKey}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}/></div>}<div className="nc-comparison-pane"><BlobPicture scope={identity} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}
-profile={!wantTranslation||targetJob||originalResult?processingProfile:undefined} owner={chapter.id} sourceKey={p.blobKey} eligible={enhancementVisible&&enhancementWindow.has(cellKey)} revision={processingSettings.cacheRevision}
+enhancement={enhancedImages.get(cellKey)}
 defer={!processingSettings.ready||!!processingProfile&&wantTranslation&&!targetJob&&!p.translationError&&!!pageTranslation(p,pageView.mode,settings.language,translationScope).result?.result&&!pageTranslation(p,pageView.mode,settings.language,translationScope).expired}
 onLoadState={state=>setLoads(prev=>{if(prev[cellKey]===state)return prev;const next={...prev};if(state)next[cellKey]=state;else delete next[cellKey];return next;})}
 onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellKey]?.key===image?.key&&prev[cellKey]?.scope===image?.scope)return prev;const next={...prev};if(image)next[cellKey]=image;else delete next[cellKey];return next;});}}/></div></>:<div className="nc-image-placeholder"><Icon name="image"/><span>{msg("正在准备页面…")}</span></div>}</div>

@@ -23,6 +23,8 @@ export interface ProcessingAdapter {
   request(settings: Record<string, string>): ImageTransferRequest;
 }
 export type ProcessingState = {phase: 'queued' | 'running' | 'ready' | 'error'; message?: string};
+/** No state until the cache lookup finishes; blob contains only the enhanced result. */
+export interface ProcessingImage {identity: string; state?: ProcessingState; blob?: Blob; retry(): void;}
 export interface ProcessingInput {
   /** Parent identity includes translation account, UUID and result revision when translated. */
   key: string;

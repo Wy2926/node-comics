@@ -5,7 +5,7 @@ import type {ChannelDefinition, ChannelField} from '../../contracts';
 import {startImageTransfer} from '../../../../image-transfer/client';
 import {DirectImageRuntime} from '../../transport/runtime';
 import {ImageTransferError} from '../../../../image-transfer/types';
-import {MAX_READING_TARGETS} from '../../../automatic';
+import {MAX_READING_TARGETS} from '../../../../reading-window';
 import {assertCurrent} from '../../../../concurrency';
 import {languages, login, safeError, serviceBase, translationRequest} from './protocol';
 

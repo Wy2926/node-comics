@@ -9,7 +9,8 @@ import {assertCurrent} from '../concurrency';
 import {resultBlobKey,registerResultReader,assertResult} from '../storage/translations/results';
 import {applyChannelJobs} from './sync';
 import type {ChannelConnection,ChannelRuntime} from './channels/contracts';
-import {ReadingWindow,type ReadingTarget,type TranslationState} from './automatic';
+import {targetKey,type ReadingTarget,type TranslationState} from './automatic';
+import {ReadingWindow} from '../reading-window';
 
 interface Options {
   channel?:ChannelConnection;connectionError?:string;copies:ReadingEntry[];
@@ -18,7 +19,7 @@ interface Options {
 export function useAutomaticTranslation({channel,connectionError='',copies,updateEntry,language,currentId}:Options){
   const [,render]=useState(0),[error,setError]=useState('');
   const copyRef=useRef(copies);copyRef.current=copies;
-  const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow()),visible=useRef<Page[]>([]);
+  const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode))),visible=useRef<Page[]>([]);
   const runtime=useRef<ChannelRuntime|undefined>(undefined),wake=useRef<()=>void>(()=>{}),stamp=useRef(0);
   const resultReaders=useRef(new Map<string,()=>void>());
   const commit=useCallback((copy:ReadingEntry)=>{copyRef.current=copyRef.current.map(c=>c.id===copy.id?copy:c);updateEntry(copy);},[updateEntry]);

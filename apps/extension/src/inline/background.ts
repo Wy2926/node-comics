@@ -7,7 +7,8 @@ import { emptyPage } from '../reader/model';
 import { pageTranslation } from '../reader/presentation';
 import { safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
 import {MAX_COMIC_IMAGES} from '../sources/shared/geometry';
-import {MAX_READING_TARGETS,type ReadingTarget} from '../translation/automatic';
+import type {ReadingTarget} from '../translation/automatic';
+import {MAX_READING_TARGETS} from '../reading-window';
 import { matchesPage } from '../translation/sync';
 import { defaults, type Job, type Page, type Settings } from '../types';
 import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
@@ -155,14 +156,15 @@ function publish(ctx:Context){
 function cancelSources(ctx:Context,keepIds:readonly string[]){
   const keep=ctx.readingIds=new Set(keepIds);
   for(const [key,work] of ctx.preparing)if(!keep.has(work.id)){work.controller.abort();ctx.preparing.delete(key);}
-  for(const [id,work] of ctx.enhancements)if(!keepIds.slice(0,2).includes(id)){work.controller.abort();ctx.enhancements.delete(id);}
+  const enhancementIds=new Set(keepIds.slice(0,MAX_READING_TARGETS));
+  for(const [id,work] of ctx.enhancements)if(!enhancementIds.has(id)){work.controller.abort();ctx.enhancements.delete(id);}
 }
 
 /** Only completed results enter enhancement; a no-text result uses the unchanged source. */
 function scheduleEnhancements(ctx:Context) {
   const view=ctx.window,profile=ctx.processing;
   if(!profile||!view||!ctx.active||!view.activity.current())return;
-  for(const image of view.request.readingImages!.slice(0,2)) {
+  for(const image of view.request.readingImages!.slice(0,MAX_READING_TARGETS)) {
     if(!ctx.readingIds.has(image.id))continue;
     const page=ctx.pages.get(pageKey(view.request,image)),job=page&&pageResult(ctx,page);
     if(!page||!job?.result)continue;

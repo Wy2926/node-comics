@@ -1,5 +1,5 @@
 import { DECODED_PAGE_WINDOW } from '../image-resources';
-import { MAX_READING_TARGETS } from '../translation/automatic';
+import { MAX_READING_TARGETS } from '../reading-window';
 
 type Positioned = { rect: { top: number; bottom: number; left: number; right: number } };
 export const visibleImage = (item: Positioned, width: number, height: number) =>

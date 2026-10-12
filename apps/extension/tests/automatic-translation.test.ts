@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe,it,expect} from 'vitest';
-import {ReadingProgress,ReadingWindow,needsTranslation,targetKey} from '../src/translation/automatic';
+import {needsTranslation,targetKey,type ReadingTarget} from '../src/translation/automatic';
+import {ReadingProgress,ReadingWindow} from '../src/reading-window';
 import {makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {job,origin,target,originalInput} from './translation-fixture';
 describe('local reading timing',()=>{
@@ -17,7 +18,7 @@ describe('local reading timing',()=>{
   expect(progress.update('first',0,0,900)).toBe(4);expect(progress.update('first',24,500,900)).toBe(5);
  });
  it('adds the fifth slot without restarting warmup or moving the current target',()=>{
-  const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
+  const window=new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode));window.update([0,1,2,3].map(target),0);
   window.update([0,1,2,3,4].map(target),50);expect(window.prefetchAt).toBe(150);
   expect(window.ready(149)).toHaveLength(1);expect(window.ready(150)).toHaveLength(5);
   window.update([1,2,3,4].map(target),1000);expect(window.ready(1080)).toHaveLength(4);
@@ -25,7 +26,7 @@ describe('local reading timing',()=>{
   expect(window.ready(1100).map(t=>t.page.id)).toEqual([1,2,3,4,5].map(n=>`page-${n}`));
  });
  it('refills all three lookahead slots on every forward page without restarting the prefetch delay',()=>{
-  const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
+  const window=new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode));window.update([0,1,2,3].map(target),0);
   expect(window.ready(150).map(t=>Number(t.page.id.replace('page-','')))).toEqual([0,1,2,3]);
   for(let current=1;current<=5;current++){
    const now=current*1000;window.update([current,current+1,current+2,current+3].map(target),now);
@@ -35,12 +36,12 @@ describe('local reading timing',()=>{
   expect(window.ready(7000).map(t=>Number(t.page.id.replace('page-','')))).toEqual([20]);
  });
  it('starts immediately, prepares the next three at 150 ms, and ignores snapshot changes',()=>{
-  const window=new ReadingWindow();window.update([0,1,2,3].map(target),0);
+  const window=new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode));window.update([0,1,2,3].map(target),0);
   expect(window.ready(0).map(t=>t.page.id)).toEqual(['page-0']);expect(window.ready(149)).toHaveLength(1);expect(window.ready(150)).toHaveLength(4);
   expect(window.update([0,1,2,3].map(target),160)).toBe(false);expect(window.ready(160)).toHaveLength(4);
  });
  it('coalesces scrolling at 80 ms with a 200 ms maximum and immediate explicit jumps',()=>{
-  const window=new ReadingWindow();window.update([target(0)],0);
+  const window=new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode));window.update([target(0)],0);
   window.update([target(1)],10);expect(window.ready(89)).toEqual([]);
   window.update([target(2)],60);window.update([target(3)],120);window.update([target(4)],180);
   expect(window.readyAt).toBe(210);expect(window.ready(210)[0].page.id).toBe('page-4');

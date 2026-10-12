@@ -197,7 +197,7 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
             const request = indexedDB.open('node-comics-reading-v2-image-processing-requests');
             request.onsuccess = () => {
               const db = request.result, records = db.transaction('records').objectStore('records').getAll();
-              records.onsuccess = () => {resolve(records.result.some(record => record.inputSha256 === failed.sha256 && record.state === 'failed')); db.close();};
+              records.onsuccess = () => {resolve(records.result.some(record => record.state === 'failed' && record.errorCode === 'HTTP_503')); db.close();};
             };
           }));
           if (prefetch) {
