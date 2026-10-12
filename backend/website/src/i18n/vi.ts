@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: cải thiện hình ảnh mượt hơn (chờ phát hành trên cửa hàng)",
+        "title": "0.12.0 · Trang rõ hơn. Tìm dễ hơn.",
         "items": [
-          "Cải thiện hình ảnh và dịch dùng chung phạm vi chuẩn bị trước, chuẩn bị các trang tiếp theo trong lúc bạn đọc.",
-          "Ảnh đã dịch hiển thị ngay khi quá trình cải thiện đang chờ hoặc đang chạy. Khi hoàn tất, kết quả thay thế tại chỗ mà không đổi vị trí đọc.",
-          "Tái sử dụng bộ nhớ đệm và tác vụ cải thiện để không gửi yêu cầu trùng lặp khi mở lại trình đọc.",
-          "Các gói 0.12.0 cho Chrome, Edge và Firefox đã sẵn sàng để gửi lên cửa hàng nhưng chưa được phát hành. Trang web hiện cung cấp Chrome 0.11.3, Edge 0.10.2 và Firefox 0.11.3 (đã ký bởi AMO)."
+          "Thêm tính năng tăng chất lượng ảnh — Kết nối nunif / waifu2x để phóng to và khử nhiễu ảnh gốc hoặc ảnh đã dịch hoàn chỉnh. Dùng trong trình đọc, ảnh EPUB và ảnh web đã dịch mà không tốn hạn mức dịch. Tăng chất lượng mặc định tắt và cần dịch vụ riêng.",
+          "Tìm trang truyện phù hợp — Lọc theo thể loại truyện, cách tính phí, nội dung ngôn ngữ gốc và điều kiện truy cập.",
+          "Trang web: ảnh và tệp cùng một nơi — Một giao diện cho ảnh, PDF và ZIP / CBZ, dùng hạn mức hiện có sau khi đăng nhập. Khi tải tệp lên xong, bạn có thể rời trang và quay lại tải ảnh đã dịch dạng ZIP.",
+          "7 nguồn truyện mới hoặc nâng cấp — Hỗ trợ thêm sáu trang web và nhập tác phẩm, chương từ Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Đọc mượt hơn — Ảnh được tăng chất lượng sẵn trước khi chuyển trang, còn bản dịch hiện có vẫn đọc được trong lúc xử lý. Kết quả thay thế ngay tại chỗ, giữ nguyên vị trí đọc; ảnh đã xử lý được dùng lại và có thể thử lại riêng từng ảnh bị lỗi."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Thêm mô hình. Giá thấp hơn.",
+        "items": [
+          "Dịch với nhiều mô hình: chọn mô hình khả dụng",
+          "Đổi mới gói đăng ký, giảm mạnh mức giá",
+          "Thêm gói hạn mức để bổ sung số trang dịch",
+          "Trang tài khoản gọn hơn, rõ hạn mức còn lại và ngày hết hạn",
+          "Hỗ trợ thêm 3 trang truyện tranh: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

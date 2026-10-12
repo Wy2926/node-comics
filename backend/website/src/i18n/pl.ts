@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: płynniejsze ulepszanie obrazów (oczekuje na publikację w sklepach)",
+        "title": "0.12.0 · Wyraźniejsze strony. Łatwiejsze szukanie.",
         "items": [
-          "Ulepszanie obrazów i tłumaczenie korzystają z tego samego okna przygotowania kolejnych stron podczas czytania.",
-          "Gotowe tłumaczenia wyświetlają się od razu, nawet gdy ulepszanie oczekuje w kolejce lub trwa. Po zakończeniu wynik zastępuje obraz bez zmiany pozycji czytania.",
-          "Pamięć podręczna i zadania ulepszania są wykorzystywane ponownie, więc ponowne otwarcie czytnika nie wysyła powtórnych żądań ulepszenia.",
-          "Pakiety 0.12.0 dla Chrome, Edge i Firefox są gotowe do przesłania do sklepów, ale nie zostały jeszcze opublikowane. Witryna udostępnia obecnie Chrome 0.11.3, Edge 0.10.2 i Firefox 0.11.3 (podpisany przez AMO)."
+          "Ulepszanie jakości obrazów — Połącz nunif / waifu2x, aby powiększać i odszumiać oryginały lub gotowe tłumaczenia. Działa w czytniku, z obrazami EPUB i przetłumaczonymi obrazami w sieci, bez zużywania limitu tłumaczeń. Ulepszanie jest domyślnie wyłączone i wymaga własnej usługi.",
+          "Znajdź odpowiednią stronę z komiksami — Filtruj według typu komiksu, opłat, treści w oryginalnym języku i wymagań dostępu.",
+          "Witryna: obrazy i całe pliki razem — Jedno miejsce dla obrazów, PDF i ZIP / CBZ, z dostępnym limitem po zalogowaniu. Po przesłaniu pliku możesz wyjść i później pobrać przetłumaczone obrazy w ZIP.",
+          "7 nowych lub ulepszonych źródeł — Obsługa sześciu nowych witryn oraz import tytułów i rozdziałów Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Płynniejsze czytanie — Ulepszone obrazy są przygotowywane przed zmianą strony, a istniejące tłumaczenia pozostają czytelne podczas przetwarzania. Wynik pojawia się bez przesuwania miejsca czytania; gotowe obrazy są używane ponownie, a nieudane ulepszenia można ponowić osobno."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Więcej modeli. Niższe ceny.",
+        "items": [
+          "Tłumaczenie wieloma modelami: wybierz dostępny model",
+          "Odświeżone subskrypcje i znacznie niższe ceny",
+          "Nowe pakiety limitu na dodatkowe strony tłumaczenia",
+          "Prostsze konto z czytelnym saldem i terminami ważności",
+          "Obsługa 3 kolejnych stron z komiksami: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

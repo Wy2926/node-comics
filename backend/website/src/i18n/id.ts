@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: peningkatan gambar lebih lancar (menunggu rilis di toko)",
+        "title": "0.12.0 · Halaman lebih jernih. Sumber lebih mudah dicari.",
         "items": [
-          "Peningkatan gambar dan terjemahan menggunakan rentang persiapan awal yang sama untuk menyiapkan halaman berikutnya saat Anda membaca.",
-          "Terjemahan yang sudah ada langsung ditampilkan meskipun peningkatan masih mengantre atau berjalan. Setelah selesai, hasilnya menggantikan gambar tanpa mengubah posisi baca.",
-          "Cache dan tugas peningkatan digunakan kembali sehingga membuka ulang pembaca tidak mengirim permintaan peningkatan duplikat.",
-          "Paket 0.12.0 untuk Chrome, Edge, dan Firefox sudah siap diajukan ke toko, tetapi belum dirilis. Situs saat ini menyediakan Chrome 0.11.3, Edge 0.10.2, dan Firefox 0.11.3 (ditandatangani AMO)."
+          "Peningkatan kualitas gambar hadir — Hubungkan nunif / waifu2x untuk memperbesar dan mengurangi derau pada gambar asli atau terjemahan lengkap. Berfungsi di pembaca, gambar EPUB dan gambar web terjemahan tanpa memakai kuota terjemahan. Peningkatan gambar nonaktif secara bawaan dan memerlukan layanan sendiri.",
+          "Temukan situs komik yang tepat — Filter berdasarkan jenis komik, biaya, konten bahasa asli dan persyaratan akses.",
+          "Situs web: gambar dan berkas jadi satu — Satu ruang untuk gambar, PDF dan ZIP / CBZ dengan kuota yang tersedia setelah masuk. Setelah unggahan berkas selesai, Anda bisa pergi dan kembali untuk mengunduh gambar terjemahan dalam ZIP.",
+          "7 sumber komik baru atau ditingkatkan — Dukungan enam situs baru serta impor karya dan bab dari Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Membaca lebih lancar — Gambar yang ditingkatkan disiapkan sebelum berpindah halaman, sementara terjemahan yang ada tetap dapat dibaca selama pemrosesan. Hasil muncul tanpa menggeser posisi baca; gambar yang sudah diproses digunakan kembali dan kegagalan dapat dicoba ulang secara terpisah."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Lebih banyak model. Harga lebih rendah.",
+        "items": [
+          "Terjemahan multimodel: pilih model yang tersedia",
+          "Paket langganan baru dengan harga jauh lebih rendah",
+          "Paket kuota baru untuk menambah halaman terjemahan",
+          "Halaman akun lebih ringkas dengan saldo dan masa berlaku yang jelas",
+          "Dukungan untuk 3 situs komik tambahan: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

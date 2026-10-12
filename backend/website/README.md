@@ -37,6 +37,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 ### 页面内容
 
 - 不提供独立广告落地页，统一使用对应语言的首页。品牌使用真实的 NodeLane Comics 团队身份，不宣称注册公司。
+- 更新日志参考插件版本说明，面向用户介绍新增功能和体验改进，不写 Git 提交、打包、审核或待发布状态；各平台实际下载版本由安装包目录维护。
 - 隐私政策、FAQ 和指南中的扩展权限说明以 [WXT 配置](../../apps/extension/wxt.config.ts)和[公共权限规则](../../docs/SITE_ADAPTERS.md#必须保持的约束)为准，修改时同步全部语言；不要将安装时声明的网站访问权限与账号登录、OAuth 或可选统计授权混为一谈。
 - 获取插件按钮使用 `data-install-extension`：通过本机浏览器信息识别桌面 Chrome、Edge、Firefox，点击直达对应官方商店；Android 和 iPhone／iPad 进入当前语言的 Firefox／Orion 教程，未知浏览器或禁用 JavaScript 时保留下载选择页。商店地址以 [src/data/site.ts](src/data/site.ts) 为唯一来源，不上传浏览器信息。
 - 首页保留 Android、Chrome、Edge、Firefox、iOS 五个现有品牌图标，移动端图标位于浏览器两侧，窄屏自动换行。主安装按钮按浏览器显示 Chrome／Edge／Firefox 图标，其余默认 Chrome；不改变上述安装地址规则。

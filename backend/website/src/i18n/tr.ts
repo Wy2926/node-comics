@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: daha akıcı görüntü iyileştirme (mağazalarda yayınlanmayı bekliyor)",
+        "title": "0.12.0 · Daha net sayfalar. Daha kolay keşif.",
         "items": [
-          "Görüntü iyileştirme ve çeviri, siz okurken sonraki sayfaları hazırlamak için aynı ön hazırlık aralığını kullanır.",
-          "İyileştirme sırada beklerken veya çalışırken mevcut çeviriler hemen gösterilir. İşlem bittiğinde sonuç, okuma konumunu değiştirmeden görüntünün yerini alır.",
-          "İyileştirme önbelleği ve görevleri yeniden kullanılır; okuyucuyu tekrar açmak yinelenen iyileştirme istekleri göndermez.",
-          "Chrome, Edge ve Firefox için 0.12.0 mağaza gönderim paketleri hazırdır ancak henüz yayınlanmamıştır. Web sitesinde şu anda Chrome 0.11.3, Edge 0.10.2 ve Firefox 0.11.3 (AMO imzalı) sunulmaktadır."
+          "Görüntü iyileştirme geldi — Orijinalleri veya tamamlanmış çevirileri büyütmek ve gürültüyü azaltmak için nunif / waifu2x bağlayın. Okuyucuda, EPUB görsellerinde ve çevrilmiş web görsellerinde çeviri kotası kullanmadan çalışır. İyileştirme varsayılan olarak kapalıdır ve kendi hizmetinizi gerektirir.",
+          "Doğru çizgi roman sitesini bulun — Çizgi roman türü, ücretlendirme, orijinal dilde içerik ve erişim koşullarına göre filtreleyin.",
+          "Web sitesi: görseller ve dosyalar bir arada — Görseller, PDF ve ZIP / CBZ için tek alan; giriş yaptıktan sonra mevcut kotanızı kullanın. Dosya yüklemesi bitince ayrılabilir, çevrilmiş görselleri ZIP olarak indirmek için daha sonra dönebilirsiniz.",
+          "7 yeni veya geliştirilmiş kaynak — Altı yeni site desteği ve Manga One için eser ve bölüm içe aktarma. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Daha akıcı okuma — İyileştirilmiş görseller sayfa çevirmeden önce hazırlanır ve işlem sürerken mevcut çeviriler okunabilir. Sonuç okuma konumunu değiştirmeden görünür; işlenmiş görseller yeniden kullanılır ve başarısız iyileştirmeler ayrı ayrı denenebilir."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Daha fazla model. Daha düşük fiyatlar.",
+        "items": [
+          "Çok modelli çeviri: kullanılabilir bir model seçin",
+          "Yenilenen abonelikler ve önemli ölçüde düşen fiyatlar",
+          "Çeviri sayfalarını artırmak için yeni kota paketleri",
+          "Bakiye ve bitiş tarihlerini daha net gösteren sade hesap sayfası",
+          "3 yeni çizgi roman sitesi desteği: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

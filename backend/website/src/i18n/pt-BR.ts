@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: aprimoramento mais fluido (publicação nas lojas pendente)",
+        "title": "0.12.0 · Páginas mais nítidas. Fontes mais fáceis de achar.",
         "items": [
-          "O aprimoramento de imagens e a tradução compartilham a mesma janela de preparação antecipada, preparando as próximas páginas durante a leitura.",
-          "As traduções existentes aparecem imediatamente enquanto o aprimoramento está na fila ou em andamento. Ao terminar, o resultado as substitui sem alterar a posição de leitura.",
-          "O cache e as tarefas de aprimoramento são reutilizados para evitar solicitações duplicadas ao reabrir o leitor.",
-          "Os pacotes 0.12.0 para Chrome, Edge e Firefox estão prontos para envio às lojas, mas ainda não foram publicados. O site oferece atualmente Chrome 0.11.3, Edge 0.10.2 e Firefox 0.11.3 (assinado pela AMO)."
+          "Melhoria de imagem disponível — Conecte nunif / waifu2x para ampliar e reduzir ruído de originais ou traduções completas. Funciona no leitor, em imagens EPUB e imagens web traduzidas, sem consumir cota de tradução. A melhoria vem desativada e precisa de um serviço próprio.",
+          "Encontre o site de quadrinhos ideal — Filtre por tipo de quadrinho, preços, conteúdo no idioma original e requisitos de acesso.",
+          "Site: imagens e arquivos juntos — Um espaço para imagens, PDF e ZIP / CBZ, usando sua cota disponível após entrar. Quando o envio terminar, saia e volte depois para baixar as imagens traduzidas em ZIP.",
+          "7 fontes novas ou aprimoradas — Seis novos sites compatíveis e importação de obras e capítulos do Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Leitura mais fluida — As imagens melhoradas são preparadas antes de virar a página, e as traduções continuam disponíveis durante o processamento. O resultado aparece sem mudar a posição de leitura; imagens já processadas são reutilizadas e falhas podem ser tentadas novamente em separado."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Mais modelos. Preços menores.",
+        "items": [
+          "Tradução com vários modelos: escolha um modelo disponível",
+          "Assinaturas reformuladas com preços muito menores",
+          "Novos pacotes de cota para adicionar páginas de tradução",
+          "Conta simplificada com saldos e datas de validade mais claros",
+          "Suporte a mais 3 sites de quadrinhos: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

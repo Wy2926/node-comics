@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: miglioramento più fluido (pubblicazione negli store in attesa)",
+        "title": "0.12.0 · Pagine più nitide. Fonti più facili da trovare.",
         "items": [
-          "Il miglioramento delle immagini e la traduzione condividono la stessa finestra di preparazione anticipata per preparare le pagine successive durante la lettura.",
-          "Le traduzioni esistenti vengono mostrate subito anche quando il miglioramento è in coda o in corso. Al termine, il risultato le sostituisce senza spostare la posizione di lettura.",
-          "La cache e le attività di miglioramento vengono riutilizzate, evitando richieste duplicate quando si riapre il lettore.",
-          "I pacchetti 0.12.0 per Chrome, Edge e Firefox sono pronti per l’invio agli store, ma non sono ancora pubblicati. Il sito offre attualmente Chrome 0.11.3, Edge 0.10.2 e Firefox 0.11.3 (firmato da AMO)."
+          "Arriva il miglioramento delle immagini — Collega nunif / waifu2x per ingrandire e ridurre il rumore di originali o traduzioni complete. Funziona nel lettore, nelle immagini EPUB e nelle immagini web tradotte, senza consumare la quota di traduzione. Il miglioramento è disattivato per impostazione predefinita e richiede un servizio proprio.",
+          "Trova il sito di fumetti giusto — Filtra per tipo di fumetto, prezzi, contenuti in lingua originale e requisiti di accesso.",
+          "Sito: immagini e file insieme — Un solo spazio per immagini, PDF e ZIP / CBZ, con la quota disponibile dopo l’accesso. Una volta caricato il file, puoi uscire e tornare più tardi per scaricare le immagini tradotte in ZIP.",
+          "7 fonti nuove o migliorate — Sei nuovi siti supportati e importazione di opere e capitoli da Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Lettura più fluida — Le immagini migliorate vengono preparate prima di cambiare pagina, mentre le traduzioni restano leggibili durante l’elaborazione. Il risultato compare senza spostare la posizione di lettura; le immagini già elaborate vengono riutilizzate e gli errori si possono ritentare separatamente."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Più modelli. Prezzi più bassi.",
+        "items": [
+          "Traduzione multimodello: scegli un modello disponibile",
+          "Abbonamenti rinnovati con prezzi notevolmente ridotti",
+          "Nuovi pacchetti di quota per aggiungere pagine da tradurre",
+          "Account semplificato con saldi e scadenze più chiari",
+          "Supporto per altri 3 siti di fumetti: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

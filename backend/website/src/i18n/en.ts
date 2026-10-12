@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: Smoother enhancement (pending store release)",
+        "title": "0.12.0 · Clearer pages. Easier discovery.",
         "items": [
-          "Enhancement and translation share the same lookahead window, preparing upcoming pages while you read.",
-          "Existing translations display immediately while enhancement is queued or running, then update in place when it finishes without moving your reading position.",
-          "Reuse enhancement caches and tasks so reopening the reader does not submit duplicate enhancement requests.",
-          "Version 0.12.0 packages for Chrome, Edge and Firefox are ready for store submission but are not yet available in stores. The website currently offers Chrome 0.11.3, Edge 0.10.2 and Firefox 0.11.3 (AMO-signed)."
+          "Image enhancement is here — Connect nunif / waifu2x to upscale and denoise originals or complete translations. Works in the reader, EPUB images and translated web images, without using translation quota. Enhancement is off by default and needs your own service.",
+          "Find the right comic site — Filter by comic type, pricing, raw-language content and access requirements to find a suitable source.",
+          "Website: images and whole files, together — One workspace for images, PDF and ZIP / CBZ, using your available quota after sign-in. Once a file finishes uploading, leave and return later to download translated images as a ZIP.",
+          "7 new or upgraded comic sources — Support for six new sites, plus comic and chapter imports for Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Smoother reading — Prepare enhanced images ahead of page turns and keep reading existing translations while enhancement runs. Results appear in place without moving your reading position; processed images are reused and failures can be retried separately."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · More models. Lower prices.",
+        "items": [
+          "Multi-model translation: choose an available model",
+          "Updated subscriptions with significantly lower prices",
+          "New quota packs to top up translation pages",
+          "A simpler account page with clearer balances and expiry dates",
+          "Support for 3 more comic websites: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

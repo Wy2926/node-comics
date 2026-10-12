@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0: flüssigere Bildverbesserung (Store-Veröffentlichung ausstehend)",
+        "title": "0.12.0 · Klarere Seiten. Einfacher entdecken.",
         "items": [
-          "Bildverbesserung und Übersetzung nutzen dasselbe Vorausladefenster und bereiten während des Lesens die nächsten Seiten vor.",
-          "Vorhandene Übersetzungen werden sofort angezeigt, auch wenn die Bildverbesserung wartet oder läuft. Nach Abschluss wird das Bild an derselben Stelle ersetzt, ohne die Leseposition zu ändern.",
-          "Cache und Aufgaben der Bildverbesserung werden wiederverwendet, sodass beim erneuten Öffnen des Readers keine doppelten Verbesserungsanfragen gesendet werden.",
-          "Die Pakete 0.12.0 für Chrome, Edge und Firefox sind zur Einreichung in den Stores vorbereitet, aber noch nicht veröffentlicht. Die Website bietet derzeit Chrome 0.11.3, Edge 0.10.2 und Firefox 0.11.3 (von AMO signiert) an."
+          "Neue Bildverbesserung — Verbinde nunif / waifu2x, um Originale oder fertige Übersetzungen hochzuskalieren und zu entrauschen. Für Reader, EPUB-Bilder und übersetzte Webbilder, ohne Übersetzungskontingent zu verbrauchen. Bildverbesserung ist standardmäßig aus und benötigt einen eigenen Dienst.",
+          "Die passende Comicseite finden — Filtere nach Comicart, Preismodell, Inhalten in Originalsprache und Zugangsbedingungen.",
+          "Website: Bilder und ganze Dateien — Ein Arbeitsbereich für Bilder, PDF und ZIP / CBZ mit deinem verfügbaren Kontingent nach der Anmeldung. Nach dem vollständigen Upload kannst du die Seite verlassen und später übersetzte Bilder als ZIP herunterladen.",
+          "7 neue oder erweiterte Comicquellen — Unterstützung für sechs neue Websites sowie Werk- und Kapitelimport für Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Flüssiger lesen — Verbesserte Bilder werden vor dem Umblättern vorbereitet. Währenddessen bleiben vorhandene Übersetzungen lesbar; das Ergebnis erscheint an derselben Stelle. Bereits bearbeitete Bilder werden wiederverwendet, fehlgeschlagene Verbesserungen lassen sich einzeln wiederholen."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Mehr Modelle. Niedrigere Preise.",
+        "items": [
+          "Übersetzung mit mehreren Modellen: verfügbares Modell wählen",
+          "Überarbeitete Abos mit deutlich niedrigeren Preisen",
+          "Neue Kontingentpakete für zusätzliche Übersetzungsseiten",
+          "Übersichtlicheres Konto mit Guthaben und Ablaufdaten",
+          "Unterstützung für 3 weitere Comic-Websites: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

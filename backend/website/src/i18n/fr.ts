@@ -643,12 +643,25 @@ export default {
       {
         "id": "0.12.0",
         "date": "2026-10-13",
-        "title": "0.12.0 : amélioration plus fluide (publication en boutique en attente)",
+        "title": "0.12.0 · Des pages plus nettes, des sources plus faciles à trouver.",
         "items": [
-          "L’amélioration des images et la traduction partagent la même fenêtre d’anticipation pour préparer les pages suivantes pendant la lecture.",
-          "Les traductions existantes s’affichent immédiatement lorsque l’amélioration est en attente ou en cours. Le résultat les remplace sur place sans modifier la position de lecture.",
-          "Les caches et les tâches d’amélioration sont réutilisés : rouvrir le lecteur ne soumet pas de requêtes d’amélioration en double.",
-          "Les paquets 0.12.0 pour Chrome, Edge et Firefox sont prêts à être soumis aux boutiques, mais ne sont pas encore publiés. Le site propose actuellement Chrome 0.11.3, Edge 0.10.2 et Firefox 0.11.3 (signé par AMO)."
+          "L’amélioration d’image arrive — Connectez nunif / waifu2x pour agrandir et débruiter les originaux ou les traductions complètes. Compatible avec le lecteur, les images EPUB et les images web traduites, sans utiliser le quota de traduction. L’amélioration est désactivée par défaut et nécessite votre propre service.",
+          "Trouvez le bon site de BD — Filtrez par type de BD, tarification, contenu en langue originale et conditions d’accès.",
+          "Sur le site : images et fichiers réunis — Un même espace pour les images, PDF et ZIP / CBZ, avec votre quota disponible après connexion. Une fois le fichier envoyé, vous pouvez partir et télécharger plus tard les images traduites en ZIP.",
+          "7 sources ajoutées ou améliorées — Six nouveaux sites pris en charge et importation d’œuvres et de chapitres pour Manga One. (COMIC FUZ, Zebrack, 再漫画, Manga One, Hachiraw, MangaTaro, WebtoonScan)",
+          "Une lecture plus fluide — Les images améliorées sont préparées avant de tourner la page. Les traductions restent lisibles pendant le traitement et le résultat apparaît sans déplacer votre position. Les images déjà traitées sont réutilisées et les échecs peuvent être relancés séparément."
+        ]
+      },
+      {
+        "id": "0.11.3",
+        "date": "2026-10-10",
+        "title": "0.11.3 · Plus de modèles. Des tarifs réduits.",
+        "items": [
+          "Traduction multimodèle : choisissez un modèle disponible",
+          "Abonnements repensés et tarifs fortement réduits",
+          "Nouveaux packs de quota pour ajouter des pages à traduire",
+          "Un compte simplifié, des soldes et échéances plus clairs",
+          "Prise en charge de 3 nouveaux sites de BD: ComicK (comickz), ComicWalker, HERO'S Web."
         ]
       },
       {

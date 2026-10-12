@@ -64,18 +64,21 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
-test('0.12.0 leads every locale with four highlights and an explicit pending store release',()=>{
-  const pending:Record<string,string>={'zh-CN':'待商店发布','zh-TW':'待商店發布',en:'pending store release',ja:'ストア公開待ち',ko:'스토어 출시 대기',fr:'publication en boutique en attente',es:'pendiente de publicación en las tiendas','pt-BR':'publicação nas lojas pendente',de:'Store-Veröffentlichung ausstehend',it:'pubblicazione negli store in attesa',ru:'ожидает публикации в магазинах',pl:'oczekuje na publikację w sklepach',uk:'очікує публікації в магазинах',tr:'mağazalarda yayınlanmayı bekliyor',vi:'chờ phát hành trên cửa hàng',id:'menunggu rilis di toko',ar:'بانتظار النشر في المتاجر'};
+test('0.12.0 and 0.11.3 describe user-facing features in every locale',()=>{
   for(const locale of locales){
-    const release=dictionaries[locale].documents.releases[0];
-    assert.equal(release.id,'0.12.0',locale);
-    assert.equal(release.date,'2026-10-13',locale);
-    assert.ok(release.title.includes('0.12.0')&&release.title.includes(pending[locale]),locale);
-    assert.equal(release.items.length,4,locale);
-    assert.equal(new Set(release.items).size,4,locale);
-    assert.ok(release.items.every(item=>item.trim().length>0),locale);
-    for(const term of ['0.12.0','Chrome 0.11.3','Edge 0.10.2','Firefox 0.11.3','AMO'])
-      assert.ok(release.items[3].includes(term),`${locale}: ${term}`);
+    const releases=dictionaries[locale].documents.releases.slice(0,2);
+    assert.deepEqual(releases.map(({id,date})=>[id,date]),[['0.12.0','2026-10-13'],['0.11.3','2026-10-10']],locale);
+    for(const release of releases){
+      assert.ok(release.title.includes(release.id!),locale);
+      assert.equal(release.items.length,5,locale);
+      assert.equal(new Set(release.items).size,5,locale);
+      assert.ok(release.items.every(item=>item.trim().length>0),locale);
+      assert.doesNotMatch([release.title,...release.items].join(' '),/待商店发布|pending store release|AMO|SHA-256|manifest\.key|Chrome 0\.11\.3|Edge 0\.10\.2/i,locale);
+    }
+    for(const term of ['nunif / waifu2x','EPUB','PDF','ZIP / CBZ','COMIC FUZ','Zebrack','再漫画','Manga One','Hachiraw','MangaTaro','WebtoonScan'])
+      assert.ok(releases[0].items.some(item=>item.includes(term)),`${locale}: ${term}`);
+    for(const term of ['ComicK (comickz)','ComicWalker',"HERO'S Web"])
+      assert.ok(releases[1].items.some(item=>item.includes(term)),`${locale}: ${term}`);
   }
 });
 
