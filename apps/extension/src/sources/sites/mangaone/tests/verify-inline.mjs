@@ -42,10 +42,10 @@ export async function verifyInline({browser, page, activate, button, source, out
     await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('#first').style.content);
     assert.equal(await first.getAttribute('src'), src); assert.deepEqual(await first.boundingBox(), box);
     await button('显示译图'); await translated();
-    // A recycled DOM element must not retain another logical page's translation.
-    await first.evaluate(img => {img.className = 'fixture_cover';});
+    // Generic visibility replaces the former site-class filter.
+    await first.evaluate(img => {img.style.display = 'none';});
     await page.waitForFunction(() => !document.querySelector('#first').style.content);
-    await first.evaluate(img => {img.className = 'fixture_page'; img.alt = '第0页';}); await translated();
+    await first.evaluate(img => {img.style.display = ''; img.className = 'unrelated-class'; img.alt = '第0页';}); await translated();
     await first.evaluate(img => {img.src = URL.createObjectURL(new Blob(['invalid image']));});
     await page.waitForFunction(() => !document.querySelector('#first').style.content);
     assert(await page.locator('#duplicate').evaluate(img => img.style.content.includes('blob:')));
@@ -59,12 +59,12 @@ export async function verifyInline({browser, page, activate, button, source, out
     await activate(); await translated();
     await button('恢复原图'); await page.waitForFunction(() => !document.querySelector('#first').style.content);
     await page.screenshot({path: path.join(out, 'mangaone-fixture-restored.png')});
-    check('Manga One: MIME-less Blob reading, duplicate slots, lazy images, body filtering, recycled elements, failed neighbour, SPA invalidation and exact geometry restoration');
+    check('Manga One generic recognition: MIME-less Blob reading, duplicate slots, lazy images, visibility, recycled elements, failed neighbour, SPA invalidation and exact geometry restoration');
   } finally {await browser.unroute(origin + '/**');}
   if (process.env.RUN_LIVE_MANGAONE !== '1') return {liveSource: false};
 
   const selector = '[class*="_viewer_wrapper"] [data-testid="placeholder"] > img[class*="_page"]';
-  await page.goto(origin + '/manga/659/chapter/359725', {waitUntil: 'domcontentloaded'});
+  await page.goto(origin + '/manga/2275/chapter/207556', {waitUntil: 'domcontentloaded'});
   await page.waitForFunction(selector => [...document.querySelectorAll(selector)].some(img => img.complete && img.naturalWidth), selector, {timeout: 60000});
   const first = page.locator(selector).first();
   const pixels = async img => {

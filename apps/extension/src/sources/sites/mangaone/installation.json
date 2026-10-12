@@ -1,3 +1,4 @@
 {
-  "autoContentMatches": []
+  "autoContentMatches": [],
+  "optionalContentMatches": ["https://manga-one.com/*"]
 }
