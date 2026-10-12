@@ -1,4 +1,8 @@
 {
+  "已占用 {0}": "Kullanılan alan: {0}",
+  "10 GB（默认）": "10 GB (varsayılan)",
+  "同时清理处理记录": "İşlem kayıtlarını da temizle",
+  "清理记录后，再次查看会重新增强；进行中的记录会保留。": "Kayıtlar temizlendikten sonra görseller yeniden görüntülendiğinde tekrar iyileştirilir. Devam eden işlem kayıtları korunur.",
   "图像类型": "Görüntü türü",
   "扫描图": "Taranmış görüntü",
   "照片": "Fotoğraf",

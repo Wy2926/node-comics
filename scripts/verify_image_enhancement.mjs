@@ -23,11 +23,25 @@ await page.addInitScript(()=>{
 });
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
-const first=()=>page.locator('.nc-manga-page[data-page-index="0"]').first();
+const first=(target=page)=>target.locator('.nc-manga-page[data-page-index="0"]').first();
 const read=()=>page.evaluate(()=>({translation:window.channelFixture.requests.length,enhancement:window.channelFixture.enhancements,expected:window.channelFixture.outputSha256,official:window.channelFixture.officialTranslations}));
-const geometry=()=>first().evaluate(element=>{const box=element.querySelector('.nc-page-picture').getBoundingClientRect(),view=document.querySelector('.nc-reading-viewport');return {height:box.height,top:box.top,scroll:view.scrollTop};});
-async function toggle(){await page.getByRole('button',{name:'阅读设置',exact:true}).click();await page.getByRole('switch',{name:'清晰度优化',exact:true}).click();await page.getByRole('button',{name:'阅读设置',exact:true}).click();}
-async function waitWidth(width){await first().locator('img.nc-page-image').last().waitFor();await page.waitForFunction(width=>document.querySelector('.nc-manga-page[data-page-index="0"] .nc-comparison-pane:last-child img.nc-page-image')?.naturalWidth===width,width);}
+const cacheState=()=>page.evaluate(async()=>{
+  const {processingCache}=await import('/src/image-processing/storage.ts');
+  const {sourceDatabaseName}=await import('/src/storage/database.ts');
+  const records=await new Promise((resolve,reject)=>{
+    const opening=indexedDB.open(sourceDatabaseName('image-processing-requests'));
+    opening.onsuccess=()=>{
+      const db=opening.result;
+      if(!db.objectStoreNames.contains('records')){db.close();reject(Error('Missing processing records'));return;}
+      const tx=db.transaction('records'),request=tx.objectStore('records').count();
+      tx.oncomplete=()=>{resolve(request.result);db.close();};tx.onerror=()=>{reject(tx.error);db.close();};
+    };opening.onerror=()=>reject(opening.error);
+  });
+  return {bytes:(await processingCache.usage()).bytes,records};
+});
+const geometry=(target=page)=>first(target).evaluate(element=>{const box=element.querySelector('.nc-page-picture').getBoundingClientRect(),view=document.querySelector('.nc-reading-viewport');return {height:box.height,top:box.top,scroll:view.scrollTop};});
+async function toggle(target=page){await target.getByRole('button',{name:'阅读设置',exact:true}).click();await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await target.getByRole('button',{name:'阅读设置',exact:true}).click();}
+async function waitWidth(width,target=page){await first(target).locator('img.nc-page-image').last().waitFor();await target.waitForFunction(width=>document.querySelector('.nc-manga-page[data-page-index="0"] .nc-comparison-pane:last-child img.nc-page-image')?.naturalWidth===width,width);}
 try {
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
   await page.goto(origin+'/tests/channel-fixture.html#settings');
@@ -36,6 +50,9 @@ try {
   const card=page.locator('.nc-enhancement-settings');
   assert.equal(await card.getByRole('switch').getAttribute('aria-checked'),'false');
   assert.equal(await card.getByRole('switch').isDisabled(),true);
+  assert.equal(await card.getByRole('combobox',{name:'增强缓存',exact:true}).innerText(),'10 GB（默认）');
+  assert.equal(await card.getByRole('checkbox',{name:'同时清理处理记录',exact:true}).isChecked(),true);
+  await card.getByText('已占用 0.0 MB',{exact:true}).waitFor();
   await page.evaluate(()=>{location.hash='library';});
   await page.getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
@@ -44,6 +61,18 @@ try {
   await card.waitFor();
   check('reader explains unconfigured enhancement with a working settings entry');
   await card.getByRole('button',{name:'添加增强渠道'}).click();
+  const dialog=page.getByRole('dialog');
+  assert.equal(await dialog.getByRole('radio',{name:'nunif / waifu2x',exact:true}).isChecked(),true);
+  await dialog.screenshot({path:path.join(out,'form-desktop.png')});
+  const buttons=await dialog.locator('.nc-channel-form-actions .button').evaluateAll(elements=>elements.map(element=>{
+    const {top,bottom,height}=element.getBoundingClientRect();return {top,bottom,height};
+  }));
+  assert.equal(buttons.length,2);assert.deepEqual(buttons[0],buttons[1]);
+  await page.getByLabel('服务地址',{exact:true}).fill('http://user:pass@localhost:8812/');
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await dialog.getByRole('alert').waitFor();
+  assert.equal(await page.getByLabel('服务地址',{exact:true}).inputValue(),'http://user:pass@localhost:8812/');
+  assert.equal((await read()).enhancement.length,0);
   await page.getByLabel('名称',{exact:true}).fill('本机 nunif');
   await page.getByLabel('服务地址',{exact:true}).fill(origin+'/fixture-nunif/');
   await page.getByRole('button',{name:'保存',exact:true}).click();
@@ -108,7 +137,7 @@ try {
   assert.deepEqual(await geometry(),before);
   await page.evaluate(()=>{window.channelFixture.blockedParentJobs=[];});
   check('reopening cached enhancements reads/decodes neither source nor translation, works with unavailable parents, preserves position and sends no POST');
-  await page.evaluate(()=>window.channelFixture.clearProcessingCache());
+  await page.evaluate(()=>window.channelFixture.clearProcessingCache(false));
   await first().getByRole('button',{name:'重试增强'}).waitFor();await waitWidth(baseWidth);
   assert.equal((await read()).enhancement.length,2);
   await page.evaluate(()=>{window.channelFixture.enhancementFail=true;});
@@ -147,12 +176,82 @@ try {
   await page.waitForTimeout(1200);assert.equal((await read()).enhancement.length,count);
   check('turning enhancement off prevents new requests while paging');
   await page.evaluate(()=>{location.hash='settings';});await card.waitFor();
+  assert.equal(await card.getByRole('combobox',{name:'增强缓存',exact:true}).innerText(),'128 MB');
+  const cached=await cacheState();assert(cached.bytes>0);assert(cached.records>0);
+  const used=`已占用 ${(cached.bytes/1024**2).toFixed(1)} MB`;
+  await card.getByText(used,{exact:true}).waitFor();
+  await card.screenshot({path:path.join(out,'cache-used.png')});
+  const clearRecords=card.getByRole('checkbox',{name:'同时清理处理记录',exact:true});
+  await clearRecords.uncheck();
+  await card.getByRole('button',{name:'清理缓存',exact:true}).click();
+  await card.getByText('已占用 0.0 MB',{exact:true}).waitFor();
+  assert.deepEqual(await cacheState(),{bytes:0,records:cached.records});
+  await clearRecords.check();
+  await card.getByRole('button',{name:'清理缓存',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('.nc-enhancement-cache-actions button').disabled);
+  assert.deepEqual(await cacheState(),{bytes:0,records:0});
+  assert.equal((await read()).enhancement.length,count);
+  await card.getByRole('combobox',{name:'增强缓存',exact:true}).click();
+  await page.getByRole('option',{name:'10 GB（默认）',exact:true}).click();
+  await page.waitForFunction(async()=>(await window.channelFixture.readProcessingSettings()).cacheLimitMb===10240);
+  check('10 GB default, actual byte usage, optional record deletion, and saved budget all work through settings controls');
   await page.setViewportSize({width:390,height:844});await card.scrollIntoViewIfNeeded();
   assert.equal(await card.evaluate(element=>element.scrollWidth>element.clientWidth+1),false);
+  await card.locator('.nc-enhancement-cache').screenshot({path:path.join(out,'cache-mobile.png')});
   await card.getByRole('button',{name:'编辑',exact:true}).click();
-  await page.screenshot({path:path.join(out,'settings-mobile.png'),fullPage:true});
+  await page.getByRole('dialog').screenshot({path:path.join(out,'settings-mobile.png')});
   assert.equal(await page.getByRole('dialog').evaluate(element=>element.scrollWidth>element.clientWidth+1),false);
+  await page.getByRole('dialog').getByRole('button',{name:'取消',exact:true}).click();
+  for(const width of [320,390]) {
+    await page.setViewportSize({width,height:844});
+    await clearRecords.uncheck();await clearRecords.check();
+    await card.getByRole('button',{name:'清理缓存',exact:true}).click();
+    assert.equal(await card.evaluate(element=>element.scrollWidth>element.clientWidth+1),false);
+  }
   check('settings and protocol form fit a narrow viewport');
+  for(const completion of ['no_text','unchanged']){
+    const resultPage=await browser.newPage({viewport:{width:1360,height:960}});
+    resultPage.on('pageerror',error=>errors.push(error.message));
+    try{
+      await resultPage.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+      await resultPage.goto(origin+'/tests/reader-fixture.html?auto=enhancement-original&enhancement=1#library');
+      await resultPage.getByRole('button',{name:/^打开漫画 /}).waitFor();
+      const releaseNotes=resultPage.locator('.nc-release-notes[open]');if(await releaseNotes.count())await releaseNotes.locator('.nc-release-close').click();
+      await resultPage.getByRole('button',{name:/^打开漫画 /}).click();
+      const image=first(resultPage);
+      await resultPage.getByRole('button',{name:'翻译',exact:true}).click();
+      await resultPage.waitForFunction(()=>window.readerFixture.submitted.length>=4);
+      await toggle(resultPage);
+      assert.equal(await resultPage.evaluate(()=>window.readerFixture.enhancements.length),0);
+      const beforeOriginal=await geometry(resultPage);
+      await resultPage.evaluate(kind=>{
+        window.readerFixture.enhancementFail=true;
+        window.readerFixture.finishNext(kind);
+      },completion);
+      await image.getByRole('button',{name:'重试增强',exact:true}).waitFor();
+      assert.equal(await image.locator('img.nc-page-image').last().evaluate(element=>element.naturalWidth),640);
+      assert.deepEqual(await geometry(resultPage),beforeOriginal);
+      const requests=await resultPage.evaluate(()=>window.readerFixture.translationRequests.length);
+      await resultPage.evaluate(()=>{window.readerFixture.enhancementFail=false;});
+      await image.getByRole('button',{name:'重试增强',exact:true}).click();
+      await waitWidth(1280,resultPage);
+      const outcome=await resultPage.evaluate(()=>({
+        enhancements:window.readerFixture.enhancements,requests:window.readerFixture.translationRequests.length,
+        originalSha:Object.entries(window.readerFixture.imageOrdinals).find(([,index])=>index===0)[0],
+      }));
+      assert.equal(outcome.enhancements.length,2);
+      assert(outcome.enhancements.every(item=>item.sha256===outcome.originalSha));
+      assert.equal(outcome.requests,requests);assert.deepEqual(await geometry(resultPage),beforeOriginal);
+      await toggle(resultPage);
+      await waitWidth(640,resultPage);
+      await toggle(resultPage);
+      await waitWidth(1280,resultPage);
+      assert.equal(await resultPage.evaluate(()=>window.readerFixture.enhancements.length),2);
+      await resultPage.screenshot({path:path.join(out,completion+'-enhanced.png')});
+      check(completion+' original result enhances only after completion, keeps source on failure, retries without translation and restores from enhancement cache');
+    }catch(error){await resultPage.screenshot({path:path.join(out,completion+'-failed.png')});throw error;}
+    finally{await resultPage.close();}
+  }
   assert.deepEqual(errors,[]);
   await writeFile(path.join(out,'result.json'),JSON.stringify({checks,errors,before,requests:await read()},null,2));
 } catch(error) {

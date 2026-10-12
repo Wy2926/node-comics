@@ -8,13 +8,13 @@ import {readingBatch} from '../src/inline/window';
 const mocks=vi.hoisted(()=>({
   getTab:vi.fn(),tabMessage:vi.fn(),localSettings:vi.fn(),openChannel:vi.fn(),init:vi.fn(),
   automatic:vi.fn(),registerAutomatic:vi.fn(),subscribe:vi.fn(),readImage:vi.fn(),prepareImage:vi.fn(),
-  inlineSize:vi.fn(),rememberOriginal:vi.fn(),enhance:vi.fn(),
+  inlineSize:vi.fn(),rememberOriginal:vi.fn(),readOriginal:vi.fn(),enhance:vi.fn(),
 }));
 vi.mock('../src/i18n/runtime',()=>({msg:(text:string)=>text}));
 vi.mock('../src/inline/auto-tabs',()=>({automaticTabsAllowed:mocks.automatic,registerAutomaticTabs:mocks.registerAutomatic}));
 vi.mock('../src/inline/theme',()=>({registerInlineThemeBackground:()=>{}}));
 vi.mock('../src/inline/originals',()=>({InlineOriginals:class {
-  async read(){} remember=mocks.rememberOriginal; async uploaded(){} clear(){} forget(){}
+  read=mocks.readOriginal; remember=mocks.rememberOriginal; async uploaded(){} clear(){} forget(){}
 }}));
 vi.mock('../src/sources',()=>({
   safeImageUrl:(url:string)=>url.startsWith('https://')?url:undefined,readInlineSourceImage:mocks.readImage,
@@ -60,6 +60,7 @@ beforeEach(async()=>{
   mocks.inlineSize.mockReturnValue(true);
   mocks.rememberOriginal.mockResolvedValue(undefined);
   const image=new Blob(['synthetic inline source'],{type:'image/png'});
+  mocks.readOriginal.mockResolvedValue(image);
   mocks.readImage.mockResolvedValue(image);
   mocks.prepareImage.mockResolvedValue({blob:image,width:500,height:700,imageSha256:'a'.repeat(64)});
   mocks.openChannel.mockImplementation(async(current:()=>boolean)=>{
@@ -94,15 +95,49 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
-  it('waits for the enhancement cache lookup before offering a parent and never reads it on a hit',async()=>{
+  it('enhances confirmed no-text originals only in the two-image window and restores sources on disable',async()=>{
+    const settings:ProcessingSettings={enabled:true,activeId:'local',cacheLimitMb:10240,
+      profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]};
+    mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':settings});
+    const images=Array.from({length:3},(_,i)=>({...request().images[0],id:`page-${i}`}));
+    await send(request(1,images));
+    mocks.enhance.mockImplementation(async(input,_profile,signal,options)=>{
+      await input.validate();const original=await input.load(signal);
+      expect(await original.blob.text()).toBe('synthetic inline source');
+      await options.onParent(original.blob);return new Blob(['enhanced original']);
+    });
+    const job:Job={id:'no-text',status:'no_text',phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:0,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'unchanged',recoverable:true},
+      delivery:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:'a'.repeat(64),width:500,height:700}};
+    await options[0].onJobs([job]);
+    await vi.waitFor(async()=>{
+      const response=await send({...request(1,images),type:'NC_INLINE_WAIT'});
+      expect(response).toMatchObject({ok:true,data:{items:[
+        {resultKey:expect.stringContaining(':enhanced:'),enhancement:{phase:'ready'}},
+        {resultKey:expect.stringContaining(':enhanced:'),enhancement:{phase:'ready'}},{id:'page-2'},
+      ]}});
+      expect((response!.data as InlineResponse).items[2].resultKey).toBeUndefined();
+    });
+    expect(mocks.enhance).toHaveBeenCalledTimes(2);expect(mocks.readOriginal).toHaveBeenCalledTimes(2);
+    expect(channels[0].readResult).not.toHaveBeenCalled();expect(cores[0].manual).not.toHaveBeenCalled();
+    mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{...settings,enabled:false}});
+    for(const notify of storageListeners)notify({'nc-image-processing':{newValue:{...settings,enabled:false}}},'local');
+    await vi.waitFor(()=>{
+      const updates=mocks.tabMessage.mock.calls.filter(([,message])=>message.type==='NC_INLINE_UPDATE');
+      expect(updates.at(-1)?.[1].data.items.every((item:InlineResponse['items'][number])=>!item.resultKey)).toBe(true);
+    });
+    expect(mocks.enhance).toHaveBeenCalledTimes(2);
+  });
+  it.each(['succeeded','no_text'] as const)('waits for the enhancement cache lookup before offering a %s parent and never reads it on a hit',async status=>{
     mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,
       profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]}});
     await send(request());
     const cached=Promise.withResolvers<Blob>(),enhanced=new Blob(['cached enhanced pixels']);
     mocks.enhance.mockImplementation(async input=>{await input.validate();return cached.promise;});
     vi.mocked(channels[0].readResult).mockRejectedValue(Error('Parent unavailable'));
-    await options[0].onJobs([{id:'cached',status:'succeeded',phase:'done',mode:'classic',target_language:'zh-Hans',
-      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'complete',recoverable:true}}]);
+    await options[0].onJobs([{id:'cached',status,phase:'done',mode:'classic',target_language:'zh-Hans',
+      created_at:'2026-01-01T00:00:00Z',version:1,quota_pages:1,cache_hit:false,image_sha256:'a'.repeat(64),result:{key:'complete',recoverable:true},
+      ...(status==='no_text'?{delivery:{kind:'no_text' as const,representation:'original' as const,normalization_version:1 as const,input_sha256:'a'.repeat(64),width:500,height:700}}:{})}]);
     await vi.waitFor(()=>expect(mocks.enhance).toHaveBeenCalledOnce());
     const waiting=await send({...request(),type:'NC_INLINE_WAIT'});
     expect((waiting!.data as {items:{resultKey?:string}[]}).items[0].resultKey).toBeUndefined();
@@ -110,7 +145,14 @@ describe('inline activation lifetime',()=>{
     await vi.waitFor(async()=>expect(await send({...request(),type:'NC_INLINE_WAIT'})).toMatchObject({ok:true,data:{items:[{resultKey:expect.stringContaining(':enhanced:')}]}}));
     const shown=await send({...request(),type:'NC_INLINE_WAIT'}),key=(shown!.data as {items:{resultKey:string}[]}).items[0].resultKey;
     const port=imagePort(key,1);try{await vi.waitFor(()=>expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'image',size:enhanced.size})));}finally{port.close();}
-    expect(channels[0].readResult).not.toHaveBeenCalled();expect(cores[0].manual).not.toHaveBeenCalled();
+    expect(channels[0].readResult).not.toHaveBeenCalled();expect(mocks.readOriginal).not.toHaveBeenCalled();expect(cores[0].manual).not.toHaveBeenCalled();
+  });
+  it('rejects a recovered source that no longer matches the completed original identity',async()=>{
+    await send(request());
+    const restore=mocks.rememberOriginal.mock.calls[0][2];
+    mocks.prepareImage.mockResolvedValue({blob:new Blob(['changed original']),width:500,height:700,imageSha256:'b'.repeat(64)});
+    await expect(restore()).rejects.toThrow('原图内容已变化');
+    expect(mocks.enhance).not.toHaveBeenCalled();expect(channels[0].readResult).not.toHaveBeenCalled();
   });
   it('enhances completed full translations, returns base first, and retries enhancement without retranslating',async()=>{
     mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'},'nc-image-processing':{enabled:true,activeId:'local',cacheLimitMb:512,

@@ -8,8 +8,22 @@ import {settings} from '../src/comics/application/preferences';
 const origin='https://api.example',scope=JSON.stringify([origin,'alice']);
 const job=(id:string,status:Job['status'],created:number,extra:Partial<Job>={}):Job=>({id,status,created_at:`2026-09-14T00:00:0${created}Z`,result:status==='succeeded'?{key:`result-${id}`,recoverable:true}:undefined,mode:'classic',target_language:'zh-Hans',phase:'queued',quota_pages:1,version:created,cache_hit:false,...extra});
 const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),translationScope:scope,jobs,outputBlobs:{first:'local-first',second:'local-second'}});
+const noText=()=>job('no-text','no_text',3,{result:{key:'no-text',recoverable:true},result_available:true,
+  delivery:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:'a'.repeat(64),width:800,height:1200}});
 afterEach(()=>vi.unstubAllGlobals());
 describe('per-page display',()=>{
+  it('makes a confirmed unchanged original eligible for enhancement without materializing a translation',()=>{
+    const original=noText(),p={...page([original]),blobKey:'original'};
+    expect(readingImage(p,'classic',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined,originalResult:original});
+    expect(readingImage(p,'classic',false,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
+  });
+  it('does not treat pending, failed, revoked or other-scope no-text results as enhanceable translations',()=>{
+    const original=noText(),p={...page([original]),blobKey:'original'};
+    for(const extra of [{status:'running'},{status:'failed'},{result_expired:true},{result_available:false},{result:undefined},{delivery:undefined}] as Partial<Job>[])
+      expect(readingImage({...p,jobs:[{...original,...extra}]},'classic',true,'zh-Hans',scope).originalResult).toBeUndefined();
+    for(const [language,key] of [['en',scope],['zh-Hans','another-account']])
+      expect(readingImage(p,'classic',true,language,key).originalResult).toBeUndefined();
+  });
   it('honors explicit original viewing even after translation finishes',()=>{
     const p={...page([job('first','succeeded',1)]),blobKey:'original'};
     expect(readingImage(p,'classic',false,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
@@ -22,6 +36,13 @@ describe('per-page display',()=>{
   });
 });
 describe('latest effect selection',()=>{
+  it('lets a newer no-text result replace an old translation without downloading that old version',()=>{
+    const original=noText(),p={...page([job('first','succeeded',1),original,job('next','running',4)]),blobKey:'original'};
+    expect(readingImage(p,'classic',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined,originalResult:original});
+    expect(latestResults(p.jobs)).toEqual([]);
+    original.result_expired=true;
+    expect(readingImage(p,'classic',true,'zh-Hans',scope)).toEqual({key:'original',job:undefined});
+  });
   it('displays local delivered bytes without a NodeLane account or asset id',()=>{
     const local=page([job('first','succeeded',1,{result:{key:'local-request',recoverable:false}})]);
     expect(pageTranslation(local,'classic','zh-Hans',scope)).toMatchObject({ready:true,expired:false});

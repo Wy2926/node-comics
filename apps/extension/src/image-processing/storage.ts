@@ -1,10 +1,10 @@
 import {ByteCache, type CacheToken} from '../storage/cache';
 import {openSourceDatabase} from '../storage/database';
-import {readProcessingSettings, subscribeProcessingSettings, updateProcessingSettings} from './settings';
+import {defaultProcessingCacheLimitMb, readProcessingSettings, subscribeProcessingSettings, updateProcessingSettings} from './settings';
 import {readTransferReceipt, removeTransferReceipts, releaseTransferBytes} from '../image-transfer/receipts';
 import {registerTransferFinalizer, type ImageTransferReceipt} from '../image-transfer/types';
 
-export const processingCache = new ByteCache({name: 'image-processing-results', budgetBytes: 512 * 1024 * 1024});
+export const processingCache = new ByteCache({name: 'image-processing-results', budgetBytes: defaultProcessingCacheLimitMb * 1024 * 1024});
 export interface ProcessingRecord {
   id: string; lookupKey: string; owner: string; profileId: string; requestId: string;
   state: 'running' | 'succeeded' | 'failed'; errorCode?: string; token: CacheToken;
@@ -104,9 +104,25 @@ export async function finalizeProcessingReceipt(receipt: ImageTransferReceipt) {
   else await run();
 }
 registerTransferFinalizer(finalizeProcessingReceipt);
-export async function clearProcessingCache() {
+export async function clearProcessingCache(clearRecords = true) {
   await processingCache.clear();
-  // Keep receipts: losing cached bytes must never silently rerun an image service.
+  if (clearRecords) {
+    // Page through metadata only. Running work and uncertain service lanes must survive a clear.
+    let after: string | undefined;
+    for (;;) {
+      const records = await transaction<ProcessingRecord[]>('records', 'readwrite', store => {
+        const request = store.getAll(after ? IDBKeyRange.lowerBound(after, true) : undefined, 100);
+        request.onsuccess = () => {
+          // Read and delete atomically so a manual retry cannot replace a record between them.
+          for (const record of request.result as ProcessingRecord[]) if (record.state !== 'running') store.delete(record.id);
+        };
+        return request;
+      });
+      if (!records.length) break;
+      await removeTransferReceipts(records.filter(record => record.state !== 'running').map(record => record.requestId));
+      after = records[records.length - 1].id;
+    }
+  }
   await updateProcessingSettings(value => ({...value, cacheRevision: crypto.randomUUID()}));
 }
 async function removeRecords(index: 'owner' | 'profileId', value: string) {

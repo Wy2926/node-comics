@@ -1,4 +1,8 @@
 {
+  "已占用 {0}": "Espaço usado: {0}",
+  "10 GB（默认）": "10 GB (padrão)",
+  "同时清理处理记录": "Limpar também os registros de processamento",
+  "清理记录后，再次查看会重新增强；进行中的记录会保留。": "Após limpar os registros, as imagens serão melhoradas novamente ao serem visualizadas. Os registros em andamento são mantidos.",
   "图像类型": "Tipo de imagem",
   "扫描图": "Imagem digitalizada",
   "照片": "Foto",

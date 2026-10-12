@@ -1,4 +1,8 @@
 {
+  "已占用 {0}": "Đã dùng: {0}",
+  "10 GB（默认）": "10 GB (mặc định)",
+  "同时清理处理记录": "Xóa cả bản ghi xử lý",
+  "清理记录后，再次查看会重新增强；进行中的记录会保留。": "Sau khi xóa bản ghi, ảnh sẽ được cải thiện lại khi xem lần sau. Bản ghi đang xử lý vẫn được giữ lại.",
   "图像类型": "Loại ảnh",
   "扫描图": "Ảnh quét",
   "照片": "Ảnh chụp",

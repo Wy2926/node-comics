@@ -158,7 +158,7 @@ function cancelSources(ctx:Context,keepIds:readonly string[]){
   for(const [id,work] of ctx.enhancements)if(!keepIds.slice(0,2).includes(id)){work.controller.abort();ctx.enhancements.delete(id);}
 }
 
-/** Only completed, full translated images enter enhancement. Originals never leave this path. */
+/** Only completed results enter enhancement; a no-text result uses the unchanged source. */
 function scheduleEnhancements(ctx:Context) {
   const view=ctx.window,profile=ctx.processing;
   if(!profile||!view||!ctx.active||!view.activity.current())return;
@@ -181,7 +181,7 @@ function scheduleEnhancements(ctx:Context) {
         const latest=ctx.pages.get(pageKey(view.request,image)),selected=latest&&pageResult(ctx,latest);
         assertCurrent(()=>!signal.aborted&&ctx.active&&view.activity.current()&&ctx.channel.isCurrent()&&selected?.id===job.id&&selected.result?.key===job.result?.key);
       },
-      async load(signal){return {blob:await ctx.channel.readResult(job,signal,()=>page.blobKey?ctx.originals.read(page.blobKey,signal):Promise.resolve(undefined)),release(){}};},
+      async load(signal){return {blob:await readPageResult(ctx,page,job,signal),release(){}};},
     },profile,signal,{retry,onParent:blob=>{if(!signal.aborted){work.parent=blob;publish(ctx);}},onState:state=>{
       if(!signal.aborted){work.state=state;publish(ctx);}
     }}).then(blob=>{
@@ -227,7 +227,11 @@ async function prepareOne(ctx:Context,request:InlineRequest,image:InlineRequest[
       const page:Page={...emptyPage(msg('网页漫画'),width,height),imageSha256,id:imageSha256,imageByteSize:blob.size,imageMime:blob.type,blobKey:'inline-original:'+ctx.channel.scope.key+':'+imageSha256,translationScope:ctx.channel.scope.key};
       page.jobs=ctx.jobs.filter(job=>matchesPage(page,job));ctx.pages.set(key,page);ctx.sourceErrors.delete(key);
       // Keep the upload original while local history is read; neither waits for the service.
-      await Promise.all([ctx.originals.remember(page.blobKey!,blob,async signal=>(await readInlineSource(ctx,request,image,sender,signal)).blob),ctx.core?.restore([{entryId:'inline',page,mode:'classic'}])]);
+      await Promise.all([ctx.originals.remember(page.blobKey!,blob,async signal=>{
+        const restored=await readInlineSource(ctx,request,image,sender,signal);
+        if(restored.imageSha256!==imageSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
+        return restored.blob;
+      }),ctx.core?.restore([{entryId:'inline',page,mode:'classic'}])]);
       assertCurrent(current);
       if(ctx.pages.size>200){const oldest=ctx.pages.keys().next().value!,old=ctx.pages.get(oldest);ctx.pages.delete(oldest);if(old?.blobKey&&![...ctx.pages.values()].some(value=>value.blobKey===old.blobKey))ctx.originals.forget(old.blobKey);}
     }catch(error){
@@ -263,7 +267,16 @@ function submitPrepared(ctx:Context):Promise<void>{
 const resultScope=(ctx:Context)=>JSON.stringify([ctx.channel.scope.key,'classic',ctx.settings.language]);
 function pageResult(ctx:Context,page:Page){
   const current=pageTranslation(page,'classic',ctx.settings.language,ctx.channel.scope.key);
-  return current.result&&!current.expired?current.result:undefined;
+  return current.result&&!current.expired?current.result:current.original;
+}
+async function readPageResult(ctx:Context,page:Page,job:Job,signal:AbortSignal){
+  const original=()=>page.blobKey?ctx.originals.read(page.blobKey,signal):Promise.resolve(undefined);
+  if(job.status==='no_text'){
+    const blob=await original();
+    if(!blob)throw Error(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
+    return blob;
+  }
+  return ctx.channel.readResult(job,signal,original);
 }
 function response(ctx:Context,request:InlineRequest):InlineResponse{
   const mode='classic',language=ctx.settings.language,scope=resultScope(ctx);
@@ -284,7 +297,7 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
     const item:InlineResult={id:image.id,pending:!!pageTranslation(page,mode,language,ctx.channel.scope.key).pending||
       waiting&&!result};
     const enhanced=ctx.enhancements.get(image.id);
-    if(result?.result&&(!ctx.missingResults.has(result.id)||enhanced)){
+    if(result?.result&&(result.status!=='no_text'||enhanced)&&(!ctx.missingResults.has(result.id)||enhanced)){
       item.resultKey=JSON.stringify([scope,result.id,result.result.key]);item.resultMode=result.mode;
       if(enhanced?.key===item.resultKey){
         item.enhancement=enhanced.state;
@@ -319,7 +332,7 @@ async function imageResponse(request:InlineRequest,sender:chrome.runtime.Message
     throw notReady();
   }
   let blob:Blob;
-  try{await ctx.channel.validateResult();blob=output??await ctx.channel.readResult(job,AbortSignal.any([signal,ctx.abort.signal]),async()=>page?.blobKey?ctx.originals.read(page.blobKey,signal):undefined);}catch(error){
+  try{await ctx.channel.validateResult();blob=output??await readPageResult(ctx,page,job,AbortSignal.any([signal,ctx.abort.signal]));}catch(error){
     if((error as {code?:string}).code==='RESULT_NOT_CACHED'&&current()&&page){ctx.missingResults.add(job.id);ctx.pages.set(pageKey(request,request.images[0]),{...page,translationError:(error as Error).message});}
     throw error;
   }

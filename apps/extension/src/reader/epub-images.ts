@@ -117,8 +117,9 @@ export class EpubImageWindow {
     this.enhanceable.clear();
     this.desired = new Map(pages.flatMap(page => {
       const result = readingImage(page, mode, translated, language, scope);
-      if (result.key && (!translated || result.job)) this.enhanceable.add(page.id);
-      return result.key && (result.job || this.profile && !translated) ? [[page.id, result.key]] : [];
+      const complete = !translated || !!result.job || !!result.originalResult;
+      if (result.key && complete) this.enhanceable.add(page.id);
+      return result.key && (result.job || this.profile && complete) ? [[page.id, result.key]] : [];
     }));
     this.apply();
   }

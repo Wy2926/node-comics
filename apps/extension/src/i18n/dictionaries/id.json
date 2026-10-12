@@ -1,4 +1,8 @@
 {
+  "已占用 {0}": "Terpakai: {0}",
+  "10 GB（默认）": "10 GB (default)",
+  "同时清理处理记录": "Hapus juga catatan pemrosesan",
+  "清理记录后，再次查看会重新增强；进行中的记录会保留。": "Setelah catatan dihapus, gambar akan ditingkatkan lagi saat dilihat kembali. Catatan proses yang sedang berjalan tetap disimpan.",
   "图像类型": "Jenis gambar",
   "扫描图": "Gambar hasil pindai",
   "照片": "Foto",

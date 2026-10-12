@@ -51,6 +51,21 @@ function visible(images:Element[],at:number) {intersect(images.map((target,i)=>(
 describe('EPUB embedded image window', () => {
   const processing = () => ({owner:'entry-a',settings:{enabled:true,activeId:'local',cacheLimitMb:512,
     profiles:[{id:'local',adapterId:'nunif',revision:1,name:'Local',settings:{url:'http://localhost/'}}]}});
+  it('enhances unchanged originals after no-text completion and restores them when disabled',async()=>{
+    const {document,images}=artwork(),window=new EpubImageWindow(vi.fn(),vi.fn());window.add(document);visible(images,0);
+    const pages=images.map(image=>{
+      const value=page(image.getAttribute('data-nc-epub-image')!);
+      return {...value,outputBlobs:{},jobs:value.jobs.map(job=>({...job,status:'no_text' as const,
+        delivery:{kind:'no_text' as const,representation:'original' as const,normalization_version:1 as const,input_sha256:'a'.repeat(64),width:240,height:360}}))};
+    });
+    window.show(pages,true,'classic','en','account-a',processing());
+    await vi.waitFor(()=>expect(window.enhancementState('OPS/0.png')?.phase).toBe('ready'));
+    expect(mocks.enhance.mock.calls.map(([input])=>input.key)).toEqual(['source:OPS/0.png','source:OPS/1.png']);
+    expect(images[0].getAttribute('src')).toMatch(/^blob:translated/);
+    expect(images[0].getAttribute('width')).toBe('240');expect(images[0].getAttribute('height')).toBe('360');
+    window.show(pages,true,'classic','en','account-a',{...processing(),settings:{...processing().settings,enabled:false}});
+    expect(images[0].getAttribute('src')).toBe('blob:original-0');expect(mocks.enhance).toHaveBeenCalledTimes(2);window.close();
+  });
   it('displays a warm enhancement without reading a parent or waiting for the original element to load',async()=>{
     mocks.enhance.mockResolvedValue(new Blob(['cached enhancement']));mocks.acquire.mockRejectedValue(Error('Parent unavailable'));
     const {document,images}=artwork(['OPS/0.png']),window=new EpubImageWindow(vi.fn(),vi.fn());

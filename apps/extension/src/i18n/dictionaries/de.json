@@ -1,4 +1,8 @@
 {
+  "已占用 {0}": "Belegt: {0}",
+  "10 GB（默认）": "10 GB (Standard)",
+  "同时清理处理记录": "Auch Verarbeitungsprotokolle löschen",
+  "清理记录后，再次查看会重新增强；进行中的记录会保留。": "Nach dem Löschen der Protokolle werden Bilder beim nächsten Ansehen erneut optimiert. Laufende Vorgänge bleiben erhalten.",
   "图像类型": "Bildtyp",
   "扫描图": "Gescanntes Bild",
   "照片": "Foto",

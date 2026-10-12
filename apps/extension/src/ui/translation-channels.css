@@ -237,6 +237,45 @@
   border-top: 1px solid var(--line);
 }
 
+.nc-enhancement-cache {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.nc-enhancement-cache-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding-top: 18px;
+}
+.nc-enhancement-cache-actions > div {
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+.nc-enhancement-cache-actions > .button {
+  flex: none;
+}
+.nc-enhancement-clear-records {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-small);
+  cursor: pointer;
+  min-height: 44px;
+}
+.nc-enhancement-clear-records > input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.nc-enhancement-cache-actions .nc-muted {
+  margin: 4px 0 0;
+  font-size: var(--text-caption);
+}
+
 @media (max-width: 700px) {
   .nc-channel-card {
     padding: 14px;

@@ -3,8 +3,8 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {decodedImage, transferLocks} from './channel-transfer-fixture';
 import {nunifAdapter} from '../src/image-processing/adapters/nunif';
 import {enhanceImage} from '../src/image-processing/runtime';
-import {activeProcessingProfile, processingDefaults, processingIdentity, saveProcessingProfile, readProcessingSettings, updateProcessingSettings} from '../src/image-processing/settings';
-import {clearProcessingCache, removeProcessingOwner, removeProcessingProfile, processingCache, readServiceLane,findProcessingRecord} from '../src/image-processing/storage';
+import {activeProcessingProfile, normalizeSettings, processingDefaults, processingIdentity, saveProcessingProfile, readProcessingSettings, updateProcessingSettings} from '../src/image-processing/settings';
+import {clearProcessingCache, removeProcessingOwner, removeProcessingProfile, processingCache, readServiceLane,findProcessingRecord,saveProcessingRecord} from '../src/image-processing/storage';
 import {readTransferReceipt,saveTransferReceipt,trimTransferReceipts} from '../src/image-transfer/receipts';
 import {hashFile} from '../src/importers/hash';
 import type {ProcessingProfile} from '../src/image-processing/contracts';
@@ -49,6 +49,14 @@ it('owns the exact nunif protocol and rejects credential-bearing URLs or invalid
     expect(() => adapter.normalize({url})).toThrow();
   expect(() => adapter.normalize({url:'http://localhost',scale:'4'})).toThrow();
 });
+it('defaults enhancement cache to 10 GB without replacing valid saved budgets', async () => {
+  expect(processingDefaults().cacheLimitMb).toBe(10240);
+  for (const cacheLimitMb of [128, 512, 1024, 10240]) {
+    await updateProcessingSettings(value => ({...value, cacheLimitMb}));
+    expect((await readProcessingSettings()).cacheLimitMb).toBe(cacheLimitMb);
+  }
+  for (const cacheLimitMb of [undefined, -1, 0, NaN, 2048]) expect(normalizeSettings({cacheLimitMb}).cacheLimitMb).toBe(10240);
+});
 it('invalidates display only for effective profile changes or an explicit cache clear', async () => {
   const profile = await selected(), before = processingIdentity(await readProcessingSettings());
   await saveProcessingProfile(profile.adapterId, 'Renamed', profile.settings, profile.id);
@@ -88,10 +96,56 @@ it('uses stable parent identity without reopening bytes, and isolates account, l
 });
 it('does not rerun after cache eviction or clearing without an explicit enhancement retry', async () => {
   const profile = await selected(), original = input(), fetcher = vi.fn(async () => output()); vi.stubGlobal('fetch', fetcher);
-  await enhanceImage(original,profile,signal()); await clearProcessingCache();
+  await enhanceImage(original,profile,signal()); await clearProcessingCache(false);
   await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'RESULT_MISSING'});
   expect(fetcher).toHaveBeenCalledOnce();
   await enhanceImage(original,profile,signal(),{retry:true}); expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('clears finished records and their receipts by default, allowing fresh enhancement without blocking the service', async () => {
+  const profile = await selected(), original = input(), fetcher = vi.fn(async () => output()); vi.stubGlobal('fetch', fetcher);
+  await enhanceImage(original,profile,signal());
+  const lookup = await hashFile(new Blob([JSON.stringify([original.owner,original.key,profile.id,profile.revision])]));
+  const record = (await findProcessingRecord(lookup))!;
+  expect((await processingCache.usage()).bytes).toBeGreaterThan(0);
+  const unrelatedId = crypto.randomUUID();
+  await saveTransferReceipt({... (await readTransferReceipt(record.requestId))!, id: unrelatedId, scope: 'translation:unrelated'});
+  await clearProcessingCache();
+  expect((await processingCache.usage()).bytes).toBe(0);
+  expect(await findProcessingRecord(lookup)).toBeUndefined();
+  expect(await readTransferReceipt(record.requestId)).toBeUndefined();
+  expect(await readTransferReceipt(unrelatedId)).toBeDefined();
+  await enhanceImage(original,profile,signal());
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('clears failed records in bounded batches and is safe to repeat', async () => {
+  const owner = crypto.randomUUID(), token = await processingCache.token(owner), records = Array.from({length: 105}, (_, index) => ({
+    id: `${owner}:${index}`, lookupKey: `${owner}:${index}`, owner, profileId: owner, requestId: crypto.randomUUID(), state: 'failed' as const, token,
+  }));
+  for (const record of records) await saveProcessingRecord(record);
+  await clearProcessingCache(); await clearProcessingCache();
+  for (const record of records) expect(await findProcessingRecord(record.lookupKey)).toBeUndefined();
+});
+it('keeps running records during a full clear, fences late output and never repeats the accepted request', async () => {
+  const profile = await selected(), original = input(), pending = Promise.withResolvers<Response>();
+  const fetcher = vi.fn(() => pending.promise); vi.stubGlobal('fetch', fetcher);
+  const work = enhanceImage(original,profile,signal()), failed = expect(work).rejects.toMatchObject({code:'RESULT_MISSING'});
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+  const lookup = await hashFile(new Blob([JSON.stringify([original.owner,original.key,profile.id,profile.revision])]));
+  const record = (await findProcessingRecord(lookup))!;
+  await clearProcessingCache();
+  expect((await findProcessingRecord(lookup))?.requestId).toBe(record.requestId);
+  expect(await readTransferReceipt(record.requestId)).toBeDefined();
+  pending.resolve(output()); await failed;
+  expect((await processingCache.usage()).bytes).toBe(0);
+  await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'RESULT_MISSING'});
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+it('does not erase uncertain service protection when clearing processing records', async () => {
+  const profile = await selected(), original = input(), fetcher = vi.fn(async () => {throw Error('network lost');}); vi.stubGlobal('fetch', fetcher);
+  await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'INTERRUPTED'});
+  await clearProcessingCache();
+  await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'INTERRUPTED'});
+  expect(fetcher).toHaveBeenCalledOnce();
 });
 it('delivers once when disk admission fails, then reports missing cache without repeating the service',async()=>{
   const profile=await selected(),original=input(),fetcher=vi.fn(async()=>output());vi.stubGlobal('fetch',fetcher);

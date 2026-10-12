@@ -4,8 +4,10 @@ import {requireHostAccess} from '../host-permissions';
 import {msg} from '../i18n/runtime';
 
 export const processingSettingsKey = 'nc-image-processing';
+export const processingCacheLimitsMb = [128, 512, 1024, 10240];
+export const defaultProcessingCacheLimitMb = 10240;
 export interface ProcessingSettings {enabled: boolean; activeId: string; profiles: ProcessingProfile[]; cacheLimitMb: number; cacheRevision?: string;}
-export const processingDefaults = (): ProcessingSettings => ({enabled: false, activeId: '', profiles: [], cacheLimitMb: 512});
+export const processingDefaults = (): ProcessingSettings => ({enabled: false, activeId: '', profiles: [], cacheLimitMb: defaultProcessingCacheLimitMb});
 const listeners = new Set<() => void>();
 export function normalizeSettings(value: unknown): ProcessingSettings {
   if (!value || typeof value !== 'object') return processingDefaults();
@@ -15,7 +17,7 @@ export function normalizeSettings(value: unknown): ProcessingSettings {
     && profile.revision > 0 && profile.settings && typeof profile.settings === 'object'
     && Object.values(profile.settings).every(value => typeof value === 'string')) : [];
   return {enabled: input.enabled === true, activeId: profiles.some(profile => profile.id === input.activeId) ? input.activeId : '', profiles,
-    cacheLimitMb: [128, 512, 1024].includes(input.cacheLimitMb) ? input.cacheLimitMb : 512,
+    cacheLimitMb: processingCacheLimitsMb.includes(input.cacheLimitMb) ? input.cacheLimitMb : defaultProcessingCacheLimitMb,
     ...(typeof input.cacheRevision === 'string' ? {cacheRevision: input.cacheRevision} : {})};
 }
 export async function readProcessingSettings(): Promise<ProcessingSettings> {

@@ -16,21 +16,26 @@ export function readingImage(page:Page,mode:Mode,translated:boolean,language:str
   if(translated){
     const target=pageTranslation(page,mode,language,scopeKey);
     if(target.blobKey)return {key:target.blobKey,job:target.result};
+    // A confirmed no-text result is complete even though there is nothing to compose.
+    if(target.original)return {key:page.blobKey,job:undefined,originalResult:target.original};
   }
   return {key:page.blobKey,job:undefined};
 }
 
-export function latestResults(jobs:Job[]){const seen=new Set<string>();return newestFirst(jobs).filter(job=>{const key=`${job.mode}:${job.target_language}`;if(job.status!=='succeeded'||seen.has(key))return false;seen.add(key);return true;});}
+export function latestResults(jobs:Job[]){const seen=new Set<string>();return newestFirst(jobs).filter(job=>{const key=`${job.mode}:${job.target_language}`;if(!['succeeded','no_text'].includes(job.status)||seen.has(key))return false;seen.add(key);return job.status==='succeeded';});}
 export function pageTranslation(page:Page,mode:Mode,language:string,scopeKey?:string){
   const jobs=scopeKey&&page.translationScope===scopeKey?newestFirst(page.jobs.filter(j=>j.mode===mode&&j.target_language===language)):[];
   const latest=jobs[0];
   // Keep the latest delivered identity after revocation. Never fall back to older versions.
-  const result=jobs.find(j=>j.status==='succeeded');
+  const delivered=jobs.find(j=>j.status==='succeeded'||j.status==='no_text');
+  const result=delivered?.status==='succeeded'?delivered:undefined;
+  const original=delivered?.status==='no_text'&&delivered.result&&delivered.delivery?.representation==='original'
+    &&!delivered.result_expired&&delivered.result_available!==false?delivered:undefined;
   const pending=jobs.find(j=>pendingStatuses.has(j.status));
   const blobKey=result?page.outputBlobs[result.id]:undefined;
   const expired=!!result&&!blobKey&&(!result.result||result.result_expired===true||result.result_available===false);
   const ready=!!blobKey;
-  return {jobs,latest,result,pending,blobKey,expired,ready};
+  return {jobs,latest,result,original,pending,blobKey,expired,ready};
 }
 /** Explicit reruns only; image-loading recovery and uncertain requests keep their existing actions. */
 export function canRetryPage(translation:ReturnType<typeof pageTranslation>,state?:TranslationState){

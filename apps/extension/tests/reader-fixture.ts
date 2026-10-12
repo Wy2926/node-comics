@@ -4,9 +4,15 @@ import {API_ORIGIN} from '../src/service';
 import {defaults,type Job,type Entitlements,type TranslationInput,type TranslationSnapshot} from '../src/types';
 import {saveSettings} from '../src/comics/application/preferences';
 import {seedReaderFixture} from './reader-fixture-data';
+import {saveProcessingProfile,updateProcessingSettings} from '../src/image-processing/settings';
+import {hashFile} from '../src/importers/hash';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a new profile on the isolated http://127.0.0.1:5176 origin.');
 const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScenario=parameters.get('auto');
+if(parameters.has('enhancement')){
+  await saveProcessingProfile('nunif','Fixture enhancement',{url:location.origin+'/fixture-nunif/'});
+  await updateProcessingSettings(value=>({...value,enabled:false}));
+}
 await saveSettings({...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
 await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:autoScenario?'fixture-'+autoScenario:'fixture-reader',name:'隔离阅读验收',role:'reader'},apiOrigin:origin});
 const originalFetch=window.fetch.bind(window);
@@ -27,11 +33,23 @@ if(autoScenario==='lite')rights.modes.classic={...rights.modes.classic,unlimited
 const activeCount=()=>[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length;
 for(const copy of stored)for(const page of copy.pages)for(const job of page.jobs)Object.assign(job,{image_sha256:page.imageSha256});
 
-const state={modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status='succeeded';state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
+const state={modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,enhancements:[] as {sha256:string;bytes:number;width:number;height:number}[],enhancementFail:false,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(status:'succeeded'|'no_text'|'unchanged'='succeeded'){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status=status==='unchanged'?'succeeded':status;if(status==='unchanged')next.delivery={kind:'translated',representation:'original',normalization_version:1,input_sha256:next.image_sha256!,width:640,height};state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
   const url=new URL(String(input),origin);if(url.origin!==origin&&url.origin!==location.origin)throw Error('External requests disabled in this fixture.');
+  if(url.pathname==='/fixture-nunif/api'){
+    const image=(init.body as FormData).get('file') as Blob,bitmap=await createImageBitmap(image);
+    state.enhancements.push({sha256:await hashFile(image),bytes:image.size,width:bitmap.width,height:bitmap.height});
+    try{
+      if(state.enhancementFail)return new Response('Synthetic enhancement failure',{status:503});
+      const canvas=new OffscreenCanvas(bitmap.width*2,bitmap.height*2);
+      try{
+        canvas.getContext('2d')!.drawImage(bitmap,0,0,canvas.width,canvas.height);
+        return new Response(await canvas.convertToBlob({type:'image/png'}));
+      }finally{canvas.width=canvas.height=1;}
+    }finally{bitmap.close();}
+  }
   if(!url.pathname.startsWith('/v1/'))return originalFetch(input,init);
   state.requests.push(url.pathname);
   if(state.delay)await new Promise(r=>setTimeout(r,state.delay));
@@ -45,7 +63,7 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   const snapshot=(id:string):TranslationSnapshot|undefined=>{
     const j=jobs.get(operations.get(id)??id);if(!j)return;
-    return {id,model:j.model,requested_model_id:j.requested_model_id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?overlay.result(id,j.image_sha256!):null};
+    return {id,model:j.model,requested_model_id:j.requested_model_id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?(j.delivery??overlay.result(id,j.image_sha256!)):null};
   };
   if(url.pathname==='/v1/translations/events'){
     const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};

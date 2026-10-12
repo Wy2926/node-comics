@@ -5,7 +5,7 @@ import {Icon} from '../icons';
 import {Modal} from './components';
 import './translation-channels.css';
 
-function ChannelGuide({url}:{url?:string}){
+export function ChannelGuide({url}:{url?:string}){
   if(!url)return null;
   return <a className="text-link nc-channel-guide" href={url} target="_blank" rel="noopener noreferrer">
     <Icon name="book" size={16}/>
