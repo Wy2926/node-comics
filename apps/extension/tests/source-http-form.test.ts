@@ -34,6 +34,27 @@ afterEach(() => {vi.unstubAllGlobals();});
 
 describe('bounded source binary POST', () => {
   const body = new Uint8Array([0, 128, 255, 10]);
+  it('reads binary GET without POST headers or text replay', async () => {
+    const replay = [{url: endpoint, referer: source, body: 'GET text replay'}];
+    fetcher.mockResolvedValueOnce(new Response(body));
+    expect(await createSourceNetworkContext(undefined, replay).requestBytes!(endpoint, {referer: source})).toEqual(body);
+    expect(fetcher.mock.calls[0][1]).toMatchObject({headers: {Accept: 'application/octet-stream'}});
+    expect(fetcher.mock.calls[0][1]).not.toHaveProperty('body');
+    expect(fetcher.mock.calls[0][1]).not.toHaveProperty('method');
+    expect(fetcher.mock.calls[0][1]?.headers).not.toHaveProperty('Content-Type');
+    expect(replay).toHaveLength(1);
+  });
+  it('reads binary form responses using the existing UTF-8 encoder and budgets', async () => {
+    fetcher.mockResolvedValueOnce(new Response(body));
+    const context = createSourceNetworkContext();
+    expect(await context.requestBytes!(endpoint, {referer: source, form: {name: '日本語 + &'}})).toEqual(body);
+    expect(fetcher.mock.calls[0][1]).toMatchObject({method: 'POST', body: 'name=%E6%97%A5%E6%9C%AC%E8%AA%9E+%2B+%26',
+      headers: {Accept: 'application/octet-stream', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'}});
+    fetcher.mockClear();
+    await expect(context.requestBytes!(endpoint, {referer: source, form: {a: '日'.repeat(120000)}})).rejects.toMatchObject({kind: 'request-denied'});
+    await expect(context.requestBytes!(endpoint, {referer: source, form: {}, body})).rejects.toMatchObject({kind: 'request-denied'});
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it('roundtrips bytes, copies input, and does not consume GET replay', async () => {
     const replay = [{url: endpoint, referer: source, body: 'GET replay'}];
     fetcher.mockResolvedValueOnce(new Response(new Uint8Array([255, 0, 128])));

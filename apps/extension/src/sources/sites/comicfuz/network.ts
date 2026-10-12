@@ -3,7 +3,7 @@ import type {SourceCatalogSnapshot, SourceSnapshot} from '../../contracts/source
 import type {SourceSearchPage} from '../../contracts/search';
 import {catalogKey, catalogUrl, chapterKey, chapterUrl, origin} from './definition';
 import {cover, id, imageId, imageUrl, label, list, nextData, object, sourceLocation} from './data';
-import {bytes, decode, encode, invalid, messages, number, text} from './protobuf';
+import {bytes, decode, encode, invalid, messages, number, text} from '../../shared/protobuf';
 
 export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const loc = sourceLocation(url), data = nextData(html, loc.manga), manga = object(data.manga);

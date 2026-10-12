@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {definition, chapterUrl} from '../definition';
 import {network, parseCatalog, parsePages, parseSearch, viewerRequest} from '../network';
-import {bytes, decode, encode, number} from '../protobuf';
+import {bytes, decode, encode, number} from '../../../shared/protobuf';
 import {image} from '../image';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
@@ -132,7 +132,7 @@ describe('COMIC FUZ binary API and page manifest', () => {
     const response = encode([2, row], [6, 2]), request = vi.fn(), requestBytes = vi.fn<NonNullable<SourceNetworkContext['requestBytes']>>(async () => response);
     const result = await network.search({siteId: 'comicfuz', query: ' Manga '}, {request, requestBytes});
     expect(result.nextCursor).toBe('2'); expect(result.items[0].catalogUrl).toBe(workUrl);
-    expect(number(decode(requestBytes.mock.calls[0][1].body), 4)).toBe(1); expect(request).not.toHaveBeenCalled();
+    expect(number(decode(requestBytes.mock.calls[0][1].body!), 4)).toBe(1); expect(request).not.toHaveBeenCalled();
     expect(parseSearch(encode([6, 0]), 1)).toEqual({items: []});
     expect(() => parseSearch(encode([2, row], [2, row], [6, 1]), 1)).toThrow();
     expect(() => parseSearch(encode([6, 2]), 1)).toThrow();

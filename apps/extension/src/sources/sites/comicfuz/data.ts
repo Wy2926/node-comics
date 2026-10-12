@@ -1,6 +1,6 @@
 import {attributes} from '../../shared/html';
 import {location, validId} from './definition';
-import {invalid} from './protobuf';
+import {invalid} from '../../shared/protobuf';
 
 export function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid();

@@ -50,11 +50,11 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
 }
 /** Packaged adapters choose request hosts; the transport checks browser access and resource budgets. */
 export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportResponse[] = []): SourceNetworkContext {
-  async function read(url: string, options: Parameters<SourceNetworkContext['request']>[1], body?: string | Uint8Array<ArrayBuffer>) {
+  async function read(url: string, options: Parameters<SourceNetworkContext['request']>[1], body?: string | Uint8Array<ArrayBuffer>, binaryResponse = false) {
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
       const binary = body instanceof Uint8Array;
-      const response = await fetch(url, {credentials: 'include', headers: {Accept: binary ? 'application/octet-stream' : 'application/json, text/html',
+      const response = await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
         ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})});
       // Some sources return a structured empty result with a non-success status.
@@ -91,10 +91,10 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
     return new TextDecoder().decode(await read(url, options, body));
   }, async requestBytes(url, options) {
     // Copy before asynchronous authorization so caller mutation cannot change the approved request.
-    if (!(options?.body instanceof Uint8Array) || options.body.byteLength > 1024 * 1024)
+    if (!options || options.body !== undefined && (!(options.body instanceof Uint8Array) || options.body.byteLength > 1024 * 1024 || options.form !== undefined))
       throw new SourceHttpError('request-denied', '来源二进制请求无效或超过限制。');
-    const body = new Uint8Array(options.body);
-    await authorizeSourceRequest(url, {referer: options.referer}, signal);
-    return read(url, {referer: options.referer}, body);
+    const body = options.body === undefined ? undefined : new Uint8Array(options.body);
+    const form = await authorizeSourceRequest(url, {referer: options.referer, form: options.form}, signal);
+    return read(url, {referer: options.referer}, body ?? form, true);
   }};
 }

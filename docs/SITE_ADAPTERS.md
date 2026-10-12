@@ -71,7 +71,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，不设插件跳转次数上限，保留循环检测与整个读取链的 30 秒超时；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。读取与验证规则见[公共图片读取](IMAGE_ACCESS.md)。
 
-二进制只读 API 可使用可选 `context.requestBytes(url, {referer, body})`，仅在普通扩展 HTTP 通道提供，返回原始字节。与文本请求复用来源权限、Referer、取消、30 秒和 8 MiB 响应预算，请求体限 1 MiB；不进入 GET 交接缓存，不自动改用网页上下文。消息编解码留在站点目录。
+二进制只读 API 可使用可选 `context.requestBytes(url, {referer, body?, form?})`，仅在普通扩展 HTTP 通道提供，返回原始字节。无正文时为 GET，`body` 为二进制 POST，`form` 为 UTF-8 表单 POST，两者不可同时提供。与文本请求复用来源权限、Referer、取消、30 秒和 8 MiB 响应预算，请求体限 1 MiB；不进入 GET 交接缓存，不自动改用网页上下文。消息字段与协议语义留在站点目录，无站点语义的 wire 基础可复用 `shared/protobuf.ts`。
 
 ## 验收与交付
 
@@ -117,4 +117,5 @@ npm run build
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 阅读器内已解码同源 Blob 正文原位翻译，复用公共取图与动态页生命周期；不提供导入或目录 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
 | [COMIC FUZ](../apps/extension/src/sources/sites/comicfuz/README.md) | 名称搜索、HTTP 完整连载目录／分卷／封面、免费正文图片还原与 12 小时更新；作品／章节浮动导入，内嵌阅读器和标签页翻译复用通用识别，不自动扣点或消耗阅读券 |
+| [Zebrack / ゼブラック](../apps/extension/src/sources/sites/zebrack/README.md) | 名称搜索、HTTP 完整分话目录／分卷／封面、公开免费正文图片还原与 12 小时更新；作品／章节浮动导入，标签页 Blob 识图复用通用逻辑，不自动购买或消耗点数及阅读券 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

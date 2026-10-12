@@ -14,7 +14,7 @@
 - 图片服务需要源站自行设置的匿名会话，公共网络和取图管线均使用既有 `credentials: include`。不提取或上传源站 Cookie；浏览器禁用 Cookie 或来源访问权限时需用户在源站恢复。HTTP 验证自行建立匿名会话，不使用用户登录凭据，退出即删除临时 Cookie 文件。
 - 每次目录更新一次 HTML 请求；每章一次二进制请求；搜索每页一次请求。目录读取不下载正文图片，图片沿用阅读器有限窗口。签名、还原参数及漫画字节不写入日志或夹具。
 
-协议依据为源站公开 [作品页](https://comic-fuz.com/manga/2062)、[免费章节](https://comic-fuz.com/manga/2062?chapterId=47170) 与其公开 Web 客户端消息结构；解析器和 wire 编解码器为本项目独立实现，不复制第三方客户端代码。图标为本地文字标识，不是官方 Logo。
+协议依据为源站公开 [作品页](https://comic-fuz.com/manga/2062)、[免费章节](https://comic-fuz.com/manga/2062?chapterId=47170) 与其公开 Web 客户端消息结构；解析器和 wire 编解码器为本项目独立实现，不复制第三方客户端代码。消息字段留在本站，wire 基础复用 `shared/protobuf.ts`。图标为本地文字标识，不是官方 Logo。
 
 ## 验证
 

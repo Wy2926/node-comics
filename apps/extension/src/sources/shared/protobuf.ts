@@ -1,6 +1,6 @@
-// Minimal wire reader for the public site's documented-in-bundle v1 messages.
+// Bounded wire primitives; message fields and protocol semantics stay in each site.
 // Unknown fields are skipped, not recursively interpreted or executed.
-export const invalid = () => Error('COMIC FUZ 数据不完整或读取协议已变化。');
+export const invalid = () => Error('来源二进制数据不完整或读取协议已变化。');
 type Value = number | Uint8Array;
 export type Fields = Map<number, Value[]>;
 export function decode(bytes: Uint8Array): Fields {

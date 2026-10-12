@@ -1,4 +1,4 @@
-import {encode} from '../protobuf';
+import {encode} from '../../../shared/protobuf';
 export const workUrl = 'https://comic-fuz.com/manga/2062', readerUrl = workUrl + '?chapterId=47170';
 export const recipe = 'comicfuz-aes:' + '11'.repeat(32) + ':' + '22'.repeat(16);
 interface Chapter {chapterId: number; chapterMainName: string; chapterSubName?: string; pointConsumption: {type?: number; amount?: number}}
