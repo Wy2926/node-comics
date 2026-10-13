@@ -17,7 +17,7 @@ const probe = path.join(out, 'probe.mjs');
 await writeFile(probe, `export {catalog} from '${source}/comics/repositories/index.ts';
   export {readWebsiteCatalog} from '${source}/comics/application/website-catalog.ts';
   export {applyCatalogRefresh} from '${source}/comics/application/catalog-service.ts';
-  export {searchSource, releaseSourceSearchSession, sourceLocation} from '${source}/sources/index.ts';`);
+  export {searchSource, readSearchCover, readSourceCover, releaseSourceSearchSession, sourceLocation} from '${source}/sources/index.ts';`);
 await compile(probe, 'verify-source.js', extension);
 const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launchPersistentContext(path.join(out, 'profile'), {headless: true,
@@ -34,8 +34,8 @@ try {
     ctx.fillStyle = '#214467'; ctx.fillRect(50, 60, 500, 500); ctx.fillStyle = '#fff'; ctx.font = '32px sans-serif';
     ctx.fillText('WebtoonScan fixture', 90, 300); return c.toDataURL('image/png').split(',')[1];
   });
-  const responses = {[f.url]: {body: f.catalogHtml(), contentType: 'text/html'},
-    [f.origin + '/?s=sample&post_type=wp-manga']: {body: f.searchHtml(), contentType: 'text/html'},
+  const responses = {[f.url]: {body: f.recentChapterHtml(f.lazyCoverHtml(f.catalogHtml())), contentType: 'text/html'},
+    [f.origin + '/?s=sample&post_type=wp-manga']: {body: f.lazyCoverHtml(f.searchHtml()), contentType: 'text/html'},
     [f.artwork]: {body: png, contentType: 'image/png', base64: true},
     [f.image]: {body: png, contentType: 'image/png', base64: true}};
   for (const id of ['0', 'chapter-1', 'chapter-2.5']) {
@@ -43,7 +43,9 @@ try {
     for (const suffix of ['', '?style=list']) responses[f.url + id + '/' + suffix] = {body, contentType: 'text/html'};
   }
   await browser.route('https://**/*', route => {
-    const url = route.request().url(), data = responses[url];
+    const request = route.request(), url = request.url(), data = responses[url];
+    if (url === f.artwork && !request.isNavigationRequest() && request.frame().url().startsWith('chrome-extension:'))
+      return route.fulfill({status: 403, body: 'Forbidden'});
     return route.fulfill(data && !(failCatalog && url === f.url)
       ? {status: 200, contentType: data.contentType, body: data.base64 ? Buffer.from(data.body, 'base64') : data.body}
       : {status: 503, body: '{}'});
@@ -62,13 +64,29 @@ try {
   await setup.reload(); await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByRole('heading', {name: 'WebtoonScan', exact: true}).waitFor();
   await setup.screenshot({path: path.join(out, 'site-directory.png')});
-  const found = await setup.evaluate(async () => {
-    const p = await import(chrome.runtime.getURL('verify-source.js')), sessionId = 'webtoonscan-test';
-    try {return (await p.searchSource('webtoonscan', {siteId: 'webtoonscan', query: 'sample'}, {sessionId})).items.length;}
-    finally {p.releaseSourceSearchSession(sessionId);}
-  });
-  assert.equal(found, 1); checks.push('Static site listing and registered source search');
+  // Preload routed documents: extension-created tabs can navigate before Playwright attaches.
   const site = await browser.newPage(); await site.goto(f.reader);
+  const coverPage = await browser.newPage(); await coverPage.goto(f.artwork);
+  await coverPage.waitForFunction(() => document.images[0]?.naturalWidth === 600);
+  assert.equal(await setup.evaluate(async url => (await fetch(url)).status, f.artwork), 403);
+  const found = await setup.evaluate(async ({url, png}) => {
+    const p = await import(chrome.runtime.getURL('verify-source.js')), sessionId = 'webtoonscan-test';
+    const inspect = async blob => {
+      const bitmap = await createImageBitmap(blob), size = [bitmap.width, bitmap.height]; bitmap.close();
+      return {type: blob.type, size, matches: btoa(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer()))) === png};
+    };
+    try {
+      const hits = await p.searchSource('webtoonscan', {siteId: 'webtoonscan', query: 'sample'}, {sessionId});
+      const search = await inspect(await p.readSearchCover(hits.items[0]));
+      const snapshot = await p.readWebsiteCatalog(url), catalog = await inspect(await p.readSourceCover(snapshot));
+      return {count: hits.items.length, covers: [search, catalog]};
+    }
+    finally {p.releaseSourceSearchSession(sessionId);}
+  }, {url: f.url, png});
+  assert.equal(found.count, 1); checks.push('Static site listing and registered source search');
+  assert.deepEqual(found.covers, Array(2).fill({type: 'image/png', size: [600, 900], matches: true}));
+  assert.deepEqual(browser.pages().filter(page => page.url() === f.artwork), [coverPage]);
+  checks.push('Catalog/search covers decode byte-exactly despite extension HTTP 403; existing image tab is retained');
   const entry = site.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true}); await entry.waitFor();
   await site.screenshot({path: path.join(out, 'embedded-entry.png')});
   const opened = browser.waitForEvent('page'); await entry.click(); reader = await opened;

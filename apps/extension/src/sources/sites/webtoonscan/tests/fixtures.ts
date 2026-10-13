@@ -6,6 +6,10 @@ export const image = 'https://cdn4.webtoonscan.cc/sample-book-42/chapter-1/1.jpg
 export const canonical = (value: string) => `<link rel="canonical" href="${value}">`;
 export const chapter = (id: string) => `<li class="wp-manga-chapter"><a href="${url}${id}/">${id}</a><span class="chapter-release-date">2026</span></li>`;
 export const poster = (owner = url) => `<a href="${owner}"><img src="${artwork}"></a>`;
+export const lazyCoverHtml = (html: string) => html.replaceAll(`<img src="${artwork}">`,
+  `<img src="data:image/svg+xml;base64,placeholder" data-lazy-src="${artwork}"><noscript><img src="${artwork}"></noscript>`);
+export const recentChapterHtml = (html: string, id = 'chapter-2.5') => html.replace('<span class="chapter-release-date">2026',
+  `<span class="chapter-release-date"><a href="${url}${id}/" title="16 seconds ago" class="c-new-tag"><!-- --></a>`);
 export function catalogHtml(ids = ['chapter-2.5', 'chapter-1', '0']) {
   return `${canonical(url)}<h1>${title}</h1><div class="summary_image">${poster()}</div>
     <div class="listing-chapters_wrap show-more"><ul class="main version-chap no-volumn active">${ids.map(chapter).join('')}</ul></div>`;

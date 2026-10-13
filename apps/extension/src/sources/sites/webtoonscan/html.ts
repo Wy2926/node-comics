@@ -49,6 +49,8 @@ export function cover(html: string, slug: string) {
   const link = one(regions(html, 'a', () => true), '封面作品');
   const owner = location(link.attrs.href);
   if (owner.chapter || owner.slug !== slug) throw Error('WebtoonScan 封面作品归属错误。');
-  const image = one(tags(link.body, 'img'), '作品封面');
-  return {url: imageUrl(image['data-src'] || image.src)};
+  // Lazy covers include a noscript copy, not a second cover image.
+  const active = link.body.replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, '');
+  const image = one(tags(active, 'img'), '作品封面');
+  return {url: imageUrl(image['data-lazy-src'] || image['data-src'] || image.src)};
 }

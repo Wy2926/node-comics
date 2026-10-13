@@ -2,9 +2,10 @@ import {describe, expect, it, vi} from 'vitest';
 import {definition, catalogKey, chapterKey, webtoonLocation} from '../definition';
 import {network, parseCatalog, parsePages} from '../network';
 import {parseSearch, searchUrl} from '../search';
+import {cover} from '../html';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
-import {artwork, catalogHtml, chapter, image, origin, reader, readerHtml, searchHtml, slug, url} from './fixtures';
+import {artwork, catalogHtml, chapter, image, lazyCoverHtml, origin, poster, reader, readerHtml, recentChapterHtml, searchHtml, slug, url} from './fixtures';
 
 describe('WebtoonScan', () => {
   it('registers network import/search, floating entry, complete catalogs and generic tab recognition', () => {
@@ -39,6 +40,35 @@ describe('WebtoonScan', () => {
   it('deduplicates only the observed identical chapter links and labels', () => {
     const result = parseCatalog(catalogHtml(['chapter-1', 'chapter-1', '0']), url);
     expect(result.entries.map(e => [e.remoteId, e.order])).toEqual([['0', 0], ['chapter-1', 1]]);
+  });
+  it('keeps all 76 chapters in native order when a recent-release badge repeats the newest link', () => {
+    const ids = Array.from({length: 76}, (_, i) => `chapter-${75 - i}`);
+    const result = validateCatalog(parseCatalog(recentChapterHtml(catalogHtml(ids), ids[0]), url), [definition]);
+    expect(result.complete).toBe(true);
+    expect(result.entries.map(e => e.remoteId)).toEqual([...ids].reverse());
+    expect(result.entries.map(e => e.order)).toEqual(ids.map((_, i) => i));
+    expect(result.entries.at(-1)?.title).toBe('chapter-75');
+  });
+  it.each(['different-chapter', 'foreign', 'missing-title', 'unmarked-extra', 'outside-row'])('rejects %s recent-release links', kind => {
+    let html = recentChapterHtml(catalogHtml());
+    if (kind === 'different-chapter') html = html.replace(`href="${url}chapter-2.5/" title`, `href="${reader}" title`);
+    if (kind === 'foreign') html = html.replace(`href="${url}chapter-2.5/" title`, `href="${origin}/manhwa/other/chapter-2.5/" title`);
+    if (kind === 'missing-title') html = html.replace(`<a href="${url}chapter-2.5/">chapter-2.5</a>`, '');
+    if (kind === 'unmarked-extra') html = html.replace('class="c-new-tag"', 'class="unknown"');
+    if (kind === 'outside-row') html = html.replace('</ul>', `<a href="${reader}" class="c-new-tag">New</a></ul>`);
+    expect(() => parseCatalog(html, url)).toThrow();
+  });
+  it('reads lazy catalog and search covers without counting noscript backups twice', () => {
+    expect(parseCatalog(lazyCoverHtml(catalogHtml()), url).cover).toEqual({url: artwork});
+    expect(parseSearch(lazyCoverHtml(searchHtml()), {siteId: 'webtoonscan', query: 'sample'}).items[0].cover).toEqual({url: artwork});
+  });
+  it.each(['missing', 'duplicate', 'unsafe', 'credentials'])('still rejects %s lazy covers', kind => {
+    let html = lazyCoverHtml(poster());
+    if (kind === 'missing') html = html.replace(/<img\b[^>]*>/, '');
+    if (kind === 'duplicate') html = html.replace('<noscript>', `<img src="${artwork}"><noscript>`);
+    if (kind === 'unsafe') html = html.replace(`data-lazy-src="${artwork}"`, 'data-lazy-src="javascript:alert(1)"');
+    if (kind === 'credentials') html = html.replace(`data-lazy-src="${artwork}"`, 'data-lazy-src="https://secret@images.test/cover.jpg"');
+    expect(() => cover(html, slug)).toThrow();
   });
   it.each(['canonical', 'foreign', 'duplicate', 'cover', 'truncated', 'empty', 'pagination', 'group'])('rejects invalid %s catalog', kind => {
     let html = catalogHtml();

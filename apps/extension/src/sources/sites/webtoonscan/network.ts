@@ -13,15 +13,17 @@ export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const artwork = cover(byClass(safe, 'div', 'summary_image'), loc.slug);
   const box = byClass(safe, 'div', 'listing-chapters_wrap');
   const list = one(regions(box, 'ul', a => !!hasClass(a, 'main') && !!hasClass(a, 'no-volumn')), '完整目录').body;
-  const rows = regions(list, 'li', a => !!hasClass(a, 'wp-manga-chapter'));
-  if (!rows.length || rows.length > 10000 || tags(list, 'a').length !== rows.length || tags(box, 'ul').length !== 1)
+  const rows = regions(list, 'li', a => !!hasClass(a, 'wp-manga-chapter')).map(row => regions(row.body, 'a', () => true));
+  if (!rows.length || rows.length > 10000 || tags(list, 'a').length !== rows.reduce((count, links) => count + links.length, 0) || tags(box, 'ul').length !== 1)
     throw Error('WebtoonScan 目录不完整或分组结构已变化。');
   const id = catalogKey(loc.slug), seen = new Map<string, string>();
   // Static list includes Show more rows. Native Previous/Next follows the reverse order.
-  const entries = rows.reverse().flatMap(row => {
-    const link = one(regions(row.body, 'a', () => true), '章节链接'), target = location(link.attrs.href);
+  const entries = rows.reverse().flatMap(links => {
+    // Recent-release badges repeat the chapter URL but are not chapter titles.
+    const link = one(links.filter(a => !hasClass(a.attrs, 'c-new-tag')), '章节链接'), target = location(link.attrs.href);
     const label = text(textContent(link.body));
-    if (!target.chapter || target.slug !== loc.slug || seen.has(target.chapter) && seen.get(target.chapter) !== label)
+    if (!target.chapter || target.slug !== loc.slug || seen.has(target.chapter) && seen.get(target.chapter) !== label ||
+        links.some(a => a !== link && chapterKey(location(a.attrs.href)) !== chapterKey(target)))
       throw Error('WebtoonScan 章节重复或归属错误。');
     // Some source lists repeat the exact same chapter URL and label (e.g. Solo Bug Player 79).
     if (seen.has(target.chapter)) return [];
