@@ -28,6 +28,27 @@ beforeEach(()=>{auth.value={session:null};auth.listeners.clear();});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('NodeLane channel boundary',()=>{
+  it.each([undefined,'model-a'])('keeps deferred model %s preparing through both policy reads without extra requests',async modelId=>{
+    auth.value={session:session()};
+    const model={id:'model-a',name:'Model A',requires_paid:false,available:true};
+    let resolveCaps!:(value:Capabilities)=>void,resolveRights!:(value:ReturnType<typeof entitlement>)=>void;
+    const caps=vi.spyOn(Api.prototype,'capabilities').mockReturnValue(new Promise(resolve=>{resolveCaps=resolve;}));
+    const rights=vi.spyOn(Api.prototype,'entitlements').mockReturnValue(new Promise(resolve=>{resolveRights=resolve;}));
+    const translate=vi.spyOn(Api.prototype,'translate'),connection=await definition.open(profile,{},()=>true,{deferPolicy:true});
+    const page=target(0),runtime=connection.createRuntime({...options(),modelId});
+    try{
+      await runtime.init();await runtime.restore([page]);
+      expect(runtime.stateFor(page,true)).toEqual({kind:'waiting',message:'准备翻译…'});
+      expect(caps).not.toHaveBeenCalled();expect(rights).not.toHaveBeenCalled();
+      const refresh=runtime.refresh();
+      resolveCaps({...capabilities,translation_models:[model]});
+      await vi.waitFor(()=>expect(rights).toHaveBeenCalledOnce());
+      expect(runtime.stateFor(page,true)?.message).toBe('准备翻译…');
+      resolveRights(entitlement());await refresh;
+      expect(runtime.stateFor(page,true)?.message).toBe('准备翻译…');
+      expect(caps).toHaveBeenCalledOnce();expect(rights).toHaveBeenCalledOnce();expect(translate).not.toHaveBeenCalled();
+    }finally{connection.dispose();}
+  });
   it('opens the inline local-cache path without contacting policy, while new admission still requires it',async()=>{
     auth.value={session:session()};
     const caps=vi.spyOn(Api.prototype,'capabilities').mockRejectedValue(Error('offline'));

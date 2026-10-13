@@ -389,7 +389,7 @@ export function installInline() {
     } catch (error) {
       if (live()) {
         if((error as {code?:string}).code==='INLINE_RESULT_NOT_READY'){
-          item.resultKey=undefined;item.checked=false;item.state={kind:'waiting',message:msg('正在准备页面…')};schedule();return;
+          item.resultKey=undefined;item.checked=false;item.state={kind:'waiting',message:msg('准备翻译…')};schedule();return;
         }
         const retranslate=(error as {code?:string}).code==='RESULT_NOT_CACHED';
         item.loadError = { kind: 'error', message: (error as Error).message, retranslate, retryAction:retranslate?'translate':undefined, retryLabel: msg('点击重新加载') };

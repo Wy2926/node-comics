@@ -132,7 +132,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   },[channel,language,prepareResult]);
   function stateFor(entryId:string,page:Page,mode:Mode):TranslationState|undefined {
     const active=windowRef.current.targets.some(t=>t.entryId===entryId&&t.page.id===page.id&&t.mode===mode);
-    if(!channel)return active?{kind:connectionError?'error':'waiting',message:connectionError||msg('正在连接翻译服务')}:undefined;
+    if(!channel)return active?{kind:connectionError?'error':'waiting',message:connectionError||msg('准备翻译…')}:undefined;
     if(!channel.available)return active?channel.unavailable:undefined;
     return runtime.current?.stateFor({entryId,page,mode},active,error);
   }

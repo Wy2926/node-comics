@@ -28,6 +28,7 @@ assert(!(manifest.content_scripts??[]).some(s=>s.js.includes('content-scripts/in
 // Dispatch the actual registered menu callback. Only this temporary copy exposes its listener
 // and installed menu titles; required host access must never cause a runtime permission request.
 const background=path.join(extension,'background.js');
+if(selectedSite==='feedback')await writeFile(background,`globalThis.fixtureStates=[];const sendInlineMessage=chrome.tabs.sendMessage.bind(chrome.tabs);chrome.tabs.sendMessage=(...args)=>{const message=args[1];if(message?.type==='NC_INLINE_UPDATE')for(const item of message.data?.items??[])if(item.state&&fixtureStates.length<200)fixtureStates.push(item.state);return sendInlineMessage(...args);};\n`+await readFile(background,'utf8'));
 if(selectedSite==='ordering')await writeFile(background,`globalThis.fixtureHoldTick=true;const addInlineListener=chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);chrome.runtime.onMessage.addListener=listener=>addInlineListener((message,sender,respond)=>listener(message,sender,value=>{if(globalThis.fixtureHoldTick&&message.type==='NC_INLINE_TICK'&&value?.ok&&value.data?.hasPending){globalThis.fixtureHoldTick=false;globalThis.fixtureReleaseTick=()=>respond(value);}else respond(value);}));\n`+await readFile(background,'utf8'));
 await writeFile(background,`globalThis.fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.fixturePermissionRequests++;throw Error('Unexpected host permission request')};globalThis.fixtureMenus=[];const originalMenuCreate=chrome.contextMenus.create.bind(chrome.contextMenus);chrome.contextMenus.create=(...a)=>{fixtureMenus.push(a[0]);return originalMenuCreate(...a)};const originalMenuListener=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=listener=>{globalThis.fixtureMenu=listener;return originalMenuListener(listener)};\n`+await readFile(background,'utf8'));
 await writeFile(background,`globalThis.fixtureTransfers={maxMessageBytes:0,resultChunks:0,sourceChunks:0};const observeChunk=(v,kind)=>{if(v?.type==='chunk'){fixtureTransfers.maxMessageBytes=Math.max(fixtureTransfers.maxMessageBytes,JSON.stringify(v).length);fixtureTransfers[kind]++;}};const connectListener=chrome.runtime.onConnect.addListener.bind(chrome.runtime.onConnect);chrome.runtime.onConnect.addListener=fn=>connectListener(port=>{const post=port.postMessage.bind(port);port.postMessage=v=>{observeChunk(v,'resultChunks');post(v)};fn(port)});const connectTab=chrome.tabs.connect.bind(chrome.tabs);chrome.tabs.connect=(...args)=>{const port=connectTab(...args);port.onMessage.addListener(v=>observeChunk(v,'sourceChunks'));return port};\n`+await readFile(background,'utf8'));
@@ -41,6 +42,7 @@ const resultRequests=[];
 const eventStreams=new Set();
 let heldResult,releaseResult,failResult;
 let preparationGate,releasePreparation;
+let policyGate,releasePolicy;
 let heldAdmissionImage,releaseAdmission,admissionStarted=false,failCapabilities=0,capabilityRetrySeconds=1;
 let measureSources=false,sourceActive=0,sourcePeak=0;
 const sourceTimings=[],heldSources=new Set(),sourceReleases=new Map();
@@ -88,7 +90,7 @@ const server=createServer(async(req,res)=>{
     }
     requests.push({method:req.method,path:url.pathname,authorization:!!req.headers.authorization});refresh();
     if(url.pathname==='/v1/auth/config')return json({dev_auth:true});
-    if(url.pathname==='/v1/capabilities'){await preparationGate;if(failCapabilities>0){failCapabilities--;return json({error:{code:'REQUEST_RATE_LIMITED',message:'Fixture policy temporarily unavailable',retry_after_seconds:capabilityRetrySeconds}},503,{'Retry-After':String(capabilityRetrySeconds)});}return json(caps);}
+    if(url.pathname==='/v1/capabilities'){await preparationGate;await policyGate;if(failCapabilities>0){failCapabilities--;return json({error:{code:'REQUEST_RATE_LIMITED',message:'Fixture policy temporarily unavailable',retry_after_seconds:capabilityRetrySeconds}},503,{'Retry-After':String(capabilityRetrySeconds)});}return json(caps);}
     if(url.pathname==='/v1/me/entitlements')return json(rights);
     if(url.pathname==='/v1/translations/events'&&req.method==='GET'){
       const ids=(url.searchParams.get('ids')??'').split(',').filter(Boolean);let previous='';
@@ -400,7 +402,7 @@ try{
     await button('关闭');
   }
   if(selectedSite==='feedback') {
-    const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&(node.name?.value===text||text==='准备翻译…'&&node.name?.value==='正在准备页面…'));
+    const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&node.name?.value===text);
     const waitNotice=async(text,visible=true)=>{
       const until=Date.now()+10000;
       while(await notice(text)!==visible&&Date.now()<until)await page.waitForTimeout(25);
@@ -408,6 +410,10 @@ try{
     };
     const holdPreparation=()=>{preparationGate=new Promise(resolve=>{releasePreparation=resolve;});};
     const finishPreparation=()=>{releasePreparation();preparationGate=undefined;releasePreparation=undefined;};
+    caps.translation_models=[{id:'fixture-selected',name:'Fixture model',requires_paid:false,available:true}];
+    await worker.evaluate(async api=>{
+      await chrome.storage.local.set({'nc-translation-channels':{activeId:'nodelane',profiles:[],modelPreferences:{[JSON.stringify([api,'fixture-reader','overlay-v1'])]:'fixture-selected'}}});
+    },api);
     jobs.get('seed-1').status='no_text';
     await page.goto(site);await page.locator('#first').evaluate(image=>image.decode());
     const before=await geometry();holdPreparation();
@@ -422,7 +428,21 @@ try{
     await button('显示译图');await waitNotice('准备翻译…');
     assert.equal(translations.size,0);
     check('pause and original view hide preparation feedback; resuming restores it without bypassing pending preparation');
-    finishPreparation();await waitNotice('准备翻译…',false);
+    policyGate=new Promise(resolve=>{releasePolicy=resolve;});
+    finishPreparation();
+    const policyUntil=Date.now()+10000;
+    while(!requests.some(request=>request.path==='/v1/capabilities')&&Date.now()<policyUntil)await page.waitForTimeout(25);
+    assert(requests.some(request=>request.path==='/v1/capabilities'),'policy refresh starts after source preparation');
+    await page.waitForTimeout(300);await waitNotice('准备翻译…');
+    const states=await worker.evaluate(()=>fixtureStates);
+    assert(states.length>0,'observed actual background state pushes');
+    assert(states.every(state=>state.kind==='waiting'&&state.message==='准备翻译…'),JSON.stringify(states));
+    assert.equal(requests.filter(request=>request.path==='/v1/capabilities').length,1,'preparation shares one policy read');
+    assert.equal(translations.size,0);assert.deepEqual(await geometry(),before);
+    await page.screenshot({path:path.join(out,'preparing-selected-model.png')});
+    check('a saved explicit model stays in preparation after source reads while policy is delayed, with no quota, permission or error flash and no submitted jobs');
+    releasePolicy();policyGate=undefined;releasePolicy=undefined;
+    await waitNotice('准备翻译…',false);
     assert.equal(await page.locator('#first').evaluate(image=>image.style.content),'');
     await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await page.waitForTimeout(200);
     assert.equal(await notice('准备翻译…'),false);
@@ -833,4 +853,4 @@ try{
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,transfers,newTranslationJobs:createdJobs,translationRequests:translations.size,queueRequests:0,uploads:uploads.size,imageAccesses:accessCount(),imageDownloads:resultRequests.length,liveSource,liveProvider:false,nativeMenuDialog:false,extensionId},null,2));
   console.log('Artifacts: '+out);
 }catch(error){await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,requests,resultRequests,accessibility:await cdp.send('Accessibility.getFullAXTree').then(v=>v.nodes.filter(n=>n.role?.value==='button').map(n=>({name:n.name?.value,description:n.description?.value}))).catch(()=>[])},null,2));await page.screenshot({path:path.join(out,'failure.png'),timeout:5000}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
-finally{releasePreparation?.();releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}
+finally{releasePreparation?.();releasePolicy?.();releaseResult?.();await browser.close();await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>web.close(resolve));}

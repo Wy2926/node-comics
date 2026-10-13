@@ -291,7 +291,7 @@ function response(ctx:Context,request:InlineRequest):InlineResponse{
   }
   for(const image of images.values()){
     if(!ctx.channel.available){items.push({id:image.id,state:ctx.channel.unavailable});continue;}
-    const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);items.push({id:image.id,state:error??{kind:'waiting',message:msg('正在准备页面…')},pending:!error});continue;}
+    const key=pageKey(request,image),page=ctx.pages.get(key);if(!page){const error=ctx.sourceErrors.get(key);items.push({id:image.id,state:error??{kind:'waiting',message:msg('准备翻译…')},pending:!error});continue;}
     const result=pageResult(ctx,page),state=ctx.core?.stateFor({entryId:'inline',page,mode},true);
     // A delivered result may still report "loading the translation" until decoded.
     // Display work and unrelated admission backoff must not occupy a translation slot.
