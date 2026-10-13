@@ -6,6 +6,25 @@ from urllib.parse import urlsplit
 
 from .resources import resolve_cpu_resources
 
+ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto',
+    'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None,
+    'ocr_batch_size': 4, 'ocr_min_batch_size': 1, 'color_batch_size': 4, 'detect_batch_size': 4,
+    'ocr_arena_extend_strategy': 'kSameAsRequested', 'ocr_arena_shrinkage': True}
+LOCAL_DEFAULTS = {'local_pages': 2, 'render_workers': 'auto', 'max_leases': 8,
+    'download_workers': 4, 'delivery_workers': 4, 'claim_batch_size': 4,
+    'document_control_workers': 2,
+    'resident_bytes': 1024 ** 3, 'document_spool_bytes': 6 * 1024 ** 3}
+
+
+def execution_settings(config):
+    """An explicit, credential/path-free allowlist for diagnostics and reports."""
+    local = {key: config.get(key, default) for key, default in LOCAL_DEFAULTS.items()}
+    local['inpaint_slots'] = config.get('inpaint_slots', local['local_pages'])
+    local['analysis_workers'] = config.get('analysis_workers', local['download_workers'])
+    local['engine'] = {key: config.get('engine', {}).get(key, default)
+                      for key, default in ENGINE_DEFAULTS.items() if key not in {'models', 'font', 'keep_lang'}}
+    return local
+
 
 def origin(value, allow_http=False):
     parsed = urlsplit(value)
@@ -30,19 +49,13 @@ def load(path):
     value['node_token'] = os.environ.get('NODE_TOKEN') or value.get('node_token')
     if not value['node_token'] or not value['node_id'] or not value['resource_id']:
         raise ValueError('Node identity and credential are required')
-    defaults = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto',
-                'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None}
-    if set(value.get('engine', {})) - set(defaults):
+    if set(value.get('engine', {})) - set(ENGINE_DEFAULTS):
         raise ValueError('Unknown local engine option')
-    value['engine'] = defaults | value.get('engine', {})
-    value.setdefault('local_pages', 2)
+    value['engine'] = ENGINE_DEFAULTS | value.get('engine', {})
+    for key, default in LOCAL_DEFAULTS.items():
+        value.setdefault(key, default)
     value.setdefault('inpaint_slots', value['local_pages'])
-    value.setdefault('render_workers', 'auto')
-    value.setdefault('max_leases', 8)
-    value.setdefault('download_workers', 4)
-    value.setdefault('delivery_workers', 4)
-    value.setdefault('resident_bytes', 1024 * 1024 * 1024)
-    value.setdefault('document_spool_bytes', 6 * 1024 ** 3)
+    value.setdefault('analysis_workers', value['download_workers'])
     value['state_dir'] = str((path.parent / value.get('state_dir', 'state')).resolve())
     value['engine']['models'] = str((path.parent / value['engine']['models']).resolve())
     value['engine']['font'] = [str((path.parent / font).resolve()) for font in value['engine']['font']]
@@ -54,8 +67,13 @@ def load(path):
     if value['render_workers'] != 'auto' and (type(value['render_workers']) is not int
                                             or not 1 <= value['render_workers'] <= value['max_leases']):
         raise ValueError('render_workers must be auto or between 1 and max_leases')
-    if not all(type(value[k]) is int and 1 <= value[k] <= 16 for k in ('download_workers', 'delivery_workers')):
+    if not all(type(value[k]) is int and 1 <= value[k] <= 16
+               for k in ('download_workers', 'analysis_workers', 'delivery_workers')):
         raise ValueError('Network worker counts must be between 1 and 16')
+    if type(value['claim_batch_size']) is not int or not 1 <= value['claim_batch_size'] <= 4:
+        raise ValueError('claim_batch_size must be between 1 and the center limit of 4')
+    if type(value['document_control_workers']) is not int or not 2 <= value['document_control_workers'] <= 3:
+        raise ValueError('document_control_workers must be 2 or 3 (claim, heartbeat, sync)')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
         raise ValueError('Reserve at least 512 MiB for page buffers')
     if type(value['document_spool_bytes']) is not int or not 256 * 1024 ** 2 <= value['document_spool_bytes'] <= 16 * 1024 ** 3:
@@ -68,6 +86,15 @@ def load(path):
         raise ValueError('inpainting_size must be 512, 768 or 1024')
     if type(value['engine']['detect_size']) is not int or not 512 <= value['engine']['detect_size'] <= 2048:
         raise ValueError('detect_size must be between 512 and 2048')
+    for key in ('ocr_batch_size', 'ocr_min_batch_size', 'color_batch_size', 'detect_batch_size'):
+        if type(value['engine'][key]) is not int or not 1 <= value['engine'][key] <= 32:
+            raise ValueError(f'engine.{key} must be between 1 and 32')
+    if value['engine']['ocr_min_batch_size'] > value['engine']['ocr_batch_size']:
+        raise ValueError('ocr_min_batch_size must not exceed ocr_batch_size')
+    if value['engine']['ocr_arena_extend_strategy'] not in ('kNextPowerOfTwo', 'kSameAsRequested'):
+        raise ValueError('ocr_arena_extend_strategy must be kNextPowerOfTwo or kSameAsRequested')
+    if type(value['engine']['ocr_arena_shrinkage']) is not bool:
+        raise ValueError('ocr_arena_shrinkage must be a boolean')
     if value['engine']['keep_lang'] is not None:
         from langcodes import tag_is_valid
         language = value['engine']['keep_lang']

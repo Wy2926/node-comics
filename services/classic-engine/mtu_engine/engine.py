@@ -234,7 +234,10 @@ class Renderer:
 
 
 class Engine:
-    def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None):
+    def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None,
+                 ocr_batch_size=None, ocr_min_batch_size=None, color_batch_size=None, detect_batch_size=None,
+                 ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None):
+        from classic_node.config import ENGINE_DEFAULTS
         import cv2
         import torch
         if not torch.cuda.is_available() or not 0 <= gpu < torch.cuda.device_count():
@@ -270,6 +273,8 @@ class Engine:
             _MODEL_MAPPING = {'model': LamaLargeInpainter._MODEL_MAPPING['model']}
         with torch.cuda.device(gpu):
             self.detector = DefaultDetector()
+            self.detector.max_batch_size = (ENGINE_DEFAULTS['detect_batch_size']
+                                           if detect_batch_size is None else detect_batch_size)
             self.inpainter = CudaLama()
             self.color_model = Model48pxOCR()
             for model in (self.detector, self.inpainter, self.color_model):
@@ -280,8 +285,11 @@ class Engine:
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
                 asyncio.run(model.load('cuda'))
-            self.colors = Colors(self.color_model)
-            self.probes = {language: Paddle(self.models, language, gpu, threads)
+            self.colors = Colors(self.color_model, color_batch_size)
+            options = {'batch_size': ocr_batch_size, 'min_batch_size': ocr_min_batch_size,
+                       'arena_extend_strategy': ocr_arena_extend_strategy, 'arena_shrinkage': ocr_arena_shrinkage}
+            options = {key: ENGINE_DEFAULTS['ocr_' + key] if value is None else value for key, value in options.items()}
+            self.probes = {language: Paddle(self.models, language, gpu, threads, **options)
                            for language in ('en', 'ch', 'korean')}
             self.recognizers = self.probes
             self.japanese = Japanese(self.models, gpu)

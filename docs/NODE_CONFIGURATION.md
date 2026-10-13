@@ -36,11 +36,29 @@
 | `local_pages` | 2；检测／OCR 与抹字共用的计算池大小 |
 | `inpaint_slots` | 默认等于 `local_pages`，范围 1–local_pages；共享计算池内的抹字合计上限 |
 | `render_workers` | `auto`；独立嵌字编码槽位与渲染进程数，可显式指定 1–max_leases |
-| `download_workers` | 4；下载池及独立分析提交池大小 |
+| `download_workers` | 4；下载池大小，范围 1–16 |
+| `analysis_workers` | 未配置时等于 `download_workers`；独立分析提交池大小，范围 1–16 |
 | `delivery_workers` | 4；最终交付与停止确认池大小 |
+| `claim_batch_size` | 4，范围 1–4；单次新领取上限，仍受中心发放上限、下载空位和内存预算限制 |
+| `document_control_workers` | 2，可选 2／3；文件领取、心跳和状态同步共用的控制池；不是文件 GPU 并发 |
 | `resident_bytes` | 1 GiB；在途页面缓冲、渲染 IPC 与蒙版缓存预算，不含模型、GPU 工作空间和进程常驻内存 |
 | `document_spool_bytes` | 6 GiB，256 MiB–16 GiB；所有文档工作目录的共享应用磁盘预算，与中心限制取较小值；部署还需持久盘硬配额 |
 | `engine` | 模型位置、CUDA 设备、算子线程、检测与修复尺寸、字体 |
+
+推理批量和显存池策略也保存在同一个私有配置的 `engine` 内，不与 CPU 线程数或页并发混用：
+
+| 字段 | 默认值与用途 |
+| --- | --- |
+| `ocr_batch_size` | 4，范围 1–32；三个 PP-OCR 会话各自的 RapidOCR 原生批量上限 |
+| `ocr_min_batch_size` | 1，范围 1–ocr_batch_size；明确的分配失败后，仅当前输入组减半重试的下限；设为 batch 上限可关闭缩批重试 |
+| `color_batch_size` | 4，范围 1–32；48px 取色批量，与 OCR 批量独立 |
+| `detect_batch_size` | 4，范围 1–32；DBNet 长图原生重排推理批量，不改变切片和回拼算法 |
+| `ocr_arena_extend_strategy` | `kSameAsRequested`；使用 ORT 原生按需扩容，减少默认二次幂扩容的超额保留；可选 `kNextPowerOfTwo` |
+| `ocr_arena_shrinkage` | `true`；通过 ORT 原生 RunOptions 在推理后收缩对应 GPU 的空闲 arena，保留仍在使用的权重／张量；可设 `false` 保持复用缓存 |
+
+这些本地设置只在启动时读取，改 JSON 不会热更新已创建的执行池或模型。配置校验、`check` 与 `event=execution_settings` 显示有效参数；不会自动改写已有私有文件。模型锁、heartbeat／claim／updates 的单个在途请求，以及 ORT 顺序执行模式下的 `inter_op_num_threads=1` 是线程安全／执行语义，不开放无效的并发开关。OCR 图像形状和宽度边界是模型输入约束，不能通过增大并发参数绕过。
+
+`resident_bytes` 不是显存预算。各框架仍独立管理显存，不承诺 GPU 总占用硬上限或自动选择最优并发。显存策略直接使用 [ORT 原生 arena 扩容／收缩](https://onnxruntime.ai/docs/get-started/with-c.html#features)，以额外分配开销换取可供其他模型使用的空闲显存；正常页不调用 PyTorch `empty_cache()`，仅 OCR 分配失败、确实可缩批时对该输入组至多回收一次未使用的 PyTorch 缓存。非法访存、形状错误和其他异常不重试；批量降到下限仍失败则保持原有单页失败流程，不重启设备、不重新调用文本供应商。缩批只是再次调用 RapidOCR 原生批处理的请求局部适配，不实现分配器、组批算法或全局显存调度；会重算当前输入组已成功的批次。长行补边变化可能影响识别结果；需用相同样本比较 OCR 完整性、P95 耗时与显存，再部署。生产保留原有业务计时与错误日志，细分诊断及资源测量仅由离线工具收集，见[节点运维](../services/classic-engine/docs/NODE_OPERATIONS.md#状态与恢复)。
 
 `engine.threads` 与 `render_workers` 默认为 `auto`，只在启动时解析。有效 CPU 取逻辑 CPU 数、进程亲和性、Linux 当前 cgroup 及可见祖先的 CPU 时间配额／cpuset 的交集限制；配额可为小数，整数分配预算 `C` 向下取整、至少为 1。无法完整读取约束时保守回退到 1 并告警；命名空间隐藏的祖先限制无法探测。Windows 使用进程亲和性，不把宿主机核数当成可用数。
 
@@ -58,7 +76,7 @@
 
 冻结覆盖文件后清除计算缓冲，把该页预占缩到 `2 × 覆盖文件字节数 + 24 MiB`，覆盖二进制日志读取、传输和元数据。结果 PUT 在独立交付池中并发，分析、完成描述与结果 BLOB 保存在私有 SQLite 恢复数据库，终态回执后删除，SQLite 自动回收空闲页。恢复数据库没有按页数设置的容量上限，也不按磁盘余量控制领取；未确认交付不能按年龄删除。模型、字体和有效算法配置共同决定引擎版本，线程／进程预算不改变结果身份；节点无独立翻译 CLI 或 PNG 压缩配置。
 
-下载阶段完成、冻结缩减内存、终态释放和配置变化都可立即补领；非空领取后仍有空间时连续发起下一批，空领取才等待 `poll_seconds` 或新提示。节点新请求最多申请 4 页；协议仍接受 1–32 的容量请求，中心对新分配最多发放 4 页。待确认的领取请求保持原编号、配置版本与数量，重试不重新计算其内容，中心返回保存的完整回执。
+下载阶段完成、冻结缩减内存、终态释放和配置变化都可立即补领；非空领取后仍有空间时连续发起下一批，空领取才等待 `poll_seconds` 或新提示。节点新请求最多申请 `claim_batch_size` 页；协议仍接受 1–32 的容量请求，中心对新分配最多发放 4 页。待确认的领取请求保持原编号、配置版本与数量，重试不重新计算其内容，中心返回保存的完整回执。
 
 heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`updates` 保持最多 20 秒的 HTTP 长轮询并直接带回译文、停止和终态变化，不续租；heartbeat 独立定时续租。无关全局通知继续等待，租约集合或真实可领取状态变化可以结束等待以重建请求快照；细节见[通知协议](COMPUTE_PROTOCOL.md#分阶段流水线与通知)。持久状态重查与周期领取负责断线补偿，无需新增 WebSocket。
 
@@ -74,4 +92,4 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 仓库包含 [classic-engine](../services/classic-engine/README.md) 源码、模型清单和测试；模型权重与字体需另行准备。产品允许选择某目标语言，不代表已有可用节点，也不代表 OCR 能可靠识别该源语言。接入引擎需要自行验证源语言 OCR、目标字体、换行、缺字和排版边界，并准确报告能力。交互与恢复见[计算协议](COMPUTE_PROTOCOL.md)。
 
-`engine.gpu` 是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎选项仅有 `models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang`；未知参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`threads` 同时约束 PyTorch、ORT 辅助算子和 OpenCV 的 CPU 线程，不增加租约并发或 CUDA 推理批次；多核节点应结合容器 CPU 配额、分析耗时与并发嵌字负载实测调整。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 DBNet／OCR／LaMa 与 Qt 嵌字后再登记能力；GPU 初始化失败不降级 CPU。
+`engine.gpu` 是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎接受 `models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang` 及上表推理选项；未知参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`threads` 同时约束 PyTorch、ORT 辅助算子和 OpenCV 的 CPU 线程，不增加租约并发或 CUDA 推理批次；多核节点应结合容器 CPU 配额、分析耗时与并发嵌字负载实测调整。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 DBNet／OCR／LaMa 与 Qt 嵌字后再登记能力；GPU 初始化失败不降级 CPU。

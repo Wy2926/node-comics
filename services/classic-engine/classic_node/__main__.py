@@ -7,7 +7,7 @@ import signal
 import sys
 from threading import Event
 
-from .config import load
+from .config import load, execution_settings
 from .operations import LOG, Operations, configure_logging, report_fatal
 
 
@@ -57,6 +57,7 @@ def execute(args):
             print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
                 'cpu_resources': config.get('_cpu_resources'),
+                'execution_settings': execution_settings(config),
                 'inpainting_backend': 'pytorch-cuda-fp32', 'renderer': 'mtu-pyqt6'}))
         finally:
             runtime.close()
@@ -84,6 +85,7 @@ def execute(args):
         try:
             LOG.info('event=starting python=%s', sys.version.split()[0])
             LOG.info('event=cpu_resources data=%s', json.dumps(config.get('_cpu_resources'), sort_keys=True))
+            LOG.info('event=execution_settings data=%s', json.dumps(execution_settings(config), sort_keys=True))
             for warning in config.get('_cpu_resources', {}).get('warnings', []):
                 LOG.warning('event=cpu_budget_warning detail=%s', warning)
             from .runtime import Runtime

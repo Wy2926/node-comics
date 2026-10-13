@@ -12,7 +12,7 @@ import pytest
 from classic_node.timing import collect
 from mtu_engine.colors import Colors, _CpuColorModel, _monochrome, ensure_stroke_contrast
 from mtu_engine.engine import serialize_region
-from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_MAX_WIDTH
+from mtu_engine.ocr import OCR_MAX_WIDTH
 
 
 def region(lines, texts=None, language='unknown'):
@@ -127,15 +127,16 @@ def test_contrast_guard_import_does_not_load_torch_in_cpu_render_workers():
 
 def test_native_prediction_receives_bounded_bgr_crops_and_preserves_ocr(colors):
     adapter, native = colors
-    first = [region([np.full((48, 120, 3), [20, 70, 180], dtype=np.uint8)]) for _ in range(OCR_BATCH_SIZE + 1)]
-    second = [region([np.full((48, 220, 3), [180, 30, 40], dtype=np.uint8)]) for _ in range(OCR_BATCH_SIZE)]
+    adapter.batch_size = 3  # Independent of the OCR batch default.
+    first = [region([np.full((48, 120, 3), [20, 70, 180], dtype=np.uint8)]) for _ in range(adapter.batch_size + 1)]
+    second = [region([np.full((48, 220, 3), [180, 30, 40], dtype=np.uint8)]) for _ in range(adapter.batch_size)]
     sizes = []
     def predict(crops):
         sizes.append(len(crops))
         return [(*crop[0, 0, ::-1].tolist(), 90, 100, 110) for crop in crops]
     native._estimate_colors_batch = predict
     adapter.apply(None, first + second)
-    assert sizes == [OCR_BATCH_SIZE, OCR_BATCH_SIZE, 1]
+    assert sizes == [adapter.batch_size, adapter.batch_size, 1]
     assert all(block.fg_colors.tolist() == [20, 70, 180] for block in first)
     assert all(block.fg_colors.tolist() == [180, 30, 40] for block in second)
     assert all(block.bg_colors.tolist() == [90, 100, 110] for block in first + second)

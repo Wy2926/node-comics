@@ -37,3 +37,19 @@ def test_measurement_fails_immediately_on_a_stage_error(tmp_path):
     with pytest.raises(AssertionError, match='inpaint') as failure:
         exercise(tmp_path, 'throughput', BrokenRuntime(), total=8, timeout=15)
     assert 'private fixture details' not in str(failure.value)
+
+
+def test_offline_profiles_keep_detailed_metrics_with_production_filter(tmp_path):
+    from classic_node.timing import record, stage
+    class ProfiledRuntime(FixtureRuntime):
+        def analyze(self, *args, **kwargs):
+            record('ocr_batches', 2)
+            record('ocr_batch_max', 4, maximum=True)
+            with stage('ocr_infer'):
+                return super().analyze(*args, **kwargs)
+    result = exercise(tmp_path, 'throughput', ProfiledRuntime(), total=8, timeout=15)
+    assert result['completed'] == 8 and result['journal_empty']
+    for profile in result['page_profiles']:
+        assert profile['timings']['ocr_batches'] == 2
+        assert profile['timings']['ocr_batch_max'] == 4
+        assert profile['timings']['ocr_infer'] >= 0

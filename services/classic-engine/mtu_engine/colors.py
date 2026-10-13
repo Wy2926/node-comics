@@ -153,8 +153,10 @@ class _CpuColorModel:
 
 
 class Colors:
-    def __init__(self, model):
+    def __init__(self, model, batch_size=None):
+        from classic_node.config import ENGINE_DEFAULTS
         from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
+        self.batch_size = ENGINE_DEFAULTS['color_batch_size'] if batch_size is None else batch_size
         # Construct only the adapter, never another Paddle session or 48px model.
         self.predictor = ModelPaddleOCR()
         self.predictor.color_model = _CpuColorModel(model.model)
@@ -211,8 +213,6 @@ class Colors:
 
     def apply(self, image, regions):
         from manga_translator.utils import chunks
-        # CPU-only render workers use the contrast guard, not the OCR runtime.
-        from .ocr import OCR_BATCH_SIZE
         predicted = []
         skipped_lines = 0
         with stage('analyze_color_gate'):
@@ -229,7 +229,7 @@ class Colors:
         # Bound both crops and GPU batches, including on very long pages. Native
         # crops, preprocessing and per-character aggregation stay intact. Only
         # one line contributes colors; full OCR/erasure/layout geometry is retained.
-        for batch in chunks(predicted, OCR_BATCH_SIZE):
+        for batch in chunks(predicted, self.batch_size):
             crops, owners, tokens = [], [], []
             for region in batch:
                 crop, text_indices = self._representative(image, region)
@@ -242,6 +242,8 @@ class Colors:
                 tokens.append(text_indices)
             if crops:
                 record('color_model_lines', len(crops))
+                record('color_batches', 1)
+                record('color_batch_max', len(crops), maximum=True)
                 predictor = self.predictor
                 if any(row is not None for row in tokens):
                     # This tiny, request-local adapter reuses upstream's input,

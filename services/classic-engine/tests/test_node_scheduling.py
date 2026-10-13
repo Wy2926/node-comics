@@ -70,6 +70,30 @@ def add_page(agent, key=0, **kwargs):
     return agent.pages[str(key)]
 
 
+def test_claim_batch_setting_does_not_expand_leases_or_download_capacity(agent):
+    agent.local['claim_batch_size'] = 2
+    assert agent.claim_capacity() == 2
+    for index in range(3):
+        add_page(agent, index)
+    assert agent.claim_capacity() == 1
+    add_page(agent, 3)
+    assert agent.claim_capacity() == 0
+
+
+def test_configured_network_pools_are_independent(tmp_path):
+    journal = Journal(tmp_path)
+    value = Agent({'local_pages': 1, 'download_workers': 5, 'analysis_workers': 2,
+                   'delivery_workers': 3, 'document_control_workers': 3}, None, None, journal)
+    try:
+        assert value.pipeline.download._max_workers == 5
+        assert value.pipeline.control._max_workers == 2
+        assert value.pipeline.delivery._max_workers == value.documents.control._max_workers == 3
+        assert value.heartbeat_pool._max_workers == value.claim_pool._max_workers == value.notice_pool._max_workers == 1
+    finally:
+        value.close()
+        journal.close()
+
+
 @pytest.mark.parametrize('error,expected', [(NodeFailure('FUTURE_RENDER_DETAIL'), 'FUTURE_RENDER_DETAIL'),
                                           (ValueError('private text'), 'CLASSIC_RENDER_FAILED')])
 def test_page_failure_preserves_diagnostic_codes_and_identifies_stage(agent, error, expected):

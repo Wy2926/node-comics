@@ -6,7 +6,9 @@ import pytest
 from rapidocr.ch_ppocr_rec import TextRecognizer
 from rapidocr.ch_ppocr_rec.typings import TextRecOutput
 
-from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, Recognizer
+from classic_node.config import ENGINE_DEFAULTS
+from classic_node.timing import collect
+from mtu_engine.ocr import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, Recognizer
 
 
 @pytest.mark.parametrize(('height', 'width'), [(48, 180), (32, 600), (48, 3200), (90, 120)])
@@ -28,7 +30,7 @@ def test_adapter_preserves_order_confidence_and_skips_unsupported_crops(monkeypa
                             _get_rotate_crop_image=lambda image, pts: pts)
     monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
     recognizer = Recognizer(model)
-    assert recognizer.rec_batch_num == OCR_BATCH_SIZE
+    assert recognizer.rec_batch_num == ENGINE_DEFAULTS['ocr_batch_size']
     assert recognizer.session._session is model.session
     assert recognizer.postprocess_op([0])[0] == [('unused', 1)]
     crops = [np.full((24, 200, 3), [20, 30, 40], dtype=np.uint8),
@@ -71,7 +73,7 @@ def test_short_and_long_inputs_use_two_native_groups_with_original_order(monkeyp
 
 def test_short_text_tensor_padding_is_independent_of_a_long_peer():
     recognizer = Recognizer.__new__(Recognizer)
-    recognizer.rec_batch_num = OCR_BATCH_SIZE
+    recognizer.rec_batch_num = ENGINE_DEFAULTS['ocr_batch_size']
     recognizer.rec_image_shape = OCR_IMAGE_SHAPE
     recognizer.cfg = SimpleNamespace(lang_type='ch', font_path=None)
     recognizer.RTL_LANGS = set()
@@ -87,3 +89,45 @@ def test_short_text_tensor_padding_is_independent_of_a_long_peer():
     recognizer.read([short])
     assert [batch.shape for batch in tensors] == [(1, 3, 48, 320), (1, 3, 48, 2500), (1, 3, 48, 320)]
     np.testing.assert_array_equal(tensors[0], tensors[2])
+
+
+@pytest.mark.parametrize('minimum,succeeds,expected', [(1, True, [4, 2, 1, 1, 1, 1]),
+                                                       (2, False, [4, 2]), (4, False, [4])])
+def test_oom_reuses_native_batches_with_bounded_request_local_retry(monkeypatch, minimum, succeeds, expected):
+    attempts, releases = [], []
+    def infer(batch):
+        attempts.append(len(batch))
+        if len(batch) > 1:
+            raise RuntimeError('bfc_arena.cc: Failed to allocate memory for requested buffer of size 108545280')
+        return np.rint((batch[:, 0, 0, 0] + 1) * 127.5).astype(int)
+    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    recognizer = Recognizer(SimpleNamespace(session=infer, _decode_ctc=lambda value: (str(value), .9)),
+                            batch_size=4, min_batch_size=minimum, recover=lambda: releases.append(1))
+    crops = [np.full((48, width, 3), i, np.uint8) for i, width in enumerate((200, 50, 100, 90))]
+    with collect() as values:
+        if succeeds:
+            assert [row['text'] for row in recognizer.read(crops)] == ['0', '1', '2', '3']
+        else:
+            with pytest.raises(RuntimeError, match='Failed to allocate'):
+                recognizer.read(crops)
+    assert attempts == expected
+    assert recognizer.rec_batch_num == 4 and recognizer.min_batch_size == minimum
+    assert len(releases) == (minimum < 4)
+    assert values.get('ocr_oom_retries', 0) == ({1: 2, 2: 1, 4: 0}[minimum])
+    assert values['ocr_batch_max'] == 4 and values['ocr_batches'] == len(attempts)
+    assert values['ocr_width_max'] == 320
+
+
+@pytest.mark.parametrize('message', ['CUDA illegal memory access', 'shape mismatch', 'private text',
+                                     'CPU out of memory'])
+def test_non_allocation_failure_never_retries_or_reclaims(monkeypatch, message):
+    calls = []
+    def infer(batch):
+        calls.append(1)
+        raise RuntimeError(message)
+    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    reader = Recognizer(SimpleNamespace(session=infer, _decode_ctc=None),
+                        recover=lambda: pytest.fail('must not clear allocator'))
+    with pytest.raises(RuntimeError, match=message):
+        reader.read([np.zeros((48, 48, 3), np.uint8)] * 4)
+    assert len(calls) == 1

@@ -13,6 +13,7 @@ from .object_transfer import ObjectTransfer
 from .operations import report_page_failure
 from .protocol import ControlFailure, NodeFailure, MAX_CHECKPOINT_BYTES
 from .timing import WIRE_FIELDS
+from .config import LOCAL_DEFAULTS
 
 PREFIX = 'document-lease:'
 LOG = logging.getLogger('classic-node')
@@ -39,7 +40,8 @@ class DocumentRunner:
         self.agent = agent
         self.pages = {}
         self.adoption_lock = RLock()
-        self.control = ThreadPoolExecutor(2, thread_name_prefix='document-control')
+        self.control = ThreadPoolExecutor(agent.local.get('document_control_workers',
+            LOCAL_DEFAULTS['document_control_workers']), thread_name_prefix='document-control')
         self.claim_future = self.heartbeat_future = self.sync_future = None
         self.next_claim = self.next_heartbeat = self.next_sync = 0
         self.objects = ObjectTransfer()

@@ -12,7 +12,8 @@ import pytest
 
 from classic_node.runtime import LANGUAGE_PROBES
 from mtu_engine.engine import Engine, Renderer, serialize_region
-from mtu_engine.ocr import OCR_BATCH_SIZE, OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
+from classic_node.config import ENGINE_DEFAULTS
+from mtu_engine.ocr import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
 
 
 @pytest.fixture(scope='module')
@@ -378,6 +379,7 @@ def test_native_representative_color_is_not_divided_by_original_line_count(asset
     predictor = SimpleNamespace(_get_rotate_crop_image=lambda *args: np.full((48, 100, 3), (180, 30, 40), dtype=np.uint8),
         _estimate_colors_batch=lambda crops: [(220, 40, 60, 120, 120, 120)] * len(crops))
     colors = Colors.__new__(Colors)
+    colors.batch_size = ENGINE_DEFAULTS['color_batch_size']
     colors.predictor = predictor
     block = TextBlock([[[0, 0], [100, 0], [100, 48], [0, 48]]] * 2, ['first', 'second'],
                       adjust_bg_color=False)
@@ -415,6 +417,7 @@ def test_native_monochrome_color_gate_without_bubble(assets, style, skip):
         calls.append(len(crops))
         return [(90, 60, 30, 200, 210, 220)] * len(crops)
     colors = Colors.__new__(Colors)
+    colors.batch_size = ENGINE_DEFAULTS['color_batch_size']
     colors._characters = {}
     colors.predictor = SimpleNamespace(_get_rotate_crop_image=ModelPaddleOCR()._get_rotate_crop_image,
                                       _estimate_colors_batch=predict)
@@ -559,7 +562,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             edge_inputs.append((np.array(image), count))
             edge_regions[count] = [serialize_region(region) for region in regions]
         assert sum(shape[0] for shape in shapes) >= 21  # Includes representative-line probes.
-        assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
+        assert all(1 <= shape[0] <= ENGINE_DEFAULTS['ocr_batch_size'] and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
                    OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)
         # Pair analyses at the same start gate and compare full checkpoint
         # regions, including line order and colors, against serial inference.
@@ -597,7 +600,7 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
                     assert ' '.join(region.text for region in regions).count(sentence) == count
                     assert [serialize_region(region) for region in regions] == edge_regions[count]
                     assert edge_mask is not None and edge_mask[-8:].any()
-        assert all(1 <= shape[0] <= OCR_BATCH_SIZE and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
+        assert all(1 <= shape[0] <= ENGINE_DEFAULTS['ocr_batch_size'] and shape[1:3] == OCR_IMAGE_SHAPE[:2] and
                    OCR_IMAGE_SHAPE[2] <= shape[3] <= OCR_MAX_WIDTH for shape in shapes)
     finally:
         engine.close()

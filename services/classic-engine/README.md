@@ -33,6 +33,8 @@ uv sync --locked --extra test
 
 增加 `--pipeline --resident-mib 8192 --total 12` 可运行真实八租约调度器和内存门控，逐轮循环输入目录内的长短图；页缓冲、IPC、缓存预算和本地回退均由调度器决定，不使用 `--cache-mib` 固定逐页额度。中心、文本和存储仍为本地模拟，报告包含每页阶段／排队耗时、缓存需求／分配／命中／重算及交付次数校验。`--auto-cpu` 验证当前启动资源规划器，手工线程／进程参数用于同资源 A/B。
 
+批量／显存策略对照沿用该工具：`--ocr-batch-size 4 --ocr-min-batch-size 1 --color-batch-size 4 --detect-batch-size 4`，并用 `--ocr-arena-extend-strategy kNextPowerOfTwo --no-ocr-arena-shrinkage --ocr-min-batch-size 4` 对照旧显存策略；只比较失败恢复时保持相同 arena 设置，仅把 `--ocr-min-batch-size` 改为 4 禁用缩批。报告保存实际推理参数；两组须在同一空闲测试 GPU、相同样本与页并发下分别启动，不能对在线接单进程运行压测。`--concurrency` 支持 1–8，4 页场景也可测量。`--pipeline` 复用工具已有的阶段观测包装，将完整数值诊断写入报告 JSON；生产不新增逐阶段详细日志或 GPU 资源查询，记录边界见[节点运维](docs/NODE_OPERATIONS.md#状态与恢复)。仅隔离容量实验可用 `--reserve-vram-mib` 预留测试显存，报告明确记录这部分占用；这不是全局显存限制，也不能将 12 GiB 卡预留 4 GiB 的结果当作 8 GiB 目标卡验收。
+
 分析细分记录检测、分组、路由、OCR、取色、气泡、蒙版细化和检查点耗时；抹字细分准备、纯色填充、LaMa。锁等待包含在对应阶段内，不可重复相加。仅原有时间字段送中心，细分指标及字节／次数计数留在本地测量，不扩展协议、不记录私有文本。大图提前分块时 `render_encode` 是分块差分、编码、校验及组包的总墙钟时间，`render_diff` 仅为分块前规划；比较输出开销应使用二者之和。`render_tile_diff_sum`／`render_tile_encode_sum` 是并发任务耗时之和，不是墙钟时间。
 
 取色记录 `analyze_color_gate` 检查耗时、`color_fast_regions`／`color_fast_lines` 无明显彩色而直接使用默认配色的段／行数和 `color_model_lines` 实际模型输入行数；前者包含在 `analyze_colors` 内。每段最大有效行取色和默认黑字白边不保留灰字、反白字原样式，须比较原图与输出，不能只验收耗时；完整 OCR、抹字与排版几何仍需保持。具体规则见 [ENGINE.md](ENGINE.md#排版配置)。

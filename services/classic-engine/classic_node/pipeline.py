@@ -8,6 +8,8 @@ import time
 from .protocol import MAX_CHECKPOINT_BYTES, ControlFailure, NodeFailure, digest
 from .operations import report_page_failure
 from .timing import WIRE_FIELDS, collect
+from .config import LOCAL_DEFAULTS
+from .document_runner import LOCAL_TIMINGS
 
 
 class Pipeline:
@@ -17,10 +19,11 @@ class Pipeline:
         self.compute = ThreadPoolExecutor(cfg['local_pages'], thread_name_prefix='compute')
         self.render_workers = cfg.get('render_workers', 1)
         self.render = ThreadPoolExecutor(self.render_workers, thread_name_prefix='render')
-        self.download = ThreadPoolExecutor(cfg.get('download_workers', 4), thread_name_prefix='download')
-        self.control = ThreadPoolExecutor(cfg.get('download_workers', 4), thread_name_prefix='analysis')
-        self.delivery = ThreadPoolExecutor(cfg.get('delivery_workers', 4), thread_name_prefix='delivery')
-        self.limit = cfg.get('resident_bytes', 1024 * 1024 * 1024)
+        self.download_workers = cfg.get('download_workers', LOCAL_DEFAULTS['download_workers'])
+        self.download = ThreadPoolExecutor(self.download_workers, thread_name_prefix='download')
+        self.control = ThreadPoolExecutor(cfg.get('analysis_workers', self.download_workers), thread_name_prefix='analysis')
+        self.delivery = ThreadPoolExecutor(cfg.get('delivery_workers', LOCAL_DEFAULTS['delivery_workers']), thread_name_prefix='delivery')
+        self.limit = cfg.get('resident_bytes', LOCAL_DEFAULTS['resident_bytes'])
         self.used = 0
         self.memory_lock = Lock()
 
@@ -129,7 +132,8 @@ class Pipeline:
             pending_bytes = sum(self.input_reservation(page) for page in downloading if not page.reserved)
             available = max(0, self.limit - self.used - pending_bytes)
         minimum = MAX_CHECKPOINT_BYTES * 6
-        return max(0, min(4, self.agent.local.get('download_workers', 4) - len(downloading), available // minimum))
+        batch = self.agent.local.get('claim_batch_size', LOCAL_DEFAULTS['claim_batch_size'])
+        return max(0, min(batch, self.download_workers - len(downloading), available // minimum))
 
     def close(self):
         for pool in (self.download, self.compute, self.render, self.control, self.delivery):
@@ -145,7 +149,7 @@ class Pipeline:
             page.check()
             start = time.monotonic()
             page.timings[name + '_queue'] = start - page.ready_at
-            with collect() as details:
+            with collect(LOCAL_TIMINGS) as details:
                 try:
                     return operation()
                 finally:

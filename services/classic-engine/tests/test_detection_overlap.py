@@ -12,6 +12,24 @@ PATCH_PATH = 'manga_translator/utils/generic.py'
 PATCH = LOCK['source']['patches'][PATCH_PATH][0]
 
 
+def test_detector_patch_exposes_only_native_batch_limit():
+    import ast
+    patches = LOCK['source']['patches']['manga_translator/detection/default.py']
+    source = 'class DefaultDetector(OfflineDetector):\n    def infer(self):\n        return det_rearrange_forward(\n' + patches[0]['before'] + '        )\n'
+    for patch in patches:
+        assert source.count(patch['before']) == 1
+        source = source.replace(patch['before'], patch['after'])
+    # Call and its surrounding model algorithm remain upstream-owned.
+    calls = []
+    namespace = {'OfflineDetector': object, 'det_rearrange_forward': lambda *a, **kw: calls.append((a, kw)),
+                 'detect_size': 1280}
+    exec(compile(ast.parse(source), '<prepared-detector>', 'exec'), namespace)
+    detector = namespace['DefaultDetector']()
+    detector.device, detector.max_batch_size = 'cuda', 2
+    detector.infer()
+    assert calls == [((1280, 2), {'device': 'cuda'})]
+
+
 def test_preparation_applies_only_the_pinned_edit(tmp_path):
     sources = {}
     for relative, patches in LOCK['source']['patches'].items():
@@ -32,7 +50,8 @@ def test_preparation_applies_only_the_pinned_edit(tmp_path):
 
 
 @pytest.mark.parametrize('source', ['unrelated source', PATCH['before'] * 2])
-def test_preparation_rejects_missing_or_ambiguous_anchor(tmp_path, source):
+def test_preparation_rejects_missing_or_ambiguous_anchor(tmp_path, monkeypatch, source):
+    monkeypatch.setitem(LOCK['source'], 'patches', {PATCH_PATH: [PATCH]})
     target = tmp_path / PATCH_PATH
     target.parent.mkdir(parents=True)
     target.write_text(source, encoding='utf-8')

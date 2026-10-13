@@ -13,6 +13,7 @@ from classic_node.journal import Journal
 from classic_node.operations import LOG, NetworkLog, Operations, configure_logging, report_fatal, report_page_failure
 from classic_node.protocol import ControlFailure, NodeFailure
 from classic_node.transport import Transport
+from classic_node.config import execution_settings
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +47,46 @@ def registration():
     return {'protocol_version': 3, 'leases': [], 'server_time': '2026-01-01T00:00:00Z',
             'config': {'version': 1, 'request_seconds': 30, 'execution_slots': 1, 'enabled': True,
                        'heartbeat_seconds': 10, 'poll_seconds': 20}}
+
+
+def test_attach_and_image_stage_never_sample_or_write_diagnostics(tmp_path, monkeypatch):
+    from classic_node.timing import record
+    agent, transport, journal = make_agent(tmp_path, lambda _: httpx.Response(200, json=registration()))
+    operations = Operations(tmp_path, agent.stop)
+    agent.operations = operations
+    def unexpected(*args, **kwargs):
+        raise AssertionError('Production stage must not sample resources or write diagnostics')
+    def operation():
+        record('ocr_batches', 1)
+        record('ocr_lock_wait', .125)
+        record('inpaint_prepare', .01)
+        record('inpaint_solid_fill', .02)
+        record('inpaint_lama', .03)
+        return 'done'
+    page = SimpleNamespace(check=lambda: None, ready_at=time.monotonic(), timings={})
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(agent.runtime, 'resource_snapshot', unexpected, raising=False)
+            patch.setattr(operations, 'record_stage', unexpected, raising=False)
+            patch.setattr(LOG, 'info', unexpected)
+            operations.attach(agent)
+            agent.pipeline.submit(page, agent.pipeline.compute, 'analyze', operation)
+            assert page.future.result(timeout=5) == 'done'
+            assert 'resources' not in operations.snapshot()
+        assert set(page.timings) == {'analyze_queue', 'analyze', 'ocr_lock_wait',
+                                    'inpaint_prepare', 'inpaint_solid_fill', 'inpaint_lama'}
+        assert page.timings['ocr_lock_wait'] == .125
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
+def test_execution_settings_allowlist_excludes_identity_paths_and_credentials():
+    settings = execution_settings({'node_token': 'secret-token', 'control_url': 'private-origin',
+        'engine': {'models': 'private-model-path', 'font': ['private-font-path'], 'ocr_batch_size': 2}})
+    assert settings['engine']['ocr_batch_size'] == 2
+    assert not any(value in json.dumps(settings) for value in ('secret-token', 'private-origin', 'private-model-path', 'private-font-path'))
 
 
 def test_process_survives_registration_outage_then_registers(tmp_path):

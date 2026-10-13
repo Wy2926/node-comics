@@ -9,11 +9,20 @@
   "render_workers": "auto",
   "max_leases": 8,
   "download_workers": 6,
+  "analysis_workers": 6,
   "delivery_workers": 6,
+  "claim_batch_size": 4,
+  "document_control_workers": 2,
   "resident_bytes": 2147483648,
   "engine": {
     "gpu": 0,
     "threads": "auto",
+    "ocr_batch_size": 4,
+    "ocr_min_batch_size": 1,
+    "color_batch_size": 4,
+    "detect_batch_size": 4,
+    "ocr_arena_extend_strategy": "kSameAsRequested",
+    "ocr_arena_shrinkage": true,
     "detect_size": 1280,
     "inpainting_size": 512
   }

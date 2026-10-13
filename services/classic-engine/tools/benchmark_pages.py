@@ -20,6 +20,7 @@ import torch
 from classic_node.protocol import digest
 from classic_node.runtime import Runtime
 from classic_node.timing import collect
+from classic_node.config import ENGINE_DEFAULTS
 from tools.validate_render_output import measured, reconstruct
 
 
@@ -40,19 +41,28 @@ def run(args):
         resources = resolve_cpu_resources(analysis_threads='auto', render_workers='auto',
                                           local_pages=args.concurrency, max_leases=8)
         args.threads, args.render_workers = resources['analysis_threads'], resources['render_workers']
-    config = {'engine': {'models': str(args.models.resolve()), 'threads': args.threads,
+    inference = {key: getattr(args, key, default) for key, default in ENGINE_DEFAULTS.items()
+                 if key.endswith('_batch_size') or key.startswith('ocr_arena_')}
+    if inference['ocr_min_batch_size'] > inference['ocr_batch_size']:
+        raise ValueError('ocr_min_batch_size must not exceed ocr_batch_size')
+    config = {'engine': {**inference, 'models': str(args.models.resolve()), 'threads': args.threads,
                          'font': [str(assets / 'fonts' / f['name']) for f in fonts]},
               'render_workers': args.render_workers,
               '_render_threads': resources['render_threads'] if resources else 1}
     paths = sorted(p for p in source.iterdir() if p.suffix.lower() in {'.png', '.webp', '.jpg', '.jpeg'})
     if not paths:
         raise ValueError('No input images')
+    # An isolated capacity experiment, not a driver/global memory limit. This
+    # allocation belongs only to this benchmark and is freed with its process.
+    reserve_mib = getattr(args, 'reserve_vram_mib', 0)
+    reserved_vram = torch.empty(reserve_mib * 1024 ** 2, dtype=torch.uint8, device='cuda') if reserve_mib else None
     runtime = Runtime(config)
     report = {'engine': runtime.version, 'torch': torch.__version__, 'cuda': torch.version.cuda,
               'gpu': torch.cuda.get_device_name(), 'threads': args.threads,
               'concurrency': args.concurrency, 'render_workers': args.render_workers,
               'cache_bytes_per_page': args.cache_mib * 1024 ** 2,
-              'translation_source': 'fixed fixture text; no provider call', 'runs': [], 'cpu_resources': resources}
+              'translation_source': 'fixed fixture text; no provider call', 'runs': [], 'cpu_resources': resources,
+              'inference_settings': inference, 'reserved_test_vram_mib': reserve_mib}
 
     def page(path):
         data = path.read_bytes()
@@ -139,6 +149,7 @@ def run(args):
                                             for p in pages]}), flush=True)
     finally:
         runtime.close()
+        del reserved_vram
 
 
 if __name__ == '__main__':
@@ -147,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--models', type=Path, required=True)
     parser.add_argument('--repeats', type=int, choices=range(1, 21), default=3)
-    parser.add_argument('--concurrency', type=int, choices=(1, 2), default=1)
+    parser.add_argument('--concurrency', type=int, choices=range(1, 9), default=1)
     parser.add_argument('--render-workers', type=int, choices=range(1, 9), default=2)
     parser.add_argument('--threads', type=int, choices=range(1, 33), default=3)
     parser.add_argument('--cache-mib', type=int, choices=range(0, 2049), default=512)
@@ -155,4 +166,12 @@ if __name__ == '__main__':
     parser.add_argument('--resident-mib', type=int, choices=range(512, 65537), default=8192)
     parser.add_argument('--total', type=int, choices=range(8, 65), default=12)
     parser.add_argument('--auto-cpu', action='store_true', help='Exercise the node CPU resource planner')
+    parser.add_argument('--reserve-vram-mib', type=int, choices=range(0, 16385), default=0, metavar='0..16384',
+                        help='Reserve test-only CUDA memory to simulate a smaller GPU; never use on a busy device')
+    for key in ('ocr_batch_size', 'ocr_min_batch_size', 'color_batch_size', 'detect_batch_size'):
+        parser.add_argument('--' + key.replace('_', '-'), type=int, choices=range(1, 33), default=ENGINE_DEFAULTS[key])
+    parser.add_argument('--ocr-arena-extend-strategy', choices=('kSameAsRequested', 'kNextPowerOfTwo'),
+                        default=ENGINE_DEFAULTS['ocr_arena_extend_strategy'])
+    parser.add_argument('--ocr-arena-shrinkage', action=argparse.BooleanOptionalAction,
+                        default=ENGINE_DEFAULTS['ocr_arena_shrinkage'])
     run(parser.parse_args())

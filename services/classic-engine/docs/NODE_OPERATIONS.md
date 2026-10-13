@@ -22,6 +22,10 @@
 - 单页失败记录 `event=page_failed`、租约 ID、阶段、错误码、异常类型及文件／函数／行号，不记录原始异常消息、源码行或局部变量。本地绘字异常映射为 `CLASSIC_RENDER_FAILED`，子进程异常／退出为 `CLASSIC_RENDER_WORKER_FAILED`，检查点不一致为 `CLASSIC_RENDER_MISMATCH`；输出仍区分 `CLASSIC_OUTPUT_ENCODE_FAILED` 和 `CLASSIC_OUTPUT_TOO_LARGE`，不会被改成通用 worker 错误。这些确定性错误不自动重试；未知异常保留当前阶段的通用错误码。
 - `render_layout` 记录绘字，`render_diff`／`render_encode` 记录输出；大图提前分块时各块的差分、编码和校验并发执行，统一计入 `render_encode` 墙钟时间，`render_diff` 仅记录分块前规划，应以两项之和计算输出成本。子进程计时合并回父进程，不写入结果身份。整段 `render` 还包括 CPU 配额等待、共享输入分配、复制、IPC 和清理，不能仅用三个子项之和代替它；对比测量须保持计时边界一致。更多分析细分、缓存命中／预算等本地指标见[测量命令](../README.md#验证)，不向中心新增字段。
 
+运行数据复用已有机制，不新增数据库、监控服务或中心协议。`event=execution_settings data={...}` 仅在启动时记录有效本地资源参数，不包含凭据、路径、正文或签名地址。生产执行阶段的收集器只启用原有协议及文件任务计时白名单，跳过新增的 OCR／取色细分计数；原有缓存规划、渲染子进程计时、失败日志、文件任务状态日志和健康状态保留。不增加逐阶段 JSON 日志、GPU／进程资源采样或峰值重置，也不向生产增加后台采样线程。
+
+详细运行数据由离线 [benchmark_pages](../README.md#验证) 的现有 JSON 报告保存。`ocr_batches`、`ocr_batch_max`、`ocr_width_max`、`ocr_input_bytes_max` 包括失败尝试；`ocr_ooms`、`ocr_oom_retries`、`ocr_cache_releases` 区分失败、缩批与缓存回收。`color_batches`／`color_batch_max` 记录取色实际批量。`ocr_infer` 含原生会话执行，不含锁等待；恢复开销在 `ocr_cache_release`，均已包含于分析时间。PyTorch 显存统计不包含 ORT，进程树 RSS 可能重复计算共享页；需要整卡峰值时仅在隔离测试中使用外部 `nvidia-smi` 采样。离线采集本身有开销，结果不等同于无观测的生产吞吐，更不能把模拟中心视为生产服务验收。
+
 ## 升级与验收
 
 中心与节点配套使用 v3，分析检查点必须满足 `mtu-regions-v1`。升级前停止新领取，排空租约和待交付结果，再停止节点并保留原包与私有数据。配置按发布包示例校验；不兼容协议或检查点的升级必须使用新的专用数据目录执行 `init`，重新填写身份，不复制不兼容的配置或恢复数据库，也不通过删除恢复记录绕过排空。运行 `doctor`，确认资产、GPU 与中心协议兼容后启动；构建指纹不要求相同。同一身份不能在两个宿主或托管方式下同时运行。

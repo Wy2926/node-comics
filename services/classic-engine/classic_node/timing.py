@@ -16,26 +16,36 @@ WIRE_FIELDS = frozenset(('download', 'download_queue', 'analyze', 'analyze_queue
 
 
 @contextmanager
-def collect():
+def collect(fields=None):
+    """Collect all offline metrics, or only the requested production fields."""
     values, lock = {}, Lock()
-    token = current.set((values, lock))
+    token = current.set((values, lock, fields))
     try:
         yield values
     finally:
         current.reset(token)
 
 
-def record(name, seconds):
+def _target(name):
     target = current.get()
+    if target is not None and (target[2] is None or name in target[2]):
+        return target
+
+
+def record(name, seconds, *, maximum=False):
+    target = _target(name)
     if target is not None:
-        values, lock = target
+        values, lock, _ = target
         with lock:
-            values[name] = values.get(name, 0.) + seconds
+            values[name] = max(values.get(name, 0.), seconds) if maximum else values.get(name, 0.) + seconds
 
 
 @contextmanager
 def stage(name):
     """Wall time, including any native synchronization inside the operation."""
+    if _target(name) is None:
+        yield
+        return
     start = perf_counter()
     try:
         yield
@@ -45,10 +55,11 @@ def stage(name):
 
 @contextmanager
 def waiting_for(lock, name):
-    start = perf_counter()
+    start = perf_counter() if _target(name) is not None else None
     lock.acquire()
     try:
-        record(name, perf_counter() - start)
+        if start is not None:
+            record(name, perf_counter() - start)
         yield
     finally:
         lock.release()

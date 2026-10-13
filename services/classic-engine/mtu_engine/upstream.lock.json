@@ -6,6 +6,16 @@
     "sha256": "f2194c2d8e9cee4c59ae0b309e3255955c2bec2735a298fc3eb07958f259ac19",
     "license": "GPL-3.0",
     "patches": {
+      "manga_translator/detection/default.py": [
+        {
+          "before": "            detect_size,\n            4,\n            device=self.device,\n",
+          "after": "            detect_size,\n            self.max_batch_size,\n            device=self.device,\n"
+        },
+        {
+          "before": "class DefaultDetector(OfflineDetector):\n",
+          "after": "class DefaultDetector(OfflineDetector):\n    max_batch_size = 4  # Node Comics overrides this from local engine configuration.\n"
+        }
+      ],
       "manga_translator/utils/generic.py": [
         {
           "before": "    ph_num = int(np.ceil(h / ph))\n",

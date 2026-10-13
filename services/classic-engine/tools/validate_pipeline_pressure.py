@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 from classic_node.agent import Agent
 from classic_node.journal import Journal
 from classic_node.protocol import digest, pack_result, png64
+from classic_node.timing import collect
 
 
 def fixture_image():
@@ -261,15 +262,19 @@ def exercise(directory, scenario, runtime=None, *, total=24, timeout=120, local_
 
     def observed(page, stage, operation):
         began = time.monotonic()
-        try:
-            return operation()
-        except BaseException as error:
-            transport.errors.append({'stage': stage, 'type': type(error).__name__})
-            raise
-        finally:
-            with spans_lock:
-                spans.append({'lease_id': page.lease['lease_id'], 'stage': stage,
-                              'start_s': began - started, 'end_s': time.monotonic() - started})
+        # Full diagnostics belong to this offline wrapper, not the node's
+        # production collector or health/heartbeat path.
+        with collect() as details:
+            try:
+                return operation()
+            except BaseException as error:
+                transport.errors.append({'stage': stage, 'type': type(error).__name__})
+                raise
+            finally:
+                page.timings.update(details)
+                with spans_lock:
+                    spans.append({'lease_id': page.lease['lease_id'], 'stage': stage,
+                                  'start_s': began - started, 'end_s': time.monotonic() - started})
 
     def observed_submit(page, pool, stage, operation):
         return submit(page, pool, stage, lambda: observed(page, stage, operation))
