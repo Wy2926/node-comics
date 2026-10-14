@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { msg } from '../../i18n/runtime';
 import { Icon } from '../../icons';
-import { Modal } from '../components';
+import { ConfirmationDialog, DialogNotice } from '../ConfirmationDialog';
 import { Thumbnail } from '../../reader/Images';
 import { coverReference } from '../../comics/application/library-service';
 import {
@@ -192,43 +192,18 @@ function FileRow({
         </div>
       </article>
       {confirmation && (
-        <Modal
-          title={confirmation === 'resume' ? msg('重新下载') : msg('清除离线内容')}
-          onClose={() => {
-            if (!busy) setConfirmation(undefined);
-          }}
+        <ConfirmationDialog
+          title={confirmation === 'resume' ? msg('重新下载') : complete ? msg('清除离线内容') : msg('取消缓存')}
+          subject={intent.title}
+          meta={confirmation === 'resume' ? intent.totalBytes !== undefined && msg('文件大小约 {0} MB', {'0': (intent.totalBytes / 1024 ** 2).toFixed(1)}) : msg('已保留 {0}', {'0': ((complete ? intent.totalBytes ?? intent.bytes : intent.bytes) / 1024 ** 2).toFixed(1) + ' MB'})}
+          action={confirmation === 'resume' ? msg('重新下载') : complete ? msg('清除离线内容') : msg('取消缓存')}
+          icon={confirmation === 'resume' ? 'refresh' : 'trash'} danger={confirmation !== 'resume'}
+          busy={busy} error={error} onClose={() => setConfirmation(undefined)}
+          onConfirm={() => void act(() => confirmation === 'resume' ? resumeRemoteFileDownload(intent.id, intent.generation) : clearRemoteFileDownload(intent.id, intent.generation))}
         >
-          <p>
-            {confirmation === 'resume'
-              ? msg('中断的文件需要从头下载。继续吗？')
-              : msg('清除《{0}》的完整离线文件？漫画与阅读记录保留，再次阅读可能需要重新下载。', {
-                  '0': intent.title,
-                })}
-          </p>
-          {error && <p role="alert">{error}</p>}
-          <div className="nc-inline">
-            <button
-              className={'button ' + (confirmation === 'resume' ? 'primary' : 'danger')}
-              disabled={busy}
-              onClick={() =>
-                void act(() =>
-                  confirmation === 'resume'
-                    ? resumeRemoteFileDownload(intent.id, intent.generation)
-                    : clearRemoteFileDownload(intent.id, intent.generation),
-                )
-              }
-            >
-              {confirmation === 'resume' ? msg('重新下载') : msg('清除离线内容')}
-            </button>
-            <button
-              className="button secondary"
-              disabled={busy}
-              onClick={() => setConfirmation(undefined)}
-            >
-              {msg('取消')}
-            </button>
-          </div>
-        </Modal>
+          {confirmation === 'resume' ? <DialogNotice title={msg('重新下载')}>{msg('下载中断后需要从头重新下载。')}<p>{msg('请保持此插件页打开，可切换到其他标签页。')}</p></DialogNotice> : <DialogNotice tone="danger" title={msg('将会移除')}>{msg('完整离线文件；再次阅读可能需要重新下载。')}</DialogNotice>}
+          <DialogNotice tone="success" title={msg('保持不变')}>{msg('漫画与阅读记录')}</DialogNotice>
+        </ConfirmationDialog>
       )}
     </>
   );
@@ -242,45 +217,19 @@ export function FileDownloadPrompt({ controller }: { controller: BookDownloadsCo
   const request = controller.filePrompt;
   if (!request) return null;
   return (
-    <Modal
-      title={msg('下载后阅读')}
-      onClose={() => {
-        if (!busy) controller.closeFilePrompt();
+    <ConfirmationDialog
+      title={msg('下载后阅读')} subject={request.plan.publication.title} action={msg('下载后阅读')} icon="download" danger={false}
+      meta={request.plan.size !== undefined && msg('文件大小约 {0} MB', { '0': (request.plan.size / 1024 ** 2).toFixed(1) })}
+      busy={busy} error={error} onClose={() => controller.closeFilePrompt()}
+      onConfirm={() => {
+        if (busy) return;
+        setBusy(true);
+        setError('');
+        void controller.confirmFile().catch((error) => setError(error.message)).finally(() => setBusy(false));
       }}
     >
-      <p>{request.plan.publication.title}</p>
-      <p>
-        {msg(
-          '此书需要先保存完整文件。下载期间请保持插件页打开；中断后需重新下载，已完成的文件可离线阅读。',
-        )}
-      </p>
-      {request.plan.size !== undefined && (
-        <p>{msg('文件大小约 {0} MB', { '0': (request.plan.size / 1024 ** 2).toFixed(1) })}</p>
-      )}
-      {error && <p role="alert">{error}</p>}
-      <div className="nc-inline">
-        <button
-          className="button primary"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            setError('');
-            void controller
-              .confirmFile()
-              .catch((error) => setError(error.message))
-              .finally(() => setBusy(false));
-          }}
-        >
-          {msg('下载后阅读')}
-        </button>
-        <button
-          className="button secondary"
-          disabled={busy}
-          onClick={() => controller.closeFilePrompt()}
-        >
-          {msg('取消')}
-        </button>
-      </div>
-    </Modal>
+      <DialogNotice tone="success" title={msg('完整文件下载')}>{msg('下载完整文件后即可离线阅读。')}</DialogNotice>
+      <DialogNotice title={msg('下载后阅读')}>{msg('请保持此插件页打开，可切换到其他标签页。')}<p>{msg('下载中断后需要从头重新下载。')}</p></DialogNotice>
+    </ConfirmationDialog>
   );
 }

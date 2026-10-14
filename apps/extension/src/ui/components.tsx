@@ -3,13 +3,14 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '../icons';
 import {useDialogViewport} from './visual-viewport';
 import './modal.css';
-export function Modal({ title, subtitle, children, footer, onClose, className='', closeLabel=msg("关闭弹窗") }: {
+export function Modal({ title, subtitle, children, footer, onClose, className='', icon='spark', closeLabel=msg("关闭弹窗") }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
   className?: string;
+  icon?: string;
   closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -26,7 +27,7 @@ export function Modal({ title, subtitle, children, footer, onClose, className=''
   }, []);
   return <dialog ref={ref} className={'modal nc-generic-modal nc-viewport-dialog '+className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="nc-modal-controls">
-      <span className="modal-spark"><Icon name="spark" size={24}/></span>
+      <span className="modal-spark"><Icon name={icon} size={24}/></span>
       <button type="button" className="modal-close icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
     </div>
     <div className="nc-modal-body" tabIndex={0}>

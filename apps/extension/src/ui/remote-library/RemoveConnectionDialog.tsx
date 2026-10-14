@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { msg } from '../../i18n/runtime';
-import { Icon } from '../../icons';
 import type { SourceAccount } from '../../comics/sources/contracts';
 import { inspectSourceRemoval, removeSource } from '../../comics/application/source-lifecycle';
-import { Modal } from '../components';
+import { ConfirmationDialog, DialogNotice } from '../ConfirmationDialog';
 import './remote-library.css';
 
 export function RemoveConnectionDialog({ account, onClose, onRemoved }: {
@@ -47,33 +46,11 @@ export function RemoveConnectionDialog({ account, onClose, onRemoved }: {
     }
   }
   return (
-    <Modal title={msg('移除书库')} onClose={() => { if (!running.current) onClose(); }} className="nc-connection-removal">
-      <div className="nc-connection-removal-warning">
-        <Icon name="trash" size={28} />
-        <div>
-          <h3>{msg('此操作无法撤销')}</h3>
-          <p>{msg('将移除《{0}》及其全部关联漫画、阅读记录和下载任务。', { '0': account.displayName })}</p>
-          <p>{msg('此书库持有的原图、译图缓存和离线文件将一并清理。')}</p>
-        </div>
-      </div>
-      {loading ? (
-        <p role="status" className="nc-muted">{msg('正在读取本机资料…')}</p>
-      ) : resources && (
-        <div className="nc-connection-removal-counts">
-          <span>{msg('关联漫画：{0} 本', { '0': resources.comicCount })}</span>
-          <span>{msg('下载任务：{0} 个', { '0': resources.downloadTaskCount })}</span>
-        </div>
-      )}
-      <p className="nc-muted">{msg('仅清理本机资料，远端书库文件保留。')}</p>
-      {error && <p role="alert" className="error">{error}</p>}
-      <div className="nc-inline">
-        <button className="button danger" disabled={busy || loading || !resources} onClick={() => void remove()}>
-          <Icon name="trash" size={18} />
-          {busy ? msg('正在移除书库…') : msg('移除书库及关联资料')}
-        </button>
-        {!resources && error && <button className="button secondary" disabled={busy || loading} onClick={() => setRetry((value) => value + 1)}>{msg('重试')}</button>}
-        <button className="button secondary" disabled={busy} onClick={onClose}>{msg('取消')}</button>
-      </div>
-    </Modal>
+    <ConfirmationDialog title={msg('移除书库')} subject={account.displayName} action={msg('移除书库及关联资料')} busy={busy} disabled={loading || !resources} error={error} onClose={() => { if (!running.current) onClose(); }} onConfirm={() => void remove()}
+      meta={loading ? <span role="status">{msg('正在读取本机资料…')}</span> : resources && <><span>{msg('关联漫画：{0} 本', { '0': resources.comicCount })}</span><span>{msg('下载任务：{0} 个', { '0': resources.downloadTaskCount })}</span></>}
+      extraActions={!resources && error && <button className="button secondary" disabled={busy || loading} onClick={() => setRetry((value) => value + 1)}>{msg('重试')}</button>}>
+      <DialogNotice tone="danger" title={msg('此操作无法撤销')}>{msg('此书库的关联漫画、阅读记录与下载任务')}<p>{msg('此书库持有的原图、译图缓存和离线文件将一并清理。')}</p></DialogNotice>
+      <DialogNotice tone="success" title={msg('保持不变')}>{msg('仅清理本机资料，远端书库文件保留。')}</DialogNotice>
+    </ConfirmationDialog>
   );
 }

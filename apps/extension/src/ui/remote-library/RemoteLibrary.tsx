@@ -17,6 +17,7 @@ import {
 import { connectionCapabilities, subscribeSourceAccounts } from '../../comics/application/source-service';
 import { disconnectSource } from '../../comics/application/source-lifecycle';
 import { Modal } from '../components';
+import { ConfirmationDialog, DialogNotice } from '../ConfirmationDialog';
 import { useContextMenu } from '../ContextMenu';
 import { ConnectionDialog } from './ConnectionDialog';
 import { RemoveConnectionDialog } from './RemoveConnectionDialog';
@@ -747,16 +748,8 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
         />
       )}
       {disconnecting && (
-        <Modal title={msg('断开连接')} onClose={() => setDisconnecting(undefined)}>
-          <p>
-            {msg('断开《{0}》后将停止来源请求；漫画与阅读记录保留，重新授权后可继续。', {
-              '0': disconnecting.displayName,
-            })}
-          </p>
-          <div className="nc-inline">
-            <button
-              className="button danger"
-              onClick={() => {
+        <ConfirmationDialog title={msg('断开连接')} subject={disconnecting.displayName} action={msg('断开连接')} icon="logout" onClose={() => setDisconnecting(undefined)}
+              onConfirm={() => {
                 const item = disconnecting;
                 setDisconnecting(undefined);
                 void disconnectSource(item.id)
@@ -765,15 +758,10 @@ export function RemoteLibrary({ active, onRead, onDownload }: Props) {
                     if (current.current.active && current.current.accountId === item.id)
                       setActionError(error.message);
                   });
-              }}
-            >
-              {msg('断开连接')}
-            </button>
-            <button className="button secondary" onClick={() => setDisconnecting(undefined)}>
-              {msg('取消')}
-            </button>
-          </div>
-        </Modal>
+              }}>
+          <DialogNotice title={msg('断开连接')}>{msg('停止来源请求，重新授权后可继续。')}</DialogNotice>
+          <DialogNotice tone="success" title={msg('保持不变')}>{msg('漫画与阅读记录')}</DialogNotice>
+        </ConfirmationDialog>
       )}
     </section>
   );

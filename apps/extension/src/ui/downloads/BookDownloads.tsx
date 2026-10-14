@@ -1,7 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
-import {Modal} from '../components';
+import {ConfirmationDialog,DialogNotice} from '../ConfirmationDialog';
 import {useContextMenu} from '../ContextMenu';
 import {LanguageFlag} from '../LanguageFlag';
 import {SearchSiteIcon} from '../comic-search/SearchSiteIcon';
@@ -91,12 +91,10 @@ function BookRow({book,controller,focused,onRead,onManageStorage}:{book:BookDown
       </div>
       <div className="nc-download-size"><span><Icon name="storage" size={14}/>{msg('离线占用')}</span><strong>{cacheSize(book.bytes)}</strong></div>
     </div>
-  </article>{menu.menu}{confirmation&&<Modal title={confirmation.kind==='cancel'?msg('取消缓存'):msg('清除离线内容')} onClose={()=>{if(!busy)setConfirmation(undefined);}}>
-    <p>{confirmation.kind==='cancel'?msg('取消《{0}》的缓存并删除已保存的离线原图？漫画和阅读记录会保留。',{'0':book.comic.title}):msg('清除《{0}》的离线原图？漫画和阅读记录会保留，之后阅读可能需要网络。',{'0':book.comic.title})}</p>
-    <p className="nc-muted">{msg('已保留 {0}',{'0':cacheSize(book.bytes)})}</p>
-    {error&&<p role="alert">{error}</p>}
-    <div className="nc-cache-actions"><button className="button danger" disabled={busy} onClick={()=>void act(async()=>{await clearBookDownloads(comicId,confirmation.generation);setConfirmation(undefined);})}>{confirmation.kind==='cancel'?msg('取消缓存'):msg('清除离线内容')}</button><button className="button secondary" disabled={busy} onClick={()=>setConfirmation(undefined)}>{msg('取消')}</button></div>
-  </Modal>}</>;
+  </article>{menu.menu}{confirmation&&<ConfirmationDialog title={confirmation.kind==='cancel'?msg('取消缓存'):msg('清除离线内容')} subject={book.comic.title} meta={msg('已保留 {0}',{'0':cacheSize(book.bytes)})} action={confirmation.kind==='cancel'?msg('取消缓存'):msg('清除离线内容')} busy={busy} error={error} onClose={()=>setConfirmation(undefined)} onConfirm={()=>void act(async()=>{await clearBookDownloads(comicId,confirmation.generation);setConfirmation(undefined);})}>
+    <DialogNotice tone="danger" title={msg('将会移除')}>{msg('离线原图；之后阅读可能需要网络。')}</DialogNotice>
+    <DialogNotice tone="success" title={msg('保持不变')}>{msg('漫画与阅读记录')}</DialogNotice>
+  </ConfirmationDialog>}</>;
 }
 export function DownloadLanguagesPopover({controller}:{controller:BookDownloadsController}){
   const picker=controller.languagePicker;

@@ -90,11 +90,6 @@ button.nc-remote-crumb:hover:not(:disabled) { color: var(--accent); background: 
 .nc-remote-details .button { margin-top: 16px; }
 .nc-connection-dialog .field { gap: 7px; }
 .nc-connection-auth-note { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--accent-soft); color: var(--muted); font-size: var(--text-small); line-height: 1.7; }
-.nc-connection-removal-warning { display: flex; align-items: flex-start; gap: 14px; padding: 18px; margin-block: 20px; border: 1px solid var(--danger); border-radius: var(--comic-control-radius); background: var(--danger-soft); color: var(--danger); }
-.nc-connection-removal-warning>.nc-icon { margin-top: 2px; --icon-stroke: currentColor; --icon-shadow: transparent; }
-.nc-connection-removal-warning h3 { margin: 0 0 10px; font-size: var(--text-body); }
-.nc-connection-removal-warning p { margin: 8px 0 0; line-height: 1.7; overflow-wrap: anywhere; }
-.nc-connection-removal-counts { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-block: 18px; font-size: var(--text-small); font-weight: 700; }
 @media (max-width: 1280px) { .nc-remote-sidebar { top: 150px; } }
 @media (max-width: 1000px) {
   .nc-remote-layout { grid-template-columns: 184px minmax(0, 1fr); gap: 22px; }
@@ -132,5 +127,4 @@ button.nc-remote-crumb:hover:not(:disabled) { color: var(--accent); background: 
   .nc-remote-group-links .text-link { min-height:44px; }
   .nc-remote-pagination { gap:12px; flex-wrap:wrap; }
   .nc-remote-pagination>.button { flex:1; min-width:0; white-space:normal; }
-  .nc-connection-removal-warning { padding:14px; gap:10px; }
 }

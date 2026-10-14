@@ -1,0 +1,39 @@
+.nc-dialog-content { display: grid; gap: 16px; margin-top: 20px; }
+.nc-dialog-subject { display: flex; align-items: center; gap: 14px; padding: 16px; border: var(--comic-border); border-radius: var(--comic-control-radius); background: var(--surface-soft); }
+.nc-dialog-subject > .nc-icon { flex: none; }
+.nc-dialog-subject > div { min-width: 0; }
+.nc-dialog-subject strong { display: block; font-size: var(--text-body); line-height: 1.5; overflow-wrap: anywhere; }
+.nc-dialog-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: var(--text-small); margin-top: 6px; overflow-wrap: anywhere; }
+.nc-dialog-notice { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface-soft); font-size: var(--text-small); line-height: 1.65; }
+.nc-dialog-notice > .nc-icon { flex: none; margin-top: 2px; --icon-stroke: currentColor; --icon-shadow: transparent; }
+.nc-dialog-notice > div { min-width: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.nc-dialog-notice h3 { margin: 0 0 4px; color: var(--ink); font-size: var(--text-small); }
+.nc-dialog-notice p { margin: 6px 0 0; }
+.nc-dialog-notice[data-tone=info] > .nc-icon { color: var(--accent); }
+.nc-dialog-notice[data-tone=success] > .nc-icon { color: var(--success); }
+.nc-dialog-notice[data-tone=danger] { border-color: var(--danger); background: var(--danger-soft); }
+.nc-dialog-notice[data-tone=danger] :is(h3, .nc-icon) { color: var(--danger); }
+.nc-app .nc-confirmation-dialog.is-danger .modal-spark { color: var(--danger); background: var(--danger-soft); --icon-stroke: currentColor; --icon-shadow: transparent; }
+.nc-dialog-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding-top: 18px; border-top: var(--comic-perforation); }
+.nc-dialog-footer .button { min-width: 0; max-width: 100%; white-space: normal; height: auto; min-height: 44px; overflow-wrap: anywhere; }
+.nc-dialog-footer .button > :is(.nc-icon, .spinner) { flex: none; }
+.nc-dialog-list { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.nc-dialog-list li { display: flex; gap: 10px; align-items: baseline; font-size: var(--text-small); overflow-wrap: anywhere; min-width: 0; }
+.nc-dialog-list li > span:first-child { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.nc-dialog-list li > span:last-child { min-width: 0; }
+.nc-dialog-list-more { color: var(--muted); font-size: var(--text-small); }
+.nc-export-progress { display: grid; gap: 10px; padding: 16px; background: var(--accent-soft); }
+.nc-export-progress > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: var(--text-small); }
+.nc-export-progress progress { width: 100%; accent-color: var(--accent); }
+.nc-export-incomplete { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--warning); border-radius: var(--comic-control-radius); font-size: var(--text-small); line-height: 1.6; }
+.nc-export-incomplete input { flex: none; margin-top: 5px; }
+.nc-export-options.nc-dialog-content .form-grid { margin-block: 0; }
+@media (max-width: 700px) {
+  .nc-dialog-content { gap: 12px; margin-top: 16px; }
+  .nc-dialog-subject, .nc-dialog-notice { padding: 12px; gap: 10px; }
+  .nc-dialog-footer { gap: 10px; }
+  .nc-dialog-footer .button { flex: 1 1 120px; }
+}
+@media (max-width: 380px) {
+  .nc-dialog-footer .button { flex-basis: 100%; }
+}

@@ -7,7 +7,7 @@ import {readDownloadScope,readComicOfflineCapability} from '../comics/acquisitio
 import type {LibraryViewModel} from '../comics/application/types';
 import {useContextMenu} from './ContextMenu';
 import {Select} from './Select';
-import {Modal} from './components';
+import {ConfirmationDialog,DialogNotice} from './ConfirmationDialog';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
 import {ShelfUpdates} from './ShelfUpdates';
@@ -15,7 +15,7 @@ import type {BookDownloadsController} from './downloads/useBookDownloads';
 import './shelf.css';
 type Props={active:boolean;notice?:ReactNode;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
 export function Library({active,notice,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
- const menu=useContextMenu(active),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),removalRunning=useRef(false);
+ const menu=useContextMenu(active),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),[removalError,setRemovalError]=useState(''),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
  const [updatesOnly,setUpdatesOnly]=useState(shelfView.current.updatesOnly);
@@ -32,6 +32,7 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
  const changeUpdatesOnly=()=>{shelfView.current.updatesOnly=!filterUpdates;shelfView.current.scrollTop=0;setUpdatesOnly(!filterUpdates);window.scrollTo({top:0,behavior:'instant'});};
  const open=(id:string)=>{shelfView.current.scrollTop=window.scrollY;onOpen(id);};
  const toggle=(id:string)=>setSelected(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;});
+ const requestRemoval=(comics:Comic[])=>{setRemovalError('');setRemoving(comics);};
  const actions=(comic:Comic)=>{
   let capability:ReturnType<typeof readComicOfflineCapability>|undefined;
   const offline=()=>capability??=readComicOfflineCapability(comic.id);
@@ -47,20 +48,20 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
   ]:[]),
   ...(onFind&&canFindAlternatives(comic.sourceUrl)?[{icon:'translate',label:msg('寻找其他语言'),onSelect:()=>onFind(comic)}]:[]),
   {icon:'download',label:msg('导出漫画'),onSelect:()=>void continueEntry(comic.id).then(entry=>{if(!entry){open(comic.id);return;}onExport(entry);}).catch(e=>notify(e.message))},
-  {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>setRemoving([comic])},
+  {icon:'trash',label:msg('移除漫画'),danger:true,onSelect:()=>requestRemoval([comic])},
  ];};
  async function confirmRemoval(){
   if(!removing?.length||removalRunning.current)return;
-  removalRunning.current=true;setBusy(true);
+  removalRunning.current=true;setBusy(true);setRemovalError('');
   try{
    const result=await removeComics(removing.map(comic=>comic.id)),removed=new Set(result.removed);
    setSelected(previous=>new Set([...previous].filter(id=>!removed.has(id))));
    const failed=removing.filter(comic=>result.failures.some(failure=>failure.id===comic.id));
    setRemoving(failed.length?failed:undefined);
    await onChanged();
-   if(result.failures.length)notify(result.failures.map(failure=>`${removing.find(comic=>comic.id===failure.id)?.title}: ${failure.error}`).join('\n'));
+   if(result.failures.length)setRemovalError(result.failures.map(failure=>`${removing.find(comic=>comic.id===failure.id)?.title}: ${failure.error}`).join('\n'));
    else notify(msg('已移除 {0} 部漫画',{'0':result.removed.length}));
-  }catch(error){notify((error as Error).message);}
+  }catch(error){setRemovalError((error as Error).message);}
   finally{removalRunning.current=false;setBusy(false);}
  }
  return <div className="nc-library">
@@ -74,15 +75,14 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
   {managing&&!!library.comics.length&&<div className="nc-batch-toolbar" role="region" aria-label={msg('批量管理')}>
    <span role="status">{msg('已选 {0} 部作品',{'0':selectedComics.length})}</span>
    <div className="nc-inline"><button className="button secondary small" disabled={busy||!matching.length||matching.every(comic=>selected.has(comic.id))} onClick={()=>setSelected(previous=>new Set([...previous,...matching.map(comic=>comic.id)]))}>{msg('全选 {0} 部',{'0':matching.length})}</button><button className="text-link" disabled={busy||!selectedComics.length} onClick={()=>setSelected(new Set())}>{msg('取消选择')}</button></div>
-   <button className="button danger small" disabled={busy||!selectedComics.length} onClick={()=>setRemoving(selectedComics)}><Icon name="trash" size={18}/>{msg('移除漫画')}</button>
+   <button className="button danger small" disabled={busy||!selectedComics.length} onClick={()=>requestRemoval(selectedComics)}><Icon name="trash" size={18}/>{msg('移除漫画')}</button>
   </div>}
   {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol"><Icon name="book" size={56}/></span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><Icon name="search" size={36}/><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid active={active} key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard active={active} key={comic.id} comic={comic} onOpen={()=>open(comic.id)} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
   {menu.menu}
-  {active&&!!removing?.length&&<Modal title={msg('移除漫画')} onClose={()=>{if(!busy)setRemoving(undefined);}}>
-   <p>{removing.length===1?msg('从书架移除《{0}》及其阅读记录？',{'0':removing[0].title}):msg('从书架移除选中的 {0} 部漫画及其阅读记录？',{'0':removing.length})}</p>
-   {removing.length>1&&<ul className="nc-removal-list">{removing.slice(0,5).map(comic=><li key={comic.id}>{comic.title}</li>)}{removing.length>5&&<li>…</li>}</ul>}
-   <p className="nc-muted">{msg('离线内容和阅读记录会移除，来源网站和云盘中的文件不会删除。')}</p>
-   <div className="nc-inline"><button className="button secondary" disabled={busy} onClick={()=>setRemoving(undefined)}>{msg('取消')}</button><button className="button danger" disabled={busy} onClick={()=>void confirmRemoval()}>{busy?msg('正在移除作品'):msg('移除漫画')}</button></div>
-  </Modal>}
+  {active&&!!removing?.length&&<ConfirmationDialog title={msg('移除漫画')} subject={removing.length===1?removing[0].title:msg('已选 {0} 部作品',{'0':removing.length})} action={msg('移除漫画')} busy={busy} error={removalError} onClose={()=>setRemoving(undefined)} onConfirm={()=>void confirmRemoval()}>
+   {removing.length>1&&<><ul className="nc-dialog-list">{removing.slice(0,5).map((comic,index)=><li key={comic.id}><span>{index+1}</span><span>{comic.title}</span></li>)}</ul>{removing.length>5&&<div className="nc-dialog-list-more">{msg('还有 {0} 部漫画',{'0':removing.length-5})}</div>}</>}
+   <DialogNotice tone="danger" title={msg('将会移除')}>{msg('漫画、离线内容与阅读记录')}<p>{msg('此操作无法撤销')}</p></DialogNotice>
+   <DialogNotice tone="success" title={msg('保持不变')}>{msg('来源网站和云盘中的文件')}</DialogNotice>
+  </ConfirmationDialog>}
  </div>;
 }
