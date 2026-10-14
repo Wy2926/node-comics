@@ -52,7 +52,8 @@ export interface FeedbackRecord {id:string;translation_id:string;issues:Feedback
 export const statusLabels: Record<JobStatus, string> = { get awaiting_upload(){return msg("等待原图上传");}, get validating_upload(){return msg("校验原图");}, get queued(){return msg("服务器排队");}, get running(){return msg("处理中");}, get succeeded(){return msg("已完成");}, get no_text(){return msg("未检测到文字");}, get failed(){return msg("处理失败");}, get cancelled(){return msg("已取消");}, get outcome_unknown(){return msg("结果待核实");},get unknown_released(){return msg("核实期限已结束");} };
 export const modeLabels: Record<Mode, string> = { get classic(){return msg("翻译");} };
 export const languageLabels:Record<string,string>={ 'zh-Hans':'简体中文','zh-Hant':'繁體中文',en:'English',ja:'日本語',ko:'한국어',fr:'Français',es:'Español','pt-BR':'Português (Brasil)',de:'Deutsch',it:'Italiano',ru:'Русский',pl:'Polski',uk:'Українська',tr:'Türkçe',vi:'Tiếng Việt',id:'Bahasa Indonesia' };
-export const languageLabel=(id:string)=>languageLabels[id]??id;
+// Unspecified Chinese is a source label, not an additional translation target.
+export const languageLabel=(id:string)=>id==='zh'?'中文':languageLabels[id]??id;
 export const phaseLabels: Record<string, string> = { get queued(){return msg("等待处理");}, get preprocessing(){return msg("准备原图");}, get detecting_ocr(){return msg("识别漫画文字");}, get translating_text(){return msg("翻译对白");}, get inpainting_rendering(){return msg("清理原文并排版");}, get validating_upload(){return msg("检查译图");}, get recovering_local(){return msg("恢复处理进度");} };
 
 export const fallbackLanguages = Object.entries(languageLabels).map(([id,label])=>({id,label}));

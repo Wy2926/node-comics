@@ -1,10 +1,20 @@
 import {describe,expect,it} from 'vitest';
 import {languageRegion} from './language-region';
 import {uiLanguages} from '../i18n/locales';
-import {fallbackLanguages} from '../types';
+import {fallbackLanguages,languageLabel,supportsLanguage} from '../types';
 import regions from '../../public/flags/regions.json';
 
 describe('language flag presentation',()=>{
+  it('labels unspecified Chinese without adding a translation target',()=>{
+    expect(languageLabel('zh')).toBe('中文');
+    expect(languageLabel('zh-Hans')).toBe('简体中文');
+    expect(languageLabel('zh-Hant')).toBe('繁體中文');
+    expect(languageLabel('unknown')).toBe('unknown');
+    expect(fallbackLanguages.some(language=>language.id==='zh')).toBe(false);
+    expect(supportsLanguage(undefined,'classic','zh')).toBe(false);
+    expect(supportsLanguage(undefined,'classic','zh-Hans')).toBe(true);
+    expect(supportsLanguage(undefined,'classic','zh-Hant')).toBe(true);
+  });
   it('covers every interface and translation language with a bundled flag',()=>{
     for(const {id} of [...uiLanguages,...fallbackLanguages])expect(regions).toContain(languageRegion(id)?.toLowerCase());
   });
