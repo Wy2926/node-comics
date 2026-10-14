@@ -9,23 +9,33 @@ import {resultBlobKey,resultInMemory} from '../storage/translations/results';
 import {translationCache} from '../storage/translations';
 
 export type ExportFormat = 'cbz' | 'zip' | 'pdf';
-export interface ExportOptions {format: ExportFormat; images: 'original' | 'translation'; mode: Mode; language: string; allowIncomplete?: boolean}
+export interface ExportOptions {format: ExportFormat; images: 'original' | 'translation'; mode: Mode; language: string; allowIncomplete?: boolean; range?: 'entry' | 'directory'}
 export interface ExportPage {
   pageId: string; ordinal: number; name: string; reference: PageReference;
   kind: 'original' | 'translation' | 'fallback' | 'no_text';
-  job?: Job; cacheKey?: string; reason?: string;
+  job?: Job; cacheKey?: string; reason?: string; chapter?: number;
+}
+export interface ExportChapter {
+  entryId: string; contentId: string; generation: number; title: string; firstPage: number; pageCount: number;
 }
 export interface ExportPlan {
   entryId: string; contentId: string; generation: number; title: string; createdAt: string;
   options: ExportOptions; pages: ExportPage[]; incomplete: boolean; expectedPages?: number;
-  scope?: TranslationScope;
+  scope?: TranslationScope; chapters?: ExportChapter[];
 }
+export const MAX_EXPORT_PAGES = 10000;
 export const MAX_EXPORT_BYTES = 128 * 1024 * 1024;
 export function safeName(value: string): string {
   const name = value.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').slice(0,70).replace(/[. ]+$/g,'') || '未命名';
   return /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(name) ? '_' + name : name;
 }
-export const exportName = (title: string, options: ExportOptions) => `${safeName(title)}-${options.images === 'original' ? '原图' : safeName(options.language)+'-'+options.mode}${options.allowIncomplete ? '-已发现页面' : ''}.${options.format}`;
+export const exportName = (title: string, options: ExportOptions) => `${safeName(title)}${options.range==='directory'?'-章节目录':''}-${options.images === 'original' ? '原图' : safeName(options.language)+'-'+options.mode}${options.allowIncomplete ? '-已发现页面' : ''}.${options.format}`;
+
+export function exportPageName(plan: ExportPlan, page: ExportPage, extension: string) {
+  const chapter=page.chapter===undefined?undefined:plan.chapters?.[page.chapter];
+  const folder=chapter?`${String(page.chapter!+1).padStart(Math.max(4,String(plan.chapters!.length).length),'0')}-${safeName(chapter.title)}/`:'';
+  return `${folder}${String(page.ordinal-(chapter?.firstPage??0)+1).padStart(5,'0')}.${extension}`;
+}
 
 /** Freeze metadata only. The explicit write command acquires one requested page at a time. */
 export async function planExport(entryId: string, options: ExportOptions, scope?: TranslationScope, signal?: AbortSignal): Promise<ExportPlan> {
@@ -38,7 +48,7 @@ export async function planExport(entryId: string, options: ExportOptions, scope?
   for (let offset = 0;; offset += 100) {
     signal?.throwIfAborted();
     const batch = await catalog.listPages(document.contentId,{offset,limit:100}); descriptors.push(...batch);
-    if (descriptors.length > 10000) throw new Error('单次导出最多支持 10000 页，请拆分文档。');
+    if (descriptors.length > MAX_EXPORT_PAGES) throw new Error('单次导出最多支持 10000 页，请拆分文档。');
     if (batch.length < 100) break;
   }
   if (!descriptors.length) throw new Error('文档没有可导出的页面。');
@@ -68,8 +78,9 @@ export async function planExport(entryId: string, options: ExportOptions, scope?
 }
 /** Explicit allowlist: no original URLs, account IDs, source locators, tokens or signed asset URLs. */
 export function exportManifest(plan: ExportPlan) {
-  return {schema:'node-comics-export/2',title:plan.title,createdAt:plan.createdAt,format:plan.options.format,images:plan.options.images,
+  return {schema:plan.chapters?'node-comics-export/3':'node-comics-export/2',title:plan.title,createdAt:plan.createdAt,format:plan.options.format,images:plan.options.images,
     mode:plan.options.images==='translation'?plan.options.mode:undefined,language:plan.options.images==='translation'?plan.options.language:undefined,
     expectedPages:plan.expectedPages ?? null,complete:!plan.incomplete,
-    pages:plan.pages.map(page=>({pageId:page.pageId,ordinal:page.ordinal+1,kind:page.kind,version:page.job?.version,reason:page.reason}))};
+    ...(plan.chapters?{chapters:plan.chapters.map((chapter,index)=>({ordinal:index+1,title:chapter.title,firstPage:chapter.firstPage+1,pageCount:chapter.pageCount}))}:{}),
+    pages:plan.pages.map(page=>({pageId:page.pageId,ordinal:page.ordinal+1,chapter:page.chapter===undefined?undefined:page.chapter+1,kind:page.kind,version:page.job?.version,reason:page.reason}))};
 }

@@ -4,34 +4,50 @@ import {msg} from '../../i18n/runtime';
 import {catalog} from '../repositories';
 import {acquirePage} from '../pages/service';
 import {openContainer} from '../../storage/containers';
-import {planExport, MAX_EXPORT_BYTES, safeName, type ExportOptions} from '../../export/plan';
+import {planExport, MAX_EXPORT_BYTES, safeName, type ExportOptions, type ExportPage} from '../../export/plan';
 import {writeExport, type ExportProgress, type ExportResult} from '../../export/files';
 import {entrySource} from './entry-source';
+import {planDirectoryExport} from './export-directory';
+export {exportDirectoryInfo} from './export-directory';
 export type {ExportOptions,ExportProgress,ExportResult};
 export {exportName} from '../../export/plan';
 export interface ExportContext {signal:AbortSignal;scope?:TranslationScope;readResult?:(job:Job,signal?:AbortSignal,original?:()=>Promise<Blob|undefined>)=>Promise<Blob>;isCurrent?:()=>boolean;destination?:WritableStream<Uint8Array>;progress?:(value:ExportProgress)=>void}
 
 export async function exportDocument(entryId:string,options:ExportOptions,context:ExportContext):Promise<ExportResult>{
-  const {scope,signal}=context;
-  const plan=await planExport(entryId,options,scope,signal);
-  const assertCurrent=async()=>{
-    if(options.images==='translation'&&context.isCurrent?.()===false)throw Error(msg('翻译渠道已切换，本次导出已停止。'));
-    const doc=await catalog.get('entries',entryId);
-    if(!doc||doc.contentId!==plan.contentId||doc.generation!==plan.generation)throw Error('来源内容已变化，本次导出已停止。');
-  };
-  return writeExport(plan,{assertCurrent,progress:context.progress,async acquire(page,readSignal){
-    await assertCurrent();
-    if(page.kind!=='translation'){
-      const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
-      return {blob:lease.blob,width:lease.identity.width,height:lease.identity.height,release:lease.release};
-    }
-    if(!page.job||!scope||!context.readResult)throw Error('已有译图身份缺失，请重新打开导出面板。');
-    const blob=await context.readResult(page.job,readSignal,async()=>{
-      const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
-      try{return lease.blob;}finally{lease.release();}
-    });
-    readSignal.throwIfAborted();await assertCurrent();return {blob,release(){}};
-  }},signal,context.destination);
+  try {
+    const {scope,signal}=context;
+    const binding=await entrySource(entryId,undefined,signal);
+    const assertChannel=()=>{
+      signal.throwIfAborted();
+      if(options.images==='translation'&&context.isCurrent?.()===false)throw Error(msg('翻译渠道已切换，本次导出已停止。'));
+    };
+    assertChannel();await binding.assertCurrent();
+    const plan=options.range==='directory'
+      ?await planDirectoryExport(entryId,options,{...context,assertCurrent:assertChannel})
+      :await planExport(entryId,options,scope,signal);
+    const snapshots=new Map((plan.chapters??[plan]).map(chapter=>[chapter.entryId,chapter]));
+    const assertCurrent=async(page?:ExportPage)=>{
+      assertChannel();await binding.assertCurrent();
+      // Check only the active chapter per page; recheck the entire frozen plan before finalizing.
+      for(const snapshot of page?[snapshots.get(page.reference.entryId)!]:snapshots.values()) {
+        const doc=await catalog.get('entries',snapshot.entryId);
+        if(!doc||doc.contentId!==snapshot.contentId||doc.generation!==snapshot.generation)throw Error(msg('来源内容已变化，本次导出已停止。'));
+      }
+    };
+    return await writeExport(plan,{assertCurrent,progress:context.progress,async acquire(page,readSignal){
+      await assertCurrent(page);
+      if(page.kind!=='translation'){
+        const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
+        return {blob:lease.blob,width:lease.identity.width,height:lease.identity.height,release:lease.release};
+      }
+      if(!page.job||!scope||!context.readResult)throw Error('已有译图身份缺失，请重新打开导出面板。');
+      const blob=await context.readResult(page.job,readSignal,async()=>{
+        const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
+        try{return lease.blob;}finally{lease.release();}
+      });
+      readSignal.throwIfAborted();await assertCurrent(page);return {blob,release(){}};
+    }},signal,context.destination);
+  }catch(error){await context.destination?.abort(error).catch(()=>{});throw error;}
 }
 
 function originalFileName({entry, comic}: Awaited<ReturnType<typeof entrySource>>) {

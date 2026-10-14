@@ -1,19 +1,19 @@
 import {BlobReader, TextReader, ZipWriter} from '@zip.js/zip.js/index-native.js';
 import {msg} from '../i18n/runtime';
 import {exportImage} from './images';
-import {exportManifest, exportName, MAX_EXPORT_BYTES, type ExportPage, type ExportPlan} from './plan';
+import {exportManifest, exportName, exportPageName, MAX_EXPORT_BYTES, type ExportPage, type ExportPlan} from './plan';
 export interface ExportProgress {completed:number;total:number;file:string;phase:string}
 export interface ExportImageLease {blob:Blob;width?:number;height?:number;release():void}
 export interface ExportDependencies {
   acquire(page:ExportPage,signal:AbortSignal):Promise<ExportImageLease>;
-  assertCurrent():Promise<void> | void;
+  assertCurrent(page?:ExportPage):Promise<void> | void;
   progress?(progress:ExportProgress):void;
 }
 export interface ExportResult {name:string;bytes:number;blob?:Blob}
 
 /** ZIP writes directly to a file stream; the fallback retains at most 128 MiB of output. */
 export async function writeExport(plan:ExportPlan,dependencies:ExportDependencies,signal:AbortSignal,destination?:WritableStream<Uint8Array>):Promise<ExportResult> {
-  const check=async()=>{signal.throwIfAborted();await dependencies.assertCurrent();signal.throwIfAborted();};
+  const check=async(page?:ExportPage)=>{signal.throwIfAborted();await dependencies.assertCurrent(page);signal.throwIfAborted();};
   await check();
   const buffered=!destination, chunks:Uint8Array<ArrayBuffer>[]=[];
   const target=destination?.getWriter();let bytes=0,sourceBytes=0,closed=false;
@@ -26,18 +26,24 @@ export async function writeExport(plan:ExportPlan,dependencies:ExportDependencie
     const pdf=plan.options.format==='pdf'?await(await import('./pdf')).pdfWriter(plan.title):undefined;
     const zip=pdf?undefined:new ZipWriter(output,{useWebWorkers:false,useCompressionStream:true,level:0});
     for(const [index,page] of plan.pages.entries()){
-      await check();dependencies.progress?.({completed:index,total:plan.pages.length,file:plan.title,phase:msg('读取第 {0} 页',{'0':page.ordinal+1})});
-      const lease=await dependencies.acquire(page,signal);
+      const chapter=page.chapter===undefined?undefined:plan.chapters?.[page.chapter];
+      const file=chapter?msg('第 {0} / {1} 章 · {2}',{'0':page.chapter!+1,'1':plan.chapters!.length,'2':chapter.title}):plan.title;
+      await check(page);dependencies.progress?.({completed:index,total:plan.pages.length,file,phase:msg('读取第 {0} 页',{'0':page.ordinal+1})});
+      let lease:ExportImageLease|undefined;
       try{
-        await check();sourceBytes+=lease.blob.size;
+        lease=await dependencies.acquire(page,signal);
+        await check(page);sourceBytes+=lease.blob.size;
         if((buffered||pdf)&&sourceBytes>MAX_EXPORT_BYTES)throw new Error('本次有界导出图片超过 128 MiB，请使用流式 CBZ / ZIP 或拆分文件。');
         if(pdf)await pdf.add(lease.blob,signal);
         else{
           const image=await exportImage(lease.blob,false,lease.width&&lease.height?{width:lease.width,height:lease.height}:undefined,signal);
-          await check();await zip!.add(`${String(page.ordinal+1).padStart(5,'0')}.${image.extension}`,new BlobReader(image.blob),{signal});
+          await check(page);await zip!.add(exportPageName(plan,page,image.extension),new BlobReader(image.blob),{signal});
         }
-      }finally{lease.release();}
-      await check();dependencies.progress?.({completed:index+1,total:plan.pages.length,file:plan.title,phase:msg('已处理第 {0} 页',{'0':page.ordinal+1})});
+      }catch(error){
+        if(!chapter||signal.aborted||error instanceof Error&&error.name==='AbortError')throw error;
+        throw Error(msg('章节「{0}」导出失败：{1}',{'0':chapter.title,'1':error instanceof Error?error.message:String(error)}));
+      }finally{lease?.release();}
+      await check(page);dependencies.progress?.({completed:index+1,total:plan.pages.length,file,phase:msg('已处理第 {0} 页',{'0':page.ordinal+1})});
     }
     await check();const manifest=JSON.stringify(exportManifest(plan),null,2);
     if(pdf){const blob=await pdf.close(manifest);if(blob.size>MAX_EXPORT_BYTES)throw new Error('PDF 文件超过 128 MiB，请改用流式 CBZ / ZIP。');await check();const writer=output.getWriter();await writer.write(new Uint8Array(await blob.arrayBuffer()));await writer.close();writer.releaseLock();}

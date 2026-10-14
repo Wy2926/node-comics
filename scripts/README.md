@@ -71,6 +71,7 @@ node scripts/verify_simple_reading.mjs
 | `node --test apps/extension/tests/modal.browser.mjs` | 同一 Vite 5181 的通用弹框夹具；长正文滚动时关闭按钮固定、焦点与背景位置恢复、嵌套下拉、关闭守卫、导入列表及短窗口大字号。沿用上述浏览器环境并阻断外网 |
 | `node --test apps/extension/tests/confirmation.browser.mjs` | 同一 Vite 5181 的操作弹窗夹具；真实合成文件导出、未完整发现提示、单项／批量移除、离线清理、文件重下载、断开／移除书库及失败重试；检查 16 语、320px 深色大字、固定底栏与焦点恢复。仅隔离数据和模拟来源，阻断外网，截图写入 `artifacts/confirmation-dialogs/` |
 | `verify_reader_scroll.mjs` | Vite 5181 的阅读窗口夹具；模拟翻译状态与译图更新，检查章节交界、双向滚动、窗口淘汰、失败与位置恢复 |
+| `node --test apps/extension/tests/directory-export.browser.mjs` | 同一 Vite 5181 的整章节目录导出夹具；真实 CBZ／ZIP／PDF、未读章节索引、单话版本去重、串行取图、取消／失败重试、位置保持，以及 16 语、320px 深色大字和固定底栏。合成来源、阻断外网，产物写入 `artifacts/directory-export/` |
 | `verify_reader_preload.mjs` | 同一 Vite 5181 夹具的 `?highres=1` 样本；真实 4000×6000 原图的邻页加载、非当前可见页、并排／单页、失败隔离、位置恢复与图片 URL 释放，不访问源站或翻译服务 |
 | `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |

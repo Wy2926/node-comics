@@ -25,6 +25,8 @@
 .nc-export-progress { display: grid; gap: 10px; padding: 16px; background: var(--accent-soft); }
 .nc-export-progress > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: var(--text-small); }
 .nc-export-progress progress { width: 100%; accent-color: var(--accent); }
+.nc-export-current { min-width: 0; font-size: var(--text-small); overflow-wrap: anywhere; }
+.nc-export-options .nc-export-range { grid-column: 1 / -1; }
 .nc-export-incomplete { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--warning); border-radius: var(--comic-control-radius); font-size: var(--text-small); line-height: 1.6; }
 .nc-export-incomplete input { flex: none; margin-top: 5px; }
 .nc-export-options.nc-dialog-content .form-grid { margin-block: 0; }
