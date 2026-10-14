@@ -1,0 +1,49 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
+import { locales, publicPaths } from '../src/i18n';
+import { sitesCopy } from '../src/i18n/sites';
+
+test('supported-site copy covers all locales and all adapter label values', () => {
+  assert.ok(publicPaths.includes('/sites/'));
+  assert.deepEqual(Object.keys(sitesCopy).sort(), [...locales].sort());
+  function check(value: unknown, reference: unknown, path: string) {
+    if (typeof reference === 'string') {
+      assert.equal(typeof value, 'string', path);
+      assert.ok((value as string).trim(), path);
+      assert.deepEqual((value as string).match(/\{\w+\}/g), reference.match(/\{\w+\}/g), path);
+    } else if (reference && typeof reference === 'object') {
+      assert.ok(value && typeof value === 'object', path);
+      assert.deepEqual(Object.keys(value).sort(), Object.keys(reference).sort(), path);
+      for (const [key, entry] of Object.entries(reference)) check((value as Record<string, unknown>)[key], entry, `${path}.${key}`);
+    }
+  }
+  for (const locale of locales) check(sitesCopy[locale], sitesCopy.en, locale);
+});
+
+test('website uses the complete extension directory without copying or fetching metadata', async () => {
+  const server = await createServer({ configFile: false, root: fileURLToPath(new URL('..', import.meta.url)), server: { middlewareMode: true }, appType: 'custom' });
+  try {
+    const { supportedSites } = await server.ssrLoadModule('/src/data/supported-sites.ts');
+    const { listSupportedSites } = await server.ssrLoadModule(fileURLToPath(new URL('../../../apps/extension/src/sources/registry/sites.ts', import.meta.url)));
+    const expected = listSupportedSites();
+    assert.ok(expected.length > 0);
+    assert.deepEqual(supportedSites.map(({ icon, anchor, ...site }: Record<string, unknown>) => site), expected.map(({ icon, ...site }: Record<string, unknown>) => site));
+    assert.equal(new Set(supportedSites.map((site: { anchor: string }) => site.anchor)).size, expected.length);
+    for (const site of supportedSites) {
+      assert.match(site.anchor, /^site-[a-z0-9-]+$/);
+      assert.ok(site.icon.startsWith('/') || site.icon.startsWith('data:image/'), site.key);
+      assert.doesNotMatch(site.icon, /^\/\//);
+      const url = new URL(site.url);
+      assert.ok(['http:', 'https:'].includes(url.protocol));
+      assert.ok(!url.username && !url.password);
+      for (const locale of locales) {
+        const copy = sitesCopy[locale];
+        assert.ok(copy.pricing[site.pricing as keyof typeof copy.pricing], site.key);
+        for (const tag of site.contentTags) assert.ok(copy.content[tag as keyof typeof copy.content], site.key);
+        for (const tag of site.accessTags ?? []) assert.ok(copy.access[tag as keyof typeof copy.access], site.key);
+      }
+    }
+  } finally { await server.close(); }
+});

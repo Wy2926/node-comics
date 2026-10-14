@@ -1,0 +1,14 @@
+---
+import type { SourceSitePricing } from '../../../../apps/extension/src/sources/contracts/definition';
+import type { Locale } from '../i18n/locales';
+import { sitesCopy } from '../i18n/sites';
+interface Props { pricing: SourceSitePricing; locale: Locale }
+const { pricing, locale } = Astro.props;
+---
+<span class="site-price" data-pricing={pricing}>{sitesCopy[locale].pricing[pricing]}</span>
+<style>
+  .site-price { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface-soft); color: var(--muted); font-size: .7rem; line-height: 1.4; font-weight: 500; }
+  .site-price::before { content: ''; flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .site-price[data-pricing=free] { color: var(--success); }
+  .site-price[data-pricing=freemium] { color: var(--accent); background: var(--accent-soft); }
+</style>

@@ -6,6 +6,7 @@ import { browserStores, site } from '../src/data/site';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
 import { homeCopy } from '../src/i18n/home';
+import { sitesCopy } from '../src/i18n/sites';
 import { publishedAmount } from '../src/components/PublishedPlanPricing';
 import { comparisonRows } from '../src/lib/pricing-comparison';
 import { publishedModels } from '../src/data/published-plans';
@@ -78,6 +79,39 @@ for (const file of htmlFiles) {
       } else if (faq) errors.push(`${label}: FAQ schema should describe the full FAQ page only`);
     } catch { errors.push(`${label}: invalid JSON-LD graph`); }
   });
+  if (basePath(route) === '/sites/') {
+    const cards = $('.supported-site');
+    const graph = JSON.parse($('script[type="application/ld+json"]').text())['@graph'];
+    const collection = graph.find((entry: Record<string, unknown>) => entry['@id'] === canonical);
+    const list = graph.find((entry: Record<string, unknown>) => entry['@type'] === 'ItemList');
+    if (!cards.length || collection?.['@type'] !== 'CollectionPage' || collection?.mainEntity?.['@id'] !== `${canonical}#directory`
+      || list?.numberOfItems !== cards.length || list?.itemListElement?.length !== cards.length)
+      errors.push(`${label}: site collection/schema mismatch`);
+    if ($('main astro-island').length || title !== `${sitesCopy[locale].title} · ${dictionaries[locale].ui.brandName}` || description !== sitesCopy[locale].description)
+      errors.push(`${label}: site directory must be static and localized`);
+    if ($('main [data-install-extension], main a[href$="/download/"]').length || $('.page-intro .intro-description').text() !== sitesCopy[locale].intro)
+      errors.push(`${label}: site directory must explain in-extension support without duplicating the navigation download action`);
+    const keys = cards.toArray().map(node => $(node).attr('data-site-key'));
+    if (new Set(keys).size !== keys.length || keys.some(key => !key)) errors.push(`${label}: duplicate/missing site keys`);
+    let previousDate = '9999-99-99';
+    cards.each((index, node) => {
+      const card = $(node), name = card.find('h3').text().trim(), anchor = card.attr('id');
+      const item = list?.itemListElement?.[index];
+      if (!name || item?.name !== name || item?.position !== index + 1 || item?.url !== `${canonical}#${anchor}`
+        || card.find('.site-reading').text() !== sitesCopy[locale].readOn.replace('{site}', name))
+        errors.push(`${label}: site content/schema mismatch ${anchor}`);
+      const outbound = card.find('a[href]'), rel = new Set((outbound.attr('rel') ?? '').split(/\s+/));
+      if (outbound.length !== 1 || !['nofollow','noopener','noreferrer'].every(value => rel.has(value)) || outbound.attr('target') !== '_blank')
+        errors.push(`${label}: source link must be qualified ${anchor}`);
+      const date = card.find('time').attr('datetime') ?? '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > previousDate) errors.push(`${label}: sites must keep adapter date order`);
+      previousDate = date;
+      const icon = new URL(card.find('img').attr('src') ?? '', canonical);
+      if (icon.origin !== site.url && !icon.href.startsWith('data:image/')) errors.push(`${label}: third-party site icon request`);
+      if (!card.find('[data-pricing]').length || !card.find('[data-content-tag]').length || !card.find('.site-languages').text())
+        errors.push(`${label}: missing source labels ${anchor}`);
+    });
+  }
   if (basePath(route) === '/') {
     if (title !== dictionaries[locale].ui.seoHomeTitle || description !== homeCopy[locale].description)
       errors.push(`${label}: redesign must preserve the existing localized SEO title and description`);
@@ -111,6 +145,21 @@ for (const file of htmlFiles) {
     if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-search img[loading="lazy"]').length !== 1) errors.push(`${label}: comparison and search must be lazy-loaded static content`);
     if ($('.home-image-pair input[type=range][hidden]').length !== 1 || $('[data-view-choice]').length) errors.push(`${label}: mobile comparison must use a slider rather than original/translated buttons`);
     if ($('[data-sample]').length !== 2 || $('[data-language-choice]:not([hidden])').length !== 4) errors.push(`${label}: expected both samples and their available output languages`);
+    const directory = pages.get(join(root, localPath('/sites/', locale), 'index.html'));
+    const entries = directory?.('.supported-site').toArray().map(node => ({ anchor: directory(node).attr('id'), name: directory(node).find('h3').text(), price: directory(node).find('[data-pricing]').text() })) ?? [];
+    const minis = $('.sites-group:not(.sites-clone) a.site-mini');
+    if ($('.home-sites .sites-row').length !== 3 || !entries.length || minis.length !== entries.length)
+      errors.push(`${label}: homepage must contain three rows and every supported site`);
+    if ($('.home-sites input, .sites-pause').length || $('.home-sites-heading p').text() !== sitesCopy[locale].carouselBody)
+      errors.push(`${label}: carousel must explain support scope without a pause checkbox`);
+    for (const entry of entries) {
+      const mini = minis.filter(`[href="${localPath('/sites/',locale)}#${entry.anchor}"]`);
+      if (mini.length !== 1 || mini.children().length !== 2 || mini.find('bdi').text() !== entry.name || mini.find('[data-pricing]').text() !== entry.price)
+        errors.push(`${label}: mini card must contain only the source name and pricing ${entry.anchor}`);
+    }
+    if ($('.sites-clone:not([aria-hidden=true]), .sites-clone a:not([tabindex="-1"])').length) errors.push(`${label}: carousel copies must not duplicate keyboard/screen-reader navigation`);
+    const carouselScript = scripts.find(text => text.includes('[data-sites-carousel]'));
+    if (!carouselScript || gzipSync(carouselScript).byteLength > 1024) errors.push(`${label}: carousel visibility script exceeds 1 KiB gzip`);
   }
   const mobilePlatform = mobilePlatforms.find(platform => basePath(route) === `/guides/${platform.slug}/`);
   if (mobilePlatform) {

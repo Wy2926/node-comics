@@ -108,6 +108,7 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 | --- | --- |
 | `verify_website_languages.mjs` | 17 语公开页面、14 档宽度导航防挤压／遮挡、RTL、无 JS 导航、桌面键盘操作、Android Chromium／iPhone WebKit 触控语言与导航菜单、返回恢复、可滚动语言菜单、仅点击切换的浏览器语言提示、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用；`--header-only` 只检查导航布局，`--menus-only` 检查布局与菜单交互，触控检查需安装与 Playwright 匹配的 WebKit，不调用真实身份、计费或模型服务 |
 | `verify_website_guides.mjs` | 构建预览中的 17 语教程目录及六篇图文教程、桌面／320px 窄屏、四语截图源文件摘要匹配与放大链接、中日韩英桌面／手机截图、无 JavaScript 与断图降级；不调用身份、计费或翻译服务 |
+| `verify_website_sites.mjs` | 构建预览中的 17 语支持站点目录、图标、三行首页轮播、1920–320px／RTL、无暂停勾选、悬停暂停、导航保留下载且正文不重复、键盘与重复轨道点击、返回、无 JavaScript 和减少动画；记录 HTML gzip 大小，禁止第三方请求。使用 `WEBSITE_PREVIEW_URL` 和 `PLAYWRIGHT_MODULE` 指定预览地址及现有 Playwright，不调用漫画源站或翻译服务 |
 | `verify_website_download.mjs` | 17 语下载页；指向公开服务时真实下载并核对摘要 |
 | `verify_website_pricing.mjs` | 17 语有／无 JavaScript 的套餐卡与权益提示、PLUS 季付／年付报价及每月额度、模拟 API 报价／额度接管与周期切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |

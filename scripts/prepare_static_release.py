@@ -68,7 +68,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
         if not match or (match[1] and not 1 <= int(match[1]) <= 65535):
             raise ValueError('Document R2 origin must be a bare HTTPS origin')
     reserved = {'admin', 'v1', 'internal', 'health', 'docs', 'redoc', 'api', 'openapi', 'account', 'auth',
-                'features', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
+                'features', 'sites', 'pricing', 'download', 'downloads', 'guides', 'faq', 'help', 'about', 'changelog',
                 'privacy', 'terms', 'refund', 'zh-tw', 'en', 'ja', 'ko', 'fr', 'es', 'pt-br', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id', 'ar', 'webhooks', 'billing', 'payment',
                 'uninstall', 'drive-connect', 'translate'}
     if kind == 'admin' and (not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9_-]{1,79}/', admin_path)

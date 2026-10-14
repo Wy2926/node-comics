@@ -40,4 +40,4 @@ export const dictionaries = Object.fromEntries(Object.entries(baseDictionaries).
   };
   return [locale,localized];
 })) as Record<Locale, Dictionary>;
-export const publicPaths=['/','/features/','/pricing/','/download/','/guides/','/faq/','/help/','/about/','/changelog/','/privacy/','/terms/','/refund/',...dictionaries['zh-CN'].documents.guides.map(guide=>`/guides/${guide.slug}/`)];
+export const publicPaths=['/','/features/','/sites/','/pricing/','/download/','/guides/','/faq/','/help/','/about/','/changelog/','/privacy/','/terms/','/refund/',...dictionaries['zh-CN'].documents.guides.map(guide=>`/guides/${guide.slug}/`)];

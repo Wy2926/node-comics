@@ -77,7 +77,7 @@ class ReleaseTests(unittest.TestCase):
         (source / 'index.html').write_text('console', encoding='utf-8')
         config = prepare('admin', source, self.root / 'static', 'v1', '/www/node-comics', admin_path='/existing-panel/')
         self.assertIn('location = /existing-panel/', config.read_text())
-        for path in ('/admin/', '/v1/', '/billing/', '/webhooks/', '/translate/'):
+        for path in ('/admin/', '/v1/', '/billing/', '/webhooks/', '/translate/', '/sites/'):
             with self.assertRaises(ValueError):
                 prepare('admin', source, self.root / 'static', 'v2', '/www/node-comics', admin_path=path)
 

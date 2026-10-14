@@ -1,0 +1,111 @@
+---
+import Base from '../layouts/Base.astro';
+import PageIntro from './PageIntro.astro';
+import SitePricing from './SitePricing.astro';
+import { supportedSites } from '../data/supported-sites';
+import { absolute } from '../data/site';
+import { dictionaries, localPath, type Locale } from '../i18n';
+import { sitesCopy } from '../i18n/sites';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const c = sitesCopy[locale];
+const t = dictionaries[locale].ui;
+const href = (path: string) => localPath(path, locale);
+const canonical = absolute(href('/sites/'));
+const listId = `${canonical}#directory`;
+const languageNames = new Intl.DisplayNames([locale], { type: 'language' });
+const dates = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
+const count = c.count.replace('{count}', new Intl.NumberFormat(locale).format(supportedSites.length));
+const schema = [
+  { '@type': 'CollectionPage', '@id': canonical, mainEntity: { '@id': listId } },
+  { '@type': 'ItemList', '@id': listId, name: c.directory, numberOfItems: supportedSites.length,
+    itemListElement: supportedSites.map((site, index) => ({ '@type': 'ListItem', position: index + 1,
+      name: site.name, url: `${canonical}#${site.anchor}` })) },
+];
+---
+<Base title={c.title} description={c.description} schema={schema}>
+  <PageIntro eyebrow={c.nav} title={c.heading} description={c.intro} />
+  <div class="container sites-page">
+    <div class="sites-actions">
+      <a class="text-link" href={href('/guides/find-manga/')}>{t.readGuide} <span aria-hidden="true">↗</span></a>
+    </div>
+    <section aria-labelledby="directory-title" id="directory">
+      <div class="sites-heading"><h2 id="directory-title">{c.directory}</h2><span>{count}</span></div>
+      <ul class="supported-sites-grid" role="list">
+        {supportedSites.map(site => <li>
+          <article class="supported-site" id={site.anchor} data-site-key={site.key}>
+            <div class="site-card-top"><img src={site.icon} alt="" aria-hidden="true" width="40" height="40" loading="lazy" decoding="async" /><SitePricing pricing={site.pricing} locale={locale} /></div>
+            <h3><bdi>{site.name}</bdi></h3>
+            <span class="site-domain" dir="ltr">{new URL(site.url).hostname.replace(/^www\./, '')}</span>
+            <p class="site-reading">{c.readOn.replace('{site}', site.name)}</p>
+            <ul class="site-tags" role="list">
+              {site.isRaw && <li class="site-raw">{c.raw}</li>}
+              {site.contentTags.map(tag => <li data-content-tag={tag}>{c.content[tag]}</li>)}
+            </ul>
+            <p class="site-languages"><span>{c.languages}</span> {site.primaryLanguages.map(language => languageNames.of(language) ?? language).join(' · ')}</p>
+            <ul class="site-access" role="list">
+              {site.search && <li>{c.search}</li>}
+              {site.accessTags?.map(tag => <li data-access-tag={tag}>{c.access[tag]}</li>)}
+            </ul>
+            <div class="site-card-bottom"><p>{c.adapted}<time datetime={site.adaptedOn}>{dates.format(new Date(`${site.adaptedOn}T00:00:00Z`))}</time></p>
+              <a href={site.url} target="_blank" rel="nofollow noopener noreferrer" aria-label={`${c.open} · ${site.name}`}>{c.open} <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+        </li>)}
+      </ul>
+      <p class="sites-metadata">{c.metadata}</p>
+    </section>
+    <section class="sites-how" aria-labelledby="sites-how-title">
+      <h2 id="sites-how-title">{c.how}</h2>
+      <ol>{c.steps.map((step, index) => <li><span aria-hidden="true">0{index + 1}</span><p>{step}</p></li>)}</ol>
+      <a class="text-link" href={href('/guides/find-manga/')}>{t.readGuide} <span aria-hidden="true">↗</span></a>
+    </section>
+    <aside class="sites-limits"><h2>{c.limitsTitle}</h2><p>{c.limits}</p><a class="text-link" href={href('/help/')}>{t.help} <span aria-hidden="true">↗</span></a></aside>
+  </div>
+</Base>
+<style>
+  .sites-page { padding-bottom: 80px; }
+  .sites-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin-block: -12px 56px; }
+  #directory, .supported-site { scroll-margin-top: 130px; }
+  .sites-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+  .sites-heading h2 { font-size: 1.35rem; }
+  .sites-heading > span, .sites-metadata { color: var(--muted); font-size: .8rem; }
+  .supported-sites-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; list-style: none; margin: 0; padding: 0; }
+  .supported-sites-grid > li { min-width: 0; }
+  .supported-site { height: 100%; display: flex; flex-direction: column; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--comic-card-radius); overflow-wrap: anywhere; }
+  .supported-site:target { border-color: var(--accent); outline: var(--comic-focus-ring); outline-offset: 3px; }
+  .site-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+  .site-card-top img { width: 40px; height: 40px; flex: none; object-fit: contain; border-radius: var(--comic-control-radius); }
+  .supported-site h3 { margin: 0; font-size: 1.18rem; line-height: 1.4; }
+  .site-domain { display: block; color: var(--muted); font-size: .75rem; margin-top: 5px; text-align: start; }
+  .site-reading { margin-block: 18px 14px; font-size: .85rem; color: var(--muted); line-height: 1.7; }
+  .site-tags, .site-access { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0; font-size: .7rem; }
+  .site-tags li { padding: 3px 8px; background: var(--surface-soft); border-radius: var(--comic-control-radius); }
+  .site-tags .site-raw { background: var(--accent-soft); color: var(--accent); }
+  .site-languages { margin-block: 16px 10px; font-size: .75rem; line-height: 1.7; }
+  .site-languages > span { color: var(--muted); margin-inline-end: 5px; }
+  .site-access { color: var(--muted); padding-bottom: 20px; }
+  .site-access li + li::before { content: '·'; margin-inline-end: 6px; }
+  .site-card-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line); font-size: .72rem; }
+  .site-card-bottom p { margin: 0; color: var(--muted); }
+  .site-card-bottom time { display: block; margin-top: 3px; }
+  .site-card-bottom a { color: var(--accent); padding-block: 10px; }
+  .sites-metadata { margin-top: 24px; line-height: 1.9; }
+  .sites-how { margin-block: 72px 48px; }
+  .sites-how h2, .sites-limits h2 { font-size: 1.4rem; }
+  .sites-how ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; list-style: none; padding: 0; margin-block: 28px; }
+  .sites-how li > span { color: var(--accent); font-size: .85rem; }
+  .sites-how li p, .sites-limits p { color: var(--muted); line-height: 1.9; font-size: .9rem; margin-top: 12px; }
+  .sites-limits { padding: 28px; border: 1px solid var(--line); border-radius: var(--comic-panel-radius); background: var(--surface); }
+  .sites-limits .text-link { margin-top: 16px; }
+  @media (max-width: 1000px) { .supported-sites-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 600px) {
+    .supported-sites-grid, .sites-how ol { grid-template-columns: 1fr; }
+    .supported-site { padding: 20px; }
+    .sites-actions { margin-bottom: 36px; }
+    .sites-how { margin-top: 48px; }
+    .sites-limits { padding: 20px; }
+    .sites-page { padding-bottom: 48px; }
+  }
+</style>

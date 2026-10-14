@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | `/` | 漫画翻译插件、漫画阅读器 | manga translator extension, comic reader |
 | `/features/` | 漫画图片翻译、EPUB 阅读、OPDS 书库 | manga translation features, EPUB reader, OPDS libraries |
+| `/sites/` | 支持的漫画网站、站名 + 漫画阅读插件／翻译 | supported manga websites, site name + manga reader / translation extension |
 | `/download/` | Chrome／Edge／Firefox 漫画翻译插件下载 | manga translator Chrome / Edge / Firefox |
 | `/pricing/` | 漫画翻译免费额度、订阅价格、翻译额度包 | free manga translation, subscription pricing, translation credits |
 | `/guides/` | 漫画翻译教程、本地漫画阅读指南 | manga translation guides, local comic reader guides |
@@ -53,6 +54,14 @@
 - [sitemap.xml.ts](src/pages/sitemap.xml.ts) 从 `publicPaths` 生成全部 17 语公开页面（包括手机安装教程），并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。
 - 首页商店入口直接使用可抓取的链接和本地浏览器标识；Chrome、Edge、Firefox 均指向各自官方商店。地址统一维护在 [site.ts](src/data/site.ts)，安装包与手动安装说明留在下载页。
 - Android／iOS 图标使用可抓取的同语言页面链接，不标为 App 下载；页面复用 Article、canonical 与 hreflang。Android 使用中英文模拟器实图，正文注明来源和验证边界；iOS 的标题、摘要、入口与正文同步标为“适配中”，不声称 Orion 已正式支持，也不展示安装步骤或伪造截图。
+
+## 支持网站目录
+
+`/sites/` 的 17 语静态目录承接站名与阅读插件的组合搜索意图。站名、域名、内容与收费标签、语言、访问条件、首次适配日期直接来自插件适配器，每个入口有稳定锚点和可见阅读说明。页面引言及首页轮播说明明确：列表收录支持插件内直接阅读的站点，标签页阅读与翻译还支持列表以外的网站，具体取决于页面兼容性；公开文案不介绍适配器实现。正文提供安装、添加漫画、继续阅读步骤，链接同语言的名称搜索教程和帮助页，下载入口沿用导航栏。只描述当前适配能力，明确独立工具身份、源站权限与付费／App 限制，不暗示官方合作、免费解锁或提供漫画版权授权。不为同质站点批量生成薄内容落地页。
+
+目录使用自引用 canonical、完整 hreflang、站点地图及与可见卡片一致的 `CollectionPage`／`ItemList`；结构化列表只指向官网自身锚点，不把源站当成官网的 `sameAs`。首页三行小卡片与全站页脚提供可抓取内链，轮播副本不重复屏幕阅读器及键盘导航。源站链接统一为 `rel="nofollow noopener noreferrer"`，图标仅使用随包本地资源，不预取或预连接源站。页面自身仍保持 `index, follow`，不得为限制外链而禁止官网目录收录或内链抓取。
+
+`nofollow` 是向搜索引擎声明不背书外链的标准方式，不是对任何搜索引擎“绝不传递权重”的保证；也不代表源站付费内容是付费广告。[Google 外链关系说明](https://developers.google.com/search/docs/crawling-indexing/qualify-outbound-links)、[nofollow 提示语义](https://developers.google.com/search/blog/2019/09/evolving-nofollow-new-ways-to-identify)。目录以真实兼容信息帮助选择和使用，不承诺流量或排名提升。[Google 实用内容指南](https://developers.google.com/search/docs/fundamentals/creating-helpful-content)
 
 ## FAQ
 

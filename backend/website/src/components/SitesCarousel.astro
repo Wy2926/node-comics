@@ -1,0 +1,75 @@
+---
+import { supportedSites } from '../data/supported-sites';
+import { sitesCopy } from '../i18n/sites';
+import { localPath, type Locale } from '../i18n/locales';
+import SitePricing from './SitePricing.astro';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const c = sitesCopy[locale];
+const path = localPath('/sites/', locale);
+const rows = Array.from({ length: 3 }, (_, row) => supportedSites.filter((_, index) => index % 3 === row));
+---
+<section class="home-sites" aria-labelledby="home-sites-title" data-sites-carousel>
+  <div class="container home-sites-heading">
+    <div><h2 id="home-sites-title">{c.carousel}</h2><p>{c.carouselBody}</p></div>
+    <a class="text-link" href={path}>{c.all} <span aria-hidden="true">↗</span></a>
+  </div>
+  <div class="container sites-marquee">
+    <div class="sites-rows">
+      {rows.map((row, index) => <div class="sites-row" dir="ltr" style={`--sites-duration: ${65 + index * 10}s`}>
+        <div class="sites-track">
+          <ul class="sites-group" role="list">
+            {row.map(site => <li><a class="site-mini" href={`${path}#${site.anchor}`} dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi><SitePricing pricing={site.pricing} locale={locale} /></a></li>)}
+          </ul>
+          <div class="sites-group sites-clone" aria-hidden="true">
+            {row.map(site => <a class="site-mini" href={`${path}#${site.anchor}`} tabindex="-1" dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi><SitePricing pricing={site.pricing} locale={locale} /></a>)}
+          </div>
+        </div>
+      </div>)}
+    </div>
+  </div>
+</section>
+<script>
+  // Only animate while visible; without JavaScript every entry remains reachable.
+  const carousel = document.querySelector<HTMLElement>('[data-sites-carousel]');
+  if (carousel) {
+    let inView = false;
+    const update = () => { carousel.dataset.moving = String(inView && !document.hidden); };
+    new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }).observe(carousel);
+    document.addEventListener('visibilitychange', update);
+  }
+</script>
+<style>
+  .home-sites { padding-block: 32px 72px; }
+  .home-sites-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+  .home-sites-heading h2 { font-size: clamp(1.7rem, 3vw, 2.5rem); }
+  .home-sites-heading p { margin-top: 16px; color: var(--muted); font-size: .9rem; }
+  .home-sites-heading .text-link { font-size: .85rem; }
+  .sites-rows { display: grid; gap: 12px; }
+  .sites-row { overflow-x: auto; scrollbar-width: thin; padding: 4px; }
+  .sites-track { display: flex; width: max-content; }
+  [data-moving] .sites-track { animation: sites-scroll var(--sites-duration) linear infinite; animation-play-state: paused; }
+  [data-moving] .sites-row { overflow-x: hidden; }
+  [data-moving=true] .sites-track { animation-play-state: running; }
+  [data-moving] .sites-row:nth-child(2) .sites-track { animation-direction: reverse; }
+  .sites-group { display: flex; align-items: stretch; flex: none; gap: 12px; list-style: none; padding: 0 12px 0 0; margin: 0; }
+  .sites-group li { display: flex; }
+  .sites-clone { display: none; }
+  [data-moving] .sites-clone { display: flex; }
+  .site-mini { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 20px; min-width: 220px; border: 1px solid var(--line); border-radius: var(--comic-card-radius); background: var(--surface); font-size: .85rem; white-space: nowrap; }
+  a.site-mini:is(:hover, :focus-visible) { border-color: var(--accent); background: var(--surface-soft); }
+  .sites-marquee:hover .sites-track { animation-play-state: paused; }
+  .sites-marquee:has(.sites-group:not(.sites-clone) a:focus) .sites-track { animation: none; transform: none; }
+  .sites-marquee:has(.sites-group:not(.sites-clone) a:focus) .sites-clone { display: none; }
+  .sites-marquee:has(.sites-group:not(.sites-clone) a:focus) .sites-row { overflow-x: auto; }
+  @keyframes sites-scroll { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    [data-moving] .sites-track { animation: none; transform: none; }
+    [data-moving] .sites-clone { display: none; }
+    [data-moving] .sites-row { overflow-x: auto; }
+  }
+  @media (max-width: 600px) {
+    .home-sites { padding-block: 16px 48px; }
+    .site-mini { min-width: 190px; padding: 14px 16px; gap: 16px; }
+  }
+</style>
