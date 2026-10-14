@@ -117,6 +117,7 @@ npm run build
 | [RawLazy](../apps/extension/src/sources/sites/rawlazy/README.md) | HTTP 名称搜索、完整静态目录／封面与分批 POST 正文、12 小时更新；作品与裸章节导入、浮动入口，标签页翻译复用通用大图识别 |
 | [KLManga](../apps/extension/src/sources/sites/klmanga/README.md) | HTTP 名称搜索、完整静态目录／封面与分批 POST 正文、12 小时更新；作品与章节导入、浮动入口，标签页翻译复用通用大图识别 |
 | [Hachiraw](../apps/extension/src/sources/sites/hachiraw/README.md) | HTTP 分页名称搜索、网页会话完整静态目录／正文、封面与 12 小时更新；作品／章节浮动导入，标签页识别复用通用规则 |
+| [RawKuro / Raw1001](../apps/extension/src/sources/sites/rawkuro/README.md) | 双域同站身份、HTTP 分页名称搜索、完整静态目录／封面与索引排序正文、12 小时更新；作品／章节浮动导入，标签页识图复用通用规则 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | HTTP 名称搜索、完整公开目录／正文／封面与 12 小时同步；作品／章节导入与网页浮动入口，阅读器及当前标签页原位翻译复用共享 GigaViewer 引擎 |
 | [ComicWalker / カドコミ](../apps/extension/src/sources/sites/comicwalker/README.md) | HTTP 名称搜索、完整公开目录／正文／封面、图片还原与 12 小时同步；作品／章节导入、浮动入口及有限 canvas 下一页预翻 |
