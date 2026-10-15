@@ -19,6 +19,12 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
  const [updatesOnly,setUpdatesOnly]=useState(shelfView.current.updatesOnly);
+ const [now,setNow]=useState(Date.now);
+ useEffect(()=>{
+  if(!active)return;
+  setNow(Date.now());const timer=window.setInterval(()=>setNow(Date.now()),60000);
+  return()=>window.clearInterval(timer);
+ },[active]);
  useEffect(()=>{if(!active){setManaging(false);setSelected(new Set());setRemoving(undefined);downloads?.close(false);}},[active,downloads?.close]);
  const updatedCount=useMemo(()=>library.comics.filter(hasCatalogUpdates).length,[library.comics]),filterUpdates=updatesOnly&&updatedCount>0;
  useEffect(()=>{
@@ -77,7 +83,7 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
    <div className="nc-inline"><button className="button secondary small" disabled={busy||!matching.length||matching.every(comic=>selected.has(comic.id))} onClick={()=>setSelected(previous=>new Set([...previous,...matching.map(comic=>comic.id)]))}>{msg('全选 {0} 部',{'0':matching.length})}</button><button className="text-link" disabled={busy||!selectedComics.length} onClick={()=>setSelected(new Set())}>{msg('取消选择')}</button></div>
    <button className="button danger small" disabled={busy||!selectedComics.length} onClick={()=>requestRemoval(selectedComics)}><Icon name="trash" size={18}/>{msg('移除漫画')}</button>
   </div>}
-  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol"><Icon name="book" size={56}/></span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><Icon name="search" size={36}/><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid active={active} key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard active={active} key={comic.id} comic={comic} onOpen={()=>open(comic.id)} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
+  {!library.comics.length?<section className="nc-empty nc-import-empty"><span className="nc-empty-symbol"><Icon name="book" size={56}/></span><h2>{msg('把喜欢的故事带进来')}</h2><p>{msg('选择漫画文件即可阅读，已适配网站也可直接添加。')}</p><button className="button primary" onClick={onImport}><Icon name="upload"/>{msg('选择漫画文件')}</button><span className="nc-muted">CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB</span></section>:!matching.length?<div className="nc-empty nc-compact-empty"><Icon name="search" size={36}/><h3>{msg('没有找到这部作品')}</h3><button className="text-link" onClick={()=>changeSearch('')}>{msg('清除搜索')}</button></div>:<ShelfGrid active={active} key={search+'|'+sort+'|'+filterUpdates} comics={matching} view={shelfView}>{comic=><ShelfCard active={active} key={comic.id} comic={comic} now={now} onOpen={()=>open(comic.id)} menu={menu.bind(comic.title,actions(comic))} selection={managing?{checked:selected.has(comic.id),disabled:busy,onToggle:()=>toggle(comic.id)}:undefined}/>}</ShelfGrid>}
   {menu.menu}
   {active&&!!removing?.length&&<ConfirmationDialog title={msg('移除漫画')} subject={removing.length===1?removing[0].title:msg('已选 {0} 部作品',{'0':removing.length})} action={msg('移除漫画')} busy={busy} error={removalError} onClose={()=>setRemoving(undefined)} onConfirm={()=>void confirmRemoval()}>
    {removing.length>1&&<><ul className="nc-dialog-list">{removing.slice(0,5).map((comic,index)=><li key={comic.id}><span>{index+1}</span><span>{comic.title}</span></li>)}</ul>{removing.length>5&&<div className="nc-dialog-list-more">{msg('还有 {0} 部漫画',{'0':removing.length-5})}</div>}</>}

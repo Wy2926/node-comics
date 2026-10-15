@@ -28,3 +28,12 @@ export function msg(key:MessageKey, values:Record<string,string|number|boolean|n
 export const messageSource=(text:string)=>formattedSources.get(text)??sourceByText.get(text)??text;
 export const browserLocale=()=>resolveLocale('auto');
 export const formatDate=(value:Date|number|string,withTime=false)=>new Intl.DateTimeFormat(locale,withTime?{dateStyle:'medium',timeStyle:'short'}:{dateStyle:'medium'}).format(new Date(value));
+let relativeTimeFormatter:Intl.RelativeTimeFormat|undefined;
+const relativeTimeUnits:[Intl.RelativeTimeFormatUnit,number][]=[['year',365*86400000],['month',30*86400000],['week',7*86400000],['day',86400000],['hour',3600000],['minute',60000]];
+export function formatRelativeTime(value:number,now=Date.now()):string {
+  const elapsed=Math.max(0,now-value);
+  if(elapsed<60000)return msg('刚刚');
+  if(!relativeTimeFormatter||relativeTimeFormatter.resolvedOptions().locale!==locale)relativeTimeFormatter=new Intl.RelativeTimeFormat(locale,{numeric:'always'});
+  const [unit,duration]=relativeTimeUnits.find(([,duration])=>elapsed>=duration)??relativeTimeUnits[relativeTimeUnits.length-1];
+  return relativeTimeFormatter.format(-Math.floor(elapsed/duration),unit);
+}

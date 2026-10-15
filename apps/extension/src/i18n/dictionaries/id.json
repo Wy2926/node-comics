@@ -33,6 +33,7 @@
   "完整离线文件；再次阅读可能需要重新下载。": "File offline lengkap. Membaca lagi mungkin memerlukan unduhan ulang.",
   "下载完整文件后即可离线阅读。": "Baca offline setelah seluruh file selesai diunduh.",
   "停止来源请求，重新授权后可继续。": "Menghentikan permintaan ke sumber ini. Beri otorisasi ulang untuk melanjutkan.",
+  "刚刚": "Baru saja",
   "已占用 {0}": "Terpakai: {0}",
   "10 GB（默认）": "10 GB (default)",
   "同时清理处理记录": "Hapus juga catatan pemrosesan",

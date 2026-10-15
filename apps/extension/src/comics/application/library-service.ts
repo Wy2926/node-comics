@@ -34,15 +34,17 @@ export async function listShelfIndex():Promise<LibraryViewModel> {
   })};
 }
 export const hasCatalogUpdates=(comic:Comic)=>!!comic.catalogUpdates?.count&&comic.catalogUpdates.revision>comic.catalogUpdates.seenRevision;
-/** Match directory chapter grouping without loading page descriptors or image data. */
-export async function shelfReadingProgress(comic:Comic):Promise<number> {
-  if(!comic.lastReadAt||!comic.lastEntryId)return 0;
+export interface ShelfReadingState {progress:number;entry?:Pick<Entry,'title'|'format'>}
+/** Read the progress and current chapter together, without page descriptors or image data. */
+export async function shelfReadingState(comic:Comic):Promise<ShelfReadingState> {
+  if(!comic.lastReadAt||!comic.lastEntryId)return {progress:0};
   const slots=readingSlots(await catalog.listEntries(comic.id));
   const current=slots.findIndex(slot=>slot.entries.some(entry=>entry.id===comic.lastEntryId));
-  if(current<0)return 0;
+  if(current<0)return {progress:0};
+  const entry=slots[current].entries.find(entry=>entry.id===comic.lastEntryId)!;
   const fraction=slots.length>1?(current+1)/slots.length
     :comic.lastPageCount&&comic.lastPage?comic.lastPage/comic.lastPageCount:0;
-  return Number.isFinite(fraction)?Math.max(0,Math.min(100,fraction*100)):0;
+  return {progress:Number.isFinite(fraction)?Math.max(0,Math.min(100,fraction*100)):0,entry:{title:entry.title,format:entry.format}};
 }
 export async function continueEntry(comicId:string,targetLanguage?:string):Promise<Entry|undefined> {
   const comic=await catalog.get('comics',comicId);if(!comic)return;

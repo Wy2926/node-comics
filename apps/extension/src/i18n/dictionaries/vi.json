@@ -33,6 +33,7 @@
   "完整离线文件；再次阅读可能需要重新下载。": "Tệp ngoại tuyến đầy đủ. Đọc lại có thể cần tải xuống lần nữa.",
   "下载完整文件后即可离线阅读。": "Có thể đọc ngoại tuyến sau khi tải xong toàn bộ tệp.",
   "停止来源请求，重新授权后可继续。": "Dừng yêu cầu đến nguồn này. Cấp quyền lại để tiếp tục.",
+  "刚刚": "Vừa xong",
   "已占用 {0}": "Đã dùng: {0}",
   "10 GB（默认）": "10 GB (mặc định)",
   "同时清理处理记录": "Xóa cả bản ghi xử lý",

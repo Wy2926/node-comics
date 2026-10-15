@@ -33,6 +33,7 @@
   "完整离线文件；再次阅读可能需要重新下载。": "Tam çevrimdışı dosya. Tekrar okumak için yeniden indirmek gerekebilir.",
   "下载完整文件后即可离线阅读。": "Dosyanın tamamı indirildiğinde çevrimdışı okuyabilirsiniz.",
   "停止来源请求，重新授权后可继续。": "Bu kaynağa istekleri durdurur. Devam etmek için yeniden yetkilendirin.",
+  "刚刚": "Az önce",
   "已占用 {0}": "Kullanılan alan: {0}",
   "10 GB（默认）": "10 GB (varsayılan)",
   "同时清理处理记录": "İşlem kayıtlarını da temizle",

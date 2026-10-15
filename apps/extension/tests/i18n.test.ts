@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { matchLocale, resolveLocale, uiLanguages, type UiLocale } from '../src/i18n/locales';
-import { getLocale, installDictionary, messageSource, msg, type Dictionary } from '../src/i18n/runtime';
+import { formatRelativeTime, getLocale, installDictionary, messageSource, msg, type Dictionary } from '../src/i18n/runtime';
 import { saveSettings, settings } from '../src/comics/application/preferences';
 import { translationNotice } from '../src/translation/notice';
 import { defaults, modeLabels, statusLabels } from '../src/types';
@@ -12,6 +12,21 @@ const placeholders=(text:string)=>[...text.matchAll(/\{\w+\}/g)].map(m=>m[0]).so
 afterEach(()=>{installDictionary('zh-CN',dictionaries['zh-CN']);vi.unstubAllGlobals();});
 
 describe('interface dictionaries',()=>{
+  it('formats approximate reading times at each unit boundary',()=>{
+    const now=Date.UTC(2026,9,14),minute=60000,day=1440*minute;
+    installDictionary('zh-CN',dictionaries['zh-CN']);
+    for(const [elapsed,expected] of [[-minute,'刚刚'],[0,'刚刚'],[minute-1,'刚刚'],[minute,'1分钟前'],[59*minute,'59分钟前'],[60*minute,'1小时前'],[day-1,'23小时前'],[day,'1天前'],[7*day-1,'6天前'],[7*day,'1周前'],[30*day-1,'4周前'],[30*day,'1个月前'],[365*day-1,'12个月前'],[365*day,'1年前'],[2*365*day,'2年前']] as const){
+      expect(formatRelativeTime(now-elapsed,now)).toBe(expected);
+    }
+  });
+  it('uses the current UI language for relative times without special yesterday or last-week labels',()=>{
+    const now=Date.UTC(2026,9,14);
+    for(const language of uiLanguages){
+      installDictionary(language.id,dictionaries[language.id]);
+      expect(formatRelativeTime(now,now)).toBe(dictionaries[language.id]['刚刚']);
+      expect(formatRelativeTime(now-86400000,now)).toBe(new Intl.RelativeTimeFormat(language.id,{numeric:'always'}).format(-1,'day'));
+    }
+  });
   it('ships all supported languages with identical keys and interpolation tokens',()=>{
     expect(Object.keys(dictionaries).sort()).toEqual(uiLanguages.map(l=>l.id).sort());
     const base=dictionaries['zh-CN'];

@@ -47,6 +47,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_discovery.mjs` | 生产 MV3 发现／详情／来源导入、返回位置、分页失败／限流及主题的隔离 HTTP 夹具；含设置中的默认开启文字翻译开关及持久化、可见书名／简介自动翻译、并发与缓存、原文切换、简介控制同行与展开位置、限流重试和取消；`--text-only` 聚焦设置、文字交互与布局，`--detail-only` 检查关闭自动翻译后的手动入口、手机年份旁操作／长标题评分／长简介与别名自然展开、桌面固定底部操作及返回位置，`--live` 只检查真实 AniList 公共列表和详情。`DISCOVERY_OUTPUT` 可指定仓库外的验收产物目录 |
 | `verify_text_translation.mjs` | 生产 MV3 匿名 Google 无密钥文字翻译，用自制书名／简介核对真实译文、无凭据 POST 与缓存；不调用名称模型或图片翻译 |
 | `verify_simple_reading.mjs` / `verify_source_database_baseline.mjs` | 单来源导入、格式、书架、批量移除、新库和重启恢复 |
+| `verify_shelf_cards.mjs` | 隔离 MV3 卡片的相对时间、无时钟图标、标题与阅读位置省略、深浅主题、窄屏和 CBZ 续读恢复；使用上方自制样本与浏览器环境变量 |
 | `verify_shelf_performance.mjs` | 隔离 MV3 书架的重复切换、封面复用、数据库读取量、菜单与滚动位置；`SHELF_PERF_BOOKS=17` 指定漫画数，`SHELF_PERF_LABEL=before` 记录基准，默认 `after` 检查读取范围与封面复用，`SHELF_PERF_EXTENSION` 可指定对照构建 |
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
 | `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |

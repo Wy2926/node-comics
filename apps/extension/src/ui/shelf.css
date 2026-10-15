@@ -23,7 +23,6 @@
 .nc-shelf-window .nc-book-cover{overflow:hidden;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
 .nc-card-source{position:absolute;top:12px;left:12px;max-width:calc(100% - 116px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px;border:1px solid #ffffff40;border-radius:6px;background:#172337ed;color:#fff;font-size:.6875rem;font-weight:800;line-height:1.45;backdrop-filter:blur(8px)}
 .nc-card-reading-time{position:absolute;bottom:12px;left:12px;display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);padding:5px 8px;border:1px solid #ffffff26;border-radius:6px;background:#172337dc;color:#fff;font-size:.6875rem;line-height:1.45;text-align:left;backdrop-filter:blur(8px)}
-.nc-card-reading-time>svg{flex-shrink:0}
 .nc-card-update{position:absolute;top:-20px;right:-15px;z-index:2;width:104px;height:92px;filter:drop-shadow(0 3px 3px #17233755);pointer-events:none}
 .nc-card-update svg{display:block;width:100%;height:100%}
 .nc-card-reading-time time{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}

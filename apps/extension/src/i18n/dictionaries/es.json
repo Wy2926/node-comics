@@ -33,6 +33,7 @@
   "完整离线文件；再次阅读可能需要重新下载。": "Archivo completo sin conexión. Volver a leer puede requerir otra descarga.",
   "下载完整文件后即可离线阅读。": "Podrás leer sin conexión cuando se descargue el archivo completo.",
   "停止来源请求，重新授权后可继续。": "Detiene las solicitudes a este origen. Vuelve a autorizarlo para continuar.",
+  "刚刚": "Ahora mismo",
   "已占用 {0}": "Espacio usado: {0}",
   "10 GB（默认）": "10 GB (predeterminado)",
   "同时清理处理记录": "Borrar también los registros de procesamiento",

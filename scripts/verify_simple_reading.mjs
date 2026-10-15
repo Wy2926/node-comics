@@ -45,7 +45,8 @@ try{
  let value=await state();assert.equal(value.comics.length,1);assert.equal(value.entries.length,1);assert.equal(value.pages.length,120);assert.equal(value.objects.length,1);assert.equal(value.chunkBytes,archive.length);assert(value.materials.length<12);assert(!value.stores.some(s=>['works','units','documents','revisions','sourceBindings'].includes(s)));
  checks.push('单本自动开始阅读，新库只有单来源漫画与只读条目，120 页仅完整容器和索引');await screenshot('reading');
  await jump(100);await rendered(99);assert(await page.locator('.nc-manga-page').count()<=11);await screenshot('page-100');await shelf();
- await page.locator('.nc-card-reading-time time').waitFor();value=await state();assert.equal(value.positions[0].pageId,value.pages.find(p=>p.ordinal===99).pageId);assert(value.materials.length<20);assert.equal(await page.locator('.nc-cover-reading').count(),0);checks.push('跳第 100 页、有限图片窗口，书架保存阅读位置但不显示页数标签');
+ await page.locator('.nc-card-reading-time time').waitFor();value=await state();assert.equal(value.positions[0].pageId,value.pages.find(p=>p.ordinal===99).pageId);assert(value.materials.length<20);assert.equal(await page.locator('.nc-cover-reading').count(),0);
+ assert.equal(await page.locator('.nc-card-position').innerText(),'第 100 页，共 120 页');assert.equal(await page.locator('.nc-card-reading-time svg').count(),0);assert.equal(await page.locator('.nc-card-reading-time time').innerText(),'刚刚');checks.push('跳第 100 页、有限图片窗口，标题下显示当前页码，封面显示无图标的相对时间');
  const progress=page.getByRole('progressbar',{name:'阅读进度'});await progress.waitFor();
  await page.waitForFunction(()=>document.querySelector('.nc-card-progress')?.getAttribute('aria-valuenow')==='83');
  const progressPlacement=await progress.evaluate(bar=>{const cover=bar.previousElementSibling.getBoundingClientRect(),rect=bar.getBoundingClientRect();return {gap:rect.top-cover.bottom,width:rect.width,coverWidth:cover.width};});
@@ -66,6 +67,7 @@ try{
  const card=page.locator('.nc-book').filter({has:page.getByRole('button',{name:'长篇漫画',exact:true})});await card.getByRole('button',{name:'打开漫画 长篇漫画',exact:true}).click({button:'right'});
  assert.equal(await page.getByRole('menuitem',{name:/编辑|版本|归属|添加来源/}).count(),0);await screenshot('comic-menu');await page.keyboard.press('Escape');
  const time=card.locator('time');assert.equal(Date.parse(await time.getAttribute('datetime')),(await state()).comics.find(c=>c.title==='长篇漫画').lastReadAt);assert(!(await time.innerText()).includes('最近阅读'));
+ assert.equal(await card.locator('.nc-card-position').innerText(),'第 100 页，共 120 页');assert(await time.getAttribute('title'));
  const placement=await card.evaluate(card=>{const cover=card.querySelector('.nc-book-cover').getBoundingClientRect(),tag=card.querySelector('.nc-card-reading-time').getBoundingClientRect();return {inside:tag.top>=cover.top&&tag.left>=cover.left&&tag.right<=cover.right&&tag.bottom<=cover.bottom,topGap:cover.top-card.getBoundingClientRect().top};});assert(placement.inside);assert(placement.topGap<=3);
  await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await screenshot('desktop-shelf');await screenshot('desktop-shelf-top');assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  await card.getByRole('button',{name:/^打开漫画 /}).click();await rendered(99);await screenshot('desktop-reader');checks.push('桌面卡片显示真实最近阅读时间，直接续读恢复位置，书架无顶部下载区块');

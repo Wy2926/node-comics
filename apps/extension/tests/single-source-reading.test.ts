@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {describe,expect,it} from 'vitest';
 import {catalog} from '../src/comics/repositories';
 import {importCatalog,importManifest,publishWebsiteManifest} from '../src/comics/application/import-service';
-import {comicDirectory,continueEntry,readerSequence,removeComic,shelfReadingProgress} from '../src/comics/application/library-service';
+import {comicDirectory,continueEntry,readerSequence,removeComic,shelfReadingState} from '../src/comics/application/library-service';
 import {sourceFor,type PageManifest,type SourceCatalogSnapshot} from '../src/sources';
 function source():SourceCatalogSnapshot{
  const slug='fixture-'+crypto.randomUUID(),id='mangacopy:'+slug;
@@ -13,24 +13,25 @@ const manifest=(url:string,adapter='mangacopy'):PageManifest=>({id:crypto.random
 describe('adapter-only imports and read-only navigation',()=>{
  it('measures shelf progress by directory chapters, grouping language alternatives and following catalog growth',async()=>{
   const comic=await importCatalog(source()),entries=await catalog.listEntries(comic.id);
-  expect(await shelfReadingProgress(comic)).toBe(0);
+  expect(await shelfReadingState(comic)).toEqual({progress:0});
   const reading={...comic,lastReadAt:1,lastEntryId:entries[1].id,lastPage:1,lastPageCount:20};
-  expect(await shelfReadingProgress(reading)).toBeCloseTo(200/3);
+  expect((await shelfReadingState(reading)).progress).toBeCloseTo(200/3);
+  expect((await shelfReadingState(reading)).entry).toEqual({title:entries[1].title,format:'website'});
   await catalog.put('entries',{...entries[1],readingSlotId:'shared'});
   await catalog.put('entries',{...entries[1],id:crypto.randomUUID(),contentId:crypto.randomUUID(),sourceEntryId:crypto.randomUUID(),readingSlotId:'shared',contentLanguage:'en'});
-  expect(await shelfReadingProgress(reading)).toBeCloseTo(200/3);
+  expect((await shelfReadingState(reading)).progress).toBeCloseTo(200/3);
   await catalog.put('entries',{...entries[2],id:crypto.randomUUID(),contentId:crypto.randomUUID(),sourceEntryId:crypto.randomUUID(),order:3});
-  expect(await shelfReadingProgress(reading)).toBe(50);
-  expect(await shelfReadingProgress({...reading,lastEntryId:'missing'})).toBe(0);
+  expect((await shelfReadingState(reading)).progress).toBe(50);
+  expect(await shelfReadingState({...reading,lastEntryId:'missing'})).toEqual({progress:0});
  });
  it('measures a single chapter by saved page position and leaves unknown totals empty',async()=>{
   const snapshot=source();snapshot.entries=snapshot.entries.slice(0,1);snapshot.groups.forEach(group=>{group.entryIds=group.entryIds.filter(id=>id===snapshot.entries[0].id);});
   const comic=await importCatalog(snapshot),[entry]=await catalog.listEntries(comic.id);
   const reading={...comic,lastReadAt:1,lastEntryId:entry.id,lastPage:5,lastPageCount:20};
-  expect(await shelfReadingProgress(reading)).toBe(25);
-  expect(await shelfReadingProgress({...reading,lastPage:20})).toBe(100);
-  expect(await shelfReadingProgress({...reading,lastPage:99})).toBe(100);
-  expect(await shelfReadingProgress({...reading,lastPageCount:undefined})).toBe(0);
+  expect((await shelfReadingState(reading)).progress).toBe(25);
+  expect((await shelfReadingState({...reading,lastPage:20})).progress).toBe(100);
+  expect((await shelfReadingState({...reading,lastPage:99})).progress).toBe(100);
+  expect((await shelfReadingState({...reading,lastPageCount:undefined})).progress).toBe(0);
  });
  it('rejects generic webpages and forged adapter IDs without creating comics',async()=>{const before=await catalog.count('comics');await expect(importManifest(manifest('https://example.org/page','generic'))).rejects.toThrow('专门适配');await expect(importManifest(manifest('https://comicpash.jp/episodes/test123','generic'))).rejects.toThrow('专门适配');expect(await catalog.count('comics')).toBe(before);expect(sourceFor('https://example.org/page').definition.capabilities.importable).not.toBe(true);});
  it('rejects invalid adapted images and catalog URLs before creating a comic',async()=>{const before=await catalog.count('comics'),input=manifest('https://comicpash.jp/episodes/test345','comicpash');input.items[0].url='javascript:alert(1)';await expect(importManifest(input)).rejects.toThrow('无效');await expect(importManifest(manifest('https://mangacopy.com/comic/invalid'))).rejects.toThrow('无效');expect(await catalog.count('comics')).toBe(before);});

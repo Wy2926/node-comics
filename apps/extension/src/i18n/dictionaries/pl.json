@@ -33,6 +33,7 @@
   "完整离线文件；再次阅读可能需要重新下载。": "Pełny plik offline. Ponowne czytanie może wymagać ponownego pobrania.",
   "下载完整文件后即可离线阅读。": "Po pobraniu całego pliku można czytać offline.",
   "停止来源请求，重新授权后可继续。": "Zatrzymuje żądania do źródła. Autoryzuj ponownie, aby kontynuować.",
+  "刚刚": "Przed chwilą",
   "已占用 {0}": "Zajęte: {0}",
   "10 GB（默认）": "10 GB (domyślnie)",
   "同时清理处理记录": "Usuń też historię przetwarzania",
