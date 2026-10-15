@@ -101,6 +101,7 @@ npm run build
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；嵌入导入／管理入口；网页正文切片原位翻译 |
 | [WEBTOON 国际站](../apps/extension/src/sources/sites/webtoons/README.md) | 七语言 Originals／Canvas 搜索、HTTP 完整公开目录／正文／封面与 12 小时更新；网页导入及已加载正文原位翻译 |
 | [WebtoonScan](../apps/extension/src/sources/sites/webtoonscan/README.md) | 名称分页搜索、网页会话完整目录／图片、专门封面与 12 小时更新；作品／章节浮动导入，标签页识别沿用通用规则 |
+| [WeLoMa](../apps/extension/src/sources/sites/weloma/README.md) | HTTP 分页名称搜索、完整静态目录／正文／封面与 12 小时同步；作品／裸章节浮动导入、章节归属校验，标签页识图复用通用规则 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |
 | [再漫画](../apps/extension/src/sources/sites/zaimanhua/README.md) | 原创／日漫名称搜索、完整网页分组目录、公开免费正文／封面与 12 小时更新；作品／章节浮动导入，标签页识图复用通用规则，不自动购买或解锁 |
