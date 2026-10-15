@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'arenascans', name: 'Arena Scans', installation,
   sites: [{id: 'arenascans', name: 'Arena Scans', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'unknown', contentTags: ['manhwa', 'manhua'], isRaw: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manhwa', 'manhua'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

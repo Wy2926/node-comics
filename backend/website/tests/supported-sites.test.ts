@@ -32,6 +32,7 @@ test('website uses the complete extension directory without copying or fetching 
     assert.deepEqual(supportedSites.map(({ icon, anchor, ...site }: Record<string, unknown>) => site), expected.map(({ icon, ...site }: Record<string, unknown>) => site));
     assert.equal(new Set(supportedSites.map((site: { anchor: string }) => site.anchor)).size, expected.length);
     for (const site of supportedSites) {
+      assert.ok(['free', 'freemium'].includes(site.pricing), site.key);
       assert.match(site.anchor, /^site-[a-z0-9-]+$/);
       assert.ok(site.icon.startsWith('/') || site.icon.startsWith('data:image/'), site.key);
       assert.doesNotMatch(site.icon, /^\/\//);

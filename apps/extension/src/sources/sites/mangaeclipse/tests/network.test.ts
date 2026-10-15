@@ -11,7 +11,7 @@ describe('Manga Eclipse', () => {
     expect(definition.identify(new URL(reader))).toMatchObject({kind: 'reader', pageKey: chapterKey({slug, chapter: first})});
     expect(definition).toMatchObject({embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720}});
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});
-    expect(definition.sites![0]).toMatchObject({adaptedOn: '2026-10-15', primaryLanguages: ['en'], pricing: 'unknown', isRaw: false});
+    expect(definition.sites![0]).toMatchObject({adaptedOn: '2026-10-15', primaryLanguages: ['en'], pricing: 'free', isRaw: false});
     expect(definition.sites![0].search).toBe(true);
     expect(network.search).toBeTypeOf('function');
     expect(network).not.toHaveProperty('pageTransport');

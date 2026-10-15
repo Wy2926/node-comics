@@ -9,7 +9,7 @@ describe('Mangasushi Madara integration', () => {
       capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
       catalogSync: {intervalMinutes: 720}});
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});
-    expect(definition.sites![0]).toMatchObject({pricing: 'unknown', primaryLanguages: ['en'], contentTags: ['manga'], isRaw: false, adaptedOn: '2026-10-15'});
+    expect(definition.sites![0]).toMatchObject({pricing: 'free', primaryLanguages: ['en'], contentTags: ['manga'], isRaw: false, adaptedOn: '2026-10-15'});
     expect(definition.sites![0].search).toBe(true);
     expect(network.search).toBeTypeOf('function');
     expect('pageTransport' in network).toBe(false);

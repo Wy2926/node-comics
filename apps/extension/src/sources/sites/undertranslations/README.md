@@ -8,7 +8,7 @@
 
 使用 [MangaThemesia 共享引擎](../../shared/mangathemesia/README.md)。协议参考 [Keiyoushi 的 UnderTranslations](https://github.com/keiyoushi/extensions-source/tree/main/src/es/undertranslations) 及 [源站公开 HTML](https://undertranslations.com/)；精确版本、摘要和许可见引擎目录的来源清单。站点模块只定义来源身份、路径、元数据与 HTTP 图片地址校验，本地图标为自制 SVG。
 
-作品 `.tsinfo` 的 `Tipo` 明确标注 Manga，主要内容为西班牙语译作；尚未确认全站收费规则，因此标为 `unknown`，不宣称全部免费。图片使用源站数据提供的普通 HTTP(S) 地址，拒绝凭据及片段；实际访问权限、请求预算和取消由公共层处理。不执行远端脚本，不绕过登录、验证或付费限制；未知读取器变体明确失败，不改用另一通道。
+作品 `.tsinfo` 的 `Tipo` 明确标注 Manga，主要内容为西班牙语译作。收费类型为 `free`：依据[首页目录](https://undertranslations.com/)与[章节样本](https://undertranslations.com/scarlet-capitulo-478/)直接开放、未见章节价格或付费解锁入口作出的内容判断，非源站正式全站免费声明；评论订阅不算付费阅读。图片使用源站数据提供的普通 HTTP(S) 地址，拒绝凭据及片段；实际访问权限、请求预算和取消由公共层处理。不执行远端脚本，不绕过登录、验证或付费限制；未知读取器变体明确失败，不改用另一通道。
 
 ## 验证
 

@@ -21,7 +21,7 @@ export const chapterUrl = (loc: RawLocation) => `${catalogUrl(loc)}/${encodeURIC
 export const definition: SourceDefinition = {
   id: 'rawkuro', name: 'RawKuro / Raw1001', installation,
   sites: Object.entries(origins).map(([id, origin]) => ({id, name: id === 'rawkuro' ? 'RawKuro' : 'Raw1001',
-    url: origin + '/', icon, adaptedOn: '2026-10-14', pricing: 'unknown', isRaw: true,
+    url: origin + '/', icon, adaptedOn: '2026-10-14', pricing: 'free', isRaw: true,
     contentTags: ['manga'], primaryLanguages: ['ja'], search: true})),
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

@@ -17,7 +17,7 @@ describe('Arena Scans', () => {
     expect(definition.capabilities).toEqual({importable: true, catalog: true, pages: true, inline: true, completePageList: true});
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});
     expect(definition).toMatchObject({embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720}});
-    expect(definition.sites![0]).toMatchObject({adaptedOn: '2026-10-15', pricing: 'unknown', contentTags: ['manhwa', 'manhua'],
+    expect(definition.sites![0]).toMatchObject({adaptedOn: '2026-10-15', pricing: 'free', contentTags: ['manhwa', 'manhua'],
       primaryLanguages: ['en'], isRaw: false, search: true});
     expect(network).not.toHaveProperty('pageTransport');
   });

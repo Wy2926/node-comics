@@ -9,7 +9,7 @@ describe('Monopoly Scan Madara integration', () => {
       capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
       catalogSync: {intervalMinutes: 720}});
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});
-    expect(definition.sites![0]).toMatchObject({pricing: 'unknown', primaryLanguages: ['es'], contentTags: ['manhua'],
+    expect(definition.sites![0]).toMatchObject({pricing: 'free', primaryLanguages: ['es'], contentTags: ['manhua'],
       isRaw: false, search: true, adaptedOn: '2026-10-15'});
     expect(definition.sites![0].icon).toMatch(/^data:image\/svg\+xml,/);
     expect('pageTransport' in network).toBe(false);

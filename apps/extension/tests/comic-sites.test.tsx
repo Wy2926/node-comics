@@ -58,7 +58,7 @@ describe('comic website directory presentation', () => {
     expect(html.match(/class="nc-site-pricing-badge /g)).toHaveLength(sites.length);
     expect(html).toContain('role="img" title="全站漫画免费阅读" aria-label="全站漫画免费阅读"><svg');
     expect(html).toContain('role="img" title="部分漫画或章节需要付费阅读"');
-    expect(html).toContain('role="img" title="尚未确认全站收费规则，请以源站说明为准"');
+    expect(html).not.toContain('class="nc-site-pricing-badge nc-site-pricing-unknown"');
     expect(html).not.toContain('nc-site-free');
     expect(html).not.toContain('nc-site-access-paid-content');
     expect(html.match(/class="nc-site-raw"/g)).toHaveLength(sites.filter(site => site.isRaw).length);

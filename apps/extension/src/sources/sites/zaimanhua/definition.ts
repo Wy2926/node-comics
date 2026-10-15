@@ -35,8 +35,8 @@ export const chapterUrl = (loc: ZaiLocation) => `${originFor(loc)}/view/${loc.sl
 export const definition: SourceDefinition = {
   id: 'zaimanhua', name: '再漫画', installation,
   sites: [
-    {id: 'zaimanhua', name: '再漫画 · 原创', url: originalOrigin + '/', icon, adaptedOn: '2026-10-12', pricing: 'unknown', isRaw: false, primaryLanguages: ['zh-Hans'], contentTags: ['manhua'], search: true},
-    {id: 'zaimanhua-manga', name: '再漫画 · 日漫', url: mangaOrigin + '/', icon, adaptedOn: '2026-10-12', pricing: 'unknown', isRaw: false, primaryLanguages: ['zh-Hans'], contentTags: ['manga'], search: true},
+    {id: 'zaimanhua', name: '再漫画 · 原创', url: originalOrigin + '/', icon, adaptedOn: '2026-10-12', pricing: 'freemium', isRaw: false, primaryLanguages: ['zh-Hans'], contentTags: ['manhua'], search: true},
+    {id: 'zaimanhua-manga', name: '再漫画 · 日漫', url: mangaOrigin + '/', icon, adaptedOn: '2026-10-12', pricing: 'freemium', isRaw: false, primaryLanguages: ['zh-Hans'], contentTags: ['manga'], search: true},
   ],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

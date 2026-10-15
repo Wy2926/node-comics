@@ -21,7 +21,7 @@ describe('adapter-owned website directory', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites: SourceSite[] = [
       {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', pricing: 'free'},
-      {...adapter.sites![0], id: 'new', adaptedOn: '2026-10-04'},
+      {...adapter.sites![0], id: 'new', adaptedOn: '2026-10-04', pricing: 'unknown'},
       {...adapter.sites![0], id: 'same-day', adaptedOn: '2026-10-04', pricing: 'freemium'},
     ];
     const result = listSupportedSites([
@@ -46,7 +46,7 @@ describe('adapter-owned website directory', () => {
       for (const tag of site.contentTags) expect(['manga', 'manhwa', 'manhua', 'webtoon', 'doujin', 'illustration']).toContain(tag);
       expect(new Set(site.accessTags).size).toBe(site.accessTags?.length ?? 0);
       for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web']).toContain(tag);
-      expect(['free', 'freemium', 'unknown']).toContain(site.pricing);
+      expect(['free', 'freemium'], site.key).toContain(site.pricing);
       expect(typeof site.isRaw).toBe('boolean');
       expect(site).not.toHaveProperty('isFree');
       if(site.icon.startsWith('data:image/svg+xml,')) {
@@ -88,7 +88,10 @@ describe('website directory multi-select filters', () => {
     expect(filter({pricing: ['free', 'freemium', 'unknown']})).toEqual(sites);
   });
   it('keeps unknown separate from free and combines access conditions', () => {
-    expect(filter({pricing: ['unknown']}).every(site => site.pricing === 'unknown')).toBe(true);
+    const unknown = {...sites[0], pricing: 'unknown' as const};
+    expect(matchesSiteFilters(unknown, {...empty, pricing: ['unknown']})).toBe(true);
+    expect(matchesSiteFilters(unknown, {...empty, pricing: ['free']})).toBe(false);
+    expect(matchesSiteFilters(unknown, {...empty, pricing: ['free', 'freemium']})).toBe(false);
     expect(filter({access: ['login-required', 'partial-web']})).toEqual(sites.filter(site => (site.accessTags?.length ?? 0) > 0));
     expect(filter({content: ['illustration'], pricing: ['freemium']})).toEqual([]);
     expect(filter({content: ['illustration'], pricing: ['free'], raw: [true], access: ['login-required']})).toHaveLength(1);

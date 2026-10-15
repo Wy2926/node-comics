@@ -2,6 +2,8 @@
 
 支持 `mangacopy.com`／`copy4000.com` 的目录导入、12 小时更新、网页章节发现和原位翻译。站点身份、权限与入口在 `definition.ts`／`installation.json`；目录更新提示、缓存和阅读位置由公共应用层管理。
 
+两个入口的收费类型均为 `free`：依据[拷贝漫画](https://www.copy4000.com/)、[MangaCopy](https://www.mangacopy.com/) 的公开目录和[作品阅读入口](https://www.copy4000.com/comic/8yue31ridechangxia)，结合既有网页章节读取行为，未见章节价格、购买或余额解锁流程，判断为免费阅读。这是已适配域名的内容判断，不采用其他同名站点的会员或收费说明；收藏、去广告等账号增值功能不作为漫画收费依据。
+
 ## HTTP 目录
 
 `network.ts` 先请求 `/comic/<slug>`，读取专门标题、封面和内联 `ccz` 字面量，再请求同主机的 `/comicdetail/<slug>/chapters`。响应 `results` 前 16 个字符为 UTF-8 IV，其余为 AES-CBC 十六进制密文；使用网页给出的公开 `ccz` 本地解码，不下载或执行源站脚本，不创建目录标签页，也不回退到 DOM。协议依据：[源站目录脚本](https://s3.mangafunb.fun/static/websitefree/js20190704/comic_detail_pass202508141558.js)。

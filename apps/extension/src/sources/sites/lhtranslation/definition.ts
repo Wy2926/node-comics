@@ -19,7 +19,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'lhtranslation', name: 'LHTranslation', installation,
   sites: [{id: 'lhtranslation', name: 'LHTranslation', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'unknown', contentTags: ['manga'], isRaw: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manga'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

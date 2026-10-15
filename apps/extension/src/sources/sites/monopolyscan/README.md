@@ -4,7 +4,7 @@
 - 通过 [Madara 共享引擎](../../shared/madara/README.md)读取作品详情、只读 AJAX 完整目录和列表正文，校验 canonical、作品数字 ID、全部章节归属及正文页槽。本站只配置来源身份和已验证协议，不独立解析 HTML 或执行源站脚本。
 - 章节的 AJAX 导航占位标记逐份核对同一作品、章节和列表样式；图片保留连续 `image-N` 页槽及重复 URL。目录、正文与封面走普通 HTTP，图片权限、Referer 和读取预算沿用公共管线。
 - 名称搜索复用共享只读 AJAX 协议：每页 12 项、每页一次 POST，无初始化 GET 或目录预取；严格校验末页标记、空结果和来源归属。
-- 提供浮动导入／管理入口、12 小时目录更新和 `inlineRecognition: 'generic'` 原位识图，无额外页面适配器。主要内容为西班牙语翻译国漫，默认从左向右阅读；全站收费规则未确认，定价为 `unknown`。
+- 提供浮动导入／管理入口、12 小时目录更新和 `inlineRecognition: 'generic'` 原位识图，无额外页面适配器。主要内容为西班牙语翻译国漫，默认从左向右阅读；收费类型为 `free`，依据[首页](https://monopolymanhua.com/)与[近期章节](https://monopolymanhua.com/manga/mientras-mis-discipulos-se-matan-entrenando-yo-me-relajo/capitulo-170/)公开提供正文、未见价格或付费解锁入口判断，不是源站正式全站免费声明。
 
 协议参考为 Keiyoushi 固定版本的 [MonopolyScan](https://github.com/keiyoushi/extensions-source/blob/780153a29642a57364e894bc0850c4e76619c7de/src/es/monopolyscan/src/eu/kanade/tachiyomi/extension/es/monopolyscan/MonopolyScan.kt) 及源站公开响应；来源、摘要和许可由共享引擎的[上游声明](../../shared/madara/upstream.json)维护，不运行 Kotlin。本地图标为自制识别图。
 

@@ -20,7 +20,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'monopolyscan', name: 'Monopoly Scan', installation,
   sites: [{id: 'monopolyscan', name: 'Monopoly Scan', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'unknown', contentTags: ['manhua'], isRaw: false, primaryLanguages: ['es'], search: true}],
+    pricing: 'free', contentTags: ['manhua'], isRaw: false, primaryLanguages: ['es'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

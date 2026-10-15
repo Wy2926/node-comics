@@ -8,7 +8,7 @@
 
 使用 [MangaThemesia 共享引擎](../../shared/mangathemesia/README.md)。协议参考 [Keiyoushi 的 LagoonScans](https://github.com/keiyoushi/extensions-source/tree/main/src/en/lagoonscans) 及 [源站公开 HTML](https://lagoonscans.com/)；精确版本、摘要和许可见引擎目录的来源清单。站点模块只定义来源身份、路径、元数据与 HTTP 图片地址校验，本地图标为自制 SVG。
 
-作品 `.infotable` 及列表类型标注确认 Manga、Manhwa 和 Manhua，主要内容为英语译作；尚未确认全站收费规则，因此标为 `unknown`，不宣称全部免费。图片使用源站数据提供的普通 HTTP(S) 地址，拒绝凭据及片段；实际访问权限、请求预算和取消由公共层处理。不执行远端脚本，不绕过登录、验证或付费限制；未知读取器变体明确失败，不改用另一通道。
+作品 `.infotable` 及列表类型标注确认 Manga、Manhwa 和 Manhua，主要内容为英语译作。收费类型为 `free`：[首页](https://lagoonscans.com/) 声明免费在线阅读，[公开章节](https://lagoonscans.com/30-years-since-the-prologue-chapter-20/) 无付费解锁要求；评论区的订阅控件不是漫画付费订阅。图片使用源站数据提供的普通 HTTP(S) 地址，拒绝凭据及片段；实际访问权限、请求预算和取消由公共层处理。不执行远端脚本，不绕过登录、验证或付费限制；未知读取器变体明确失败，不改用另一通道。
 
 ## 验证
 

@@ -19,7 +19,7 @@ const html = `<body class="postid-42"><link rel="canonical" href="${chapter}"><h
 describe('Bun Manga shared Madara integration', () => {
   it('declares verified HTTP capabilities, English metadata and generic inline recognition', () => {
     expect(definition).toMatchObject({id: 'bunmanga', inlineRecognition: 'generic', embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720}});
-    expect(definition.sites![0]).toMatchObject({search: true, pricing: 'unknown', primaryLanguages: ['en'], isRaw: false, adaptedOn: '2026-10-15'});
+    expect(definition.sites![0]).toMatchObject({search: true, pricing: 'free', primaryLanguages: ['en'], isRaw: false, adaptedOn: '2026-10-15'});
     expect(definition.sites![0].icon).toMatch(/^data:image\/svg\+xml,/);
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});
     expect(network).not.toHaveProperty('pageTransport');
