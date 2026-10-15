@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. The TypeScript implementation reuses Node Comics' existing Comici catalog, search, canvas and image modules; upstream Kotlin/APK code and downloaded source scripts are not executed or bundled.",
-  "scope": "Public title-only search, numbered HTML catalogs, public episode JSON identity/access/contentId, contentsInfo viewer manifests and 4x4 column-major image permutations for Comic PASH, HERO'S Web, Comic RIDE, COMIC Ryu, Young Animal and Champion Cross. JSON catalog pagination, image-only episode content, account/JWT operations, unlock/purchase APIs, rankings and other upstream sites are not implemented or claimed compatible.",
+  "scope": "Public title-only search, numbered HTML catalogs, public episode JSON identity/access/contentId, contentsInfo viewer manifests and 4x4 column-major image permutations for Comic PASH, HERO'S Web, Comic RIDE, COMIC Ryu, Young Animal, Champion Cross, Young Champion, MangaBang, Hanayume, TakeComic, KimiComi and Asacomi. JSON catalog pagination, image-only episode content, account/JWT operations, unlock/purchase APIs, rankings and other upstream sites are not implemented or claimed compatible.",
   "files": [
     {
       "path": "lib-multisrc/comiciviewer/src/eu/kanade/tachiyomi/multisrc/comiciviewer/ComiciViewer.kt",
@@ -85,6 +85,66 @@
       "path": "src/ja/championcross/build.gradle.kts",
       "sha256": "8524dd90fef5aedcda1973cfa353b35e84ed3bf949f4b80889da59ca7784b0ee",
       "purpose": "Champion Cross source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/youngchampion/src/eu/kanade/tachiyomi/extension/ja/youngchampion/YoungChampion.kt",
+      "sha256": "e7e2bda0b81b5a3aa61a7d6f93657fb931a69cfa5f0adb8cfb97434cd3ca7b1a",
+      "purpose": "Young Champion's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/youngchampion/build.gradle.kts",
+      "sha256": "4cecd164980647aa5db02caa7ce75657f23faccb8801dd47b467a4cb746aa61d",
+      "purpose": "Young Champion source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/mangabang/src/eu/kanade/tachiyomi/extension/ja/mangabang/MangaBang.kt",
+      "sha256": "bbc86b373aa4430b3d687a515ea90d8f02d28160449d7ca379dc188ed1028988",
+      "purpose": "MangaBang's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/mangabang/build.gradle.kts",
+      "sha256": "fe4c861451beee9733fae48eb266d860e2b04b9d961c4600fdb2e2f7107f98f5",
+      "purpose": "MangaBang source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/hanayume/src/eu/kanade/tachiyomi/extension/ja/hanayume/Hanayume.kt",
+      "sha256": "02b1b96b41fd68d323a6e7256964dbb212deef43ecef8b627ddddc01f2eddbd8",
+      "purpose": "Hanayume's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/hanayume/build.gradle.kts",
+      "sha256": "346fb976845b6d4ffdb709af1f4fe30bd0b13aaa9f1c4c80f9ff8cecac79e55f",
+      "purpose": "Hanayume source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/takecomic/src/eu/kanade/tachiyomi/extension/ja/takecomic/TakeComic.kt",
+      "sha256": "5a8c500847e21a5ef21e139477b2c6f9c85fc5f78c21bd1c8bc65ccef3c72f37",
+      "purpose": "TakeComic's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/takecomic/build.gradle.kts",
+      "sha256": "651dedf5d06ff67cfe96c049f8a74a10e2a9c58f941c9887286d7aa472dbee1b",
+      "purpose": "TakeComic source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/kimicomi/src/eu/kanade/tachiyomi/extension/ja/kimicomi/KimiComi.kt",
+      "sha256": "724cf6b34da581df477e61baf0c00848f9cb6af5c7b0bcd86c8f9c111988d3f5",
+      "purpose": "KimiComi's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/kimicomi/build.gradle.kts",
+      "sha256": "a21553e526d40cba6df9b0efed1ca9e74e4edc04687b4b26e4e169b1e4128bbd",
+      "purpose": "KimiComi source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/asacomi/src/eu/kanade/tachiyomi/extension/ja/asacomi/Asacomi.kt",
+      "sha256": "0207f91acc5e0e7f57376a39a800ca9607feac82f7f57c9b9dfd2c3c723ab0cd",
+      "purpose": "Asacomi's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/asacomi/build.gradle.kts",
+      "sha256": "644e03acdfd3af2752a01e80f1f6c9397e97c942f81d9f09fa2f3c80df396d02",
+      "purpose": "Asacomi source domain and Japanese language declaration."
     }
   ]
 }

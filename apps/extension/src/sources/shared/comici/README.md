@@ -1,6 +1,10 @@
 # ComiciViewer 共享引擎
 
-由 [Comic PASH](../../sites/comicpash/README.md)、[HERO'S Web](../../sites/heros/README.md)、[Comic RIDE](../../sites/comicride/README.md)、[COMIC リュウ](../../sites/comicryu/README.md)、[Young Animal](../../sites/younganimal/README.md) 和 [Champion Cross](../../sites/championcross/README.md) 显式调用，共用编号目录、搜索响应、公开章节元数据、正文接口与 canvas 容器协议，不自动认领未知网站。
+由以下站点显式调用，共用编号目录、搜索响应、公开章节元数据、正文接口与 canvas 容器协议，不自动认领未知网站：
+
+- [Comic PASH](../../sites/comicpash/README.md)、[HERO'S Web](../../sites/heros/README.md)、[Comic RIDE](../../sites/comicride/README.md)、[COMIC リュウ](../../sites/comicryu/README.md)
+- [Young Animal](../../sites/younganimal/README.md)、[Champion Cross](../../sites/championcross/README.md)、[ヤンチャンWeb](../../sites/youngchampion/README.md)、[マンガBANGコミックス](../../sites/mangabang/README.md)
+- [花とゆめ＋](../../sites/hanayume/README.md)、[竹コミ！](../../sites/takecomic/README.md)、[キミコミ](../../sites/kimicomi/README.md)、[アサコミ](../../sites/asacomi/README.md)
 
 与 [Madara](../madara/README.md) 遵循同一共享边界：`config.ts` 只描述当前消费方需要的协议；站点 `definition.ts`／`protocol.ts` 声明域名、URL 身份、图片归属、搜索页大小及安装入口；网络请求仅走调用方 `context.request`，不直接使用 `fetch` 或浏览器 API。Comici 的解析函数和网络编排保持在 `network.ts`，搜索独立在 `search.ts`；不像 Madara 的普通图片，Comici 的 canvas 与打乱图块需要专门的页面／图片模块。
 
@@ -17,7 +21,7 @@
 
 ## 验证
 
-六站 `tests/` 保留独立入口。四家新增站点共用 `tests/adapter-contract.ts`，覆盖身份与资源隔离、完整目录／变更拒绝、JSON 章节归属／访问状态、正文页序、搜索分页、取消与 canvas 按需读取；原有 PASH／HERO'S 回归覆盖图块像素、重绘及导航失效。
+各站 `tests/` 保留独立入口。`tests/adapter-contract.ts` 为站点提供共享协议回归，覆盖身份与资源隔离、完整目录／变更拒绝、JSON 章节归属／访问状态、正文页序、搜索分页、取消与 canvas 按需读取；PASH／HERO'S 回归另外覆盖图块像素、重绘及导航失效。
 
 在仓库根目录执行各站 `tests/verify-http.mjs`，例如：
 
