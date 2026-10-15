@@ -2,7 +2,7 @@
 
 在浏览器前端执行的 TypeScript HTML 解析器与只读请求编排。实现复用项目已有代码，并参考 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 的 Madara 协议；不运行、加载或打包 Kotlin／APK，也不是上游全部 Madara 功能的移植。
 
-当前显式接入 WebtoonScan、LHTranslation、Mangasushi 和 Manga Eclipse，来源注册为 `sites/` 下的 37 个适配器。固定上游版本中的 249 个 Madara 源模块是参考范围，不代表其余网站已经注册、适配或验证可用。
+当前显式接入 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga 和 Monopoly Scan 六个站点。固定上游版本中的 249 个 Madara 源模块是参考范围，不代表其余网站已经注册、适配或验证可用。
 
 ## 接入与职责
 
@@ -20,13 +20,15 @@
 | [LHTranslation](../../sites/lhtranslation/README.md) | `catalog: 'ajax'` | `reader: 'ajax-select'` | `search: 'ajax'`，12 项分页 |
 | [Mangasushi](../../sites/mangasushi/README.md) | `catalog: 'ajax'` | `reader: 'ajax-select'` | `search: 'ajax'`，12 项分页 |
 | [Manga Eclipse](../../sites/mangaeclipse/README.md) | 静态列表 | `reader: 'catalog-select'` | `search: 'ajax'`，12 项分页 |
+| [Bun Manga](../../sites/bunmanga/README.md) | 静态列表 | `reader: 'ajax-select'`，服务端预填充选择框 | `search: 'ajax'`，12 项分页 |
+| [Monopoly Scan](../../sites/monopolyscan/README.md) | `catalog: 'ajax'` | `reader: 'ajax-select'` | `search: 'ajax'`，12 项分页 |
 
 ## 已实现的协议边界
 
 - **作品与目录**：作品 canonical 必须精确匹配；标题仅去除已确认的 `manga-title-badges`，封面必须属于该作品。静态目录接受单一 `listing-chapters_wrap` 内未分组的 `ul.main.no-volumn` 或 `ul.main.version-chap`，包含已在 HTML 中的折叠行。拒绝 `has-volumn`、嵌套／额外列表、未知行和额外链接。
 - **只读 AJAX 目录**：先核对详情页的 canonical、`body.postid-*` 与 `manga-chapters-holder[data-id]`，再向该作品 `/ajax/chapters/` 发送一次空表单 POST；不逐章抓取、不轮询、不执行源站脚本。响应仍须满足完整平铺列表规则，列表外只允许已确认的本地排序链接；分页、动态加载按钮或额外链接拒绝读取，不把部分响应声明为完整目录。下载按钮只有在作品数字 ID、章节数字 ID 和占位链接符合协议时才作为辅助标记忽略，不触发下载。
 - **目录顺序与完整性**：最多 10000 行，反转源站倒序列表形成阅读顺序。相同章节与标题去重；冲突标题、跨作品条目或错误更新标记拒绝读取，不推断缺失章节或跨组连读。
-- **列表正文**：默认要求章节 canonical、`h1#chapter-heading` 和静态章节选择框。`ajax-select` 保留章节 canonical／标题，改为核对作品数字 ID、顶部导航以及两份 AJAX 选择占位标记；不额外请求选择框。`catalog-select` 要求 canonical 精确指向所属作品，使用全部已验证静态选择框的一致选中项文字作为章节标题。所有模式都核对正文当前章节标识；选中项存在时，其章节值、完整地址与文字必须一致。
+- **列表正文**：默认要求章节 canonical、`h1#chapter-heading` 和静态章节选择框。`ajax-select` 保留章节 canonical／标题，核对作品数字 ID、顶部导航和两份或三份一致的选择容器（第三份为顶部导航栏重复控件）；不额外请求选择框。容器可为空占位，也可全部由服务端预填充，每个容器必须恰有一个章节选择框；混合未加载状态、容器外选择框和不一致选中项拒绝读取。`catalog-select` 要求 canonical 精确指向所属作品，使用全部已验证静态选择框的一致选中项文字作为章节标题。所有模式都核对正文当前章节标识；选中项存在时，其章节值、完整地址与文字必须一致。
 - **图片页槽**：仅接受 `reading-content` 内 `page-break` 与连续的 `image-N`，最多 1500 页。保留重复 URL，不补页、不重编号，不把视频、画布、额外图片或缺失槽当作完整正文。封面支持 `data-lazy-src`／`data-src` 并忽略 `noscript` 备用图；正文使用 `data-src`／`src`，全部地址经站点提供的校验器处理。
 - **公开 HTML 名称搜索**：默认使用 `?s=<query>&post_type=wp-manga` 与 `/page/<n>/`，核对查询、结果总数、已验证页大小和同源下一页，保持 WebtoonScan 的既有协议。
 - **AJAX 名称搜索**：`search: 'ajax'` 从第一页直接向 `/wp-admin/admin-ajax.php` 发送只读 `madara_load_more` 表单；固定 `content-search` 模板、已发布漫画类型、站点声明的页大小、名称与零基页码。每页仅一次 POST，无初始化 GET、不执行源站脚本、不转发整包页面参数、不预取候选详情。与 HTML 搜索共用作品／封面解析和来源校验。只接受完整卡片片段；单一空的末尾 `no-posts` 标记确认结束（也可用于满页），无标记的满页保留下一游标，非空短页缺少标记则报错，防止在卡片边界截断后漏项。成功空正文是已验证的无结果信号，WordPress `0`、错误／验证页及未知结构不能变成无结果。AJAX 响应没有总数，不套用公开 GET 页面可能不同的总数与默认页大小。公共运行时继续绑定会话／站点／名称游标、超时、取消和访问权限，不自动读取所有页。
@@ -42,7 +44,7 @@
 在 `apps/extension` 执行：
 
 ```powershell
-npm test -- src/sources/shared/madara src/sources/sites/webtoonscan src/sources/sites/lhtranslation src/sources/sites/mangasushi src/sources/sites/mangaeclipse --maxWorkers=2
+npm test -- src/sources/shared/madara src/sources/sites/webtoonscan src/sources/sites/lhtranslation src/sources/sites/mangasushi src/sources/sites/mangaeclipse src/sources/sites/bunmanga src/sources/sites/monopolyscan --maxWorkers=2
 ```
 
 共享和站点自造夹具检查来源隔离、协议组合、取消、请求数量、完整性、错误归属与页槽边界。真实 HTTP、原始响应回放、浏览器导入与原位入口的条件以各站 README 为准；回放已采集 HTML 不代表当前在线状态，解析通过不代替真实图片解码、浏览器阅读／位置恢复和模型验收。
@@ -61,6 +63,8 @@ AJAX 搜索同样使用隔离 profile 和正式产品界面，需先构建并配
 node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs lhtranslation a NodeLaneNoSuchTitle987654 --max-pages=10
 node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs mangasushi a NodeLaneNoSuchTitle987654 --max-pages=5
 node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs mangaeclipse a NodeLaneNoSuchTitle987654 --max-pages=3
+node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs bunmanga prince NodeLaneNoSuchTitle987654 --max-pages=3
+node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs monopolyscan sistema NodeLaneNoSuchTitle987654 --max-pages=3
 ```
 
 每次只勾选指定站点，实际提交名称、点击「加载更多」直至末页，再重新搜索不存在名称；检查每页唯一 POST、查询和零基页码、来源归属、跨页不重复、顺序保留、终点按钮消失和真实封面解码，并断言没有读取候选详情或写入书架／目录。页数是验收上限而非固定源站结果，超限即失败，不自动扩展扫描；默认最多 3 页，显式配置最多 10 页，另限 90 请求、18 张封面响应、32 MiB 和 180 秒。只阻断产品账号／模型服务，不替换源站响应、不改 UA 或导入用户 Cookie。报告和截图写入忽略的 `artifacts/madara-search-browser/`；这是实际桌面无头扩展 UI 与真实服务验证，不是用户现有浏览器、移动端或模型验收。

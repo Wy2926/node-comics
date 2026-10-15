@@ -10,6 +10,10 @@ import {definition as sushi} from '../../../sites/mangasushi/definition';
 import {network as sushiNetwork} from '../../../sites/mangasushi/network';
 import {definition as eclipse} from '../../../sites/mangaeclipse/definition';
 import {network as eclipseNetwork} from '../../../sites/mangaeclipse/network';
+import {definition as bun} from '../../../sites/bunmanga/definition';
+import {network as bunNetwork} from '../../../sites/bunmanga/network';
+import {definition as monopoly} from '../../../sites/monopolyscan/definition';
+import {network as monopolyNetwork} from '../../../sites/monopolyscan/network';
 import {validateSearchPage} from '../../../core/search';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -133,16 +137,19 @@ describe('Madara shared AJAX search', () => {
 });
 
 describe('explicit Madara AJAX search consumers', () => {
-  it.each([{definition: lh, network: lhNetwork}, {definition: sushi, network: sushiNetwork}, {definition: eclipse, network: eclipseNetwork}])(
+  const consumers = [{definition: lh, network: lhNetwork}, {definition: sushi, network: sushiNetwork}, {definition: eclipse, network: eclipseNetwork},
+    {definition: bun, network: bunNetwork}, {definition: monopoly, network: monopolyNetwork}];
+  const definitions = consumers.map(consumer => consumer.definition);
+  it.each(consumers)(
     'validates $definition.id search results through the public contract with shared pagination', async ({definition, network}) => {
       const registered = definition.sites![0], host = new URL(registered.url).origin;
       expect(registered.search).toBe(true); expect(network).not.toHaveProperty('pageTransport');
       const request = vi.fn().mockResolvedValueOnce(fragment(0, 12, host)).mockResolvedValueOnce(fragment(12, 1, host) + terminal);
       const query = {siteId: registered.id, query: 'book'};
-      const first = validateSearchPage(await network.search!(query, {request}), definition, registered, [lh, sushi, eclipse]);
+      const first = validateSearchPage(await network.search!(query, {request}), definition, registered, definitions);
       expect(first.items).toHaveLength(12); expect(first.nextCursor).toBe('page:2');
       expect(first.items[0]).toMatchObject({sourceId: definition.id, siteId: registered.id, catalogId: `${definition.id}:manga:book-0`});
-      const last = validateSearchPage(await network.search!({...query, cursor: first.nextCursor}, {request}), definition, registered, [lh, sushi, eclipse]);
+      const last = validateSearchPage(await network.search!({...query, cursor: first.nextCursor}, {request}), definition, registered, definitions);
       expect(last.items).toHaveLength(1); expect(last.nextCursor).toBeUndefined();
       expect(request.mock.calls.map(([url, options]) => [url, options.form.page, options.form['vars[posts_per_page]']])).toEqual(
         ['0', '1'].map(page => [host + '/wp-admin/admin-ajax.php', page, '12']));

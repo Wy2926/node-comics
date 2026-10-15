@@ -95,9 +95,18 @@ export function createMadaraParsers(site: MadaraSite) {
     if (site.reader === 'ajax-select') {
       const mangaId = postId(safe);
       const nav = one(navigation.filter(a => a.id === 'manga-reading-nav-head'), '章节导航');
-      if (menus.length || holders.length !== 2 || nav['data-id'] !== mangaId || nav['data-chapter'] !== loc.chapter ||
+      // Some Madara layouts repeat the same chapter picker in the top breadcrumb as well as head/foot.
+      if (![2, 3].includes(holders.length) || nav['data-id'] !== mangaId || nav['data-chapter'] !== loc.chapter ||
           holders.some(a => a['data-manga'] !== mangaId || a['data-chapter'] !== loc.chapter || a['data-type'] !== 'manga' || a['data-style'] !== 'list' || a['data-vol'] !== '0'))
         throw Error(`${site.name} 章节导航归属错误。`);
+      // A server-populated picker is the same protocol, but every holder must contain exactly one menu.
+      // Reject mixed/partial loading and standalone menus; selected values are checked below as usual.
+      if (menus.length) {
+        const populated = regions(safe, 'div', a => !!hasClass(a, 'chapters_selectbox_holder'));
+        if (menus.length !== holders.length || populated.length !== holders.length || populated.some(holder =>
+          regions(holder.body, 'select', a => !!hasClass(a, 'single-chapter-select')).length !== 1))
+          throw Error(`${site.name} 章节选择框未完整绑定导航。`);
+      }
     } else if (!menus.length || holders.length) throw Error(`${site.name} 章节导航缺失或不符合协议。`);
     for (const menu of menus) {
       const option = one(regions(menu.body, 'option', a => a.selected !== undefined), '当前章节');

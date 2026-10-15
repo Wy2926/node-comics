@@ -222,7 +222,7 @@ describe('Madara explicitly selected reader navigation', () => {
     ['foreign nav work', html => html.replace(nav, nav.replace('data-id="42"', 'data-id="43"'))],
     ['foreign nav chapter', html => html.replace(nav, nav.replace('chapter-1', 'chapter-2'))],
     ['one holder', html => html.replace(holder, '')],
-    ['three holders', html => html.replace(holder, holder + holder)],
+    ['four holders', html => html.replace(holder, holder + holder + holder)],
     ['foreign holder work', html => html.replace(holder, holder.replace('data-manga="42"', 'data-manga="43"'))],
     ['foreign holder chapter', html => html.replace(holder, holder.replace('chapter-1', 'chapter-2'))],
     ['holder type', html => html.replace(holder, holder.replace('data-type="manga"', 'data-type="novel"'))],
@@ -238,6 +238,38 @@ describe('Madara explicitly selected reader navigation', () => {
   ];
   it.each(invalidAjaxReaders)('rejects AJAX reader %s rather than guessing navigation', (_name, mutate) => {
     expect(() => createMadaraParsers(ajaxSite).parsePages(mutate(reader(ajaxSite)), pageUrl)).toThrow();
+  });
+
+  it('accepts the verified additional breadcrumb picker without another network request', async () => {
+    const html = reader(ajaxSite).replace(nav, holder + nav);
+    const request = vi.fn<SourceNetworkContext['request']>().mockResolvedValue(html);
+    const snapshot = await createMadaraNetwork(ajaxSite).network.pages(pageUrl, {request});
+    expect(snapshot).toMatchObject({knownTotal: 2, discoveryComplete: true});
+    expect(request.mock.calls).toEqual([[pageUrl + '?style=list']]);
+  });
+
+  it.each(['data-manga="42"', 'data-chapter="chapter-1"', 'data-vol="0"', 'data-type="manga"', 'data-style="list"'])(
+    'still validates %s on the additional breadcrumb picker', attribute => {
+      const extra = holder.replace(attribute, attribute.replace(/="[^"]*"/, '="foreign"'));
+      expect(() => createMadaraParsers(ajaxSite).parsePages(reader(ajaxSite).replace(nav, extra + nav), pageUrl)).toThrow();
+    });
+
+  const populatedHolder = holder.replace('</div>', menu + '</div>');
+  it.each([2, 3])('validates %i server-populated AJAX pickers without fetching their options', async count => {
+    const html = reader(ajaxSite).replace(holder + holder, populatedHolder.repeat(count));
+    const request = vi.fn<SourceNetworkContext['request']>().mockResolvedValue(html);
+    expect(await createMadaraNetwork(ajaxSite).network.pages(pageUrl, {request})).toMatchObject({knownTotal: 2, discoveryComplete: true});
+    expect(request.mock.calls).toEqual([[pageUrl + '?style=list']]);
+  });
+  it.each([
+    ['partial population', populatedHolder + holder],
+    ['standalone menus', holder + holder + menu + menu],
+    ['two menus in one picker', holder.replace('</div>', menu + menu + '</div>') + holder],
+    ['foreign selected work', populatedHolder + populatedHolder.replace(pageUrl, otherPageUrl)],
+    ['foreign selected chapter', populatedHolder + populatedHolder.replace('selected="selected" value="chapter-1"', 'selected="selected" value="chapter-2"')],
+    ['disagreeing labels', populatedHolder + populatedHolder.replace('Chapter 1 &amp; Start', 'Different chapter')],
+  ])('rejects %s in server-populated AJAX navigation', (_label, markup) => {
+    expect(() => createMadaraParsers(ajaxSite).parsePages(reader(ajaxSite).replace(holder + holder, markup), pageUrl)).toThrow();
   });
 
   const invalidCatalogReaders: Mutation[] = [

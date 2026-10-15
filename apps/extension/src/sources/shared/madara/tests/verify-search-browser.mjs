@@ -42,15 +42,17 @@ const limits = {maxPages, pageItems: 12, requests: 90, textResponses: (maxPages 
 const network = {requests: 0, textResponses: 0, imageResponses: 0, completedBodyBytes: 0, blockedServiceRequests: 0, origins: {}};
 const startedAt = Date.now();
 const checks = [], pages = [], durations = [], errors = [], httpFailures = [], requestFailures = [], textRequests = [], rawRequests = [], pendingSizes = new Set();
-let context, reader, panel, watchdog, fatal, stage = 'prepare', serviceOrigin, target, origin, knownSourceOrigins = [], manifest, manifestBytes, home;
+let context, reader, panel, watchdog, fatal, stage = 'prepare', serviceOrigin, target, origin, knownSourceOrigins = [], searchableSiteCount = 0, manifest, manifestBytes, home;
 const stop = message => {if (!fatal) {fatal = Error(message); void context?.close().catch(() => {});}};
 const inspect = () => reader.evaluate(async () => (await import(chrome.runtime.getURL('madara-search-inspect.js'))).counts());
 function assertNoLibraryWrites(counts) {
   assert.deepEqual(counts, {comics: 0, catalogs: 0, entries: 0}, 'Search must not import or prefetch a candidate catalog');
 }
 async function selectedSite() {
+  assert.equal(await panel.locator('.nc-search-site-option').count(), searchableSiteCount, 'All registered searchable sites must remain rendered before any search');
   const selected = await panel.locator('.nc-search-site-option').evaluateAll(options => options.filter(option => option.querySelector('input').checked).map(option => option.querySelector('b').textContent));
   assert.deepEqual(selected, [target.name], 'Only the explicitly requested site may be searched');
+  assert.equal(await panel.locator('.nc-search-scope-heading > [role="status"]').innerText(), '已选 1 个网站');
 }
 async function settled() {
   await reader.waitForFunction(() => {
@@ -192,6 +194,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   serviceOrigin = setup.serviceOrigin;
   const matches = setup.sites.filter(site => site.id === siteId); assert.equal(matches.length, 1, 'siteId must identify exactly one registered searchable site');
   target = matches[0]; origin = new URL(target.url).origin; knownSourceOrigins = setup.sites.map(site => new URL(site.url).origin);
+  searchableSiteCount = setup.sites.length;
   assert.notEqual(origin, serviceOrigin);
   // Block only the product account/model service; source and CDN responses are never routed or fulfilled.
   await context.route(url => url.origin === serviceOrigin, async route => {
@@ -202,6 +205,10 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   stage = 'select one site in the product UI';
   await reader.goto(home + '#search'); panel = reader.locator('.nc-search-page'); await panel.waitFor();
   await panel.getByRole('button', {name: '直接搜索', exact: true}).click();
+  const expand = panel.locator('.nc-search-scope-expand');
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
+  // Collapsed sites are unmounted but remain selected; expose the full scope before changing it.
+  await reader.waitForFunction(count => document.querySelectorAll('.nc-search-page .nc-search-site-option').length === count, searchableSiteCount);
   for (const option of await panel.locator('.nc-search-site-option').all()) {
     await option.locator('input').setChecked(await option.locator('b').innerText() === target.name);
   }

@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. The front-end TypeScript parsers and caller-transport request orchestration reuse Node Comics code; upstream Kotlin/APK code is not executed or bundled.",
-  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi and Manga Eclipse, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
+  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi, Manga Eclipse, Bun Manga and Monopoly Scan, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select (including the repeated breadcrumb picker and fully server-populated holders) and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
   "files": [
     {
       "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/MadaraBase.kt",
@@ -65,6 +65,26 @@
       "path": "src/en/mangaeclipse/build.gradle.kts",
       "sha256": "d63bd7d56e5e4e56c1ec0c6b09732a089a37f2d08600896e079d1262737e5d29",
       "purpose": "Reference for the Manga Eclipse source domain, language and Madara theme declaration."
+    },
+    {
+      "path": "src/en/bunmanga/src/eu/kanade/tachiyomi/extension/en/bunmanga/BunManga.kt",
+      "sha256": "dfb16e6f4142c8797a112fc3c8f0d051ea19ecf515f338130c6ca6163bca81d7",
+      "purpose": "Confirms Bun Manga uses the unmodified upstream Madara base and default MangaPage catalog mode; actual reader picker markup is verified independently from public raw HTTP."
+    },
+    {
+      "path": "src/en/bunmanga/build.gradle.kts",
+      "sha256": "9f35caafb7180310c10071fbca2868fbe730a58cec6c21f679b34aa77a56e95a",
+      "purpose": "Reference for the Bun Manga source domain, English language and Madara theme declaration."
+    },
+    {
+      "path": "src/es/monopolyscan/src/eu/kanade/tachiyomi/extension/es/monopolyscan/MonopolyScan.kt",
+      "sha256": "0e62065aefaec3db1d3f2f8671e1632bc64f698205ac6c79954ec9ca43cb0258",
+      "purpose": "Confirms Monopoly Scan explicitly uses MangaAjax catalog mode; date parsing is not ported."
+    },
+    {
+      "path": "src/es/monopolyscan/build.gradle.kts",
+      "sha256": "3ace5c8510cc3650a876096410e9c5ca3240f4c25f8f489806122f04da9005ef",
+      "purpose": "Reference for the Monopoly Scan source domain, Spanish language and Madara theme declaration."
     }
   ]
 }

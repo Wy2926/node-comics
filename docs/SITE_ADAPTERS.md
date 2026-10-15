@@ -79,7 +79,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 新增或修复站点时，可先核对 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 等上游实现，复用已确认的协议知识；不直接加载其 Android／Kotlin 扩展，也不根据上游站点数量批量声明支持。参考或移植的来源、精确版本、文件 SHA-256、用途及许可留在对应共享引擎或站点目录，必要的第三方许可随插件分发；区分协议参考、实际移植和未实现的上游能力。
 
-[Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由 WebtoonScan、LHTranslation、Mangasushi 和 Manga Eclipse 显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
+[Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga 和 Monopoly Scan 显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
 
 ## 验收与交付
 
@@ -110,6 +110,8 @@ npm run build
 | [LHTranslation](../apps/extension/src/sources/sites/lhtranslation/README.md) | Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；作品／章节浮动导入与通用原位识图 |
 | [Mangasushi](../apps/extension/src/sources/sites/mangasushi/README.md) | Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；作品／章节浮动导入与通用原位识图 |
 | [Manga Eclipse](../apps/extension/src/sources/sites/mangaeclipse/README.md) | Madara 共享 AJAX 名称分页搜索、普通 HTTP 静态完整目录、作品级 canonical 与章节选择项绑定的正文、封面和 12 小时更新；浮动导入与通用原位识图 |
+| [Bun Manga](../apps/extension/src/sources/sites/bunmanga/README.md) | Madara 共享 AJAX 名称分页搜索、静态完整目录和预填充章节选择器正文、封面与 12 小时更新；浮动导入与通用原位识图 |
+| [Monopoly Scan](../apps/extension/src/sources/sites/monopolyscan/README.md) | 西语 Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；浮动导入与通用原位识图 |
 | [WeLoMa](../apps/extension/src/sources/sites/weloma/README.md) | HTTP 分页名称搜索、完整静态目录／正文／封面与 12 小时同步；作品／裸章节浮动导入、章节归属校验，标签页识图复用通用规则 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |
