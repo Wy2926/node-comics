@@ -15,6 +15,7 @@ assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const source=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=path.join(extension,'probe.js');
 await writeFile(probe,`export {catalog} from '${source}/comics/repositories/index.ts';
 export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';
+export {listSearchSites} from '${source}/sources/index.ts';
 export {importCatalog} from '${source}/comics/application/import-service.ts';
 export {catalogHtml as guaziCatalogHtml,readerHtml as guaziReaderHtml} from '${source}/sources/sites/guazimanhua/tests/fixtures.ts';`);
 const {build}=createRequire(path.join(root,'apps/extension/package.json'))('vite');
@@ -24,9 +25,15 @@ const context=await chromium.launchPersistentContext(path.join(out,'profile'),{h
 context.setDefaultTimeout(20_000);
 const permissionRequests=[];
 await context.exposeBinding('__fixturePermissionRequest',(_,request)=>{permissionRequests.push(request);});
-await context.addInitScript(()=>{if(location.protocol==='chrome-extension:'){chrome.permissions.request=request=>{void window.__fixturePermissionRequest(request);throw Error('Unexpected permission request with required host access');};if(!localStorage.getItem('nc-settings'))localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single',fit:'window',appearance:'light',language:'en'}));if(!localStorage.getItem('nc-search-language'))localStorage.setItem('nc-search-language','zh-Hans');}});
+await context.addInitScript(()=>{if(location.protocol==='chrome-extension:'){chrome.permissions.request=request=>{void window.__fixturePermissionRequest(request);throw Error('Unexpected permission request with required host access');};localStorage.setItem('nc-release-notes-version',chrome.runtime.getManifest().version);if(!localStorage.getItem('nc-settings'))localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single',fit:'window',appearance:'light',language:'en'}));if(!localStorage.getItem('nc-search-language'))localStorage.setItem('nc-search-language','zh-Hans');}});
 const errors=[],checks=[],requests=[];let titleMode='english',copyFail=true,slow=false,slowImport=false,emptyReader=false,guaziCatalog='',guaziReader='';
+let releaseImport;
 const check=message=>{checks.push(message);console.log(message);};
+const filterPopover=root=>root.locator('.nc-search-filter-popover');
+const expandScope=async root=>{const button=root.locator('.nc-search-scope-expand');if(await button.count()&&await button.getAttribute('aria-expanded')==='false')await button.click();};
+const collapseScope=async root=>{const button=root.locator('.nc-search-scope-expand');if(await button.count()&&await button.getAttribute('aria-expanded')==='true')await button.click();};
+const openFilters=async root=>{await root.locator('.nc-search-scope-trigger').click();await filterPopover(root).waitFor();};
+const closeFilters=async root=>{await filterPopover(root).getByRole('button',{name:'关闭面板',exact:true}).click();assert.equal(await root.locator('.nc-search-scope-trigger').getAttribute('aria-expanded'),'false');};
 context.on('page',page=>page.on('pageerror',error=>{if(page.url().startsWith('chrome-extension:'))errors.push(error.message);}));
 const image=await readFile(path.join(root,'samples/starlight-bookshop.png'));
 const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
@@ -69,7 +76,7 @@ await context.route(/https?:\/\//,async route=>{
   }
   if(url.hostname==='www.guazimanhua.com'){
     const fresh=url.searchParams.get('id')==='456'||url.searchParams.get('id')==='21';
-    if(fresh&&slowImport&&url.pathname==='/comic.php'){console.log('Fixture slow import requested: '+url.href);await pause(1_500);}
+    if(fresh&&slowImport&&url.pathname==='/comic.php')await new Promise(resolve=>{releaseImport=resolve;});
     let body=url.pathname==='/chapter.php'?guaziReader:guaziCatalog;
     if(fresh)body=body.replaceAll('id=123','id=456').replaceAll('id=11','id=21').replaceAll('星光书店','星光书店 新来源');
     return route.fulfill({contentType:'text/html; charset=utf-8',body});
@@ -82,6 +89,7 @@ await context.route(/https?:\/\//,async route=>{
 let reader;
 try{
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),home=new URL('reader.html',worker.url()).href;
+  await waitUntil(()=>worker.evaluate(()=>typeof chrome.permissions?.request==='function'));
   await worker.evaluate(()=>{globalThis.__fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.__fixturePermissionRequests++;throw Error('Unexpected background permission request with required host access');};});
   reader=await context.newPage();await reader.goto(home);await reader.locator('.nc-library').waitFor();
   const fixtures=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));return {catalog:probe.guaziCatalogHtml(['11']).replaceAll('Fixture comic','星光书店').replace('<script>throw Error(\'never execute\')</script>',''),reader:probe.guaziReaderHtml()};});
@@ -100,23 +108,80 @@ try{
   await language.click();assert.equal(await language.getAttribute('aria-expanded'),'true');await language.press('Escape');assert.equal(await language.getAttribute('aria-expanded'),'false');assert.equal(await panel().count(),1);
   await panel().getByRole('button',{name:'关闭查找面板',exact:true}).focus();await reader.keyboard.press('Shift+Tab');assert(await panel().evaluate(element=>element.contains(document.activeElement)));check('Shared Select popover and Escape work inside native dialog; focus remains trapped');
 
-  const siteInputs=panel().locator('.nc-search-site-option input');assert((await siteInputs.count())>=5);for(const input of await siteInputs.all()){assert(await input.isChecked());assert(!await input.isDisabled());}assert.equal(await panel().getByText(/已排除|语言待确认|按资源语言筛选/).count(),0);
-  assert.equal(await panel().getByText(/尚未开放搜索/).count(),0);
+  assert.equal(await panel().locator('.nc-search-site-options').isVisible(),true);
+  assert.equal(await panel().locator('.nc-search-site-option').count(),10);
+  const availableSites=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));return probe.listSearchSites();});
+  const scope=panel().locator('.nc-search-scope'),filters=filterPopover(panel());
+  assert.equal(await filters.isVisible(),false);
+  await scope.getByRole('button',{name:'反选',exact:true}).click();
+  assert.match(await scope.locator('.nc-search-scope-heading>span').innerText(),/已选 0 个网站/);
+  await scope.getByRole('button',{name:'全选',exact:true}).click();
+  assert.match(await scope.locator('.nc-search-scope-heading>span').innerText(),new RegExp('已选 '+availableSites.length+' 个网站'));
+  await expandScope(panel());assert.equal(await scope.locator('.nc-search-site-option').count(),availableSites.length);
+  assert(await scope.locator('.nc-search-site-option input').evaluateAll(inputs=>inputs.every(input=>input.checked)));
+  await collapseScope(panel());assert.equal(await scope.locator('.nc-search-site-option').count(),10);
+  await reader.screenshot({path:path.join(out,'search-sites-collapsed.png')});
+  await openFilters(panel());assert.equal(await reader.locator('dialog[open]').count(),1,'Filters must not add a modal');
+  const filterBounds=await filters.boundingBox(),triggerBounds=await scope.locator('.nc-search-scope-trigger').boundingBox();
+  assert(filterBounds.x+filterBounds.width<=triggerBounds.x,'Desktop filters open to the left of their trigger');
+  await reader.keyboard.press('Escape');assert.equal(await panel().count(),1);assert.equal(await filters.isVisible(),false);
+  assert(await scope.locator('.nc-search-scope-trigger').evaluate(element=>element===document.activeElement));
+  await expandScope(panel());await openFilters(panel());
+  await filters.getByRole('button',{name:'免费',exact:true}).click();
+  const freeSites=availableSites.filter(site=>site.pricing==='free');
+  assert.equal(await scope.locator('.nc-search-site-option').count(),freeSites.length);
+  await closeFilters(panel());
+  assert(await scope.getByRole('button',{name:'全选',exact:true}).isDisabled());
+  await scope.getByRole('button',{name:'反选',exact:true}).click();
+  assert.equal(await scope.locator('.nc-search-site-option input:checked').count(),0);
+  assert(await panel().locator('.nc-search-form .button.primary').isDisabled());
+  await openFilters(panel());await filters.getByRole('button',{name:'清空筛选',exact:true}).click();await closeFilters(panel());
+  assert.equal(await scope.locator('.nc-search-site-option input:checked').count(),availableSites.length-freeSites.length,'Inverting filtered sites preserves excluded selections');
+  await openFilters(panel());await filters.getByRole('button',{name:'免费',exact:true}).click();await closeFilters(panel());
+  await scope.locator('.nc-search-site-option input').first().check();
+  await scope.getByRole('button',{name:'反选',exact:true}).click();
+  assert.equal(await scope.locator('.nc-search-site-option input:checked').count(),freeSites.length-1,'Invert flips every matched choice');
+  await scope.getByRole('button',{name:'全选',exact:true}).click();
+  assert.equal(await scope.locator('.nc-search-site-option input:checked').count(),freeSites.length);
+  check('Ten inline sites show by default; expand/collapse preserves selection; batch actions include collapsed matches but preserve filter-excluded choices');
+  await openFilters(panel());
+  await filters.getByRole('button',{name:'部分收费',exact:true}).click();await filters.getByRole('button',{name:'同人',exact:true}).click();
+  assert.equal(await scope.locator('.nc-search-site-option').count(),availableSites.filter(site=>['free','freemium'].includes(site.pricing)&&site.contentTags.includes('doujin')).length);
+  await filters.getByRole('button',{name:'更多筛选',exact:true}).click();await filters.getByRole('button',{name:'生肉为主',exact:true}).click();await filters.getByRole('button',{name:'需要登录',exact:true}).click();
+  assert.equal(await scope.locator('.nc-search-site-option').count(),availableSites.filter(site=>['free','freemium'].includes(site.pricing)&&site.contentTags.includes('doujin')&&site.isRaw&&site.accessTags?.includes('login-required')).length);
+  assert.equal(requests.length,0);await filters.getByRole('button',{name:'清空筛选',exact:true}).click();await closeFilters(panel());
+  await collapseScope(panel());await openFilters(panel());
+  check('Anchored nonmodal filters reuse all four directory groups with OR/AND semantics; Escape restores trigger focus without closing the parent sheet');
+  await reader.screenshot({path:path.join(out,'search-sites.png')});
+  await reader.evaluate(()=>{document.documentElement.dataset.appearance='dark';});await reader.screenshot({path:path.join(out,'search-sites-dark.png')});await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
+  await reader.setViewportSize({width:390,height:844});
+  await waitUntil(async()=>{const bounds=await filters.boundingBox();return bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=390&&bounds.y+bounds.height<=844;});
+  const compactFilter=await filters.boundingBox();assert(compactFilter.x>=0&&compactFilter.y>=0&&compactFilter.x+compactFilter.width<=390&&compactFilter.y+compactFilter.height<=844);
+  await reader.screenshot({path:path.join(out,'search-sites-mobile.png')});await reader.setViewportSize({width:1560,height:1120});
+  await panel().getByRole('textbox',{name:'原作品名称',exact:true}).click();
+  assert.equal(await filters.isVisible(),false);assert.equal(await panel().count(),1,'Outside click remains usable without a modal overlay');
+  await expandScope(panel());
+  const siteInputs=scope.locator('.nc-search-site-option input');assert(await siteInputs.evaluateAll(inputs=>inputs.every(input=>input.checked&&!input.disabled)));
   await reader.waitForFunction(()=>[...document.querySelectorAll('.nc-search-site-option img,.nc-search-language img')].every(image=>image.complete&&image.naturalWidth>0));
-  const optionsLayout=await panel().locator('.nc-search-site-options').evaluate(element=>({columns:getComputedStyle(element).gridTemplateColumns.split(' ').length,icons:element.querySelectorAll('img').length}));assert.equal(optionsLayout.columns,3);assert.equal(optionsLayout.icons,await siteInputs.count());
-  const sheetBounds=await panel().boundingBox();assert(sheetBounds.width>1300);assert.equal(Math.round(sheetBounds.y+sheetBounds.height),1120);assert((await language.boundingBox()).width<=190);
-  await panel().screenshot({path:path.join(out,'search-sites.png')});
+  const optionsLayout=await scope.locator('.nc-search-site-options').evaluate(element=>({columns:getComputedStyle(element).gridTemplateColumns.split(' ').length,icons:element.querySelectorAll('img').length}));
+  assert.equal(optionsLayout.columns,5);assert.equal(optionsLayout.icons,await siteInputs.count());
+  const sheetBounds=await panel().boundingBox();assert(sheetBounds.width>1300);assert.equal(Math.round(sheetBounds.y+sheetBounds.height),1120);
+  const languageBounds=await language.boundingBox(),translateBounds=await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).boundingBox();
+  assert(languageBounds.width>=120&&languageBounds.x+languageBounds.width<=translateBounds.x);
+  assert(Math.abs(languageBounds.y+languageBounds.height-translateBounds.y-translateBounds.height)<1,'Target language and search action share the left-column row');
   // Keep this suite's fixed HTTP fixtures independent of newly discovered search adapters.
   const fixtureSites=new Set(['动漫屋 DM5','瓜子漫画','拷贝漫画','MangaCopy','MangaDex']);
-  for(const option of await panel().locator('.nc-search-site-option').all())if(!fixtureSites.has(await option.locator('b').innerText()))await option.locator('input').uncheck();
+  await scope.getByRole('button',{name:'反选',exact:true}).click();
+  for(const name of fixtureSites)await scope.getByRole('checkbox',{name,exact:true}).check();
   const mirrorOption=panel().locator('.nc-search-site-option').filter({hasText:'MangaCopy'});await mirrorOption.locator('input').uncheck();
+  await collapseScope(panel());
 
   await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();
   await panel().locator('.nc-search-result').first().waitFor();assert.equal(await panel().locator('.nc-search-result').count(),1);assert.match(await panel().locator('.nc-search-query').innerText(),/名称语言为English/);assert.equal(await language.getAttribute('data-value'),'zh-Hans');
-  const guaziOption=panel().locator('.nc-search-site-option').filter({hasText:'瓜子漫画'}).locator('input');await guaziOption.uncheck();
+  await expandScope(panel());const guaziOption=panel().locator('.nc-search-site-option').filter({hasText:'瓜子漫画'}).locator('input');await guaziOption.uncheck();
   assert.equal(await panel().locator('.nc-search-status').filter({hasText:'瓜子漫画'}).count(),1);assert(await panel().locator('.nc-search-result').count()>=1);
   await panel().locator('.nc-search-status.is-error').waitFor();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===4);
-  assert.equal(requests.filter(request=>request.kind==='search'&&request.site==='guazi').length,1);await guaziOption.check();check('Editing the next search scope during requests keeps this round running and its arrived results visible');
+  assert.equal(requests.filter(request=>request.kind==='search'&&request.site==='guazi').length,1);await guaziOption.check();await collapseScope(panel());check('Editing the next search scope during requests keeps this round running and its arrived results visible');
   await panel().locator('.nc-search-result-cover img').first().waitFor();check('English title fallback only changes the search name; first site is visible before slower sites and covers load independently');
   const mangaDexResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await mangaDexResult.getByRole('img',{name:'English',exact:true}).count(),1);assert.equal(await mangaDexResult.locator('.nc-search-result-languages [role=img]').count(),2);const noLanguageResults=panel().locator('.nc-search-result').filter({hasNot:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);assert.equal(await panel().getByRole('checkbox',{name:'只看语言已确认',exact:true}).count(),0);assert.equal(await panel().getByText('语言待确认',{exact:true}).count(),0);check('Site-supplied languages use accessible flag icons; unknown languages have no placeholder or confirmed-language filter');
   const dexFilter=panel().locator('.nc-search-status').filter({hasText:'MangaDex'}),beforeFilter=requests.length;
@@ -143,16 +208,16 @@ try{
   }));for(const size of siteIconSizes){assert(size.height>30);assert(Math.abs(size.height-size.textHeight)<1);assert(Math.abs(size.width-size.height)<1);assert(Math.abs(size.offset)<1);}
   const badge=await panel().locator('.nc-search-result-source').first().evaluate(element=>({font:parseFloat(getComputedStyle(element).fontSize),icon:element.querySelector('.nc-search-site-icon').getBoundingClientRect().height}));assert(badge.font>=12&&badge.icon>=20);
   const beforeScopeEdit=requests.length;await dm5.click();const filteredTitles=await panel().locator('.nc-search-result h3').allTextContents();
-  const selectedScope=[];for(const input of await panel().locator('.nc-search-site-option input').all())if(await input.isChecked()){selectedScope.push(input);await input.uncheck();}
+  await expandScope(panel());const selectedScope=[];for(const input of await panel().locator('.nc-search-site-option input').all())if(await input.isChecked()){selectedScope.push(input);await input.uncheck();}
   assert.deepEqual(await panel().locator('.nc-search-result h3').allTextContents(),filteredTitles);assert.equal(await dm5.getAttribute('aria-pressed'),'true');assert.equal(await panel().locator('.nc-search-status').count(),4);assert.equal(requests.length,beforeScopeEdit);assert(await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).isDisabled());
-  for(const input of selectedScope)await input.check();await dm5.click();assert.equal(await panel().locator('.nc-search-result').count(),6);assert.equal(requests.length,beforeScopeEdit);
+  for(const input of selectedScope)await input.check();await collapseScope(panel());await dm5.click();assert.equal(await panel().locator('.nc-search-result').count(),6);assert.equal(requests.length,beforeScopeEdit);
   check('Results interleave sites and pagination; scope edits preserve the current filter, site controls and results, including an empty next scope; site icons span both text lines and source badges are larger');
   await panel().screenshot({path:path.join(out,'search-light.png')});
   await reader.evaluate(()=>{document.documentElement.dataset.appearance='dark';});await panel().screenshot({path:path.join(out,'search-dark.png')});await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
-  check('Wide bottom sheet, three-column site options, inline progress and two-column results render in both themes');
+  check('Wide bottom sheet, inline site options, inline progress and two-column results render in both themes');
   const beforeClose=requests.length;await panel().getByRole('button',{name:'关闭查找面板',exact:true}).click();await openShelf();assert.equal(await panel().locator('.nc-search-result').count(),6);assert.equal(requests.length,beforeClose);assert.match(await panel().locator('.nc-search-progress>span').first().getAttribute('title'),/上次查找/);check('Closing/reopening retains results and last-search time without new search traffic');
-  assert(!await mirrorOption.locator('input').isChecked());
-  await language.click();await panel().locator('[role=option][data-value=ja]').click();for(const option of await panel().locator('.nc-search-site-option').all())assert(!await option.locator('input').isDisabled());assert(await panel().locator('.nc-search-site-option').filter({hasText:'MangaDex'}).locator('input').isChecked());const originalNameCalls=requests.filter(request=>request.kind==='title').length;await panel().getByRole('button',{name:'使用原名搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===5);assert.equal(requests.filter(request=>request.kind==='title').length,originalNameCalls);assert(await mangaDexResult.isVisible());assert(requests.some(request=>request.site==='mangadex'&&request.query==='星あかりの本屋'));assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);for(const request of requests.filter(request=>request.kind==='search'))assert(!(request.parameters??[]).some(key=>/language/i.test(key)),request.site+' must search by name without a language parameter');check('Japanese-name search includes MangaDex English/Traditional-Chinese releases and every selected site without request language filters');await mangaDexResult.scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'name-only-search.png')});
+  await expandScope(panel());assert(!await mirrorOption.locator('input').isChecked());
+  await language.click();await panel().locator('[role=option][data-value=ja]').click();for(const option of await panel().locator('.nc-search-site-option').all())assert(!await option.locator('input').isDisabled());assert(await panel().locator('.nc-search-site-option').filter({hasText:'MangaDex'}).locator('input').isChecked());await collapseScope(panel());const originalNameCalls=requests.filter(request=>request.kind==='title').length;await panel().getByRole('button',{name:'使用原名搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===5);assert.equal(requests.filter(request=>request.kind==='title').length,originalNameCalls);assert(await mangaDexResult.isVisible());assert(requests.some(request=>request.site==='mangadex'&&request.query==='星あかりの本屋'));assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);for(const request of requests.filter(request=>request.kind==='search'))assert(!(request.parameters??[]).some(key=>/language/i.test(key)),request.site+' must search by name without a language parameter');check('Japanese-name search includes MangaDex English/Traditional-Chinese releases and every selected site without request language filters');await mangaDexResult.scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'name-only-search.png')});
   slow=true;await panel().getByRole('button',{name:'重新搜索',exact:true}).click();await panel().getByRole('button',{name:'停止查找',exact:true}).click();await pause(2_700);assert.equal(await panel().locator('.nc-search-result').count(),0);assert.match(await panel().locator('.nc-search-progress').innerText(),/已停止/);
   await panel().getByRole('button',{name:'重新搜索',exact:true}).click();await language.click();await panel().locator('[role=option][data-value=en]').click();await pause(2_700);assert.equal(await panel().locator('.nc-search-result').count(),0);assert.equal(await panel().locator('.nc-search-progress').count(),0);check('Stopped and language-replaced requests never publish delayed fixture results');slow=false;
   await language.click();await panel().locator('[role=option][data-value=zh-Hans]').click();titleMode='null';await panel().getByPlaceholder('请输入漫画作品名称').fill('星あかりの本屋 別題');await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();await panel().getByText('未找到常用简体中文名称，请手动输入或明确使用原名搜索。',{exact:true}).waitFor();assert.equal(await panel().locator('.nc-search-result').count(),0);
@@ -160,10 +225,10 @@ try{
   await panel().getByPlaceholder('请输入漫画作品名称').fill('星あかりの本屋 修正');titleMode='login';await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();await panel().getByText('登录后可自动查找名称，也可以手动输入。',{exact:true}).waitFor();
   await panel().getByPlaceholder('输入漫画名称或别名').fill('星光书店');await panel().getByRole('button',{name:'搜索网站',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length>=5);check('Null title requires explicit input; 401 leaves manual site searching fully usable');
   const existingResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店',exact:true})});assert.match(await existingResult.innerText(),/已在书架/);await existingResult.getByRole('button',{name:'继续阅读',exact:true}).click();await reader.locator('.nc-reader').waitFor();await reader.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth>0);check('Existing source identity shows the bookshelf badge and continues through the real reader');
-  await reader.getByLabel('跳转页码',{exact:true}).fill('2');await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
+  await reader.getByLabel('跳转页码',{exact:true}).fill('2');await reader.getByLabel('跳转页码',{exact:true}).press('Enter');await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
   await reader.getByRole('button',{name:'打开目录',exact:true}).click();assert.equal(await reader.locator('.nc-reader-drawer').getByRole('button',{name:'寻找其他语言',exact:true}).count(),0);await reader.getByRole('button',{name:'关闭面板',exact:true}).click();await reader.getByRole('button',{name:'阅读设置',exact:true}).click();await reader.screenshot({path:path.join(out,'reader-settings.png')});await reader.locator('.nc-reader-drawer[aria-label="阅读设置"]').getByRole('button',{name:'寻找其他语言',exact:true}).click();await panel().waitFor();assert.equal(await panel().getByPlaceholder('请输入漫画作品名称').inputValue(),'星光书店');await reader.keyboard.press('ArrowRight');await panel().getByRole('button',{name:'关闭查找面板',exact:true}).click();assert.equal(await reader.getByLabel('跳转页码',{exact:true}).inputValue(),'2');assert(await reader.getByRole('button',{name:'阅读设置',exact:true}).evaluate(element=>element===document.activeElement));check('Reader settings owns the search entry; directory has none; search preserves work title/page 2 and returns focus to the settings trigger');
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await openShelf();await panel().getByRole('button',{name:'使用原名搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length>=5);await panel().getByPlaceholder('输入漫画名称或别名').fill('星光书店');await panel().getByRole('button',{name:/^(?:重新搜索|搜索网站)$/,exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length>=5);
-  const freshResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店 新来源',exact:true})});slowImport=true;await freshResult.getByRole('button',{name:'导入并阅读',exact:true}).click();assert(await panel().getByRole('combobox',{name:'名称目标语言',exact:true}).isDisabled());await panel().getByRole('button',{name:'关闭查找面板',exact:true}).click();
+  const freshResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店 新来源',exact:true})});slowImport=true;await freshResult.getByRole('button',{name:'导入并阅读',exact:true}).click();await waitUntil(()=>!!releaseImport);assert(await panel().getByRole('combobox',{name:'名称目标语言',exact:true}).isDisabled());await panel().getByRole('button',{name:'关闭查找面板',exact:true}).click();slowImport=false;releaseImport();
   await waitUntil(()=>reader.evaluate(async()=>{const {catalog}=await import(chrome.runtime.getURL('verify-search.js'));return (await catalog.list('comics')).some(comic=>comic.title==='星光书店 新来源');}));
   const saved=await reader.evaluate(async()=>{const {catalog}=await import(chrome.runtime.getURL('verify-search.js'));const comics=await catalog.list('comics');return {count:comics.length,original:comics.find(comic=>comic.title==='星あかりの本屋')?.id};});assert.equal(saved.count,3);assert.equal(saved.original,seed.id);assert.equal(await reader.locator('.nc-reader').count(),0);assert.equal(await reader.locator('.nc-library').count(),1);check('New-source import preserves the original record; closing during slow import prevents late navigation');
   emptyReader=true;await card(seed.id).getByRole('button',{name:'打开漫画 '+seed.title,exact:true}).click();await reader.locator('.nc-reader .nc-empty').waitFor();assert.equal(await reader.locator('.nc-page-image').count(),0);
@@ -196,40 +261,74 @@ try{
   await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).click();await searchPage().waitFor();
   assert.equal(new URL(reader.url()).hash,'#search');assert.equal(await panel().count(),0);assert.equal(requests.length,beforePage);assert.equal(await searchPage().getByPlaceholder('输入漫画名称或别名').inputValue(),'');
   assert.equal(await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).getAttribute('aria-current'),'page');
-  const pageMirror=searchPage().locator('.nc-search-site-option').filter({hasText:'MangaCopy'}).locator('input');assert(!await pageMirror.isChecked());await pageMirror.check();assert.equal(requests.length,beforePage);check('The standalone page restores the scope saved by the other-language sheet without making requests');
+  assert.equal(await searchPage().locator('.nc-search-header,.nc-page-heading').count(),0);
+  const nameInput=searchPage().getByRole('textbox',{name:'搜索名称',exact:true});
+  for(const width of [1560,1280,1024,768,390]){
+    await reader.setViewportSize({width,height:1120});
+    const nameBounds=await nameInput.boundingBox(),submitBounds=await searchPage().getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
+    assert(nameBounds.width>120&&nameBounds.width<=481,'Name input stays usable and bounded: '+JSON.stringify({width,nameBounds}));
+    assert(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow at '+width);
+    const controlsBounds=await searchPage().locator('.nc-search-controls').boundingBox(),scopeBounds=await searchPage().locator('.nc-search-scope').boundingBox();
+    if(width>=1024){
+      assert(Math.abs(nameBounds.y-submitBounds.y)<1);
+      assert(controlsBounds.x+controlsBounds.width<scopeBounds.x,'Desktop search controls sit to the left of the scope');
+      assert(Math.abs(controlsBounds.y-scopeBounds.y)<1,'Both desktop columns start on the same row');
+    }else assert(scopeBounds.y>=controlsBounds.y+controlsBounds.height,'Narrow containers stack the scope below the controls');
+    await searchPage().getByRole('button',{name:'翻译名称搜索',exact:true}).click();
+    const sourceBounds=await searchPage().getByRole('textbox',{name:'原作品名称',exact:true}).boundingBox();
+    assert(sourceBounds.width>120&&sourceBounds.width<=481);
+    if(width>=1024)assert((await searchPage().locator('.nc-search-language .nc-select').boundingBox()).width>=156,'Desktop language selector keeps readable text');
+    assert(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Translated search fits at '+width);
+    if(width===390)await reader.screenshot({path:path.join(out,'search-page-mobile.png')});
+    await searchPage().getByRole('button',{name:'直接搜索',exact:true}).click();
+  }
+  await reader.setViewportSize({width:1560,height:1120});
+  check('Search page removes its banner; desktop controls and scope share two columns, narrow screens stack them and both name modes stay within 480px across five viewport sizes');
+  await expandScope(searchPage());const pageMirror=searchPage().locator('.nc-search-site-option').filter({hasText:'MangaCopy'}).locator('input');assert(!await pageMirror.isChecked());await pageMirror.check();await collapseScope(searchPage());assert.equal(requests.length,beforePage);check('The standalone page restores the scope saved by the other-language sheet without making requests');
   await reader.screenshot({path:path.join(out,'search-page-empty.png')});
   const pageTitleCalls=requests.filter(request=>request.kind==='title').length;
   await searchPage().getByPlaceholder('输入漫画名称或别名').fill('星光书店');await searchPage().getByPlaceholder('输入漫画名称或别名').press('Enter');
   await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(requests.filter(request=>request.kind==='title').length,pageTitleCalls);
   await reader.waitForFunction(()=>[...document.querySelectorAll('.nc-search-page .nc-search-result-cover img')].some(image=>image.naturalWidth>0));
+  const beforeScopeFilter=requests.length;
+  await openFilters(searchPage());await filterPopover(searchPage()).getByRole('button',{name:'免费',exact:true}).click();await filterPopover(searchPage()).getByRole('button',{name:'同人',exact:true}).click();
+  assert.match(await searchPage().locator('.nc-search-scope-heading>span').innerText(),/已选 1 个网站/);assert.equal(requests.length,beforeScopeFilter);assert.equal(await searchPage().locator('.nc-search-result').count(),5);
+  await closeFilters(searchPage());await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();
+  await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===1);
+  assert.equal(await searchPage().locator('.nc-search-status').count(),1);assert.equal(await searchPage().locator('.nc-search-result').count(),1);
+  assert.deepEqual(requests.slice(beforeScopeFilter).filter(request=>request.kind==='search').map(request=>request.site),['mangadex']);
+  await openFilters(searchPage());await filterPopover(searchPage()).getByRole('button',{name:'清空筛选',exact:true}).click();await closeFilters(searchPage());await expandScope(searchPage());
+  assert.equal(await searchPage().locator('.nc-search-site-option input:checked').count(),5);assert.equal(await searchPage().locator('.nc-search-result').count(),1);
+  await collapseScope(searchPage());await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);
+  check('Pricing/content filters constrain real fixture requests to the checked matching sites; clearing filters restores selections without replacing results until resubmission');
   for(const appearance of ['light','dark']){
     await reader.evaluate(value=>{document.documentElement.dataset.appearance=value;},appearance);
     const styles=await reader.evaluate(()=>{
       const read=selector=>{const style=getComputedStyle(document.querySelector(selector));return {border:style.borderTop,shadow:style.boxShadow,radius:style.borderRadius};};
-      return {navigation:read('.nc-app-header nav [aria-current=page]'),card:read('.nc-search-page .nc-search-result'),action:read('.nc-search-page .nc-search-submit-row .button'),heading:read('.nc-search-page .nc-page-heading')};
+      return {navigation:read('.nc-app-header nav [aria-current=page]'),card:read('.nc-search-page .nc-search-result'),action:read('.nc-search-page .nc-search-submit-row .button'),composer:read('.nc-search-page .nc-search-composer')};
     });
     assert.equal(styles.card.border,styles.navigation.border,'Result cards and navigation share the theme stroke');
     assert.equal(styles.card.shadow,styles.navigation.shadow,'Result cards and navigation share the small hard shadow');
     assert.equal(styles.action.border,styles.navigation.border,'Search action must keep the shared button border');
-    assert.equal(styles.heading.border,styles.navigation.border,'Search heading must keep the shared page border');
+    assert.equal(styles.composer.border,styles.navigation.border,'Search controls keep the shared panel border');
     assert.notEqual(styles.action.shadow,'none','Search action must not suppress the shared hard shadow');
     await reader.screenshot({path:path.join(out,appearance==='light'?'search-page-results.png':'search-page-dark.png')});
   }
   await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
-  check('Search heading, result cards and action buttons share the navigation stroke and shadow tokens in light and dark themes');
+  check('Compact search controls, result cards and action buttons share navigation stroke and shadow tokens in light and dark themes');
   const beforePageReturn=requests.length;
   await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).click();assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(requests.length,beforePageReturn);check('Navigation opens a full search page; direct Enter search skips translation; leaving and returning retains its independent results');
   await searchPage().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await reader.locator('.nc-reader').waitFor();await reader.getByRole('button',{name:'返回搜索',exact:true}).click();await searchPage().waitFor();assert.equal(await searchPage().locator('.nc-search-result').count(),5);check('Full-page search opens the real reader and returns to its retained result grid');
   slow=true;await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();await pause(2_700);await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).click();assert.equal(await searchPage().locator('.nc-search-result').count(),0);assert.match(await searchPage().locator('.nc-search-progress').innerText(),/已停止/);slow=false;
   titleMode='english';await searchPage().getByRole('button',{name:'翻译名称搜索',exact:true}).click();assert.equal(await searchPage().getByPlaceholder('请输入漫画作品名称').inputValue(),'星光书店');await searchPage().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);assert.equal(requests.filter(request=>request.kind==='title').length,pageTitleCalls+1);check('Page navigation cancels late search results; switching to translation mode carries the name and searches the translated title');
   const deepLink=await context.newPage();await deepLink.goto(home+'#search');await deepLink.locator('.nc-search-page').waitFor();assert.equal(new URL(deepLink.url()).hash,'#search');assert.equal(await deepLink.locator('dialog[open]').count(),0);
-  const freshDm5=deepLink.locator('.nc-search-site-option').filter({hasText:'动漫屋 DM5'}).locator('input');await freshDm5.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();assert(!await freshDm5.isChecked());assert.equal(await deepLink.locator('.nc-search-result').count(),0);
-  for(const input of await deepLink.locator('.nc-search-site-option input').all())if(await input.isChecked())await input.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();assert.equal(await deepLink.locator('.nc-search-site-option input:checked').count(),0);
+  await expandScope(deepLink);const freshDm5=deepLink.locator('.nc-search-site-option').filter({hasText:'动漫屋 DM5'}).locator('input');await freshDm5.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();await expandScope(deepLink);assert(!await freshDm5.isChecked());assert.equal(await deepLink.locator('.nc-search-result').count(),0);
+  await expandScope(deepLink);for(const input of await deepLink.locator('.nc-search-site-option input').all())if(await input.isChecked())await input.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();assert.equal(await deepLink.locator('.nc-search-site-option input:checked').count(),0);
   await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-site-option input:checked').length===0);assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(await searchPage().locator('.nc-search-status').count(),5);
-  for(const input of await deepLink.locator('.nc-search-site-option input').all())await input.check();await deepLink.close();check('Fresh tabs and reloads restore saved and entirely deselected scopes; cross-tab preference updates leave existing results intact');
+  await deepLink.locator('.nc-search-scope').getByRole('button',{name:'全选',exact:true}).click();await deepLink.close();check('Fresh tabs and reloads restore saved and entirely deselected scopes; cross-tab preference updates leave existing results intact');
   assert.deepEqual(permissionRequests,[]);assert.equal(await worker.evaluate(()=>globalThis.__fixturePermissionRequests),0);check('The unchanged built manifest grants HTTP/HTTPS access; normal searches, website entry and imports never request extra permissions');
   assert.deepEqual(errors,[]);
   const result={evidence:'Production MV3/App with isolated HTTP fixtures; no live model/source traffic; unmodified required HTTP/HTTPS manifest and zero runtime permission requests',out,checks,errors,permissionRequests,requests:requests.map(request=>request.kind==='title'?{kind:request.kind,targetLanguage:request.body.target_language}:{kind:request.kind,site:request.site,...(request.parameters?{parameters:request.parameters}:{})})};
   await writeFile(path.join(out,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }catch(error){if(reader){await reader.getByRole('button',{name:'打开漫画 星あかりの本屋',exact:true}).click({button:'right',timeout:1_000}).then(()=>reader.getByRole('menuitem',{name:'寻找其他语言',exact:true}).click({timeout:1_000})).catch(()=>{});await writeFile(path.join(out,'failure-state.json'),JSON.stringify({errors,requests,text:await reader.locator('body').innerText()},null,2)).catch(()=>{});}await reader?.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});console.error('Artifacts: '+out);throw error;}
-finally{await context.close();}
+finally{releaseImport?.();await context.close();}

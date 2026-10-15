@@ -65,15 +65,18 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         if(name==='搜索漫画'){
           const input=await page.getByRole('textbox',{name:'搜索名称',exact:true}).boundingBox(),submit=await page.getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
           assert(Math.abs(input.y-submit.y)<1,'Phone direct search action should sit beside the input');
-          assert.equal(await page.locator('.nc-search-site-options').isVisible(),false,'Phone search scope must start collapsed');
-          const scope=page.getByRole('button',{name:/搜索范围.*已选/});
+          assert.equal(await page.locator('.nc-search-site-options').isVisible(),true,'Phone search sites remain inline');
+          assert.equal(await page.locator('.nc-search-site-option').count(),10,'Collapsed scope shows ten sites');
+          const scope=page.locator('.nc-search-scope-trigger');
           await scope.click();
           assert.equal(await scope.getAttribute('aria-expanded'),'true');
+          assert.equal(await page.locator('dialog[open]').count(),0,'Filters must not open a modal');
+          await page.locator('.nc-search-filter-popover').getByRole('button',{name:'关闭面板',exact:true}).click();
           const firstSite=page.locator('.nc-search-site-option input').first();
           const selected=await firstSite.isChecked();await firstSite.setChecked(!selected);
-          await scope.click();await scope.click();
+          await page.locator('.nc-search-scope-expand').click();await page.locator('.nc-search-scope-expand').click();
           assert.equal(await firstSite.isChecked(),!selected,'Collapsing scope must retain site selection');
-          await firstSite.setChecked(selected);await scope.click();
+          await firstSite.setChecked(selected);
         }
         if(name==='发现'){
           const columns=await page.locator('.nc-discovery-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
@@ -324,12 +327,13 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
             await resizedNav.getByRole('button',{name,exact:true}).click();
             assert(await resizedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Desktop overflow: ${width}x${height}, touch=${hasTouch}, ${name}`);
             if(name==='漫画网站'){
-              assert.equal(await resizedPage.locator('.nc-site-card').first().evaluate(el=>getComputedStyle(el).display),'block',`Phone rows leaked into desktop ${width}x${height}, touch=${hasTouch}`);
+              assert.equal(await resizedPage.locator('.nc-site-card').first().evaluate(el=>getComputedStyle(el).flexDirection),'column',`Phone rows leaked into desktop ${width}x${height}, touch=${hasTouch}`);
               if(width===420)assert.equal(await resizedPage.locator('.nc-sites-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);
             }
             if(name==='搜索漫画'){
               assert.equal(await resizedPage.locator('.nc-search-site-options').isVisible(),true);
-              assert.equal(await resizedPage.getByRole('button',{name:/搜索范围.*已选/}).isVisible(),false);
+              assert.equal(await resizedPage.locator('.nc-search-site-option').count(),10);
+              assert.equal(await resizedPage.locator('.nc-search-scope-trigger').isVisible(),true);
             }
           }
           if(width<=700)assert.equal((await resizedNav.boundingBox()).height,80,'Phone density leaked into narrow desktop navigation');

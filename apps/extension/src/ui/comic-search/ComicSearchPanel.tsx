@@ -4,7 +4,7 @@ import {Icon} from '../../icons';
 import {formatDate,msg} from '../../i18n/runtime';
 import {fallbackLanguages,languageLabel} from '../../types';
 import {Thumbnail} from '../../reader/Images';
-import {listSearchSites,releaseSourceSearchSession,searchSource,type SourceSearchResult} from '../../sources';
+import {listSearchSites,matchesSiteFilters,releaseSourceSearchSession,searchSource,type SiteFilters,type SourceSearchResult} from '../../sources';
 import {ComicSearchSession,comicSearchSourceKey} from '../../comics/application/search/session';
 import {readSearchSiteSelection,saveSearchSiteSelection} from '../../comics/application/preferences';
 import type {SearchSeed,SearchSiteState} from '../../comics/application/search/types';
@@ -13,6 +13,8 @@ import {LanguageFlag} from '../LanguageFlag';
 import {searchResultCoverKey} from './SearchResultCover';
 import {SearchResultCard} from './SearchResultCard';
 import {SearchSiteIcon} from './SearchSiteIcon';
+import {SearchScopeSettings} from './SearchScopeSettings';
+import {emptySiteFilters} from '../SiteFilterControls';
 import {useDialogViewport} from '../visual-viewport';
 import './comic-search.css';
 
@@ -48,7 +50,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot);
   const dialog=useRef<HTMLDialogElement>(null),closeRef=useRef<HTMLButtonElement>(null),queryRef=useRef<HTMLInputElement>(null),sourceRef=useRef<HTMLInputElement>(null),scrollRef=useRef<HTMLDivElement>(null);
   const coverCache=useRef(new Map<string,string>()),titleId=useId(),queryId=useId(),sourceId=useId();
-  const scopeId=useId(),[scopeExpanded,setScopeExpanded]=useState(false);
+  const [scopeFilters,setScopeFilters]=useState<SiteFilters>(emptySiteFilters);
   const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
   const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
@@ -57,7 +59,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   useEffect(()=>{if(lastQuery.current!==snapshot.query){lastQuery.current=snapshot.query;setQuery(snapshot.query);}},[snapshot.query]);
   useEffect(()=>{
     if(!open)return;
-    const restore=()=>{const saved=readSearchSiteSelection();for(const state of session.getSnapshot().sites)session.setSelected(state.site.key,saved[state.site.key]??true);};
+    const restore=()=>{const saved=readSearchSiteSelection();session.setSelection(Object.fromEntries(session.getSnapshot().sites.map(state=>[state.site.key,saved[state.site.key]??true])));};
     const storageChanged=(event:StorageEvent)=>{if(event.key===null||event.key==='nc-search-sites')restore();};
     restore();window.addEventListener('storage',storageChanged);
     return()=>window.removeEventListener('storage',storageChanged);
@@ -80,7 +82,8 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   useEffect(()=>{setSiteFilter('');setImportErrors({});},[snapshot.requestedTitleLanguage,snapshot.sourceTitle]);
   if(!open)return null;
 
-  const selected=snapshot.sites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle'),filteredSite=resultSites.find(state=>state.site.key===siteFilter);
+  const scopeSites=snapshot.sites.filter(state=>matchesSiteFilters(state.site,scopeFilters));
+  const selected=scopeSites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle'),filteredSite=resultSites.find(state=>state.site.key===siteFilter);
   const siteWait=waitSeconds(filteredSite?.error?.retryAt,clock),titleWait=waitSeconds(snapshot.titleRetryAt,clock);
   const siteBusy=filteredSite?.status==='running'||filteredSite?.status==='queued',siteRetry=filteredSite?.status==='error'||filteredSite?.status==='stopped';
   const returned=resultSites.filter(state=>state.status==='ready'||state.status==='empty').length,failed=resultSites.filter(state=>state.status==='error').length;
@@ -90,8 +93,8 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const showResolved=translating&&(snapshot.titleState==='resolved'||snapshot.titleState==='missing'||snapshot.titleState==='error'||snapshot.titleState==='manual');
   const sourceCover=seed.cover?.url&&/^(?:blob:|data:image\/|chrome-extension:|moz-extension:)/.test(seed.cover.url)?seed.cover.url:undefined;
   const close=()=>{session.stop();onClose?.();};
-  const submitManual=(value=query)=>{setReopened(false);setSiteFilter('');session.searchManual(value);};
-  const automatic=()=>{setReopened(false);setSiteFilter('');void session.searchWithTranslatedTitle();};
+  const submitManual=(value=query)=>{setReopened(false);setSiteFilter('');session.searchManual(value,selected.map(state=>state.site.key));};
+  const automatic=()=>{setReopened(false);setSiteFilter('');void session.searchWithTranslatedTitle(selected.map(state=>state.site.key));};
   const useOriginal=()=>{setQuery(snapshot.sourceTitle);submitManual(snapshot.sourceTitle);};
   const changeMode=(next:'direct'|'translate')=>{if(next===mode)return;session.stop();if(next==='translate'&&!snapshot.sourceTitle&&query)session.setSourceTitle(query);if(next==='direct'&&!query)setQuery(snapshot.sourceTitle);setMode(next);};
   const importHit=(hit:SourceSearchResult)=>{
@@ -109,18 +112,18 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
   };
   const content=<>
-    <header className="nc-search-header nc-page-heading">
-      <div><span className="nc-search-heading-icon"><Icon name={sheet?'translate':'comic-search'} size={26}/></span><div><h1 id={titleId}>{sheet?msg('寻找其他语言'):msg('搜索漫画')}</h1><p>{msg('输入名字，发现更多漫画。')}</p></div></div>
+    {sheet&&<header className="nc-search-header">
+      <h1 id={titleId}>{msg('寻找其他语言')}</h1>
       <div className="nc-search-header-context">{seed.title&&<div className="nc-search-origin"><div className="nc-search-origin-cover">{seed.coverKey?<Thumbnail blobKey={seed.coverKey}/>:sourceCover?<img src={sourceCover} alt=""/>:<Icon name="book" size={20}/>}</div><div><small>{seed.sourceName??msg('当前作品')}</small><b title={seed.title}>{seed.title}</b></div></div>}{sheet&&<button ref={closeRef} className="icon-button" aria-label={msg('关闭查找面板')} onClick={close}><Icon name="close"/></button>}</div>
-    </header>
+    </header>}
     <div ref={scrollRef} className="nc-search-body" data-search-scroll={sheet?'true':undefined}>
-      <section className="nc-search-workbench">
         <div className="nc-search-composer">
+          <div className="nc-search-controls">
+          <div className="nc-search-toolbar">
           <div className="nc-search-mode segmented" role="group" aria-label={msg('搜索方式')}>
             <button type="button" className={!translating?'active':undefined} aria-pressed={!translating} disabled={!!importing} onClick={()=>changeMode('direct')}><Icon name="search" size={17}/>{msg('直接搜索')}</button>
             <button type="button" className={translating?'active':undefined} aria-pressed={translating} disabled={!!importing} onClick={()=>changeMode('translate')}><Icon name="translate" size={17}/>{msg('翻译名称搜索')}</button>
           </div>
-          {!!seed.titles?.length&&<div className="nc-search-title-options" role="group" aria-label={msg('作品别名')}>{seed.titles.map(title=><button type="button" key={title} className="button secondary small" disabled={!!importing} onClick={()=>{session.stop();if(translating)session.setSourceTitle(title);setQuery(title);}}>{title}</button>)}</div>}
           <form className="nc-search-form" onSubmit={event=>{event.preventDefault();if(translating)automatic();else submitManual();}}>
             <div className="nc-search-fields">
               <label className="nc-search-name" htmlFor={translating?sourceId:queryId}><span>{translating?msg('原作品名称'):msg('搜索名称')}</span>
@@ -128,21 +131,19 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
               </label>
               {translating&&<label className="nc-search-language"><span>{msg('名称目标语言')}</span><Select disabled={!!importing} value={snapshot.requestedTitleLanguage} onChange={event=>{setReopened(false);session.setTargetLanguage(event.target.value);onLanguageChange?.(event.target.value);}} aria-label={msg('名称目标语言')}>{fallbackLanguages.map(language=><SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}</Select></label>}
             </div>
-            <div className="nc-search-submit-row"><div className="nc-search-submit-hint"><p>{translating?msg('先找到目标语言的常用名称，再搜索网站。'):msg('输入漫画名称，搜索已选择的网站。')}</p>{translating&&<button type="button" className="nc-search-text-button" disabled={!!importing||!snapshot.sourceTitle.trim()||!selected.length} onClick={useOriginal}>{msg('使用原名搜索')}</button>}</div><button className="button primary" disabled={!!importing||!selected.length||!(translating?snapshot.sourceTitle:query).trim()||(translating&&(titleWait>0||snapshot.phase==='resolving-name'))}><Icon name={translating?'translate':'search'} size={18}/>{translating?(titleWait?msg('{0} 秒后重试',{'0':titleWait}):msg('翻译名称并搜索')):snapshot.searchedAt?msg('重新搜索'):msg('搜索网站')}</button></div>
+            <div className="nc-search-submit-row"><button className="button primary" disabled={!!importing||!selected.length||!(translating?snapshot.sourceTitle:query).trim()||(translating&&(titleWait>0||snapshot.phase==='resolving-name'))}><Icon name={translating?'translate':'search'} size={18}/>{translating?(titleWait?msg('{0} 秒后重试',{'0':titleWait}):msg('翻译名称并搜索')):snapshot.searchedAt?msg('重新搜索'):msg('搜索网站')}</button></div>
           </form>
+          </div>
+          <div className="nc-search-submit-hint"><p>{translating?msg('先找到目标语言的常用名称，再搜索网站。'):msg('输入漫画名称，搜索已选择的网站。')}</p>{translating&&<button type="button" className="nc-search-text-button" disabled={!!importing||!snapshot.sourceTitle.trim()||!selected.length} onClick={useOriginal}>{msg('使用原名搜索')}</button>}</div>
+          {!!seed.titles?.length&&<div className="nc-search-title-options" role="group" aria-label={msg('作品别名')}>{seed.titles.map(title=><button type="button" key={title} className="button secondary small" disabled={!!importing} onClick={()=>{session.stop();if(translating)session.setSourceTitle(title);setQuery(title);}}>{title}</button>)}</div>}
           {snapshot.phase==='resolving-name'&&<p className="nc-search-resolving" role="status"><span className="spinner"/>{msg('正在查找常用{0}名称…',{'0':languageLabel(snapshot.requestedTitleLanguage)})}<button className="nc-search-text-button" onClick={()=>session.stop()}>{msg('停止查找')}</button></p>}
           {showResolved&&<section className="nc-search-query"><div><label htmlFor={queryId}>{msg('搜索名称')}</label></div><form onSubmit={event=>{event.preventDefault();submitManual();}}><input ref={queryRef} id={queryId} disabled={!!importing} value={query} onChange={event=>setQuery(event.target.value)} placeholder={msg('输入漫画名称或别名')}/><button className="button secondary small" disabled={!!importing||!query.trim()||!selected.length}>{snapshot.searchedAt?msg('重新搜索'):msg('搜索网站')}</button></form><p>{snapshot.titleState==='missing'?msg('未找到常用{0}名称，请手动输入或明确使用原名搜索。',{'0':languageLabel(snapshot.requestedTitleLanguage)}):snapshot.resolvedTitleLanguage&&snapshot.resolvedTitleLanguage!==snapshot.requestedTitleLanguage?msg('名称语言为{0}，将使用此名称搜索。',{'0':languageLabel(snapshot.resolvedTitleLanguage)}):msg('可以修改搜索名称，不会更改作品资料。')}</p></section>}
           {snapshot.titleError&&<div className="nc-search-inline-error" role="status"><Icon name="info" size={16}/><span>{snapshot.titleError.message}</span>{titleWait>0&&<span>{msg('{0} 秒后可重试',{'0':titleWait})}</span>}{snapshot.titleError.kind==='login'&&onLogin&&<button className="nc-search-text-button" onClick={onLogin}>{msg('登录')}</button>}</div>}
-        </div>
-        <aside className="nc-search-sites" aria-label={msg('搜索范围')} data-phone-expanded={scopeExpanded}>
-          <button type="button" className="nc-phone-scope-toggle" aria-expanded={scopeExpanded} aria-controls={scopeId} onClick={()=>setScopeExpanded(value=>!value)}><b>{msg('搜索范围')}</b><span>{msg('已选 {0} 个网站',{'0':selected.length})}</span><Icon name="chevron" size={16}/></button>
-          <div className="nc-search-sites-heading"><h2>{msg('搜索范围')}</h2><span>{msg('已选 {0} 个网站',{'0':selected.length})}</span></div>
-          <div id={scopeId} className="nc-search-site-options">{snapshot.sites.map(state=><label className="nc-search-site-option" key={state.site.key}><input type="checkbox" checked={state.selected} disabled={!!importing} onChange={event=>{session.setSelected(state.site.key,event.target.checked);saveSearchSiteSelection(state.site.key,event.target.checked);}}/><SearchSiteIcon icon={state.site.icon}/><b title={state.site.name}>{state.site.name}</b></label>)}</div>
-          <p>{msg('各网站仅按搜索名称查询，不按内容语言筛选。')}</p>
           {!selected.length&&<p className="nc-search-notice" role="status">{msg('请先选择至少一个可搜索的网站。')}</p>}
           {permissionError&&<p className="nc-search-notice" role="alert">{permissionError.message}</p>}
-        </aside>
-      </section>
+          </div>
+          <SearchScopeSettings sites={scopeSites} totalCount={snapshot.sites.length} filters={scopeFilters} onFiltersChange={setScopeFilters} disabled={!!importing} onSelectionChange={selection=>{session.setSelection(selection);saveSearchSiteSelection(selection);}}/>
+        </div>
       {snapshot.searchedAt?<section className="nc-search-results">
         <div className="nc-search-result-heading"><h2>{msg('搜索结果')}</h2><div className="nc-search-progress" role="status"><span title={reopened?msg('上次查找：{0}',{'0':formatDate(snapshot.searchedAt,true)}):undefined}>{snapshot.phase==='stopped'?msg('已停止'):msg('{0}/{1} 个网站已返回',{'0':returned,'1':resultSites.length})}</span>{failed>0&&<span className="nc-search-failed-count">{msg('{0} 个网站失败',{'0':failed})}</span>}<span className="nc-search-candidate-count">{msg('{0} 个候选',{'0':results.length})}</span>{active&&<button className="nc-search-text-button" onClick={()=>session.stop()}>{msg('停止查找')}</button>}</div></div>
         <div className="nc-search-status-list">{resultSites.map(state=><button type="button" key={state.site.key} className={'nc-search-status is-'+state.status} aria-pressed={filteredSite?.site.key===state.site.key} title={state.site.name+' · '+msg('查看此网站结果')} onClick={()=>setSiteFilter(value=>value===state.site.key?'':state.site.key)}><SearchSiteIcon icon={state.site.icon}/><b>{state.site.name}</b><span className="nc-search-site-state"><i className="nc-search-status-dot"/>{stateLabel(state)}</span></button>)}</div>
@@ -162,5 +163,5 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
       </section>:<div className="nc-search-empty nc-search-intro"><span className="nc-search-intro-icon"><Icon name="comic-search" size={32}/></span><h2>{msg('按名称发现更多来源')}</h2><p>{msg('获取漫画名后，同时搜索所选网站；有结果就会立即显示。')}</p></div>}
     </div>
   </>;
-  return sheet?<dialog ref={dialog} className="nc-comic-search nc-search-sheet" aria-labelledby={titleId} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={keyDown} onClick={event=>{if(event.target===event.currentTarget){const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();}}}>{content}</dialog>:<section className={`nc-comic-search nc-search-${presentation}`} aria-labelledby={titleId}>{content}</section>;
+  return sheet?<dialog ref={dialog} className="nc-comic-search nc-search-sheet" aria-labelledby={titleId} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={keyDown} onClick={event=>{if(event.target===event.currentTarget){const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();}}}>{content}</dialog>:<section className={`nc-comic-search nc-search-${presentation}`} aria-label={msg('搜索漫画')}>{content}</section>;
 }

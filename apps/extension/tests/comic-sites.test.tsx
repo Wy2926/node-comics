@@ -1,7 +1,10 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {ComicSites} from '../src/ui/ComicSites';
+import {SearchScopeSettings} from '../src/ui/comic-search/SearchScopeSettings';
+import {emptySiteFilters} from '../src/ui/SiteFilterControls';
 import {listSupportedSites} from '../src/sources/registry/sites';
+import {listSearchSites} from '../src/sources';
 import {installDictionary} from '../src/i18n/runtime';
 import english from '../src/i18n/dictionaries/en.json';
 
@@ -9,6 +12,29 @@ vi.mock('../src/ui/SupportRequestForm', () => ({SupportRequestForm: () => null})
 afterEach(() => {vi.unstubAllGlobals(); installDictionary('zh-CN', {});});
 
 describe('comic website directory presentation', () => {
+  it('keeps only the nonmodal filters closed and disables bulk actions for no matching sites', () => {
+    const html = renderToStaticMarkup(<SearchScopeSettings sites={[]} totalCount={10} filters={emptySiteFilters} onFiltersChange={()=>{}} onSelectionChange={()=>{}} disabled={false}/>);
+    expect(html).toContain('aria-haspopup="dialog" aria-expanded="false"');
+    expect(html).toContain('class="nc-search-filter-popover" hidden=""');
+    expect(html).toContain('popover="auto"');
+    expect(html).not.toContain('<dialog');
+    expect(html.match(/class="nc-site-filter-group"/g)).toHaveLength(4);
+    expect(html).toContain('显示 0 / 10 个网站');
+    expect(html).toContain('没有符合条件的网站，请调整或清除筛选。');
+    expect(html).toContain('disabled="">全选');
+    expect(html).toContain('disabled="">反选');
+  });
+  it('shows ten inline sites by default while counts and batch actions cover every matching site', () => {
+    const sites=listSearchSites().map(site=>({site,selected:true,status:'idle' as const,resultCount:0,resultKeys:[]}));
+    expect(sites.length).toBeGreaterThan(10);
+    const html=renderToStaticMarkup(<SearchScopeSettings sites={sites} totalCount={sites.length} filters={emptySiteFilters} onFiltersChange={()=>{}} onSelectionChange={()=>{}} disabled={false}/>);
+    expect(html.match(/class="nc-search-site-option"/g)).toHaveLength(10);
+    expect(html).toContain(`已选 ${sites.length} 个网站`);
+    expect(html).toContain(`显示 10 / ${sites.length} 个网站`);
+    expect(html).toContain(`展开全部 ${sites.length} 个网站`);
+    expect(html).toContain('disabled="">全选');
+    expect(html).not.toContain('disabled="">反选');
+  });
   const render = () => {
     vi.stubGlobal('location', new URL('https://fixture.test/#sites'));
     return renderToStaticMarkup(<ComicSites/>);
@@ -20,8 +46,9 @@ describe('comic website directory presentation', () => {
     expect(html).toContain(`显示 ${listSupportedSites().length} / ${listSupportedSites().length} 个网站`);
     expect(html).toContain('disabled="">清空筛选');
     expect(html).toContain('同组多选匹配任一项，不同组同时满足。');
-    expect(html).toContain('id="nc-site-advanced-filters" hidden=""');
-    expect(html).toContain('aria-expanded="false" aria-controls="nc-site-advanced-filters"');
+    const advancedId = html.match(/aria-expanded="false" aria-controls="([^"]+)"/)?.[1];
+    expect(advancedId).toBeTruthy();
+    expect(html).toContain(`id="${advancedId}" hidden=""`);
     expect(html).toContain('更多筛选');
     expect(html).not.toContain('DISCOVER YOUR NEXT STORY');
     expect(html).not.toContain('nc-page-heading');

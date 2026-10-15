@@ -1,4 +1,7 @@
 {
+  "展开全部 {0} 个网站": "Hiện tất cả {0} trang web",
+  "收起网站": "Thu gọn trang web",
+  "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Chỉ tìm trên các trang đã chọn và phù hợp với bộ lọc. Thay đổi áp dụng cho lần tìm kiếm tiếp theo.",
   "第 {0} / {1} 章 · {2}": "Chương {0} / {1} · {2}",
   "正在补齐章节目录…": "Đang tải danh sách chương đầy đủ…",
   "章节目录尚未完整加载，请先补齐目录后重试。": "Danh sách chương chưa đầy đủ. Hãy tải toàn bộ rồi thử lại.",
@@ -966,7 +969,8 @@
   "网站访问受限": "Website access restricted",
   "返回搜索": "Quay lại tìm kiếm",
   "搜索": "Tìm kiếm",
-  "输入名字，发现更多漫画。": "Một cái tên. Thêm nhiều câu chuyện.",
+  "全选": "Chọn tất cả",
+  "反选": "Đảo lựa chọn",
   "搜索方式": "Chế độ tìm kiếm",
   "直接搜索": "Tìm theo tên",
   "翻译名称搜索": "Dịch tên và tìm",

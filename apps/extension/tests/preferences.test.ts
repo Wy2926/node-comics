@@ -15,9 +15,9 @@ it('accepts only listed search languages without converting unsupported values',
 });
 it('persists each search site choice, including an entirely deselected scope, independently of language settings', () => {
   expect(readSearchSiteSelection()).toEqual({});
-  saveSearchSiteSelection('a:a', false); saveSearchSiteSelection('b:b', false);
+  saveSearchSiteSelection({'a:a':false}); saveSearchSiteSelection({'b:b':false});
   expect(readSearchSiteSelection()).toEqual({'a:a':false,'b:b':false});
-  saveSearchLanguage('ja'); saveSearchSiteSelection('a:a', true);
+  saveSearchLanguage('ja'); saveSearchSiteSelection({'a:a':true});
   expect(readSearchSiteSelection()).toEqual({'a:a':true,'b:b':false});
   expect(readSearchLanguage('en')).toBe('ja');
   expect(localStorage.getItem('nc-settings')).toBeNull();
@@ -29,7 +29,15 @@ it('recovers search scope from malformed or unavailable optional preference stor
   localStorage.setItem('nc-search-sites',JSON.stringify({'a:a':false,'b:b':'false','c:c':true}));
   expect(readSearchSiteSelection()).toEqual({'a:a':false,'c:c':true});
   vi.stubGlobal('localStorage',{getItem:()=>{throw Error('unavailable');},setItem:()=>{throw Error('unavailable');}});
-  expect(readSearchSiteSelection()).toEqual({});expect(()=>saveSearchSiteSelection('a:a',false)).not.toThrow();
+  expect(readSearchSiteSelection()).toEqual({});expect(()=>saveSearchSiteSelection({'a:a':false})).not.toThrow();
+});
+it('saves a filtered batch with one storage read and write while preserving hidden choices', () => {
+  saveSearchSiteSelection({'hidden:hidden':false});
+  const read=vi.spyOn(localStorage,'getItem'),write=vi.spyOn(localStorage,'setItem');
+  const selection=Object.fromEntries(Array.from({length:44},(_,index)=>['site:'+index,index%2===0]));
+  saveSearchSiteSelection(selection);
+  expect(read).toHaveBeenCalledTimes(1);expect(write).toHaveBeenCalledTimes(1);
+  expect(readSearchSiteSelection()).toEqual({'hidden:hidden':false,...selection});
 });
 it('keeps known preferences while discarding old concurrency and backend overrides', async () => {
   localStorage.setItem('nc-settings', JSON.stringify({ requestConcurrency: 1, autoTranslate: true, apiBase: 'https://wrong.example', translationMode:'unsupported', language: 'en' }));

@@ -1,4 +1,7 @@
 {
+  "展开全部 {0} 个网站": "Tampilkan semua {0} situs",
+  "收起网站": "Tampilkan lebih sedikit situs",
+  "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Hanya situs yang dicentang dan sesuai filter yang dicari. Perubahan berlaku untuk pencarian berikutnya.",
   "第 {0} / {1} 章 · {2}": "Bab {0} / {1} · {2}",
   "正在补齐章节目录…": "Memuat daftar bab lengkap…",
   "章节目录尚未完整加载，请先补齐目录后重试。": "Daftar bab belum lengkap. Muat seluruh daftar lalu coba lagi.",
@@ -966,7 +969,8 @@
   "网站访问受限": "Website access restricted",
   "返回搜索": "Kembali ke pencarian",
   "搜索": "Cari",
-  "输入名字，发现更多漫画。": "Satu judul. Lebih banyak cerita.",
+  "全选": "Pilih semua",
+  "反选": "Balik pilihan",
   "搜索方式": "Mode pencarian",
   "直接搜索": "Cari berdasarkan judul",
   "翻译名称搜索": "Terjemahkan dan cari",

@@ -3,8 +3,6 @@
  * popup (including a touch laptop) must not opt in just because it is narrow.
  * No viewport listeners, duplicate page trees, or business rules belong here.
  */
-.nc-phone-scope-toggle { display: none; }
-
 @media (max-device-width: 1000px) and (pointer: coarse), (max-device-width: 1000px) and (hover: none) {
   @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) {
     .nc-app {
@@ -80,10 +78,8 @@
     .nc-app .nc-discovery-poster-bottom { padding: 22px 6px 6px; gap: 2px; }
     .nc-app .nc-discovery-filter-row { gap: 8px; padding-top: 12px; }
 
-    /* One search session and checkbox set; only the phone disclosure is new. */
-    .nc-app .nc-search-workbench { gap: 10px; }
+    /* Search keeps its inline scope and anchored filters on phones. */
     .nc-app .nc-search-composer { padding: 12px; }
-    .nc-app .nc-search-mode.segmented { margin-bottom: 12px; }
     .nc-app .nc-search-form, .nc-app .nc-search-fields { gap: 10px; }
     .nc-app .nc-search-submit-row { gap: 8px; }
     .nc-app .nc-search-submit-hint>p { display: none; }
@@ -91,19 +87,9 @@
     .nc-app .nc-comic-search .nc-search-submit-row>.button { min-height: var(--nc-phone-hit); height: auto; padding: 8px; white-space: normal; }
     .nc-app .nc-search-form:not(:has(.nc-search-language)) { grid-template-columns: minmax(0, 1fr) fit-content(45%); }
     .nc-app .nc-search-form:not(:has(.nc-search-language)) .nc-search-submit-row>.button { grid-area: 1/2; }
-    .nc-app .nc-search-form:not(:has(.nc-search-language)) .nc-search-submit-hint { display: none; }
-    .nc-app .nc-search-sites { padding: 0 12px; }
-    .nc-app .nc-search-sites-heading { display: none; }
-    .nc-app .nc-phone-scope-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--nc-phone-hit); padding: 8px 0; text-align: start; font-size: var(--text-small); }
-    .nc-app .nc-phone-scope-toggle>span { margin-inline-start: auto; color: var(--muted); font-size: var(--text-caption); }
-    .nc-app .nc-phone-scope-toggle>.nc-icon { flex: none; transform: rotate(90deg); }
-    .nc-app .nc-phone-scope-toggle[aria-expanded=true]>.nc-icon { transform: rotate(-90deg); }
-    .nc-app .nc-search-sites[data-phone-expanded=false]>.nc-search-site-options,
-    .nc-app .nc-search-sites[data-phone-expanded=false]>p:not([role]) { display: none; }
-    .nc-app .nc-search-sites[data-phone-expanded=true] { padding-bottom: 10px; }
+    .nc-app .nc-search-submit-hint:not(:has(button)) { display: none; }
     .nc-app .nc-search-site-options { gap: 6px; }
     .nc-app .nc-search-site-option { min-height: var(--nc-phone-hit); padding: 6px; }
-    .nc-app .nc-search-sites>p { margin-block: 8px 0; }
     .nc-app .nc-search-intro { margin-top: 12px; }
     .nc-app .nc-search-result { padding: 10px; gap: 10px; }
     .nc-app .nc-search-result-cover { width: 60px; height: 90px; }

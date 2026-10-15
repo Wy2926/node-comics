@@ -20,6 +20,48 @@ beforeEach(()=>analytics.track.mockClear());
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
 
 describe('comic search session',()=>{
+  it('applies a visible-site batch once, preserves hidden sites and ignores unchanged or unknown keys',()=>{
+    const {session,deps}=setup({},Array.from({length:44},(_,index)=>site(String(index))));
+    const listener=vi.fn();session.subscribe(listener);
+    const before=session.getSnapshot();
+    session.setSelection(Object.fromEntries(before.sites.slice(0,22).map(state=>[state.site.key,!state.selected])));
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot().sites.map(state=>state.selected)).toEqual([...Array(22).fill(false),...Array(22).fill(true)]);
+    expect(session.getSnapshot().sites[22]).toBe(before.sites[22]);
+    expect(session.getSnapshot().results).toBe(before.results);
+    session.setSelection({'0:0':false,'unknown':true});session.setSelection({});
+    expect(listener).toHaveBeenCalledTimes(1);expect(deps.search).not.toHaveBeenCalled();expect(deps.translateTitle).not.toHaveBeenCalled();
+    session.setSelection(Object.fromEntries(before.sites.slice(0,22).map(state=>[state.site.key,true])));
+    expect(listener).toHaveBeenCalledTimes(2);expect(session.getSnapshot().sites.every(state=>state.selected)).toBe(true);
+  });
+  it('intersects the submitted scope with saved selections without overwriting them',async()=>{
+    const {session,deps}=setup({},[site('a'),site('b'),site('c')],{'c:c':false});
+    session.searchManual('filtered',['b:b','b:b','c:c','unknown']);await flush();
+    expect(vi.mocked(deps.search).mock.calls.map(([id])=>id)).toEqual(['b']);
+    expect(session.getSnapshot().sites.map(state=>state.selected)).toEqual([true,true,false]);
+    vi.mocked(deps.search).mockClear();session.searchManual('all');await flush();
+    expect(vi.mocked(deps.search).mock.calls.map(([id])=>id)).toEqual(['a','b']);
+  });
+  it('snapshots the filtered scope before resolving a translated title',async()=>{
+    const name=deferred<{name:string;target_language:string}>();
+    const {session,deps}=setup({translateTitle:()=>name.promise});
+    const scope=['a:a'];const pending=session.searchWithTranslatedTitle(scope);
+    scope.splice(0,1,'b:b');session.setSelection({'a:a':false});
+    name.resolve({name:'translated',target_language:'en'});await pending;await flush();
+    expect(vi.mocked(deps.search).mock.calls.map(([id])=>id)).toEqual(['a']);
+  });
+  it('rejects an empty filtered scope without requests or interrupting the active round',async()=>{
+    const pending=deferred<SourceSearchResults>();
+    const {session,deps}=setup({search:vi.fn().mockReturnValue(pending.promise)},[site('a')]);
+    session.searchManual('first');
+    const before=session.getSnapshot(),signal=vi.mocked(deps.search).mock.calls[0][2].signal;
+    session.searchManual('empty',[]);await session.searchWithTranslatedTitle([]);
+    expect(session.getSnapshot()).toMatchObject({phase:'searching',query:before.query,searchedAt:before.searchedAt});
+    expect(signal?.aborted).toBe(false);expect(deps.translateTitle).not.toHaveBeenCalled();
+    expect(deps.search).toHaveBeenCalledTimes(1);expect(deps.release).not.toHaveBeenCalled();
+    expect(session.getSnapshot().titleError?.kind).toBe('invalid');
+    pending.resolve(page('a'));await flush();expect(session.getSnapshot().results).toHaveLength(1);
+  });
   it('preserves the search origin through name translation and deferred site completion',async()=>{
     let now=1700000000000;
     const name=deferred<{name:string;target_language:string}>(),results=deferred<SourceSearchResults>();
@@ -50,14 +92,14 @@ describe('comic search session',()=>{
     expect(deps.translateTitle).not.toHaveBeenCalled();expect(deps.search).not.toHaveBeenCalled();
     expect(session.getSnapshot().sites.map(state=>state.selected)).toEqual([true,true]);
     expect(deps.listSites).toHaveBeenCalledWith();
-    session.setSelected('a:a',false);session.setSelected('unknown:unknown',false);await session.searchWithTranslatedTitle();
+    session.setSelection({'a:a':false,'unknown:unknown':false});await session.searchWithTranslatedTitle();
     expect(deps.translateTitle).not.toHaveBeenCalled();expect(session.getSnapshot().titleError?.kind).toBe('invalid');
   });
   it('keeps every site selectable regardless of its display languages and preserves choices when name language changes',()=>{
     const {session,deps}=setup({},[site('japanese',['ja']),site('english',['en']),site('unknown',[])]);
-    session.setSelected('english:english',false);session.setTargetLanguage('zh-Hant');
+    session.setSelection({'english:english':false});session.setTargetLanguage('zh-Hant');
     expect(session.getSnapshot().sites.map(state=>state.selected)).toEqual([true,false,true]);
-    session.setSelected('english:english',true);expect(session.getSnapshot().sites.every(state=>state.selected)).toBe(true);
+    session.setSelection({'english:english':true});expect(session.getSnapshot().sites.every(state=>state.selected)).toBe(true);
     expect(deps.listSites).toHaveBeenCalledTimes(1);
   });
   it('restores saved site choices while selecting newly available sites by default',()=>{
@@ -71,7 +113,7 @@ describe('comic search session',()=>{
     const {session,deps}=setup({search},[site('a'),site('b'),site('c')],{'c:c':false});
     session.searchManual('first query');await flush();
     const before=session.getSnapshot(),signal=search.mock.calls[1][2].signal;
-    session.setSelected('a:a',false);session.setSelected('b:b',false);session.setSelected('c:c',true);
+    session.setSelection({'a:a':false,'b:b':false,'c:c':true});
     expect(session.getSnapshot()).toMatchObject({query:before.query,searchedAt:before.searchedAt,phase:'searching',results:before.results});
     expect(signal?.aborted).toBe(false);expect(deps.release).not.toHaveBeenCalled();expect(search).toHaveBeenCalledTimes(2);
     session.loadMore('a:a');await flush();expect(session.getSnapshot().results.map(result=>result.catalogId)).toEqual(['first','second']);
@@ -86,7 +128,7 @@ describe('comic search session',()=>{
     const name=deferred<{name:string;target_language:string}>();
     const search=vi.fn<ComicSearchDependencies['search']>(async id=>page(id));
     const {session}=setup({translateTitle:()=>name.promise,search},[site('a'),site('b')],{'b:b':false});
-    const pending=session.searchWithTranslatedTitle();session.setSelected('a:a',false);session.setSelected('b:b',true);
+    const pending=session.searchWithTranslatedTitle();session.setSelection({'a:a':false,'b:b':true});
     name.resolve({name:'translated',target_language:'en'});await pending;await flush();
     expect(search.mock.calls.map(call=>call[0])).toEqual(['a']);
     await session.searchWithTranslatedTitle();await flush();expect(search.mock.calls.map(call=>call[0])).toEqual(['a','b']);

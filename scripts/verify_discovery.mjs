@@ -409,10 +409,13 @@ try {
     assert.equal(await dialog.getByRole('textbox', {name: '搜索名称', exact: true}).inputValue(), '星光书店 19');
     await dialog.getByRole('button', {name: '星光书店', exact: true}).click();
     assert.equal(sourceRequests.length, 0);
-    for (const option of await dialog.locator('.nc-search-site-option').all()) {
-      const input = option.locator('input');
-      if (!(await option.innerText()).includes('瓜子漫画') && await input.isChecked()) await input.uncheck();
-    }
+    await dialog.locator('.nc-search-scope-trigger').click();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('dialog[open]').count(), 1, 'Scope Escape must not close the discovery dialog');
+    await dialog.locator('.nc-search-scope-expand').click();
+    await dialog.getByRole('button', {name: '反选', exact: true}).click();
+    await dialog.getByRole('checkbox', {name: '瓜子漫画', exact: true}).check();
+    await dialog.locator('.nc-search-scope-expand').click();
     await dialog.getByRole('button', {name: '搜索网站', exact: true}).click();
     await dialog.getByRole('button', {name: '导入并阅读', exact: true}).waitFor();
     await page.screenshot({path: path.join(out, 'discovery-sources.png')});

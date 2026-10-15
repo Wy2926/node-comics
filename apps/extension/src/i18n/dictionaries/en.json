@@ -1,4 +1,7 @@
 {
+  "展开全部 {0} 个网站": "Show all {0} sites",
+  "收起网站": "Show fewer sites",
+  "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Only checked sites matching the filters are searched. Changes apply to the next search.",
   "第 {0} / {1} 章 · {2}": "Chapter {0} / {1} · {2}",
   "正在补齐章节目录…": "Loading the full chapter list…",
   "章节目录尚未完整加载，请先补齐目录后重试。": "The chapter list is incomplete. Load the full list and try again.",
@@ -966,7 +969,8 @@
   "网站访问受限": "Website access restricted",
   "返回搜索": "Back to search",
   "搜索": "Search",
-  "输入名字，发现更多漫画。": "One name. More stories to discover.",
+  "全选": "Select all",
+  "反选": "Invert selection",
   "搜索方式": "Search mode",
   "直接搜索": "Search by name",
   "翻译名称搜索": "Translate and search",

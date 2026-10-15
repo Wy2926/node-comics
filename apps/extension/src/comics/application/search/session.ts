@@ -91,13 +91,21 @@ export class ComicSearchSession {
   }
   setSourceTitle(value:string){if(value===this.snapshot.sourceTitle)return;this.prepare();this.emit({sourceTitle:value});}
   setTargetLanguage(value:string){if(value===this.snapshot.requestedTitleLanguage)return;this.prepare();this.emit({requestedTitleLanguage:value});}
-  setSelected(key:string,selected:boolean){const state=this.current(key);if(!state||state.selected===selected)return;this.patchSite(key,{selected});}
-  private selected(){return this.snapshot.sites.filter(state=>state.selected);}
-  private noSites(){if(this.selected().length)return false;this.emit({phase:'needs-query',titleError:{kind:'invalid',message:msg('请先选择至少一个可搜索的网站。')}});return true;}
-  async searchWithTranslatedTitle(){
+  setSelection(selection:Readonly<Record<string,boolean>>){
+    let changed=false;
+    const sites=this.snapshot.sites.map(state=>{
+      const selected=selection[state.site.key];
+      if(typeof selected!=='boolean'||state.selected===selected)return state;
+      changed=true;return {...state,selected};
+    });
+    if(changed)this.emit({sites});
+  }
+  private selectedKeys(scope?:readonly string[]){const keys=scope&&new Set(scope);return this.snapshot.sites.filter(state=>state.selected&&(!keys||keys.has(state.site.key))).map(state=>state.site.key);}
+  private noSites(siteKeys:readonly string[]){if(siteKeys.length)return false;this.emit({titleError:{kind:'invalid',message:msg('请先选择至少一个可搜索的网站。')}});return true;}
+  async searchWithTranslatedTitle(scope?:readonly string[]){
     if(this.snapshot.titleRetryAt&&this.snapshot.titleRetryAt>this.now())return;
-    if(this.noSites())return;
-    const siteKeys=this.selected().map(state=>state.site.key);
+    const siteKeys=this.selectedKeys(scope);
+    if(this.noSites(siteKeys))return;
     const title=this.snapshot.sourceTitle.trim();
     this.prepare();
     if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title)){
@@ -118,11 +126,12 @@ export class ComicSearchSession {
       this.beginSites(result.name.trim(),siteKeys);
     }catch(error){if(this.disposed||generation!==this.generation)return;const failure=titleFailure(error,this.now());this.emit({phase:'needs-query',titleState:'error',titleError:failure,titleRetryAt:failure.retryAt});this.finishUsage('failed');}
   }
-  searchManual(value:string){
-    if(this.noSites())return;
+  searchManual(value:string,scope?:readonly string[]){
+    const siteKeys=this.selectedKeys(scope);
+    if(this.noSites(siteKeys))return;
     let query:string;
     try{query=validateSearchQuery(value);}catch(error){this.emit({titleError:titleFailure(error,this.now())});return;}
-    this.prepare();this.startUsage('direct');this.emit({query,titleState:'manual'});this.beginSites(query,this.selected().map(state=>state.site.key));
+    this.prepare();this.startUsage('direct');this.emit({query,titleState:'manual'});this.beginSites(query,siteKeys);
   }
   private beginSites(query:string,siteKeys:readonly string[]){
     this.searchId=`${this.prefix}:${this.generation}`;

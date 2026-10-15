@@ -1,4 +1,7 @@
 {
+  "展开全部 {0} 个网站": "{0} sitenin tümünü göster",
+  "收起网站": "Daha az site göster",
+  "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Yalnızca filtrelere uyan seçili sitelerde arama yapılır. Değişiklikler sonraki aramada geçerli olur.",
   "第 {0} / {1} 章 · {2}": "Bölüm {0} / {1} · {2}",
   "正在补齐章节目录…": "Tam bölüm listesi yükleniyor…",
   "章节目录尚未完整加载，请先补齐目录后重试。": "Bölüm listesi eksik. Listenin tamamını yükleyip tekrar deneyin.",
@@ -966,7 +969,8 @@
   "网站访问受限": "Website access restricted",
   "返回搜索": "Aramaya dön",
   "搜索": "Ara",
-  "输入名字，发现更多漫画。": "Bir ad. Keşfedilecek daha fazla hikâye.",
+  "全选": "Tümünü seç",
+  "反选": "Seçimi tersine çevir",
   "搜索方式": "Arama modu",
   "直接搜索": "Ada göre ara",
   "翻译名称搜索": "Çevir ve ara",

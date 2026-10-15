@@ -36,6 +36,6 @@ export function readSearchSiteSelection():Record<string,boolean> {
     return Object.fromEntries(Object.entries(saved).filter((entry):entry is [string,boolean]=>typeof entry[1]==='boolean'));
   }catch{return {};}
 }
-export function saveSearchSiteSelection(key:string,selected:boolean) {
-  try{localStorage.setItem('nc-search-sites',JSON.stringify({...readSearchSiteSelection(),[key]:selected}));}catch{/* Preference storage is optional. */}
+export function saveSearchSiteSelection(selection:Readonly<Record<string,boolean>>) {
+  try{localStorage.setItem('nc-search-sites',JSON.stringify({...readSearchSiteSelection(),...selection}));}catch{/* Preference storage is optional. */}
 }

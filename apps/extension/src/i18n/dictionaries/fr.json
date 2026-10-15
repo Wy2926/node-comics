@@ -1,4 +1,7 @@
 {
+  "展开全部 {0} 个网站": "Afficher les {0} sites",
+  "收起网站": "Afficher moins de sites",
+  "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Seuls les sites cochés correspondant aux filtres sont recherchés. Les modifications s’appliquent à la prochaine recherche.",
   "第 {0} / {1} 章 · {2}": "Chapitre {0} / {1} · {2}",
   "正在补齐章节目录…": "Chargement de la liste complète…",
   "章节目录尚未完整加载，请先补齐目录后重试。": "La liste des chapitres est incomplète. Chargez-la entièrement puis réessayez.",
@@ -966,7 +969,8 @@
   "网站访问受限": "Website access restricted",
   "返回搜索": "Retour à la recherche",
   "搜索": "Rechercher",
-  "输入名字，发现更多漫画。": "Un nom. Plus de récits à découvrir.",
+  "全选": "Tout sélectionner",
+  "反选": "Inverser la sélection",
   "搜索方式": "Mode de recherche",
   "直接搜索": "Rechercher par nom",
   "翻译名称搜索": "Traduire et rechercher",
