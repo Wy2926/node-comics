@@ -1,4 +1,4 @@
-Keiyoushi extensions-source - Madara protocol reference
+Keiyoushi extensions-source - Madara and ComiciViewer protocol reference
 
 Upstream project: keiyoushi/extensions-source
 Repository: https://github.com/keiyoushi/extensions-source
@@ -6,14 +6,16 @@ Revision: 780153a29642a57364e894bc0850c4e76619c7de
 License: Apache-2.0
 Upstream LICENSE SHA-256: b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
 
-Node Comics uses the upstream Madara sources as a protocol reference for its
-HTML parsers, bounded chapter-list requests and read-only search pagination. The front-end TypeScript
+Node Comics uses the upstream Madara and ComiciViewer sources as protocol
+references for HTML/JSON parsers, bounded chapter-list requests, read-only search
+pagination, public chapter metadata and ComiciViewer image manifests. The front-end TypeScript
 implementation extends existing Node Comics code; upstream Kotlin/APK code is
 not executed or bundled.
 This is not a complete port of the upstream engines or their source catalog.
 
 Referenced files and their SHA-256 hashes are recorded in:
 apps/extension/src/sources/shared/madara/upstream.json
+apps/extension/src/sources/shared/comici/upstream.json
 
 No tracked NOTICE file is present in the upstream repository at this revision.
 The upstream LICENSE text is reproduced verbatim below.

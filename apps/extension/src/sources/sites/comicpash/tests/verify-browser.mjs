@@ -35,6 +35,11 @@ if (!live) await context.route('https://**/*', route => {
     <a class="series-sort-link" href="${base}/1">1-2</a>${['first','second'].map(id => `<a class="series-eplist-item-link" href="/episodes/${id}"><span class="series-eplist-item-h-text">${id}</span></a>`).join('')}`});
   if (url.pathname.startsWith('/episodes/')) return route.fulfill({contentType: 'text/html', body:
     `<link rel="canonical" href="https://comicpash.jp${url.pathname}"><meta property="og:title" content="Fixture chapter"><div id="comici-viewer" data-api-domain="/api" data-series-id="fixture" data-comici-viewer-id="${viewer}"></div>`});
+  if (url.pathname.startsWith('/api/episodes/')) {
+    const id = url.pathname.split('/').at(-1);
+    return route.fulfill({json: {episode: {id, series: {id: 'fixture'}, summary: {id, title: 'Fixture chapter'},
+      contentId: 24, access: {episodeId: id, hasAccess: true}, content: [{type: 'viewer', viewerId: viewer}]}}});
+  }
   if (url.pathname === '/api/book/contentsInfo') return route.fulfill({json: {totalPages: 3, scrollDirection: '横',
     result: Array.from({length: Number(url.searchParams.get('page-to')) + 1}, (_, sort) => ({sort, width: 720, height: 1024,
       scramble: JSON.stringify(Array.from({length: 16}, (_, i) => 15 - i)), imageUrl: `https://viewer.comicpash.jp/book/${viewer}/${sort}.png`}))}});
@@ -68,12 +73,13 @@ try {
   const details = await reader.evaluate(async () => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const comic = (await catalog.list('comics'))[0], entries = await catalog.listEntries(comic.id, {limit: 10000}), entry = entries.find(e => e.indexState === 'ready');
-    return {comicId: comic.id, entryId: entry.id, chapters: entries.length, total: entry.pageCount, complete: entry.discoveryComplete};
+    return {comicId: comic.id, title: comic.title, entryId: entry.id, chapters: entries.length, total: entry.pageCount, complete: entry.discoveryComplete};
   });
   assert(details.complete); assert(details.total > 0); assert.equal(created.length, before + 1);
   await site.close(); checks.push('Embedded button imports a complete catalog and chapter without acquisition tabs');
   for (let n = 1; n <= details.total; n++) {
     await reader.getByLabel('跳转页码').fill(String(n), {force: true});
+    await reader.getByLabel('跳转页码').press('Enter');
     await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, n - 1, {timeout: 60000});
     if (n === 1 || n === details.total) await reader.screenshot({path: path.join(out, `reader-${n}.png`)});
   }
@@ -87,12 +93,13 @@ try {
     assert.deepEqual(pixels, [0,255,100,255]);checks.push('Decoded synthetic pixels match the expected original tile');
   }
   const restore = Math.min(details.total, 10); await reader.getByLabel('跳转页码').fill(String(restore), {force: true});
+  await reader.getByLabel('跳转页码').press('Enter');
   await reader.waitForFunction(async ({id, index}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js')), entry = await catalog.get('entries', id), pages = await catalog.listPages(entry.contentId);
     return (await catalog.get('positions', id))?.pageId === pages[index]?.pageId;
   }, {id: details.entryId, index: restore - 1});
   const route = reader.url();await reader.close();failImages = true;reader = await context.newPage();await reader.goto(route);
-  await reader.getByRole('button', {name: /继续阅读/}).click();
+  await reader.getByRole('button', {name: '打开漫画 ' + details.title, exact: true}).click();
   await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, restore - 1);
   await reader.screenshot({path: path.join(out, 'reopened.png')});checks.push('Reopening restores reading position and cached images');
   if (!live) {

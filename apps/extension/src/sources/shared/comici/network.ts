@@ -64,18 +64,27 @@ export function comiciNetwork(site: ComiciSite) {
     context.signal?.throwIfAborted();
     return value;
   }
-  function parseReader(raw: string, url: string) {
-    const html = inertHtml(raw), loc = location(url);
+  function parseEpisode(raw: string, url: string) {
+    const loc = location(url);
     if (!loc.episodeId) throw changed();
-    canonical(html, url);
-    const viewers = tags(html, 'div').filter(attrs => attrs.id === 'comici-viewer');
-    const viewer = viewers[0];
-    if (viewers.length !== 1 || !/^[a-f\d]{32}$/.test(viewer['data-comici-viewer-id'] ?? '') ||
-      !/^[a-zA-Z0-9]+$/.test(viewer['data-series-id'] ?? ''))
-      throw Error(`${site.name} 未提供可读取的正文，请在源站确认登录、免费范围或购买状态。`);
-    if (viewer['data-api-domain'] !== '/api' || loc.seriesId && loc.seriesId !== viewer['data-series-id']) throw changed();
-    return {viewerId: viewer['data-comici-viewer-id'], seriesId:viewer['data-series-id'],
-      title: tags(html, 'meta').find(attrs => attrs.property === 'og:title')?.content?.slice(0, 2048) || `${site.name} ${loc.episodeId}`};
+    // Public chapter metadata is smaller than reader HTML and also identifies locked chapters.
+    // Never infer access from a leaked viewer ID or attempt the source's unlock/purchase APIs.
+    let body;
+    try { body = JSON.parse(raw); } catch { throw changed(); }
+    const episode = body?.episode;
+    if (!episode || episode.id !== loc.episodeId || episode.summary?.id !== loc.episodeId ||
+      typeof episode.series?.id !== 'string' || !/^[a-zA-Z0-9]+$/.test(episode.series.id) ||
+      loc.seriesId && loc.seriesId !== episode.series.id ||
+      typeof episode.summary.title !== 'string' || !episode.summary.title.trim() || episode.summary.title.length > 2048 ||
+      !Number.isSafeInteger(episode.contentId) || episode.contentId < 1 ||
+      episode.access?.episodeId !== loc.episodeId || typeof episode.access.hasAccess !== 'boolean' ||
+      !Array.isArray(episode.content) || episode.content.length > 1500) throw changed();
+    const viewers = episode.content.filter((item: {type?: unknown} | null) => item?.type === 'viewer');
+    if (viewers.length > 1 || viewers.length && (typeof viewers[0].viewerId !== 'string' ||
+      !/^[a-f\d]{32}$/.test(viewers[0].viewerId))) throw changed();
+    return {seriesId: episode.series.id as string, title: episode.summary.title.trim() as string,
+      contentId: episode.contentId as number, hasAccess: episode.access.hasAccess as boolean,
+      viewerId: viewers[0]?.viewerId as string | undefined};
   }
   type Contents = {totalPages: number; scrollDirection: string; result: Array<{sort: number; width: number; height: number; scramble: string; imageUrl: string}>};
   function parseContents(raw: string, viewerId: string) {
@@ -104,7 +113,7 @@ export function comiciNetwork(site: ComiciSite) {
     async resolveCatalog(url,context){
       const loc=location(url);
       if(!loc.episodeId)throw changed();
-      return catalogUrl(parseReader(await request(context,episodeUrl(loc.episodeId)),url).seriesId);
+      return catalogUrl(parseEpisode(await request(context, `${origin}/api/episodes/${loc.episodeId}`), url).seriesId);
     },
     async catalog(url, context) {
       const loc = location(url);
@@ -135,8 +144,10 @@ export function comiciNetwork(site: ComiciSite) {
     async pages(url, context): Promise<SourceSnapshot> {
       const loc = location(url);
       if (!loc.episodeId) throw changed();
-      const reader = parseReader(await request(context, episodeUrl(loc.episodeId)), url);
-      const endpoint = `${origin}/api/book/contentsInfo?user-id=&comici-viewer-id=${reader.viewerId}&page-from=0&page-to=`;
+      const reader = parseEpisode(await request(context, `${origin}/api/episodes/${loc.episodeId}`), url);
+      if (!reader.hasAccess || !reader.viewerId)
+        throw Error(`${site.name} 未提供可读取的正文，请在源站确认登录、免费范围或购买状态。`);
+      const endpoint = `${origin}/api/book/contentsInfo?user-id=&comici-viewer-id=${reader.viewerId}&contentId=${reader.contentId}&page-from=0&page-to=`;
       const first = parseContents(await request(context, endpoint + '0'), reader.viewerId);
       const full = first.total === 1 ? first : parseContents(await request(context, endpoint + (first.total - 1)), reader.viewerId);
       if (full.total !== first.total || full.direction !== first.direction || full.items.length !== full.total ||
@@ -145,5 +156,5 @@ export function comiciNetwork(site: ComiciSite) {
         knownTotal: full.total, note: '', items: full.items};
     },
   } satisfies SourceNetwork;
-  return {network, search, searchUrl, parseSearch, parseCatalogPage, parseReader, parseContents};
+  return {network, search, searchUrl, parseSearch, parseCatalogPage, parseEpisode, parseContents};
 }

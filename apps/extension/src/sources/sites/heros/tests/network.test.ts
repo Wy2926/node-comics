@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {catalogUrl, definition, episodeUrl, origin} from '../definition';
-import {network, parseCatalogPage, parseContents, parseReader, parseSearch, searchUrl} from '../network';
+import {network, parseCatalogPage, parseContents, parseEpisode, parseSearch, searchUrl} from '../network';
 import {sourceFor, validateSourceCatalog} from '../../../index';
 import {validateSearchPage} from '../../../core/search';
 
@@ -11,8 +11,8 @@ const catalog = (ids: string[], last = false) => `<link rel="canonical" href="${
   <img class="series-h-img" src="https://cdn-public.comici.jp/series/fixture/cover.webp">
   <a class="series-sort-link" href="${base}/new">最新話から</a><a class="series-sort-link" href="${base}${last ? '/1' : ''}">1<!-- -->-<!-- -->2</a>
   <a class="series-sort-link">...</a><a class="series-sort-link" href="${base}${last ? '' : '/2'}">3-3</a>${ids.map(entry).join('')}`;
-const reader = `<link rel="canonical" href="${episodeUrl(episode)}"><meta property="og:title" content="Chapter">
-  <div id="comici-viewer" data-api-domain="/api" data-series-id="${series}" data-comici-viewer-id="${viewer}"></div>`;
+const reader = JSON.stringify({episode: {id: episode, series: {id: series}, summary: {id: episode, title: 'Chapter'},
+  contentId: 50, access: {episodeId: episode, hasAccess: true}, content: [{type: 'viewer', viewerId: viewer}]}});
 const row = (sort: number) => ({sort, width: 844, height: 1200,
   scramble: '[11,13,9,10,1,5,15,0,14,6,4,3,2,7,8,12]',
   imageUrl: `https://comicsviewer.heros-web.com/book/${viewer}/page.jpg?signature=synthetic`});
@@ -65,12 +65,12 @@ describe("HERO'S Web comici adapter", () => {
     await expect(network.catalog(base, {request, previous})).rejects.toThrow();
     expect(JSON.stringify(previous)).toBe(before);
   });
-  it('rejects foreign canonical, viewer/API ownership and inert fake markup', () => {
-    expect(() => parseReader(reader.replace('data-series-id="fixture"', 'data-series-id="foreign"'), url)).toThrow();
-    expect(() => parseReader(reader.replace('data-api-domain="/api"', 'data-api-domain="https://evil.test"'), url)).toThrow();
-    expect(() => parseReader(reader.replace('/episodes/first', '/episodes/other'), url)).toThrow();
-    expect(() => parseReader(reader.replace('<div', '<!-- <div').replace('</div>', '</div> -->'), url)).toThrow();
-    expect(() => parseReader(`<link rel="canonical" href="${episodeUrl(episode)}"><p>ログイン</p>`, url)).toThrow('源站');
+  it('rejects foreign episode/series ownership, malformed viewers and non-JSON responses', () => {
+    expect(() => parseEpisode(reader.replace('"id":"fixture"', '"id":"foreign"'), url)).toThrow();
+    expect(() => parseEpisode(reader.replace(viewer, 'invalid'), url)).toThrow();
+    expect(() => parseEpisode(reader.replaceAll('"first"', '"other"'), url)).toThrow();
+    expect(() => parseEpisode('<html>Verify</html>', url)).toThrow();
+    expect(() => parseEpisode('{}', url)).toThrow();
     expect(() => parseCatalogPage(catalog(['first']).replace('/episodes/first', 'https://evil.test/episodes/first'), base)).toThrow();
   });
   it('keeps original page order and repeated URLs; only accepts source-owned images', async () => {

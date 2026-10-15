@@ -81,6 +81,8 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 [Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga 和 Monopoly Scan 显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
 
+[ComiciViewer](../apps/extension/src/sources/shared/comici/README.md) 复用既有 Comici 搜索、编号目录、canvas 与图块还原，按相同共享边界接入 Comic PASH、HERO'S Web、Comic RIDE、COMIC リュウ、Young Animal 和 Champion Cross。公开章节 API 负责归属及访问校验，站点保留各自图片主机策略；上游来源、已实现协议与未支持变体以引擎目录为准，不声明上游所有站点可用。
+
 ## 验收与交付
 
 在 `apps/extension` 执行：
@@ -118,6 +120,10 @@ npm run build
 | [再漫画](../apps/extension/src/sources/sites/zaimanhua/README.md) | 原创／日漫名称搜索、完整网页分组目录、公开免费正文／封面与 12 小时更新；作品／章节浮动导入，标签页识图复用通用规则，不自动购买或解锁 |
 | [Comic PASH](../apps/extension/src/sources/sites/comicpash/README.md) | HTTP 完整分页目录／章节、图片还原、12 小时更新；嵌入作品导入入口；网页已渲染 canvas 原位翻译 |
 | [HERO'S Web](../apps/extension/src/sources/sites/heros/README.md) | HTTP 名称搜索、完整编号目录／正文／封面、12 小时更新；裸章节归属和浮动导入入口，与 Comic PASH 复用 Comici 图片还原及正文 canvas 识别 |
+| [Comic RIDE / ライコミ](../apps/extension/src/sources/sites/comicride/README.md) | ComiciViewer 名称搜索、完整编号目录／公开正文／封面、图块还原与 12 小时更新；作品／章节浮动导入、正文 canvas 识别 |
+| [COMIC リュウ](../apps/extension/src/sources/sites/comicryu/README.md) | ComiciViewer 名称搜索、完整编号目录／公开正文／封面、图块还原与 12 小时更新；作品／章节浮动导入、正文 canvas 识别 |
+| [Young Animal](../apps/extension/src/sources/sites/younganimal/README.md) | ComiciViewer 名称搜索、完整编号目录／公开正文／封面、图块还原与 12 小时更新；作品／章节浮动导入、正文 canvas 识别 |
+| [Champion Cross](../apps/extension/src/sources/sites/championcross/README.md) | ComiciViewer 名称搜索、完整编号目录／公开正文／封面、图块还原与 12 小时更新；作品／章节浮动导入、正文 canvas 识别 |
 | [MangaDex](../apps/extension/src/sources/sites/mangadex/README.md) | HTTP 多语言目录与章节、同话候选、作品封面、12 小时更新；章节 UUID 独立身份，图片内容标识不依赖临时服务器地址 |
 | [ComicK (comickz)](../apps/extension/src/sources/sites/comickz/README.md) | HTTP 名称搜索、完整多语言分页目录／正文／封面与 12 小时同步；同卷同话候选、网页浮动导入，标签页翻译沿用通用图片识别 |
 | [MangaTaro](../apps/extension/src/sources/sites/mangataro/README.md) | HTTP 分页名称搜索、完整多语言目录／正文／封面与 12 小时更新；同话发布候选、作品／章节浮动导入，标签页识图复用通用规则 |

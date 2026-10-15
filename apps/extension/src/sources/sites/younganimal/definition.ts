@@ -1,0 +1,33 @@
+import type {SourceDefinition} from '../../contracts/definition';
+import installation from './installation.json';
+import icon from './icon.svg?inline';
+
+export const origin = 'https://younganimal.com';
+export const catalogUrl = (id: string) => `${origin}/series/${id}`;
+export const episodeUrl = (id: string, series?: string) => `${origin}/episodes/${id}${series ? '#nodelane-younganimal=' + series : ''}`;
+export function younganimalLocation(url: URL) {
+  if (url.origin !== origin || url.username || url.password) return null;
+  const series = /^\/series\/([a-zA-Z0-9]+)(?:\/(?:[1-9]\d*|new|old))?\/?$/.exec(url.pathname);
+  if (series) return {seriesId: series[1], episodeId: undefined};
+  const episode = /^\/episodes\/([a-zA-Z0-9]+)(?:\/(?:[1-9]\d*|new|old))?\/?$/.exec(url.pathname);
+  if (!episode) return null;
+  const binding = /^#nodelane-younganimal=([a-zA-Z0-9]+)$/.exec(url.hash);
+  if (url.hash.startsWith('#nodelane-younganimal') && !binding) return null;
+  return {seriesId: binding?.[1], episodeId: episode[1]};
+}
+export const definition: SourceDefinition = {
+  id: 'younganimal', name: 'Young Animal / ヤングアニマル', installation,
+  sites: [{id: 'younganimal', name: 'Young Animal / ヤングアニマル', url: origin + '/', icon, adaptedOn: '2026-10-15',
+    pricing: 'freemium', isRaw: true, contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
+  capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
+  embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720},
+  identify(url) {
+    if (url.origin !== origin || url.username || url.password) return null;
+    const loc = younganimalLocation(url);
+    if (!loc) return {sourceId: this.id, kind: 'other', url: url.href, pageKey: this.id + ':' + url.href};
+    const key = loc.seriesId && 'younganimal:series:' + loc.seriesId;
+    return {sourceId: this.id, kind: loc.episodeId ? 'reader' : 'catalog', url: url.href,
+      pageKey: loc.episodeId ? 'younganimal:episode:' + loc.episodeId : key!,
+      ...(key ? {catalog: {key, url: catalogUrl(loc.seriesId!)}} : {})};
+  },
+};

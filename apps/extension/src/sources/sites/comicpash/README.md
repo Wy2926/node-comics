@@ -5,7 +5,7 @@
 支持 HTTPS `comicpash.jp`／`www.comicpash.jp` 的 `/series/<id>` 作品目录、数字分页及 new／old 排序地址，以及 `/episodes/<id>` 章节。首页、搜索等只认领为非阅读页面，不把封面或推荐图当正文。
 
 - 作品导入：HTTP 读取完整只读目录、按源站顺序阅读、每 12 小时检查更新。具备浏览器网站访问权限时在作品页 `.series-act` 嵌入导入／管理按钮；也可在插件中粘贴作品或章节链接导入。
-- 章节读取：HTTP 获取完整页序、按需下载并还原原始分辨率图片，不依赖来源标签页。裸章节先通过已有 viewer 元数据解析所属作品，再核对完整目录包含当前章节；弹窗和粘贴链接均复用作品身份。
+- 章节读取：HTTP 获取完整页序、按需下载并还原原始分辨率图片，不依赖来源标签页。裸章节先通过公开章节 API 解析所属作品，再核对完整目录包含当前章节；弹窗和粘贴链接均复用作品身份。
 - 标签页翻译：读取 Comici 正文容器内已渲染 canvas，排除广告、空白、点赞和结束页。窗口快照保持部分状态；完整章节导入使用独立网络通道。尺寸、画布替换／重绘、viewer 身份和导航变化使旧读取失效。
 - 来源网站、正文 `viewer.comicpash.jp` 与图片 CDN 遵循[公共权限规则](../../../../../../docs/SITE_ADAPTERS.md#必须保持的约束)，不逐站弹授权；浏览器撤权后取消页面入口登记。
 
@@ -15,7 +15,7 @@
 
 ## 来源协议
 
-章节 HTML 提供 `data-comici-viewer-id`、`data-series-id` 与 `/api`；目录生成的章节地址使用本地 `#nodelane-comicpash=<series>` 绑定作品，读取时核对实际归属。`GET /api/book/contentsInfo` 的公开请求带空 `user-id`，先读页数，再读取完整范围，核对总数、sort 连续页序、尺寸、正文主机和 `/book/<viewer-id>/` 归属。签名地址只随来源清单使用，不写入仓库样本或验证报告。
+`GET /api/episodes/<id>` 提供章节／作品身份、访问判定、`contentId` 和 viewer ID；目录生成的章节地址使用本地 `#nodelane-comicpash=<series>` 绑定作品，读取时核对实际归属。只有源站 `access.hasAccess` 为真且提供 viewer 时才继续获取正文。`GET /api/book/contentsInfo` 的公开请求带空 `user-id`、`contentId` 和 viewer ID，先读页数，再读取完整范围，核对总数、sort 连续页序、尺寸、正文主机和 `/book/<viewer-id>/` 归属。签名地址只随来源清单使用，不写入仓库样本或验证报告。
 
 目录、搜索、canvas 生命周期与图片还原显式复用 [Comici 共享实现](../../shared/comici/README.md)，本站的主机和作品／图片归属校验仍在 `definition.ts`／`protocol.ts`。图片使用 4×4、按列枚举的 tile permutation；`image.ts` 经公共图片管线还原为 PNG，匹配网页 viewer 的余边处理，并保留已有 `comici-v1` 清单标记。实现依据 [源站 viewer.js](https://comicpash.jp/js/viewer/viewer.js)，参考脚本 SHA-256：`ba9199d3996e4e8feca4d36bfd82e9d185aa7b2310f7b4f3273290bda68fc06a`。只独立实现已观察的协议，不执行或分发源站脚本；无新增第三方解码组件、模型、字体或权重。
 
@@ -32,10 +32,13 @@ node scripts/verify_comicpash.mjs
 Remove-Item Env:RUN_LIVE_COMICPASH
 node scripts/verify_inline_translation.mjs
 node apps/extension/src/sources/sites/comicpash/tests/verify-search-http.mjs
+node apps/extension/src/sources/sites/comicpash/tests/verify-http.mjs
 ```
 
 `verify_comicpash` 默认使用隔离目录／接口和自制 tile 图片，检查站内入口、完整导入、实际像素还原、关闭源站取图、重开位置恢复、来源失败及目录重试。真实开关仅读取公开来源，模型和产品 API 不参与；截图和脱敏报告在忽略目录 `artifacts/comicpash-validation/`。
 
 `verify-search-http.mjs` 独立检查真实搜索、空结果及下一页，报告在 `artifacts/comicpash/search-http/`；不证明目录导入、受限内容、浏览器权限或模型效果。
+
+`verify-http.mjs` 额外检查两个作品的完整目录、裸章节归属、正文清单、首图字节和封面。基于真实源站的 MV3 导入、图片还原与阅读位置验收入口，以及固定上游来源和许可，见[共享引擎](../../shared/comici/README.md)。
 
 浏览器使用隔离 profile；安装权限与撤权恢复、Firefox 运行、受限章节和真实翻译模型效果需分别验收，不能以公开样本或模拟结果代替。

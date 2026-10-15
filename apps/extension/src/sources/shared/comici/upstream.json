@@ -1,0 +1,90 @@
+{
+  "repository": "https://github.com/keiyoushi/extensions-source",
+  "commit": "780153a29642a57364e894bc0850c4e76619c7de",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "distributionPath": "apps/extension/public/licenses/keiyoushi-extensions-source.txt",
+    "noticeFile": null
+  },
+  "usage": "Protocol reference only. The TypeScript implementation reuses Node Comics' existing Comici catalog, search, canvas and image modules; upstream Kotlin/APK code and downloaded source scripts are not executed or bundled.",
+  "scope": "Public title-only search, numbered HTML catalogs, public episode JSON identity/access/contentId, contentsInfo viewer manifests and 4x4 column-major image permutations for Comic PASH, HERO'S Web, Comic RIDE, COMIC Ryu, Young Animal and Champion Cross. JSON catalog pagination, image-only episode content, account/JWT operations, unlock/purchase APIs, rankings and other upstream sites are not implemented or claimed compatible.",
+  "files": [
+    {
+      "path": "lib-multisrc/comiciviewer/src/eu/kanade/tachiyomi/multisrc/comiciviewer/ComiciViewer.kt",
+      "sha256": "56881f8ac6c5cfd0b7693e4d214a748fca7f7e1312399d16bdc951791ce512d8",
+      "purpose": "Public episode and contentsInfo endpoints, contentId and explicit chapter access; existing HTML catalogs are retained, without account or unlocking requests."
+    },
+    {
+      "path": "lib-multisrc/comiciviewer/src/eu/kanade/tachiyomi/multisrc/comiciviewer/Dto.kt",
+      "sha256": "cd3853a8dccc2d409914a7b0e642f075da5e5eff797d4d60aa296281ceefc9e7",
+      "purpose": "Reference for episode identity, series, summary, access, contentId and viewer content fields; not a complete DTO port."
+    },
+    {
+      "path": "lib-multisrc/comiciviewer/src/eu/kanade/tachiyomi/multisrc/comiciviewer/ImageInterceptor.kt",
+      "sha256": "09cb46898483fdc082c8590fdb6c72ce366b0e67dd96c9d3d1ee7df5c37466c3",
+      "purpose": "Cross-check of the existing 4x4 column-major permutation; Node Comics retains its comici-v1 format and source-viewer transparent remainder behavior, not the upstream edge-copy implementation."
+    },
+    {
+      "path": "src/ja/comicpash/src/eu/kanade/tachiyomi/extension/ja/comicpash/ComicPash.kt",
+      "sha256": "f31ad53e8fe5f1f9e82e1008e03df7baf9f66cf33895fa44d3745c85b23a8268",
+      "purpose": "Comic PASH's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/comicpash/build.gradle.kts",
+      "sha256": "baa0dedf70ae4ac337de43060e04eb1b6b35ceb9bfb03d3eda14b4f4de303145",
+      "purpose": "Comic PASH source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/herosweb/src/eu/kanade/tachiyomi/extension/ja/herosweb/HerosWeb.kt",
+      "sha256": "4f1b10c222c91036cab1498dd2c77a234112c240e2db63b03936d2639b481f89",
+      "purpose": "HERO'S Web's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/herosweb/build.gradle.kts",
+      "sha256": "e3e36289b69c1d958eefceb5208fcb760af074b129a71d54f567b082833de9a5",
+      "purpose": "HERO'S Web source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/comicride/src/eu/kanade/tachiyomi/extension/ja/comicride/ComicRide.kt",
+      "sha256": "73be6dd8add5cb97a85acb8a58ec19c9ea0a58def91b7ce0a551c5d20c5af00e",
+      "purpose": "Comic RIDE's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/comicride/build.gradle.kts",
+      "sha256": "db022d57c52cbff5439d62c652c693560a3cc43ebe2f4b6f721dc7a884829a0a",
+      "purpose": "Comic RIDE source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/comicryu/src/eu/kanade/tachiyomi/extension/ja/comicryu/ComicRyu.kt",
+      "sha256": "24b08e5899567e6ca7fe0a9909e0de12663c2c372327f0f15302e09c9ca2860a",
+      "purpose": "COMIC Ryu's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/comicryu/build.gradle.kts",
+      "sha256": "fba526a5b5b57220c0fece903afcec4d5679ef4070b61737b414442658e9bbbb",
+      "purpose": "COMIC Ryu source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/younganimal/src/eu/kanade/tachiyomi/extension/ja/younganimal/YoungAnimal.kt",
+      "sha256": "5d00683e124e9476e7657c9cc3221a3be35d3428f15f62da1f3167e08a5f2906",
+      "purpose": "Young Animal's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/younganimal/build.gradle.kts",
+      "sha256": "a2329523b64e8a3a274cd87a33ecbf61894d95ae9294e116718310c51b4f768e",
+      "purpose": "Young Animal source domain and Japanese language declaration."
+    },
+    {
+      "path": "src/ja/championcross/src/eu/kanade/tachiyomi/extension/ja/championcross/ChampionCross.kt",
+      "sha256": "1015d125b1f04b534d436b53317d3a483cd69f29239edf42ce8e027c009953da",
+      "purpose": "Champion Cross's explicit ComiciViewer inheritance."
+    },
+    {
+      "path": "src/ja/championcross/build.gradle.kts",
+      "sha256": "8524dd90fef5aedcda1973cfa353b35e84ed3bf949f4b80889da59ca7784b0ee",
+      "purpose": "Champion Cross source domain and Japanese language declaration."
+    }
+  ]
+}

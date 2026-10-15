@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {network, parseContents, parseReader} from '../network';
+import {network, parseContents, parseEpisode} from '../network';
 import {definition, episodeUrl} from '../definition';
 import {validateSourceCatalog} from '../../../index';
 
@@ -9,15 +9,16 @@ const heading = `<link rel="canonical" href="${base}"><meta property="og:title" 
 const paging = `<a class="series-sort-link" href="${base}">1<!-- -->-<!-- -->2</a><a class="series-sort-link" href="${base}/2">3-3</a>`;
 const entry = (id: string) => `<a class="series-eplist-item-link" href="/episodes/${id}"><span class="series-eplist-item-h-text">Chapter ${id}</span></a>`;
 const html = (ids: string[]) => heading + paging + ids.map(entry).join('');
-const reader = `<link rel="canonical" href="${episodeUrl(episode)}"><meta property="og:title" content="Chapter"><div id="comici-viewer" data-comici-viewer-id="${viewer}" data-series-id="${series}" data-api-domain="/api"></div>`;
+const reader = JSON.stringify({episode: {id: episode, series: {id: series}, summary: {id: episode, title: 'Chapter'},
+  contentId: 24, access: {episodeId: episode, hasAccess: true}, content: [{type: 'viewer', viewerId: viewer}]}});
 const row = (sort: number) => ({sort, width: 720, height: 1024, scramble: JSON.stringify(Array.from({length: 16}, (_, i) => 15 - i)),
   imageUrl: `https://viewer.comicpash.jp/book/${viewer}/page.jpg?signature=synthetic`});
 const contents = (sorts = [0, 1]) => ({totalPages: 2, scrollDirection: '横', result: sorts.map(row)});
 describe('Comic PASH public network source', () => {
-  it('resolves the series from validated viewer metadata without requesting the image API',async()=>{
+  it('resolves the series from validated episode metadata without requesting the image API',async()=>{
     const request=vi.fn(async()=>reader);
     expect(await network.resolveCatalog!(episodeUrl(episode),{request})).toBe(base);
-    expect(request).toHaveBeenCalledExactlyOnceWith(episodeUrl(episode));
+    expect(request).toHaveBeenCalledExactlyOnceWith('https://comicpash.jp/api/episodes/' + episode);
     await expect(network.resolveCatalog!(episodeUrl(episode,'foreign'),{request})).rejects.toThrow();
     await expect(network.resolveCatalog!(episodeUrl(episode),{request:async()=>heading})).rejects.toThrow();
     const controller=new AbortController();request.mockImplementationOnce(async()=>{controller.abort();return reader;});
@@ -83,8 +84,8 @@ describe('Comic PASH public network source', () => {
     expect(() => parseContents(JSON.stringify(body), viewer)).toThrow();
   });
   it('rejects restricted readers, cross-series bindings and changing/incomplete page counts', async () => {
-    expect(() => parseReader(heading, url)).toThrow();
-    expect(() => parseReader(reader, episodeUrl(episode, 'foreign'))).toThrow();
+    expect(() => parseEpisode(heading, url)).toThrow();
+    expect(() => parseEpisode(reader, episodeUrl(episode, 'foreign'))).toThrow();
     await expect(network.pages(url, {request: async u => u.includes('/episodes/') ? reader : JSON.stringify(contents([0]))})).rejects.toThrow();
   });
   it('honors cancellation before and after requests', async () => {
