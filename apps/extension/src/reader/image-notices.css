@@ -1,3 +1,16 @@
+.nc-image-failure { padding: 22px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; max-width: 420px; background: var(--surface); color: var(--ink); }
+.nc-image-failure.over-image { position: absolute; bottom: 24px; max-width: calc(100% - 32px); }
+.nc-image-failure p { font-size: var(--text-small); color: var(--muted); }
+.nc-image-translation { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 20px); padding: 8px 12px; font-family: inherit; font-size: var(--text-caption); font-weight: 500; line-height: 1.5; text-align: left; }
+.nc-translation-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-translation-retry { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font-weight: 650; }
+.nc-app .nc-image-translation { background: var(--surface); color: var(--ink); border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-image-translation.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); box-shadow: 2px 2px 0 var(--danger); }
+.nc-app .nc-image-translation.upgrade { background: var(--comic-warning-paper); color: var(--comic-warning-ink); border-color: var(--comic-warning-ink); }
+.nc-image-translation:is(.upgrade,.error,.login) { cursor: pointer; }
+button.nc-image-translation:hover { box-shadow: var(--comic-shadow); }
+button.nc-image-translation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nc-app .nc-image-failure { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
 .nc-app .nc-image-translation.is-dismissible {
   gap: 0;
   padding: 0;

@@ -8,6 +8,7 @@ vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(),registerInlineBackground:vi.fn()}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(),registerRegionBackground:vi.fn()}));
+vi.mock('../src/immersive/background',()=>({registerImmersiveBackground:vi.fn()}));
 vi.mock('../src/host-permissions',()=>({requireHostAccess:vi.fn(async()=>{})}));
 vi.mock('../src/sources/runtime/image-headers',()=>({recoverImageHeaders:async()=>{}}));
 

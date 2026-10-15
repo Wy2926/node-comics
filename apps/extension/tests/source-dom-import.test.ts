@@ -4,6 +4,7 @@ vi.mock('../src/sources/registry/networks',()=>({sourceNetworks:{}}));
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({activateInline:vi.fn(),registerInlineBackground:vi.fn()}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(),registerRegionBackground:vi.fn()}));
+vi.mock('../src/immersive/background',()=>({registerImmersiveBackground:vi.fn()}));
 import {registerSourceBackground} from '../src/sources/runtime/background';
 vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 const url='https://comic.naver.com/webtoon/list?titleId=123',reader='https://comic.naver.com/webtoon/detail?titleId=123&no=1';

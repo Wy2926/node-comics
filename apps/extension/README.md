@@ -1,6 +1,6 @@
 # Node Comics 插件
 
-WXT + React + TypeScript，提供桌面及手机布局的浏览器阅读器、单来源书架与网页原位翻译。手机适配面向 Firefox Android 与 iOS Orion，界面共用视觉令牌及业务流程；浏览器 API 和真机验收边界见[手机布局](../../docs/POPUP_AND_THEME.md#手机布局与浏览器能力)。
+WXT + React + TypeScript，提供桌面及手机布局的浏览器阅读器、单来源书架、网页原位翻译与[标签页沉浸阅读](../../docs/IN_PAGE_TRANSLATION.md#标签页沉浸阅读)。手机适配面向 Firefox Android 与 iOS Orion，界面共用视觉令牌及业务流程；浏览器 API 和真机验收边界见[手机布局](../../docs/POPUP_AND_THEME.md#手机布局与浏览器能力)。
 
 ## 运行与构建
 

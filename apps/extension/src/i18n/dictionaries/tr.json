@@ -1,4 +1,9 @@
 {
+  "返回网页": "Web sitesine dön",
+  "选择正文区域": "Çizgi roman alanını seç",
+  "已识别 {0} 张，可能不完整。": "{0} görsel bulundu; bölüm eksik olabilir.",
+  "点击漫画正文区域，Esc 取消。": "Çizgi roman alanına tıklayın. İptal için Esc tuşuna basın.",
+  "加入书架": "Kitaplığa ekle",
   "展开全部 {0} 个网站": "{0} sitenin tümünü göster",
   "收起网站": "Daha az site göster",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Yalnızca filtrelere uyan seçili sitelerde arama yapılır. Değişiklikler sonraki aramada geçerli olur.",

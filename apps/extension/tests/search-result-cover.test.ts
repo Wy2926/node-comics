@@ -4,7 +4,8 @@ import type {SourceSearchResult} from '../src/sources/contracts/search';
 // Exercise the component's effects and real request pool without a browser DOM.
 const hooks=vi.hoisted(()=>({cursor:0,state:0,effects:[] as {deps:unknown[];cleanup?:()=>void}[],pending:[] as (()=>void)[]}));
 const images=vi.hoisted(()=>({read:vi.fn<(hit:SourceSearchResult,signal?:AbortSignal)=>Promise<Blob>>()}));
-vi.mock('react',()=>({
+vi.mock('react',async importOriginal=>({
+  ...await importOriginal<typeof import('react')>(),
   useRef:()=>({current:null}),
   useState:()=>[hooks.state++===0?undefined:true,()=>{}], // The cover is visible in this fixture.
   useEffect:(callback:()=>void|(()=>void),deps:unknown[])=>{

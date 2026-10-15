@@ -1,4 +1,9 @@
 {
+  "返回网页": "Volver al sitio web",
+  "选择正文区域": "Seleccionar área del cómic",
+  "已识别 {0} 张，可能不完整。": "Se encontraron {0} imágenes; el capítulo puede estar incompleto.",
+  "点击漫画正文区域，Esc 取消。": "Haz clic en el área del cómic. Pulsa Esc para cancelar.",
+  "加入书架": "Añadir a la biblioteca",
   "展开全部 {0} 个网站": "Mostrar los {0} sitios",
   "收起网站": "Mostrar menos sitios",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Solo se buscan sitios marcados que coincidan con los filtros. Los cambios se aplican a la próxima búsqueda.",

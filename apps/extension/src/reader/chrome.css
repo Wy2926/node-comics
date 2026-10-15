@@ -1,0 +1,9 @@
+/* Shared reader skin; viewport and toolbar geometry stay with each reader. */
+.nc-app .nc-reader-rail { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
+.nc-app .nc-reader { --reader-rail-border: 2px; }
+.nc-app .nc-reader-rail button { border-radius: var(--comic-control-radius); }
+.nc-app .nc-reader-rail :is(button[aria-expanded=true], button[aria-pressed=true]) { background: var(--accent-soft); outline: 1px solid var(--ink); outline-offset: -1px; color: var(--accent); }
+.nc-app .nc-reader-drawer, .nc-app .nc-translation-popover { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
+.nc-app .nc-drawer-title, .nc-app .nc-comic-directory-heading { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); border-bottom: var(--comic-perforation); }
+.nc-app .nc-translation-popover .nc-drawer-title { margin-bottom: 14px; }
+.nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }

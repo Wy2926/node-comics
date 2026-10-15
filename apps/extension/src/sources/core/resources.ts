@@ -2,6 +2,7 @@ import { msg } from '../../i18n/runtime';
 import type { PageImage } from '../contracts/page';
 import type { PageSnapshot, SourceItem, SourceSnapshot } from '../contracts/source';
 import { imageDataUrl } from '../shared/bytes';
+import {randomId} from '../../random-id';
 
 const previewBudget = 2_000_000;
 const maxPreviewBytes = 100_000;
@@ -57,7 +58,7 @@ export class PageImageRegistry {
       if (!image?.read) continue;
       let entry = this.slots.get(slot.id);
       if (!entry) {
-        entry = { ...slot, handle: 'page-image:' + crypto.randomUUID(), image, pageUrl: snapshot.url };
+        entry = { ...slot, handle: 'page-image:' + randomId(), image, pageUrl: snapshot.url };
         this.slots.set(slot.id, entry);
         this.entries.set(entry.handle, entry);
       }

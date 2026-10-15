@@ -1,32 +1,9 @@
+@import './controls.css';
+@import '../../reader/chrome.css';
 /* Full-page surfaces load after their layout styles. Popup keeps comic.css only. */
-.nc-app .button,
-.nc-app button.button.nc-comic-action {
-  border: var(--comic-border);
-  border-radius: var(--comic-control-radius);
-  box-shadow: var(--comic-shadow-small);
-  font-weight: 700;
-  transition: transform .12s, box-shadow .12s, background .12s;
-}
-.nc-app .button.primary, .nc-app button.button.nc-comic-action { box-shadow: var(--comic-shadow); border: var(--comic-border); }
-.nc-app .button.secondary, .nc-app .button.tinted { border: var(--comic-border); }
-.nc-app .button.danger { border-width: 2px; box-shadow: 2px 2px 0 var(--danger); }
-.nc-app .button.quiet { background: var(--surface); }
-.nc-app .button:hover:not(:disabled), .nc-app button.button.nc-comic-action:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: var(--comic-shadow-hover); }
-.nc-app .button:active:not(:disabled), .nc-app button.button.nc-comic-action:active:not(:disabled) { transform: translate(2px,2px); box-shadow: var(--comic-shadow-active); }
-.nc-app .button:disabled, .nc-app button.button.nc-comic-action:disabled { opacity: 1; background: var(--surface-soft); color: var(--muted); box-shadow: var(--comic-shadow-disabled); border-color: var(--line); }
-.nc-app .icon-button { border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface); }
-.nc-app .icon-button:hover { border-color: var(--ink); box-shadow: var(--comic-shadow-small); }
-.nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])),
-.nc-app textarea, .nc-app .field :is(input, textarea) { border: var(--comic-input-border); border-radius: var(--comic-control-radius); box-shadow: none; }
-.nc-app input:where(:not([type=checkbox]):not([type=range]):not([type=radio])):focus,
-.nc-app textarea:focus, .nc-app .field :is(input, textarea):focus { outline: none; border-color: var(--accent); box-shadow: none; }
-.nc-app input::placeholder, .nc-app textarea::placeholder { color: var(--muted); opacity: .8; }
 .nc-app .nc-search { border: var(--comic-input-border); border-radius: var(--comic-control-radius); background: var(--surface); padding: 0 12px; }
 .nc-app .nc-search:focus-within { border-color: var(--accent); }
 .nc-app .nc-search input, .nc-app .nc-search input:focus { border: 0; min-width: 0; box-shadow: none; outline: none; }
-.nc-app .segmented { border: var(--comic-border); border-radius: var(--comic-control-radius); gap: 5px; padding: 4px; }
-.nc-app .segmented button { border-radius: 2px; }
-.nc-app .segmented button.active { border-radius: 2px; box-shadow: var(--comic-shadow-small); color: var(--accent-on); background: var(--accent); }
 .nc-app :is(.nc-filter-chips>button, .nc-theme-options button, .nc-issue-options label, .nc-choice-card, .nc-version-filter, .nc-catalog-group-tabs>button) { border-width: 2px; border-radius: var(--comic-control-radius); }
 .nc-app :is(.nc-filter-chips>button[aria-pressed=true], .nc-theme-options button.selected, .nc-issue-options label.selected, .nc-choice-card[aria-pressed=true], .nc-version-filter[aria-pressed=true], .nc-catalog-group-tabs>button[aria-pressed=true]) { border-color: var(--ink); box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--ink); }
 .nc-app .nc-catalog-check { border: var(--comic-border); border-radius: var(--comic-control-radius); }
@@ -144,24 +121,7 @@
 .nc-app .nc-action-feedback.error { color: var(--danger); background: var(--danger-soft); border-color: var(--danger); }
 .nc-app .nc-danger-text { color: var(--danger)!important; }
 
-/* Reader chrome adopts the tokens without changing the image canvas or gutters. */
-.nc-app .nc-reader-rail { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
-.nc-app .nc-reader { --reader-rail-border: 2px; }
-.nc-app .nc-reader-rail button { border-radius: var(--comic-control-radius); }
-.nc-app .nc-reader-rail :is(button[aria-expanded=true], button[aria-pressed=true]) { background: var(--accent-soft); outline: 1px solid var(--ink); outline-offset: -1px; color: var(--accent); }
-.nc-app .nc-reader-drawer, .nc-app .nc-translation-popover { z-index: 35; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow); }
-.nc-app .nc-drawer-title, .nc-app .nc-comic-directory-heading { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); border-bottom: var(--comic-perforation); }
-.nc-app .nc-translation-popover .nc-drawer-title { margin-bottom: 14px; }
-.nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }
-.nc-app .nc-image-translation { background: var(--surface); color: var(--ink); border: var(--comic-border); border-radius: var(--comic-control-radius); box-shadow: var(--comic-shadow-small); }
-.nc-app .nc-image-translation.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); box-shadow: 2px 2px 0 var(--danger); }
-.nc-app .nc-image-translation.upgrade { background: var(--comic-warning-paper); color: var(--comic-warning-ink); border-color: var(--comic-warning-ink); }
-.nc-app .nc-image-failure { border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); }
-
-@media (prefers-reduced-motion: reduce) {
-  .nc-app .button, .nc-app button.button.nc-comic-action { transition: none; }
-  .nc-app .button:hover:not(:disabled), .nc-app .button:active:not(:disabled) { transform: none; }
-}
+.nc-app .nc-reader-drawer, .nc-app .nc-translation-popover { z-index: 35; }
 
 /* Responsive geometry stays separate from the shared color, radius and shadow tokens. */
 .nc-app fieldset { min-inline-size: 0; min-width: 0; }

@@ -1,8 +1,7 @@
 import {msg} from '../i18n/runtime';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {ReadingEntry,Settings} from '../types';
-import {scrollAnchorFor} from './model';
-import {completePageList} from '../comics/application/library-service';
+import {scrollAnchorFor,completePageList} from './model';
 import {chapterWindow,pageAtHeight,type ChapterWindow} from './virtual-window';
 import {ChapterResourceWindow} from './chapter-resources';
 import {ReadingProgress,READING_TARGETS} from '../reading-window';

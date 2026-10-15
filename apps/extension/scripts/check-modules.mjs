@@ -185,7 +185,7 @@ for (const [filename, dependencies] of graph) {
         destination === 'page.ts')
     )
       fail('core cannot import composition/runtime');
-    if ((owner || part?.startsWith('generic/')) && !destination && !relative(target).startsWith('src/i18n/'))
+    if ((owner || part?.startsWith('generic/')) && !destination && !relative(target).startsWith('src/i18n/') && to !== 'src/random-id.ts')
       fail('adapter depends on application');
     if (
       (owner || part?.startsWith('generic/')) &&
@@ -204,7 +204,8 @@ for (const [filename, dependencies] of graph) {
       part &&
       /^(shared|contracts)\//.test(part) &&
       !destination &&
-      !relative(target).startsWith('src/i18n/')
+      !relative(target).startsWith('src/i18n/') &&
+      to !== 'src/random-id.ts'
     )
       fail('utility depends on application');
   }

@@ -1,10 +1,12 @@
 /* Semantic tokens: accent choices never change status meaning or artwork. */
 :root {
   --text-scale: 1;
-  --text-caption: .75rem;
-  --text-small: .875rem;
-  --text-body: 1rem;
-  --text-title: 1.25rem;
+  /* Also used inside Shadow DOM, where rem would inherit the source site's root size. */
+  --text-base: calc(16px * var(--text-scale));
+  --text-caption: calc(var(--text-base) * .75);
+  --text-small: calc(var(--text-base) * .875);
+  --text-body: var(--text-base);
+  --text-title: calc(var(--text-base) * 1.25);
   --canvas: #f6f8fc;
   --surface: #fff;
   --surface-soft: #f0f3f8;
@@ -44,7 +46,7 @@
   --pink-light: var(--accent-soft);
   --blue: var(--accent);
   font-family: "Segoe UI","Microsoft YaHei",sans-serif;
-  font-size: calc(16px * var(--text-scale));
+  font-size: var(--text-base);
   color: var(--ink);
   background: var(--canvas);
   color-scheme: light;

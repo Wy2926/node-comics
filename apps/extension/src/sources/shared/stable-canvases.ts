@@ -1,5 +1,6 @@
 import type { PageImage, SourcePageContext } from '../contracts/page';
 import { canvasImage } from './canvas';
+import {randomId} from '../../random-id';
 
 const sampleInterval = 250, settleTime = 250, pollInterval = 500;
 interface CanvasState {
@@ -38,7 +39,7 @@ export function stableCanvasTargets(context: SourcePageContext, candidates: () =
       }
       const pixels = `${canvas.width}:${canvas.height}:` + String.fromCharCode(...data);
       const state = previous?.pixels === pixels ? previous : {
-        pixels, url: 'page-image:' + crypto.randomUUID(), sampledAt: now, changedAt: now,
+        pixels, url: 'page-image:' + randomId(), sampledAt: now, changedAt: now,
       };
       state.sampledAt = now;
       states.set(canvas, state);

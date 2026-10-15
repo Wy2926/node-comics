@@ -17,6 +17,7 @@ import {InlineAnalytics} from './analytics';
 import {bindWebShortcuts} from '../shortcuts/web-content';
 import {selectedImage,selectionCurrent,type ImageSelection} from './selection';
 import {readBlobImage} from '../sources/shared/blob-image';
+import {randomId} from '../random-id';
 
 interface Candidate {
   id: string;
@@ -36,7 +37,7 @@ interface Candidate {
   loading?: { key: string; controller: AbortController };
 }
 export function installInline() {
-  let navigationId: string = crypto.randomUUID(),
+  let navigationId: string = randomId(),
     initialUrl = location.href;
   const analytics=new InlineAnalytics((name,params,startedAt)=>track(name,params,startedAt,navigationId));
   let analyticsObservation=0;
@@ -625,7 +626,7 @@ export function installInline() {
     }
     if (message?.type === 'NC_INLINE_IDENTITY') {
       navigationId = lifecycle.current().navigationId;
-      respond({ url: location.href, navigationId, enabled, activeUrl: initialUrl, dismissedUrl });
+      respond({ url: location.href, navigationId, enabled, original, paused, activeUrl: initialUrl, dismissedUrl });
       return;
     }
     if (message?.type === 'NC_INLINE_SELECT_IMAGE') {

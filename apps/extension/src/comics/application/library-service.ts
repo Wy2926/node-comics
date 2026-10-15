@@ -180,7 +180,7 @@ export async function removeComics(ids:readonly string[]) {
 }
 export const subscribeLibrary=catalog.subscribe;
 export const markRead=catalog.markRead;
-export const completePageList=(copy:ReadingEntry)=>copy.pages.length>0&&copy.discoveryComplete&&(!copy.knownTotal||copy.knownTotal===copy.pages.length);
+export {completePageList} from '../../reader/model';
 export type {Comic,Entry};
 
 

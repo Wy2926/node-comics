@@ -599,10 +599,66 @@ describe('inline activation lifetime',()=>{
   });
 
   it.each([{enabled:true},{enabled:false,dismissedUrl:url}])('does not let automatic activation reclaim a region-owned page: %j',identity=>{
-    mocks.tabMessage.mockResolvedValue({url,...identity});
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_REGION_IDENTITY'
+      ?{url,...identity}:{url,enabled:false});
     return background.activateInline(7,true).then(()=>{
       expect(chrome.scripting.executeScript).not.toHaveBeenCalled();expect(mocks.openChannel).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('immersive activation',()=>{
+  it('prepares the new document consumer before stopping inline and retains its navigation identity',async()=>{
+    let prepared=false,navigationId='nav-7';
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>{
+      if(message.type==='NC_IMMERSIVE_PREPARE'){prepared=true;return {ok:true};}
+      if(message.type==='NC_INLINE_STOP'){if(!prepared)navigationId='retired-navigation';return {ok:true};}
+      if(message.type==='NC_IMMERSIVE_IDENTITY')return {url,navigationId,enabled:false};
+      if(message.type==='NC_INLINE_IDENTITY')return {url,navigationId,enabled:true,original:false,paused:false};
+      return {ok:true};
+    });
+    await background.activateImmersive(7);
+    const types=mocks.tabMessage.mock.calls.map(([,message])=>message.type);
+    expect(types.indexOf('NC_IMMERSIVE_PREPARE')).toBeLessThan(types.indexOf('NC_INLINE_STOP'));
+    expect(types.indexOf('NC_INLINE_STOP')).toBeLessThan(types.lastIndexOf('NC_IMMERSIVE_IDENTITY'));
+    expect(types.lastIndexOf('NC_IMMERSIVE_IDENTITY')).toBeLessThan(types.indexOf('NC_IMMERSIVE_SHOW'));
+    expect(types).not.toContain('NC_IMMERSIVE_STOP');
+    expect(session['nc-inline:7']).toEqual({url,navigationId:'nav-7',documentId:'doc-7',automatic:false,immersive:true});
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_PREPARE',translation:true},{frameId:0,documentId:'doc-7'});
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith({target:{tabId:7},files:['content-scripts/immersive.js']});
+    expect(mocks.openChannel).not.toHaveBeenCalled();
+  });
+
+  it.each([{enabled:false,original:false,paused:false},{enabled:true,original:true,paused:false},{enabled:true,original:false,paused:true}])(
+    'does not enable translation when the preceding inline view was not translating: %j',async state=>{
+      mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_INLINE_IDENTITY'
+        ?{url,navigationId:'nav-7',...state}:{url,navigationId:'nav-7',enabled:false});
+      await background.activateImmersive(7);
+      expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_PREPARE',translation:false},{frameId:0,documentId:'doc-7'});
+      expect(mocks.openChannel).not.toHaveBeenCalled();
+    });
+
+  it('does not reset an already-open immersive session or its authorization on repeated activation',async()=>{
+    const saved={url,navigationId:'nav-7',documentId:'doc-7',automatic:false,immersive:true};
+    session['nc-inline:7']=structuredClone(saved);
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_IMMERSIVE_IDENTITY'
+      ?{url,navigationId:'nav-7',enabled:true}:{ok:true});
+    await background.activateImmersive(7);
+    await background.activateImmersive(7);
+    expect(session['nc-inline:7']).toEqual(saved);
+    expect(mocks.tabMessage.mock.calls.map(([,message])=>message.type)).toEqual(['NC_IMMERSIVE_IDENTITY','NC_IMMERSIVE_IDENTITY']);
+    expect(mocks.openChannel).not.toHaveBeenCalled();
+  });
+
+  it.each([{enabled:true},{enabled:false,dismissedUrl:url}])('keeps automatic translation out of an immersive-owned or dismissed document: %j',async identity=>{
+    const saved=structuredClone(session['nc-inline:7']);
+    mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_IMMERSIVE_IDENTITY'
+      ?{url,...identity}:{url,enabled:false});
+    await background.activateInline(7,true);
+    expect(mocks.tabMessage.mock.calls.map(([,message])=>message.type)).toEqual(['NC_IMMERSIVE_IDENTITY']);
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+    expect(session['nc-inline:7']).toEqual(saved);
+    expect(mocks.openChannel).not.toHaveBeenCalled();
   });
 });
 

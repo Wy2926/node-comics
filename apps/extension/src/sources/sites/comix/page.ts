@@ -4,6 +4,7 @@ import {renderedImages} from '../../shared/dom-images';
 import {MAX_COMIC_IMAGES} from '../../shared/geometry';
 import {imageSession} from '../../shared/session';
 import {comixLocation} from './definition';
+import {randomId} from '../../../random-id';
 
 const catalogAnchor = '.mpage__actions';
 const readerAnchor = '.rpage-floatctl';
@@ -52,7 +53,7 @@ export const createPage: CreateSourcePage = context => {
         }
         if (element.tagName !== 'CANVAS' || element.width <= 0 || element.height <= 0) return [];
         let version = versions.get(element);
-        if (!version) { version = crypto.randomUUID(); versions.set(element,version); }
+        if (!version) { version = randomId(); versions.set(element,version); }
         const url = 'page-image:' + version;
         const key = `${page.dataset.page}:${element.width}:${element.height}`;
         return [{element, key, url, read: async (requestSignal?:AbortSignal) => {

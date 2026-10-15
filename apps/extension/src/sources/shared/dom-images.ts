@@ -4,6 +4,7 @@ import type { DiscoveredPage, SourceSnapshot } from '../contracts/source';
 import { comicImageRect, MAX_COMIC_IMAGES } from './geometry';
 import { safeImageUrl } from './urls';
 import { readBlobImage } from './blob-image';
+import {randomId} from '../../random-id';
 export function imageDiscovery(
   doc: Document,
   pageUrl: string,
@@ -50,7 +51,7 @@ export function imageDiscovery(
     previous = [];
     const items: DiscoveredPage[] = found.map(({ element, url, width, height }, order) => {
       const slot = retained.get(element) ?? reusable.get(url)?.pop();
-      const id = slot?.id ?? crypto.randomUUID();
+      const id = slot?.id ?? randomId();
       previous.push({ element, url, id });
       return { id, resource: { kind: 'http', url }, width, height, order };
     });

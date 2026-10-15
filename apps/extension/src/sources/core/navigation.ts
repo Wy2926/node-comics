@@ -1,6 +1,7 @@
 import type { SourceDefinition, SourceLocation } from '../contracts/definition';
 import type { CreateSourcePage, SourcePageSession } from '../contracts/page';
 import { resolveSource } from './resolve';
+import {randomId} from '../../random-id';
 export class SourceNavigation {
   private current?: {
     url: string;
@@ -35,7 +36,7 @@ export class SourceNavigation {
       session.dispose();
       throw Error('SOURCE_CAPABILITY_MISMATCH');
     }
-    this.current = { url, controller, session, location, navigationId: crypto.randomUUID() };
+    this.current = { url, controller, session, location, navigationId: randomId() };
     return this.current;
   }
   dispose() {

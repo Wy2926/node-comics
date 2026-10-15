@@ -751,18 +751,6 @@ a {
   text-align: center;
   padding: 20px;
 }
-.nc-image-failure {
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  text-align: center;
-  max-width: 420px;
-  background: var(--surface);
-  color: var(--ink);
-  border-radius: 12px;
-}
 .nc-comparison-pane > .nc-image-failure:not(.over-image) {
   align-self: flex-start;
   margin-top: min(80px, 10vh);
@@ -770,17 +758,6 @@ a {
 .nc-comparison-pane > .nc-image-placeholder {
   justify-content: flex-start;
   padding-top: min(100px, 15vh);
-}
-.nc-image-failure.over-image {
-  position: absolute;
-  bottom: 24px;
-  max-width: calc(100% - 32px);
-  box-shadow: var(--shadow);
-  border: 1px solid var(--line);
-}
-.nc-image-failure p {
-  font-size: .875rem;
-  color: var(--muted);
 }
 .nc-stream-chapter {
   display: flex;
@@ -1545,54 +1522,6 @@ a {
 .nc-ahead-field .unit-input input {
   width: 88px;
 }
-.nc-task-animation {
-  display: inline-flex;
-  flex: none;
-  vertical-align: middle;
-  color: var(--accent);
-}
-.nc-task-animation.translating {
-  height: 15px;
-  width: 15px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: nc-spin .85s linear infinite;
-}
-.nc-task-animation.waiting {
-  align-items: center;
-  gap: 3px;
-  height: 15px;
-  width: 21px;
-}
-.nc-task-animation.waiting i {
-  height: 4px;
-  width: 4px;
-  background: currentColor;
-  border-radius: 50%;
-  animation: nc-wait 1.2s ease-in-out infinite;
-}
-.nc-task-animation.waiting i:nth-child(2) {
-  animation-delay: .16s;
-}
-.nc-task-animation.waiting i:nth-child(3) {
-  animation-delay: .32s;
-}
-@keyframes nc-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes nc-wait {
-  0%,60%,100% {
-    transform: translateY(0);
-    opacity: .4;
-  }
-  30% {
-    transform: translateY(-3px);
-    opacity: 1;
-  }
-}
 /* Full-width thumbnails keep their aspect ratio; variable rows remain virtualized. */
 .nc-thumb-list {
   padding: 0 12px;
@@ -1716,14 +1645,6 @@ a {
 @media(max-width:760px) { .nc-stat-grid.nc-entitlements-grid { grid-template-columns: 1fr; } }
 
 .nc-page-picture { position:relative; }
-.nc-image-translation { position:absolute; top:10px; left:10px; z-index:2; display:flex; align-items:center; gap:8px; max-width:calc(100% - 20px); padding:8px 12px; border:1px solid rgba(255,255,255,.65); border-radius:12px; background:rgba(255,255,255,.94); color:#42526b; box-shadow:0 3px 14px #24355220; font-family:inherit; font-size:12px; font-weight:500; line-height:1.5; text-align:left; }
-.nc-translation-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.nc-image-translation.upgrade { color:#755022; background:#fff3d9; border-color:#efcf90; cursor:pointer; }
-.nc-image-translation.error,.nc-image-translation.login { cursor:pointer; }
-.nc-image-translation.error {color:#963a52;border-color:#eec5cf;background:#fff5f7}
-.nc-translation-retry {display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-weight:650}
-button.nc-image-translation:hover {box-shadow:0 4px 18px #24355235}
-button.nc-image-translation:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
 
 /* Side tools stay outside the image canvas. */
 .nc-reader {

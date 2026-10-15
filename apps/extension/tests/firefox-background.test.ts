@@ -9,6 +9,7 @@ vi.mock('../src/sources/runtime/optional-content',()=>({registerOptionalSourceCo
 vi.mock('../src/i18n/background',()=>({registerLocaleBackground:()=>async()=>{}}));
 vi.mock('../src/inline/background',()=>({registerInlineBackground:()=>{},activateInline:vi.fn()}));
 vi.mock('../src/region/background',()=>({registerRegionBackground:()=>{},activateRegion:vi.fn()}));
+vi.mock('../src/immersive/background',()=>({registerImmersiveBackground:vi.fn()}));
 vi.mock('../src/comics/application/website-catalog',()=>({readWebsiteCatalog:vi.fn()}));
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 

@@ -4,6 +4,7 @@ import { canvasImage } from '../canvas';
 import { MAX_COMIC_IMAGES } from '../geometry';
 import { imageSession } from '../session';
 import type {ComiciSite} from './config';
+import {randomId} from '../../../random-id';
 
 const pageSelector = '#comici-viewer #xCVPages > .-cv-page:not(.mode-empty)';
 const pageElements = (doc: Document) =>
@@ -53,7 +54,7 @@ export function comiciPage(context: SourcePageContext, location: ComiciSite['loc
           return [];
         let id = ids.get(canvas);
         if (!id) {
-          id = crypto.randomUUID();
+          id = randomId();
           ids.set(canvas, id);
         }
         const key = `${episode}:${order}:${canvas.width}:${canvas.height}`;

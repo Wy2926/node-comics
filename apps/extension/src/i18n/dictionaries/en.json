@@ -1,4 +1,9 @@
 {
+  "返回网页": "Back to website",
+  "选择正文区域": "Select comic area",
+  "已识别 {0} 张，可能不完整。": "Found {0} images; the chapter may be incomplete.",
+  "点击漫画正文区域，Esc 取消。": "Click the comic area. Press Esc to cancel.",
+  "加入书架": "Add to library",
   "展开全部 {0} 个网站": "Show all {0} sites",
   "收起网站": "Show fewer sites",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Only checked sites matching the filters are searched. Changes apply to the next search.",

@@ -24,14 +24,15 @@ import {enhanceImage} from '../image-processing/runtime';
 import {readProcessingSettings, activeProcessingProfile, processingIdentity, subscribeProcessingSettings} from '../image-processing/settings';
 import type {ProcessingProfile, ProcessingState} from '../image-processing/contracts';
 import {resultBlobKey} from '../storage/translations/results';
+import {currentImmersiveSession,validImmersiveImages,readImmersiveOriginal,clearImmersiveSources} from '../immersive/resources';
 
 interface WindowRequest {request:InlineRequest;sender:chrome.runtime.MessageSender;activity:RequestActivity;refreshRights:boolean;}
 interface Preparation {id:string;controller:AbortController;promise:Promise<void>;}
 interface Enhancement {key:string;controller:AbortController;blob?:Blob;parent?:Blob;state:ProcessingState;}
-interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;waitIds?:string;active:boolean;abort:AbortController;explicitImage:boolean;
+interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;settings:Settings;pages:Map<string,Page>;jobs:Job[];originals:InlineOriginals;sourceErrors:Map<string,NonNullable<InlineResult['state']>>;missingResults:Set<string>;waiting?:AbortController;waitIds?:string;active:boolean;abort:AbortController;explicitImage:boolean;immersive:boolean;
   id:string;revision:number;readingIds:Set<string>;window?:WindowRequest;preparing:Map<string,Preparation>;sources:RequestPool;submitting?:Promise<void>;submitAgain:boolean;publishTimer?:ReturnType<typeof setTimeout>;
   processing?:ProcessingProfile;processingKey:string;enhancements:Map<string,Enhancement>;}
-interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;}
+interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;immersive?:boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0,processingGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
 function activationEpoch(tabId:number){
@@ -50,44 +51,59 @@ export async function activateInline(tabId:number,automatic=false){
 export async function activateInlineImage(tabId:number,info:chrome.contextMenus.OnClickData){
   return activate(tabId,false,info);
 }
-async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus.OnClickData){
+export async function activateImmersive(tabId:number){return activate(tabId,false,undefined,true);}
+async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus.OnClickData,immersive=false){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
     const tab=await chrome.tabs.get(tabId);
     if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
     if(info&&(info.frameId!==0||info.mediaType!=='image'||!info.srcUrl||info.pageUrl!==tab.url))throw Error(msg('图片范围无效。'));
     if(automatic){
       if(!tab.active||!await automaticTabsAllowed())return;
+      const reader=await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_IDENTITY'},{frameId:0}).catch(()=>null);
+      if(reader?.url===tab.url&&(reader.enabled||reader.dismissedUrl===tab.url))return;
       const region=await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_IDENTITY'},{frameId:0}).catch(()=>null);
       if(region?.url===tab.url&&(region.enabled||region.dismissedUrl===tab.url))return;
       const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},{frameId:0}).catch(()=>null);
       // Do not reset a manual pause, original-view choice, or dismissal on tab activation.
       if(existing?.url===tab.url&&(existing.dismissedUrl===tab.url||existing.enabled&&existing.activeUrl===tab.url))return;
     }
-    const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
+    const injected=await chrome.scripting.executeScript({target:{tabId},files:[immersive?'content-scripts/immersive.js':'content-scripts/inline.js']});
     const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    if(immersive){
+      const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_IDENTITY'},target);
+      const saved=await chrome.storage.session.get(activationKey(tabId));
+      const activation=saved[activationKey(tabId)] as Activation|undefined;
+      if(existing?.enabled&&existing.url===tab.url&&activation?.immersive&&activation.navigationId===existing.navigationId)return;
+    }
+    const prior=immersive?await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target).catch(()=>null):undefined;
+    // The new consumer owns the document before the old inline subscriber leaves.
+    if(immersive)await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_PREPARE',translation:prior?.enabled&&!prior.original&&!prior.paused},target);
     // data: originals stay in the page; only their bytes use the chunked source port.
     const selection=info?await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_SELECT_IMAGE',
       ...(/^data:image\//i.test(info.srcUrl!)?{dataImage:true}:{srcUrl:info.srcUrl}),pageUrl:tab.url},target):undefined;
     if(info&&(!selection?.ok||!selection.image||typeof selection.image.id!=='string'||typeof selection.image.url!=='string'))throw Error(msg('图片范围无效。'));
+    if(!immersive){await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},target).catch(()=>{});clearImmersiveSources(tabId);}
     const epoch=invalidateTab(tabId),current=()=>activationEpochs.get(tabId)===epoch;
     await chrome.storage.session.remove(activationKey(tabId));
     await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_STOP'},{frameId:0}).catch(()=>{});
     await chrome.storage.session.remove(regionActivationKey(tabId));
     // Stop before asking for identity: unsubscribing may retire the source navigation.
-    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},target);
-    const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target);
+    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},target).catch(()=>{});
+    const identity=await chrome.tabs.sendMessage(tabId,{type:immersive?'NC_IMMERSIVE_IDENTITY':'NC_INLINE_IDENTITY'},target);
     assertCurrent(current);
     if(!identity||identity.url!==tab.url)throw Error(msg("网页已变化，请重新启动翻译。"));
     if(automatic&&!await automaticTabsAllowed())return;
     assertCurrent(current);
-    await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic,...(selection?{image:selection.image}:{})} satisfies Activation});
+    await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic,...(immersive?{immersive:true}:{}),...(selection?{image:selection.image}:{})} satisfies Activation});
     assertCurrent(current);epoch.active=true;
-    const started=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_START',automatic,imageId:selection?.image.id},target);
+    const started=await chrome.tabs.sendMessage(tabId,{type:immersive?'NC_IMMERSIVE_SHOW':'NC_INLINE_START',automatic,imageId:selection?.image.id},target);
     if(started?.ok===false){invalidateTab(tabId);await chrome.storage.session.remove(activationKey(tabId));throw Error(msg('图片范围无效。'));}
   });
 }
 /** A hand-selected crop owns this document until explicitly leaving region mode. */
 export async function suspendInline(tabId:number){
+  await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},{frameId:0}).catch(()=>{});
+  clearImmersiveSources(tabId);
   invalidateTab(tabId);
   await chrome.storage.session.remove(activationKey(tabId));
   await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},{frameId:0}).catch(()=>{});
@@ -125,7 +141,7 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
     for(const [key,page] of pages){const incoming=jobs.filter(job=>matchesPage(page,job));if(incoming.length)pages.set(key,{...page,translationScope:channel.scope.key,jobs:mergeJobs(page.jobs,incoming)});}
     publish(ctx);
   };
-  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,id:crypto.randomUUID(),revision:0,readingIds:new Set(),preparing:new Map(),sources:new RequestPool(3),submitAgain:false,processingKey:'',enhancements:new Map()};
+  ctx={key,channel,settings,pages,jobs:[],originals,sourceErrors:new Map(),missingResults:new Set(),active:true,abort:new AbortController(),explicitImage:activity.explicitImage===true,immersive:activity.immersive===true,id:crypto.randomUUID(),revision:0,readingIds:new Set(),preparing:new Map(),sources:new RequestPool(3),submitAgain:false,processingKey:'',enhancements:new Map()};
   // Register before reading so a concurrent setting event can update this context too.
   contexts.set(tabId,ctx);
   const processingVersion=processingGeneration,processingSettings=await readProcessingSettings();
@@ -201,7 +217,9 @@ async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRe
     const lifetime=AbortSignal.any([signal,ctx.abort.signal]);
     const current=()=>!lifetime.aborted&&ctx.active&&ctx.channel.isCurrent();
     assertCurrent(current);let blob:Blob;
-    if(image.url==='page-image:'+image.id){
+    if(ctx.immersive){
+      blob=await readImmersiveOriginal(sender,request.navigationId,image.id,lifetime);
+    }else if(image.url==='page-image:'+image.id){
       const port=chrome.tabs.connect(sender.tab!.id!,{name:INLINE_SOURCE_PORT,frameId:0,...(sender.documentId?{documentId:sender.documentId}:{})});
       blob=await receiveImage(port,{navigationId:request.navigationId,id:image.id},lifetime,current);
     }
@@ -364,11 +382,13 @@ async function checkedRequest(message:InlineRequest,sender:chrome.runtime.Messag
     assertCurrent(active);activation.documentId=sender.documentId;
     await chrome.storage.session.set({[activationKey(tabId)]:activation});assertCurrent(active);
   });
-  const activity={active,current:()=>active()&&(message.type==='NC_INLINE_IMAGE'||message.generation===(windowGenerations.get(tabId)??0))};
+  const activity={active,current:()=>active()&&(message.type==='NC_INLINE_IMAGE'||message.generation===(windowGenerations.get(tabId)??0)),immersive:activation.immersive===true};
   const explicitImage=!!activation.image;
   if(['NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message.type))return {tabId,tab,...activity,explicitImage};
   const validImages=(images:unknown,limit:number)=>Array.isArray(images)&&images.length<=limit&&(!explicitImage||images.length===1&&images[0]?.id===activation.image!.id&&images[0]?.url===activation.image!.url)&&images.every((v:{id?:string;url?:string;width:number;height:number;referrerPolicy?:unknown})=>v&&typeof v.id==='string'&&v.id.length<=80&&typeof v.url==='string'&&(v.url==='page-image:'+v.id||safeImageUrl(v.url,activation.url)===v.url)&&(v.referrerPolicy===undefined||isImageReferrerPolicy(v.referrerPolicy))&&(explicitImage?Number.isFinite(v.width)&&Number.isFinite(v.height)&&v.width>0&&v.height>0:inlineImageSize(v.width,v.height,activation.url)));
-  if(!validImages(message.images,MAX_READING_TARGETS)||(message.type==='NC_INLINE_TICK'||message.readingImages!==undefined)&&!validImages(message.readingImages,MAX_COMIC_IMAGES))throw Error(msg('图片范围无效。'));
+  const immersiveSession=activation.immersive?await currentImmersiveSession(sender,message.navigationId):undefined;
+  const validate=(images:unknown,limit:number)=>immersiveSession?validImmersiveImages(immersiveSession,images,limit):validImages(images,limit);
+  if(!validate(message.images,MAX_READING_TARGETS)||(message.type==='NC_INLINE_TICK'||message.readingImages!==undefined)&&!validate(message.readingImages,MAX_COMIC_IMAGES))throw Error(msg('图片范围无效。'));
   if(message.type==='NC_INLINE_IMAGE'&&(message.images.length!==1||typeof message.resultKey!=='string'||message.resultKey.length>2048))throw Error(msg('图片范围无效。'));
   return {tabId,tab,...activity,explicitImage};
 }
