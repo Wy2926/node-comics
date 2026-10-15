@@ -1,0 +1,60 @@
+{
+  "repository": "https://github.com/keiyoushi/extensions-source",
+  "commit": "780153a29642a57364e894bc0850c4e76619c7de",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "distributionPath": "apps/extension/public/licenses/keiyoushi-extensions-source.txt",
+    "noticeFile": null
+  },
+  "usage": "Protocol reference only. Node Comics implements inert TypeScript HTML/JSON parsing through its existing source contracts and caller transport; upstream Kotlin/APK code is not executed or bundled.",
+  "scope": "Explicitly registered Lagoon Scans, UnderTranslations and Arena Scans: public WordPress name search, complete static chapterlist, dedicated work cover, canonical and allc chapter ownership, unprotected full-mode ts_reader.run JSON with one selected image source. No source scripts, view-count POSTs, account actions, protected-page unlocks, novels, alternate randomized slugs, DOM-only or base64/obfuscated reader variants are implemented.",
+  "files": [
+    {
+      "path": "lib-multisrc/mangathemesia/src/eu/kanade/tachiyomi/multisrc/mangathemesia/MangaThemesia.kt",
+      "sha256": "172d5ae83392baaa356743f4219ed211edade3a92ac4f582486a1b05ff34c627",
+      "purpose": "Reference for search cards, chapterlist markup, lazy image attributes and reader data. Node Comics verifies live public ?s= search pagination and strictly parses the full reader JSON instead of regex-extracting arbitrary image arrays; source view counters are not called."
+    },
+    {
+      "path": "lib-multisrc/mangathemesia/src/eu/kanade/tachiyomi/multisrc/mangathemesia/MangaThemesiaAlt.kt",
+      "sha256": "595f85fe3267c2c6bf564fe7edabe103b16e1a5d9024630097d6b94fbc168c8f",
+      "purpose": "Reviewed to delimit unsupported randomized URL variants; no full-site URL map, persistence or refresh behavior is ported."
+    },
+    {
+      "path": "lib-multisrc/mangathemesia/src/eu/kanade/tachiyomi/multisrc/mangathemesia/MangaThemesiaPaidChapterHelper.kt",
+      "sha256": "f2e04a9379b4f42f02f5aea1f27a7e429d19cff47373613c3b06a302bd45a555",
+      "purpose": "Reference for locked chapter markers; Node Comics refuses unsupported protected catalogs/readers and never hides a locked row to claim a complete free catalog."
+    },
+    {
+      "path": "src/en/lagoonscans/src/eu/kanade/tachiyomi/extension/en/lagoonscans/LagoonScans.kt",
+      "sha256": "5438e057c8aa89f5a030e355dbab54cc36f4498e82f5bcb71ce23bcf537e1b70",
+      "purpose": "Confirms Lagoon Scans uses the standard MangaThemesia source without protocol overrides."
+    },
+    {
+      "path": "src/en/lagoonscans/build.gradle.kts",
+      "sha256": "5253de63e38f43679917b4e7354edf3b9eed3f97d02106ac2feb1b4194d968c5",
+      "purpose": "Reference for the source name, English language, origin and theme declaration."
+    },
+    {
+      "path": "src/es/undertranslations/src/eu/kanade/tachiyomi/extension/es/undertranslations/UnderTranslations.kt",
+      "sha256": "73d5bcabeec10ffdee91da49211c687aacca99664fe3cf704307bd7e06ea283d",
+      "purpose": "Confirms UnderTranslations uses the standard MangaThemesia source without protocol overrides."
+    },
+    {
+      "path": "src/es/undertranslations/build.gradle.kts",
+      "sha256": "73342f576d3d06501a1e61008bb4ed09c282011753567e2c38848c39d0ca585e",
+      "purpose": "Reference for the source name, Spanish language, origin and theme declaration."
+    },
+    {
+      "path": "src/en/arenascans/src/eu/kanade/tachiyomi/extension/en/arenascans/ArenaScans.kt",
+      "sha256": "3cb5811e296c0a4b1cde65618cc9fa53255e8f1e157fcf39dc1ee44ea5707f5a",
+      "purpose": "Confirms Arena Scans uses the standard MangaThemesia source without protocol overrides."
+    },
+    {
+      "path": "src/en/arenascans/build.gradle.kts",
+      "sha256": "5a09d344ce9f526cce31e104cbaa95d68c5968a48cef66cfbf4f12008dd8eabd",
+      "purpose": "Reference for the source name, English language, origin and theme declaration."
+    }
+  ]
+}

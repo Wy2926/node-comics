@@ -6,14 +6,18 @@ import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 
-const usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs <siteId> <query-with-2-or-more-pages> <no-result-query> [--max-pages=3]';
+const usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs <siteId> <query-with-2-or-more-pages> <no-result-query> [--max-pages=3] [--html-search] [--page-size=10]';
 const args = process.argv.slice(2);
 if (args.includes('--help')) {console.log(usage); process.exit(0);}
 const positional = args.filter(value => !value.startsWith('--')), flags = args.filter(value => value.startsWith('--'));
 const [siteId, query, emptyQuery] = positional;
 assert(positional.length === 3 && /^[a-z0-9-]+$/.test(siteId), usage);
-assert(flags.length <= 1 && flags.every(value => /^--max-pages=\d+$/.test(value)), usage);
-const maxPages = Number(flags[0]?.split('=')[1] ?? 3);
+assert(flags.length <= 3 && flags.every(value => /^(?:--max-pages=\d+|--html-search|--page-size=\d+)$/.test(value)) &&
+  new Set(flags.map(value => value.split('=')[0])).size === flags.length, usage);
+const htmlSearch = flags.includes('--html-search');
+const maxPages = Number(flags.find(value => value.startsWith('--max-pages='))?.split('=')[1] ?? 3);
+const pageItems = Number(flags.find(value => value.startsWith('--page-size='))?.split('=')[1] ?? 12);
+assert(Number.isInteger(pageItems) && pageItems >= 1 && pageItems <= 100, '--page-size must be 1..100; default Madara AJAX uses 12 items');
 assert(Number.isInteger(maxPages) && maxPages >= 2 && maxPages <= 10, '--max-pages must be 2..10; use a bounded, verified query');
 for (const value of [query, emptyQuery]) assert(typeof value === 'string' && value.trim() === value && value.length > 0 &&
   [...value].length <= 256 && !/[\u0000-\u001f\u007f]/u.test(value), 'Queries must contain 1..256 printable characters');
@@ -38,10 +42,10 @@ function safeValue(key, value, depth = 0) {
 }
 const safeParams = value => Object.fromEntries([...new URLSearchParams(value)].map(([key, item]) => [key, safeValue(key, item)]));
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const limits = {maxPages, pageItems: 12, requests: 90, textResponses: (maxPages + 1) * 2, imageResponses: 18, bytes: 32 * 1024 * 1024, timeoutMs: 180000};
+const limits = {maxPages, pageItems, requests: 90, textResponses: (maxPages + 1) * 2, imageResponses: 18, bytes: 32 * 1024 * 1024, timeoutMs: 180000};
 const network = {requests: 0, textResponses: 0, imageResponses: 0, completedBodyBytes: 0, blockedServiceRequests: 0, origins: {}};
 const startedAt = Date.now();
-const checks = [], pages = [], durations = [], errors = [], httpFailures = [], requestFailures = [], textRequests = [], rawRequests = [], pendingSizes = new Set();
+const checks = [], pages = [], durations = [], errors = [], httpFailures = [], requestFailures = [], textRequests = [], textTargets = [], rawRequests = [], pendingSizes = new Set();
 let context, reader, panel, watchdog, fatal, stage = 'prepare', serviceOrigin, target, origin, knownSourceOrigins = [], searchableSiteCount = 0, manifest, manifestBytes, home;
 const stop = message => {if (!fatal) {fatal = Error(message); void context?.close().catch(() => {});}};
 const inspect = () => reader.evaluate(async () => (await import(chrome.runtime.getURL('madara-search-inspect.js'))).counts());
@@ -82,13 +86,21 @@ async function operation(label, action, pageIndex = 0, searchQuery = query) {
   ]);
   const detail = await settled(), requests = textRequests.slice(start);
   assert.equal(requests.length, 1, 'Each search page must make exactly one public text request');
-  assert.equal(requests[0].method, 'POST', 'Verified AJAX pagination must not add a preliminary GET');
-  assert.match(requests[0].contentType, /^application\/x-www-form-urlencoded(?:;|$)/i);
-  assert.deepEqual(requests[0].form, {
-    action: 'madara_load_more', page: String(pageIndex), template: 'madara-core/content/content-search',
-    'vars[paged]': '1', 'vars[template]': 'search', 'vars[posts_per_page]': '12',
-    'vars[post_type]': 'wp-manga', 'vars[post_status]': 'publish', 'vars[s]': searchQuery,
-  }, 'The actual request must use the verified nine-field form, correct query and zero-based page');
+  if (htmlSearch) {
+    assert.equal(requests[0].method, 'GET', 'HTML search must use a single read-only GET');
+    assert.equal(requests[0].bodyBytes, 0, 'HTML search must not submit a request body');
+    assert.equal(requests[0].form, undefined);
+    const expected = origin + (pageIndex === 0 ? '/' : `/page/${pageIndex + 1}/`) + '?' + new URLSearchParams({s: searchQuery});
+    assert.equal(textTargets[start], expected, 'HTML search must preserve the exact same-origin path, page and name query');
+  } else {
+    assert.equal(requests[0].method, 'POST', 'Verified AJAX pagination must not add a preliminary GET');
+    assert.match(requests[0].contentType, /^application\/x-www-form-urlencoded(?:;|$)/i);
+    assert.deepEqual(requests[0].form, {
+      action: 'madara_load_more', page: String(pageIndex), template: 'madara-core/content/content-search',
+      'vars[paged]': '1', 'vars[template]': 'search', 'vars[posts_per_page]': '12',
+      'vars[post_type]': 'wp-manga', 'vars[post_status]': 'publish', 'vars[s]': searchQuery,
+    }, 'The actual request must use the verified nine-field form, correct query and zero-based page');
+  }
   assertNoLibraryWrites(await inspect());
   durations.push({stage: label, elapsedMs: Date.now() - started});
   return {detail, requests};
@@ -109,8 +121,11 @@ async function recordPage(number, previous, requests) {
   const items = await candidates(), hasMore = await panel.getByRole('button', {name: '加载更多', exact: true}).count() === 1;
   assert.deepEqual(items.slice(0, previous.length), previous, 'Load more must retain the existing result order and identity');
   const added = items.slice(previous.length);
-  assert(added.length <= limits.pageItems, 'One source page must respect the verified Madara page size');
-  if (hasMore) assert.equal(added.length, limits.pageItems, 'Only a full page may offer a continuation');
+  assert(added.length <= limits.pageItems, 'One source page must respect the configured candidate limit');
+  if (hasMore) {
+    if (htmlSearch) assert(added.length > 0, 'HTML continuation must advance by a nonempty result page');
+    else assert.equal(added.length, limits.pageItems, 'Only a full page may offer a continuation');
+  }
   pages.push({page: number, count: added.length, cumulativeCount: items.length, hasMore,
     first: added[0] ?? null, last: added.at(-1) ?? null, candidates: added, requests});
   return {items, hasMore};
@@ -162,6 +177,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
       if (++network.textResponses > limits.textResponses) stop('Public search-text response budget exceeded');
       if (url.origin !== origin) stop('Unexpected non-source text response during a single-site search');
       const headers = request.headers(), body = request.postData() ?? '', contentType = headers['content-type'] ?? '';
+      textTargets.push(request.url()); // Exact URL comparison stays in memory; reports retain only sanitized fields.
       textRequests.push({stage, method: request.method(), url: sourceUrl(url.href), query: safeParams(url.search),
         status: response.status(), contentType, referer: headers.referer ? sourceUrl(headers.referer) : null,
         bodyBytes: Buffer.byteLength(body), ...(contentType.startsWith('application/x-www-form-urlencoded') ? {form: safeParams(body)} : {})});
@@ -232,7 +248,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   assert(!result.hasMore, `The query still has more results after ${maxPages} pages; choose a narrower query rather than scanning the site`);
   await panel.locator('.nc-search-status-detail').scrollIntoViewIfNeeded();
   await reader.screenshot({path: path.join(out, 'search-last.png')});
-  checks.push('Only the selected site is queried; real UI Load more appends unique owned candidates through the terminal page with one form POST per page');
+  checks.push(`Only the selected site is queried; real UI Load more appends unique owned candidates through the terminal page with one ${htmlSearch ? 'query-bound GET' : 'form POST'} per page`);
   await wait(1000); await input.fill(emptyQuery);
   const empty = await operation('no-result query', () => panel.getByRole('button', {name: '重新搜索', exact: true}).click(), 0, emptyQuery);
   assert.equal(await panel.locator('.nc-search-result').count(), 0);

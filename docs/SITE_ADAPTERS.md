@@ -83,6 +83,8 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 [ComiciViewer](../apps/extension/src/sources/shared/comici/README.md) 复用既有 Comici 搜索、编号目录、canvas 与图块还原，由经过独立验收的站点按相同共享边界显式接入。公开章节 API 负责归属及访问校验，站点保留各自图片主机策略；支持名单、上游来源、已实现协议与未支持变体以引擎目录为准，不声明上游所有站点可用。
 
+[MangaThemesia](../apps/extension/src/sources/shared/mangathemesia/README.md) 接入 Lagoon Scans、UnderTranslations 和 Arena Scans，共享网页名称分页搜索、完整静态目录、章节作品绑定及公开 `ts_reader` JSON 图片清单。站点保留主机、路径、身份与图片策略；不执行源站脚本、不发送浏览量统计或解锁请求，不自动认领上游其他站点。支持结构、限制及上游摘要以引擎目录为准。
+
 ## 验收与交付
 
 在 `apps/extension` 执行：
@@ -114,6 +116,9 @@ npm run build
 | [Manga Eclipse](../apps/extension/src/sources/sites/mangaeclipse/README.md) | Madara 共享 AJAX 名称分页搜索、普通 HTTP 静态完整目录、作品级 canonical 与章节选择项绑定的正文、封面和 12 小时更新；浮动导入与通用原位识图 |
 | [Bun Manga](../apps/extension/src/sources/sites/bunmanga/README.md) | Madara 共享 AJAX 名称分页搜索、静态完整目录和预填充章节选择器正文、封面与 12 小时更新；浮动导入与通用原位识图 |
 | [Monopoly Scan](../apps/extension/src/sources/sites/monopolyscan/README.md) | 西语 Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；浮动导入与通用原位识图 |
+| [Lagoon Scans](../apps/extension/src/sources/sites/lagoonscans/README.md) | 英语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
+| [UnderTranslations](../apps/extension/src/sources/sites/undertranslations/README.md) | 西语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
+| [Arena Scans](../apps/extension/src/sources/sites/arenascans/README.md) | 英语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
 | [WeLoMa](../apps/extension/src/sources/sites/weloma/README.md) | HTTP 分页名称搜索、完整静态目录／正文／封面与 12 小时同步；作品／裸章节浮动导入、章节归属校验，标签页识图复用通用规则 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |
