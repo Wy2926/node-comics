@@ -1,8 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {definition, catalogKey, chapterKey, webtoonLocation} from '../definition';
-import {network, parseCatalog, parsePages} from '../network';
-import {parseSearch, searchUrl} from '../search';
-import {cover} from '../html';
+import {network, parseCatalog, parsePages, parseSearch, searchUrl} from '../network';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
 import {artwork, catalogHtml, chapter, image, lazyCoverHtml, origin, poster, reader, readerHtml, recentChapterHtml, searchHtml, slug, url} from './fixtures';
@@ -68,7 +66,7 @@ describe('WebtoonScan', () => {
     if (kind === 'duplicate') html = html.replace('<noscript>', `<img src="${artwork}"><noscript>`);
     if (kind === 'unsafe') html = html.replace(`data-lazy-src="${artwork}"`, 'data-lazy-src="javascript:alert(1)"');
     if (kind === 'credentials') html = html.replace(`data-lazy-src="${artwork}"`, 'data-lazy-src="https://secret@images.test/cover.jpg"');
-    expect(() => cover(html, slug)).toThrow();
+    expect(() => parseCatalog(catalogHtml().replace(poster(), html), url)).toThrow();
   });
   it.each(['canonical', 'foreign', 'duplicate', 'cover', 'truncated', 'empty', 'pagination', 'group'])('rejects invalid %s catalog', kind => {
     let html = catalogHtml();

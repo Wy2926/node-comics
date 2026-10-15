@@ -19,7 +19,7 @@
 
 ## 必须保持的约束
 
-1. **站点隔离。** 域名、路径、资源归属及站点特有选择器／协议只在本站目录；站点之间不互相导入。同一阅读器引擎经多个站点验证的结构、观察规则及解码算法可集中到 `shared/<engine>/`，由站点显式调用并传入身份／资源校验器（如 [GigaViewer](../apps/extension/src/sources/shared/gigaviewer/README.md)）；共享引擎不声明主机、不自行请求、不自动认领未知网站。其余复用无站点语义的 `shared/` 工具，不调用整个 `generic` 作隐式兜底。
+1. **站点隔离。** 域名、路径、资源归属及站点特有选择器／协议只在本站目录；站点之间不互相导入。同一阅读器引擎经多个站点验证的结构、观察规则及解码算法可集中到 `shared/<engine>/`，由站点显式调用并传入身份／资源校验器（如 [GigaViewer](../apps/extension/src/sources/shared/gigaviewer/README.md)、[Madara](../apps/extension/src/sources/shared/madara/README.md)）；只共享当前消费站点需要且已验证的部分。共享引擎不声明具体主机、不直接调用 `fetch` 或浏览器 API、不自动认领未知网站；协议请求仅通过站点提供的上下文执行，沿用公共权限、取消和预算。其余复用无站点语义的 `shared/` 工具，不调用整个 `generic` 作隐式兜底。
 2. **依赖方向。** 站点只依赖自身、`contracts/`、`shared/` 和现有 i18n；不调用 `chrome.*`／`browser.*`，不导入 UI、漫画仓储、缓存、翻译或来源运行时。`definition.ts` 的传递依赖不访问 DOM、浏览器全局或 CSS。
 3. **公共入口。** UI、漫画应用与页面服务使用 `sources/index.ts`；内容脚本使用 `sources/page.ts`。公共层负责权限、网络、消息、标签页、清单登记和生命周期，注册表不得直接引用具体站点文件。
 4. **明确认领。** 先校验 HTTP(S) URL，再精确核对主机、路径与资源归属。一个站点匹配才使用；冲突报错。未知站点仅用通用原位翻译，不能导入漫画。已认领站点等待、失败或能力缺失时不退回通用规则或另一读取通道。
@@ -75,6 +75,12 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 二进制只读 API 可使用可选 `context.requestBytes(url, {referer, body?, form?})`，仅在普通扩展 HTTP 通道提供，返回原始字节。无正文时为 GET，`body` 为二进制 POST，`form` 为 UTF-8 表单 POST，两者不可同时提供。与文本请求复用来源权限、Referer、取消、30 秒和 8 MiB 响应预算，请求体限 1 MiB；不进入 GET 交接缓存，不自动改用网页上下文。消息字段与协议语义留在站点目录，无站点语义的 wire 基础可复用 `shared/protobuf.ts`。
 
+## 上游协议与代码参考
+
+新增或修复站点时，可先核对 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 等上游实现，复用已确认的协议知识；不直接加载其 Android／Kotlin 扩展，也不根据上游站点数量批量声明支持。参考或移植的来源、精确版本、文件 SHA-256、用途及许可留在对应共享引擎或站点目录，必要的第三方许可随插件分发；区分协议参考、实际移植和未实现的上游能力。
+
+[Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由 WebtoonScan、LHTranslation、Mangasushi 和 Manga Eclipse 显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
+
 ## 验收与交付
 
 在 `apps/extension` 执行：
@@ -100,7 +106,10 @@ npm run build
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；嵌入导入／管理按钮，章节 Referer；网页正文图片原位翻译 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；嵌入导入／管理入口；网页正文切片原位翻译 |
 | [WEBTOON 国际站](../apps/extension/src/sources/sites/webtoons/README.md) | 七语言 Originals／Canvas 搜索、HTTP 完整公开目录／正文／封面与 12 小时更新；网页导入及已加载正文原位翻译 |
-| [WebtoonScan](../apps/extension/src/sources/sites/webtoonscan/README.md) | 名称分页搜索、网页会话完整目录／图片、专门封面与 12 小时更新；作品／章节浮动导入，标签页识别沿用通用规则 |
+| [WebtoonScan](../apps/extension/src/sources/sites/webtoonscan/README.md) | 复用 Madara 静态 HTML 解析的名称分页搜索、网页会话完整目录／图片、专门封面与 12 小时更新；作品／章节浮动导入，标签页识别沿用通用规则 |
+| [LHTranslation](../apps/extension/src/sources/sites/lhtranslation/README.md) | Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；作品／章节浮动导入与通用原位识图 |
+| [Mangasushi](../apps/extension/src/sources/sites/mangasushi/README.md) | Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；作品／章节浮动导入与通用原位识图 |
+| [Manga Eclipse](../apps/extension/src/sources/sites/mangaeclipse/README.md) | Madara 共享 AJAX 名称分页搜索、普通 HTTP 静态完整目录、作品级 canonical 与章节选择项绑定的正文、封面和 12 小时更新；浮动导入与通用原位识图 |
 | [WeLoMa](../apps/extension/src/sources/sites/weloma/README.md) | HTTP 分页名称搜索、完整静态目录／正文／封面与 12 小时同步；作品／裸章节浮动导入、章节归属校验，标签页识图复用通用规则 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |

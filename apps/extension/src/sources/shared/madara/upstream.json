@@ -1,0 +1,70 @@
+{
+  "repository": "https://github.com/keiyoushi/extensions-source",
+  "commit": "780153a29642a57364e894bc0850c4e76619c7de",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "distributionPath": "apps/extension/public/licenses/keiyoushi-extensions-source.txt",
+    "noticeFile": null
+  },
+  "usage": "Protocol reference only. The front-end TypeScript parsers and caller-transport request orchestration reuse Node Comics code; upstream Kotlin/APK code is not executed or bundled.",
+  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi and Manga Eclipse, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
+  "files": [
+    {
+      "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/MadaraBase.kt",
+      "sha256": "f094ead174b71175616fc4c765d3f5956240cd78ed5193f65de278a3c50fc96e",
+      "purpose": "Reference for MangaPage and MangaAjax chapter protocols, Madara HTML containers and image attributes; other chapter modes, view tracking and protected-page decryption are not implemented."
+    },
+    {
+      "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/MadaraNoAjax.kt",
+      "sha256": "f8f5cb475a67e4c73d43a276a731cc3488b10aa1dd13c8bf1f0afc920bcb4359",
+      "purpose": "Reference for public HTML search URLs and pagination; RSS and post-ID recovery are not implemented."
+    },
+    {
+      "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/Madara.kt",
+      "sha256": "c96e591e1ede514fc2a707ad6757325e9d7f3a9dc43db02ea5b92ec4d32f9442",
+      "purpose": "Reference for madara_load_more, zero-based page and explicit posts_per_page/published-manga search fields. Node Comics uses the sites' verified content-search template and shared card parser, not upstream's content-archive template or advanced filters."
+    },
+    {
+      "path": "src/en/webtoonscan/src/eu/kanade/tachiyomi/extension/en/webtoonscan/WebtoonScan.kt",
+      "sha256": "abd81f9451d36871a5b43ca3595b0e6ac542097922b581a3fa5718f28c3f2a9a",
+      "purpose": "Confirms WebtoonScan uses the unmodified upstream Madara base."
+    },
+    {
+      "path": "src/en/webtoonscan/build.gradle.kts",
+      "sha256": "a18b6aa33c07fee50c49a5cb59b14d0925d2c1b563e48289e9e92339d86d225f",
+      "purpose": "Reference for the WebtoonScan source domain and Madara theme declaration."
+    },
+    {
+      "path": "src/en/lhtranslation/src/eu/kanade/tachiyomi/extension/en/lhtranslation/LHTranslation.kt",
+      "sha256": "9333df4a423f95d085e3d4593247d8c9355f496627367bca8bade5c8d6b8b855",
+      "purpose": "Confirms the LHTranslation source explicitly uses MangaAjax chapter mode."
+    },
+    {
+      "path": "src/en/lhtranslation/build.gradle.kts",
+      "sha256": "1d5dfafdfc796ea71354709396f78aaf70333d0f79b306df7ddfdef1b30e2851",
+      "purpose": "Reference for the LHTranslation source domain, language and Madara theme declaration."
+    },
+    {
+      "path": "src/en/mangasushi/src/eu/kanade/tachiyomi/extension/en/mangasushi/Mangasushi.kt",
+      "sha256": "1770cddb3701580a13958eb559d325c884c1e761d4493b54c7a775870ebad2ee",
+      "purpose": "Confirms the Mangasushi source explicitly uses MangaAjax chapter mode."
+    },
+    {
+      "path": "src/en/mangasushi/build.gradle.kts",
+      "sha256": "0e8f884ae7536ae31359fb5350a516fb9195aca61fa34c171d51de168223eb54",
+      "purpose": "Reference for the Mangasushi source domain, language and Madara theme declaration."
+    },
+    {
+      "path": "src/en/mangaeclipse/src/eu/kanade/tachiyomi/extension/en/mangaeclipse/MangaEclipse.kt",
+      "sha256": "4e11bb0695328e2ba4c1d79e252f06907695a8057ce344171ccd3d1f8caf3a21",
+      "purpose": "Confirms Manga Eclipse uses the unmodified upstream Madara base and default MangaPage chapter mode."
+    },
+    {
+      "path": "src/en/mangaeclipse/build.gradle.kts",
+      "sha256": "d63bd7d56e5e4e56c1ec0c6b09732a089a37f2d08600896e079d1262737e5d29",
+      "purpose": "Reference for the Manga Eclipse source domain, language and Madara theme declaration."
+    }
+  ]
+}
