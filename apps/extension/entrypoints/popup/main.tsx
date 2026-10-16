@@ -25,7 +25,7 @@ type Discovery={kind:'catalog'|'pages';id:string};
 function Popup({initialError=''}:{initialError?:string}){
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
  const [error,setError]=useState(initialError),[discoveryError,setDiscoveryError]=useState('');
- const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState<'tab'|'region'|'immersive'>(),[saving,setSaving]=useState(false);
+ const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState<'tab'|'region'>(),[saving,setSaving]=useState(false);
  const lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
  const [preferences,setPreferences]=useState(settings);useAppearance(preferences);
  const shortcuts=useShortcutPreferences(),[browserShortcuts,setBrowserShortcuts]=useState<BrowserShortcuts>({});
@@ -66,13 +66,13 @@ function Popup({initialError=''}:{initialError?:string}){
   try{await saveSettings(next);}catch{setError(msg("语言未能同步，请重新选择后再翻译。"));}
   finally{saveLock.current=false;setSaving(false);}
  }
- async function translate(kind:'tab'|'region'|'immersive'='tab'){
+ async function translate(kind:'tab'|'region'='tab'){
   if(source?.id==null||lock.current||openLock.current||saveLock.current)return;
   openLock.current=true;setTranslating(kind);setError('');
   try{
    await requireHostAccess();
    await saveSettings(settings());
-   await sourceMessage({type:kind==='immersive'?'NC_IMMERSIVE_START':kind==='region'?'NC_TRANSLATE_REGION':'NC_TRANSLATE_TAB',tabId:source.id,url:source.url});window.close();
+   await sourceMessage({type:kind==='region'?'NC_TRANSLATE_REGION':'NC_TRANSLATE_TAB',tabId:source.id,url:source.url});window.close();
   }catch(e){setError((e as Error).message);}
   finally{openLock.current=false;setTranslating(undefined);}
  }
@@ -139,7 +139,6 @@ function Popup({initialError=''}:{initialError?:string}){
    </section>}
    <section className="nc-popup-tools" aria-label={msg('我的漫画')}>
     <div className="nc-popup-tool-grid">
-     <button className="nc-popup-tool" disabled={!source||disabled} onClick={()=>void translate('immersive')}><Icon name="book" size={23}/><span>{translating==='immersive'?msg('正在打开漫画'):msg('沉浸阅读')}</span></button>
      <button className="nc-popup-tool nc-popup-region" disabled={!source||disabled} onClick={()=>void translate('region')}><Icon name="expand" size={23}/><span>{translating==='region'?msg('正在启动翻译…'):msg('划图翻译')}</span>{nativeShortcutHint('nc-translate-region')}</button>
      <button className="nc-popup-tool nc-popup-library nc-comic-paper" disabled={disabled} onClick={()=>void openPage()}><Icon name="folder" size={23}/><span>{msg('我的漫画')}</span>{shortcutHint('app.library')}</button>
      <button className="nc-popup-tool" disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={23}/><span>{msg('设置')}</span>{shortcutHint('app.settings')}</button>

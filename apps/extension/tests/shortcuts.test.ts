@@ -22,6 +22,11 @@ describe('shortcut catalog and normalization',()=>{
       for(const binding of command.defaults){expect(validateBinding(binding)).toBeUndefined();expect(findConflict(command.id,binding,{})).toBeUndefined();}
     }
   });
+  it('limits website shortcuts to page translation controls and settings',()=>{
+    expect(shortcutCommands.filter(command=>command.scope==='web').map(command=>command.id))
+      .toEqual(['web.pause','web.original','web.close','web.shortcuts']);
+    expect(activeBindings({}).has('Alt+KeyQ')).toBe(false);
+  });
   it('supports exact multi-modifier combinations, layout-independent codes and native labels',()=>{
     expect(bindingFromEvent(keyboard('KeyQ',{key:'a',ctrlKey:true,altKey:true,shiftKey:true,metaKey:true}))).toBe('Ctrl+Alt+Shift+Meta+KeyQ');
     expect(formatBinding('Ctrl+Shift+KeyQ')).toBe('Ctrl + Shift + Q');
@@ -103,19 +108,5 @@ describe('shortcut dispatch',()=>{
     bindShortcuts(f.target,{'reader.original':run},{getOverrides:()=>overrides});
     for(let i=0;i<10000;i++)f.emit('keydown',keyboard('KeyQ'));
     expect(f.querySelector).not.toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
-  });
-  it('uses the reader shadow scope for overlays and retains shared repeat and input guards',()=>{
-    const f=fixture(),run=vi.fn(),ownQuery=vi.fn(()=>null);
-    const element={ownerDocument:{defaultView:f.target},querySelector:ownQuery,
-      addEventListener:f.target.addEventListener,removeEventListener:f.target.removeEventListener} as unknown as HTMLElement;
-    Object.assign(f.target,{HTMLElement:{prototype:{}}});
-    const cleanup=bindShortcuts(element,{'web.immersive':run},{getOverrides:()=>({})});
-    const toggle=()=>keyboard('KeyQ',{altKey:true});
-    f.emit('keydown',toggle());f.emit('keydown',{...toggle(),repeat:true});
-    expect(run).toHaveBeenCalledOnce();expect(f.querySelector).not.toHaveBeenCalled();expect(ownQuery).toHaveBeenCalled();
-    f.emit('keyup',toggle());
-    ownQuery.mockReturnValue({} as never);f.emit('keydown',toggle());expect(run).toHaveBeenCalledOnce();
-    ownQuery.mockReturnValue(null);f.emit('keydown',{...toggle(),composedPath:()=>[{closest:()=>({})}] as unknown as EventTarget[]});
-    expect(run).toHaveBeenCalledOnce();cleanup();for(const values of f.listeners.values())expect(values.size).toBe(0);
   });
 });

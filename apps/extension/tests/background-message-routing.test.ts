@@ -97,7 +97,7 @@ async function setupBackground(mobile = false) {
   });
   const {default:background}=await import('../entrypoints/background');
   background.main();
-  expect(listeners).toHaveLength(10); // Locale, theme, inline, immersive, region, sources, Drive, catalog sync, analytics, shortcuts.
+  expect(listeners).toHaveLength(9); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts.
 }
 beforeEach(() => setupBackground());
 
@@ -221,30 +221,9 @@ describe('production background listeners share the runtime message channel', ()
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]); expect(result.response).toBeUndefined();
   });
 
-  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS','NC_TRANSLATE_REGION','NC_IMMERSIVE_START'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
+  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS','NC_TRANSLATE_REGION'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
     const result = await dispatch({type, manifestId: 'book', pageId: 'page-1'}, {id: extensionId, url: 'https://example.test/book', frameId: 0, tab: {id: 1} as chrome.tabs.Tab});
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]);
   });
 
-  it('owns immersive popup activation once without importing a comic or starting page translation', async () => {
-    const tab={id:42,url:'https://example.test/comic'};tabs.set(tab.id,tab);
-    vi.stubGlobal('navigator',{locks:{request:async(_name:string,run:()=>Promise<unknown>)=>run()}});
-    vi.mocked(chrome.permissions.contains).mockImplementation(async()=>true);
-    Object.assign(chrome.scripting,{executeScript:vi.fn(async()=>[{documentId:'document-42',frameId:0}])});
-    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async(_id,message)=>['NC_IMMERSIVE_IDENTITY','NC_INLINE_IDENTITY'].includes((message as Message).type)
-      ?{url:tab.url,navigationId:'navigation-42',enabled:false}:{ok:true});
-    expect(await owned({type:'NC_IMMERSIVE_START',tabId:42,url:tab.url})).toEqual({ok:true,data:true});
-    expect(session['nc-inline:42']).toMatchObject({url:tab.url,navigationId:'navigation-42',documentId:'document-42',automatic:false,immersive:true});
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(42,expect.objectContaining({type:'NC_IMMERSIVE_SHOW'}),{frameId:0,documentId:'document-42'});
-    expect(vi.mocked(chrome.tabs.sendMessage).mock.calls.some(([,message])=>(message as Message).type==='NC_INLINE_START')).toBe(false);
-    expect(Object.keys(local).some(key=>key.startsWith('nc-import:')||key.startsWith('manifest:'))).toBe(false);
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it.each(['NC_IMMERSIVE_RESOLVE','NC_IMMERSIVE_BIND','NC_IMMERSIVE_RELEASE','NC_IMMERSIVE_SETTINGS'])(
-    'routes an unauthorized document %s only to the immersive owner',async type=>{
-      const sender={id:extensionId,url:'https://example.test/comic',frameId:0,documentId:'document-42',tab:{id:42} as chrome.tabs.Tab};
-      expect(await owned({type,navigationId:'navigation-42'},sender)).toMatchObject({ok:false,error:'SOURCE_SESSION_EXPIRED'});
-      expect(request).not.toHaveBeenCalled();
-    });
 });

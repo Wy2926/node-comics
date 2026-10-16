@@ -3,7 +3,7 @@ import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import type {Settings} from '../types';
 
-/** Display-only controls are safe in either an extension page or a source-page shadow tree. */
+/** Shared display controls for image and EPUB readers. */
 export function ReaderChoice<T extends string>({label, value, options, onChange}: {
   label: string;
   value: T;

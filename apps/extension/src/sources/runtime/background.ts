@@ -3,8 +3,7 @@ import { msg } from '../../i18n/runtime';
 import { requireHostAccess } from '../../host-permissions';
 import { sourceFailure } from './diagnostics';
 
-import { activateInline, activateInlineImage, activateImmersive, registerInlineBackground } from '../../inline/background';
-import {registerImmersiveBackground} from '../../immersive/background';
+import { activateInline, activateInlineImage, registerInlineBackground } from '../../inline/background';
 import { activateRegion, registerRegionBackground } from '../../region/background';
 import type { SourceCatalog } from '../../comics/application/types';
 import { pollSourceDiscovery } from '../core/discovery';
@@ -33,7 +32,6 @@ const sourceMessageTypes = new Set([
   'NC_SEARCH_TAB',
   'NC_TRANSLATE_TAB',
   'NC_TRANSLATE_REGION',
-  'NC_IMMERSIVE_START',
   'NC_DISCOVER_TAB',
   'NC_OPEN_PAGE',
   'NC_REGISTER_CATALOG',
@@ -100,7 +98,6 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
 export function registerSourceBackground(readCatalog:(url:string)=>Promise<SourceCatalogSnapshot> = readSourceCatalog) {
   const localeReady = registerLocaleBackground();
   registerInlineBackground();
-  registerImmersiveBackground();
   registerRegionBackground();
   registerSourceTabRecovery();
   void recoverImageHeaders().catch(()=>{});
@@ -128,12 +125,11 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
           contexts: ['page', 'image', 'link', 'selection'],
           documentUrlPatterns: ['http://*/*', 'https://*/*'],
         });
-        chrome.contextMenus.create({id:'nc-immersive',title:msg('沉浸阅读'),contexts:['page','image','link'],documentUrlPatterns:['http://*/*','https://*/*']});
       }),
     );
   });
   chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
-    if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-image' || info.menuItemId === 'nc-translate-region' || info.menuItemId === 'nc-immersive') && tab?.id != null) {
+    if ((info.menuItemId === 'nc-translate-page' || info.menuItemId === 'nc-translate-image' || info.menuItemId === 'nc-translate-region') && tab?.id != null) {
       try {
         await requireHostAccess();
         await localeReady();
@@ -145,12 +141,11 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
           if (current.url !== tab.url || current.url !== info.pageUrl)
             throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
           await activateInlineImage(tab.id, info);
-        } else if (info.menuItemId === 'nc-translate-region' || info.menuItemId === 'nc-immersive') {
+        } else if (info.menuItemId === 'nc-translate-region') {
           const current = await chrome.tabs.get(tab.id);
           if (!current.url || !safeImageUrl(current.url, current.url)) throw Error(msg('请在普通网页中使用翻译。'));
           if (current.url !== tab.url) throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-          if(info.menuItemId==='nc-immersive')await activateImmersive(tab.id);
-          else await activateRegion(tab.id);
+          await activateRegion(tab.id);
         } else await activateInline(tab.id);
       } catch {
         await chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html#settings') });
@@ -190,14 +185,13 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     (async () => {
       await localeReady();
       if(message.type==='NC_SEARCH_TAB'){await openSearchFromTab(message.tabId,message.url);return true;}
-      if (message?.type === 'NC_TRANSLATE_TAB' || message?.type === 'NC_TRANSLATE_REGION' || message?.type==='NC_IMMERSIVE_START') {
+      if (message?.type === 'NC_TRANSLATE_TAB' || message?.type === 'NC_TRANSLATE_REGION') {
         if (!Number.isInteger(message.tabId) || message.tabId < 0)
           throw Error(msg('当前标签页不可用，请重新打开插件。'));
         const tab = await chrome.tabs.get(message.tabId);
         if (!tab.url || !safeImageUrl(tab.url, tab.url)) throw Error(msg('请在普通网页中使用翻译。'));
         if (tab.url !== message.url) throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-        if(message.type==='NC_IMMERSIVE_START'){await requireHostAccess();await activateImmersive(message.tabId);}
-        else if (message.type === 'NC_TRANSLATE_REGION') await activateRegion(message.tabId);
+        if (message.type === 'NC_TRANSLATE_REGION') await activateRegion(message.tabId);
         else await activateInline(message.tabId);
         return true;
       }

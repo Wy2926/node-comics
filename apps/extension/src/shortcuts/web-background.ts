@@ -1,6 +1,6 @@
 import {requireHostAccess} from '../host-permissions';
 import {msg} from '../i18n/runtime';
-import {activateInline,activateImmersive} from '../inline/background';
+import {activateInline} from '../inline/background';
 import {activateRegion} from '../region/background';
 import {decodeShortcutOverrides,loadShortcutOverrides,shortcutStorageKey} from './store';
 import type {ShortcutOverrides} from './catalog';
@@ -39,7 +39,7 @@ export function registerWebShortcutsBackground() {
     if(!['NC_SHORTCUTS_GET','NC_SHORTCUTS_EXECUTE'].includes(message?.type)||!fromWebsite(sender))return;
     void (async()=>{
       if(message.type==='NC_SHORTCUTS_GET')return {ok:true,overrides:publicOverrides(await loadShortcutOverrides())};
-      if(!['web.shortcuts','web.immersive'].includes(message.action)||!isWebsite(message.url)||typeof message.instanceId!=='string'||message.instanceId.length>80)
+      if(message.action!=='web.shortcuts'||!isWebsite(message.url)||typeof message.instanceId!=='string'||message.instanceId.length>80)
         throw Error(msg('当前标签页不可用，请重新打开插件。'));
       const tab=await chrome.tabs.get(sender.tab!.id!);
       if(!tab.active||!isWebsite(tab.url)||tab.url!==message.url||new URL(sender.url!).origin!==new URL(tab.url).origin)
@@ -48,22 +48,7 @@ export function registerWebShortcutsBackground() {
       const identity=await chrome.tabs.sendMessage(tab.id!,{type:'NC_SHORTCUTS_IDENTITY'},target);
       if(identity?.url!==tab.url||identity.instanceId!==message.instanceId)
         throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-      if(message.action==='web.shortcuts')await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#settings/shortcuts')});
-      else{
-        const tabId=tab.id!;
-        if(startingTabs.has(tabId))return {ok:true};
-        startingTabs.add(tabId);
-        try{
-          const reader=await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_IDENTITY'},target).catch(()=>undefined);
-          if(reader?.enabled&&reader.url===tab.url)await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},target);
-          else{
-            await requireHostAccess();
-            const current=await chrome.tabs.get(tabId);
-            if(!current.active||current.url!==tab.url)throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-            await activateImmersive(tabId);
-          }
-        }finally{startingTabs.delete(tabId);}
-      }
+      await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#settings/shortcuts')});
       return {ok:true};
     })().then(respond).catch(error=>respond({ok:false,error:error instanceof Error?error.message:msg('连接失败')}));
     return true;

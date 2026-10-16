@@ -2,11 +2,10 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import chinese from '../src/i18n/dictionaries/zh-CN.json';
 vi.mock('../src/sources/runtime/source-tabs', () => ({ registerSourceTabRecovery: vi.fn() }));
 
-const translation=vi.hoisted(()=>({page:vi.fn(),image:vi.fn(),region:vi.fn(),immersive:vi.fn()}));
+const translation=vi.hoisted(()=>({page:vi.fn(),image:vi.fn(),region:vi.fn()}));
 const browserMocks=vi.hoisted(()=>({tabGet:vi.fn<()=>Promise<chrome.tabs.Tab>>(),hostAccess:vi.fn<()=>Promise<boolean>>()}));
-vi.mock('../src/inline/background',()=>({activateInline:translation.page,activateInlineImage:translation.image,activateImmersive:translation.immersive,registerInlineBackground:vi.fn()}));
+vi.mock('../src/inline/background',()=>({activateInline:translation.page,activateInlineImage:translation.image,registerInlineBackground:vi.fn()}));
 vi.mock('../src/region/background',()=>({activateRegion:translation.region,registerRegionBackground:vi.fn()}));
-vi.mock('../src/immersive/background',()=>({registerImmersiveBackground:vi.fn()}));
 
 const pageUrl='https://source.test/chapter';
 const tab={id:7,url:pageUrl} as chrome.tabs.Tab;
@@ -32,42 +31,18 @@ beforeEach(async()=>{
   });
   const {registerSourceBackground}=await import('../src/sources/runtime/background');
   registerSourceBackground();
-  await vi.waitFor(()=>expect(chrome.contextMenus.update).toHaveBeenCalledTimes(4));
+  await vi.waitFor(()=>expect(chrome.contextMenus.update).toHaveBeenCalledTimes(3));
 });
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('image translation context menu',()=>{
-  it('adds an image-only menu beside page, region and immersive reading entries',async()=>{
+  it('adds only page, image and region translation entries',async()=>{
     installed();
-    await vi.waitFor(()=>expect(chrome.contextMenus.create).toHaveBeenCalledTimes(4));
+    await vi.waitFor(()=>expect(chrome.contextMenus.create).toHaveBeenCalledTimes(3));
     expect(chrome.contextMenus.create).toHaveBeenCalledWith({id:'nc-translate-image',title:'Translate image',
       contexts:['image'],documentUrlPatterns:['http://*/*','https://*/*']});
     expect(vi.mocked(chrome.contextMenus.create).mock.calls.map(([entry])=>entry.id))
-      .toEqual(['nc-translate-page','nc-translate-image','nc-translate-region','nc-immersive']);
-    expect(chrome.contextMenus.create).toHaveBeenCalledWith({id:'nc-immersive',title:'Immersive Reading',
-      contexts:['page','image','link'],documentUrlPatterns:['http://*/*','https://*/*']});
-  });
-
-  it('opens immersive reading from the current tab without invoking another translation mode',async()=>{
-    await click({menuItemId:'nc-immersive',editable:false,frameId:0,pageUrl},tab);
-    expect(translation.immersive).toHaveBeenCalledExactlyOnceWith(7);
-    expect(translation.page).not.toHaveBeenCalled();expect(translation.image).not.toHaveBeenCalled();expect(translation.region).not.toHaveBeenCalled();
-    expect(chrome.tabs.create).not.toHaveBeenCalled();
-  });
-
-  it.each(['permission','activation'])('uses the existing settings entry on immersive %s failure',async stage=>{
-    if(stage==='permission')browserMocks.hostAccess.mockResolvedValue(false);
-    else translation.immersive.mockRejectedValueOnce(Error('The tab was closed'));
-    await click({menuItemId:'nc-immersive',editable:false,frameId:0,pageUrl},tab);
-    if(stage==='permission')expect(translation.immersive).not.toHaveBeenCalled();
-    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url:'chrome-extension://test/reader.html#settings'});
-  });
-
-  it('does not activate immersive reading on a tab that navigated after opening its menu',async()=>{
-    browserMocks.tabGet.mockResolvedValue({...tab,url:pageUrl+'/changed'});
-    await click({menuItemId:'nc-immersive',editable:false,frameId:0,pageUrl},tab);
-    expect(translation.immersive).not.toHaveBeenCalled();
-    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url:'chrome-extension://test/reader.html#settings'});
+      .toEqual(['nc-translate-page','nc-translate-image','nc-translate-region']);
   });
 
   it.each(['https://images.test/page.png','blob:https://source.test/image','data:image/png;base64,cGFnZQ=='])
@@ -115,10 +90,9 @@ describe('image translation context menu',()=>{
   it('updates the image menu title with the saved UI language',async()=>{
     vi.mocked(chrome.contextMenus.update).mockClear();
     changed({'nc-reader-settings':{oldValue:{uiLanguage:'en'},newValue:{uiLanguage:'zh-CN'}}},'local');
-    await vi.waitFor(()=>expect(chrome.contextMenus.update).toHaveBeenCalledTimes(4));
+    await vi.waitFor(()=>expect(chrome.contextMenus.update).toHaveBeenCalledTimes(3));
     expect(chrome.contextMenus.update).toHaveBeenCalledWith('nc-translate-image',{title:'翻译图片'});
     expect(chrome.contextMenus.update).toHaveBeenCalledWith('nc-translate-page',{title:'翻译当前页面'});
     expect(chrome.contextMenus.update).toHaveBeenCalledWith('nc-translate-region',{title:'划图翻译'});
-    expect(chrome.contextMenus.update).toHaveBeenCalledWith('nc-immersive',{title:'沉浸阅读'});
   });
 });

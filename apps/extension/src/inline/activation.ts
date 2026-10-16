@@ -3,7 +3,6 @@ export interface InlineActivation {
   navigationId: string;
   documentId?: string;
   automatic?: boolean;
-  immersive?: boolean;
   image?: { id: string; url: string };
 }
 

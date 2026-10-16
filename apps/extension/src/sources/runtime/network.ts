@@ -65,26 +65,21 @@ export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal
   signal?.throwIfAborted();
   return snapshot;
 }
-/** A temporary reader needs the validated chapter, not a persistent import record. */
-export async function readNetworkPageSnapshot(url:string,signal?:AbortSignal):Promise<PageSnapshot>{
-  signal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(60_000)]);
+export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<PageManifest>{
+  const readSignal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(60_000)]);
   const {definition,location}=resolveSource(url,definitions),read=networkOperation(url,'pages');
   if(!read)throw Error('SOURCE_COLLECTION_UNSUPPORTED');
   const value=sourceNetworks[definition.id]?.pageTransport?.includes('pages')
-    ?await withPageNetworkContext(url,signal,context=>read(url,context))
-    :await read(url,networkContext(signal,await takeImportResponses(location,signal)));
+    ?await withPageNetworkContext(url,readSignal,context=>read(url,context))
+    :await read(url,networkContext(readSignal,await takeImportResponses(location,readSignal)));
   const snapshot=validatePages(value,location);
-  signal?.throwIfAborted();
+  readSignal.throwIfAborted();
   const manifest:PageSnapshot={adapter:snapshot.adapter,url:snapshot.url,title:snapshot.title,direction:snapshot.direction,
     discoveryComplete:snapshot.discoveryComplete,knownTotal:snapshot.knownTotal,note:snapshot.note,
     items:snapshot.items.map(({resource,id,contentKey,width,height,order})=>{
     if(resource.kind!=='http')throw Error('SOURCE_PAGES_INVALID');
     return {id,contentKey,url:resource.url,width,height,order,processing:resource.processing};
   })};
-  return manifest;
-}
-export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<PageManifest>{
-  const manifest=await readNetworkPageSnapshot(url,signal);
   if(manifest.items.length&&manifest.items.every(item=>item.contentKey!==undefined)){
     // Equal renewable HTTP observations share one immutable record. A changed URL,
     // page slot, recipe or content key gets another ID, preserving in-flight locators.

@@ -79,14 +79,13 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
   </div>;
 }
 
-export function ReaderNavigation({backLabel, backText, title, notice, onBack, progressStatus, showProgress = true, directoryOpen, onDirectory, children}: {
+export function ReaderNavigation({backLabel, backText, title, notice, onBack, progressStatus, directoryOpen, onDirectory, children}: {
   backLabel: string;
   backText: string;
   title: string;
   notice?: string;
   onBack(): void;
   progressStatus?: ReadingProgressStatus;
-  showProgress?: boolean;
   directoryOpen: boolean;
   onDirectory(): void;
   children?: ReactNode;
@@ -98,7 +97,7 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
       <Icon name="list"/><span>{msg('目录')}</span>{notice && <i className="nc-rail-notice" aria-hidden="true"/>}
     </button>
     {children && <><span className="nc-rail-divider"/>{children}</>}
-  </nav>{showProgress && <ReadingProgressBadge status={progressStatus}/>}</>;
+  </nav><ReadingProgressBadge status={progressStatus}/></>;
 }
 
 export function ReaderTools({label, above, below, children}: {label: string; above: number; below: number; children: ReactNode}) {

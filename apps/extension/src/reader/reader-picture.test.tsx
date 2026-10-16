@@ -28,6 +28,7 @@ function effect(callback: () => void | (() => void), deps: unknown[]) {
 }
 vi.mock('./prepare-image', () => ({prepareReaderImage: vi.fn(async (_url: string, signal: AbortSignal) => signal.throwIfAborted())}));
 import {ReaderPicture, type ReaderPictureProps} from './ReaderPicture';
+import {msg} from '../i18n/runtime';
 
 let options: ReaderPictureProps;
 let tree: ReactNode;
@@ -42,9 +43,10 @@ function render(change: Partial<ReaderPictureProps> = {}) {
   } while (hooks.dirty);
 }
 async function flush() {for (let n = 0; n < 5; n++) await Promise.resolve(); render();}
-function images(node: ReactNode): {src: string; className: string; onLoad(event: unknown): void}[] {
+type ImageProps = {src: string; alt: string; className: string; 'data-result-job': string; onLoad(event: unknown): void};
+function images(node: ReactNode): ImageProps[] {
   if (Array.isArray(node)) return node.flatMap(child => images(child));
-  if (!isValidElement<{children?: ReactNode; src: string; className: string; onLoad(event: unknown): void}>(node)) return [];
+  if (!isValidElement<ImageProps & {children?: ReactNode}>(node)) return [];
   return node.type === 'img' ? [node.props] : images(node.props.children);
 }
 function displayed() {const image = images(tree).find(image => image.className === 'nc-page-image-pending'); expect(image).toBeDefined(); image!.onLoad({currentTarget: {naturalWidth: 800, naturalHeight: 1200}}); render();}
@@ -54,20 +56,19 @@ beforeEach(() => {
   let id = 0;
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:reader-test-${++id}`);
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
-  options = {scope: 'slot-1', blobKey: 'original', alt: 'Page 1', onImport: vi.fn(), hideSourceActions: true,
+  options = {scope: 'slot-1', blobKey: 'original', alt: 'Page 1', onImport: vi.fn(),
     acquire: vi.fn(async () => ({blob: new Blob(['image']), release: vi.fn()}))};
 });
 afterEach(() => {cleanup(); vi.restoreAllMocks();});
 
 describe('shared reader pixel presentation', () => {
   it('commits only after the actual display loads and releases its URL and source lease on removal', async () => {
-    const release = vi.fn(), shown = vi.fn(), dimensions = vi.fn();
-    render({acquire: vi.fn(async () => ({blob: new Blob(['image']), release})), onShown: shown, onDimensions: dimensions});
+    const release = vi.fn(), shown = vi.fn();
+    render({acquire: vi.fn(async () => ({blob: new Blob(['image']), release})), onShown: shown});
     await flush();
     expect(shown.mock.calls.some(([value]) => value?.key === 'original')).toBe(false);
     displayed();
     expect(shown).toHaveBeenCalledWith(expect.objectContaining({key: 'original'}));
-    expect(dimensions).toHaveBeenCalledExactlyOnceWith(800, 1200);
     cleanup();
     expect(release).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1');
@@ -80,16 +81,23 @@ describe('shared reader pixel presentation', () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:reader-test-1');
     cleanup(); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:reader-test-1');
   });
-  it('restarts a cancelled source read on a new session revision without a manual retry or remount', async () => {
+  it('identifies original and translated pixels through the displayed job', async () => {
+    render(); await flush(); displayed();
+    expect(images(tree)[0]).toMatchObject({alt: `Page 1${msg('原图')}`, 'data-result-job': 'original'});
+    render({blobKey: 'translated', job: {id: 'translated-job'} as NonNullable<ReaderPictureProps['job']>});
+    await flush(); displayed();
+    expect(images(tree)[0]).toMatchObject({alt: `Page 1${msg('译图')}`, 'data-result-job': 'translated-job'});
+  });
+  it('restarts a failed source read when its resource key changes without a manual retry or remount', async () => {
     let reject!: (reason: Error) => void;
     const pending = new Promise<{blob: Blob; release(): void}>((_resolve, fail) => {reject = fail;});
     const acquire = vi.fn<ReaderPictureProps['acquire']>(async () => ({blob: new Blob(['recovered']), release: vi.fn()})).mockImplementationOnce(() => pending);
-    const state = vi.fn(), first = JSON.stringify(['slot-1', JSON.stringify(['session-one', 'original']), 'original']);
+    const state = vi.fn(), first = 'source-version-one';
     render({blobKey: first, acquire, onLoadState: state});
-    reject(Error('SOURCE_SESSION_EXPIRED')); await flush();
-    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase: 'error', error: 'SOURCE_SESSION_EXPIRED'}));
+    reject(Error('Source changed')); await flush();
+    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase: 'error', error: 'Source changed'}));
     render({blobKey: first}); await flush(); expect(acquire).toHaveBeenCalledOnce();
-    render({blobKey: JSON.stringify(['slot-1', JSON.stringify(['session-two', 'original']), 'original'])}); await flush();
+    render({blobKey: 'source-version-two'}); await flush();
     expect(acquire).toHaveBeenCalledTimes(2); displayed();
     expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase: 'ready', error: undefined}));
     expect(images(tree).map(image => image.src)).toEqual(['blob:reader-test-1']);
@@ -101,7 +109,7 @@ describe('shared reader pixel presentation', () => {
     cleanup();
     expect(release).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1');
-    // SessionPicture keeps its page frame but mounts a new ReaderPicture after visibility returns.
+    // A new visible image window mounts a fresh picture after releasing its old pixels.
     hooks.states=[];hooks.refs=[];hooks.pending=[];
     render();await flush();displayed();
     expect(acquire).toHaveBeenCalledTimes(2);

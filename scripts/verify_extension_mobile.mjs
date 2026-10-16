@@ -306,41 +306,6 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         assert((await area.boundingBox()).y>0,'Phone full-height canvas leaked into a narrow desktop window');
         check('desktop geometry, hover/leave, numeric keyboard focus and narrow-window phone isolation');
       }finally{await desktop.close();}
-      // Actual SessionReader and shadow styles, with synthetic images/public shortcut preferences only.
-      await page.evaluate(async()=>{
-        const [react,dom,{SessionReader,sessionReaderStyles},{shadowThemeStyles},{defaults}]=await Promise.all([
-          import('/node_modules/.vite/deps/react.js'),import('/node_modules/.vite/deps/react-dom_client.js'),
-          import('/src/reader/SessionReader.tsx'),import('/src/inline/shadow.ts'),import('/src/types.ts'),
-        ]);
-        const {createElement}=react.default??react,{createRoot}=dom.default??dom;
-        window.chrome={runtime:{onMessage:{addListener(){},removeListener(){}},sendMessage:async()=>({ok:true,overrides:{}})}};
-        // A pre-existing source-page selection must not swallow reader taps.
-        const source=document.querySelector('#root h1');if(source)window.getSelection().selectAllChildren(source);
-        const host=document.createElement('div');host.id='session-controls-fixture';host.style.cssText='position:fixed;inset:0;z-index:9999';
-        document.body.append(host);
-        const shadow=host.attachShadow({mode:'open'}),style=document.createElement('style'),theme=document.createElement('div');
-        style.textContent=shadowThemeStyles(sessionReaderStyles);theme.className='theme';theme.style.cssText='height:100%;width:100%';shadow.append(style,theme);
-        const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1200;
-        const ctx=canvas.getContext('2d');ctx.fillStyle='#b6dafa';ctx.fillRect(0,0,800,1200);ctx.fillStyle='#315480';ctx.font='48px sans-serif';ctx.fillText('Session reader fixture',60,120);
-        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png')),root=createRoot(theme);
-        root.render(createElement(SessionReader,{title:'Session controls fixture',pages:Array.from({length:30},(_,i)=>({id:`page-${i}`,width:800,height:1200})),
-          settings:defaults,setSettings(){},loadImage:async()=>({blob,release(){}}),onExit(){root.unmount();host.remove();}}));
-      });
-      const session=page.locator('#session-controls-fixture'),sessionCanvas=session.locator('.nc-reading-viewport');
-      await session.locator('.nc-page-image').first().waitFor();
-      for(const [width,height] of [[390,844],[844,390]]){
-        await page.setViewportSize({width,height});await session.locator('.nc-reader.controls-hidden').waitFor();
-        const before=await sessionCanvas.boundingBox();
-        assert(before.y===0&&before.height===height,'Shadow reader reserves hidden toolbar space');
-        await page.touchscreen.tap(width/2,height/2);await session.locator('.nc-reader:not(.controls-hidden)').waitFor();
-        assert.deepEqual(await sessionCanvas.boundingBox(),before,'Shadow reader reveal changed the canvas');
-        await page.touchscreen.tap(width/2,height/2);await session.locator('.nc-reader.controls-hidden').waitFor();
-        await shot(`session-immersive-hidden-${width}`);
-      }
-      assert(await session.locator('.nc-manga-page').count()<=11,'Toolbar changes expanded the bounded image window');
-      await session.getByRole('button',{name:'显示阅读工具',exact:true}).tap();
-      await session.getByRole('button',{name:'返回网页',exact:true}).tap();await session.waitFor({state:'detached'});
-      check('shadow SessionReader fills portrait/landscape, toggles tools without resizing and retains its bounded image window');
     }
     if(!readerOnly){
     const longImage=await page.evaluate(async pngModule=>{

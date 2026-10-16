@@ -4,7 +4,7 @@ import {InlineBackoff} from './backoff';
 beforeEach(()=>{vi.useFakeTimers({toFake:['performance']});vi.stubGlobal('navigator',{onLine:true});});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 
-describe('shared inline and immersive control backoff',()=>{
+describe('inline control backoff',()=>{
   it('retains the longest deadline and does not increase failures during local-only recovery',()=>{
     const value=new InlineBackoff(),schedule=vi.fn();
     expect(value.fail()).toBe(1000);expect(value.reason).toBe('backoff');

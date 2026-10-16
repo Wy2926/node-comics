@@ -3,11 +3,9 @@ import {msg} from '../i18n/runtime';
 import {hasShortcutOverlay} from '../shortcuts/runtime';
 
 /** Reader chrome owns interaction state, never image windows or document locations. */
-export function useReaderControls<Panel extends string>({blocked, notify, local = false}: {
+export function useReaderControls<Panel extends string>({blocked, notify}: {
   blocked: boolean;
   notify(message: string): void;
-  /** An embedded reader owns keys/focus inside its shadow host, not the source document. */
-  local?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<Panel>();
@@ -56,7 +54,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
   async function fullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
-      else await (local ? root.current! : document.documentElement).requestFullscreen();
+      else await document.documentElement.requestFullscreen();
     } catch {
       notify(msg('此浏览器暂时无法进入全屏。'));
     }
@@ -90,7 +88,6 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
     return () => {document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true);};
   }, [panel, blocked]);
   useEffect(() => {
-    if (local) return;
     function escape(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing ||
         event.keyCode === 229 || blocked || hasShortcutOverlay(document)) return;
@@ -99,7 +96,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
     }
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
-  }, [immersive, panel, blocked, local]);
+  }, [immersive, panel, blocked]);
 
   return {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen};
 }

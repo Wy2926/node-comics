@@ -81,6 +81,18 @@ describe('reader numeric keyboard', () => {
 });
 
 describe('immersive reader controls', () => {
+  it('enters fullscreen for the whole reader document and exits the active fullscreen view', async () => {
+    const requestFullscreen = vi.fn(async () => {}), exitFullscreen = vi.fn(async () => {});
+    Object.assign(document, {documentElement: {requestFullscreen}, fullscreenElement: null, exitFullscreen});
+    await controls.fullscreen();
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+    expect(exitFullscreen).not.toHaveBeenCalled();
+    Object.assign(document, {fullscreenElement: {}});
+    await controls.fullscreen();
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+  });
+
   it('defaults to immersive with a visible, auto-hiding first-use toolbar', () => {
     expect(controls.immersive).toBe(true);
     expect(controls.hidden).toBe(false);

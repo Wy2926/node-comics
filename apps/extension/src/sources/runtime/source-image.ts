@@ -51,12 +51,6 @@ export async function readSourceImage(reference:SourceImageReference,signal?:Abo
   const valid=await sourceMessage<{url:string;pageUrl:string;data?:string;sourceId?:string;processing?:string}>({type:'NC_SOURCE_IMAGE',manifestId:reference.manifestId,pageId:reference.pageId});
   signal?.throwIfAborted();
   if(valid.url!==reference.expectedUrl)throw Error('图片来源已变化，请重新发现。');
-  return readResolvedSourceImage(valid,signal);
-}
-
-/** Trusted runtime only: the caller must validate the manifest and exact page first. */
-export async function readResolvedSourceImage(valid:{url:string;pageUrl:string;data?:string;sourceId?:string;processing?:string},signal?:AbortSignal):Promise<Blob> {
-  signal?.throwIfAborted();
   const adapter=valid.sourceId?sourceImages[valid.sourceId]:undefined;
   if(valid.processing&&!adapter?.decode)throw Error('来源图片处理器不可用。');
   const headers=valid.data?undefined:typeof adapter?.headers==='function'?adapter.headers(valid.url):adapter?.headers;
