@@ -11,7 +11,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<Panel>();
-  const [immersive, setImmersive] = useState(false);
+  const [immersive, setImmersive] = useState(true);
   const [hidden, setHidden] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -22,8 +22,23 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
       hideTimer.current = setTimeout(() => {
         // Mouse-restored button focus must not pin the tools open. Keyboard
         // focus and editable controls stay visible until focus leaves them.
-        if (!root.current?.querySelector('.nc-reader-controls :focus-visible')) setHidden(true);
+        if (root.current?.querySelector('.nc-reader-controls :focus-visible, .nc-reader-controls :active')) return;
+        // Touch browsers can retain :hover after a tap; only a real hover-capable
+        // pointer should keep idle controls open while choosing an action.
+        if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches &&
+          root.current?.querySelector('.nc-reader-controls:hover')) return;
+        setHidden(true);
       }, 1200);
+    }
+  }
+
+  function toggleControls() {
+    if (panel) {setPanel(undefined); return;}
+    if (!immersive || blocked) return;
+    if (hidden) reveal();
+    else {
+      clearTimeout(hideTimer.current);
+      setHidden(true);
     }
   }
 
@@ -86,5 +101,5 @@ export function useReaderControls<Panel extends string>({blocked, notify, local 
     return () => window.removeEventListener('keydown', escape);
   }, [immersive, panel, blocked, local]);
 
-  return {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen};
+  return {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen};
 }

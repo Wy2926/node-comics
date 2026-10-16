@@ -69,14 +69,21 @@ async function reachable(page, name) {
   return button;
 }
 
+async function showTools(page) {
+  if (await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden'))) {
+    await page.getByRole('button', {name: '显示阅读工具', exact: true}).click();
+  }
+}
+
 async function mobileGeometry(page) {
   await visibleContent(page);
+  await showTools(page);
   const geometry = await page.evaluate(() => {
     const box = selector => {const value = document.querySelector(selector).getBoundingClientRect(); return {top: value.top, bottom: value.bottom};};
     return {top: box('.nc-reader-rail.left'), bottom: box('.nc-reader-rail.right'), canvas: box('.nc-epub-stage'), overflow: document.documentElement.scrollWidth > innerWidth + 1};
   });
   assert.equal(geometry.overflow, false);
-  assert(geometry.canvas.top >= geometry.top.bottom - 1 && geometry.canvas.bottom <= geometry.bottom.top + 1, 'Tools must not cover EPUB content');
+  assert(geometry.canvas.top === 0 && geometry.canvas.bottom === page.viewportSize().height, 'Immersive tools must overlay a full-height EPUB canvas');
   for (const name of ['关闭阅读器', '打开目录', '阅读设置']) await reachable(page, name);
   await (await reachable(page, '打开目录')).click();
   await (await reachable(page, '关闭面板')).click();
@@ -103,7 +110,20 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
         // Fixture diagnostics are not reader chrome and otherwise cover the bottom tools.
         await page.addStyleTag({content: '.nc-app > details {display:none !important}'});
         await ready(page);
+        await showTools(page);
         if (scenario === 'navigation-and-reopen') {
+          await t.test('default immersive toolbar toggles from iframe taps without resizing or moving the text', async () => {
+            assert(await page.locator('.nc-reader').evaluate(element => element.classList.contains('is-immersive')));
+            await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+            const canvas = page.locator('.nc-epub-stage'), before = await canvas.boundingBox(), anchorBefore = await location(page);
+            await page.touchscreen.tap(195, 422);
+            await page.waitForFunction(() => !document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+            assert.deepEqual(await canvas.boundingBox(), before, 'EPUB content tap must not resize the canvas');
+            await page.touchscreen.tap(195, 422);
+            await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+            assert.equal((await location(page)).cfi, anchorBefore.cfi, 'EPUB toolbar toggling must keep the reading anchor');
+            await page.screenshot({path: path.join(output, `${engine}-immersive-hidden.png`)});
+          });
           await mobileGeometry(page);
           await page.screenshot({path: path.join(output, `${engine}-portrait.png`)});
           for (const [title, href] of [['Chapter Two', 'two.xhtml'], ['Chapter One', 'one.xhtml']]) {
@@ -127,13 +147,51 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           assert.equal(restored.cfi.split(':')[0], saved.cfi.split(':')[0], 'Reopening must restore the same CFI text node');
           assert(Math.abs(restored.progression - saved.progression) < .002, 'Reopening must preserve the local reading anchor');
           const reopened = await renderedAnchor(page, anchor);
-          await t.test('reopening preserves the rendered text within one line', {
-            todo: engine === 'webkit' && 'EPUB.js retains the same CFI but loses a measured 60px intra-node offset; real iOS devices remain unverified.',
-          }, () => {
-            assert(anchor && reopened && Math.abs(reopened.top - anchor.top) <= Math.max(anchor.lineHeight, reopened.lineHeight) + 2,
-              `Reopening must keep the rendered text within one line: ${JSON.stringify({anchor, reopened})}`);
+          await t.test('reopening preserves the rendered text within one pixel', () => {
+            assert(anchor && reopened && Math.abs(reopened.top - anchor.top) <= 1,
+              `Reopening must keep the intra-node offset: ${JSON.stringify({anchor, reopened})}`);
+            t.diagnostic(`Reopen drift: ${reopened.top - anchor.top}px`);
           });
           await page.screenshot({path: path.join(output, `${engine}-reopened.png`)});
+          await t.test('small scrolls within the same CFI survive repeated reopening', async () => {
+            const before = await location(page);
+            await page.locator('.nc-epub-viewport .epub-container').evaluate(element => {element.scrollTop += 8;});
+            await page.waitForFunction(progression => JSON.parse(document.querySelector('output[aria-label="保存位置"]').textContent).progression !== progression, before.progression);
+            const scrolled = await location(page), text = await renderedAnchor(page, anchor);
+            assert.equal(scrolled.cfi, before.cfi, 'This regression must scroll inside the same CFI');
+            assert(Math.abs(text.top - reopened.top + 8) <= 1);
+            for (let pass = 0; pass < 2; pass++) {
+              await showTools(page);
+              await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
+              await page.getByRole('button', {name: '重开阅读器', exact: true}).click();
+              await ready(page);
+              const after = await renderedAnchor(page, text);
+              assert(Math.abs(after.top - text.top) <= 1, `Repeated reopen ${pass}: ${JSON.stringify({text, after})}`);
+            }
+          });
+          await t.test('font reflow and reopening at a different width preserve the text anchor', async () => {
+            const before = await location(page);
+            await showTools(page);
+            await page.getByRole('button', {name: '阅读设置', exact: true}).click();
+            await page.getByRole('button', {name: '放大', exact: true}).click();
+            await page.waitForFunction(progression => JSON.parse(document.querySelector('output[aria-label="保存位置"]').textContent).progression !== progression, before.progression);
+            await page.getByRole('button', {name: '关闭面板', exact: true}).click();
+            assert.equal((await location(page)).cfi.split(':')[0], before.cfi.split(':')[0], 'Font reflow must keep the same text node');
+            const text = await renderedAnchor(page, anchor);
+            await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
+            await page.getByRole('button', {name: '重开阅读器', exact: true}).click();
+            await ready(page);
+            assert(Math.abs((await renderedAnchor(page, text)).top - text.top) <= 1, 'Reopening must retain the reflowed position');
+            const saved = await location(page);
+            await showTools(page);
+            await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
+            await page.setViewportSize({width: 844, height: 390});
+            await page.getByRole('button', {name: '重开阅读器', exact: true}).click();
+            await ready(page);
+            assert.equal((await location(page)).cfi.split(':')[0], saved.cfi.split(':')[0], 'Reopening at a different width must prefer CFI over the saved fraction');
+            await visibleContent(page);
+          });
+          await showTools(page);
           const jump = page.getByRole('spinbutton', {name: '跳转章节', exact: true});
           const beforeEdit = await location(page);
           await jump.fill('');
@@ -174,7 +232,9 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           const retry = page.locator('.nc-image-translation.error .nc-image-translation-action');
           await retry.waitFor({state: 'visible'});
           await page.waitForFunction(() => document.querySelector('output[aria-label="已提交图片"]').textContent.includes('image-2.png'));
-          await retry.click();
+          await page.mouse.move(195, 422);
+          await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+          await retry.tap();
           await page.waitForFunction(() => document.querySelector('output[aria-label="已提交图片"]').textContent.includes('image-1.png'));
           await retry.waitFor({state: 'detached'});
           assert.equal((await location(page)).cfi, saved.cfi, 'Retry must preserve the reading anchor');
@@ -215,7 +275,9 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           await retry.waitFor();
           await page.screenshot({path: path.join(output, `${engine}-${scenario}.png`)});
           const saved = await location(page), submissions = await page.locator('output[aria-label="已提交图片"]').textContent();
-          await retry.click();
+          await page.mouse.move(195, 422);
+          await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+          await retry.tap();
           await page.waitForFunction(href => window.epubEnhancementFixture.requests.filter(request => request.href === href).length === 2, href);
           await retry.waitFor({state: 'detached'});
           await page.locator('[data-enhancement-state]').waitFor({state: 'detached'});

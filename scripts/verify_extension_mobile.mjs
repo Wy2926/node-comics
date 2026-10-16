@@ -12,6 +12,7 @@ const out=path.resolve(process.env.MOBILE_ARTIFACTS||'artifacts/mobile-validatio
 await mkdir(out,{recursive:true});
 const {version}=JSON.parse(await readFile('apps/extension/package.json','utf8'));
 const reports=[];
+const readerOnly=process.argv.includes('--reader-only');
 for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').split(',')){
   const browser=await engines[engine].launch({headless:true,...engine==='chromium'&&process.env.TEST_CHROMIUM?{executablePath:process.env.TEST_CHROMIUM}:{}});
   const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,...engine==='firefox'?{}:{isMobile:true},locale:'zh-CN',reducedMotion:'reduce'});
@@ -48,6 +49,7 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await page.goto(web);
     await page.getByRole('navigation',{name:'主导航'}).waitFor();
     const nav=page.getByRole('navigation',{name:'主导航'});
+    if(!readerOnly){
     for(const [width,height] of [[320,568],[360,800],[390,844],[430,932],[844,390]]){
       await page.setViewportSize({width,height});
       for(const name of ['我的漫画','远程书库','发现','搜索漫画','漫画网站']){
@@ -145,8 +147,9 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await card.click();await page.getByRole('dialog').waitFor();await noOverflow();await inViewport(page.getByRole('dialog').getByRole('button',{name:'关闭弹窗',exact:true}));await shot('discovery-detail');
     await page.getByRole('dialog').getByRole('button',{name:'关闭弹窗',exact:true}).click();
     check('discovery detail is scrollable and closable on phone');
+    }
     await nav.getByRole('button',{name:'我的漫画',exact:true}).click();
-    await page.evaluate(async()=>{
+    const importComic=target=>target.evaluate(async()=>{
       const {comicFile}=await import('/tests/comic-fixture.ts');
       // Distinct edge-to-edge colors expose any space added by the reader,
       // including short and tall pages (not whitespace inside an original).
@@ -159,9 +162,57 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
       const file=await comicFile('Mobile fixture',Array.from({length:8},(_,index)=>blobs[index%blobs.length])),transfer=new DataTransfer();transfer.items.add(file);
       const input=document.querySelector('input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
     });
+    await importComic(page);
     await page.locator('.nc-page-image').first().waitFor({timeout:60000});
     const viewport=page.locator('.nc-reading-viewport');
     await page.locator('.nc-manga-page[data-page-index="2"] .nc-page-image').waitFor();
+    const hidden=target=>target.waitForFunction(()=>document.querySelector('.nc-reader')?.classList.contains('controls-hidden'));
+    const visible=target=>target.waitForFunction(()=>!document.querySelector('.nc-reader')?.classList.contains('controls-hidden'));
+    const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const canvas=()=>viewport.evaluate(el=>{
+      const box=el.getBoundingClientRect();
+      return {x:box.x,y:box.y,width:box.width,height:box.height,scroll:el.scrollTop};
+    });
+    assert(await page.locator('.nc-reader').evaluate(el=>el.classList.contains('is-immersive')),'Immersive reading must default to on');
+    for(const [width,height] of [[320,568],[390,844],[430,932],[844,390]]){
+      await page.setViewportSize({width,height});await hidden(page);await settle();
+      await viewport.evaluate(el=>{el.scrollTop=220;});await settle();
+      const before=await canvas();
+      assert(before.y===0&&before.height===height,`Hidden phone tools reserve space at ${width}x${height}: ${JSON.stringify(before)}`);
+      await shot(`reader-immersive-hidden-${width}`);
+      await page.touchscreen.tap(width/2,height/2);await visible(page);await settle();
+      assert.deepEqual(await canvas(),before,'Revealing tools must not resize or move the page');
+      await shot(`reader-immersive-visible-${width}`);
+      await page.touchscreen.tap(width/2,height/2);await hidden(page);await settle();
+      assert.deepEqual(await canvas(),before,'Dismissing tools must not resize or move the page');
+      check(`default immersive fills ${width}x${height}; content taps toggle tools without moving the canvas`);
+    }
+    await page.setViewportSize({width:390,height:844});await settle();
+    if(engine==='chromium'){
+      const cdp=await context.newCDPSession(page),before=await canvas();
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:387,y:620}]});
+      for(let y=600;y>=400;y-=20){
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:387,y}]});await settle();
+      }
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      assert((await canvas()).scroll>before.scroll,'Native touch drag did not scroll the page');
+      assert(await page.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),'Touch scrolling at the edge reopened tools');
+      await viewport.evaluate(el=>new Promise(resolve=>{
+        let previous=el.scrollTop,stable=0;
+        const next=()=>{stable=Math.abs(el.scrollTop-previous)<.5?stable+1:0;previous=el.scrollTop;if(stable>=8)resolve();else requestAnimationFrame(next);};requestAnimationFrame(next);
+      }));
+      await cdp.detach();check('native touch edge scrolling leaves the toolbar hidden');
+    }
+    await page.touchscreen.tap(195,422);await visible(page);
+    await page.getByRole('button',{name:'阅读设置',exact:true}).tap();
+    const immersive=page.getByRole('switch',{name:'沉浸阅读',exact:true});
+    assert.equal(await immersive.getAttribute('aria-checked'),'true');
+    await immersive.tap();await page.getByRole('button',{name:'关闭面板',exact:true}).tap();await settle();
+    const reserved=await canvas();
+    assert(reserved.y>0&&reserved.height<844,'Disabling immersive should keep the existing reserved toolbar layout');
+    check(`immersive recovers ${844-reserved.height}px of vertical canvas at 390px; disabled mode retains its toolbar space`);
+    // Remaining geometry/translation checks intentionally keep tools pinned.
+    await viewport.evaluate(el=>{el.scrollTop=0;});await settle();
     const pageGeometry=await page.locator('.nc-manga-page').evaluateAll(pages=>pages.slice(0,3).map(page=>{
       const box=page.getBoundingClientRect(),image=page.querySelector('.nc-page-image'),picture=page.querySelector('.nc-page-picture').getBoundingClientRect();
       return {index:Number(page.dataset.pageIndex),top:box.top,bottom:box.bottom,height:picture.height,expectedHeight:picture.width*image.naturalHeight/image.naturalWidth};
@@ -227,6 +278,71 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     await page.getByRole('button',{name:'打开漫画 Mobile fixture',exact:true}).waitFor();await noOverflow();
     await shot('library-populated');
     check('real CBZ import, reader controls, drawers, orientation and position retention');
+    // Mouse hover, keyboard focus and the physical-device gate use a real desktop context.
+    if(readerOnly){
+      const desktop=await browser.newContext({viewport:{width:1280,height:900},screen:{width:1920,height:1080},locale:'zh-CN',reducedMotion:'reduce'});
+      try{
+        await desktop.route(/^https?:\/\//,route=>new URL(route.request().url()).origin===origin?route.continue():route.fulfill({status:503,json:{}}));
+        await desktop.addInitScript(({version})=>{
+          localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',appearance:'light',layout:'continuous',fit:'width',discoveryTextTranslation:false}));
+          localStorage.setItem('nc-release-notes-version',version);
+        },{version});
+        const mouse=await desktop.newPage();mouse.on('pageerror',error=>errors.push(error.message));
+        await mouse.goto(web);await mouse.getByRole('navigation',{name:'主导航'}).waitFor();await importComic(mouse);
+        await mouse.locator('.nc-page-image').first().waitFor({timeout:60000});await hidden(mouse);
+        const area=mouse.locator('.nc-reading-viewport'),before=await area.boundingBox();
+        assert(before.x>0,'Desktop side tool space was removed');
+        await mouse.mouse.move(2,450);await visible(mouse);
+        assert.deepEqual(await area.boundingBox(),before,'Desktop reveal changed canvas geometry');
+        await mouse.getByRole('button',{name:'阅读设置',exact:true}).hover();await mouse.waitForTimeout(1600);
+        assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Stationary mouse hover hid the toolbar');
+        await mouse.mouse.move(640,450);await hidden(mouse);
+        await mouse.getByRole('button',{name:'显示阅读工具',exact:true}).click();
+        const number=mouse.getByRole('spinbutton',{name:'跳转页码',exact:true});
+        await number.fill('2');await mouse.mouse.move(640,450);await mouse.waitForTimeout(1600);
+        assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Page-number editing hid the toolbar');
+        await number.press('Enter');await hidden(mouse);await mouse.screenshot({path:path.join(out,`${engine}-reader-desktop-hidden.png`)});
+        await mouse.setViewportSize({width:650,height:900});await hidden(mouse);
+        assert((await area.boundingBox()).y>0,'Phone full-height canvas leaked into a narrow desktop window');
+        check('desktop geometry, hover/leave, numeric keyboard focus and narrow-window phone isolation');
+      }finally{await desktop.close();}
+      // Actual SessionReader and shadow styles, with synthetic images/public shortcut preferences only.
+      await page.evaluate(async()=>{
+        const [react,dom,{SessionReader,sessionReaderStyles},{shadowThemeStyles},{defaults}]=await Promise.all([
+          import('/node_modules/.vite/deps/react.js'),import('/node_modules/.vite/deps/react-dom_client.js'),
+          import('/src/reader/SessionReader.tsx'),import('/src/inline/shadow.ts'),import('/src/types.ts'),
+        ]);
+        const {createElement}=react.default??react,{createRoot}=dom.default??dom;
+        window.chrome={runtime:{onMessage:{addListener(){},removeListener(){}},sendMessage:async()=>({ok:true,overrides:{}})}};
+        // A pre-existing source-page selection must not swallow reader taps.
+        const source=document.querySelector('#root h1');if(source)window.getSelection().selectAllChildren(source);
+        const host=document.createElement('div');host.id='session-controls-fixture';host.style.cssText='position:fixed;inset:0;z-index:9999';
+        document.body.append(host);
+        const shadow=host.attachShadow({mode:'open'}),style=document.createElement('style'),theme=document.createElement('div');
+        style.textContent=shadowThemeStyles(sessionReaderStyles);theme.className='theme';theme.style.cssText='height:100%;width:100%';shadow.append(style,theme);
+        const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1200;
+        const ctx=canvas.getContext('2d');ctx.fillStyle='#b6dafa';ctx.fillRect(0,0,800,1200);ctx.fillStyle='#315480';ctx.font='48px sans-serif';ctx.fillText('Session reader fixture',60,120);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png')),root=createRoot(theme);
+        root.render(createElement(SessionReader,{title:'Session controls fixture',pages:Array.from({length:30},(_,i)=>({id:`page-${i}`,width:800,height:1200})),
+          settings:defaults,setSettings(){},loadImage:async()=>({blob,release(){}}),onExit(){root.unmount();host.remove();}}));
+      });
+      const session=page.locator('#session-controls-fixture'),sessionCanvas=session.locator('.nc-reading-viewport');
+      await session.locator('.nc-page-image').first().waitFor();
+      for(const [width,height] of [[390,844],[844,390]]){
+        await page.setViewportSize({width,height});await session.locator('.nc-reader.controls-hidden').waitFor();
+        const before=await sessionCanvas.boundingBox();
+        assert(before.y===0&&before.height===height,'Shadow reader reserves hidden toolbar space');
+        await page.touchscreen.tap(width/2,height/2);await session.locator('.nc-reader:not(.controls-hidden)').waitFor();
+        assert.deepEqual(await sessionCanvas.boundingBox(),before,'Shadow reader reveal changed the canvas');
+        await page.touchscreen.tap(width/2,height/2);await session.locator('.nc-reader.controls-hidden').waitFor();
+        await shot(`session-immersive-hidden-${width}`);
+      }
+      assert(await session.locator('.nc-manga-page').count()<=11,'Toolbar changes expanded the bounded image window');
+      await session.getByRole('button',{name:'显示阅读工具',exact:true}).tap();
+      await session.getByRole('button',{name:'返回网页',exact:true}).tap();await session.waitFor({state:'detached'});
+      check('shadow SessionReader fills portrait/landscape, toggles tools without resizing and retains its bounded image window');
+    }
+    if(!readerOnly){
     const longImage=await page.evaluate(async pngModule=>{
       const {bitmapPng}=await import(pngModule);
       const original=Object.getOwnPropertyDescriptor(window,'OffscreenCanvas');
@@ -362,6 +478,7 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
       }finally{await desktop.close();}
     }
     check('desktop mouse/touch widths retain bounded navigation and compact popup without hiding shortcuts');
+    }
     assert.deepEqual(errors,[]);
     reports.push({engine,checks,errors,realMobileDevice:false,externalServices:false});
   }catch(error){

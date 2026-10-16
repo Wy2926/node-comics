@@ -69,8 +69,9 @@
 .nc-session-region-hint { position:fixed; max-width:calc(100% - 32px); z-index:2; pointer-events:none; font-size:var(--text-body); }
 .nc-session-region-highlight { position:fixed; z-index:1; pointer-events:none; border:var(--comic-border); border-color:var(--accent); border-radius:var(--comic-control-radius); background:color-mix(in srgb,var(--accent) 12%,transparent); box-sizing:border-box; }
 @media (prefers-reduced-motion:reduce) { .nc-session-reader .spinner { animation:none; } }
-@media(max-width:700px) {
+@media (max-width:700px), (max-width:1000px) and (max-height:500px) and (pointer:coarse), (max-width:1000px) and (max-height:500px) and (hover:none) {
   .nc-session-reader .nc-reading-viewport { inset:64px 0 62px; }
+  .nc-session-reader .nc-reader.is-immersive .nc-reading-viewport { inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px); margin:0; }
   .nc-session-reader .nc-reader-rail { top:auto; transform:none; width:auto; height:52px; max-height:none; flex-direction:row; align-items:center; justify-content:center; padding:3px 6px; gap:5px; }
   .nc-session-reader .nc-reader-rail.left { top:6px; left:6px; right:6px; }
   .nc-session-reader .nc-reader-rail.right { bottom:6px; left:6px; right:6px; }

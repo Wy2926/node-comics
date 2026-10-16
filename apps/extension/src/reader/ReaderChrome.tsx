@@ -54,18 +54,26 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
   const revealControl = immersive ? (event: {target: EventTarget}) => {
     if ((event.target as Element).closest('.nc-reader-controls')) reveal();
   } : undefined;
-  return <div ref={ref} className={`nc-reader ${hidden ? 'controls-hidden' : ''}`}
+  return <div ref={ref} className={`nc-reader${immersive ? ' is-immersive' : ''}${hidden ? ' controls-hidden' : ''}`}
     data-background={background}
     onPointerMove={immersive ? event => {
       // Touch scrolling is not a request to reopen the tools at a screen edge.
-      if (event.pointerType === 'touch') return;
+      if (event.pointerType !== 'mouse' || !hidden) return;
       if ((event.target as Element).closest('.nc-reader-controls')) {reveal(); return;}
       const bounds = event.currentTarget.getBoundingClientRect();
-      if (event.clientX - bounds.left < 8 || bounds.right - event.clientX < 8) reveal();
+      const compact = window.matchMedia?.(compactReaderQuery).matches;
+      if (compact ? event.clientY - bounds.top < 16 || bounds.bottom - event.clientY < 16
+        : event.clientX - bounds.left < 16 || bounds.right - event.clientX < 16) reveal();
     } : undefined}
     onPointerDownCapture={revealControl}
+    onPointerUpCapture={revealControl}
+    onPointerCancelCapture={revealControl}
+    onPointerOver={revealControl}
+    onPointerOut={immersive ? event => {
+      if (!hidden && !(event.relatedTarget as Element | null)?.closest?.('.nc-reader-controls')) revealControl?.(event);
+    } : undefined}
     onFocusCapture={revealControl}
-    onBlurCapture={revealControl}>
+    onBlurCapture={immersive && !hidden ? revealControl : undefined}>
     {children}
     {hidden && <button className="nc-reveal" aria-label={msg('显示阅读工具')} onClick={reveal}><Icon name="settings" size={20}/></button>}
   </div>;

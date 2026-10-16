@@ -75,7 +75,7 @@ export function SessionReader(props: SessionReaderProps) {
   const stream = useChapterStream({copy, sequence, layout: settings.layout, update,
     onActiveEntry: noop, onLoadEntry: noop, onMarkRead: markRead, notify: setMessage});
   const controls = useReaderControls<'directory' | 'settings'>({blocked: false, notify: setMessage, local: true});
-  const {root, panel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen} = controls;
+  const {root, panel, togglePanel, closePanel, immersive, hidden, reveal, toggleControls, fullscreen} = controls;
   const shortcutState = useRef({exit, panel}); shortcutState.current = {exit, panel};
   useEffect(() => {
     const element = root.current; if (!element) return;
@@ -129,7 +129,7 @@ export function SessionReader(props: SessionReaderProps) {
       immediate: navigationReason.current === 'direct'});
   }, [readingKey, visibleKey, view]);
   useEffect(() => () => callbacks.current.onReadingWindow?.({pageIds: [], visiblePageIds: [], view: 'original', immediate: true}), []);
-  useEffect(() => {setImmersive(true); viewport.current?.focus({preventScroll: true});}, []);
+  useEffect(() => {viewport.current?.focus({preventScroll: true});}, []);
 
   function scroll() {stream.scroll(); measureVisible();}
   function selectView(value: SessionReaderView) {preserve(); setView(value);}
@@ -212,7 +212,12 @@ export function SessionReader(props: SessionReaderProps) {
       {props.loading && <div className="nc-session-loading" role="status" aria-live="polite"><span className="spinner" aria-hidden="true"/><span>{msg('正在准备页面…')}</span></div>}
       <div className="nc-reading-viewport" data-reader-viewport="true" data-decoded-pages={foreground ? mountedIds.length : 0} data-page-count={pages.length}
         aria-busy={props.loading}
-        tabIndex={0} ref={viewport} onScroll={scroll} onClick={event => {if (!(event.target as Element).closest('button,input,a')) reveal();}}>
+        tabIndex={0} ref={viewport} onScroll={scroll} onClick={event => {
+          const selection = window.getSelection();
+          if (event.defaultPrevented || (event.target as Element).closest('button,a,input,select,textarea,[role="button"],[contenteditable]') ||
+            selection?.toString() && event.currentTarget.contains(selection.anchorNode)) return;
+          toggleControls();
+        }}>
         <div className="nc-reading-surface">
           <div className="nc-page-stack" ref={node => {if (node) stacks.current.set(copy.id, node); else stacks.current.delete(copy.id);}}>
             {settings.layout === 'continuous' && <div aria-hidden="true" style={{height: currentWindow.before}}/>}

@@ -148,7 +148,7 @@ export function epubProgression(rendition: Rendition, location?: Location): numb
   return Math.max(0, Math.min(1, (offset - origin) / Math.max(1, extent)));
 }
 
-function restoreProgression(rendition: Rendition, progression: number, index: number) {
+function restoreProgression(rendition: Rendition, progression: number, index: number, cfi?: string) {
   const manager = managerFor(rendition);
   const { container, settings } = manager;
   const vertical = settings.axis !== "horizontal";
@@ -167,7 +167,12 @@ function restoreProgression(rendition: Rendition, progression: number, index: nu
         ? scrollExtent - visible - offset
         : -offset;
   }
+  const {scrollLeft, scrollTop} = container;
   manager.scrollTo(vertical ? 0 : offset, vertical ? offset : 0, true);
+  // A text CFI can cover several scroll positions. Refine it only while the saved
+  // fraction still maps to that exact anchor; changed fonts/width must keep the CFI.
+  if (cfi && currentEpubLocation(rendition)?.start?.cfi !== cfi)
+    manager.scrollTo(scrollLeft, scrollTop, true);
   void rendition.reportLocation();
 }
 
@@ -183,11 +188,13 @@ export async function restoreEpubLocation(
       if (await session.book.getRange(location.cfi)) {
         session.signal?.throwIfAborted();
         await rendition.display(location.cfi);
+        session.signal?.throwIfAborted();
         // A fixed page's element CFI identifies the page, not the viewport's offset
         // inside it. Preserve that offset independently (image-only pages have no text).
-        if (rendition.settings?.layout === 'pre-paginated' && Number.isFinite(location.progression)) {
+        const fixed = rendition.settings?.layout === 'pre-paginated';
+        if (Number.isFinite(location.progression) && (fixed || !managerFor(rendition).isPaginated)) {
           const index = session.book.spine.get(location.cfi)?.index;
-          if (index !== undefined) restoreProgression(rendition, location.progression!, index);
+          if (index !== undefined) restoreProgression(rendition, location.progression!, index, fixed ? undefined : location.cfi);
         }
         return;
       }

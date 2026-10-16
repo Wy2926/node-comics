@@ -31,10 +31,11 @@ vi.mock('react', async original => ({
 import {useReaderControls} from '../src/reader/useReaderControls';
 import {ReaderShell, dismissReaderKeyboard} from '../src/reader/ReaderChrome';
 
-let blocked: boolean, focusVisible: boolean;
+let blocked: boolean, focusVisible: boolean, active: boolean, hovered: boolean, finePointer: boolean, compact: boolean;
 const focus = vi.fn();
-const querySelector = vi.fn((selector: string) => selector === '.nc-reader-controls :focus-visible'
-  ? focusVisible ? {focus} : null : selector === '[data-reader-settings-trigger]' ? {focus} : null);
+const querySelector = vi.fn((selector: string) => selector === '.nc-reader-controls :focus-visible, .nc-reader-controls :active'
+  ? focusVisible || active ? {focus} : null : selector === '.nc-reader-controls:hover'
+    ? hovered ? {} : null : selector === '[data-reader-settings-trigger]' ? {focus} : null);
 let controls: ReturnType<typeof useReaderControls<'settings' | 'directory' | 'translation'>>;
 function render() {
   do {
@@ -56,11 +57,11 @@ const target = (inControls: boolean) => ({closest: vi.fn(() => inControls ? {} :
 
 beforeEach(() => {
   hooks.states = []; hooks.refs = []; hooks.effects = []; hooks.pending = [];
-  blocked = focusVisible = false;
+  blocked = focusVisible = active = hovered = finePointer = compact = false;
   focus.mockClear(); querySelector.mockClear();
   vi.useFakeTimers();
   vi.stubGlobal('document', {querySelector: () => null, addEventListener: vi.fn(), removeEventListener: vi.fn()});
-  vi.stubGlobal('window', {addEventListener: vi.fn(), removeEventListener: vi.fn()});
+  vi.stubGlobal('window', {addEventListener: vi.fn(), removeEventListener: vi.fn(), matchMedia: (query: string) => ({matches: query.includes('pointer: fine') ? finePointer : compact})});
   render();
 });
 afterEach(() => {cleanup(); vi.useRealTimers(); vi.unstubAllGlobals();});
@@ -80,6 +81,31 @@ describe('reader numeric keyboard', () => {
 });
 
 describe('immersive reader controls', () => {
+  it('defaults to immersive with a visible, auto-hiding first-use toolbar', () => {
+    expect(controls.immersive).toBe(true);
+    expect(controls.hidden).toBe(false);
+    expect(shell().className).toContain('is-immersive');
+    advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it('toggles tools on content taps without leaving a hide timer running', () => {
+    controls.toggleControls(); render();
+    expect(controls.hidden).toBe(true); expect(vi.getTimerCount()).toBe(0);
+    controls.toggleControls(); render();
+    expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(1);
+    advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it.each(['panel', 'blocked', 'disabled'] as const)('content taps respect %s', reason => {
+    if (reason === 'panel') controls.setPanel('settings');
+    else if (reason === 'blocked') blocked = true;
+    else controls.setImmersive(false);
+    render(); controls.toggleControls(); render();
+    expect(controls.panel).toBeUndefined();
+    expect(controls.hidden).toBe(false);
+    advance(5000); expect(controls.hidden).toBe(reason === 'panel');
+  });
+
   it('hides after 1200ms and does not restart for unrelated renders', () => {
     enable(); advance(1000); render();
     expect(controls.hidden).toBe(false);
@@ -95,7 +121,7 @@ describe('immersive reader controls', () => {
     expect(focus).toHaveBeenCalledWith({preventScroll: true});
     expect(vi.getTimerCount()).toBe(1);
     advance(); expect(controls.hidden).toBe(true);
-    expect(querySelector).toHaveBeenCalledWith('.nc-reader-controls :focus-visible');
+    expect(querySelector).toHaveBeenCalledWith('.nc-reader-controls :focus-visible, .nc-reader-controls :active');
   });
 
   it('protects keyboard/input focus, then resumes from blur without a blank-area click', () => {
@@ -149,19 +175,68 @@ describe('immersive reader controls', () => {
     cleanup(); expect(vi.getTimerCount()).toBe(0);
   });
 
+  it.each(['onPointerUpCapture', 'onPointerCancelCapture'] as const)('keeps a long control press visible, then rearms on %s', handler => {
+    active = true;
+    shell().onPointerDownCapture!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
+    advance(5000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
+    active = false;
+    shell()[handler]!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
+    advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it('keeps stationary mouse hover open and resumes after leaving the toolbar', () => {
+    finePointer = hovered = true;
+    shell().onPointerOver!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
+    advance(5000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
+    shell().onPointerOut!({target: target(true), relatedTarget: target(true)} as unknown as PointerEvent<HTMLDivElement>);
+    expect(vi.getTimerCount()).toBe(0);
+    hovered = false;
+    shell().onPointerOut!({target: target(true), relatedTarget: target(false)} as unknown as PointerEvent<HTMLDivElement>);
+    advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it('does not let sticky touch hover pin the toolbar open', () => {
+    hovered = true; advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it('does not reopen hidden tools when their old mouse focus/hover leaves for a content action', () => {
+    advance();
+    expect(shell().onBlurCapture).toBeUndefined();
+    shell().onPointerOut!({target: target(true), relatedTarget: target(false)} as unknown as PointerEvent<HTMLDivElement>);
+    render(); expect(controls.hidden).toBe(true); expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('has no pointer/focus handlers outside immersive mode and avoids layout reads over controls', () => {
+    controls.setImmersive(false); render();
     expect(shell().onPointerMove).toBeUndefined();
     expect(shell().onPointerDownCapture).toBeUndefined();
     expect(shell().onFocusCapture).toBeUndefined();
     expect(shell().onBlurCapture).toBeUndefined();
     enable();
     const bounds = vi.fn(() => ({left: 0, right: 1000}));
-    shell().onPointerMove!({target: target(true), currentTarget: {getBoundingClientRect: bounds}} as unknown as PointerEvent<HTMLDivElement>);
+    shell().onPointerMove!({pointerType: 'mouse', target: target(true), currentTarget: {getBoundingClientRect: bounds}} as unknown as PointerEvent<HTMLDivElement>);
     expect(bounds).not.toHaveBeenCalled();
     advance(); expect(controls.hidden).toBe(true);
-    shell().onPointerMove!({target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 4} as unknown as PointerEvent<HTMLDivElement>);
+    shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 4} as unknown as PointerEvent<HTMLDivElement>);
     render(); expect(controls.hidden).toBe(false);
     expect(bounds).toHaveBeenCalledOnce();
+  });
+
+  it('does not measure the canvas or restart timers for visible-toolbar mouse movement', () => {
+    const bounds = vi.fn();
+    advance(1000);
+    for (let i = 0; i < 100; i++) shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
+    expect(bounds).not.toHaveBeenCalled();
+    advance(200); expect(controls.hidden).toBe(true);
+  });
+
+  it('uses the top/bottom edges for compact toolbars instead of the page sides', () => {
+    compact = true; advance();
+    const bounds = vi.fn(() => ({left: 0, right: 390, top: 0, bottom: 844}));
+    const move = (clientX: number, clientY: number) => {shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX, clientY} as unknown as PointerEvent<HTMLDivElement>); render();};
+    move(2, 400); expect(controls.hidden).toBe(true);
+    move(195, 2); expect(controls.hidden).toBe(false);
+    advance(); move(195, 842); expect(controls.hidden).toBe(false);
   });
 
   it('does not reopen tools or measure the canvas while a touch scroll passes an edge', () => {

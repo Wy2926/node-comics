@@ -524,7 +524,7 @@ describe("EPUB source position restoration", () => {
         }),
         spine: {
           get: vi.fn((href: string) =>
-            href === "/OPS/chapter.xhtml" ? { href } : undefined,
+            href === "/OPS/chapter.xhtml" || href === "valid" ? { href: "/OPS/chapter.xhtml", index: 0 } : undefined,
           ),
         },
       },
@@ -542,8 +542,9 @@ describe("EPUB source position restoration", () => {
     expect(epubProgression(rendition as unknown as Rendition)).toBe(0.5);
   });
 
-  it("prefers valid CFI, and falls back to first section for a missing href", async () => {
+  it("keeps paginated text on its valid CFI, and falls back to first section for a missing href", async () => {
     const rendition = view();
+    rendition.manager.isPaginated = true;
     await restoreEpubLocation(
       session(true),
       rendition as unknown as Rendition,
@@ -557,6 +558,39 @@ describe("EPUB source position restoration", () => {
       { href: "missing", progression: 0.5 },
     );
     expect(rendition.display).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it.each([0, 84])('restores a continuous text offset of %dpx within the saved CFI without redisplaying the chapter', async offset => {
+    const rendition = view(), current = session(true);
+    rendition.display.mockImplementation(async () => {rendition.manager.container.scrollTop = 760;});
+    Object.assign(rendition, {currentLocation: () => ({start: {cfi: 'valid', index: 0}})});
+    await restoreEpubLocation(current, rendition as unknown as Rendition, {cfi: 'valid', progression: (760 + offset) / 4000});
+    expect(rendition.manager.container.scrollTop).toBe(760 + offset);
+    expect(rendition.manager.scrollTo).toHaveBeenCalledTimes(1);
+    expect(rendition.display).toHaveBeenCalledTimes(1);
+    expect(current.book.getRange).toHaveBeenCalledTimes(1);
+    expect(rendition.reportLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the CFI position when a saved fraction maps to different text after reflow', async () => {
+    const rendition = view();
+    rendition.display.mockImplementation(async () => {rendition.manager.container.scrollTop = 1200;});
+    Object.assign(rendition, {currentLocation: () => ({start: {cfi: rendition.manager.container.scrollTop === 1200 ? 'valid' : 'other-text'}})});
+    await restoreEpubLocation(session(true), rendition as unknown as Rendition, {cfi: 'valid', progression: 844 / 4000});
+    expect(rendition.manager.scrollTo.mock.calls).toEqual([[0, 844, true], [0, 1200, true]]);
+    expect(rendition.manager.container.scrollTop).toBe(1200);
+    expect(rendition.display).toHaveBeenCalledTimes(1);
+    expect(rendition.reportLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refine a text CFI without a saved fraction or scroll after display is aborted', async () => {
+    const rendition = view(), current = session(true), controller = new AbortController();
+    await restoreEpubLocation(current, rendition as unknown as Rendition, {cfi: 'valid'});
+    expect(rendition.manager.scrollTo).not.toHaveBeenCalled();
+    Object.assign(current, {signal: controller.signal});
+    rendition.display.mockImplementation(async () => {controller.abort();});
+    await expect(restoreEpubLocation(current, rendition as unknown as Rendition, {cfi: 'valid', progression: 0.5})).rejects.toThrow();
+    expect(rendition.manager.scrollTo).not.toHaveBeenCalled();
   });
 
   it('restores a fixed page offset within the CFI section, not an adjacent visible page', async () => {

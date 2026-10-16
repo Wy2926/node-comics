@@ -13,7 +13,7 @@
     min-height: 0;
   }
 
-  /* Reserve the chrome space even while hidden: revealing it never shifts a page. */
+  /* Non-immersive layout reserves chrome space; phone.css overlays immersive tools. */
   .nc-app .nc-reader .nc-reading-viewport {
     margin: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px))
       env(safe-area-inset-right, 0px)

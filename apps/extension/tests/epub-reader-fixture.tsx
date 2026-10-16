@@ -26,6 +26,7 @@ import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
+import '../src/ui/phone.css';
 
 if (location.hostname !== '127.0.0.1' || location.port !== '5198') throw Error('Use the isolated 127.0.0.1:5198 fixture origin.');
 const unregister = registerSourceDriver(createOpdsProvider());

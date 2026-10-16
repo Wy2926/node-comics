@@ -77,8 +77,8 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_preload.mjs` | 同一 Vite 5181 夹具的 `?highres=1` 样本；真实 4000×6000 原图的邻页加载、非当前可见页、并排／单页、失败隔离、位置恢复与图片 URL 释放，不访问源站或翻译服务 |
 | `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
-| `verify_extension_mobile.mjs` | Vite 5181 或回环 `TEST_READER_URL`；Chromium／Firefox／WebKit 的 320–430px 与横屏、导航、弹框、CBZ 实际导入、阅读工具及位置恢复，含模拟软键盘视口、Popup 和无 OffscreenCanvas 的 20000px 长图。`MOBILE_BROWSER` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，外部 HTTP 全部模拟，截图写入 `artifacts/mobile-validation/`；不是 Firefox Android／Orion 真机验收 |
-| `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复及同 CFI 续读。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网。WebKit 段内像素级恢复精度单列严格 TODO，不等同真机通过 |
+| `verify_extension_mobile.mjs` | Vite 5181 或回环 `TEST_READER_URL`；Chromium／Firefox／WebKit 的 320–430px 与横屏、导航、弹框、CBZ 实际导入、阅读工具及位置恢复，含模拟软键盘视口、Popup 和无 OffscreenCanvas 的 20000px 长图。`--reader-only` 聚焦默认沉浸、上下工具无占位、轻点显隐／原生触摸滚动、位置保持和桌面悬停／焦点／窄窗口隔离。`MOBILE_BROWSER` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，外部 HTTP 全部模拟，截图写入 `artifacts/mobile-validation/`（可用 `MOBILE_ARTIFACTS` 指定）；不是 Firefox Android／Orion 真机验收 |
+| `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复，以及同 CFI 段内小幅滚动、连续重开的像素级位置保持和字号／屏宽变化后的文字锚点恢复。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网；模拟浏览器通过不等同真机通过 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明、首次提示、焦点恢复和 16 语大字号布局，`--release-only` 仅检查更新面板。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |

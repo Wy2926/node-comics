@@ -134,7 +134,10 @@
     .nc-app .nc-account-page :is(.nc-rights-card, .nc-chart-card, .nc-stat, .nc-purchase-card) { padding: 12px; }
     .nc-app .nc-rights-grid, .nc-app .nc-purchase-grid { gap: 10px; }
 
-    /* The same reader chrome, with less reserved space. No position logic changes. */
+    /* Immersive chrome overlays a stable full-height canvas, including while visible. */
+    .nc-app .nc-reader.is-immersive .nc-reading-viewport {
+      margin-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
+    }
     .nc-app .nc-reader { --reader-tool-size: 44px; --reader-mobile-footer: 58px; }
     .nc-app .nc-reader .nc-reader-tool-group>button,
     .nc-app .nc-reader .nc-page-versions button { width: 44px; }

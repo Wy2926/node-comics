@@ -109,10 +109,10 @@ export function EpubReader({
   const [view, setView] = useState(() => readReadingView(viewKey));
   const fontSize = Math.max(70, view.zoom);
   const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
-  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
+  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
-  const latest = useRef({ copy, update, settings, fontSize, images, panel, reveal, setPanel });
-  latest.current = { copy, update, settings, fontSize, images, panel, reveal, setPanel };
+  const latest = useRef({ copy, update, settings, fontSize, images, toggleControls });
+  latest.current = { copy, update, settings, fontSize, images, toggleControls };
   const [position, setPosition] = useState<Location>();
   const [tocHref, setTocHref] = useState<string>();
   const leaveReader = () => {capturePosition.current?.();onBack();};
@@ -245,11 +245,11 @@ export function EpubReader({
         setTocHref(navigation.current(view, location));
         if (positioning.current) return;
         const { copy: latestCopy, update: persist } = latest.current;
-        // Layout/initial restoration is not a new reading action or a newer sync timestamp.
+        // Ignore unchanged reports, but keep small scrolls that share the same text CFI.
         const total = current!.index.chapters.length;
         const withinChapter = epubProgression(view, location);
         if (latestCopy.documentLocation?.cfi === location.start.cfi &&
-          (view.settings.layout !== 'pre-paginated' || Math.abs((latestCopy.documentLocation.progression ?? 0) - withinChapter) < 0.001)) return;
+          latestCopy.documentLocation.progression === withinChapter) return;
         const totalProgression = location.atEnd
           ? 1
           : Math.max(
@@ -303,9 +303,8 @@ export function EpubReader({
       );
       view.on('click', (event: MouseEvent) => {
         const target = event.target as Element | null;
-        if (target?.closest('a') || target?.ownerDocument.getSelection()?.toString()) return;
-        if (latest.current.panel) latest.current.setPanel(undefined);
-        else latest.current.reveal();
+        if (event.defaultPrevented || target?.closest('a,button,input,select,textarea,[role="button"],[contenteditable]') || target?.ownerDocument.getSelection()?.toString()) return;
+        latest.current.toggleControls();
       });
       await view.started;
       current.signal?.throwIfAborted();
