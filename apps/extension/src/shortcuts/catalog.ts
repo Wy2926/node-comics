@@ -34,6 +34,7 @@ export const shortcutCommands = [
   {id:'reader.fullscreen',label:'切换全屏',scope:'reader',defaults:['KeyF']},
   {id:'reader.back',label:'返回书架',scope:'reader',defaults:[]},
   {id:'reader.find',label:'寻找其他语言',scope:'reader',defaults:[]},
+  {id:'web.immersive',label:'切换网页与沉浸阅读',scope:'web',defaults:['Alt+KeyQ']},
   {id:'web.pause',label:'暂停或继续网页翻译',scope:'web',defaults:['Alt+Shift+KeyP']},
   {id:'web.original',label:'切换网页原图与译图',scope:'web',defaults:['Alt+Shift+KeyO']},
   {id:'web.close',label:'关闭网页翻译',scope:'web',defaults:['Alt+Shift+KeyX']},

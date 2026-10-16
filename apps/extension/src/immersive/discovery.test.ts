@@ -21,6 +21,12 @@ class FixtureElement {
   width = 1000;
   height = 1400;
   role = '';
+  overflowX = 'visible';
+  overflowY = 'visible';
+  clientLeft = 0;
+  clientTop = 0;
+  get clientWidth() {return this.rectWidth - this.clientLeft * 2;}
+  get clientHeight() {return this.rectHeight - this.clientTop * 2;}
   constructor(readonly ownerDocument: Document, readonly tagName: string, public top = 0, public left = 200, public rectWidth = 800, public rectHeight = 1100) {}
   append(child: FixtureElement) { child.parentElement = this; this.children.push(child); return child; }
   contains(element: FixtureElement): boolean {
@@ -42,6 +48,7 @@ class FixtureElement {
 }
 const element = (value: FixtureElement) => value as unknown as Element;
 function fixture(sourceId = 'generic', kind: 'reader' | 'catalog' | 'other' = 'reader') {
+  vi.stubGlobal('getComputedStyle', vi.fn((value: FixtureElement) => ({overflowX: value.overflowX, overflowY: value.overflowY})));
   let targets: PageImage[] = [];
   const page = {navigationId: 'navigation-one', url: `https://${sourceId}.example/chapter`, controller: new AbortController(),
     location: {sourceId, kind}, session: {direction: 'rtl' as const, inlineTargets: vi.fn(() => targets)}};
@@ -85,6 +92,52 @@ describe('current-tab immersive region selection', () => {
     const expected = [f.image(current, 'current1', -100), f.image(current, 'current2', 1000)];
     const result = selectImmersiveTargets(f.targets(), {document: f.doc, generic: true});
     expect(result.targets).toEqual(expected.map(item => item.target));
+  });
+
+  it.each(['generic','dedicated'])('anchors %s pages inside a scroller rather than a previous clipped page', sourceId => {
+    const f = fixture(sourceId), reader = f.add(f.add(f.body, 'main'), 'section', 220, 100, 900, 680);
+    reader.overflowY = 'auto';
+    Object.assign(f.doc.defaultView!, {innerHeight: 1000});
+    f.image(reader, 'page6', -818, 200, 600, 825);
+    const current = f.image(reader, 'page7', 31, 200, 600, 825);
+    f.image(reader, 'page8', 880, 200, 600, 825);
+    const snapshot = createImmersiveDiscovery(f.doc).scan();
+    expect(snapshot.pages).toHaveLength(3);
+    expect(snapshot.pages.find(page => page.id === snapshot.anchor?.id)?.element).toBe(current.target.element);
+    expect(snapshot.anchor?.offset).toBeCloseTo((220 - 31) / 825, 8);
+  });
+
+  it('intersects nested scroll clips and uses the border-adjusted visible top for the anchor', () => {
+    const f = fixture(), outer = f.add(f.body, 'main', 210, 100, 900, 580), reader = f.add(outer, 'section', 180, 100, 900, 680);
+    outer.overflowY = 'hidden'; outer.clientTop = 10;
+    reader.overflowY = 'scroll'; reader.clientTop = 3;
+    f.image(reader, 'previous', -818, 200, 600, 825);
+    const current = f.image(reader, 'current', 31, 200, 600, 825);
+    f.image(reader, 'next', 880, 200, 600, 825);
+    const discovery = createImmersiveDiscovery(f.doc), snapshot = discovery.scan();
+    expect(snapshot.pages.find(page => page.id === snapshot.anchor?.id)?.element).toBe(current.target.element);
+    expect(snapshot.anchor?.offset).toBeCloseTo((outer.top + outer.clientTop - current.img.top) / 825, 8);
+    // Layout caches must not survive a subsequent scan or a source scroll/resize.
+    outer.top = 260;
+    expect(discovery.scan().anchor?.offset).toBeCloseTo((270 - current.img.top) / 825, 8);
+  });
+
+  it('prefers a horizontally visible page over one clipped by an inner scroll owner', () => {
+    const f = fixture('dedicated'), reader = f.add(f.body, 'main', 100, 620, 550, 600);
+    reader.overflowX = 'hidden'; reader.clientLeft = 4;
+    f.image(reader, 'clipped', -40, 0, 600, 825);
+    const current = f.image(reader, 'visible', 0, 650, 500, 700);
+    const snapshot = createImmersiveDiscovery(f.doc).scan();
+    expect(snapshot.pages.find(page => page.id === snapshot.anchor?.id)?.element).toBe(current.target.element);
+    expect(snapshot.anchor?.offset).toBe(0);
+  });
+
+  it('retains window-scroll anchors despite root overflow locks and returns null for no pages', () => {
+    const f = fixture('dedicated'); f.body.overflowY = 'hidden'; f.body.top = -9000;
+    f.image(f.body, 'current', -330);
+    const discovery = createImmersiveDiscovery(f.doc), snapshot = discovery.scan();
+    expect(snapshot.anchor).toEqual({id: snapshot.pages[0].id, offset: .3});
+    f.setTargets([]); expect(discovery.scan().anchor).toBeNull();
   });
 
   it('does not turn a cover grid into a full-page comic list', () => {
@@ -241,13 +294,26 @@ describe('immersive page identities and original-resource lifetime', () => {
 
   it('groups a 1500-page chapter with bounded layout reads and no resource reads', () => {
     const f = fixture(), reader = f.add(f.add(f.body, 'main'), 'section'), read = vi.fn(async () => new Blob(['original']));
+    reader.overflowY = 'auto';
     for (let i = 0; i < 1500; i++) f.image(f.add(reader, 'div'), 'page' + i, i * 1200, 200, 800, 1100, read);
     const geometry = vi.spyOn(FixtureElement.prototype, 'getBoundingClientRect');
     try {
       expect(createImmersiveDiscovery(f.doc).scan().pages).toHaveLength(1500);
-      expect(geometry.mock.calls.length).toBeLessThanOrEqual(5000);
+      // 1500 image boxes plus one scrolling ancestor, shared by region selection and anchor selection.
+      expect(geometry).toHaveBeenCalledTimes(1501);
+      // 1500 unique wrappers plus the common reader/main; shared ancestors are never read per image.
+      expect(getComputedStyle).toHaveBeenCalledTimes(1502);
       expect(read).not.toHaveBeenCalled();
       expect(f.page.session.inlineTargets).toHaveBeenCalledTimes(1);
     } finally { geometry.mockRestore(); }
+  });
+
+  it('bounds clipping ancestry to sixteen elements even for very deeply nested content', () => {
+    const f = fixture('dedicated'); let parent = f.body;
+    for (let index = 0; index < 40; index++) parent = f.add(parent, 'div');
+    f.image(parent, 'current', -110);
+    const snapshot = createImmersiveDiscovery(f.doc).scan();
+    expect(snapshot.anchor?.offset).toBe(.1);
+    expect(getComputedStyle).toHaveBeenCalledTimes(16);
   });
 });

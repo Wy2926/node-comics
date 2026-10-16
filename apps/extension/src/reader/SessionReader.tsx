@@ -1,13 +1,14 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
+import {bindWebShortcuts} from '../shortcuts/web-content';
 import {DECODED_PAGE_WINDOW} from '../image-resources';
 import type {Page, ReadingEntry} from '../types';
 import {pageFrame} from './geometry';
 import {pageAtHeight, pageWindow} from './virtual-window';
 import {useChapterStream} from './useChapterStream';
 import {useReaderControls} from './useReaderControls';
-import {ReaderDrawer, ReaderNavigation, ReaderNumberInput, ReaderSettingsButton, ReaderShell, ReaderTools, compactReaderQuery} from './ReaderChrome';
+import {ReaderDrawer, ReaderNavigation, ReaderNumberInput, ReaderSettingsButton, ReaderShell, ReaderTools, isCompactReaderDevice} from './ReaderChrome';
 import {ReaderChoice, ReaderDisplaySettings, ReaderScale} from './ReaderOptions';
 import {ReaderPicture} from './ReaderPicture';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
@@ -54,7 +55,7 @@ export function SessionReader(props: SessionReaderProps) {
   const [message, setMessage] = useState('');
   const firstPage = pages.find(page => page.id === position.pageId) ?? pages[0];
   const [sizing, setSizing] = useState(() => {
-    const initial = initialReadingView(firstPage, window.matchMedia?.(compactReaderQuery).matches ?? false);
+    const initial = initialReadingView(firstPage, isCompactReaderDevice());
     return {fit: initial?.fit ?? settings.fit, zoom: initial?.zoom ?? 100};
   });
   const manuallySized = useRef(false), autoSized = useRef(false), exiting = useRef(false);
@@ -75,6 +76,11 @@ export function SessionReader(props: SessionReaderProps) {
     onActiveEntry: noop, onLoadEntry: noop, onMarkRead: markRead, notify: setMessage});
   const controls = useReaderControls<'directory' | 'settings'>({blocked: false, notify: setMessage, local: true});
   const {root, panel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, fullscreen} = controls;
+  const shortcutState = useRef({exit, panel}); shortcutState.current = {exit, panel};
+  useEffect(() => {
+    const element = root.current; if (!element) return;
+    return bindWebShortcuts({'web.immersive': () => shortcutState.current.exit()}, () => !shortcutState.current.panel, element);
+  }, []);
   const {viewport, stacks, geometry, index, indexRef, navigationReason, readingAhead, preserve, persist, restore, jump} = stream;
   const windows = useMemo(() => pageWindow([copy], copy.id, index,
     page => pageFrame(page, viewportSize, sizing.fit, sizing.zoom).height, settings.layout === 'single' ? 1 : DECODED_PAGE_WINDOW),
@@ -137,7 +143,7 @@ export function SessionReader(props: SessionReaderProps) {
       ? previous : {...previous, [pageId]: {width, height}});
     if (pageId === copy.pages[index]?.id && !autoSized.current && !manuallySized.current) {
       autoSized.current = true;
-      const initial = initialReadingView({width, height}, window.matchMedia?.(compactReaderQuery).matches ?? false);
+      const initial = initialReadingView({width, height}, isCompactReaderDevice());
       if (initial) setSizing({fit: initial.fit, zoom: initial.zoom});
     }
   }
@@ -150,6 +156,7 @@ export function SessionReader(props: SessionReaderProps) {
   function keyboard(event: KeyboardEvent<HTMLDivElement>) {
     // Source-page shortcuts must not receive typing or navigation inside the reader.
     event.stopPropagation();
+    if (event.defaultPrevented) return;
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') {event.preventDefault(); event.stopPropagation(); if (panel) closePanel(); else exit(); return;}
     const target = event.target as HTMLElement;
@@ -202,7 +209,9 @@ export function SessionReader(props: SessionReaderProps) {
         <ReaderSettingsButton open={panel === 'settings'} onClick={() => togglePanel('settings')}/>
       </ReaderTools>
       {(notice || message) && <div className="nc-session-notice" role="status">{message || notice}</div>}
+      {props.loading && <div className="nc-session-loading" role="status" aria-live="polite"><span className="spinner" aria-hidden="true"/><span>{msg('正在准备页面…')}</span></div>}
       <div className="nc-reading-viewport" data-reader-viewport="true" data-decoded-pages={foreground ? mountedIds.length : 0} data-page-count={pages.length}
+        aria-busy={props.loading}
         tabIndex={0} ref={viewport} onScroll={scroll} onClick={event => {if (!(event.target as Element).closest('button,input,a')) reveal();}}>
         <div className="nc-reading-surface">
           <div className="nc-page-stack" ref={node => {if (node) stacks.current.set(copy.id, node); else stacks.current.delete(copy.id);}}>
@@ -220,7 +229,7 @@ export function SessionReader(props: SessionReaderProps) {
             {settings.layout === 'continuous' && <div aria-hidden="true" style={{height: currentWindow.after}}/>}
           </div>
           <div className="nc-reader-end"><p>{complete ? msg('已到当前内容末尾') : msg('当前已发现 {0} 页', {'0': pages.length})}</p>
-            {!complete && onReload && <button className="button secondary" onClick={onReload}>{msg('重新载入')}</button>}
+            {!complete && onReload && <button className="button secondary" disabled={props.loading} onClick={onReload}>{msg('重新载入')}</button>}
           </div>
         </div>
       </div>
@@ -238,7 +247,7 @@ export function SessionReader(props: SessionReaderProps) {
               <ReaderScale label={msg('缩放')} value={sizing.zoom} min={40} max={200} onChange={zoom => resizeView({zoom})}/></>}/>
           <div className="nc-stack-actions">
             <button className="button secondary" onClick={() => void fullscreen()}><Icon name="expand"/>{msg('全屏阅读')}</button>
-            {onReload && <button className="button secondary" onClick={() => {preserve(); persist(); onReload();}}><Icon name="refresh"/>{msg('重新载入')}</button>}
+            {onReload && <button className="button secondary" disabled={props.loading} onClick={() => {preserve(); persist(); onReload();}}><Icon name="refresh"/>{msg('重新载入')}</button>}
             {onSelectRegion && <button className="button secondary" onClick={() => {preserve(); persist(); onSelectRegion();}}><Icon name="expand"/>{msg('选择正文区域')}</button>}
             {onImport && <button className="button secondary" onClick={() => {preserve(); persist(); onImport();}}><Icon name="folder"/>{msg('加入书架')}</button>}
           </div>

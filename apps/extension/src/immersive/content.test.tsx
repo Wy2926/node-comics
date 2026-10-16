@@ -1,9 +1,11 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {Children,isValidElement,type ReactNode} from 'react';
 import {installImmersive} from './content';
 import {IMMERSIVE_SOURCE_PORT,type ImmersiveImage,type ImmersiveSession} from './protocol';
 import {IMAGE_CHUNK_BYTES} from '../inline/blob-transfer';
 import {defaults} from '../types';
 import type {PageImage} from '../sources/contracts/page';
+import {bindWebShortcuts} from '../shortcuts/web-content';
 
 const dependency=vi.hoisted(()=>({document:vi.fn(),image:vi.fn(),render:vi.fn(),unmount:vi.fn()}));
 vi.mock('react-dom/client',()=>({createRoot:()=>({render:dependency.render,unmount:dependency.unmount})}));
@@ -16,6 +18,7 @@ vi.mock('../sources',()=>({sourceImage:dependency.image,sourceFor:(url:string)=>
 vi.mock('../inline/shadow',()=>({shadowThemeStyles:()=>''}));
 vi.mock('../inline/theme',()=>({connectInlineTheme:()=>()=>{}}));
 vi.mock('../i18n/runtime',()=>({msg:(value:string)=>value,subscribeLocale:()=>()=>{}}));
+vi.mock('../shortcuts/web-content',()=>({bindWebShortcuts:vi.fn(()=>vi.fn())}));
 
 type Listener=(...args:any[])=>any;
 function event(){
@@ -31,6 +34,7 @@ class FixtureElement {
   children:FixtureElement[]=[];parentElement:FixtureElement|null=null;isConnected=true;
   shadow?:FixtureElement;
   activeElement:FixtureElement|null=null;
+  clientTop=0;clientLeft=0;clientHeight=1100;clientWidth=800;scrollHeight=1100;scrollTop=0;
   naturalWidth=800;naturalHeight=1100;className='';textContent='';dataset:Record<string,string>={};
   private attributes=new Map<string,string>();
   private styles=new Map<string,{value:string;priority:string}>();
@@ -119,6 +123,82 @@ function fixture(networkSession?:ImmersiveSession){
 beforeEach(()=>{vi.resetAllMocks();vi.useFakeTimers();});
 afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();});
 
+function renderedElements(node:ReactNode):Array<{type:unknown;props:Record<string,any>}>{
+  return Children.toArray(node).flatMap(child=>isValidElement<Record<string,any>>(child)?[child,...renderedElements(child.props.children)]:[]);
+}
+const rendered=()=>renderedElements(dependency.render.mock.calls.at(-1)![0]);
+
+describe('immersive preparation feedback',()=>{
+  it.each([false,true])('restores the original empty-style attribute presence after cancellation: %s',async(hadStyle)=>{
+    const f=fixture(),binding=deferred<void>();f.add('first');f.delayNextBind(binding.promise);
+    if(hadStyle)f.html.setAttribute('style','');
+    await f.start();
+    // Reflect the CSSOM-created attribute which the lightweight fixture does not serialize.
+    f.html.setAttribute('style','overflow: hidden !important;');
+    const has=vi.spyOn(f.html,'hasAttribute'),remove=vi.spyOn(f.html,'removeAttribute');
+    f.stop();
+    expect(f.html.style.getPropertyValue('overflow')).toBe('');
+    if(!hadStyle){
+      expect(has).toHaveBeenCalledWith('style');expect(remove).toHaveBeenCalledWith('style');
+      expect(has.mock.invocationCallOrder[0]).toBeLessThan(remove.mock.invocationCallOrder[0]);
+    }else expect(remove).not.toHaveBeenCalled();
+    expect(f.html.hasAttribute('style')).toBe(hadStyle);binding.resolve();await flush();
+  });
+
+  it('shows an accessible central loading state and binds the same customizable exit shortcut',async()=>{
+    const f=fixture(),binding=deferred<void>();f.add('first');f.delayNextBind(binding.promise);await f.start();
+    const start=rendered().find(node=>node.props.className==='nc-session-start')!;
+    expect(start.props).toMatchObject({'aria-busy':true,'aria-modal':'true',tabIndex:-1});
+    expect(rendered().find(node=>node.props.className==='nc-session-start-state')!.props.role).toBe('status');
+    expect(rendered().some(node=>node.props.className==='spinner'&&node.props['aria-hidden']==='true')).toBe(true);
+    expect(rendered().filter(node=>node.type==='button')).toHaveLength(1);
+    const node=new FixtureElement(f.doc,'DIV'),focus=vi.spyOn(node,'focus'),cleanup=start.props.ref(node);
+    expect(focus).toHaveBeenCalledWith({preventScroll:true});
+    const [handlers,enabled,target]=vi.mocked(bindWebShortcuts).mock.calls.at(-1)!;
+    expect(target).toBe(node);expect(enabled()).toBe(true);
+    handlers['web.immersive']!({} as KeyboardEvent);
+    expect(dependency.unmount).toHaveBeenCalledOnce();expect(enabled()).toBe(false);cleanup();
+    const count=dependency.render.mock.calls.length;binding.resolve();await flush();
+    expect(dependency.render).toHaveBeenCalledTimes(count);
+  });
+
+  it('can exit with Escape during preparation without a late response reopening or locking the page',async()=>{
+    const f=fixture(),binding=deferred<void>();f.add('first');f.delayNextBind(binding.promise);await f.start();
+    const event={key:'Escape',nativeEvent:{isComposing:false},preventDefault:vi.fn(),stopPropagation:vi.fn()};
+    dependency.render.mock.calls.at(-1)![0].props.onKeyDown(event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();expect(dependency.unmount).toHaveBeenCalledOnce();
+    expect(f.html.children.some(node=>node.shadow)).toBe(false);expect(f.html.style.getPropertyValue('overflow')).toBe('');
+    const count=dependency.render.mock.calls.length;binding.resolve();await flush();
+    expect(dependency.render).toHaveBeenCalledTimes(count);expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('replaces failed preparation with an alert and explicit retry, then removes the loader',async()=>{
+    const f=fixture(),binding=deferred<void>();f.add('first');f.delayNextBind(binding.promise);await f.start();
+    binding.reject(Error('SOURCE_BIND_UNAVAILABLE'));await flush();
+    expect(rendered().find(node=>node.props.className==='nc-session-start')!.props['aria-busy']).toBe(false);
+    expect(rendered().find(node=>node.props.className==='nc-session-start-state')!.props.role).toBe('alert');
+    expect(rendered().some(node=>node.props.className==='spinner')).toBe(false);
+    const retry=rendered().find(node=>node.type==='button'&&node.props.children==='重试')!;
+    retry.props.onClick();await flush();
+    const reader=dependency.render.mock.calls.at(-1)![0].props.children;
+    expect(reader.props.loading).toBe(false);expect(reader.props.pages).toHaveLength(1);f.stop();
+  });
+
+  it('keeps existing pages and the anchor on failed reload and coalesces duplicate reloads',async()=>{
+    const f=fixture();f.add('first');f.add('second');await f.start();
+    const reader=dependency.render.mock.calls.at(-1)![0].props.children;
+    const position={pageId:reader.props.pages[1].id,relativeOffset:.4};reader.props.onPosition(position);
+    const binding=deferred<void>();f.delayNextBind(binding.promise);reader.props.onReload();reader.props.onReload();await flush();
+    const pending=dependency.render.mock.calls.at(-1)![0].props.children;
+    expect(f.binds).toHaveLength(2);expect(pending.props.loading).toBe(true);expect(pending.key).toBe(reader.key);
+    expect(pending.props.pages).toEqual(reader.props.pages);expect(pending.props.initialAnchor).toEqual(position);
+    binding.reject(Error('SOURCE_BIND_UNAVAILABLE'));await flush();
+    const failed=dependency.render.mock.calls.at(-1)![0].props.children;
+    expect(failed.props.loading).toBe(false);expect(failed.props.notice).toBeTruthy();expect(failed.key).toBe(reader.key);
+    expect(failed.props.pages).toEqual(reader.props.pages);expect(failed.props.initialAnchor).toEqual(position);f.stop();
+  });
+});
+
 describe('region picker theme isolation and restoration',()=>{
   it('keeps picker siblings inside the theme and Escape restores the same reader and scroll locks',async()=>{
     const f=fixture(),first=f.add('first');f.add('second');
@@ -183,6 +263,36 @@ describe('region picker theme isolation and restoration',()=>{
     for(const type of ['pointermove','click','keydown'])expect(f.listeners(type)).toBe(0);
     for(const element of [f.html,f.body])expect(element.style.getPropertyValue('overflow')).toBe('');
     expect(dependency.unmount).toHaveBeenCalledOnce();expect(f.main.children).toEqual([f.targets[0].element]);
+    expect(window.scrollBy).not.toHaveBeenCalled();
+  });
+});
+
+describe('source position restoration',()=>{
+  it('restores an externally toggled page inside the scroll container client edge, excluding its border',async()=>{
+    const f=fixture();f.add('first');const second=f.add('second');await f.start();
+    const reader=dependency.render.mock.calls.at(-1)![0].props.children;
+    Object.assign(f.main,{top:220,clientTop:6,clientHeight:674,scrollHeight:5000,scrollTop:600});
+    (second.element as unknown as FixtureElement).top=31;
+    vi.stubGlobal('getComputedStyle',(element:Element)=>({overflowY:element===(f.main as unknown as Element)?'auto':'visible'}));
+    reader.props.onPosition({pageId:reader.props.pages[1].id,relativeOffset:.25});f.stop();
+    expect(f.main.scrollTop).toBe(600+31-220-6+1100*.25);
+    expect(window.scrollBy).not.toHaveBeenCalled();expect(dependency.unmount).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {outerTop:300,outerOverflow:'hidden',innerTop:220,visibleTop:310},
+    {outerTop:0,outerOverflow:'visible',innerTop:-100,visibleTop:0},
+  ])('restores the same offset when an outer clip or the window raises the visible edge: %j',async({outerTop,outerOverflow,innerTop,visibleTop})=>{
+    const f=fixture();f.add('first');const second=f.add('second');await f.start();
+    const reader=dependency.render.mock.calls.at(-1)![0].props.children;
+    Object.assign(f.main,{top:outerTop,clientTop:10,clientHeight:600});
+    const inner=new FixtureElement(f.doc,'DIV',innerTop),image=second.element as unknown as FixtureElement;
+    Object.assign(inner,{clientTop:6,clientHeight:450,scrollHeight:5000,scrollTop:600});
+    f.main.children=f.main.children.filter(child=>child!==image);f.main.append(inner);inner.append(image);image.top=31;
+    vi.stubGlobal('getComputedStyle',(element:Element)=>({overflowY:element===(inner as unknown as Element)?'auto'
+      :element===(f.main as unknown as Element)?outerOverflow:'visible'}));
+    reader.props.onPosition({pageId:reader.props.pages[1].id,relativeOffset:.25});f.stop();
+    expect(inner.scrollTop).toBe(600+31-visibleTop+1100*.25);
     expect(window.scrollBy).not.toHaveBeenCalled();
   });
 });

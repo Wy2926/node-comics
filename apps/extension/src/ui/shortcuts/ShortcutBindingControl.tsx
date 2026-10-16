@@ -13,19 +13,20 @@ type Props = {
   invalid?: boolean;
   onStart: () => void;
   onStop: () => void;
-  onRecord: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** True only when recording started a save and temporarily disables the editor. */
+  onRecord: (event: KeyboardEvent<HTMLButtonElement>) => void | boolean;
   onRemove: () => void;
 };
 
 /** A key recorder, not a text input: keep Tab traversal and a separate remove action. */
 export function ShortcutBindingControl({label, binding, compact, recording, disabled, describedBy, invalid, onStart, onStop, onRecord, onRemove}: Props) {
-  const editor = useRef<HTMLButtonElement>(null), removedFocus = useRef<HTMLButtonElement | null>(null);
+  const editor = useRef<HTMLButtonElement>(null), pendingFocus = useRef<HTMLButtonElement | null>(null);
   useLayoutEffect(() => {
-    if (disabled || !removedFocus.current) return;
-    const previous = removedFocus.current;
-    removedFocus.current = null;
-    // Removing a binding replaces its clear button with an add slot. Keep
-    // keyboard editing in that slot, without stealing focus from another action.
+    if (disabled || !pendingFocus.current) return;
+    const previous = pendingFocus.current;
+    pendingFocus.current = null;
+    // Saving disables the focused editor; removing may replace its clear button.
+    // Resume the same slot without stealing focus from another action.
     if (document.activeElement === previous || document.activeElement === document.body) editor.current?.focus({preventScroll: true});
   }, [binding, disabled]);
   const actionLabel = binding ? msg('修改“{0}”的快捷键', {'0': label}) : msg('添加“{0}”的快捷键', {'0': label});
@@ -35,7 +36,10 @@ export function ShortcutBindingControl({label, binding, compact, recording, disa
     <button ref={editor} type="button" className="nc-shortcut-key" disabled={disabled}
       aria-label={actionLabel} title={binding ? `${actionLabel} · ${formattedBinding}` : actionLabel}
       aria-description={formattedBinding} aria-describedby={describedBy} aria-invalid={invalid || undefined}
-      onClick={onStart} onBlur={() => {if (recording) onStop();}} onKeyDown={onRecord}>
+      onClick={onStart} onBlur={() => {if (recording) onStop();}} onKeyDown={event => {
+        const focused = document.activeElement === event.currentTarget ? event.currentTarget : null;
+        if (onRecord(event) === true) pendingFocus.current = focused;
+      }}>
       {recording ? <><Icon name="keyboard" size={16}/><span>{msg('按下组合键')}</span></> : binding ? <span className="nc-shortcut-keycaps">
         {binding.split('+').map((key, index) => <span className="nc-shortcut-key-part" key={key}>
           {index > 0 && <span className="nc-shortcut-plus" aria-hidden="true"> + </span>}<kbd>{formatBinding(key)}</kbd>
@@ -44,7 +48,7 @@ export function ShortcutBindingControl({label, binding, compact, recording, disa
     </button>
     {binding && <button type="button" className="nc-shortcut-remove" disabled={disabled}
       aria-label={removeLabel} title={removeLabel} onClick={event => {
-        removedFocus.current = document.activeElement === event.currentTarget ? event.currentTarget : null;
+        pendingFocus.current = document.activeElement === event.currentTarget ? event.currentTarget : null;
         onRemove();
       }}><Icon name="close" size={16}/></button>}
   </div>;

@@ -10,7 +10,7 @@ function keyboard(code:string,values:Partial<KeyboardEvent>={}){
 }
 function fixture(){
   const listeners=new Map<string,Set<(event:KeyboardEvent)=>void>>(),querySelector=vi.fn().mockReturnValue(null);
-  const target={document:{querySelector},addEventListener:(type:string,listener:(event:KeyboardEvent)=>void)=>{if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(listener);},removeEventListener:(type:string,listener:(event:KeyboardEvent)=>void)=>listeners.get(type)?.delete(listener)} as unknown as Window;
+  const target={document:{querySelector,ownerDocument:null},addEventListener:(type:string,listener:(event:KeyboardEvent)=>void)=>{if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(listener);},removeEventListener:(type:string,listener:(event:KeyboardEvent)=>void)=>listeners.get(type)?.delete(listener)} as unknown as Window;
   return {target,listeners,querySelector,emit:(type:string,event:KeyboardEvent)=>{for(const listener of listeners.get(type)??[])listener(event);}};
 }
 
@@ -27,7 +27,7 @@ describe('shortcut catalog and normalization',()=>{
     expect(formatBinding('Ctrl+Shift+KeyQ')).toBe('Ctrl + Shift + Q');
     expect(formatBinding('Meta+ArrowRight')).toBe('⌘ + →');
   });
-  it.each(['Escape','Tab','Ctrl+KeyL','Meta+KeyR','Ctrl+Shift+KeyT','Ctrl+Digit1','Alt+ArrowLeft','Alt+F4','F5','F12','Shift+F10','Ctrl+KeyE','Ctrl+KeyK','Ctrl+F4','Alt+KeyD'])('reserves browser/system controls %s',binding=>expect(validateBinding(binding)).toBe('reserved'));
+  it.each(['Escape','Tab','Ctrl+KeyL','Meta+KeyR','Ctrl+Shift+KeyT','Ctrl+Digit1','Alt+ArrowLeft','Alt+F4','F5','F12','Shift+F10','Ctrl+KeyE','Ctrl+KeyK','Ctrl+F4','Alt+KeyD','Alt+Shift+KeyI'])('reserves browser/system controls %s',binding=>expect(validateBinding(binding)).toBe('reserved'));
   it.each(['','A','KeyAB','Alt+Ctrl+KeyK','Ctrl+Ctrl+KeyK','Ctrl+','Control+KeyQ','__proto__','F13'])('rejects invalid bindings %s',binding=>expect(validateBinding(binding)).toBe('invalid'));
   it('ignores IME, dead keys, AltGraph and modifier-only events',()=>{
     for(const values of [{isComposing:true},{keyCode:229},{key:'Dead'},{key:'Process'},{getModifierState:()=>true}])expect(bindingFromEvent(keyboard('KeyT',values))).toBeUndefined();
@@ -103,5 +103,19 @@ describe('shortcut dispatch',()=>{
     bindShortcuts(f.target,{'reader.original':run},{getOverrides:()=>overrides});
     for(let i=0;i<10000;i++)f.emit('keydown',keyboard('KeyQ'));
     expect(f.querySelector).not.toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
+  });
+  it('uses the reader shadow scope for overlays and retains shared repeat and input guards',()=>{
+    const f=fixture(),run=vi.fn(),ownQuery=vi.fn(()=>null);
+    const element={ownerDocument:{defaultView:f.target},querySelector:ownQuery,
+      addEventListener:f.target.addEventListener,removeEventListener:f.target.removeEventListener} as unknown as HTMLElement;
+    Object.assign(f.target,{HTMLElement:{prototype:{}}});
+    const cleanup=bindShortcuts(element,{'web.immersive':run},{getOverrides:()=>({})});
+    const toggle=()=>keyboard('KeyQ',{altKey:true});
+    f.emit('keydown',toggle());f.emit('keydown',{...toggle(),repeat:true});
+    expect(run).toHaveBeenCalledOnce();expect(f.querySelector).not.toHaveBeenCalled();expect(ownQuery).toHaveBeenCalled();
+    f.emit('keyup',toggle());
+    ownQuery.mockReturnValue({} as never);f.emit('keydown',toggle());expect(run).toHaveBeenCalledOnce();
+    ownQuery.mockReturnValue(null);f.emit('keydown',{...toggle(),composedPath:()=>[{closest:()=>({})}] as unknown as EventTarget[]});
+    expect(run).toHaveBeenCalledOnce();cleanup();for(const values of f.listeners.values())expect(values.size).toBe(0);
   });
 });

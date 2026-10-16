@@ -10,12 +10,13 @@ import {sourceFailure} from '../sources/runtime/diagnostics';
 import {defaults,type Settings} from '../types';
 import {RequestPool} from '../concurrency';
 import {randomId} from '../random-id';
+import {bindWebShortcuts} from '../shortcuts/web-content';
 import {SessionReader,sessionReaderStyles} from '../reader/SessionReader';
 import type {SessionReaderAnchor,SessionReaderWindow,SessionReaderPage,SessionReaderProps} from '../reader/session-model';
 import {shadowThemeStyles} from '../inline/shadow';
 import {connectInlineTheme} from '../inline/theme';
 import {receiveImage,serveImage} from '../inline/blob-transfer';
-import {createImmersiveDiscovery,type ImmersiveSnapshot} from './discovery';
+import {createImmersiveDiscovery,immersiveViewportTop,type ImmersiveSnapshot} from './discovery';
 import {IMMERSIVE_ORIGINAL_PORT,IMMERSIVE_SOURCE_PORT,type ImmersiveImage,type ImmersiveSession,type ImmersiveResolve} from './protocol';
 import {ImmersiveTranslation} from './translation';
 
@@ -53,7 +54,8 @@ export function installImmersive(){
   function unlockPage(){
     for(const {element,value,priority,hadStyle} of locks)if(element.style.getPropertyValue('overflow')==='hidden'&&element.style.getPropertyPriority('overflow')==='important'){
       if(value)element.style.setProperty('overflow',value,priority);else element.style.removeProperty('overflow');
-      if(!hadStyle&&!element.style.length)element.removeAttribute('style');
+      // Synchronize a pending CSSOM attribute before removing it on a fast loading cancellation.
+      if(!hadStyle&&!element.style.length&&element.hasAttribute('style'))element.removeAttribute('style');
     }
     locks=[];
   }
@@ -67,7 +69,7 @@ export function installImmersive(){
       while(container&&container!==document.body&&container!==document.documentElement){
         const style=getComputedStyle(container);
         if(/auto|scroll/.test(style.overflowY)&&container.scrollHeight>container.clientHeight){
-          container.scrollTop+=rect.top-container.getBoundingClientRect().top+rect.height*position!.relativeOffset;break;
+          container.scrollTop+=rect.top-immersiveViewportTop(target,document)+rect.height*position!.relativeOffset;break;
         }
         container=container.parentElement;
       }
@@ -77,7 +79,7 @@ export function installImmersive(){
   }
   function stop(position?:SessionReaderAnchor){
     if(!enabled)return;
-    dismissedUrl=url;enabled=false;epoch++;version++;
+    dismissedUrl=url;enabled=false;loading=false;epoch++;version++;
     cancelPicker?.();picking=false;clearTimeout(scanTimer);scanTimer=undefined;
     translation?.dispose();translation=undefined;
     for(const close of transfers)close();
@@ -92,9 +94,23 @@ export function installImmersive(){
     if(!enabled||!root||!host)return;
     host.dataset.loading=String(loading);host.dataset.error=error;host.dataset.pageCount=String(session?.images.length??0);host.dataset.complete=String(session?.complete??false);
     if(!session){
-      root.render(<div className="nc-app nc-session-reader" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();stop();}}}><div className="nc-session-start" role="dialog" aria-label={msg('沉浸阅读')}>
-        <button className="button secondary" onClick={()=>stop()}>{msg('返回网页')}</button><p role={error?'alert':'status'}>{error||msg('正在准备页面…')}</p>
-        {!loading&&<><button className="button secondary" onClick={()=>void resolve()}>{msg('重试')}</button><button className="button secondary" onClick={selectRegion}>{msg('选择正文区域')}</button></>}
+      root.render(<div className="nc-app nc-session-reader" onKeyDown={event=>{
+        event.stopPropagation();if(event.nativeEvent.isComposing||event.keyCode===229)return;
+        if(event.key==='Escape'){event.preventDefault();stop();return;}
+        if(event.key==='Tab'){
+          const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+          const active=(event.currentTarget.getRootNode() as ShadowRoot).activeElement;
+          if(event.shiftKey&&(active===buttons[0]||!buttons.includes(active as HTMLButtonElement))||!event.shiftKey&&active===buttons.at(-1)){
+            event.preventDefault();(event.shiftKey?buttons.at(-1):buttons[0])?.focus();
+          }
+        }
+      }}><div className="nc-session-start" ref={bindStartShortcuts} tabIndex={-1} role="dialog" aria-modal="true" aria-label={msg('沉浸阅读')} aria-busy={loading}>
+        <button className="button secondary nc-session-start-back" onClick={()=>stop()}>{msg('返回网页')}</button>
+        <div className="nc-session-start-state" role={error?'alert':'status'} aria-atomic="true">
+          {loading&&<span className="spinner" aria-hidden="true"/>}
+          <h2>{msg('沉浸阅读')}</h2><p>{error||msg('正在准备页面…')}</p>
+          {!loading&&<div className="nc-session-start-actions"><button className="button secondary" onClick={()=>void resolve()}>{msg('重试')}</button><button className="button secondary" onClick={selectRegion}>{msg('选择正文区域')}</button></div>}
+        </div>
       </div></div>);return;
     }
     const pages:SessionReaderPage[]=session.images.map(image=>{
@@ -104,7 +120,7 @@ export function installImmersive(){
     const source=sourceFor(url);
     root.render(<IconSpriteContext value=""><SessionReader key={readerRevision} title={session.title} pages={pages} settings={settings} setSettings={change=>{
       settings=typeof change==='function'?change(settings):change;render();void send('NC_IMMERSIVE_SETTINGS',{settings}).catch(()=>{});
-    }} initialView={initialView} initialAnchor={anchor} complete={session.complete}
+    }} initialView={initialView} initialAnchor={anchor} complete={session.complete} loading={loading}
       notice={error||(!session.complete?msg('已识别 {0} 张，可能不完整。',{'0':session.images.length}):undefined)}
       loadImage={loadImage} onExit={position=>stop(position)} onPosition={position=>{
         anchor=position;if(host)host.dataset.currentPage=String(Math.max(0,session!.images.findIndex(image=>image.id===position.pageId))+1);
@@ -115,6 +131,11 @@ export function installImmersive(){
       }} onReload={()=>void resolve()} onSelectRegion={!session.manifest?selectRegion:undefined}
       onImport={source.definition.capabilities.importable&&source.location.kind!=='other'?()=>{void send('NC_IMPORT_CURRENT').catch(reason=>{error=sourceFailure(reason).error;render();});}:undefined}/></IconSpriteContext>);
   }
+  const bindStartShortcuts=(node:HTMLDivElement|null)=>{
+    if(!node)return;
+    node.focus({preventScroll:true});
+    return bindWebShortcuts({'web.immersive':()=>stop()},()=>enabled&&!picking,node);
+  };
   const loadImage:SessionReaderProps['loadImage']=async(id,view,signal)=>{
     try{
     const stamp=epoch,sessionId=session?.id,image=session?.images.find(item=>item.id===id);
@@ -175,7 +196,7 @@ export function installImmersive(){
     }
   }
   async function resolve(resetPosition=false){
-    if(!enabled)return;
+    if(!enabled||loading&&!resetPosition)return;
     const previous=session,position=anchor;
     if(lastWindow)initialView=lastWindow.view;
     const stamp=epoch,request=++version;let resolved=false;loading=true;error='';
@@ -226,9 +247,9 @@ export function installImmersive(){
           if(lastWindow)initialView=lastWindow.view;
           readerRevision++;
         }
-        bound=true;render();if(lastWindow)updateWindow(lastWindow);
+        bound=true;if(lastWindow)updateWindow(lastWindow);
       }})
-        .catch(reason=>{if(current(stamp)&&request===version){error=sourceFailure(reason).error;render();}})
+        .catch(reason=>{if(current(stamp)&&request===version)error=sourceFailure(reason).error;})
         .finally(()=>{if(current(stamp)&&request===version){loading=false;render();if(bound)queueScan();}});
     },120);
   }
@@ -269,7 +290,7 @@ export function installImmersive(){
     if(message?.type==='NC_IMMERSIVE_IDENTITY'){respond({url:location.href,navigationId:lifecycle.current().navigationId,enabled,dismissedUrl});return;}
     if(message?.type==='NC_IMMERSIVE_PREPARE'){prepare(message.translation===true);respond({ok:true});return;}
     if(message?.type==='NC_IMMERSIVE_SHOW'){show();respond({ok:true});return;}
-    if(message?.type==='NC_IMMERSIVE_STOP'){stop();respond({ok:true});return;}
+    if(message?.type==='NC_IMMERSIVE_STOP'){stop(anchor);respond({ok:true});return;}
     if(enabled)translation?.onMessage(message);
   });
   chrome.runtime.onConnect.addListener(port=>{

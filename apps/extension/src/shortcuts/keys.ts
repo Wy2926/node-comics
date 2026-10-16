@@ -9,6 +9,7 @@ export function validateBinding(binding:string):'reserved'|'invalid'|undefined {
   // Keep browser navigation, editing, accessibility and dialog cancellation native.
   if(['Escape','Tab','F1','F3','F5','F6','F11','F12'].includes(code)||!parts.length&&['Enter','NumpadEnter','Backspace','Delete','Insert'].includes(code))return 'reserved';
   if(alt&&!ctrl&&!meta&&['ArrowLeft','ArrowRight','Home','F4','Space','KeyD','KeyE','KeyF'].includes(code)||shift&&code==='F10')return 'reserved';
+  if(alt&&shift&&!ctrl&&!meta&&code==='KeyI')return 'reserved'; // Chrome/Edge feedback dialog.
   if((ctrl||meta)&&!alt&&(/^(?:Key[ACDEFGHJKLNOPQRSTUVWXYZ]|Digit[0-9]|Equal|Minus|NumpadAdd|NumpadSubtract|PageUp|PageDown|Space|F4|Delete)$/.test(code)||shift&&/^Key[BIM]$/.test(code)))return 'reserved';
 }
 

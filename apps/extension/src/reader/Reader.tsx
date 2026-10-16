@@ -29,7 +29,7 @@ import {initialReadingView,readingViewDefaults,readStoredReadingView,saveReading
 import {track,type AnalyticsFields} from '../analytics';
 import type {ReaderAnalytics} from './analytics';
 import {useReaderAnalytics} from './useReaderAnalytics';
-import {ReaderShell,ReaderNavigation,ReaderTools,ReaderSettingsButton,ReaderDrawer,ReaderNumberInput,compactReaderQuery} from './ReaderChrome';
+import {ReaderShell,ReaderNavigation,ReaderTools,ReaderSettingsButton,ReaderDrawer,ReaderNumberInput,compactReaderQuery,isCompactReaderDevice} from './ReaderChrome';
 import {ReaderChoice as Choice,ReaderScale,ReaderSettings,ReaderTranslationSettings} from './ReaderSettings';
 import {useReaderControls} from './useReaderControls';
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
@@ -41,8 +41,8 @@ const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRe
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
 // Descriptor views can contain placeholder dimensions; materialization supplies the real image identity and size.
-const [compactAtOpen]=useState(()=>window.matchMedia?.(compactReaderQuery).matches??false);
-const initialView=page?.imageSha256?initialReadingView(page,compactAtOpen):undefined;
+const [compactAtOpen]=useState(isCompactReaderDevice);
+const initialView=initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
 const [savedView,setView]=useState<ReadingView|undefined>(()=>readStoredReadingView(viewKey)??initialView);const [compare,setCompare]=useState(false);
 const view=savedView??readingViewDefaults();
 const [feedback,setFeedback]=useState<{job:Job;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});

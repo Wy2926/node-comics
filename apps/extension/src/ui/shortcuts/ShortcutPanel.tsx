@@ -142,6 +142,7 @@ export function ShortcutPanel({onClose, initialScope}: {onClose: () => void; ini
     const bindings = [...resolveBindings(id, current)];
     bindings[index] = binding;
     void commit({...current, [id]: [...new Set(bindings)]});
+    return true;
   }
   function restore(id: ShortcutId) {
     const next = {...current}; delete next[id];

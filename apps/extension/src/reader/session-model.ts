@@ -42,6 +42,7 @@ export interface SessionReaderProps {
   onSelectRegion?(): void;
   onImport?(): void;
   complete?: boolean;
+  loading?: boolean;
   notice?: string;
 }
 

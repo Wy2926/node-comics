@@ -9,7 +9,10 @@ describe('comic viewing choices',()=>{
       vi.stubGlobal('localStorage',{getItem:()=>raw});expect(readStoredReadingView('comic')).toBeDefined();
     }
   });
-  it.each([{width:1000,height:3000},{width:800,height:24000}])('initializes a first long image %j to width and 50 percent',page=>{
+  it.each([{width:1000,height:1500},{width:1500,height:1000},{width:1000,height:3000},{width:800,height:24000}])('initializes every desktop image %j to width and 50 percent',page=>{
+    expect(initialReadingView(page)).toEqual({mode:'classic',preference:'original',zoom:50,fit:'width'});
+  });
+  it.each([undefined,{width:0,height:1300},{width:900,height:0},{width:NaN,height:3000},{width:900,height:Infinity}])('uses the desktop sizing before real dimensions arrive: %j',page=>{
     expect(initialReadingView(page)).toEqual({mode:'classic',preference:'original',zoom:50,fit:'width'});
   });
   it('uses the full phone width for a new long image without changing a saved zoom',()=>{
@@ -17,11 +20,11 @@ describe('comic viewing choices',()=>{
     vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'original',zoom:50,fit:'width'})});
     expect(readStoredReadingView('comic')?.zoom).toBe(50);
   });
-  it.each([{width:1000,height:1500},{width:1500,height:1000},{width:1000,height:2999}])('keeps a regular image %j at window and 100 percent',page=>{
-    expect(initialReadingView(page)).toEqual({mode:'classic',preference:'original',zoom:100,fit:'window'});
+  it.each([{width:1000,height:1500},{width:1500,height:1000},{width:1000,height:2999}])('keeps a regular phone image %j at window and 100 percent',page=>{
+    expect(initialReadingView(page,true)).toEqual({mode:'classic',preference:'original',zoom:100,fit:'window'});
   });
-  it.each([undefined,{width:0,height:1300},{width:900,height:0},{width:NaN,height:3000},{width:900,height:Infinity}])('waits for known valid image dimensions %j',page=>{
-    expect(initialReadingView(page)).toBeUndefined();
+  it.each([undefined,{width:0,height:1300},{width:900,height:0},{width:NaN,height:3000},{width:900,height:Infinity}])('waits for known valid phone image dimensions %j',page=>{
+    expect(initialReadingView(page,true)).toBeUndefined();
   });
   it('starts each work on originals and shares explicit choices only within that work',()=>{
     const saved=new Map<string,string>();

@@ -5,10 +5,11 @@ import type {Page,Settings} from '../types';
 export type ReadingView = PageView & {zoom:number;fit:Settings['fit']};
 
 export function readingViewDefaults():ReadingView{return {mode:'classic',preference:'original',zoom:100,fit:'window'};}
-/** Only known image dimensions can establish a comic's initial sizing. */
+/** Desktop sizing is immediate; only compact readers need dimensions to detect long images. */
 export function initialReadingView(page?:Pick<Page,'width'|'height'>,compact=false):ReadingView|undefined{
+  if(!compact)return {...readingViewDefaults(),fit:'width',zoom:50};
   if(!page||!Number.isFinite(page.width)||!Number.isFinite(page.height)||page.width<=0||page.height<=0)return;
-  return {...readingViewDefaults(),...(page.height>=page.width*3?{fit:'width' as const,zoom:compact?100:50}:{})};
+  return {...readingViewDefaults(),...(page.height>=page.width*3?{fit:'width' as const}:{})};
 }
 
 /** Display choice, image fit and proportional zoom belong to this comic only. */

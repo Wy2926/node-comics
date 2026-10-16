@@ -52,7 +52,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
 | `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |
 | `verify_image_transport.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与默认 HTTP 缓存复用 |
-| `verify_immersive_reading.mjs` | 隔离 MV3 当前标签页沉浸阅读：通用正文、500 页章节有限窗口、模拟 MTU 原译切换、退出位置／焦点与 URL 释放；`--styles-only` 使用本地夹具检查六色亮暗令牌、字号隔离、原生进度滑块与翻译状态；`--headed` 用独立可见窗口尝试检查真实切页后的后台释放，浏览器未报告隐藏状态时记为未验证；`--live` 追加公开适配站／通用网页真实原图，只读且不调用模型，`--live-only` 仅真实来源。沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，IMMERSIVE_OUTPUT 指定产物目录；不代替原生菜单、Firefox 或手机验收 |
+| `verify_immersive_reading.mjs` | 隔离 MV3 当前标签页沉浸阅读：通用正文、PC 首次铺满宽度与 50% 实际尺寸、中心加载动画／减少动画／失败重试及加载中退出、默认／自定义双向切换快捷键与输入／重复保护、500 页章节有限窗口、模拟 MTU 原译切换、退出位置／焦点与 URL 释放；`--styles-only` 使用本地夹具检查六色亮暗令牌、字号隔离、原生进度滑块与翻译状态；`--headed` 用独立可见窗口尝试检查真实切页后的后台释放，浏览器未报告隐藏状态时记为未验证；`--live` 追加公开适配站／通用网页真实原图，只读且不调用模型，`--live-only` 仅真实来源。沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，IMMERSIVE_OUTPUT 指定产物目录；不代替原生菜单、Firefox 或手机验收 |
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
 | `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有 Komga 测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |

@@ -33,6 +33,24 @@ describe('temporary reader presentation', () => {
     expect(html).toContain('data-page-id="page-99"');
     expect(html).toContain('data-decoded-pages="1"');
   });
+  it('starts desktop pages at half of the width-fit canvas even before dimensions arrive', () => {
+    expect(render({pages:[pages[0]]})).toContain('style="width:438px;height:657px"');
+    expect(render({pages:[{id:'unknown',width:0,height:0}]})).toContain('style="width:438px;');
+  });
+  it('keeps width-fit 50 percent for a narrow desktop window but the existing phone default', () => {
+    vi.stubGlobal('window',{matchMedia:(query:string)=>({matches:!query.includes('max-device-width')})});
+    expect(render({pages:[pages[0]]})).toContain('style="width:438px;height:657px"');
+    vi.stubGlobal('window',{matchMedia:()=>({matches:true})});
+    expect(render({pages:[pages[0]]})).toContain('style="width:440px;height:660px"');
+  });
+  it('announces a centered reload state without replacing page frames or the active view', () => {
+    const html=render({loading:true,initialView:'translation',onReload:vi.fn()});
+    expect(html).toContain('class="nc-session-loading" role="status" aria-live="polite"');
+    expect(html).toContain('class="spinner" aria-hidden="true"');expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('data-view="translation"');expect(html).toContain('data-decoded-pages="11"');
+    expect(html).toContain('disabled="">重新载入');
+    expect(render()).not.toContain('nc-session-loading');
+  });
   it('unmounts hidden pixel presentations while retaining the bounded page frames and anchor', () => {
     const options={initialAnchor:{pageId:'page-749',relativeOffset:.42}};
     vi.stubGlobal('document',{hidden:true});

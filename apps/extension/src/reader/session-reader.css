@@ -55,8 +55,15 @@
 .nc-session-reader .nc-image-failure-retry { z-index:2; }
 .nc-session-notice, .nc-session-region-hint { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:7; max-width:calc(100% - 180px); padding:8px 12px; border:var(--comic-border); border-radius:var(--comic-control-radius); box-shadow:var(--comic-shadow-small); background:var(--surface); color:var(--ink); font-size:var(--text-caption); }
 .nc-session-reader .spinner { width:20px; height:20px; border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:nc-spin .85s linear infinite; }
-.nc-session-start { padding:32px; background:var(--surface); color:var(--ink); height:100%; }
-.nc-session-start .button { margin:0 12px 12px 0; }
+.nc-session-start { position:relative; display:grid; place-items:center; padding:88px 24px; background:var(--surface); color:var(--ink); height:100%; overflow:auto; outline:0; }
+.nc-session-start-back { position:absolute; top:max(20px,env(safe-area-inset-top)); left:max(20px,env(safe-area-inset-left)); }
+.nc-session-start-state { display:flex; flex-direction:column; align-items:center; gap:16px; width:min(440px,100%); text-align:center; overflow-wrap:anywhere; }
+.nc-session-reader .nc-session-start-state .spinner { width:44px; height:44px; border-width:3px; }
+.nc-session-start-state h2 { margin:0; font-size:var(--text-title); }
+.nc-session-start-state p { margin:0; color:var(--muted); }
+.nc-session-start-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; }
+.nc-session-loading { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:8; display:flex; align-items:center; gap:12px; max-width:calc(100% - 32px); padding:16px 20px; border:var(--comic-border); border-radius:var(--comic-control-radius); background:var(--surface); box-shadow:var(--comic-shadow-small); color:var(--ink); pointer-events:none; }
+.nc-session-loading .spinner { flex:none; }
 .theme[data-picking=true] { background:transparent; }
 .theme[data-picking=true] .nc-session-mount { visibility:hidden; }
 .nc-session-region-hint { position:fixed; max-width:calc(100% - 32px); z-index:2; pointer-events:none; font-size:var(--text-body); }

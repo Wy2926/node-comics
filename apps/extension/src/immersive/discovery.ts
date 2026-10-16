@@ -36,16 +36,66 @@ const ancestors = (element: Element) => {
 };
 const attached = (target: PageImage, doc: Document) => target.element.isConnected && target.element.ownerDocument === doc;
 
-function closestToViewport(targets: readonly PageImage[], doc: Document): PageImage | undefined {
-  const width = doc.defaultView?.innerWidth ?? 0;
-  let selected: PageImage | undefined, best = Infinity;
+/** One scan owns these caches; each image/ancestor geometry and ancestor style is read at most once. */
+function scanLayout(doc: Document) {
+  type Bounds = {left: number; right: number; top: number; bottom: number};
+  const rects = new Map<Element, DOMRect>(), paths = new Map<Element, Element[]>(), clips = new Map<Element, Bounds | null>();
+  const width = doc.defaultView?.innerWidth ?? 0, height = doc.defaultView?.innerHeight ?? 0;
+  const rect = (element: Element) => {
+    let value = rects.get(element);
+    if (!value) {value = element.getBoundingClientRect(); rects.set(element, value);}
+    return value;
+  };
+  const path = (element: Element) => {
+    let value = paths.get(element);
+    if (!value) {value = ancestors(element); paths.set(element, value);}
+    return value;
+  };
+  const viewport = (element: Element) => {
+    const visible: Bounds = {left: 0, right: width, top: 0, bottom: height};
+    for (const parent of path(element)) {
+      // Root overflow propagates to the window, including the reader's temporary page lock.
+      if (parent.tagName === 'BODY' || parent.tagName === 'HTML') break;
+      if (!clips.has(parent)) {
+        const style = getComputedStyle(parent), clipsX = /^(auto|scroll|hidden|clip|overlay)$/.test(style.overflowX),
+          clipsY = /^(auto|scroll|hidden|clip|overlay)$/.test(style.overflowY);
+        const bounds = clipsX || clipsY ? rect(parent) : null;
+        clips.set(parent, bounds ? {
+          left: clipsX ? bounds.left + parent.clientLeft : -Infinity,
+          right: clipsX ? bounds.left + parent.clientLeft + parent.clientWidth : Infinity,
+          top: clipsY ? bounds.top + parent.clientTop : -Infinity,
+          bottom: clipsY ? bounds.top + parent.clientTop + parent.clientHeight : Infinity,
+        } : null);
+      }
+      const clip = clips.get(parent);
+      if (clip) {
+        visible.left = Math.max(visible.left, clip.left); visible.right = Math.min(visible.right, clip.right);
+        visible.top = Math.max(visible.top, clip.top); visible.bottom = Math.min(visible.bottom, clip.bottom);
+      }
+    }
+    return visible;
+  };
+  return {rect, path, viewport, height};
+}
+type ScanLayout = ReturnType<typeof scanLayout>;
+
+/** Exit restoration uses the same clipped reading edge as entry discovery. */
+export function immersiveViewportTop(element: Element, doc: Document): number {
+  return scanLayout(doc).viewport(element).top;
+}
+
+function closestToViewport(targets: readonly PageImage[], layout: ScanLayout): PageImage | undefined {
+  let selected: PageImage | undefined, best = Infinity, selectedVisible = false;
   for (const target of targets) {
-    const rect = target.element.getBoundingClientRect();
+    const rect = layout.rect(target.element), viewport = layout.viewport(target.element);
     if (!(rect.width > 0 && rect.height > 0)) continue;
-    const distance = rect.top > 0 ? rect.top : rect.bottom < 0 ? -rect.bottom : 0;
-    const horizontal = rect.right <= 0 || rect.left >= width ? width : Math.abs(rect.left + rect.width / 2 - width / 2) / 100;
+    if (viewport.right <= viewport.left || viewport.bottom <= viewport.top) continue;
+    const visible = rect.bottom > viewport.top && rect.top < viewport.bottom && rect.right > viewport.left && rect.left < viewport.right;
+    const distance = rect.top > viewport.top ? rect.top - viewport.top : rect.bottom < viewport.top ? viewport.top - rect.bottom : 0;
+    const horizontal = rect.right <= viewport.left || rect.left >= viewport.right ? viewport.right - viewport.left
+      : Math.abs(rect.left + rect.width / 2 - (viewport.left + viewport.right) / 2) / 100;
     const score = distance + horizontal;
-    if (score < best) { best = score; selected = target; }
+    if (visible && !selectedVisible || visible === selectedVisible && score < best) {best = score; selected = target; selectedVisible = visible;}
   }
   return selected ?? targets[0];
 }
@@ -65,12 +115,16 @@ export function pickImmersiveRoot(element: Element, targets: readonly PageImage[
   return inside.length ? element : target.element;
 }
 
-/** Only candidate metadata and layout are inspected; this never scrolls, reads pixels or requests resources. */
-export function selectImmersiveTargets(targets: readonly PageImage[], options: {
+type SelectionOptions = {
   document: Document;
   generic: boolean;
   root?: Element | null;
-}): {root: Element | null; targets: PageImage[]} {
+};
+/** Only candidate metadata and layout are inspected; this never scrolls, reads pixels or requests resources. */
+export function selectImmersiveTargets(targets: readonly PageImage[], options: SelectionOptions) {
+  return selectTargets(targets, options, scanLayout(options.document));
+}
+function selectTargets(targets: readonly PageImage[], options: SelectionOptions, layout: ScanLayout): {root: Element | null; targets: PageImage[]} {
   const {document: doc, generic, root} = options;
   const available = targets.slice(0, MAX_COMIC_IMAGES).filter(target => attached(target, doc));
   if (root) return root.ownerDocument === doc && root.isConnected
@@ -80,7 +134,7 @@ export function selectImmersiveTargets(targets: readonly PageImage[], options: {
   const candidates = available.filter(target => !target.element.closest(excludedRegion));
   const counts = new Map<Element, number>(), paths = new Map<PageImage, Element[]>();
   for (const target of candidates) {
-    const path = ancestors(target.element);
+    const path = layout.path(target.element);
     paths.set(target, path);
     for (const parent of path) counts.set(parent, (counts.get(parent) ?? 0) + 1);
   }
@@ -93,14 +147,15 @@ export function selectImmersiveTargets(targets: readonly PageImage[], options: {
     groups.set(owner, group);
   }
   let chosen: {root: Element | null; targets: PageImage[]} = {root: null, targets: []}, best = -Infinity;
-  const viewportHeight = Math.max(1, doc.defaultView?.innerHeight ?? 1);
+  const viewportHeight = Math.max(1, layout.height);
   for (const [owner, group] of groups) {
-    const anchor = closestToViewport(group, doc)!;
-    const reference = anchor.element.getBoundingClientRect();
+    const anchor = closestToViewport(group, layout)!;
+    const reference = layout.rect(anchor.element), viewport = layout.viewport(anchor.element);
     if (!(reference.width > 0 && reference.height > 0)) continue;
+    if (viewport.right <= viewport.left || viewport.bottom <= viewport.top) continue;
     // A column of comic pages is distinct from a row/grid of equally large cover images.
     const column = group.filter(target => {
-      const rect = target.element.getBoundingClientRect();
+      const rect = layout.rect(target.element);
       return rect.width > 0 && rect.height > 0 &&
         Math.abs(rect.left + rect.width / 2 - reference.left - reference.width / 2) <= Math.min(rect.width, reference.width) * 0.3 &&
         Math.min(rect.width, reference.width) / Math.max(rect.width, reference.width) >= 0.5;
@@ -108,11 +163,11 @@ export function selectImmersiveTargets(targets: readonly PageImage[], options: {
     if (group.length >= 3 && column.length * 2 <= group.length) {
       const inColumn = new Set(column);
       if (group.some(target => {
-        const rect = target.element.getBoundingClientRect();
+        const rect = layout.rect(target.element);
         return !inColumn.has(target) && Math.abs(rect.top - reference.top) < Math.min(rect.height, reference.height) * 0.25;
       })) continue;
     }
-    const distance = reference.top > viewportHeight ? reference.top - viewportHeight : reference.bottom < 0 ? -reference.bottom : 0;
+    const distance = reference.top > viewport.bottom ? reference.top - viewport.bottom : reference.bottom < viewport.top ? viewport.top - reference.bottom : 0;
     const score = (distance === 0 ? 4 : 0) - Math.min(4, distance / viewportHeight) +
       Math.min(3, Math.log2(column.length || 1)) + (owner.closest(contentRegion) ? 2 : 0) -
       (owner.tagName === 'BODY' || owner.tagName === 'HTML' ? 4 : 0);
@@ -122,10 +177,13 @@ export function selectImmersiveTargets(targets: readonly PageImage[], options: {
 }
 
 export function immersiveAnchor(pages: readonly ImmersivePage[], doc: Document): ImmersiveSnapshot['anchor'] {
-  const target = closestToViewport(pages, doc) as ImmersivePage | undefined;
+  return anchorFor(pages, scanLayout(doc));
+}
+function anchorFor(pages: readonly ImmersivePage[], layout: ScanLayout): ImmersiveSnapshot['anchor'] {
+  const target = closestToViewport(pages, layout) as ImmersivePage | undefined;
   if (!target) return null;
-  const rect = target.element.getBoundingClientRect();
-  return {id: target.id, offset: rect.height > 0 ? clamp(-rect.top / rect.height) : 0};
+  const rect = layout.rect(target.element), viewport = layout.viewport(target.element);
+  return {id: target.id, offset: rect.height > 0 ? clamp((viewport.top - rect.top) / rect.height) : 0};
 }
 
 /** Shares the source document's lifecycle and observation; the caller owns its subscription. */
@@ -150,7 +208,7 @@ export function createImmersiveDiscovery(doc: Document) {
       const limited = found.length >= MAX_COMIC_IMAGES;
       latestTargets = [...new Map(found.slice(0, MAX_COMIC_IMAGES).filter(target => attached(target, doc))
         .map(target => [target.element, target])).values()];
-      const selected = selectImmersiveTargets(latestTargets, {document: doc, generic, root});
+      const layout = scanLayout(doc), selected = selectTargets(latestTargets, {document: doc, generic, root}, layout);
       const byElement = new Map(previous.map(slot => [slot.target.element, slot]));
       const retained = new Map(latestTargets.flatMap(target => {
         const slot = byElement.get(target.element);
@@ -190,7 +248,7 @@ export function createImmersiveDiscovery(doc: Document) {
         };
       });
       return {navigationId: page.navigationId, url: page.url, title: doc.title.slice(0, 160), sourceId: page.location.sourceId,
-        direction: page.session.direction, partial: true, root: selected.root, pages, anchor: immersiveAnchor(pages, doc), limited};
+        direction: page.session.direction, partial: true, root: selected.root, pages, anchor: anchorFor(pages, layout), limited};
     },
   };
 }

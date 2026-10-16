@@ -49,6 +49,14 @@ describe('public content shortcut preferences',()=>{
     const handlers=binding()[1];expect(handlers['web.close']!(key(false))).toBe(false);expect(action).not.toHaveBeenCalled();
     handlers['web.close']!(key());expect(action).toHaveBeenCalledOnce();cleanup();
   });
+  it('binds the same sanitized preferences inside a closed-shadow reader scope',async()=>{
+    const element={} as HTMLElement,exit=vi.fn(),cleanup=bindWebShortcuts({'web.immersive':exit},()=>true,element);
+    initial.resolve({ok:true,overrides:{'web.immersive':['Alt+Shift+KeyV']}});await flush();
+    expect(binding()[0]).toBe(element);expect(binding()[2].getOverrides()).toEqual({'web.immersive':['Alt+Shift+KeyV']});
+    binding()[1]['web.immersive']!(key());expect(exit).toHaveBeenCalledOnce();
+    broadcast({type:'NC_SHORTCUTS_CHANGED',overrides:{'web.immersive':[]}});
+    expect(binding()[2].getOverrides()).toEqual({'web.immersive':[]});cleanup();
+  });
 });
 
 describe('always-on shortcut entry',()=>{
@@ -61,9 +69,15 @@ describe('always-on shortcut entry',()=>{
     expect(respond).toHaveBeenCalledExactlyOnceWith({instanceId:'000102030405060708090a0b0c0d0e0f',url:'http://source.test/chapter'});
     expect(binding()[1]['web.shortcuts']).toBeTypeOf('function');cleanup();
   });
-  it('registers only the panel, leaving native translation starts and inactive controls untouched',()=>{
+  it('registers the panel and immersive toggle, leaving native translation starts untouched',()=>{
     const cleanup=installWebShortcuts();
-    expect(Object.keys(binding()[1])).toEqual(['web.shortcuts']);cleanup();
+    expect(Object.keys(binding()[1])).toEqual(['web.shortcuts','web.immersive']);cleanup();
+  });
+  it('routes immersive entry with the current document identity',async()=>{
+    const cleanup=installWebShortcuts();initial.resolve({ok:true,overrides:{}});await flush();
+    binding()[1]['web.immersive']!(key());
+    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({type:'NC_SHORTCUTS_EXECUTE',action:'web.immersive',url:'https://source.test/chapter',instanceId:expect.any(String)});
+    expect(binding()[1]['web.immersive']!(key())).toBe(false);cleanup();
   });
   it('sends its own document identity and suppresses overlapping activations',async()=>{
     const cleanup=installWebShortcuts();initial.resolve({ok:true,overrides:{}});await flush();

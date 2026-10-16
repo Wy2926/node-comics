@@ -6,7 +6,7 @@ const trustedBackground = (sender:chrome.runtime.MessageSender) => sender.id===c
   && !sender.tab&&(!sender.url||sender.url.startsWith(chrome.runtime.getURL('')));
 
 /** Public shortcut preferences only: content scripts never receive account or reader storage. */
-export function bindWebShortcuts(handlers:ShortcutHandlers, enabled:()=>boolean) {
+export function bindWebShortcuts(handlers:ShortcutHandlers, enabled:()=>boolean, target:Window|HTMLElement=window) {
   let overrides:ShortcutOverrides={},disposed=false,ready=false,revision=0;
   const changed=(message:{type?:string;overrides?:unknown},sender:chrome.runtime.MessageSender)=>{
     if(message?.type!=='NC_SHORTCUTS_CHANGED'||!trustedBackground(sender))return;
@@ -20,7 +20,7 @@ export function bindWebShortcuts(handlers:ShortcutHandlers, enabled:()=>boolean)
   // The page must not invoke extension actions through synthetic keyboard events.
   const guarded=Object.fromEntries(Object.entries(handlers).map(([id,handler])=>[id,(event:KeyboardEvent)=>
     event.isTrusted?handler!(event):false])) as ShortcutHandlers;
-  const unbind=bindShortcuts(window,guarded,{getOverrides:()=>overrides,enabled:()=>ready&&!disposed&&!document.hidden&&enabled()});
+  const unbind=bindShortcuts(target,guarded,{getOverrides:()=>overrides,enabled:()=>ready&&!disposed&&!document.hidden&&enabled()});
   return ()=>{disposed=true;unbind();chrome.runtime.onMessage.removeListener(changed);};
 }
 
@@ -45,15 +45,16 @@ export function installWebShortcuts() {
     shadow.append(notice);document.documentElement.append(host);errorHost=host;
     errorTimer=setTimeout(()=>{host.remove();if(errorHost===host)errorHost=undefined;},7000);
   }
-  function execute(){
+  function execute(action:'web.shortcuts'|'web.immersive'){
     if(busy)return false;
     busy=true;
-    void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_EXECUTE',action:'web.shortcuts',url:location.href,instanceId})
+    void chrome.runtime.sendMessage({type:'NC_SHORTCUTS_EXECUTE',action,url:location.href,instanceId})
       .then(response=>{if(!response?.ok&&response?.error)showError(response.error);})
       .catch(()=>{}).finally(()=>{busy=false;});
   }
   const unbind=bindWebShortcuts({
-    'web.shortcuts':execute,
+    'web.shortcuts':()=>execute('web.shortcuts'),
+    'web.immersive':()=>execute('web.immersive'),
   },()=>!disposed);
   return ()=>{
     disposed=true;unbind();chrome.runtime.onMessage.removeListener(identity);

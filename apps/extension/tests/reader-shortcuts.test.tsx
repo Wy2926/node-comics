@@ -93,29 +93,29 @@ describe('reader shortcut action integration',()=>{
  it('bounds repeated zoom keys, resets to 100%, and keeps the comic viewing preference',()=>{
   render(fixture());
   for(let index=0;index<15;index++)hooks.handlers['reader.zoomIn']();
-  expect(view()).toEqual({mode:'classic',preference:'original',zoom:200,fit:'window'});
+  expect(view()).toEqual({mode:'classic',preference:'original',zoom:200,fit:'width'});
   for(let index=0;index<25;index++)hooks.handlers['reader.zoomOut']();
   expect(view().zoom).toBe(40);hooks.handlers['reader.zoomReset']();expect(view().zoom).toBe(100);
   expect(actions.preserve).toHaveBeenCalledTimes(41);
  });
  it('changes layout and fit through the same preserving controls while retaining unrelated settings',()=>{
   const props=fixture();render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();
-  expect(props.settings).toEqual({...defaults,layout:'single'});expect(view().fit).toBe('width');
+  expect(props.settings).toEqual({...defaults,layout:'single'});expect(view().fit).toBe('window');
   expect(actions.preserve).toHaveBeenCalledTimes(2);
   expect(actions.preserve.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(props.setSettings).mock.invocationCallOrder[0]);
-  render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();expect(props.settings).toEqual(defaults);expect(view().fit).toBe('window');
+  render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();expect(props.settings).toEqual(defaults);expect(view().fit).toBe('width');
  });
- it('defaults fit to window independently of global settings and restores the comic fit for geometry and controls',()=>{
+ it('defaults desktop sizing to width at 50 percent independently of global settings and restores the comic fit',()=>{
   const props=fixture({settings:{...defaults,fit:'width'}});const initial=render(props);
-  expect(view().fit).toBe('window');
+  expect(view()).toEqual({mode:'classic',preference:'original',zoom:50,fit:'width'});
   const pageWidth=(tree:ReactElement)=>nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number};
-  expect(pageWidth(initial).width).toBe(440);
-  hooks.handlers['reader.fit']();const fitted=render(props);expect(pageWidth(fitted).width).toBe(876);
+  expect(pageWidth(initial).width).toBe(438);
+  hooks.handlers['reader.fit']();const fitted=render(props);expect(pageWidth(fitted).width).toBe(220);
   expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings.fit).toBe('width');
   hooks.handlers['reader.settings']();const settings=render(props);
   const choice=nodes(settings).find(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式')!;
-  expect(choice.props.value).toBe('width');(choice.props.onChange as (value:string)=>void)('window');
-  expect(view().fit).toBe('window');expect(props.setSettings).not.toHaveBeenCalled();expect(actions.preserve).toHaveBeenCalledTimes(2);
+  expect(choice.props.value).toBe('window');(choice.props.onChange as (value:string)=>void)('width');
+  expect(view().fit).toBe('width');expect(props.setSettings).not.toHaveBeenCalled();expect(actions.preserve).toHaveBeenCalledTimes(2);
   hooks.states=[];vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:100,fit:'width'}),setItem:vi.fn()});
   const restored=render(props);expect(view()).toEqual({mode:'classic',preference:'translation',zoom:100,fit:'width'});expect(pageWidth(restored).width).toBe(876);
  });
@@ -129,13 +129,34 @@ describe('reader shortcut action integration',()=>{
   hooks.states=[];render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
   expect(long.setSettings).not.toHaveBeenCalled();
  });
- it('waits through unloaded pages and placeholder dimensions before saving the first actual long-image preset',()=>{
+ it('applies desktop sizing before placeholder dimensions resolve without a later sizing jump',()=>{
+  const setItem=vi.fn();vi.stubGlobal('localStorage',{getItem:()=>null,setItem});
+  const props=fixture({copy:{...copy,pages:[]}});render(props);flushEffects();
+  expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
+  props.copy={...copy,pages:copy.pages.map(page=>({...page,width:900,height:1300,imageSha256:undefined}))};
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,width:800,height:24000,imageSha256:`real-${page.id}`}))};
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  expect(actions.preserve).not.toHaveBeenCalled();
+ });
+ it.each([
+  {compact:false,phoneDevice:false,phone:false},
+  {compact:true,phoneDevice:false,phone:false},
+  {compact:false,phoneDevice:true,phone:false},
+  {compact:true,phoneDevice:true,phone:true},
+ ])('uses phone sizing only when both device and compact viewport gates match: %j',({compact,phoneDevice,phone})=>{
+  vi.stubGlobal('window',{matchMedia:(query:string)=>({matches:query.includes('max-device-width')?phoneDevice:compact}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:phone?'window':'width',zoom:phone?100:50});
+ });
+ it('waits through unloaded phone pages and placeholders before saving the first actual long-image preset',()=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const setItem=vi.fn();vi.stubGlobal('localStorage',{getItem:()=>null,setItem});
   const props=fixture({copy:{...copy,pages:[]}});render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
   props.copy={...copy,pages:copy.pages.map(page=>({...page,width:900,height:1300,imageSha256:undefined}))};
   render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,width:800,height:24000,imageSha256:`real-${page.id}`}))};
-  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:100});
   expect(actions.preserve).toHaveBeenCalledOnce();expect(setItem).not.toHaveBeenCalled();
   render(props);flushEffects();expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
  });
@@ -148,6 +169,7 @@ describe('reader shortcut action integration',()=>{
   expect(props.setSettings).not.toHaveBeenCalled();
  });
  it('preserves a manual choice even when a queued initialization effect sees the newly loaded dimensions',()=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});render(props);
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
   render(props);hooks.handlers['reader.fit']();const selected={...view()};flushEffects();expect(view()).toEqual(selected);

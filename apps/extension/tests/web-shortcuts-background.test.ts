@@ -1,11 +1,11 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {registerWebShortcutsBackground} from '../src/shortcuts/web-background';
-import {activateInline} from '../src/inline/background';
+import {activateInline,activateImmersive} from '../src/inline/background';
 import {activateRegion} from '../src/region/background';
 import {requireHostAccess} from '../src/host-permissions';
 import {loadShortcutOverrides} from '../src/shortcuts/store';
 
-vi.mock('../src/inline/background',()=>({activateInline:vi.fn(async()=>{})}));
+vi.mock('../src/inline/background',()=>({activateInline:vi.fn(async()=>{}),activateImmersive:vi.fn(async()=>{})}));
 vi.mock('../src/region/background',()=>({activateRegion:vi.fn(async()=>{})}));
 vi.mock('../src/host-permissions',()=>({requireHostAccess:vi.fn(async()=>{})}));
 vi.mock('../src/shortcuts/store',async original=>({...await original<typeof import('../src/shortcuts/store')>(),loadShortcutOverrides:vi.fn(async()=>({'web.shortcuts':['Ctrl+Alt+KeyT'],'app.library':['Alt+KeyB']}))}));
@@ -16,7 +16,7 @@ const sender:chrome.runtime.MessageSender={id:'extension',url:'https://source.te
 let listener:Listener,changed:(changes:Record<string,chrome.storage.StorageChange>,area:string)=>void,nativeCommand:(command:string,tab?:chrome.tabs.Tab)=>void;
 let tab:Partial<chrome.tabs.Tab>,identity:{instanceId:string;url:string};
 const command=(action='web.shortcuts')=>({type:'NC_SHORTCUTS_EXECUTE',action,url:'https://source.test/chapter',instanceId:'instance-7'});
-const flush=async()=>{for(let count=0;count<10;count++)await Promise.resolve();};
+const flush=async()=>{for(let count=0;count<20;count++)await Promise.resolve();};
 async function send(message:any,from=sender){
   let result:any;
   const owned=listener(message,from,value=>{result=value;});
@@ -54,6 +54,33 @@ describe('website shortcut protocol',()=>{
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_IDENTITY'},{frameId:0,documentId:'document-7'});
     expect(chrome.tabs.create).toHaveBeenCalledWith({url:'chrome-extension://extension/reader.html#settings/shortcuts'});
     expect(requireHostAccess).not.toHaveBeenCalled();expect(activateInline).not.toHaveBeenCalled();
+  });
+  it('opens immersive reading through its existing permission-checked activation',async()=>{
+    expect((await send(command('web.immersive'))).result).toEqual({ok:true});
+    expect(requireHostAccess).toHaveBeenCalledOnce();expect(activateImmersive).toHaveBeenCalledExactlyOnceWith(7);
+    expect(chrome.tabs.create).not.toHaveBeenCalled();expect(activateInline).not.toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_IDENTITY'},{frameId:0,documentId:'document-7'});
+  });
+  it('returns from an active immersive reader in the same document without restarting it',async()=>{
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async(_id,message:unknown)=>(message as {type:string}).type==='NC_SHORTCUTS_IDENTITY'?identity:{enabled:true,url:tab.url});
+    expect((await send(command('web.immersive'))).result).toEqual({ok:true});
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_STOP'},{frameId:0,documentId:'document-7'});
+    expect(requireHostAccess).not.toHaveBeenCalled();expect(activateImmersive).not.toHaveBeenCalled();
+  });
+  it('does not duplicate an immersive activation while its previous entry is pending',async()=>{
+    let finish!:()=>void;vi.mocked(activateImmersive).mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;}));
+    await send(command('web.immersive'));await send(command('web.immersive'));
+    expect(activateImmersive).toHaveBeenCalledOnce();finish();await flush();
+    await send(command('web.immersive'));expect(activateImmersive).toHaveBeenCalledTimes(2);
+  });
+  it.each(['permission','navigation','inactive'])('does not enter immersive after a failed target check: %s',async reason=>{
+    vi.mocked(requireHostAccess).mockImplementationOnce(async()=>{
+      if(reason==='permission')throw Error('restricted');
+      if(reason==='navigation')tab={...tab,url:'https://source.test/other'};
+      if(reason==='inactive')tab={...tab,active:false};
+    });
+    expect((await send(command('web.immersive'))).result).toMatchObject({ok:false});
+    expect(activateImmersive).not.toHaveBeenCalled();
   });
   it.each(['web.translate','web.region','web.pause','web.close','reader.translation','anything'])('rejects unsupported backend action %s',async action=>{
     expect((await send(command(action))).result).toMatchObject({ok:false});

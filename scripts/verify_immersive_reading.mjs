@@ -105,7 +105,7 @@ const buildJavaScriptSha256 = buildJavaScriptDigest.digest('hex');
 function genericHtml(alternate = false) {
   return `<!doctype html><meta charset="utf-8"><title>Original comic fixture</title>
   <style>body{margin:0;background:#f1f4f8;font:16px system-ui}header{height:220px;padding:20px;box-sizing:border-box}main{width:680px;margin:auto}#comic-scroll{height:680px;overflow:auto;background:white}article{padding:16px 20px}.comic{display:block;width:600px;height:825px;margin:0 auto 24px}aside img{width:70px;height:90px}footer{height:900px}button{padding:8px}</style>
-  <header><button id="site-action">Original site control</button><aside><img src="/images/8.png" alt="Small recommendation"></aside></header>
+  <header><button id="site-action">Original site control</button><input id="site-entry" aria-label="Original site text input"><span id="site-editable" contenteditable="true" tabindex="0">Original editable text</span><aside><img src="/images/8.png" alt="Small recommendation"></aside></header>
   <main><section id="comic-scroll"><article id="comic-body" aria-label="Comic chapter">
   ${Array.from({length: 12}, (_, index) => `<img class="comic" id="source-${index + 1}" src="/images/${index === 3 ? 3 : index + 1}.png" width="800" height="1100" alt="Original synthetic page ${index + 1}">`).join('')}
   <img class="comic" id="lazy" data-src="/images/13.png" width="800" height="1100" alt="Lazy synthetic page">
@@ -158,9 +158,9 @@ async function surfaceCall(fn, args, returnByValue = true) {
 }
 async function surfaceState() {
   return surfaceCall(function () {
-    const host = this.host, viewport = this.querySelector('[data-reader-viewport]'), images = [...this.querySelectorAll('img')];
+    const host = this.host, reader = this.querySelector('.nc-session-reader[data-current-page]'), viewport = this.querySelector('[data-reader-viewport]'), images = [...this.querySelectorAll('img')];
     const visible = image => {const r = image.getBoundingClientRect(), v = viewport?.getBoundingClientRect(); return !!v && r.width > 0 && r.height > 0 && r.top < v.bottom && r.bottom > v.top && r.left < v.right && r.right > v.left;};
-    return {count: Number(host.dataset.pageCount), complete: host.dataset.complete, current: Number(host.dataset.currentPage), view: host.dataset.view, loading: host.dataset.loading, error: host.dataset.error,
+    return {count: Number(host.dataset.pageCount), complete: host.dataset.complete, current: Number(reader?.dataset.currentPage ?? host.dataset.currentPage), view: host.dataset.view, loading: host.dataset.loading, error: host.dataset.error,
       viewport: viewport ? {top: viewport.scrollTop, left: viewport.scrollLeft, width: viewport.clientWidth, height: viewport.clientHeight} : null,
       imageElements: images.length, decodedImageElements: images.filter(image => image.complete && image.naturalWidth > 0).length,
       visibleDecodedImages: images.filter(image => visible(image) && image.complete && image.naturalWidth > 0).length,
@@ -418,11 +418,178 @@ async function runLateFirstImage() {
 }
 async function readingOffset() {
   return surfaceCall(function () {
-    const cell = [...this.querySelectorAll('[data-page-index]')].find(cell => Number(cell.dataset.pageIndex) + 1 === Number(this.host.dataset.currentPage));
+    const current = Number(this.querySelector('.nc-session-reader[data-current-page]')?.dataset.currentPage ?? this.host.dataset.currentPage);
+    const cell = [...this.querySelectorAll('[data-page-index]')].find(cell => Number(cell.dataset.pageIndex) + 1 === current);
     const rect = cell?.getBoundingClientRect(), viewport = this.querySelector('[data-reader-viewport]')?.getBoundingClientRect();
     if (!rect?.height || !viewport) throw Error('Current page geometry is missing');
-    return {page: Number(this.host.dataset.currentPage), relativeOffset: (viewport.top - rect.top) / rect.height};
+    return {page: current, relativeOffset: (viewport.top - rect.top) / rect.height};
   });
+}
+async function resolveControl(action) {
+  // Delay real extension replies in its isolated world; never add production test hooks.
+  return probe.evaluate(async ({url, action}) => {
+    const tab = (await chrome.tabs.query({})).find(tab => tab.url === url); if (!tab?.id) throw Error('Fixture tab is missing');
+    const values = await chrome.scripting.executeScript({target: {tabId: tab.id}, world: 'ISOLATED', args: [action], func: action => {
+      let state = globalThis.__ncImmersiveFixtureResolve;
+      if (!state) {
+        state = globalThis.__ncImmersiveFixtureResolve = {held: false, calls: 0, pending: []};
+        const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+        chrome.runtime.sendMessage = (...args) => {
+          if (args[0]?.type !== 'NC_IMMERSIVE_RESOLVE') return send(...args);
+          state.calls++;
+          if (!state.held) return send(...args);
+          return send(...args).then(response => new Promise(resolve => state.pending.push(failed => resolve(failed ? {ok: false, error: 'SOURCE_REQUEST_FAILED'} : response))));
+        };
+      }
+      if (action === 'hold') state.held = true;
+      if (action === 'release' || action === 'fail') {
+        state.held = false;
+        for (const finish of state.pending.splice(0)) finish(action === 'fail');
+      }
+      return {held: state.held, calls: state.calls, pending: state.pending.length};
+    }});
+    return values[0].result;
+  }, {url: page.url(), action});
+}
+async function loadingState(reloading = false) {
+  return surfaceCall(function (reloading) {
+    const status = this.querySelector(reloading ? '.nc-session-loading' : '.nc-session-start-state');
+    const spinner = status?.querySelector('.spinner'), rect = status?.getBoundingClientRect(), spin = spinner && getComputedStyle(spinner);
+    return {role: status?.getAttribute('role'), text: status?.textContent?.trim(),
+      center: rect ? {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, width: rect.width, height: rect.height} : null,
+      viewport: {width: innerWidth, height: innerHeight},
+      spinner: spin ? {width: parseFloat(spin.width), height: parseFloat(spin.height), animationName: spin.animationName, animationDuration: spin.animationDuration,
+        animations: spinner.getAnimations().map(animation => animation.playState), visibility: spin.visibility} : null,
+      busy: this.querySelector('[data-reader-viewport]')?.getAttribute('aria-busy'),
+      back: !!this.querySelector('.nc-session-start-back')};
+  }, reloading);
+}
+function assertCenteredLoading(value, label, reducedMotion = false, minimumSpinnerSize = 32) {
+  assert.equal(value.role, 'status', label + ' must announce an accessible loading status');
+  assert(value.text && value.center?.width > 0 && value.center.height > 0, label + ' must show loading text');
+  assert(Math.abs(value.center.x - value.viewport.width / 2) <= 3, label + ' must be horizontally centered');
+  assert(Math.abs(value.center.y - value.viewport.height / 2) <= 3, label + ' must be vertically centered');
+  assert(value.spinner?.width >= minimumSpinnerSize && value.spinner.height >= minimumSpinnerSize && value.spinner.visibility === 'visible', label + ' must show a visible center spinner');
+  if (reducedMotion) assert.equal(value.spinner.animationName, 'none', label + ' must respect reduced motion');
+  else assert(value.spinner.animationName !== 'none' && parseFloat(value.spinner.animationDuration) > 0 && value.spinner.animations.includes('running'), label + ' must animate when reduced motion is off');
+}
+async function assertDesktopDefault() {
+  await button(['阅读设置']);
+  const value = await surfaceCall(function () {
+    const viewport = this.querySelector('[data-reader-viewport]'), currentPage = Number(this.querySelector('.nc-session-reader[data-current-page]')?.dataset.currentPage ?? this.host.dataset.currentPage);
+    const current = this.querySelector(`[data-page-index="${currentPage - 1}"]`);
+    const scale = [...this.querySelectorAll('.nc-reader-option')].find(option => option.querySelector('b')?.textContent === '缩放');
+    return {fit: this.querySelector('[role="group"][aria-label="图片适应方式"] [aria-pressed="true"]')?.textContent,
+      zoom: scale?.querySelector('.nc-inline span')?.textContent, viewportWidth: viewport?.clientWidth, pageWidth: current?.getBoundingClientRect().width};
+  });
+  assert.equal(value.fit, '铺满宽度'); assert.equal(value.zoom, '50%');
+  assert(Math.abs(value.pageWidth - (value.viewportWidth - 24) * 0.5) < 2, 'Desktop 50% must size actual page geometry against viewport width');
+  await button(['关闭面板']);
+  measurements.push({label: 'desktop-immersive-default', ...value});
+}
+async function runLoadingAndShortcuts() {
+  stage = 'centered immersive loading, retry and cancellation';
+  const beforeTranslations = mtuInputs.length;
+  await open(local + '/generic');
+  await page.locator('img[src]').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  await page.locator('#site-action').focus(); const source = await originalPosition();
+  await page.emulateMedia({reducedMotion: 'no-preference'});
+  await resolveControl('hold'); await activate();
+  await until(async () => (await resolveControl('inspect')).pending === 1, 'The controlled initial resolve did not reach its reply gate');
+  await until(async () => !!(await loadingState()).spinner, 'The initial reader did not show a centered spinner');
+  const animated = await loadingState(); assertCenteredLoading(animated, 'Initial loading'); assert(animated.back);
+  await page.screenshot({path: path.join(out, 'immersive-loading-center.png')});
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  const reduced = await loadingState(); assertCenteredLoading(reduced, 'Reduced-motion loading', true);
+  await resolveControl('fail');
+  await until(async () => {const state = await surfaceState(); return state.loading === 'false' && !!state.error;}, 'Controlled resolve failure did not settle');
+  const failed = await loadingState(); assert.equal(failed.role, 'alert'); assert.equal(failed.spinner, null);
+  await page.screenshot({path: path.join(out, 'immersive-loading-failed.png')});
+  await resolveControl('hold'); await button(['重试']);
+  await until(async () => (await resolveControl('inspect')).pending === 1, 'Retry did not repeat the real resolve');
+  assertCenteredLoading(await loadingState(), 'Retry loading', true);
+  await resolveControl('release');
+  await until(async () => {const state = await surfaceState(); return state.loading === 'false' && state.visibleDecodedImages > 0;}, 'Retry did not restore the actual original image');
+  assert.equal((await loadingState()).center, null);
+  await assertDesktopDefault();
+  await closeSurface(); assert.deepEqual(await originalPosition(), source);
+  measurements.push({label: 'immersive-centered-loading', animated, reduced, failed});
+  check('Centered initial loading animates, announces status, honors reduced motion and recovers from resolve failure using the actual retry control');
+
+  const cancellationSource = await originalPosition();
+  await resolveControl('hold'); await activate();
+  await until(async () => (await resolveControl('inspect')).pending === 1, 'Cancellation resolve did not reach its reply gate');
+  await page.keyboard.press('Escape'); await page.locator('[data-nc-immersive]').waitFor({state: 'detached'});
+  const cancelledBeforeReply = await originalPosition();
+  await resolveControl('release'); await pause(200);
+  measurements.push({label: 'immersive-loading-cancellation', before: cancellationSource, afterEscape: cancelledBeforeReply, afterReply: await originalPosition()});
+  assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'A late resolve must not resurrect the cancelled reader');
+  assert.deepEqual(await originalPosition(), source); assert.equal((await resources()).active, 0);
+  check('Escape during loading restores source focus/styles; a late completed reply cannot resurrect the surface or its images');
+
+  stage = 'default and custom immersive tab shortcuts';
+  try {
+    for (const selector of ['#site-entry', '#site-editable']) {
+      await page.locator(selector).focus(); await page.keyboard.press('Alt+q'); await pause(120);
+      assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'Typing controls must not enter immersive reading');
+    }
+    await page.locator('#site-action').focus();
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', {key: 'q', code: 'KeyQ', altKey: true, bubbles: true})));
+    await pause(120); assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'Source scripts must not invoke extension actions through synthetic keys');
+    await resolveControl('hold'); await page.keyboard.press('Alt+q');
+    await page.locator('[data-nc-immersive]').waitFor();
+    await until(async () => (await resolveControl('inspect')).pending === 1, 'Keyboard entry did not reach the controlled loading state');
+    await page.keyboard.press('Alt+q'); await page.locator('[data-nc-immersive]').waitFor({state: 'detached'});
+    await resolveControl('release'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'The same mode shortcut must exit loading and reject its late result');
+    await page.keyboard.down('Alt'); await page.keyboard.down('q');
+    await page.locator('[data-nc-immersive]').waitFor();
+    await until(async () => (await surfaceState()).visibleDecodedImages > 0, 'Default keyboard entry did not decode an image');
+    await page.keyboard.down('q'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 1, 'A held/repeated entry key must not toggle the new surface off');
+    await page.keyboard.up('q'); await page.keyboard.up('Alt');
+    await surfaceCall(function () {this.querySelector('input[aria-label="跳转页码"]').focus();});
+    await page.keyboard.press('Alt+q'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 1, 'Reader page input must protect typing from mode switching');
+    await button(['阅读设置']); await page.keyboard.press('Alt+q'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 1, 'An open reader settings panel must protect against mode switching');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 1, 'Escape closes the reader panel before exiting the mode');
+    await surfaceCall(function () {this.querySelector('[data-reader-viewport]').focus();});
+    await jump(7); await surfaceCall(function () {this.querySelector('[data-reader-viewport]').focus();});
+    await page.mouse.move(640, 450); await page.mouse.wheel(0, 170); await pause(180);
+    const beforeSwitch = await readingOffset();
+    await page.keyboard.press('Alt+q'); await page.locator('[data-nc-immersive]').waitFor({state: 'detached'});
+    assert.equal((await resources()).active, 0);
+    const sourceAfterSwitch = await page.evaluate(() => {
+      const container = document.querySelector('#comic-scroll'), rect = container.getBoundingClientRect();
+      return {scrollTop: container.scrollTop, viewport: {top: rect.top, bottom: rect.bottom},
+        pages: [5, 6, 7, 8].map(number => {const image = document.querySelector('#source-' + number), rect = image.getBoundingClientRect(); return {number, top: rect.top, bottom: rect.bottom, height: rect.height};})};
+    });
+    await page.keyboard.press('Alt+q'); await page.locator('[data-nc-immersive]').waitFor();
+    await until(async () => (await surfaceState()).visibleDecodedImages > 0, 'Keyboard re-entry did not restore original images');
+    const afterSwitch = await readingOffset();
+    measurements.push({label: 'shortcut-mode-roundtrip', before: beforeSwitch, sourceAfterSwitch, after: afterSwitch});
+    assert.equal(afterSwitch.page, beforeSwitch.page, 'Keyboard mode round-trip must preserve the logical page');
+    assert(Math.abs(afterSwitch.relativeOffset - beforeSwitch.relativeOffset) < 0.025, 'Keyboard mode round-trip must preserve the within-page offset');
+    await page.screenshot({path: path.join(out, 'immersive-keyboard-restored.png')});
+    await page.keyboard.press('Alt+q'); await page.locator('[data-nc-immersive]').waitFor({state: 'detached'});
+
+    await probe.evaluate(() => chrome.storage.local.set({'nc-shortcuts': {version: 1, overrides: {'web.immersive': ['Alt+Shift+KeyH']}}}));
+    await pause(200); await page.keyboard.press('Alt+q'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'A custom binding must remove the default binding');
+    await page.keyboard.press('Alt+Shift+h'); await page.locator('[data-nc-immersive]').waitFor();
+    await until(async () => (await surfaceState()).visibleDecodedImages > 0, 'Custom keyboard entry did not decode images');
+    await page.keyboard.press('Alt+q'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 1, 'A custom binding must also replace the default inside the shadow reader');
+    await page.keyboard.press('Alt+Shift+h'); await page.locator('[data-nc-immersive]').waitFor({state: 'detached'});
+    await probe.evaluate(() => chrome.storage.local.set({'nc-shortcuts': {version: 1, overrides: {'web.immersive': []}}}));
+    await pause(200);
+    await page.keyboard.press('Alt+q'); await page.keyboard.press('Alt+Shift+h'); await pause(120);
+    assert.equal(await page.locator('[data-nc-immersive]').count(), 0, 'An explicitly disabled mode shortcut must stay disabled');
+    assert.equal(mtuInputs.length, beforeTranslations, 'Loading and mode switching in original view must not invoke translation');
+    check('Desktop uses width-fit at 50%; trusted default/custom keys switch both modes with position preservation, while input, repeat, synthetic and disabled keys are protected');
+  } finally {await probe.evaluate(() => chrome.storage.local.remove('nc-shortcuts'));}
 }
 const borderProperties = ['border-top-width', 'border-top-style', 'border-top-color'];
 const skinProperties = ['background-color', 'color', ...borderProperties, 'border-radius', 'box-shadow'];
@@ -682,7 +849,14 @@ async function runAdaptedFixture() {
   await page.mouse.move(640, 450); await page.mouse.wheel(0, 160); await pause(180);
   const reloadPosition = await readingOffset(), beforeReloadRequests = fixtureRequests.length;
   assert.equal(reloadPosition.page, 250);
+  await resolveControl('hold');
   await button(['阅读设置']); await button(['重新载入'], '.nc-stack-actions');
+  await until(async () => (await resolveControl('inspect')).pending === 1, 'Manual reload did not reach its controlled resolve reply gate');
+  const reloadLoading = await loadingState(true); assertCenteredLoading(reloadLoading, 'Reload loading', true, 20);
+  assert.equal(reloadLoading.busy, 'true');
+  assert((await surfaceState()).visibleDecodedImages > 0, 'Reload must retain the currently readable page behind the progress status');
+  await page.screenshot({path: path.join(out, 'immersive-reload-loading.png')});
+  await resolveControl('release');
   await until(async () => {const state = await surfaceState(); return state.loading === 'false' && state.visibleDecodedImages > 0;}, 'Manual manifest reload did not finish');
   // A successful resolve may remount the presentation and close its drawer.
   if ((await surfaceState()).buttons.includes('关闭面板')) await button(['关闭面板']);
@@ -691,8 +865,8 @@ async function runAdaptedFixture() {
   assert.equal(reloadedPosition.page, 250, 'Manual manifest reload must not reset to page 1');
   assert(Math.abs(reloadedPosition.relativeOffset - reloadPosition.relativeOffset) < 0.02, 'Manual manifest reload must preserve the within-page offset');
   assert(fixtureRequests.length - beforeReloadRequests <= 15, 'Manual reload must not reload the whole chapter');
-  measurements.push({label: 'manifest-reload-position', before: reloadPosition, after: reloadedPosition, requests: fixtureRequests.length - beforeReloadRequests});
-  check('Manual manifest reload preserves page 250 and its within-page offset with a bounded image window');
+  measurements.push({label: 'manifest-reload-position', before: reloadPosition, after: reloadedPosition, loading: reloadLoading, requests: fixtureRequests.length - beforeReloadRequests});
+  check('Manual manifest reload shows centered accessible progress over the existing page and preserves page 250 and its within-page offset with a bounded image window');
   await jump(499); await metrics('manifest-page-499'); assert((await surfaceState()).pageIds.length <= 11);
   await jump(3); const repeated = await surfaceState(); assert.equal(new Set(repeated.pageIds).size, repeated.pageIds.length);
   assert(fixtureRequests.length - beforeImages < 60, 'Jumping must not read intermediate or all chapter images');
@@ -838,7 +1012,7 @@ try {
   }, local);
   if (fixtures) {
     if (stylesOnly) await runStyles();
-    else {await runHttpDiagnostic(); if (!flags.has('--http-only')) {await runGeneric(); await runRegionSelection(); await runLateFirstImage(); await runAdaptedFixture(); if (!flags.has('--no-translation')) await runTranslation();}}
+    else {await runHttpDiagnostic(); if (!flags.has('--http-only')) {await runLoadingAndShortcuts(); await runGeneric(); await runRegionSelection(); await runLateFirstImage(); await runAdaptedFixture(); if (!flags.has('--no-translation')) await runTranslation();}}
   }
   reportMtuBeforeLive = mtuInputs.length;
   if (live) {await runLive('adapted', process.env.IMMERSIVE_LIVE_ADAPTED_URL || 'https://mangapill.com/chapters/2-11194000/one-piece-chapter-1194'); await runLive('generic', process.env.IMMERSIVE_LIVE_GENERIC_URL || 'https://xkcd.com/353/');}

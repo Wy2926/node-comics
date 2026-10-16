@@ -15,14 +15,18 @@ function protectedTarget(event:KeyboardEvent):boolean {
 }
 
 /** Top-layer placement alone is not modal: scrollbars and passive hints also use popovers. */
-export function hasShortcutOverlay(document:Document):boolean {
+export function hasShortcutOverlay(root:Document|HTMLElement):boolean {
+  const document=(root.ownerDocument??root) as Document;
   const interactive=':is([role="menu"],[role="listbox"],[role="dialog"])';
   const popover=typeof document.defaultView?.HTMLElement.prototype.showPopover==='function'
     ? `,[popover]:popover-open${interactive}` : '';
-  return !!document.querySelector(`dialog[open],[role="dialog"][aria-modal="true"],[data-popover-fallback-open]${interactive}${popover}`);
+  return !!root.querySelector(`dialog[open],[role="dialog"][aria-modal="true"],[data-popover-fallback-open]${interactive}${popover}`);
 }
 
-export function bindShortcuts(target:Window,handlers:ShortcutHandlers,options:{getOverrides:()=>ShortcutOverrides;enabled?:()=>boolean}):()=>void {
+export function bindShortcuts(target:Window|HTMLElement,handlers:ShortcutHandlers,options:{getOverrides:()=>ShortcutOverrides;enabled?:()=>boolean}):()=>void {
+  // A reader in a closed shadow tree owns its own keys and modal descendants.
+  const overlayRoot='document' in target?target.document:target;
+  const focusWindow='document' in target?target:target.ownerDocument.defaultView;
   let previous:ShortcutOverrides|undefined,bindings=activeBindings({});
   const pending=new Set<string>();
   const key=(event:KeyboardEvent)=>{
@@ -32,7 +36,7 @@ export function bindShortcuts(target:Window,handlers:ShortcutHandlers,options:{g
     if(overrides!==previous){previous=overrides;bindings=activeBindings(overrides);}
     const candidates=bindings.get(binding);if(!candidates)return;
     // Query only on a matching key, never scan images or watch the document.
-    if(hasShortcutOverlay(target.document))return;
+    if(hasShortcutOverlay(overlayRoot))return;
     for(const id of candidates){
       const handler=handlers[id];if(!handler)continue;
       if((event.repeat||pending.has(event.code))&&!commandById.get(id)?.repeat)return;
@@ -40,10 +44,10 @@ export function bindShortcuts(target:Window,handlers:ShortcutHandlers,options:{g
       pending.add(event.code);event.preventDefault();return;
     }
   };
-  const release=(event:KeyboardEvent)=>pending.delete(event.code);
+  const release=(event:KeyboardEvent)=>{pending.delete(event.code);};
   const clear=()=>pending.clear();
-  target.addEventListener('keydown',key);
-  target.addEventListener('keyup',release);
-  target.addEventListener('blur',clear);
-  return()=>{target.removeEventListener('keydown',key);target.removeEventListener('keyup',release);target.removeEventListener('blur',clear);pending.clear();};
+  target.addEventListener('keydown',key as EventListener);
+  target.addEventListener('keyup',release as EventListener);
+  focusWindow?.addEventListener('blur',clear);
+  return()=>{target.removeEventListener('keydown',key as EventListener);target.removeEventListener('keyup',release as EventListener);focusWindow?.removeEventListener('blur',clear);pending.clear();};
 }

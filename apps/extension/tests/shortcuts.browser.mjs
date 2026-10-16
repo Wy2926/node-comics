@@ -150,13 +150,17 @@ test('real reader shortcuts remain active with a scrollbar popover and pause onl
   await reader();
   await page.keyboard.press('s');
   await page.locator('.nc-reader-drawer').waitFor();
+  await page.locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('50%', {exact: true}).waitFor();
+  assert.equal(await page.getByRole('group', {name: '图片适应方式', exact: true}).locator('[aria-pressed="true"]').textContent(), '铺满宽度');
+  const dimensions = await viewport().evaluate(element => ({viewportWidth: element.clientWidth, pageWidth: element.querySelector('.nc-manga-page').getBoundingClientRect().width}));
+  assert(Math.abs(dimensions.pageWidth - (dimensions.viewportWidth - 24) * .5) <= 2, 'Desktop first-open page geometry must use width-fit at 50%');
   await page.locator('.nc-scrollbar-layer:popover-open').first().waitFor({state: 'attached'});
   // Regression: the settings drawer opens a passive manual-popover scrollbar.
   // It must not disable all shortcuts merely by occupying the browser top layer.
   await page.keyboard.press('PageDown'); await waitPage(2);
   await page.keyboard.press('j'); await waitPage(3);
   await page.keyboard.press('=');
-  await page.locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('110%', {exact: true}).waitFor();
+  await page.locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('60%', {exact: true}).waitFor();
   await waitPage(3);
   const before = await readingPosition();
   await page.getByRole('button', {name: '键盘快捷键', exact: true}).click();
