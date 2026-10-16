@@ -2,9 +2,10 @@ import {describe, expect, it, vi} from 'vitest';
 import type {SourceNetworkContext} from '../../../contracts/network';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
-import {catalogHtml, fixtureSite, readerHtml, searchHtml} from '../../../shared/mangathemesia/tests/fixtures';
+import {catalogHtml, fixtureSite, readerHtml, searchHtml, workDocument} from '../../../shared/mangathemesia/tests/fixtures';
 import {catalogKey, catalogUrl, chapterKey, chapterUrl, definition, location, origin} from '../definition';
 import {network, parseCatalog, parsePages, parseSearch, searchUrl} from '../network';
+import {describeWork} from '../page';
 
 const work = 'sample', chapter = 'unrelated-release-1', second = 'unrelated-release-2.5', url = catalogUrl(work), reader = chapterUrl(chapter);
 const fixture = {...fixtureSite('arenascans'), origin, location, catalogKey, catalogUrl, chapterKey, chapterUrl, emptySearchText: 'Not Found',
@@ -13,6 +14,13 @@ const catalog = () => catalogHtml(fixture, [second, chapter]);
 const pages = (images?: string[]) => readerHtml(fixture, images).replaceAll('sample-chapter-1', chapter);
 
 describe('Arena Scans', () => {
+  it('provides lightweight work titles for catalog and bare chapter tabs', () => {
+    for (const current of [url, reader]) {
+      const {document} = workDocument(current, 'Sample & Book', current === reader ? url : undefined);
+      expect(describeWork({document, location: definition.identify(new URL(current))!, signal: new AbortController().signal}))
+        .toEqual({status: 'ready', value: {title: 'Sample & Book', catalogId: catalogKey(work), catalogUrl: url}});
+    }
+  });
   it('declares verified HTTP capabilities, local injection scope and generic inline recognition', () => {
     expect(definition.capabilities).toEqual({importable: true, catalog: true, pages: true, inline: true, completePageList: true});
     expect(definition.installation).toEqual({autoContentMatches: [], optionalContentMatches: [origin + '/*']});

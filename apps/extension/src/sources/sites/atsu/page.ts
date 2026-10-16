@@ -4,6 +4,15 @@ import {imageSession} from '../../shared/session';
 import {atsuLocation, catalogUrl, origin} from './definition';
 import {assetUrl} from './protocol';
 
+function uniqueTitle(elements: NodeListOf<Element>, titleSelector?: string) {
+  if (elements.length > 8) return;
+  const titles = new Set([...elements].map(element => {
+    const label = titleSelector ? element.querySelector(titleSelector) ?? element : element;
+    return label.textContent?.replace(/\s+/g, ' ').trim();
+  }).filter(Boolean));
+  return titles.size === 1 ? [...titles][0] : undefined;
+}
+
 export const createPage: CreateSourcePage = context => {
   const session = imageSession(context, {
     containers: '[data-reader-page]', attributes: ['data-page-number'],
@@ -28,10 +37,31 @@ export const createPage: CreateSourcePage = context => {
     describeWork() {
       session.snapshot();
       const loc = atsuLocation(new URL(context.location.url));
-      if (!loc || loc.chapterId) return {status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'};
-      const url = context.document.querySelector('meta[property="og:url"]')?.getAttribute('content');
-      const title = context.document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.trim();
-      if (url !== catalogUrl(loc.mangaId) || !title || title.length > 2048) return {status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'};
+      if (!loc) return {status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'};
+      const doc = context.document, url = catalogUrl(loc.mangaId);
+      let title: string | undefined;
+      if (loc.chapterId) {
+        // Work links include an empty icon, a pure name, and a labeled navigation card.
+        // The card's title span excludes its separate media/Info label; chapter metadata is not a work name.
+        const path = new URL(url).pathname;
+        const selector = [path, path + '/', url, url + '/'].map(href => `a[href="${href}"]`).join(',');
+        title = uniqueTitle(doc.querySelectorAll(selector), 'span.text-ellipsis');
+      } else {
+        const canonical = doc.querySelector('meta[property="og:url"]')?.getAttribute('content')?.trim();
+        const metadata = doc.querySelector('meta[property="og:title"]')?.getAttribute('content')?.replace(/\s+/g, ' ').trim();
+        if (canonical === url) title = metadata;
+        else if ((!canonical || canonical === origin || canonical === origin + '/') &&
+            uniqueTitle(doc.querySelectorAll('h1')) === metadata) {
+          // Hydration replaces og:url with the site root. Bind matching headings to one
+          // owned reading link, so stale SPA text cannot identify a newly navigated work.
+          const href = doc.querySelector(`a[href^="/read/${loc.mangaId}/"],a[href^="${origin}/read/${loc.mangaId}/"]`)?.getAttribute('href');
+          try {
+            const owner = href ? atsuLocation(new URL(href, url)) : null;
+            if (owner?.mangaId === loc.mangaId && owner.chapterId) title = metadata;
+          } catch { /* Untrusted source link. */ }
+        }
+      }
+      if (!title || Array.from(title).length > 2000 || /[\u0000-\u001f\u007f]/u.test(title)) return {status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'};
       return {status: 'ready', value: {title, catalogId: 'atsu:' + loc.mangaId, catalogUrl: url}};
     },
   };

@@ -42,6 +42,18 @@ export const envelope = (body: string, head = '') => `<html><head>${head}</head>
 export const coverUrl = (site: FixtureSite) => site.imageOrigin + '/cover.jpg';
 export const pageUrl = (site: FixtureSite, index = 0) => `${site.imageOrigin}/pages/${index}.jpg`;
 
+type WorkElement = {textContent: string; getAttribute(name: string): string | null};
+export const workElement = (textContent: string, href = ''): WorkElement => ({textContent, getAttribute: name => name === 'href' ? href : null});
+export function workDocument(canonical: string, title = 'Sample & Book', owner?: string) {
+  const nodes: Record<string, WorkElement[]> = {
+    'link[rel="canonical"]': [workElement('', canonical)],
+    '.postbody h1.entry-title': owner ? [] : [workElement(title)],
+    '.chapterbody .allc a[href]': owner ? [workElement(title, owner)] : [],
+  };
+  const document = {title: 'Chapter 99 - Never use this title', querySelectorAll: (selector: string) => nodes[selector] ?? []} as unknown as Document;
+  return {nodes, document};
+}
+
 export function fixtureDefinition(site: FixtureSite): SourceDefinition {
   return {
     id: site.id, name: site.name, installation: {autoContentMatches: [], optionalContentMatches: [site.origin + '/*']},

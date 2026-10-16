@@ -3,7 +3,7 @@
 - 支持 `https://mangaeclipse.com/manga/<slug>/` 作品与 `/manga/<slug>/<chapter>/` 章节。章节 slug 原样作为身份，保留 `chapter-01`、小数和带标题的 `1-trap-part-one`；`style=list`／`style=paged` 不改变身份。未确认的域名、镜像和路径不导入。
 - 复用 [Madara 共享引擎](../../shared/madara/README.md) 的静态完整目录和 `catalog-select` 阅读协议。目录使用单一未分组 `ul.main.version-chap`，包含折叠行；作品标题排除 `manga-title-badges` 标记。章节 canonical 指向精确作品，全部选中项的章节值、完整跳转地址和文字必须一致，并与正文当前章节标识匹配；章节标题取已验证的选中项，不依赖不存在的 `h1` 或文档标题。
 - 目录与正文使用普通 HTTP，正文固定请求列表样式；不为读取目录打开源站网页或加载其广告、推荐图和脚本。需要源站验证时由用户在网站完成后重试，不自动改用其他通道。图片使用共享严格地址校验与公共 Referer 读取，不预取全章图片。
-- 支持完整目录导入、12 小时目录同步与作品／章节浮动入口；原位翻译声明 `inlineRecognition: 'generic'`，不维护额外 DOM 识图实现。
+- 支持完整目录导入、12 小时目录同步与作品／章节浮动入口及「寻找其他语言」；原位翻译声明 `inlineRecognition: 'generic'`，不维护额外 DOM 识图实现。
 - 名称搜索复用 Madara 只读 AJAX 搜索与分页，每页显式请求 12 项、一次 POST，不依赖 GET 页面的首批数量或总数。成功空响应或空的末尾 `no-posts` 标记确认结束，非空短页缺少标记则报错；共用严格作品／封面校验，不预取候选目录或打开源站标签页。
 - 主要内容语言为英语，已确认存在国漫英译内容，不标生肉。收费类型为 `free`：依据[首页](https://mangaeclipse.com/)公开目录、[章节阅读入口](https://mangaeclipse.com/manga/world-apocalypse-online/chapter-112/)及正文直接开放、未见章节购买或会员解锁入口的行为判断，非源站正式全站免费声明；账号与评论功能不算阅读收费。
 

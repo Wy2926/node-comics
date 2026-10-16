@@ -21,7 +21,67 @@ function fixture(url: string) {
   return {good, querySelectorAll, document: {title: 'Fixture', querySelectorAll, defaultView: null} as unknown as Document};
 }
 
+function workFixture(title = 'Fixture work') {
+  const url = 'https://lagoonscans.com/manga/fixture-work/', images = fixture(url);
+  const heading = {textContent: title};
+  const querySelectorAll = vi.fn((selector: string) => {
+    if (selector === 'link[rel="canonical"]') return [{getAttribute: (name: string) => name === 'href' ? url : null}];
+    if (selector === '.postbody h1.entry-title') return heading.textContent ? [heading] : [];
+    return images.querySelectorAll(selector);
+  });
+  const document = {...images.document, querySelectorAll} as unknown as Document;
+  return {url, document, heading, querySelectorAll, images, location: sourceFor(url).location};
+}
+
 describe('generic recognition is independent of import classification', () => {
+  it('composes registered work metadata lazily without scanning images or fetching a catalog', async () => {
+    const {document, url, location, querySelectorAll, images} = workFixture();
+    const fetch = vi.fn(() => {throw Error('Unexpected metadata request');}); vi.stubGlobal('fetch', fetch);
+    const session = pageFactories[location.sourceId]({document, location, signal: new AbortController().signal});
+    expect(querySelectorAll).not.toHaveBeenCalled();
+    expect(await session.discoverPages()).toEqual({status: 'unsupported', code: 'SOURCE_PAGE_UNSUPPORTED'});
+    expect(querySelectorAll).not.toHaveBeenCalled();
+    expect(session.describeWork?.()).toEqual({status: 'ready', value: {
+      title: 'Fixture work', catalogId: 'lagoonscans:manga:fixture-work', catalogUrl: url,
+    }});
+    expect(querySelectorAll.mock.calls.map(([selector]) => selector))
+      .toEqual(['link[rel="canonical"]', '.postbody h1.entry-title']);
+    expect(images.querySelectorAll).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+    expect(session.inlineTargets().map(target => target.element)).toEqual(images.good);
+    expect(images.querySelectorAll.mock.calls.map(([selector]) => selector))
+      .toEqual(['img:not([data-nc-canvas-translation])', 'img,canvas']);
+    session.dispose();
+  });
+
+  it('rejects registered metadata reads after abort or disposal before touching the document', () => {
+    const {document, location, querySelectorAll, images} = workFixture();
+    const controller = new AbortController();
+    const session = pageFactories[location.sourceId]({document, location, signal: controller.signal});
+    expect(session.describeWork?.().status).toBe('ready'); querySelectorAll.mockClear();
+    controller.abort(Error('navigation'));
+    expect(() => session.describeWork?.()).toThrow('navigation');
+    expect(querySelectorAll).not.toHaveBeenCalled(); session.dispose();
+    const fresh = pageFactories[location.sourceId]({document, location, signal: new AbortController().signal});
+    fresh.dispose(); expect(() => fresh.describeWork?.()).toThrow('SOURCE_SESSION_EXPIRED');
+    expect(querySelectorAll).not.toHaveBeenCalled(); expect(images.querySelectorAll).not.toHaveBeenCalled();
+  });
+
+  it('keeps generic image recognition when work metadata is missing', () => {
+    const missing = workFixture('');
+    const session = pageFactories[missing.location.sourceId]({document: missing.document, location: missing.location, signal: new AbortController().signal});
+    expect(session.describeWork?.()).toEqual({status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'});
+    expect(missing.images.querySelectorAll).not.toHaveBeenCalled();
+    expect(session.inlineTargets().map(target => target.element)).toEqual(missing.images.good); session.dispose();
+  });
+
+  it('uses the work-reference title budget in Unicode code points', () => {
+    const {document, location, heading} = workFixture('𠀋'.repeat(2000));
+    const session = pageFactories[location.sourceId]({document, location, signal: new AbortController().signal});
+    expect(session.describeWork?.()).toMatchObject({status: 'ready', value: {title: heading.textContent}});
+    heading.textContent += '𠀋';
+    expect(session.describeWork?.()).toEqual({status: 'not-ready', code: 'SOURCE_WORK_UNAVAILABLE'}); session.dispose();
+  });
+
   for (const definition of definitions.filter(source => source.inlineRecognition === 'generic')) {
     it.each(['reader', 'catalog', 'other'] as const)(`${definition.id} scans %s pages without changing their identity`, async kind => {
       const url = definition.sites![0].url, {document, good, querySelectorAll} = fixture(url);

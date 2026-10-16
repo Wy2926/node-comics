@@ -10,7 +10,7 @@
 | --- | --- |
 | `definition.ts`（必需） | 导出 `definition`：与目录名一致且唯一的稳定 ID、纯 URL 识别、能力、可选目录同步与网站入口元数据 |
 | `installation.json`（必需） | 内容脚本匹配范围；由定义引用，只用于决定页面入口的注入位置 |
-| `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理；可选 `describeWork` 提供可靠作品名与定位 |
+| `page.ts`（按需） | 导出 `createPage`：DOM／canvas 会话、发现、显示目标、观察与清理，会话可选 `describeWork` 提供可靠作品名与定位；使用通用识图的站点可仅导出 `describeWork(context)`，由注册表组合到通用会话，不创建专用识图器 |
 | `network.ts`（按需） | 导出 `network`：独立可选的 `catalog`、`pages`、`search` HTTP 解析操作；章节 URL 缺少作品身份时可提供 `resolveCatalog` |
 | `image.ts`（按需） | 导出 `image`：图片请求头、正文解码或原位 HTTP 原图解码；不依赖是否实现网络目录 |
 | `icon.svg`、`README.md`、`tests/` | 本地图标、支持范围与协议来源、脱敏夹具和站点测试 |
@@ -102,6 +102,8 @@ npm run build
 在桌面目标浏览器加载构建产物，实际完成导入 → 取图／解码 → 阅读 → 重开恢复，检查错误提示与阅读位置。按能力补测原位译图恢复、canvas 重绘／SPA 导航或无标签页网络读取；仅下载成功不能代替完整阅读器验收。
 
 通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及各验证入口的环境与范围。区分隔离样本、真实站点、浏览器安装权限／撤权恢复与模型翻译效果；测试结果和截图写入忽略的产物目录，不在 README 追加流水记录。
+
+网页作品名交接可在构建后从仓库根目录运行 `node apps/extension/tests/source-work.browser.mjs`，沿用 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`／`CHROMIUM_PATH`。该隔离 MV3 夹具覆盖作品／章节网页按钮、插件弹窗、缺名手填和错误归属，确认打开搜索不会额外请求目录或名称服务；不代表真实来源或模型效果。
 
 ## 现有站点
 

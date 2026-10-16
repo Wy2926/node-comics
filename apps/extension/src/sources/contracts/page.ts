@@ -19,6 +19,8 @@ export interface SourcePageContext {
   location: SourceLocation;
   signal: AbortSignal;
 }
+/** Current-document work metadata, independent of image recognition or catalog discovery. */
+export type DescribeSourceWork = (context: SourcePageContext) => Discovery<SourceWorkReference>;
 export interface SourcePageSession {
   direction: 'ltr' | 'rtl';
   snapshot(): SourceSnapshot;

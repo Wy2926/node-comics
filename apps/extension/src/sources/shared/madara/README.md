@@ -11,6 +11,7 @@
 - [createMadaraParsers](index.ts) 是纯解析入口：接收原始 HTTP 响应，返回搜索、目录和正文结果，不请求网络。不能用执行源站脚本后的 DOM 快照代替原始响应，脚本可能删除或改写身份字段。
 - [createMadaraNetwork](network.ts) 复用同一解析器，仅通过调用方的 `context.request` 执行声明的 GET／只读表单 POST，并在请求前后检查取消。没有直接 `fetch`、浏览器 API、隐藏请求通道、缓存或失败后自动切换。
 - [madaraImageUrl](image.ts) 提供共享地址语法检查；实际图片权限、Referer、字节读取和解码沿用公共图片管线。
+- [createMadaraWork](work.ts) 供 Manga Eclipse、Bun Manga 和 LHTranslation 的页面元数据入口显式调用：核对当前作品／章节 canonical，再从面包屑中精确指向所属作品的链接读取名称；重复导航须名称一致。只读取当前 DOM，不使用章节标题、通用文档标题或 OG 标题，不抓取目录；原位识图仍由通用识图处理。
 
 当前经过站点声明的协议组合如下；未填 `searchPageSize` 时不生成 `network.search`，也不能在站点元数据中声明名称搜索。
 
