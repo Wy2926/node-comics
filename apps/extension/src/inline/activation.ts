@@ -17,7 +17,7 @@ export async function currentInlineActivation(sender: chrome.runtime.MessageSend
   if (!activation || activation.navigationId !== navigationId || activation.documentId && activation.documentId !== sender.documentId) return;
   const tab = await chrome.tabs.get(sender.tab.id);
   // sender.url may lag behind SPA navigation, so use the browser's current tab URL.
-  if (tab.url !== activation.url) return;
+  if (tab.status === 'loading' || tab.url !== activation.url) return;
   try {
     if (new URL(sender.url ?? '').origin !== new URL(activation.url).origin) return;
   } catch {

@@ -35,6 +35,8 @@ interface Context {key:string;channel:ChannelConnection;core?:ChannelRuntime;set
 interface RequestActivity {active:()=>boolean;current:()=>boolean;explicitImage?:boolean;immersive?:boolean;}
 const contexts=new Map<number,Context>(),windowGenerations=new Map<number,number>();let configGeneration=0,processingGeneration=0;
 const activationEpochs=new Map<number,{active:boolean}>();
+const transfers=new Map<number,Set<()=>void>>();
+const closeTransfers=(tabId:number)=>{for(const close of transfers.get(tabId)??[])close();};
 function activationEpoch(tabId:number){
   let epoch=activationEpochs.get(tabId);
   if(!epoch){epoch={active:true};activationEpochs.set(tabId,epoch);} // A restarted worker may restore an authorized document.
@@ -43,7 +45,17 @@ function activationEpoch(tabId:number){
 function invalidateTab(tabId:number){
   const epoch={active:false};activationEpochs.set(tabId,epoch);
   const old=contexts.get(tabId);if(old){disposeContext(old);contexts.delete(tabId);}
+  closeTransfers(tabId);clearImmersiveSources(tabId);
   windowGenerations.delete(tabId);return epoch;
+}
+function retireTab(tabId:number){
+  // Cancel in the event turn: the old document's own invalidation may already fail URL authorization.
+  const epoch=invalidateTab(tabId);
+  void navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
+    if(activationEpochs.get(tabId)!==epoch)return;
+    await chrome.storage.session.remove(activationKey(tabId));
+    if(activationEpochs.get(tabId)===epoch)activationEpochs.delete(tabId);
+  }).catch(()=>{});
 }
 export async function activateInline(tabId:number,automatic=false){
   return activate(tabId,automatic);
@@ -54,7 +66,9 @@ export async function activateInlineImage(tabId:number,info:chrome.contextMenus.
 export async function activateImmersive(tabId:number){return activate(tabId,false,undefined,true);}
 async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus.OnClickData,immersive=false){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
+    let epoch=activationEpoch(tabId);const current=()=>activationEpochs.get(tabId)===epoch;
     const tab=await chrome.tabs.get(tabId);
+    assertCurrent(current);
     if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
     if(info&&(info.frameId!==0||info.mediaType!=='image'||!info.srcUrl||info.pageUrl!==tab.url))throw Error(msg('图片范围无效。'));
     if(automatic){
@@ -68,22 +82,28 @@ async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus
       if(existing?.url===tab.url&&(existing.dismissedUrl===tab.url||existing.enabled&&existing.activeUrl===tab.url))return;
     }
     const injected=await chrome.scripting.executeScript({target:{tabId},files:[immersive?'content-scripts/immersive.js':'content-scripts/inline.js']});
+    assertCurrent(current);
     const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
     if(immersive){
       const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_IDENTITY'},target);
       const saved=await chrome.storage.session.get(activationKey(tabId));
+      assertCurrent(current);
       const activation=saved[activationKey(tabId)] as Activation|undefined;
       if(existing?.enabled&&existing.url===tab.url&&activation?.immersive&&activation.navigationId===existing.navigationId)return;
     }
+    let prepared=false,transitioned=false;
+    try{
     const prior=immersive?await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target).catch(()=>null):undefined;
+    assertCurrent(current);
     // The new consumer owns the document before the old inline subscriber leaves.
-    if(immersive)await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_PREPARE',translation:prior?.enabled&&!prior.original&&!prior.paused},target);
+    if(immersive){prepared=true;await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_PREPARE',translation:prior?.enabled&&!prior.original&&!prior.paused},target);}
     // data: originals stay in the page; only their bytes use the chunked source port.
     const selection=info?await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_SELECT_IMAGE',
       ...(/^data:image\//i.test(info.srcUrl!)?{dataImage:true}:{srcUrl:info.srcUrl}),pageUrl:tab.url},target):undefined;
+    assertCurrent(current);
     if(info&&(!selection?.ok||!selection.image||typeof selection.image.id!=='string'||typeof selection.image.url!=='string'))throw Error(msg('图片范围无效。'));
-    if(!immersive){await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},target).catch(()=>{});clearImmersiveSources(tabId);}
-    const epoch=invalidateTab(tabId),current=()=>activationEpochs.get(tabId)===epoch;
+    if(!immersive)await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},target).catch(()=>{});
+    assertCurrent(current);epoch=invalidateTab(tabId);transitioned=true;
     await chrome.storage.session.remove(activationKey(tabId));
     await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_STOP'},{frameId:0}).catch(()=>{});
     await chrome.storage.session.remove(regionActivationKey(tabId));
@@ -96,15 +116,21 @@ async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus
     assertCurrent(current);
     await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic,...(immersive?{immersive:true}:{}),...(selection?{image:selection.image}:{})} satisfies Activation});
     assertCurrent(current);epoch.active=true;
-    const started=await chrome.tabs.sendMessage(tabId,{type:immersive?'NC_IMMERSIVE_SHOW':'NC_INLINE_START',automatic,imageId:selection?.image.id},target);
-    if(started?.ok===false){invalidateTab(tabId);await chrome.storage.session.remove(activationKey(tabId));throw Error(msg('图片范围无效。'));}
+    const started=await chrome.tabs.sendMessage(tabId,immersive?{type:'NC_IMMERSIVE_SHOW',navigationId:identity.navigationId}:{type:'NC_INLINE_START',automatic,imageId:selection?.image.id},target);
+    assertCurrent(current);
+    if(started?.ok===false)throw Error(msg('图片范围无效。'));
+    }catch(error){
+      if(transitioned){if(current())invalidateTab(tabId);await chrome.storage.session.remove(activationKey(tabId));}
+      // This activation still owns the lock; a later explicit activation cannot be stopped here.
+      if(prepared)await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},target).catch(()=>{});
+      throw error;
+    }
   });
 }
 /** A hand-selected crop owns this document until explicitly leaving region mode. */
 export async function suspendInline(tabId:number){
-  await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},{frameId:0}).catch(()=>{});
-  clearImmersiveSources(tabId);
   invalidateTab(tabId);
+  await chrome.tabs.sendMessage(tabId,{type:'NC_IMMERSIVE_STOP'},{frameId:0}).catch(()=>{});
   await chrome.storage.session.remove(activationKey(tabId));
   await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP'},{frameId:0}).catch(()=>{});
 }
@@ -417,8 +443,6 @@ async function step(request:InlineRequest,sender:chrome.runtime.MessageSender,ac
   return response(ctx,request);
 }
 export function registerInlineBackground(){
-  const transfers=new Map<number,Set<()=>void>>();
-  const closeTransfers=(tabId:number)=>{for(const close of transfers.get(tabId)??[])close();};
   chrome.runtime.onConnect.addListener(port=>{
     if(port.name!==INLINE_RESULT_PORT)return;
     const sender=port.sender,tabId=sender?.tab?.id;
@@ -451,7 +475,8 @@ export function registerInlineBackground(){
     }).catch(()=>{});
   });
   chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&before?.language!==after?.language)invalidate();});
-  chrome.tabs.onRemoved.addListener(tabId=>{closeTransfers(tabId);invalidateTab(tabId);activationEpochs.delete(tabId);void navigator.locks.request('nc-inline-activation:'+tabId,()=>chrome.storage.session.remove(activationKey(tabId)));});
+  chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.url||change.status==='loading')retireTab(tabId);});
+  chrome.tabs.onRemoved.addListener(retireTab);
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!['NC_INLINE_TICK','NC_INLINE_WAIT','NC_INLINE_INVALIDATE','NC_INLINE_OPEN'].includes(message?.type)||sender.id!==chrome.runtime.id||sender.tab?.id==null||sender.frameId!==0)return;
     void(async()=>{

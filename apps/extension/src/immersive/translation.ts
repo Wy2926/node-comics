@@ -2,6 +2,7 @@ import {RequestPool} from '../concurrency';
 import {msg} from '../i18n/runtime';
 import {receiveImage,INLINE_RESULT_PORT} from '../inline/blob-transfer';
 import type {InlineImage,InlineResponse,InlineResult} from '../inline/protocol';
+import {InlineBackoff} from '../inline/backoff';
 import {ReadingWindow} from '../reading-window';
 import type {SessionReaderWindow} from '../reader/session-model';
 let generationSequence=0;
@@ -11,8 +12,8 @@ export class ImmersiveTranslation {
   readonly results=new Map<string,InlineResult>();
   private generation=++generationSequence;private active=false;private disposed=false;
   private window=new ReadingWindow<InlineImage>(image=>image.id);
-  private timer?:ReturnType<typeof setTimeout>;private busy?:number;private watching=false;
-  private pending=false;private backoff=0;private failures=0;private retryId?:string;
+  private timer?:ReturnType<typeof setTimeout>;private waitTimer?:ReturnType<typeof setTimeout>;private busy?:number;private watching=false;
+  private pending=false;private backoff=new InlineBackoff();private waitBackoff=new InlineBackoff();private retryId?:string;
   private latest?:Pick<InlineResponse,'contextId'|'revision'|'scope'>;
   private requiresInternet=true;private loads=new RequestPool(2);
   constructor(readonly navigationId:string,private changed:()=>void){}
@@ -24,13 +25,15 @@ export class ImmersiveTranslation {
     const changed=this.window.update(active?images:[],performance.now(),view.immediate);
     if(this.active!==active||changed){
       this.active=active;this.generation=++generationSequence;
+      clearTimeout(this.waitTimer);this.waitTimer=undefined;
       void this.send('NC_INLINE_INVALIDATE',{keepIds:active?images.map(image=>image.id):[]}).catch(()=>{});
       if(active)this.schedule();else clearTimeout(this.timer);
     }
   }
   openAccount(){void this.send('NC_INLINE_OPEN',{view:'account'}).catch(()=>{});}
-  retry(id:string){this.retryId=id;this.backoff=0;this.generation=++generationSequence;this.results.delete(id);this.changed();this.schedule();}
-  reset(){this.generation=++generationSequence;this.results.clear();this.latest=undefined;this.backoff=0;this.changed();this.schedule();}
+  retry(id:string){this.retryId=id;this.backoff.reset();this.generation=++generationSequence;this.results.delete(id);this.changed();this.schedule();}
+  reset(){this.generation=++generationSequence;this.results.clear();this.latest=undefined;this.pending=false;
+    this.backoff.reset();this.waitBackoff.reset();clearTimeout(this.waitTimer);this.waitTimer=undefined;this.changed();this.schedule();}
   accept(data:InlineResponse,generation:number){
     if(this.disposed||!this.active||generation!==this.generation)return;
     if(this.latest?.contextId===data.contextId&&data.revision<=this.latest.revision)return;
@@ -38,9 +41,9 @@ export class ImmersiveTranslation {
     this.latest={contextId:data.contextId,revision:data.revision,scope:data.scope};
     for(const item of data.items)this.results.set(item.id,item);
     this.pending=!!data.hasPending;this.requiresInternet=data.requiresInternet!==false;
-    if(data.retryAfterMs)this.backoff=Math.max(this.backoff,performance.now()+data.retryAfterMs);
+    if(data.retryAfterMs)this.backoff.postpone(data.retryAfterMs);
     this.changed();
-    if(data.needsSubmit||data.retryAfterMs)this.schedule(Math.max(100,this.backoff-performance.now()));
+    if(data.needsSubmit||data.retryAfterMs)this.schedule(Math.max(100,this.backoff.delay));
     void this.watch();
   }
   onMessage(message:{type?:string;navigationId?:string;generation?:number;data?:InlineResponse}){
@@ -65,36 +68,46 @@ export class ImmersiveTranslation {
     const generation=this.generation;this.busy=generation;
     const retryId=this.retryId;this.retryId=undefined;
     try{
+      const deferRemote=this.backoff.reason;
       const response=await this.send('NC_INLINE_TICK',{images,readingImages:this.window.targets,retryId,
-        deferRemote:performance.now()<this.backoff?'backoff':navigator.onLine===false?'offline':undefined});
+        deferRemote});
       if(generation!==this.generation||this.disposed)return;
-      if(!response?.ok)throw Error(response?.error??msg('翻译服务暂不可用'));
-      this.failures=0;this.accept(response.data,generation);
+      if(!response?.ok){this.backoff.fail(response?.retryAfterMs);throw Error(response?.error??msg('翻译服务暂不可用'));}
+      this.accept(response.data,generation);
+      this.backoff.afterTick(delay=>this.schedule(delay),deferRemote,response.data.requiresInternet);
       if(images.length<this.window.targets.length)this.schedule();
     }catch(error){
       if(generation!==this.generation||this.disposed)return;
       for(const image of images)if(!this.results.get(image.id)?.resultKey)this.results.set(image.id,{id:image.id,state:{kind:'error',message:(error as Error).message}});
-      this.backoff=performance.now()+Math.min(30000,1000*2**this.failures++);this.changed();this.schedule(this.backoff-performance.now());
+      this.changed();this.schedule(this.backoff.fail());
     }finally{if(this.busy===generation)this.busy=undefined;if(generation!==this.generation)this.schedule();}
   }
   private async watch(){
+    clearTimeout(this.waitTimer);this.waitTimer=undefined;
     if(this.watching||!this.pending||!this.active||this.disposed||document.hidden||this.requiresInternet&&navigator.onLine===false)return;
-    this.watching=true;let retry=false;
+    // Subscription failures do not delay new-image preparation, and admission limits do not stop accepted tasks.
+    const delay=this.waitBackoff.delay;
+    if(delay){this.waitTimer=setTimeout(()=>void this.watch(),delay);return;}
+    this.watching=true;
     try{
       while(this.pending&&this.active&&!this.disposed&&!document.hidden&&(!this.requiresInternet||navigator.onLine!==false)){
         const generation=this.generation;
-        const response=await this.send('NC_INLINE_WAIT',{images:this.window.targets});
-        if(generation!==this.generation)continue;
-        if(!response?.ok){retry=true;break;}
-        this.accept(response.data,generation);
+        try{
+          const response=await this.send('NC_INLINE_WAIT',{images:this.window.targets});
+          if(generation!==this.generation)continue;
+          if(!response?.ok){this.waitBackoff.fail(response?.retryAfterMs);break;}
+          this.waitBackoff.succeeded();this.accept(response.data,generation);
+        }catch{
+          if(generation!==this.generation)continue;
+          this.waitBackoff.fail();break;
+        }
       }
-    }catch{retry=true;}finally{
-      this.watching=false;
-      if(retry)this.schedule(Math.min(30000,1000*2**this.failures++));
+    }finally{
+      this.watching=false;void this.watch();
     }
   }
   dispose(){
-    this.disposed=true;this.active=false;this.generation=++generationSequence;clearTimeout(this.timer);
+    this.disposed=true;this.active=false;this.generation=++generationSequence;clearTimeout(this.timer);clearTimeout(this.waitTimer);this.waitTimer=undefined;
     void this.send('NC_INLINE_INVALIDATE',{keepIds:[]}).catch(()=>{});this.results.clear();
   }
 }

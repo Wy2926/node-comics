@@ -80,6 +80,20 @@ describe('shared reader pixel presentation', () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:reader-test-1');
     cleanup(); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:reader-test-1');
   });
+  it('restarts a cancelled source read on a new session revision without a manual retry or remount', async () => {
+    let reject!: (reason: Error) => void;
+    const pending = new Promise<{blob: Blob; release(): void}>((_resolve, fail) => {reject = fail;});
+    const acquire = vi.fn<ReaderPictureProps['acquire']>(async () => ({blob: new Blob(['recovered']), release: vi.fn()})).mockImplementationOnce(() => pending);
+    const state = vi.fn(), first = JSON.stringify(['slot-1', JSON.stringify(['session-one', 'original']), 'original']);
+    render({blobKey: first, acquire, onLoadState: state});
+    reject(Error('SOURCE_SESSION_EXPIRED')); await flush();
+    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase: 'error', error: 'SOURCE_SESSION_EXPIRED'}));
+    render({blobKey: first}); await flush(); expect(acquire).toHaveBeenCalledOnce();
+    render({blobKey: JSON.stringify(['slot-1', JSON.stringify(['session-two', 'original']), 'original'])}); await flush();
+    expect(acquire).toHaveBeenCalledTimes(2); displayed();
+    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase: 'ready', error: undefined}));
+    expect(images(tree).map(image => image.src)).toEqual(['blob:reader-test-1']);
+  });
   it('releases displayed pixels when hidden by unmount and loads a fresh image when shown again', async () => {
     const release=vi.fn(),acquire=vi.fn(async()=>({blob:new Blob(['image']),release}));
     render({acquire});await flush();displayed();

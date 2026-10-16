@@ -35,6 +35,7 @@ const imageClick=()=>({menuItemId:'nc-translate-image',editable:false,frameId:0,
   srcUrl:request().images[0].url,pageUrl:url}) as chrome.contextMenus.OnClickData;
 const gate=()=>{let finish!:()=>void;const promise=new Promise<void>(resolve=>{finish=resolve;});return {promise,finish};};
 let listener:Listener,removed:(id:number)=>void,connected:(port:chrome.runtime.Port)=>void;
+let updated:(id:number,change:chrome.tabs.OnUpdatedInfo,tab:chrome.tabs.Tab)=>void;
 let storageListeners:Array<(changes:Record<string,unknown>,area:string)=>void>;
 let session:Record<string,unknown>,cores:ChannelRuntime[],channels:ChannelConnection[],options:RuntimeOptions[];
 let background:typeof import('../src/inline/background');
@@ -46,11 +47,11 @@ function imagePort(resultKey:string,generation=1){
     onMessage:{addListener:(fn:(message:unknown)=>void)=>listeners.add(fn),removeListener:(fn:(message:unknown)=>void)=>listeners.delete(fn)},
     onDisconnect:{addListener:(fn:()=>void)=>ended.add(fn),removeListener:(fn:()=>void)=>ended.delete(fn)}} as unknown as chrome.runtime.Port;
   connected(port);for(const fn of listeners)fn({type:'open',request:{...request(generation),type:'NC_INLINE_IMAGE',resultKey}});
-  return {postMessage,close:()=>{for(const fn of ended)fn();}};
+  return {postMessage,disconnect:port.disconnect,close:()=>{for(const fn of ended)fn();}};
 }
 
 beforeEach(async()=>{
-  vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];storageListeners=[];
+  vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];storageListeners=[];updated=()=>{};
   session={'nc-inline:7':{url,navigationId:'nav-7',documentId:'doc-7',automatic:false}};
   mocks.getTab.mockImplementation(async()=>({...tab}));
   mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_REGION_IDENTITY'
@@ -87,7 +88,8 @@ beforeEach(async()=>{
     storage:{local:{get:mocks.localSettings},session:{
       get:async(key:string)=>structuredClone({[key]:session[key]}),set:async(value:Record<string,unknown>)=>Object.assign(session,structuredClone(value)),
       remove:async(key:string)=>{delete session[key];}},onChanged:{addListener(fn:typeof storageListeners[number]){storageListeners.push(fn);}}},
-    tabs:{get:mocks.getTab,sendMessage:mocks.tabMessage,create:vi.fn(),query:async()=>[],onRemoved:{addListener(fn:typeof removed){removed=fn;}}},
+    tabs:{get:mocks.getTab,sendMessage:mocks.tabMessage,create:vi.fn(),query:async()=>[],
+      onUpdated:{addListener(fn:typeof updated){updated=fn;}},onRemoved:{addListener(fn:typeof removed){removed=fn;}}},
     scripting:{executeScript:vi.fn(async()=>[{documentId:'doc-7'}])},
   });
   background=await import('../src/inline/background');background.registerInlineBackground();
@@ -579,6 +581,57 @@ describe('inline activation lifetime',()=>{
     await vi.waitFor(()=>expect(session['nc-inline:7']).toBeUndefined());expect(mocks.openChannel).not.toHaveBeenCalled();
   });
 
+  it.each(['source','policy'] as const)('navigation cancels an authorized %s wait before any new submission',async stage=>{
+    const pending=gate(),next={...tab,url:url+'/next'},open=mocks.openChannel.getMockImplementation()!;
+    if(stage==='source')mocks.readImage.mockImplementationOnce(async()=>{await pending.promise;return new Blob(['source']);});
+    else mocks.openChannel.mockImplementationOnce(async(current:()=>boolean)=>{
+      const channel=await open(current);vi.mocked(cores[0].refresh).mockImplementation(()=>pending.promise);return channel;
+    });
+    const response=send({...request(),refreshRights:true});
+    await vi.waitFor(()=>expect(stage==='source'?mocks.readImage:cores[0]?.refresh).toHaveBeenCalledOnce());
+    mocks.getTab.mockResolvedValue(next);updated(7,{url:next.url},next);
+    const liveAfterNavigation=options[0].isCurrent(),signal=mocks.readImage.mock.calls[0][2] as AbortSignal;
+    const invalidated=await send({type:'NC_INLINE_INVALIDATE',navigationId:'nav-7',generation:2,keepIds:[]});
+    pending.finish();const result=await response;
+    expect(liveAfterNavigation).toBe(false);expect(signal.aborted).toBe(true);
+    expect(invalidated).toMatchObject({ok:false});expect(result).toMatchObject({ok:false});
+    expect(cores[0].submit).not.toHaveBeenCalled();expect(cores[0].dispose).toHaveBeenCalledOnce();
+    expect(cores[0].manual).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+    await vi.waitFor(()=>expect(session['nc-inline:7']).toBeUndefined());
+  });
+
+  it('same-URL loading synchronously cancels local work and closes result transfers',async()=>{
+    await send(request());const port=imagePort('missing');
+    const next={...tab,status:'loading' as const};mocks.getTab.mockResolvedValue(next);
+    updated(7,{status:'loading'},next);
+    expect(options[0].isCurrent()).toBe(false);expect(cores[0].dispose).toHaveBeenCalledOnce();
+    expect(port.disconnect).toHaveBeenCalledOnce();
+    expect(await send(request(2))).toMatchObject({ok:false});
+    await vi.waitFor(()=>expect(session['nc-inline:7']).toBeUndefined());
+  });
+
+  it('rejects restored same-URL authorization while the tab is already loading',async()=>{
+    mocks.getTab.mockResolvedValue({...tab,status:'loading'});
+    expect(await send(request())).toMatchObject({ok:false});
+    expect(mocks.openChannel).not.toHaveBeenCalled();expect(mocks.readImage).not.toHaveBeenCalled();
+  });
+
+  it('keeps an active context across non-navigation tab updates',async()=>{
+    await send(request());updated(7,{title:'Updated title',status:'complete'},tab);
+    expect(options[0].isCurrent()).toBe(true);expect(cores[0].dispose).not.toHaveBeenCalled();
+    expect(session['nc-inline:7']).toMatchObject({url,navigationId:'nav-7'});
+  });
+
+  it('navigation cleanup queued behind a fresh activation does not delete its authorization',async()=>{
+    const pending=gate(),holding=locks('nc-inline-activation:7',()=>pending.promise);
+    const activating=background.activateInline(7),next={...tab,url:url+'/next'};
+    mocks.getTab.mockResolvedValue(next);
+    mocks.tabMessage.mockImplementation(async()=>({url:next.url,navigationId:'nav-next',enabled:false}));
+    updated(7,{url:next.url},next);pending.finish();await holding;await activating;
+    await locks('nc-inline-activation:7',async()=>{});
+    expect(session['nc-inline:7']).toMatchObject({url:next.url,navigationId:'nav-next',automatic:false});
+  });
+
   it('stopping automatic translation invalidates an in-flight authorized document',async()=>{
     session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:true};
     const pending=gate();mocks.getTab.mockImplementationOnce(async()=>{await pending.promise;return {...tab};});
@@ -625,6 +678,7 @@ describe('immersive activation',()=>{
     expect(types).not.toContain('NC_IMMERSIVE_STOP');
     expect(session['nc-inline:7']).toEqual({url,navigationId:'nav-7',documentId:'doc-7',automatic:false,immersive:true});
     expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_PREPARE',translation:true},{frameId:0,documentId:'doc-7'});
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_IMMERSIVE_SHOW',navigationId:'nav-7'}),{frameId:0,documentId:'doc-7'});
     expect(chrome.scripting.executeScript).toHaveBeenCalledWith({target:{tabId:7},files:['content-scripts/immersive.js']});
     expect(mocks.openChannel).not.toHaveBeenCalled();
   });
@@ -648,6 +702,32 @@ describe('immersive activation',()=>{
     expect(session['nc-inline:7']).toEqual(saved);
     expect(mocks.tabMessage.mock.calls.map(([,message])=>message.type)).toEqual(['NC_IMMERSIVE_IDENTITY','NC_IMMERSIVE_IDENTITY']);
     expect(mocks.openChannel).not.toHaveBeenCalled();
+  });
+
+  it('does not show an immersive activation invalidated while its authorization is being saved',async()=>{
+    const writing=gate(),entered=gate(),set=chrome.storage.session.set;
+    vi.spyOn(chrome.storage.session,'set').mockImplementation(async value=>{
+      entered.finish();await writing.promise;await set(value);
+    });
+    const activating=background.activateImmersive(7),settled=activating.catch(error=>error);
+    await entered.promise;
+    const next={...tab,url:url+'/next'};mocks.getTab.mockResolvedValue(next);updated(7,{url:next.url},next);
+    writing.finish();expect(await settled).toBeInstanceOf(Error);
+    expect(mocks.tabMessage.mock.calls.some(([,message])=>message.type==='NC_IMMERSIVE_SHOW')).toBe(false);
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_IMMERSIVE_STOP'},{frameId:0,documentId:'doc-7'});
+    await vi.waitFor(()=>expect(session['nc-inline:7']).toBeUndefined());
+  });
+
+  it('does not prepare an immersive activation whose injection crosses a navigation',async()=>{
+    const injecting=gate(),entered=gate();
+    vi.mocked(chrome.scripting.executeScript).mockImplementation(async()=>{
+      entered.finish();await injecting.promise;return [{documentId:'doc-7'}];
+    });
+    const settled=background.activateImmersive(7).catch(error=>error);await entered.promise;
+    const next={...tab,url:url+'/next'};mocks.getTab.mockResolvedValue(next);updated(7,{url:next.url},next);
+    injecting.finish();expect(await settled).toBeInstanceOf(Error);
+    expect(mocks.tabMessage).not.toHaveBeenCalled();
+    await vi.waitFor(()=>expect(session['nc-inline:7']).toBeUndefined());
   });
 
   it.each([{enabled:true},{enabled:false,dismissedUrl:url}])('keeps automatic translation out of an immersive-owned or dismissed document: %j',async identity=>{

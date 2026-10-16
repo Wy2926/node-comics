@@ -82,19 +82,22 @@ function fixture(networkSession?:ImmersiveSession){
     session:{direction:'rtl',inlineTargets:()=>targets}};
   dependency.document.mockReturnValue({current:()=>page,subscribe:(value:typeof subscriber)=>{subscriber=value;return ()=>{subscriber=undefined;};}});
   const messages=event(),connections=event(),binds:ImmersiveSession[]=[];
-  let nextBind:Promise<void>|undefined;
+  let nextBind:Promise<void>|undefined,nextSessionId='session-one';
   vi.stubGlobal('chrome',{runtime:{id:'extension',getURL:(path:string)=>'chrome-extension://extension/'+path,
     onMessage:messages,onConnect:connections,
     sendMessage:vi.fn(async(message:{type:string;images:ImmersiveImage[]})=>{
       if(message.type==='NC_IMMERSIVE_RESOLVE')return {ok:true,data:{settings:defaults,session:networkSession}};
       if(message.type==='NC_IMMERSIVE_BIND'){
-        const session:ImmersiveSession={id:'session-one',navigationId,url,title:'Chapter',direction:'rtl',complete:false,images:message.images};
+        const session:ImmersiveSession={id:nextSessionId,navigationId,url,title:'Chapter',direction:'rtl',complete:false,images:message.images};
         const pending=nextBind;nextBind=undefined;
         binds.push(session);if(pending)await pending;return {ok:true,data:session};
       }
       return {ok:true};
     })}});
-  const send=(type:string)=>messages.emit({type},{id:'extension'},()=>{});
+  const send=(type:string,extra:Record<string,unknown>={})=>{
+    let response:unknown;
+    messages.emit({type,...extra},{id:'extension'},(value:unknown)=>{response=value;});return response;
+  };
   const add=(name:string,read:PageImage['read']=async()=>new Blob(['source'],{type:'image/png'}))=>{
     const element=new FixtureElement(doc,'IMG',targets.length*1100);main.append(element);
     const target:PageImage={element:element as unknown as HTMLImageElement,key:name,url:'blob:'+url+'/'+name,read};
@@ -108,14 +111,15 @@ function fixture(networkSession?:ImmersiveSession){
     return {output,port,pull:(offset:number)=>input.emit({type:'pull',offset})};
   };
   installImmersive();
-  return {doc,html,body,main,page,targets,binds,add,sourcePort,
+  return {doc,html,body,main,page,targets,binds,add,sourcePort,send,
     listeners(type:string){return documentListeners.get(type)?.size??0;},
     dispatch(type:string,properties:Record<string,unknown>={}){
       const value={type,target:doc,preventDefault:vi.fn(),stopImmediatePropagation:vi.fn(),...properties};
       for(const listener of [...documentListeners.get(type)??[]])listener(value);return value;
     },
     delayNextBind(pending:Promise<void>){nextBind=pending;},
-    async start(){send('NC_IMMERSIVE_PREPARE');send('NC_IMMERSIVE_SHOW');await flush();expect(binds).toHaveLength(networkSession?0:1);},
+    replaceNextSession(){nextSessionId='replacement-session';},
+    async start(){send('NC_IMMERSIVE_PREPARE');send('NC_IMMERSIVE_SHOW',{navigationId});await flush();expect(binds).toHaveLength(networkSession?0:1);},
     async change(){subscriber?.changed();await vi.advanceTimersByTimeAsync(120);await flush();},
     stop(){send('NC_IMMERSIVE_STOP');},
   };
@@ -129,6 +133,25 @@ function renderedElements(node:ReactNode):Array<{type:unknown;props:Record<strin
 const rendered=()=>renderedElements(dependency.render.mock.calls.at(-1)![0]);
 
 describe('immersive preparation feedback',()=>{
+  it.each(['stopped','navigated','replaced-navigation','wrong-navigation','missing-navigation'] as const)('rejects a %s SHOW without creating a host or locking source scrolling',async(reason)=>{
+    const f=fixture();f.add('first');f.send('NC_IMMERSIVE_PREPARE');
+    if(reason==='stopped')f.stop();
+    if(reason==='navigated')location.href=url+'/next';
+    if(reason==='replaced-navigation')f.page.navigationId='replacement-navigation';
+    const identity=reason==='missing-navigation'?{}:{navigationId:reason==='wrong-navigation'?'other-navigation':navigationId};
+    expect(f.send('NC_IMMERSIVE_SHOW',identity)).toEqual({ok:false});await flush();
+    expect(f.html.children).toEqual([f.body]);expect(dependency.render).not.toHaveBeenCalled();
+    expect(f.binds).toHaveLength(0);
+    for(const element of [f.html,f.body])expect(element.style.getPropertyValue('overflow')).toBe('');
+    f.stop();
+  });
+
+  it('acknowledges a duplicate current SHOW without creating another host or reload',async()=>{
+    const f=fixture();f.add('first');await f.start();const host=f.html.children.find(element=>element.shadow);
+    expect(f.send('NC_IMMERSIVE_SHOW',{navigationId})).toEqual({ok:true});await flush();
+    expect(f.html.children.filter(element=>element.shadow)).toEqual([host]);expect(f.binds).toHaveLength(1);f.stop();
+  });
+
   it.each([false,true])('restores the original empty-style attribute presence after cancellation: %s',async(hadStyle)=>{
     const f=fixture(),binding=deferred<void>();f.add('first');f.delayNextBind(binding.promise);
     if(hadStyle)f.html.setAttribute('style','');
@@ -317,6 +340,33 @@ describe('network chapter initial anchor',()=>{
 });
 
 describe('current-tab source binding during generic rescans',()=>{
+  it.each(['remove','prepend','reorder','resize'] as const)('refreshes unchanged page read identities after a source %s without remounting or losing the anchor',async(change)=>{
+    const f=fixture();f.add('first');f.add('second');f.add('third');await f.start();
+    const before=dependency.render.mock.calls.at(-1)![0].props.children;
+    const position={pageId:before.props.pages[1].id,relativeOffset:.42};before.props.onPosition(position);
+    f.replaceNextSession();
+    if(change==='remove')f.targets.shift();
+    else if(change==='prepend'){const inserted=f.add('inserted');f.targets.pop();f.targets.unshift(inserted);}
+    else if(change==='reorder')f.targets.reverse();
+    else (f.targets[0].element as unknown as FixtureElement).naturalHeight=1200;
+    await f.change();
+    const after=dependency.render.mock.calls.at(-1)![0].props.children;
+    const previous=before.props.pages.find((page:ImmersiveImage)=>page.id===position.pageId);
+    const current=after.props.pages.find((page:ImmersiveImage)=>page.id===position.pageId);
+    expect(current.id).toBe(previous.id);expect(current.revision).not.toBe(previous.revision);
+    expect(after.key).toBe(before.key);expect(after.props.initialAnchor).toEqual(position);
+    expect(dependency.unmount).not.toHaveBeenCalled();expect(window.scrollBy).not.toHaveBeenCalled();f.stop();
+  });
+
+  it('keeps unchanged page read identities and the anchor for a same-session lazy append',async()=>{
+    const f=fixture();f.add('first');f.add('second');await f.start();
+    const before=dependency.render.mock.calls.at(-1)![0].props.children;
+    const position={pageId:before.props.pages[1].id,relativeOffset:.42};before.props.onPosition(position);
+    f.add('third');await f.change();const after=dependency.render.mock.calls.at(-1)![0].props.children;
+    expect(after.props.pages.slice(0,2)).toEqual(before.props.pages);expect(after.key).toBe(before.key);
+    expect(after.props.initialAnchor).toEqual(position);expect(dependency.unmount).not.toHaveBeenCalled();f.stop();
+  });
+
   it.each(['rescan','reload'] as const)('does not automatically retry a failed %s binding on every scan interval',async(action)=>{
     const f=fixture();f.add('first');await f.start();await vi.advanceTimersByTimeAsync(120);
     const reader=dependency.render.mock.calls.at(-1)![0].props.children,binding=deferred<void>();

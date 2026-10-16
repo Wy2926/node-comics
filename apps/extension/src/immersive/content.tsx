@@ -113,9 +113,11 @@ export function installImmersive(){
         </div>
       </div></div>);return;
     }
+    const sourceRevision=session.id;
     const pages:SessionReaderPage[]=session.images.map(image=>{
       const result=translation?.results.get(image.id);
-      return {...image,revision:result?.resultKey??'original',status:result?.state};
+      // A replaced source session cancels reads even for retained page IDs; retry pixels, not the reader or its anchor.
+      return {...image,revision:JSON.stringify([sourceRevision,result?.resultKey??'original']),status:result?.state};
     });
     const source=sourceFor(url);
     root.render(<IconSpriteContext value=""><SessionReader key={readerRevision} title={session.title} pages={pages} settings={settings} setSettings={change=>{
@@ -274,8 +276,9 @@ export function installImmersive(){
     anchor=entryAnchor=undefined;selectedRoot=null;signature='';focusBefore=document.activeElement instanceof HTMLElement?document.activeElement:null;
     releaseDocument=lifecycle.subscribe({changed:queueScan,invalidated:()=>stop()});
   }
-  function show(){
-    if(host)return;
+  function show(expectedNavigationId:unknown){
+    if(!enabled||expectedNavigationId!==navigationId||!current())return false;
+    if(host)return true;
     host=document.createElement('div');host.dataset.ncImmersive='';host.dataset.currentPage='1';host.dataset.view=initialView;
     host.style.cssText='all:initial!important;position:fixed!important;inset:0!important;z-index:2147483647!important;display:block!important;pointer-events:auto!important;color-scheme:normal!important';
     const shadow=host.attachShadow({mode:'closed'}),style=document.createElement('style');style.textContent=shadowThemeStyles(iconStyles+'\n'+sessionReaderStyles);
@@ -283,13 +286,13 @@ export function installImmersive(){
     sprite.setAttribute('style','position:absolute;width:0;height:0;overflow:hidden');sprite.setAttribute('aria-hidden','true');shadow.append(document.importNode(sprite,true));
     surface=document.createElement('div');surface.className='theme';surface.style.cssText='height:100%;width:100%;';shadow.append(style,surface);
     const mount=document.createElement('div');mount.className='nc-session-mount';surface.append(mount);
-    document.documentElement.append(host);root=createRoot(mount);releaseTheme=connectInlineTheme(surface);releaseLocale=subscribeLocale(render);lockPage();void resolve();
+    document.documentElement.append(host);root=createRoot(mount);releaseTheme=connectInlineTheme(surface);releaseLocale=subscribeLocale(render);lockPage();void resolve();return true;
   }
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(sender.id!==chrome.runtime.id)return;
     if(message?.type==='NC_IMMERSIVE_IDENTITY'){respond({url:location.href,navigationId:lifecycle.current().navigationId,enabled,dismissedUrl});return;}
     if(message?.type==='NC_IMMERSIVE_PREPARE'){prepare(message.translation===true);respond({ok:true});return;}
-    if(message?.type==='NC_IMMERSIVE_SHOW'){show();respond({ok:true});return;}
+    if(message?.type==='NC_IMMERSIVE_SHOW'){respond({ok:show(message.navigationId)});return;}
     if(message?.type==='NC_IMMERSIVE_STOP'){stop(anchor);respond({ok:true});return;}
     if(enabled)translation?.onMessage(message);
   });

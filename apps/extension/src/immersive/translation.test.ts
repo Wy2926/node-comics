@@ -25,6 +25,166 @@ afterEach(()=>{
 });
 
 describe('immersive translation view client',()=>{
+  it.each(['reset','window'] as const)('ignores an old WAIT rejection after a %s without delaying the current generation',async change=>{
+    const oldWait=Promise.withResolvers<{ok:boolean;data:InlineResponse}>();let ticks=0;
+    sendMessage.mockImplementation(async message=>{
+      if(message.type==='NC_INLINE_WAIT')return oldWait.promise;
+      if(message.type==='NC_INLINE_TICK')return {ok:true,data:{...response(++ticks),hasPending:ticks===1}};
+      return {ok:true};
+    });
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    if(change==='reset')value.reset();else value.update({...view(),pageIds:images.slice(1).map(image=>image.id)},images.slice(1));
+    await vi.advanceTimersByTimeAsync(1);expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+    oldWait.reject(Error('Old transport failed'));await vi.advanceTimersByTimeAsync(1);
+    expect(vi.getTimerCount()).toBe(0);
+    value.update({...view(),pageIds:images.slice(2).map(image=>image.id)},images.slice(2));await vi.advanceTimersByTimeAsync(1);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(3);
+    expect(messages('NC_INLINE_TICK').at(-1).deferRemote).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(6000);expect(messages('NC_INLINE_TICK')).toHaveLength(3);
+  });
+
+  it.each(['push','window'] as const)('keeps WAIT RetryAfter across a %s update without delaying cached results or new window preparation',async change=>{
+    let ticks=0,waits=0,revision=0;
+    sendMessage.mockImplementation(async message=>{
+      if(message.type==='NC_INLINE_TICK'){ticks++;return {ok:true,data:{...response(++revision),hasPending:true}};}
+      if(message.type==='NC_INLINE_WAIT')return ++waits===1?{ok:false,error:'Retry later',retryAfterMs:5000}:{ok:true,data:response(++revision)};
+      return {ok:true};
+    });
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);const deadline=performance.now()+5000;
+    await vi.advanceTimersByTimeAsync(50);
+    if(change==='window'){
+      value.update({...view(),pageIds:images.slice(1).map(image=>image.id)},images.slice(1));await vi.advanceTimersByTimeAsync(1);
+      expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+      expect(messages('NC_INLINE_TICK').at(-1).deferRemote).toBeUndefined();
+    }
+    const current=messages('NC_INLINE_TICK').at(-1);
+    value.onMessage({type:'NC_INLINE_UPDATE',navigationId:'navigation',generation:current.generation,
+      data:{...response(++revision),hasPending:true,items:[{id:current.images[0].id,resultKey:'cached-result'}]}});
+    await vi.advanceTimersByTimeAsync(1);
+    expect(value.results.get(current.images[0].id)?.resultKey).toBe('cached-result');
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(deadline-performance.now()-1);expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);expect(messages('NC_INLINE_WAIT')).toHaveLength(2);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(ticks);expect(ticks).toBe(change==='window'?2:1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('continues accepted-task subscriptions during new-image admission backoff',async()=>{
+    const waiting=Promise.withResolvers<{ok:boolean;data:InlineResponse}>();
+    sendMessage.mockImplementation(async message=>message.type==='NC_INLINE_WAIT'?waiting.promise:message.type==='NC_INLINE_TICK'
+      ? {ok:true,data:{...response(),hasPending:true,retryAfterMs:5000}}:{ok:true});
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    waiting.resolve({ok:true,data:response(2)});await vi.advanceTimersByTimeAsync(1);
+  });
+
+  it.each(['rejection','response'] as const)('recovers repeated WAIT %s failures with its own bounded retry and no extra TICK',async failure=>{
+    let waits=0;
+    sendMessage.mockImplementation(async message=>{
+      if(message.type==='NC_INLINE_TICK')return {ok:true,data:{...response(),hasPending:true}};
+      if(message.type==='NC_INLINE_WAIT'){
+        if(++waits<3){if(failure==='rejection')throw Error('Transport unavailable');return {ok:false,error:'Transport unavailable'};}
+        return {ok:true,data:response(2)};
+      }
+      return {ok:true};
+    });
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(999);expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);expect(messages('NC_INLINE_WAIT')).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1999);expect(messages('NC_INLINE_WAIT')).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);expect(messages('NC_INLINE_WAIT')).toHaveLength(3);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(1);expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('removes a pending WAIT wakeup when a pushed completion no longer needs a subscription',async()=>{
+    sendMessage.mockImplementation(async message=>message.type==='NC_INLINE_TICK'?{ok:true,data:{...response(),hasPending:true}}
+      :message.type==='NC_INLINE_WAIT'?{ok:false,error:'Retry later',retryAfterMs:5000}:{ok:true});
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    const generation=messages('NC_INLINE_TICK')[0].generation;
+    value.onMessage({type:'NC_INLINE_UPDATE',navigationId:'navigation',generation,data:response(2)});
+    expect(vi.getTimerCount()).toBe(0);await vi.advanceTimersByTimeAsync(6000);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);expect(messages('NC_INLINE_TICK')).toHaveLength(1);
+  });
+
+  it.each(['original','hidden','disposed'] as const)('clears WAIT wakeups while %s and retains the remaining retry deadline when resumed',async stopped=>{
+    let waits=0,revision=0;
+    sendMessage.mockImplementation(async message=>{
+      if(message.type==='NC_INLINE_TICK')return {ok:true,data:{...response(++revision),hasPending:true}};
+      if(message.type==='NC_INLINE_WAIT')return ++waits===1?{ok:false,error:'Retry later',retryAfterMs:5000}:{ok:true,data:response(++revision)};
+      return {ok:true};
+    });
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    const deadline=performance.now()+5000;
+    if(stopped==='original')value.update(view('original'),images);
+    else if(stopped==='hidden'){visibility.hidden=true;value.update(view(),images);}
+    else value.dispose();
+    expect(vi.getTimerCount()).toBe(0);await vi.advanceTimersByTimeAsync(1000);
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);expect(messages('NC_INLINE_TICK')).toHaveLength(1);
+    if(stopped==='disposed'){await vi.advanceTimersByTimeAsync(6000);expect(vi.getTimerCount()).toBe(0);return;}
+    visibility.hidden=false;value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+    expect(messages('NC_INLINE_TICK').at(-1).deferRemote).toBeUndefined();
+    expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(deadline-performance.now()-1);expect(messages('NC_INLINE_WAIT')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);expect(messages('NC_INLINE_WAIT')).toHaveLength(2);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(2);expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([undefined,5000])('resumes remote work after a window change during backoff (server delay: %s)',async retryAfterMs=>{
+    let ticks=0;
+    sendMessage.mockImplementation(async message=>message.type==='NC_INLINE_TICK'&&++ticks===1
+      ? {ok:false,error:'Temporary failure',retryAfterMs}
+      : {ok:true,data:response(ticks+1)});
+    const {value}=client();value.update(view(),images);
+    await vi.advanceTimersByTimeAsync(150);
+    const deadline=150+(retryAfterMs??1000);
+    await vi.advanceTimersByTimeAsync(50);
+    value.update({...view(),pageIds:images.slice(1).map(image=>image.id)},images.slice(1));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+    expect(messages('NC_INLINE_TICK')[1].deferRemote).toBe('backoff');
+    await vi.advanceTimersByTimeAsync(deadline-performance.now()-1);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(3);
+    expect(messages('NC_INLINE_TICK')[2].deferRemote).toBeUndefined();
+  });
+
+  it('resumes once when local recovery finishes after the retry deadline',async()=>{
+    const restore=Promise.withResolvers<{ok:boolean;data:InlineResponse}>();let ticks=0;
+    sendMessage.mockImplementation(async message=>{
+      if(message.type!=='NC_INLINE_TICK')return {ok:true,data:response()};
+      ticks++;
+      if(ticks===1)return {ok:false,error:'Temporary failure'};
+      if(ticks===2)return restore.promise;
+      return {ok:true,data:response(ticks)};
+    });
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    value.update({...view(),pageIds:images.slice(1).map(image=>image.id)},images.slice(1));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(2);
+    restore.resolve({ok:true,data:response(2)});await vi.advanceTimersByTimeAsync(1);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(3);
+    expect(messages('NC_INLINE_TICK')[2].deferRemote).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(30000);expect(messages('NC_INLINE_TICK')).toHaveLength(3);
+  });
+
+  it.each(['original','hidden','disposed'])('does not wake deferred remote work after becoming %s',async stopped=>{
+    sendMessage.mockImplementation(async message=>message.type==='NC_INLINE_TICK'
+      ? {ok:false,error:'Temporary failure',retryAfterMs:5000}
+      : {ok:true,data:response()});
+    const {value}=client();value.update(view(),images);await vi.advanceTimersByTimeAsync(150);
+    if(stopped==='original')value.update(view('original'),images);
+    else if(stopped==='hidden'){visibility.hidden=true;value.update(view(),images);}
+    else value.dispose();
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(messages('NC_INLINE_TICK')).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each([false,true])('leaves no scheduled work for an empty translation window (previously active: %s)',async started=>{
     const {value}=client();
     if(started)value.update(view(),images);

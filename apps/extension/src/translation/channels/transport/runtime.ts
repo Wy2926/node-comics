@@ -9,7 +9,7 @@ import {targetKey, type ReadingTarget, type TranslationState} from '../../automa
 import {MAX_READING_TARGETS} from '../../../reading-window';
 import type {ChannelRuntime, RuntimeOptions, TranslationScope} from '../contracts';
 import {interruptAbandonedTransfer} from '../../../image-transfer/client';
-import {readDirectOperation, readDirectOperations, saveDirectOperation, updateDirectOperation, type DirectOperation} from './operations';
+import {discardUnstartedDirectOperation, readDirectOperation, readDirectOperations, saveDirectOperation, updateDirectOperation, type DirectOperation} from './operations';
 import {readTransferReceipt, releaseTransferBytes} from '../../../image-transfer/receipts';
 import {ImageTransferError, withTransferLock} from '../../../image-transfer/types';
 
@@ -23,6 +23,7 @@ export class DirectImageRuntime implements ChannelRuntime {
   private initialization?: Promise<void>;
   private records = new Map<string, DirectOperation>();
   private targets: ReadingTarget[] = [];
+  private requestCurrent: (target: ReadingTarget) => boolean = () => true;
   private stopped = false;
   private pumping = false;
   private timer?: ReturnType<typeof setTimeout>;
@@ -35,7 +36,10 @@ export class DirectImageRuntime implements ChannelRuntime {
     return JSON.stringify([this.scope.key, this.options.language, target.mode, image]);
   }
   private needsStart(target: ReadingTarget) {
-    return !this.records.has(this.id(target)) && !pageTranslation(target.page, target.mode, this.options.language, this.scope.key).latest;
+    return this.requestCurrent(target) && !this.records.has(this.id(target)) && !pageTranslation(target.page, target.mode, this.options.language, this.scope.key).latest;
+  }
+  private targetCurrent(target: ReadingTarget) {
+    return this.current() && this.requestCurrent(target) && this.targets.some(value => this.id(value) === this.id(target));
   }
   get waitingIds() {return [...this.records.values()].filter(r => r.job.status === 'running').map(r => r.job.id);}
   get hasPending() {return this.waitingIds.length > 0 || this.targets.some(t => this.needsStart(t));}
@@ -47,7 +51,6 @@ export class DirectImageRuntime implements ChannelRuntime {
   }
   async init() {
     return this.initialization ??= (async () => {
-      for (const record of await readDirectOperations(this.scope.key)) this.records.set(record.id, record);
       await this.reconcile(true);
       if (this.current()) await this.options.onJobs([...this.records.values()].flatMap(r => r.previousResult ? [r.previousResult, r.job] : [r.job]));
       this.schedule();
@@ -55,7 +58,11 @@ export class DirectImageRuntime implements ChannelRuntime {
   }
   async restore(targets:ReadingTarget[]) {
     await this.init();
-    for(const target of targets){const record=await readDirectOperation(this.id(target));if(record)await this.adopt(record);}
+    for(const target of targets){
+      const record=await readDirectOperation(this.id(target));
+      // An operation may still be between saving its intent and starting the driver.
+      if(record&&(record.job.status!=='running'||await readTransferReceipt(record.job.id)))await this.adopt(record);
+    }
   }
   private async publish(record: DirectOperation) {
     const saved = await updateDirectOperation(record); this.records.set(saved.id, saved);
@@ -81,8 +88,7 @@ export class DirectImageRuntime implements ChannelRuntime {
       await withTransferLock('settle:' + savedRecord.job.id, async () => {
       const record = await readDirectOperation(savedRecord.id);
       if (!record) return;
-      await this.adopt(record);
-      if (record.job.status !== 'running') return;
+      if (record.job.status !== 'running') {await this.adopt(record); return;}
       const receipt = recover ? await interruptAbandonedTransfer(record.job.id) : await readTransferReceipt(record.job.id);
       if (!receipt) {
         // Another tab may still be preparing bytes under the operation lock.
@@ -90,6 +96,7 @@ export class DirectImageRuntime implements ChannelRuntime {
         if (locks?.held?.some(lock => lock.name === 'nc-image-transfer:operation:' + record.id)) return;
         await this.publish(this.failure(record, 'INTERRUPTED')); return;
       }
+      await this.adopt(record);
       if (receipt.state === 'failed') {await this.publish(this.failure(record, receipt.errorCode ?? 'INTERRUPTED')); return;}
       if (receipt.state !== 'succeeded') return;
       const job: Job = {...record.job, status: 'succeeded', phase: 'succeeded', completed_at: new Date(receipt.updatedAt).toISOString(),
@@ -120,6 +127,7 @@ export class DirectImageRuntime implements ChannelRuntime {
     await this.init();
     if (!this.current()) return;
     // Only the unstarted tail is replaced. An already submitted image retains its receipt.
+    this.requestCurrent = isCurrent;
     this.targets = targets.slice(0, MAX_READING_TARGETS).filter(isCurrent); this.runtimeError = undefined;
     void this.pump();
   }
@@ -134,14 +142,14 @@ export class DirectImageRuntime implements ChannelRuntime {
       if (!target) return;
       const id = this.id(target);
       await withTransferLock('admission:' + this.scope.key, () => withTransferLock('operation:' + id, async () => {
-        if (!this.current() || !this.targets.some(t => this.id(t) === id)) return;
+        if (!this.targetCurrent(target)) return;
         await this.reconcile();
-        if (this.waitingIds.length) return;
+        if (this.waitingIds.length || !this.targetCurrent(target)) return;
         const existing = await readDirectOperation(id);
         if (existing) {this.records.set(id, existing); return;}
         const displayed = pageTranslation(target.page, target.mode, this.options.language, this.scope.key);
         if (displayed.latest) return;
-        await this.begin(target);
+        await this.begin(target, undefined, () => this.targetCurrent(target));
       }));
     } catch {
       canContinue = false; this.runtimeError = this.driver.errorMessage('INTERRUPTED'); this.changed();
@@ -150,7 +158,8 @@ export class DirectImageRuntime implements ChannelRuntime {
       if (canContinue && this.current() && !this.waitingIds.length && this.targets.some(value => this.needsStart(value))) void this.pump();
     }
   }
-  private async begin(target: ReadingTarget, previous?: DirectOperation) {
+  private async begin(target: ReadingTarget, previous?: DirectOperation, requestCurrent = this.current) {
+    if (!requestCurrent()) return;
     const created = new Date().toISOString();
     let record: DirectOperation = {
       id: this.id(target), scope: this.scope.key, entryId: target.entryId, pageId: target.page.id,
@@ -159,28 +168,44 @@ export class DirectImageRuntime implements ChannelRuntime {
         mode: target.mode, target_language: this.options.language, status: 'running', phase: 'translating_text',
         created_at: created, updated_at: created, version: 1, quota_pages: 0, cache_hit: false},
     };
-    await saveDirectOperation(record); this.records.set(record.id, record);
-    if (this.current()) await this.options.onJobs([record.job]);
-    this.changed();
+    let saved = false, started = false;
     let lease: {blob: Blob; release: () => void} | undefined;
     try {
       // Capture before source acquisition/network work; cache clearing fences late completion.
       record = {...record, cacheToken: await translationCache.token(this.scope.key)};
+      if (!requestCurrent()) return;
       const reference = target.page.blobKey ? parsePageReference(target.page.blobKey) : undefined;
       if (reference) lease = await this.options.readOriginal?.(reference);
       const blob = lease?.blob ?? (target.page.blobKey ? await this.options.getBlob(target.page.blobKey) : undefined);
+      if (!requestCurrent()) return;
       if (!blob) throw new ImageTransferError('SOURCE_MISSING');
       const sha = await hashFile(blob);
       if (target.page.imageSha256 && sha !== target.page.imageSha256 || target.page.imageByteSize && blob.size !== target.page.imageByteSize)
         throw new ImageTransferError('SOURCE_CHANGED');
-      if (!this.current()) throw new ImageTransferError('INTERRUPTED');
+      if (!requestCurrent()) return;
       record = {...record, job: {...record.job, image_sha256: sha}};
-      await this.publish(record);
-      await this.driver.start(record.job.id, blob, target.mode, this.options.language);
+      await saveDirectOperation(record); saved = true; this.records.set(record.id, record);
+      if (!requestCurrent()) return;
+      // No asynchronous gap between the final admission check and starting the transfer.
+      started = true;
+      const transfer = this.driver.start(record.job.id, blob, target.mode, this.options.language);
+      this.changed();
+      await Promise.all([transfer, this.current() ? this.options.onJobs([record.job]) : Promise.resolve()]);
       if (target.page.blobKey) await this.options.onInputConsumed?.(target.page.blobKey).catch(() => {});
     } catch (error) {
-      await this.publish(this.failure(record, error instanceof ImageTransferError ? error.code : 'INTERRUPTED'));
-    } finally {lease?.release();}
+      if (!started && !requestCurrent()) return;
+      const failed = this.failure(record, error instanceof ImageTransferError ? error.code : 'INTERRUPTED');
+      // Preparation can fail before a manual replacement is saved; do not let its old UUID hide the error.
+      if (!saved) await saveDirectOperation(failed);
+      await this.publish(failed);
+    } finally {
+      lease?.release();
+      if (saved && !started) {
+        await discardUnstartedDirectOperation(record, previous);
+        const restored = await readDirectOperation(record.id);
+        if (restored) this.records.set(record.id, restored); else this.records.delete(record.id);
+      }
+    }
   }
   async manual(target: ReadingTarget) {
     await this.init();

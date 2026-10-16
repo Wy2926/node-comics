@@ -230,6 +230,9 @@ try{
     await page.locator('#panel-10').scrollIntoViewIfNeeded();await shown('panel-10');
     await until(()=>[2,3,4].every(id=>sourceTimings.some(read=>read.image===id&&read.cancelled)),'leaving the window cancels the three held HTTP reads');
     assert.equal(await page.locator('#panel-1').evaluate(image=>image.style.content),'');
+    // Drain this window before measuring restoration; accepted neighbour results are not cache misses.
+    await until(()=>sourceActive===0&&[...translations.values()].every(entry=>{const job=jobs.get(entry.jobId);return job.status==='succeeded'&&resultRequests.includes('output-'+job.id);}),
+      'the current window completes its accepted results before the cache-restore measurement');
     const reads=sourceTimings.filter(read=>read.image===1).length,downloads=resultRequests.length,requestsBefore=requests.length,translationsBefore=translations.size;
     preparationGate=new Promise(resolve=>{releasePreparation=resolve;});
     await page.locator('#panel-1').evaluate(image=>{

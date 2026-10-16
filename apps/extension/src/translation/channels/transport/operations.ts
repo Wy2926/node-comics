@@ -41,6 +41,24 @@ export async function saveDirectOperation(operation: DirectOperation) {
   });
 }
 
+/** Caller holds the operation lock and has not called the driver or published this attempt. */
+export async function discardUnstartedDirectOperation(operation: DirectOperation, previous?: DirectOperation): Promise<void> {
+  const database = await db();
+  await new Promise<void>((resolve, reject) => {
+    const tx = database.transaction(['operations', 'tombstones'], 'readwrite'), store = tx.objectStore('operations');
+    const current = store.get(operation.id);
+    current.onsuccess = () => {
+      const saved = current.result as DirectOperation | undefined;
+      if (saved?.job.id !== operation.job.id) return;
+      if (!previous) {store.delete(operation.id); return;}
+      const restored = {...previous, entryId: saved.entryId, pageId: saved.pageId};
+      const removed = tx.objectStore('tombstones').get(restored.entryId);
+      removed.onsuccess = () => {if (removed.result) store.delete(operation.id); else store.put(restored);};
+    };
+    tx.oncomplete = () => resolve(); tx.onabort = tx.onerror = () => reject(tx.error);
+  });
+}
+
 /** Atomic attempt check: an old completion cannot overwrite a user-requested new attempt. */
 export async function updateDirectOperation(operation: DirectOperation): Promise<DirectOperation> {
   const database = await db();

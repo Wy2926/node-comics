@@ -366,6 +366,8 @@ async function runGeneric() {
   await page.locator('#site-action').click(); assert.equal(await page.locator('body').getAttribute('data-site-clicks'), '1');
   check('Generic candidates retain duplicate URLs, exclude thumbnail/unloaded lazy images and observe append; unchanged exit restores exactly, moved exit aligns the source page without moving the outer viewport');
   await page.evaluate(() => {const scroll = document.querySelector('#comic-scroll'); scroll.scrollTop = document.querySelector('#lazy').offsetTop;});
+  // Let the source's IntersectionObserver assign src before asking the browser to decode it.
+  await page.locator('#lazy[src]').waitFor({state: 'attached'});
   await page.locator('#lazy').evaluate(image => image.decode());
   await start(); assert.equal((await surfaceState()).count, 14); await closeSurface();
   assert.equal(await page.locator('[data-nc-immersive]').count(), 0);
@@ -901,8 +903,20 @@ async function runTranslation() {
   stage = 'loopback-only translation view';
   await open(local + '/generic'); await page.locator('img[src]').evaluateAll(images => Promise.all(images.map(image => image.decode())));
   await start(); const original = await surfaceState(), before = mtuInputs.length;
+  mtuMode = 'pending';
   await button(['显示译图', '译图', '翻译', 'Translated', 'Show translation']);
   await until(() => mtuInputs.length > before, 'The local MTU fixture received no translation input');
+  await pause(200);
+  await button(['恢复原图', '原图', 'Original', 'Show original']);
+  const pausedRequests = mtuInputs.length, pausedPosition = await readingOffset();
+  releaseMtu('success');
+  await pause(1600); // Allow the accepted request and both local receipt-poll cycles to finish.
+  assert.equal(mtuInputs.length, pausedRequests, 'Original view must not start the unsubmitted MTU tail after its accepted request completes');
+  assert.equal((await surfaceState()).view, original.view);
+  assert.deepEqual(await readingOffset(), pausedPosition, 'Completing an accepted request in original view must not move the reader');
+  await page.screenshot({path: path.join(out, 'generic-original-after-pending-translation.png')});
+  check('Returning to original view lets the accepted MTU request finish without starting queued neighbours or moving the reading anchor');
+  await button(['显示译图', '译图', '翻译', 'Translated', 'Show translation']);
   const translatedHash = createHash('sha256').update(translated).digest('hex');
   await until(async () => surfaceCall(async function (expected) {
     const viewport = this.querySelector('[data-reader-viewport]')?.getBoundingClientRect(); if (!viewport) return false;
