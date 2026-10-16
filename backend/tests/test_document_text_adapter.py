@@ -20,13 +20,13 @@ def test_document_prompt_keeps_all_ocr_in_user_data_without_interpolation():
     pages = [{'page': 1, 'segments': [{'id': 'p1:0', 'source': hostile}]},
              {'page': 200, 'segments': [{'id': 'p200:0', 'source': '…\nドキドキ 🗯 ' * 250}]}]
     original = json.dumps(pages, ensure_ascii=False)
-    prompt = messages(pages, 'zh-Hant')
+    prompt = messages(pages, 'zh-Hant', SYSTEM)
     assert [row['role'] for row in prompt] == ['system', 'user']
     assert prompt[0]['content'] == SYSTEM + '\nTarget: "zh-Hant"'
     assert hostile not in prompt[0]['content']
-    assert json.loads(prompt[1]['content']) == {'pages': pages}
+    assert json.loads(prompt[-1]['content']) == {'pages': pages}
     assert json.dumps(pages, ensure_ascii=False) == original
-    assert PROMPT_VERSION == 'comic-document-v2'
+    assert PROMPT_VERSION == 'comic-document-v5'
     # A fixed instruction block, not a repeated per-page prompt or glossary.
     assert len(SYSTEM.encode()) < 4096
     assert input_bound(prompt) == len(json.dumps(

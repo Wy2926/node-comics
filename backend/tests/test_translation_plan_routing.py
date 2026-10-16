@@ -74,7 +74,11 @@ def test_plan_pools_keep_stable_weights_and_read_candidates_once(admin_case):
             keys = [digest(index) for index in range(4000)]
             chosen = [resolve(key)['text']['provider_id'] for key in keys]
             assert chosen == [resolve(key)['text']['provider_id'] for key in keys]
-            assert len(statements) == 1
+            # One provider read plus one editable-guidance read per resolver,
+            # never one query per page or repeated weighted selection.
+            assert len(statements) == 2
+            assert sum('FROM system_settings' in statement for statement in statements) == 1
+            assert sum('FROM translation_providers' in statement for statement in statements) == 1
             statements.clear()
             assert has_provider(db, plan_id='lite') and not has_provider(db, plan_id='guest')
             assert len(statements) == 2
@@ -258,7 +262,7 @@ def test_worker_uses_frozen_model_after_plan_scope_and_revision_changes(text_cas
         db.commit()
     assert resolve_credentials(original) == 'isolated-test-text-key'
     calls = []
-    def model(segments, language, profile):
+    def model(segments, language, profile, prompt):
         calls.append(profile)
         return TextResponse('{"b001":"你好"}', {'input_tokens': 10, 'output_tokens': 2}, 'frozen')
     monkeypatch.setattr(classic, 'call_text', model)

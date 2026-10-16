@@ -38,7 +38,7 @@ const views = {
   operations: ['运行诊断', 'DIAGNOSTICS', '查看服务健康、图片授权与受理记录。', '⌕'],
   statistics: ['用量与成本', 'USAGE & COST', '查看调用计量与业务统计。', '▥'],
   audit: ['操作审计', 'AUDIT LOG', '查询管理员操作和变更记录。', '≡'],
-  settings: ['系统设置', 'SYSTEM SETTINGS', '统一管理上传与反馈的服务保护设置。', '⚙'],
+  settings: ['系统设置', 'SYSTEM SETTINGS', '管理翻译提示词、默认额度与请求保护设置。', '⚙'],
 } as const;
 type View = keyof typeof views;
 const navigationGroups: {name: string; pages: View[]}[] = [

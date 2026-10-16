@@ -14,6 +14,7 @@ from app.models import Job, TextCall, now, uid
 from app.providers import digest
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import lock_scheduler, release_lease, start_lease
+from conftest import configure_system_limits
 from test_document_quota_api import document_case, create, purchase
 
 
@@ -93,7 +94,7 @@ def claim():
 
 
 def llm_reply(prompt, profile, *, json_schema, limits):
-    pages = json.loads(prompt[1]['content'])['pages']
+    pages = json.loads(prompt[-1]['content'])['pages']
     assert [row['page'] for row in pages] == [1, 2]
     assert all(len(row['segments'][0]['source']) > 1800 for row in pages)
     assert limits.max_output_tokens == 32000 and limits.timeout_seconds == 600
@@ -167,11 +168,34 @@ def test_unknown_call_is_not_retried_and_keeps_page_reservation(flow, monkeypatc
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize('prompt_change', [None, 'SYSTEM', 'PROMPT_VERSION'])
-def test_saved_text_recovery_never_calls_model_twice(flow, monkeypatch, prompt_change):
+@pytest.mark.parametrize('generation', ['current', 'stored', 'legacy'])
+@pytest.mark.parametrize('prompt_change', [None, 'SYSTEM', 'PROMPT_VERSION', 'settings'])
+def test_saved_text_recovery_never_calls_model_twice(flow, monkeypatch, prompt_change, generation):
     from app.errors import ProcessingError
+    with session_factory()() as db:
+        job = db.get(Job, flow.job_id)
+        if generation == 'legacy':
+            # Pre-settings document jobs used the single-page version in config;
+            # the actual paid request identity was always comic-document-v2.
+            job.config = {key: value for key, value in job.config.items() if key != 'text_prompt'}
+            job.config = {**job.config, 'prompt_version': 'comic-json-v9'}
+        elif generation == 'stored':
+            job.config = {**job.config, 'text_prompt': 'Previously saved v3 system and contract.\nDo not rewrite.',
+                          'prompt_version': 'comic-document-v3'}
+        db.commit()
+        expected_system = text.LEGACY_SYSTEM if generation == 'legacy' else job.config['text_prompt']
+        expected_version = 'comic-document-v2' if generation == 'legacy' else job.config['prompt_version']
+        frozen = dict(job.config)
     calls = []
     def invoke(*args, **kwargs):
+        assert args[0][0]['content'] == expected_system + '\nTarget: "zh-Hans"'
+        assert len(args[0]) == 2
+        with session_factory()() as db:
+            document = db.get(Document, flow.job_id)
+            assert document.text_input_payload['version'] == expected_version
+            call = db.get(TextCall, document.text_call_id)
+            expected_cost = text._cost_micros(args[1], text.input_bound(args[0]), kwargs['limits'].max_output_tokens)
+            assert call.reserved_micros == expected_cost
         calls.append(1)
         return llm_reply(*args, **kwargs)
     monkeypatch.setattr(text, 'call_messages', invoke)
@@ -188,13 +212,32 @@ def test_saved_text_recovery_never_calls_model_twice(flow, monkeypatch, prompt_c
         workflow.stage_for(db, flow.job_id, 'doc_text').available_at = now() - timedelta(seconds=1)
         db.commit()
     lease = claim()
-    if prompt_change:
+    if prompt_change == 'settings':
+        configure_system_limits(comic_translation_prompt='Changed after a paid response; do not resend.')
+    elif prompt_change:
         monkeypatch.setattr(text, prompt_change, getattr(text, prompt_change) + '\nchanged')
-        with pytest.raises(ProcessingError, match='DOCUMENT_TEXT_CONFLICT'):
-            text.run_text_stage(flow.job_id, lease.id)
-    else:
-        workflow.complete_control(lease.id, text.run_text_stage(flow.job_id, lease.id))
+    workflow.complete_control(lease.id, text.run_text_stage(flow.job_id, lease.id))
     assert len(calls) == 1
+    with session_factory()() as db:
+        assert db.get(Job, flow.job_id).config == frozen
+
+
+@pytest.mark.parametrize('field', ['text_prompt', 'prompt_version'])
+def test_paid_response_rejects_tampered_frozen_prompt_without_resending(flow, monkeypatch, field):
+    from app.errors import ProcessingError
+    monkeypatch.setattr(text, 'call_messages', llm_reply)
+    ocr_all(flow)
+    lease = claim()
+    text.run_text_stage(flow.job_id, lease.id)
+    with session_factory()() as db:
+        job = db.get(Job, flow.job_id)
+        job.config = {**job.config, field: job.config.get(field, '') + ' tampered'}
+        db.commit()
+    monkeypatch.setattr(text, 'call_messages', lambda *a, **k: pytest.fail('Paid response must not resend'))
+    with pytest.raises(ProcessingError, match='DOCUMENT_TEXT_CONFLICT'):
+        text.run_text_stage(flow.job_id, lease.id)
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(TextCall)) == 1
 
 
 @pytest.mark.parametrize('mismatch', ['job', 'workspace_generation'])
@@ -468,6 +511,18 @@ def test_single_page_translation_larger_than_ocr_checkpoint_budget_is_preserved(
 def test_missing_empty_extra_duplicate_translations_are_not_accepted(content):
     with pytest.raises(TextError):
         text.parse_translations(content, {'p1:0'})
+
+
+def test_document_translations_match_exact_string_ids_even_when_reordered():
+    expected = {'p1:0', 'p1:01'}
+    rows = [{'id': 'p1:01', 'text': 'Second segment'}, {'id': 'p1:0', 'text': 'First segment'}]
+    assert text.parse_translations(json.dumps({'translations': rows}), expected) == {
+        'p1:0': 'First segment', 'p1:01': 'Second segment'}
+    for invalid_id in ('p1:01', 'p1:1'):
+        # Equal row counts cannot conceal a duplicate or a numerically similar ID.
+        changed = [rows[0], {**rows[1], 'id': invalid_id}]
+        with pytest.raises(TextError, match='DOCUMENT_TEXT_INCOMPLETE'):
+            text.parse_translations(json.dumps({'translations': changed}), expected)
 
 
 def test_document_payloads_are_deferred_from_metadata_queries(flow):

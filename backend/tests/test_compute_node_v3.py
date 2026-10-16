@@ -342,7 +342,7 @@ def test_real_cuda_node_uploads_overlay(v3, tmp_path, monkeypatch, ocr_language,
         from app import classic
         from app.adapters.llm import TextResponse
         arabic = 'العربية لا لأ لإ لآ مُحَمَّد ٢٠٠،؟…: AMIRA (200)'
-        def arabic_fixture(segments, language, profile):
+        def arabic_fixture(segments, language, profile, prompt):
             assert language == 'ar'
             return TextResponse(json.dumps({s['id']: arabic for s in segments}),
                                 {'input_tokens': 10, 'output_tokens': 10}, 'fixture')

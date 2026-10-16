@@ -49,6 +49,7 @@ OpenRouter 可通过 `openrouter_providers` 指定最多 20 个不重复的上�
 | `backend/app/translation_channels.py` | 渠道注册，绑定配置校验器和调用函数 |
 | `backend/app/adapters/llm.py` | 通用 `call_messages(messages, profile, json_schema=...)`、`LLMConfig` 连接配置、统一响应和错误 |
 | `backend/app/adapters/text.py` | 正文 `TextPolicy`、分组、JSON 输入与提示词、逐组输出 Schema、译文完整性解析 |
+| `backend/app/translation_prompts.py` | 单图／整本共用的推荐语义规则、漫画名推荐规则；后台可编辑，固定输出契约由各调用方维护 |
 | `backend/app/comic_titles.py` | 漫画名 JSON 输入与提示词、严格 JSON 解析、独立有界执行与缓存协调 |
 | `backend/app/comic_title_limits.py` | 每用户漫画名请求窗口、限速与诊断摘要 |
 | `backend/app/comic_title_cache.py` | 共享漫画名缓存、查询去重、执行续租及结果写入校验 |
@@ -68,13 +69,13 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 
 ### 正文 LLM 文本格式
 
-新任务使用 `comic-json-v9` 缓存身份。恢复任务保留供应商版本及输出上限；未完成分组使用运行代码的提示词和 Schema，已完成的 ID 到译文检查点直接复用，不按任务的 `prompt_version` 装载另一套提示词或解析器。API、文本 worker 与 maintenance 须配套发布；升级前排空不符合当前 JSON 契约的任务，回退前排空超出目标版本输出上限或空译文支持范围的任务。计算节点须支持跳过空字符串绘字。独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
+新任务使用 `comic-json-v12` 协议版本，在受理时将完整有效提示词冻结为任务配置的 `text_prompt`，与供应商版本、输出上限一起进入缓存身份；不把提示词加入需严格匹配凭据版本的 `text` profile。所有分组、自动重试和重启恢复使用该快照，已完成 ID 的译文检查点直接复用。已冻结的旧版提示词保持原文；没有 `text_prompt` 的升级前任务继续原 `comic-json-v9` 内置提示词和当前兼容 JSON 解析器。后台字段与生效规则见[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)。API、文本 worker、文档 worker 与 maintenance 须配套发布，全部切换后才可保存新后台配置；旧代码不能读取含新增提示词字段的设置，也不会使用新任务的提示词快照。回退须先排空／处理新版本在途与未知任务，并恢复旧代码兼容的系统设置，不能单独回退镜像。计算节点须支持跳过空字符串绘字。独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
 
-Chat Completions 与 Responses 共用 `comic-json-v9` 输出契约，源文本和译文只采用 JSON：顶层直接为段落 ID 到文本的对象映射，不携带 `translations` 包装。正文逐组生成严格 JSON Schema，禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验同时执行。使用标准库编码和解析；模型 HTTP 信封、内部检查点及发给节点的 `translations` 包装分别遵循各自协议。
+Chat Completions 与 Responses 共用原有紧凑 JSON 输出契约，源文本和译文只采用 JSON：顶层直接为段落 ID 到文本的对象映射，不携带 `translations` 包装。正文逐组生成严格 JSON Schema，禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验同时执行。使用标准库编码和解析；模型 HTTP 信封、内部检查点及发给节点的 `translations` 包装分别遵循各自协议。
 
 Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.strict=true`；Responses 发送 `text.format` 中的同等定义。OpenRouter 同时发送 `provider.require_parameters=true`，只向支持请求参数的端点路由。正文供应商必须支持严格结构化输出；不支持时按上游错误终止，不静默移除约束。漫画名及其他未传 Schema 的通用调用保持原请求参数。[OpenAI 结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)、[OpenRouter 结构化输出](https://openrouter.ai/docs/guides/features/structured-outputs)
 
-目标语言放在系统指令的 `Target: "zh-Hans"` 中，用户消息只包含 JSON 对象，避免模型在译文中复制目标语言字段。输入示例：
+目标语言放在系统指令的 `Target: "zh-Hans"` 中，用户消息只包含 ID 到 OCR 原文的 JSON 对象，避免模型在译文中复制目标语言字段。请求只使用 system＋OCR 两条消息，不附加作品名。输入示例：
 
 ```json
 {"0":"Hello, friend!","1":"Let's go!"}
@@ -86,9 +87,9 @@ Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.stri
 {"0":"你好，朋友！","1":"走吧！"}
 ```
 
-系统指令要求自然、忠实，保留含义、语气、名称与音效，利用组内上下文；源文本只能作为数据。提示词要求逐 ID 翻译和不添加解释，JSON 格式、必填 ID 和禁止额外字段由 Schema 定义。只发送 ID 和 OCR 原文，不发送图片、坐标、掩膜或历史对话。节点按页生成无前缀、无补零的十进制字符串 ID：`"0"`、`"1"`……`"199"`（每页最多 200 块）；分组后沿用页内 ID，不重新编号或新增映射。输入与输出使用同一结构，模型只替换文本值；后端仍按原字符串精确匹配历史／其他合规节点的 ID，不能把 `"01"` 改成 `"1"`。逗号、引号、反斜杠、换行和 Unicode 按 JSON 字符串规则处理，不作为表格分隔符。解析允许 JSON 空白及键顺序变化，空字符串及纯空白译文规范化为 `""` 并保存该 ID，恢复执行不会因值为空而再次调用模型；节点行为见[计算协议](COMPUTE_PROTOCOL.md#覆盖结果与一次提交)。仍拒绝 Markdown 包裹、附加说明、额外字段、重复键（包括转义后相同的键）、缺失／未知 ID、非字符串、超过 2000 字符的译文、NUL 和未配对代理字符。只接受这一种 JSON 结构，不保留旧包装、表格解析或格式回退；格式失败进入已有有界重试并逐次计量。提示词版本进入任务快照及结果缓存身份。
+系统指令由后台语义规则与固定协议拼接，推荐规则和生效边界见[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)。固定协议要求输入只作数据、只翻译 OCR 消息且不添加解释；JSON 格式、必填 ID 和禁止额外字段由 Schema 定义。只发送 ID 和 OCR 原文，不发送图片、坐标、掩膜或历史对话。节点按页生成无前缀、无补零的十进制字符串 ID：`"0"`、`"1"`……`"199"`（每页最多 200 块）；分组后沿用页内 ID，不重新编号或新增映射。输入与输出使用同一结构，模型只替换文本值；后端仍按原字符串精确匹配历史／其他合规节点的 ID，不能把 `"01"` 改成 `"1"`。逗号、引号、反斜杠、换行和 Unicode 按 JSON 字符串规则处理，不作为表格分隔符。解析允许 JSON 空白及键顺序变化，空字符串及纯空白译文规范化为 `""` 并保存该 ID，恢复执行不会因值为空而再次调用模型；节点行为见[计算协议](COMPUTE_PROTOCOL.md#覆盖结果与一次提交)。仍拒绝 Markdown 包裹、附加说明、额外字段、重复键（包括转义后相同的键）、缺失／未知 ID、非字符串、超过 2000 字符的译文、NUL 和未配对代理字符。只接受这一种 JSON 结构，不保留旧包装、表格解析或格式回退；格式失败进入已有有界重试并逐次计量。提示词版本与全文进入任务快照及结果缓存身份。
 
-采用紧凑对象映射，避免为每段重复 `id`／`text` 字段及外层包装；分组和并发设置不变。输入由系统指令与目标语言、ID 到 OCR 原文的用户消息、逐组 Schema 三部分组成；Schema 在 `properties` 和 `required` 中各携带一次 ID，每组和每次重试都重复这些固定开销。默认分组上限按 `{id, source}` 的 JSON UTF-8 字节计算，不是 token 上限，也不包含 Schema。输入成本预占是消息及 Schema 的 UTF-8 字节数加 256 的保守上界，不是真实 token；供应商返回 `usage` 后按实际 input/output token 更新该次成本。输出上限允许配置 128–32768 token，须符合所选模型能力；已有版本不自动加大。响应信封读取仍有 1 MiB 硬上限。较高输出上限增加未知成本预占，不要求模型生成同样多的 token；实际消耗仍按返回用量计量。格式开销、真实 token 用量、模型延迟与错误率需用所选供应商验证。
+采用紧凑对象映射，避免为每段重复 `id`／`text` 字段及外层包装；分组和并发设置不变。输入包括系统指令与目标语言、ID 到 OCR 原文的用户消息、逐组 Schema；Schema 在 `properties` 和 `required` 中各携带一次 ID，每组和每次重试都重复这些固定开销。默认分组上限按 `{id, source}` 的 JSON UTF-8 字节计算，不是 token 上限，也不包含提示词或 Schema。输入成本预占是实际消息及 Schema 的 UTF-8 字节数加 256 的保守上界，不是真实 token；供应商返回 `usage` 后按实际 input/output token 更新该次成本。输出上限允许配置 128–32768 token，须符合所选模型能力；已有版本不自动加大。响应信封读取仍有 1 MiB 硬上限。较高输出上限增加未知成本预占，不要求模型生成同样多的 token；实际消耗仍按返回用量计量。格式开销、真实 token 用量、模型延迟与错误率需用所选供应商验证。
 
 达到 token 或其他生成限制的未完成响应仍进入有界重试。明确的 `refusal`／内容过滤响应记为 `TEXT_REFUSED`，保留用量与请求 ID 并终止，避免当作格式错误重复请求；拒绝内容不进入默认日志。严格 Schema 不替代业务校验，也不保证翻译质量。
 

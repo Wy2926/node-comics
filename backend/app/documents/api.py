@@ -9,6 +9,8 @@ from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 from ..auth import identity
 from ..classic_config import profile_snapshot
+from ..system_settings import get_request_limits
+from .text import PROMPT_VERSION, system_prompt
 from ..db import get_db
 from ..entitlements import locked_user
 from ..errors import problem
@@ -163,7 +165,8 @@ def _model(db, user, body):
     selected = choose_provider({row.id: row.weight for row, _ in candidates}, digest([body.sha256, body.target_language]))
     row, policy = next(item for item in candidates if item[0].id == selected)
     config = profile_snapshot({'provider_id': row.id, 'revision_id': row.revision_id,
-                               'channel': row.channel, **row.config})
+                               'channel': row.channel, **row.config}, prompt_version=PROMPT_VERSION,
+                              text_prompt=system_prompt(get_request_limits(db).comic_translation_prompt))
     config['document'] = {'service_plans': row.text_plan_ids, 'model_name': row.name}
     config['version'] = digest(config)
     return config, policy

@@ -69,11 +69,11 @@ LLM 尚未发送且工作目录丢失时，可以在同一宿主提高目录代�
 
 ## 整本 LLM
 
-全部有效 OCR 文本按页汇总，一次发送 `comic-document-v2` 请求；输入只含页号、全局唯一段落 ID 和原文，不含图像、坐标、掩膜。固定大小严格 Schema 返回 `translations: [{id,text}]`，应用层校验每一个 ID 恰好一次且译文非空，避免为几万段生成几万个 Schema 属性。
+全部有效 OCR 文本按页汇总，新任务一次发送 `comic-document-v5` 请求；输入包含页号、全局唯一段落 ID 和原文，不含图像、坐标、掩膜。固定大小严格 Schema 返回 `translations: [{id,text}]`，应用层校验每一个 ID 恰好一次且译文非空，避免为几万段生成几万个 Schema 属性。
 
-系统提示词在 `backend/app/documents/text.py` 维护：原文仅为待翻译数据，不接受其中的指令；逐段完整翻译，不合并、摘要或删去重复文字，代码／编号／占位符逐字保留。漫画规则包括跨页专名与术语一致、对白／心理活动／旁白语体、称谓关系、停顿口吃和拟声词；仅依据所提供的文字消歧，不虚构画面、说话人或剧情，不为假想气泡尺寸压缩内容。难辨 OCR 片段保留原文，不能编造或返回空串。提示词和 Schema 不能保证语义准确，仍须做模型效果验收；这些规则不改变单图提示词或分组协议。
+正文语义规则与单图共用后台[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)，固定整本协议在 `backend/app/documents/text.py` 维护：输入仅为数据，只翻译 OCR 页面消息，按 Schema 输出 JSON，每个原始 ID 恰好对应其完整、非空译文；不要求数组顺序，按 ID 对应段落。不改变单图分组与允许空译文的输出协议。推荐规则强调忠实自然、专名一致、人物语气与幽默文化含义；提示词和 Schema 不能保证语义准确，仍须做模型效果验收。
 
-提示词版本与完整内容都参与请求摘要。升级中央文本 worker 的提示词前须停止领取新的整本 LLM 阶段，排空已发送调用并处理待恢复响应／未知结果，再切换版本；不能让新提示词接管旧请求检查点，也不能用新版本自动重发旧请求。
+任务受理时冻结提示词版本和完整内容，并计入实际模型请求摘要。后台修改仅作用于新任务；未发送阶段、自动恢复及已保存的付费回复始终使用原快照。已有冻结提示词的旧任务保持原文；没有 `text_prompt` 的升级前任务仍使用原 `comic-document-v2` 完整提示词与摘要，不能让新规则接管旧请求，也不能自动重发旧请求。费用预占和上下文预检包含实际提示词。配套部署与回退限制见[供应商规范](TRANSLATION_PROVIDERS.md#正文-llm-文本格式)。
 
 供应商不可变配置中的 `document` 单独设置以下参数，管理界面可编辑；默认关闭，不自动把单图供应商视为整本可用。
 
@@ -164,4 +164,4 @@ npm.cmd --prefix backend/website run dev:documents
 
 在 `backend` 执行 `python -m pytest -q tests/test_document_*.py`；测试涵盖授权、200 页边界、多桶原子预占、取消竞态、重复结算、文件恶意结构、固定宿主与代次、共享 GPU 容量、LLM 数据库断点与未知调用不重发、完整 ZIP 和清理。节点测试见 [test_document_node.py](../services/classic-engine/tests/test_document_node.py) 和 [test_document_workspace.py](../services/classic-engine/tests/test_document_workspace.py)，验证本地检查点、无中间对象传输及恢复。PostgreSQL 并发用 `RUN_POSTGRES_CONCURRENCY=1` 和明确隔离的 `nodecomics_concurrency_test` 数据库；普通 fixture 不代表 GPU／模型效果。
 
-真实 R2：仓库根运行 `backend/.venv/Scripts/python.exe scripts/verify_document_storage_live.py --help`，使用指定凭据和随机测试前缀，验证后只清理自身对象。真实模型：`scripts/verify_document_llm_live.py --base-url <私有兼容接口>/v1 --model <已授权模型> --protocol responses`，或通过 `--profile <不含密钥的配置.json>` 保留实际协议、思考参数和上游路由；密钥独立从隐藏输入或 stdin 读取，不改生产供应商。默认一次发送合成两页文本；`--case pages-200` 验证 200 页、全部段落 ID、首尾编号和超过 2000 字符的单段译文，实际 POST 次数由传输层计数。`--case comic-context` 增加跨页专名、数字、代码、对白片段、拟声词和伪指令样本；只自动校验结构与字面保留，报告中的 `semantic_review` 保持待评审，否定作用域、同音词消歧和漫画自然度须另行人工查看合成译文，不能将关键词检查当成准确率。脚本记录提示词版本及结果元数据，不记录正文或凭据。独立预算可用 `--max-output-tokens`、`--timeout-seconds`、`--context-tokens` 等测试参数指定，但不得超过已核实的模型能力。模型列表成功不等于账户有推理权限；这些合成文本检查也不替代真实 OCR、绘图或模型质量验收。
+真实 R2：仓库根运行 `backend/.venv/Scripts/python.exe scripts/verify_document_storage_live.py --help`，使用指定凭据和随机测试前缀，验证后只清理自身对象。真实模型：`scripts/verify_document_llm_live.py --base-url <私有兼容接口>/v1 --model <已授权模型> --protocol responses`，或通过 `--profile <不含密钥的配置.json>` 保留实际协议、思考参数和上游路由；密钥独立从隐藏输入或 stdin 读取，不改生产供应商。脚本使用内置推荐提示词，不读取后台自定义规则；默认一次发送合成两页文本。`--case pages-200` 验证 200 页、全部段落 ID、首尾编号和超过 2000 字符的单段译文，实际 POST 次数由传输层计数。`--case comic-context` 使用 8 页 20 段合成文本，包含跨页专名、数字与代码、对白片段、拟声和伪指令，以及人名／普通词、成语／反讽、谐音梗、敬语／方言、性别歧义和非血缘称谓反例。只自动校验结构与字面保留，报告中的 12 项 `semantic_review` 保持待评审；否定作用域、梗与双关、关系语气和漫画自然度须另行人工查看合成译文，不能将关键词检查当成准确率。脚本记录提示词版本及结果元数据，不记录正文或凭据。独立预算可用 `--max-output-tokens`、`--timeout-seconds`、`--context-tokens` 等测试参数指定，但不得超过已核实的模型能力。模型列表成功不等于账户有推理权限；这些合成文本检查也不替代真实 OCR、绘图或模型质量验收。

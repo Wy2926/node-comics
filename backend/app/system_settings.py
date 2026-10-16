@@ -1,8 +1,10 @@
 """Versioned administrator settings shared by every API and worker process."""
 from datetime import datetime
+from hashlib import sha256
+import re
 
 from fastapi import APIRouter, Depends
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, select, update
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -13,6 +15,7 @@ from .db import Base, get_db
 from .errors import problem
 from .models import User, now
 from .request_models import RequestBody
+from .translation_prompts import MAX_PROMPT_LENGTH, PROMPT_DEFAULTS
 
 router = APIRouter(prefix="/v1/admin/system-settings", tags=["system settings"])
 
@@ -36,6 +39,18 @@ class RequestLimits(RequestBody):
     guest_daily_limit: int = Field(ge=1, le=100)
     guest_network_daily_limit: int = Field(ge=1, le=1000)
     guest_global_daily_limit: int = Field(ge=1, le=100000)
+    comic_translation_prompt: str = Field(min_length=1, max_length=MAX_PROMPT_LENGTH)
+    comic_title_prompt: str = Field(min_length=1, max_length=MAX_PROMPT_LENGTH)
+
+    @field_validator('comic_translation_prompt', 'comic_title_prompt', mode='before')
+    @classmethod
+    def valid_prompt(cls, value):
+        if not isinstance(value, str):
+            raise ValueError('提示词必须是文本')
+        value = value.replace('\r\n', '\n').replace('\r', '\n')
+        if re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\ud800-\udfff]', value):
+            raise ValueError('提示词不能包含控制字符或无效 Unicode')
+        return value.strip()
 
     @model_validator(mode="after")
     def consistent_limits(self):
@@ -69,7 +84,8 @@ def initialize_system_settings(db):
     if row is not None:
         return row
     cfg = settings()
-    values = RequestLimits.model_validate({name: getattr(cfg, name) for name in RequestLimits.model_fields})
+    values = RequestLimits.model_validate({**{name: getattr(cfg, name)
+        for name in RequestLimits.model_fields if name not in PROMPT_DEFAULTS}, **PROMPT_DEFAULTS})
     if db.get_bind().dialect.name == "postgresql":
         from sqlalchemy.dialects.postgresql import insert
     else:
@@ -81,10 +97,10 @@ def initialize_system_settings(db):
 
 
 def stored_limits(values):
-    # Existing versioned rows predate guest controls. Do not overwrite their
+    # Existing versioned rows predate guest controls and editable prompts. Do not overwrite their
     # settings or versions during reads; a complete PUT persists the new fields.
     return RequestLimits.model_validate({'guest_daily_limit': 5,
-        'guest_network_daily_limit': 100, 'guest_global_daily_limit': 10000, **values})
+        'guest_network_daily_limit': 100, 'guest_global_daily_limit': 10000, **PROMPT_DEFAULTS, **values})
 
 
 def get_request_limits(db):
@@ -94,7 +110,18 @@ def get_request_limits(db):
 
 def settings_json(row):
     return {"version": row.version, "values": stored_limits(row.values).model_dump(),
+            "prompt_defaults": PROMPT_DEFAULTS,
             "updated_at": row.updated_at.isoformat() + "Z", "updated_by": row.updated_by}
+
+
+def audit_settings(value):
+    # Operators may include private terminology; audit identities, not prompt bodies.
+    values = {**value['values']}
+    for name in PROMPT_DEFAULTS:
+        prompt = values[name]
+        values[name] = {'sha256': sha256(prompt.encode()).hexdigest(), 'characters': len(prompt)}
+    return {key: (values if key == 'values' else item)
+            for key, item in value.items() if key != 'prompt_defaults'}
 
 
 @router.get("")
@@ -120,7 +147,8 @@ def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin),
         problem("SYSTEM_SETTINGS_CONFLICT", "系统设置已被其他管理员更新，请刷新后重试", 409,
                 current_version=current)
     result = settings_json(row)
-    record_audit(db, user.id, 'system_settings.update', 'system_settings', '1', before=before, after=result)
+    record_audit(db, user.id, 'system_settings.update', 'system_settings', '1',
+                 before=audit_settings(before), after=audit_settings(result))
     from .notifications import publish
     publish(db, 'policy')
     db.commit()

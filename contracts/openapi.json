@@ -10768,6 +10768,18 @@
             "maximum": 100000.0,
             "minimum": 1.0,
             "title": "Guest Global Daily Limit"
+          },
+          "comic_translation_prompt": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Comic Translation Prompt"
+          },
+          "comic_title_prompt": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Comic Title Prompt"
           }
         },
         "additionalProperties": false,
@@ -10786,7 +10798,9 @@
           "feedback_receipts_per_day",
           "guest_daily_limit",
           "guest_network_daily_limit",
-          "guest_global_daily_limit"
+          "guest_global_daily_limit",
+          "comic_translation_prompt",
+          "comic_title_prompt"
         ],
         "title": "RequestLimits",
         "description": "One immutable operation snapshot; PUT requires every supported field."

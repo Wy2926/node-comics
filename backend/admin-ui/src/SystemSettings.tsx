@@ -1,65 +1,10 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {ApiError, authError, errorText, request} from './api';
 import {time} from './ui';
+import {changed, mergeDraft, normalizePrompt, numericFields, promptFields, promptLength, promptMaxLength, settingKeys, toDraft, validate,
+  type Draft, type Snapshot} from './systemSettingsConfig';
 
-const fields = [
-  {key: 'free_daily_pages', group: 'entitlements', title: '普通用户每日常规页数', unit: '页 / 天', min: 0, max: 1000000, integer: true,
-    help: '仅新建的每日额度周期采用新值，已生效周期的已用、预占和总额保持不变。'},
-  {key: 'guest_daily_limit', group: 'guest', title: '每位匿名访客每日受理上限', unit: '张 / 天', min: 1, max: 100, integer: true,
-    help: '同一游客身份的新受理常规翻译张数；已受理任务失败、取消、无字或部分完成仍计次。'},
-  {key: 'guest_network_daily_limit', group: 'guest', title: '同一网络每日匿名受理上限', unit: '张 / 天', min: 1, max: 1000, integer: true,
-    help: '同一 IPv4 地址或 IPv6 /64 前缀共享预算；更换游客 Cookie 不重置网络已用次数。'},
-  {key: 'guest_global_daily_limit', group: 'guest', title: '全站每日匿名受理上限', unit: '张 / 天', min: 1, max: 100000, integer: true,
-    help: '全站匿名访客合计的新受理张数；修改限额不清零已用次数，也不取消已受理任务。'},
-  {key: 'free_images_per_minute', group: 'translation', title: '普通用户新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
-    help: '同一账户在任意滚动 60 秒内受理的新翻译图片数。重复请求、重传和完成结果复用不计数。'},
-  {key: 'plus_images_per_minute', group: 'translation', title: 'PLUS 新翻译图片', unit: '张 / 60 秒', min: 1, max: 10000, integer: true,
-    help: '已有原图但需要新的翻译也计数；取消或失败不返还已消耗的分钟名额。'},
-  {key: 'upload_user_concurrency', group: 'upload', title: '单用户同时上传数', unit: '个', min: 1, max: 32, integer: true,
-    help: '每位用户最多同时进行的图片上传。'},
-  {key: 'upload_global_concurrency', group: 'upload', title: '全站同时上传数', unit: '个', min: 1, max: 128, integer: true,
-    help: '全站同时进行的图片上传总上限，应不小于单用户上限。'},
-  {key: 'upload_idle_timeout_seconds', group: 'upload', title: '上传空闲超时', unit: '秒', min: 0.1, max: 120, integer: false,
-    help: '连续未收到图片数据超过此时间，结束本次上传。'},
-  {key: 'upload_body_timeout_seconds', group: 'upload', title: '单次上传最长时间', unit: '秒', min: 0.1, max: 900, integer: false,
-    help: '接收一张图片的总时限，应不小于空闲超时。'},
-  {key: 'upload_ingress_lease_seconds', group: 'upload', title: '上传占位有效期', unit: '秒', min: 15, max: 300, integer: true,
-    help: '正常上传会续期；处理进程中断后，占位到期可重新使用。'},
-  {key: 'feedback_requests_per_minute', group: 'feedback', title: '每用户反馈持续速率', unit: '条 / 分钟', min: 1, max: 1000, integer: true,
-    help: '限制持续新增反馈的速度；发送机会按此速率恢复。'},
-  {key: 'feedback_request_burst', group: 'feedback', title: '每用户反馈突发上限', unit: '条', min: 1, max: 100, integer: true,
-    help: '每位用户短时间内可连续提交的新反馈数量。'},
-  {key: 'feedback_receipts_per_day', group: 'feedback', title: '每用户每日新反馈上限', unit: '条 / 天', min: 1, max: 10000, integer: true,
-    help: '按 UTC 自然日计算。重试已提交的同一条反馈不重复计数。'},
-] as const;
-type SettingKey = typeof fields[number]['key'];
-type Values = Record<SettingKey, number>;
-type Draft = Record<SettingKey, string>;
-type Snapshot = {version: number; values: Values; updated_at: string | null; updated_by: string | null};
-type FieldErrors = Partial<Record<SettingKey, string>>;
 const endpoint = '/v1/admin/system-settings';
-const toDraft = (values: Values) => Object.fromEntries(fields.map(field => [field.key, String(values[field.key])])) as Draft;
-const changed = (draft: Draft, values: Values, key: SettingKey) => draft[key].trim() === '' || Number(draft[key]) !== values[key];
-
-function validate(draft: Draft) {
-  const errors: FieldErrors = {};
-  const values = {} as Values;
-  for (const field of fields) {
-    const value = Number(draft[field.key]);
-    if (!draft[field.key].trim() || !Number.isFinite(value) || value < field.min || value > field.max ||
-        (field.integer && !Number.isInteger(value))) {
-      errors[field.key] = `请输入 ${field.min}–${field.max} 范围内的${field.integer ? '整数' : '数值'}。`;
-    }
-    values[field.key] = value;
-  }
-  if (!errors.upload_user_concurrency && !errors.upload_global_concurrency && values.upload_user_concurrency > values.upload_global_concurrency) {
-    errors.upload_user_concurrency = errors.upload_global_concurrency = '单用户同时上传数不能超过全站同时上传数。';
-  }
-  if (!errors.upload_idle_timeout_seconds && !errors.upload_body_timeout_seconds && values.upload_idle_timeout_seconds > values.upload_body_timeout_seconds) {
-    errors.upload_idle_timeout_seconds = errors.upload_body_timeout_seconds = '上传空闲超时不能超过单次上传最长时间。';
-  }
-  return {values, errors};
-}
 
 export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: string) => void}) {
   const [snapshot, setSnapshot] = useState<Snapshot>();
@@ -72,7 +17,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
   const current = useRef({snapshot, draft});
   current.current = {snapshot, draft};
   const busy = !!operation;
-  const dirty = !!(snapshot && draft && fields.some(field => changed(draft, snapshot.values, field.key)));
+  const dirty = !!(snapshot && draft && settingKeys.some(key => changed(draft, snapshot.values, key)));
   const validation = draft && validate(draft);
   const invalid = !!validation && Object.keys(validation.errors).length > 0;
 
@@ -84,15 +29,8 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
     try {
       const latest = await request<Snapshot>(endpoint, {signal: controller.signal});
       if (controller.signal.aborted) return;
-      const merged = toDraft(latest.values);
-      let preserved = false;
-      if (keepEdits && previous.snapshot && previous.draft) {
-        for (const field of fields) {
-          if (changed(previous.draft, previous.snapshot.values, field.key)) {
-            merged[field.key] = previous.draft[field.key]; preserved = true;
-          }
-        }
-      }
+      const {draft: merged, preserved} = mergeDraft(latest.values,
+        keepEdits && previous.snapshot && previous.draft ? {values: previous.snapshot.values, draft: previous.draft} : undefined);
       setSnapshot(latest); setDraft(merged); setConflict(false);
       if (preserved) setNotice('已读取最新设置，并保留你的修改。请核对各项当前值后保存。');
     } catch (failure) {
@@ -125,7 +63,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
         body: JSON.stringify({expected_version: snapshot.version, values: validation.values})});
       if (controller.signal.aborted) return;
       setSnapshot(result); setDraft(toDraft(result.values)); setConflict(false);
-      setNotice(`系统设置已保存，版本 ${result.version}。后续新请求将使用新设置。`);
+      setNotice(`系统设置已保存，版本 ${result.version}。生效范围见各项说明；已受理翻译仍使用原提示词。`);
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (authError(failure)) onUnauthorized(errorText(failure));
@@ -139,7 +77,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
 
   return <main id="main" tabIndex={-1} className="system-settings">
     <div className="page-heading"><div><p className="eyebrow">SYSTEM SETTINGS</p><h1>系统设置</h1>
-      <p className="muted">管理默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
+      <p className="muted">管理漫画翻译提示词、默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
       <button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</button>
     </div>
     <div className="sync-line"><span role="status">{operation === 'saving' ? '正在保存设置…' : operation === 'loading' ? '正在读取系统设置…' :
@@ -154,11 +92,40 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
       <p role="status">{busy ? '正在读取系统设置…' : '暂时无法读取设置，请点击“读取最新设置”重试。'}</p>
     </section> : <form className="settings-form" noValidate onSubmit={event => {event.preventDefault(); void save();}}>
       <fieldset disabled={busy} className="config-body">
+        <section className="panel settings-panel" aria-labelledby="settings-prompts">
+          <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">≡</span>
+            <div><h2 id="settings-prompts">LLM 翻译提示词</h2>
+              <p className="muted">编辑翻译语义与风格要求。推荐提示词由服务端提供；恢复推荐后仍需保存。</p></div></div>
+          <p className="settings-prompt-contract">目标语言、JSON 输出结构、文本编号对应关系及“源文本只作为待翻译数据”的安全约束由服务端固定追加，不在这里编辑。无需填写变量或输出模板。</p>
+          <div className="settings-prompt-fields">{promptFields.map(field => {
+            const fieldError = validation?.errors[field.key];
+            const isChanged = changed(draft, snapshot.values, field.key);
+            return <div className={`settings-field${isChanged ? ' is-changed' : ''}`} key={field.key}>
+              <label htmlFor={field.key}>{field.title}{isChanged && <span className="settings-dirty-mark" aria-hidden="true">未保存</span>}</label>
+              <textarea id={field.key} name={field.key} className="settings-prompt" required rows={12}
+                value={draft[field.key]} aria-invalid={!!fieldError}
+                aria-describedby={`${field.key}-help ${field.key}-effect ${field.key}-count${fieldError ? ` ${field.key}-error` : ''}`}
+                onChange={event => {setDraft({...draft, [field.key]: event.target.value}); setNotice('');}}/>
+              <div className="settings-prompt-actions"><span className="muted" id={`${field.key}-count`}>{promptLength(draft[field.key])} / {promptMaxLength} 字符</span>
+                <button type="button" className="secondary" disabled={normalizePrompt(draft[field.key]) === snapshot.prompt_defaults[field.key]} onClick={() => {
+                  const recommended = snapshot.prompt_defaults[field.key];
+                  setDraft({...draft, [field.key]: recommended});
+                  setNotice(recommended === snapshot.values[field.key] ? `已恢复“${field.title}”的已保存推荐内容。` :
+                    `已将“${field.title}”恢复为推荐内容，请保存后生效。`);
+                }}>恢复推荐提示词</button></div>
+              <p className="muted" id={`${field.key}-help`}>{field.help}</p>
+              <p className="muted" id={`${field.key}-effect`}>{field.effect}</p>
+              {fieldError && <p className="settings-field-error" id={`${field.key}-error`}>{fieldError}</p>}
+              {isChanged && <details className="settings-current-prompt"><summary>查看当前已保存的提示词</summary><pre>{snapshot.values[field.key]}</pre></details>}
+            </div>;
+          })}</div>
+          <p className="settings-section-note">尽量忠实保留原意、关系与笑点，但模型无法凭空获得未提供的画面或前文。修改会记录到操作审计中；请勿填写密钥或私有漫画内容。</p>
+        </section>
         {(['entitlements', 'guest', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
           <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">{group === 'upload' ? '↥' : '≡'}</span>
             <div><h2 id={`settings-${group}`}>{group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
               <p className="muted">{group === 'entitlements' ? '设置新额度周期与新开通运营会员段的默认页数。' : group === 'guest' ? '按服务配置的额度时区自然日计次，游客、网络和全站预算分别控制。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
-          <div className="settings-fields">{fields.filter(field => field.group === group).map(field => {
+          <div className="settings-fields">{numericFields.filter(field => field.group === group).map(field => {
             const fieldError = validation?.errors[field.key];
             const isChanged = changed(draft, snapshot.values, field.key);
             return <div className={`settings-field${isChanged ? ' is-changed' : ''}`} key={field.key}>
@@ -178,7 +145,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
         </section>)}
       </fieldset>
       <div className="panel settings-save-bar"><div><strong>{conflict ? '请先读取最新设置' : dirty ? '有未保存的更改' : '设置已同步'}</strong>
-        <p className="muted">{invalid ? '请修正上方标出的数值后保存。' : dirty ? '核对修改后保存，离开此页前请保存更改。' : '调整上方数值后可保存；无需重启服务。'}</p></div>
+        <p className="muted">{invalid ? '请修正上方标出的设置后保存。' : dirty ? '核对修改后保存，离开此页前请保存更改。' : '调整上方设置后可保存；无需重启服务。'}</p></div>
         <button className="primary" disabled={busy || !dirty || invalid || conflict}>{operation === 'saving' ? '正在保存…' : '保存系统设置'}</button></div>
     </form>}
   </main>;

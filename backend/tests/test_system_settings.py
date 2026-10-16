@@ -1,5 +1,7 @@
 """Shared settings authorization, validation, snapshots and atomic version updates."""
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
+import json
 from threading import Barrier
 from types import SimpleNamespace
 
@@ -17,6 +19,7 @@ from app.db import engine, session_factory
 from app.models import User, now, uid
 from app.system_settings import (RequestLimits, SystemSettings, SystemSettingsUpdate, get_request_limits,
     initialize_system_settings, put_system_settings, router, settings_json)
+from app.translation_prompts import MAX_PROMPT_LENGTH, PROMPT_DEFAULTS
 from test_classic import text_database
 
 DEFAULTS = {
@@ -27,6 +30,7 @@ DEFAULTS = {
     "upload_ingress_lease_seconds": 45, "feedback_requests_per_minute": 30,
     "feedback_request_burst": 10, "feedback_receipts_per_day": 100,
     "guest_daily_limit": 5, "guest_network_daily_limit": 100, "guest_global_daily_limit": 10000,
+    **PROMPT_DEFAULTS,
 }
 PATH = "/v1/admin/system-settings"
 
@@ -46,7 +50,8 @@ def test_main_application_exposes_system_settings(client):
 @pytest.fixture
 def system_case(text_database):
     for name, value in DEFAULTS.items():
-        setattr(settings(), name, value)
+        if name not in PROMPT_DEFAULTS:
+            setattr(settings(), name, value)
     with session_factory()() as db:
         operator = User(id=uid(), subject="settings-admin", name="Admin", role="admin")
         reader = User(id=uid(), subject="settings-reader", name="Reader", role="user")
@@ -69,6 +74,7 @@ def test_only_administrators_can_read_and_change_settings(system_case):
         assert getattr(case.client, method)(PATH, headers=case.reader_auth, **kwargs).status_code == 403
     original = case.client.get(PATH, headers=case.auth).json()
     assert original["version"] == 1 and original["values"] == DEFAULTS
+    assert original["prompt_defaults"] == PROMPT_DEFAULTS
     assert original["updated_by"] is None and original["updated_at"].endswith("Z")
     values = {**DEFAULTS, "upload_user_concurrency": 12, "upload_global_concurrency": 24,
               "feedback_requests_per_minute": 40}
@@ -108,7 +114,8 @@ def test_invalid_values_do_not_change_settings(system_case, change):
 
 def test_complete_values_and_consistent_limits_are_required(system_case):
     case = system_case
-    for field in ("upload_user_concurrency", "guest_daily_limit", "guest_network_daily_limit", "guest_global_daily_limit"):
+    for field in ("upload_user_concurrency", "guest_daily_limit", "guest_network_daily_limit", "guest_global_daily_limit",
+                  *PROMPT_DEFAULTS):
         missing = {name: value for name, value in DEFAULTS.items() if name != field}
         assert case.client.put(PATH, headers=case.auth,
             json={"expected_version": 1, "values": missing}).status_code == 422
@@ -119,6 +126,58 @@ def test_complete_values_and_consistent_limits_are_required(system_case):
         assert response.status_code == 422
         assert response.json()["detail"]["code"] == "SYSTEM_SETTINGS_INVALID"
         assert message in response.json()["detail"]["message"]
+
+
+@pytest.mark.parametrize('field', PROMPT_DEFAULTS)
+@pytest.mark.parametrize('value', [None, True, 123, {}, '', ' \t\r\n ', 'x' * (MAX_PROMPT_LENGTH + 1),
+                                  'x\x00y', 'x\x1by', 'x\x7fy', 'x\x85y'],
+                         ids=['null', 'boolean', 'number', 'object', 'empty', 'whitespace', 'too-long',
+                              'nul', 'escape', 'delete', 'c1-control'])
+def test_invalid_prompt_never_changes_settings(system_case, field, value):
+    case = system_case
+    original = case.client.get(PATH, headers=case.auth).json()
+    response = case.client.put(PATH, headers={**case.auth, 'Content-Type': 'application/json'},
+        content=json.dumps({'expected_version': 1, 'values': {**DEFAULTS, field: value}}))
+    assert response.status_code == 422
+    assert case.client.get(PATH, headers=case.auth).json() == original
+
+
+@pytest.mark.parametrize('field', PROMPT_DEFAULTS)
+def test_invalid_unicode_prompt_uses_production_private_validation_response(client, field):
+    auth = login(client, 'admin')
+    original = client.get(PATH, headers=auth).json()
+    response = client.put(PATH, headers={**auth, 'Content-Type': 'application/json'},
+        content=json.dumps({'expected_version': original['version'],
+                            'values': {**original['values'], field: 'PRIVATE_PROMPT_\ud800'}}))
+    assert response.status_code == 422
+    assert 'PRIVATE_PROMPT' not in response.text and 'input' not in response.text
+    assert client.get(PATH, headers=auth).json() == original
+
+
+def test_prompt_normalization_maximum_length_and_audit_are_private(system_case):
+    from app.admin_audit import AdminAudit
+    case = system_case
+    original = case.client.get(PATH, headers=case.auth).json()
+    guidance = 'Preserve PRIVATE_TERMINOLOGY_术式.\nKeep names.\n\tUse context.'
+    values = {**DEFAULTS, 'comic_translation_prompt': ' \r\n' + guidance.replace('\n', '\r\n') + ' \t',
+              'comic_title_prompt': '漫' * MAX_PROMPT_LENGTH}
+    response = case.client.put(PATH, headers=case.auth, json={'expected_version': 1, 'values': values})
+    assert response.status_code == 200, response.text
+    expected = {**values, 'comic_translation_prompt': guidance}
+    assert response.json()['values'] == expected
+    assert response.json()['prompt_defaults'] == PROMPT_DEFAULTS
+    with session_factory()() as db:
+        assert get_request_limits(db).model_dump() == expected
+        audit = db.scalar(select(AdminAudit).where(AdminAudit.action == 'system_settings.update'))
+        for source, recorded in ((original['values'], audit.before), (expected, audit.after)):
+            assert 'prompt_defaults' not in recorded
+            for field in PROMPT_DEFAULTS:
+                assert recorded['values'][field] == {'sha256': sha256(source[field].encode()).hexdigest(),
+                                                     'characters': len(source[field])}
+            assert recorded['values']['free_daily_pages'] == expected['free_daily_pages']
+        recorded_json = json.dumps([audit.before, audit.after], ensure_ascii=False)
+        assert 'PRIVATE_TERMINOLOGY' not in recorded_json
+        assert all(prompt not in recorded_json for prompt in PROMPT_DEFAULTS.values())
 
 
 def test_environment_only_seeds_once_and_initializer_leaves_commit_to_caller(system_case):
@@ -138,9 +197,10 @@ def test_environment_only_seeds_once_and_initializer_leaves_commit_to_caller(sys
         assert get_request_limits(db).model_dump() == DEFAULTS
 
 
-def test_legacy_row_exposes_guest_defaults_without_mutating_saved_settings(system_case):
+def test_legacy_row_exposes_defaults_without_mutating_saved_settings(system_case):
     case = system_case
-    legacy = {name: value for name, value in DEFAULTS.items() if not name.startswith("guest_")}
+    legacy = {name: value for name, value in DEFAULTS.items()
+              if not name.startswith("guest_") and name not in PROMPT_DEFAULTS}
     with session_factory()() as db:
         db.add(SystemSettings(id=1, version=7, values=legacy, updated_at=now(),
                               updated_by=case.owner_id))

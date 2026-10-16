@@ -1348,7 +1348,16 @@ dialog::backdrop {
 .settings-number {display: flex; align-items: center; gap: 10px;}
 .settings-number input {width: 100%; min-width: 0; max-width: 220px;}
 .settings-number > span {white-space: nowrap; color: var(--muted); font-size: 12px;}
-.settings-field input[aria-invalid=true] {border-color: #c45468; background: #fff9fa;}
+.settings-field input[aria-invalid=true], .settings-field textarea[aria-invalid=true] {border-color: #c45468; background: #fff9fa;}
+.settings-prompt-contract {margin-bottom: 20px; font-size: 12px; color: var(--muted); line-height: 1.7;}
+.settings-prompt-fields {display: grid; gap: 28px;}
+.settings-prompt {width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font: inherit; font-size: 13px; line-height: 1.7; resize: vertical; min-height: 180px;}
+.settings-prompt:focus {outline: 2px solid var(--purple); outline-offset: 2px;}
+.settings-prompt-actions {display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;}
+.settings-prompt-actions > span {font-size: 12px;}
+.settings-current-prompt {font-size: 12px; color: var(--purple);}
+.settings-current-prompt summary {cursor: pointer;}
+.settings-current-prompt pre {white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; margin: 10px 0 0; color: var(--muted);}
 .settings-dirty-mark {color: #79560a; background: #fff3d8; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 500;}
 .settings-field-error {color: #ad3c50; font-size: 12px;}
 .settings-current-value {font-size: 11px; color: var(--purple);}

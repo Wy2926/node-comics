@@ -24,6 +24,7 @@ try{
   assert.equal(state.requests.filter(p=>p==='/v1/translations/events').length,1,'current and prefetch pages share their first SSE connection');
   assert(state.translations.slice(0,4).every(item=>!('priority' in item.body)),'reading order is local scheduling, not a server priority field');
   assert(state.translations.every(item=>/^[a-f0-9-]{36}$/.test(item.id)&&!('page_key' in item.body)&&!('session_id' in item.body)));
+  assert(state.translations.every(item=>!('comic_title' in item.body)),'translation requests must not include work-title context');
   check('current image is submitted first, followed by three independent prefetch images with short UUIDs');
   await page.evaluate(()=>{document.querySelector('.nc-reading-viewport').scrollTop+=4;});
   await page.waitForTimeout(400);assert.equal((await snapshot()).translations.length,state.translations.length);
@@ -110,6 +111,7 @@ try{
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
   state=await snapshot();assert.equal(state.translations.length,submittedBeforeSwitch);
+  assert(!state.requests.some(p=>p.startsWith('/v1/comic-titles/')),'body translation must not query the title translation service');
   assert.deepEqual(errors,[]);
   check('original and translated views preserve a nonzero in-page reading position without resubmission');
   await page.screenshot({path:path.join(out,'switched-position.png')});

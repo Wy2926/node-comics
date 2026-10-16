@@ -47,7 +47,7 @@
 - 支付事件人工重试只重新入队既有事件，先核对渠道环境及处理次数；处理中或已完成事件不能重复入队，一分钟内最多一次人工重试。本站不提供发起退款或争议举证。
 - 订单退款明细分别显示平台累计退款、已记录成功金额和完整性；缺失金额不是零。历史订单核实使用所选订单的渠道／订阅／交易／结账关联。
 
-系统设置的字段、完整保存与生效边界统一见[系统设置](SYSTEM_SETTINGS.md)；付费产品权益由不可变版本管理，见[会员规则](MEMBERSHIP_AND_QUOTAS.md)。
+`#settings` 可编辑漫画正文与漫画名称 LLM 提示词、对照已保存内容并恢复推荐草稿；正文覆盖单图和整本，新任务冻结提示词，已有任务不随保存改变。字段、完整保存、缓存与生效边界统一见[系统设置](SYSTEM_SETTINGS.md)；付费产品权益由不可变版本管理，见[会员规则](MEMBERSHIP_AND_QUOTAS.md)。
 
 ## 运行与构建
 
@@ -107,7 +107,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 | `/v1/admin/billing` | `/orders` 与定向 reconcile；`/events` 及详情／retry；`/subscriptions` 及详情／invoices／terms；`/customers / accounts/{id}` |
 | `/v1/admin/operations` | `/health / users/{id} / uploads / requests / assets / results / statistics` |
 | `/v1/admin/audit` | 管理动作分页检索，仅显示脱敏元数据 |
-| `/v1/admin/system-settings` | GET 当前版本，PUT 完整配置及预期版本 |
+| `/v1/admin/system-settings` | GET 当前版本与推荐提示词，PUT 完整配置（含两项提示词）及预期版本 |
 
 监控与诊断 GET 只读取数据库元数据，不读取图片文件、不调用供应商、不改变队列或结算；状态“有效”不等于已探测对象存在。管理写操作和平台核实按各自业务产生副作用并记录审计。不向页面发送节点令牌、供应商密钥、图片、OCR 或译文全文；反馈评论和管理员处理备注属于有权限的业务记录。
 

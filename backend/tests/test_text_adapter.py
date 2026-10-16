@@ -68,6 +68,7 @@ def test_json_special_characters_survive_both_protocols(profile, monkeypatch, pr
     source = 'Hello, "friend"!\nC:\\comics / 😀'
     translated = '你好，"朋友"！\nC:\\漫画 / 😀'
     segments = [{'id': '01', 'source': source}]
+    frozen_prompt = text.system_prompt('Preserve 幻影術 and character voice; do not guess unclear names.')
     with session_factory()() as db:
         configure_text_provider(db, profile['provider_id'], protocol=protocol)
         revised = snapshot(db, profile['provider_id'])['text']
@@ -75,14 +76,16 @@ def test_json_special_characters_survive_both_protocols(profile, monkeypatch, pr
     def handler(request):
         data = json.loads(request.content)
         prompt = data['messages' if protocol == 'chat_completions' else 'input']
-        assert json.loads(prompt[1]['content']) == {'01': source}
+        assert prompt[0] == {'role': 'system', 'content': frozen_prompt + '\nTarget: "zh-Hans"'}
+        assert len(prompt) == 2
+        assert json.loads(prompt[-1]['content']) == {'01': source}
         reply = json.dumps({'01': translated})
         result = {'choices': [{'message': {'content': reply}, 'finish_reason': 'stop'}]} if protocol == 'chat_completions' else {
             'status': 'completed', 'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': reply}]}]}
         return httpx.Response(200, json=result)
 
     install(monkeypatch, handler)
-    response = text.call_text(segments, 'zh-Hans', revised)
+    response = text.call_text(segments, 'zh-Hans', revised, frozen_prompt)
     assert text.parse_translations(response.content, segments) == {'01': translated}
 
 

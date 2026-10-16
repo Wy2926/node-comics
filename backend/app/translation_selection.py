@@ -1,5 +1,6 @@
 """Public model choices share the same locked entitlement decisions as admission."""
 from .classic_config import profile_snapshot
+from .adapters.text import system_prompt
 from .config import settings
 from .entitlements import admission_policy, free_model_policy, membership_benefits, membership_choices, UNLIMITED
 from .errors import problem
@@ -7,6 +8,7 @@ from .models import now
 from .providers import digest
 from .translation_models import TranslationProvider
 from .translation_providers import _provider_query
+from .system_settings import get_request_limits
 
 
 def policy_resolver(db, user, at=None):
@@ -61,6 +63,7 @@ def select_model(db, user, model_id, at):
         problem('TRANSLATION_MODEL_UNAVAILABLE', '所选模型暂不可用，请重新选择', 503)
     policy, reason = policy_resolver(db, user, at)(row.text_plan_ids)
     config = profile_snapshot({'provider_id': row.id, 'revision_id': row.revision_id,
-                               'channel': row.channel, **row.config})
+                               'channel': row.channel, **row.config},
+                              text_prompt=system_prompt(get_request_limits(db).comic_translation_prompt))
     # Delay access rejection until after account-owned result/in-flight reuse.
     return {**config, 'version': digest(config)}, policy, reason
