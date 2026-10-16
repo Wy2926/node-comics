@@ -15,7 +15,7 @@ sequenceDiagram
     participant F as 中心私有磁盘
     N->>C: 注册、claim 整页租约
     C-->>N: 当前租约、相对输入路径、摘要、检查点
-    N->>C: GET input，节点身份 + 租约令牌
+    N->>C: GET input，节点身份
     C->>F: 读取任务临时原图
     C-->>N: 有界图片字节
     N->>C: analysis 幂等检查点
@@ -32,9 +32,9 @@ sequenceDiagram
 
 ## 传输与信任边界
 
-本节单图路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；单图输入只接受当前租约的精确相对路径，不接受外部 URL、任意跳转或源站凭据。单图原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。文件任务的 R2 传输独立见下节，不改变单图链路。
+本节单图路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；节点下载客户端只接受租约描述中的精确相对路径，不接受外部 URL、任意跳转或源站凭据。单图原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。文件任务的 R2 传输独立见下节，不改变单图链路。
 
-原图 GET 额外携带 `X-Lease-Token`，中心核对节点、租约令牌、代次、取消状态和期限后直接返回字节。已经开始的流式读取有界完成或被客户端中断；取消立即阻止后续读取和交付，不能召回已经下载的字节。节点验证长度与 SHA-256，缓存不延长执行权。
+原图 GET 只验证节点身份，再按租约 ID 定位原图文件；不获取调度锁，不校验租约令牌、节点归属、执行代次、取消状态或处理期限。所有已认证节点均为可信自管节点，可读取路径对应的现存原图；文件删除后不可再读取。服务端读取与节点接收缓冲均为 256 KiB，单次 HTTP 响应流式传输。取消和过期仍阻止执行与交付，节点验证长度与 SHA-256，读取成功不延长执行权。
 
 JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False)` 的 SHA-256；文件摘要直接散列字节。默认日志不写图片、OCR 全文、令牌或原始异常。
 
@@ -47,7 +47,7 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 | `POST /nodes/{id}/updates` | revision、wait_seconds（0–20）、config_version、can_claim、最多 32 项 leases 快照 | revision、claim_ready、变化的 leases；配置变化时带 config；不续租、不领取 |
 | `POST /nodes/{id}/heartbeat` | config_version、leases 中的 lease_id、lease_token、translations_revision、phase | server_time、config、逐项续期／停止／终态；只返回更新的译文 |
 | `POST /leases/{id}/analysis` | lease_token、analysis_hash、analysis | analysis_hash、receipt；有文字时 receipt 为 null，无文字时为稳定终态 |
-| `GET /leases/{id}/input` | 节点头与 X-Lease-Token | 原图二进制；不跳转、不签名 |
+| `GET /leases/{id}/input` | 节点身份头 | 原图二进制；不跳转、不签名 |
 | `PUT /leases/{id}/result` | multipart：一个 metadata 字符串字段、最多一个 output 文件 | 稳定 terminal 回执本体 |
 | `POST /leases/{id}/complete` | lease_token、error:{code}，可带 timings | 错误或停止确认的稳定 terminal 回执；不接受结果图片 |
 

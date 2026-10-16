@@ -1577,18 +1577,6 @@
             }
           },
           {
-            "name": "x-lease-token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 64,
-              "description": "Current lease token; also requires the node Authorization and X-Node-Id headers.",
-              "title": "X-Lease-Token"
-            },
-            "description": "Current lease token; also requires the node Authorization and X-Node-Id headers."
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,

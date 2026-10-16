@@ -12,6 +12,8 @@ from test_compute_v3 import (
     test_recovery_reuses_analysis_and_running_text_without_duplicate_call,
     test_deadline_cannot_be_extended_by_heartbeats,
     test_version_languages_and_direct_input_access,
+    test_input_missing_metadata_or_file_is_unavailable,
+    test_input_streams_256_kib_chunks_without_a_database_transaction,
     test_result_written_before_lost_commit_is_recovered,
     test_upload_is_scoped_frozen_and_validates_container_metadata,
     test_late_direct_upload_cannot_publish_after_cancel_or_new_generation,
@@ -45,6 +47,7 @@ from test_compute_multinode import (
     test_lost_node_work_recovers_on_peer_and_old_lease_cannot_publish,
 )
 from test_compute_fastpaths import (
+    test_input_download_only_reads_identity_and_file_metadata,
     test_full_node_and_replay_do_not_rank_the_queue,
     test_empty_replay_only_probes_existence_and_retry_hint_is_jittered,
     test_capacity_shrink_after_preparation_does_not_trigger_reselection,

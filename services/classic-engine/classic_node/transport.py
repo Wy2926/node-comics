@@ -87,7 +87,7 @@ class Transport:
                 if response.status_code != 200:
                     raise ControlFailure('CONTROL_INVALID_RESPONSE')
                 data = bytearray()
-                for chunk in response.iter_bytes(64 * 1024):
+                for chunk in response.iter_bytes(256 * 1024):
                     check()
                     data.extend(chunk)
                     if len(data) > limit:

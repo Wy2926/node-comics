@@ -55,6 +55,24 @@ def test_input_uses_center_node_and_current_lease_credentials():
         client.close()
 
 
+def test_input_download_receives_256_kib_chunks_and_the_final_tail():
+    data = bytes(range(256)) * 2048 + b'tail'
+    checks = []
+
+    class Body(httpx.SyncByteStream):
+        def __iter__(self):
+            yield data
+
+    client = Transport(config(), control_transport=httpx.MockTransport(
+        lambda _: httpx.Response(200, stream=Body())))
+    try:
+        assert client.download('test', 'lease-secret', metadata(data),
+                               check=lambda: checks.append(True)) == data
+        assert len(checks) == 4  # Before GET, two 256 KiB chunks, then the tail.
+    finally:
+        client.close()
+
+
 @pytest.mark.parametrize('path', ['http://control.example.test/input', 'https://other.example.test/input',
     '//other.example.test/input', PREFIX + '/leases/other/input', PREFIX + '/leases/test/input?token=private',
     PREFIX + '/leases/test/input#fragment', PREFIX + '/leases/test/../other/input'])

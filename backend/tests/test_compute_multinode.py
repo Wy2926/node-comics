@@ -10,7 +10,7 @@ from app import compute_v3, dispatcher, scheduler
 from app.db import session_factory
 from app.models import Job, now
 from app.queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
-from test_compute_v3 import PREFIX, analyze, claim, heartbeat, request, read_input, v3
+from test_compute_v3 import PREFIX, analysis_for, analyze, claim, heartbeat, request, read_input, v3
 from test_node_management import provision
 
 
@@ -194,7 +194,10 @@ def test_idle_or_incompatible_peer_never_reserves_work(v3):
     assert claim(other).json()['leases'] == []
     leases = claim(v3, 4).json()['leases']
     assert len(leases) == 3
-    assert read_input(other, leases[0]).status_code == 403
+    response = read_input(other, leases[0])
+    assert response.status_code == 200
+    assert response.content == read_input(v3, leases[0]).content
+    assert heartbeat(other, [leases[0]]).json()['leases'][0]['status'] == 'stop'
 
 
 def test_lost_node_work_recovers_on_peer_and_old_lease_cannot_publish(v3):
@@ -215,7 +218,13 @@ def test_lost_node_work_recovers_on_peer_and_old_lease_cannot_publish(v3):
     assert second['job_id'] == first['job_id'] and second['generation'] == first['generation'] + 1
     assert heartbeat(v3, [first]).json()['leases'][0]['status'] == 'terminal'
     response = read_input(v3, first)
-    assert response.status_code == 409
+    assert response.status_code == 200
+    assert response.content == read_input(other, second).content
+    from app.providers import digest
+    stale_analysis = analysis_for(first)
+    assert request(v3, f'/leases/{first["lease_id"]}/analysis', {
+        'lease_token': first['lease_token'], 'analysis': stale_analysis,
+        'analysis_hash': digest(stale_analysis)}).status_code == 409
     analyze(other, second, empty=True)
     with session_factory()() as db:
         from app.models import Ledger

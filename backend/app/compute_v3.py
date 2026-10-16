@@ -6,7 +6,7 @@ import random
 from typing import Annotated, Literal
 import time
 
-from fastapi import APIRouter, Depends, Response, Request, Header, HTTPException
+from fastapi import APIRouter, Depends, Response, Request, HTTPException
 from starlette.responses import StreamingResponse
 from starlette.datastructures import UploadFile
 from pydantic import ValidationError, model_validator
@@ -399,32 +399,29 @@ def analysis(lease_id: str, body: AnalysisRequest, identity=Depends(node_auth), 
     return result
 
 
-@router.get('/leases/{lease_id}/input')
-def read_input(lease_id: str, x_lease_token: str = Header(max_length=64,
-               description='Current lease token; also requires the node Authorization and X-Node-Id headers.'),
-               identity=Depends(node_auth), db: Session = Depends(get_db)):
-    lock_scheduler(db)
-    lease, _, job = live_lease(db, lease_id, x_lease_token, identity)
-    source = db.get(Asset, job.input_asset_id)
+@router.get('/leases/{lease_id}/input', dependencies=[Depends(node_auth)])
+def read_input(lease_id: str, db: Session = Depends(get_db)):
+    # Trusted nodes read existing files; execution fencing stays on control routes.
+    source = db.execute(select(Asset.storage_key, Asset.mime, Asset.byte_size)
+        .join(Job, Job.input_asset_id == Asset.id)
+        .join(ExecutionLease, ExecutionLease.job_id == Job.id)
+        .where(ExecutionLease.id == lease_id)).one_or_none()
+    db.rollback()  # Release the read transaction before opening or streaming the file.
+    if source is None:
+        raise ProcessingError('INPUT_UNAVAILABLE', '临时原图不可用，请恢复输入')
     try:
         handle = get_store().path(source.storage_key).open('rb')
     except OSError:
         raise ProcessingError('INPUT_UNAVAILABLE', '临时原图不可用，请恢复输入') from None
-    mime, size = source.mime, source.byte_size
-    try:
-        db.commit()
-    except BaseException:
-        handle.close()
-        raise
 
     def chunks():
         try:
-            while chunk := handle.read(64 * 1024):
+            while chunk := handle.read(256 * 1024):
                 yield chunk
         finally:
             handle.close()
-    return StreamingResponse(chunks(), media_type=mime,
-                             headers={'Content-Length': str(size), 'Cache-Control': 'private, no-store'})
+    return StreamingResponse(chunks(), media_type=source.mime,
+                             headers={'Content-Length': str(source.byte_size), 'Cache-Control': 'private, no-store'})
 
 
 class NodeError(RequestBody):

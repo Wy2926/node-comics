@@ -144,8 +144,8 @@ def deliver(v3, lease, result, data=None, *, token=None):
 
 
 def read_input(v3, lease, *, token=None):
-    return v3['client'].get(lease['input']['path'],
-        headers={**v3['auth'], 'X-Lease-Token': token or lease['lease_token']})
+    headers = {**v3['auth'], **({'X-Lease-Token': token} if token is not None else {})}
+    return v3['client'].get(lease['input']['path'], headers=headers)
 
 
 def test_claim_receipt_capacity_shrink_and_restart(v3):
@@ -278,11 +278,12 @@ def test_mixed_heartbeat_cancellation_and_stopped_ack(v3):
         db.commit()
     reply = heartbeat(v3, [leases[0], {**leases[1], 'lease_token': 'invalid'}, leases[1]]).json()['leases']
     assert [item['status'] for item in reply] == ['stop', 'stop', 'active']
-    assert read_input(v3, leases[0]).status_code == 409
+    assert read_input(v3, leases[0]).status_code == 200
     response = request(v3, f'/leases/{leases[0]["lease_id"]}/complete',
         {'lease_token': leases[0]['lease_token'], 'error': {'code': 'LEASE_STOPPED'}})
     assert response.status_code == 200, response.text
     assert response.json()['job_status'] == 'cancelled'
+    assert read_input(v3, leases[0]).json()['error']['code'] == 'INPUT_UNAVAILABLE'
 
 
 def test_recovery_reuses_analysis_and_running_text_without_duplicate_call(v3):
@@ -381,10 +382,58 @@ def test_version_languages_and_direct_input_access(v3):
     assert response.status_code == 200
     assert hashlib.sha256(response.content).hexdigest() == lease['input']['sha256']
     assert 'no-store' in response.headers['cache-control']
-    assert read_input(v3, lease, token='invalid').status_code == 403
-    assert v3['client'].get(lease['input']['path']).status_code == 401
+    assert read_input(v3, lease, token='invalid').content == response.content
+    for headers in ({}, v3['admin'], {'X-Node-Id': v3['node']['node_id']},
+                    {**v3['auth'], 'Authorization': 'Bearer invalid'},
+                    {**v3['auth'], 'X-Node-Id': 'unknown-node'}):
+        assert v3['client'].get(lease['input']['path'], headers=headers).status_code == 401
     assert request(v3, '/nodes/register', {**v3['registration'], 'protocol_version': 2}).status_code == 422
     assert v3['client'].post('/internal/compute/v2/nodes/register', headers=v3['auth'], json=v3['registration']).status_code == 404
+
+
+@pytest.mark.parametrize('missing', ['lease', 'input', 'file'])
+def test_input_missing_metadata_or_file_is_unavailable(v3, missing):
+    from app.models import Asset
+    v3['create']()
+    lease = claim(v3).json()['leases'][0]
+    with session_factory()() as db:
+        job = db.get(Job, lease['job_id'])
+        if missing == 'lease':
+            lease['input']['path'] = PREFIX + '/leases/missing/input'
+        elif missing == 'input':
+            job.input_asset_id = None
+            db.commit()
+        else:
+            LocalStore().delete(db.get(Asset, job.input_asset_id).storage_key)
+    response = read_input(v3, lease)
+    assert response.status_code == 422
+    assert response.json()['error']['code'] == 'INPUT_UNAVAILABLE'
+
+
+def test_input_streams_256_kib_chunks_without_a_database_transaction(v3, png):
+    import asyncio
+    from app.compute_v3 import read_input as input_response
+
+    buffer = BytesIO()
+    Image.open(BytesIO(png)).save(buffer, 'PNG', compress_level=0)
+    data = buffer.getvalue()
+    user = login(v3['client'], 'input-buffer-reader')
+    asset = upload(v3['client'], user, data)
+    created = create_translation_job(v3['client'], user, asset, key=uuid4().hex, language='en', mode='classic')
+    assert created.status_code == 202
+    lease = claim(v3).json()['leases'][0]
+
+    async def drain(response):
+        return [chunk async for chunk in response.body_iterator]
+
+    with session_factory()() as db:
+        response = input_response(lease['lease_id'], db=db)
+        assert not db.in_transaction()
+        chunks = asyncio.run(drain(response))
+        assert not db.in_transaction()
+    assert [len(chunk) for chunk in chunks] == [256 * 1024, len(data) - 256 * 1024]
+    assert b''.join(chunks) == data
+    assert response.headers['content-length'] == str(len(data))
 
 
 def test_result_written_before_lost_commit_is_recovered(v3, png, monkeypatch):
