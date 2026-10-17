@@ -40,23 +40,32 @@ async function checkStyle(){
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 }
 async function checkRelease(){
-  const checkArtwork=async()=>assert(await page.locator('.nc-release-featured').evaluateAll(cards=>cards.every(card=>{
-    const text=card.querySelector('.nc-release-feature-text').getBoundingClientRect();
-    const art=card.querySelector('.nc-release-feature-art').getBoundingClientRect();
-    return text.right+8<=art.left || art.bottom+4<=text.top;
-  })),'Release text and artwork must not overlap.');
+  const checkLayout=async()=>assert(await page.locator('.nc-release-notes').evaluate(dialog=>{
+    const heading=dialog.querySelector('.nc-release-notes-heading').getBoundingClientRect();
+    const art=dialog.querySelector('.nc-release-cover-art').getBoundingClientRect();
+    const footer=dialog.querySelector('.nc-release-footer button').getBoundingClientRect();
+    return (!art.width || heading.right<=art.left) && footer.top>=0 && footer.bottom<=innerHeight
+      && [...dialog.querySelectorAll('.nc-release-highlights>li')].every(card=>card.scrollWidth<=card.clientWidth);
+  }),'Release content must not overlap or overflow, and closing must stay accessible.');
   await page.goto(`${origin}/tests/account-fixture.html?scenario=member#account`);
-  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','0.11.3'));
+  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','0.12.0'));
   await page.reload();
   const dialog=page.getByRole('dialog'),trigger=page.getByRole('button',{name:`版本更新 · v${version}`,exact:true});
+  await page.locator('.nc-account-heading').waitFor();
+  assert.equal(await dialog.count(),0,'Opening the account must not prompt for release notes.');
+  await page.getByRole('button',{name:'外观与设置',exact:true}).click();
+  await page.locator('.settings-card').first().waitFor();
+  assert.equal(await dialog.count(),0,'Opening settings must not prompt for release notes.');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('nc-release-notes-version')),'0.12.0');
+  await page.getByRole('button',{name:'我的漫画',exact:true}).click();
   await dialog.waitFor();
-  assert((await dialog.innerText()).includes(`v${version}`));
-  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),5);
-  for(const text of ['清晰度优化','nunif / waifu2x','网站目录','官网','PDF','ZIP / CBZ','COMIC FUZ','Zebrack','再漫画','Manga One','Hachiraw','MangaTaro','WebtoonScan'])
+  assert.equal(await dialog.locator('.nc-release-version').innerText(),version);
+  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
+  for(const text of ['首个正式版','双页','翻页','CBZ','ZIP','PDF','22','已有译图'])
     assert((await dialog.innerText()).includes(text));
-  assert(!(await dialog.innerText()).includes('资费大幅降低'));
-  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),5);
-  await checkArtwork();
+  assert(!/资费大幅降低|nunif|waifu2x|官网|升级不会|版本入口|WeLoMa/.test(await dialog.innerText()));
+  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),4);
+  await checkLayout();
   await shot(`release-${version}`);
   await dialog.locator('.nc-release-content').evaluate(element=>element.scrollTop=element.scrollHeight);
   assert(await dialog.locator('.nc-release-footer button').isVisible());
@@ -77,7 +86,7 @@ async function checkRelease(){
     await trigger.click();
     await dialog.waitFor();
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
-    await checkArtwork();
+    await checkLayout();
     await shot(`release-${version}-mobile-${theme}`);
     await page.getByRole('button',{name:'知道了',exact:true}).click();
     await dialog.waitFor({state:'detached'});
@@ -91,16 +100,17 @@ async function checkRelease(){
     await page.locator('.nc-release-trigger').click();
     await dialog.waitFor();
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
-    assert(!(await dialog.innerText()).includes('0.11.3'));
-    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),5);
+    assert(!/0\.11\.3|0\.12\.0/.test(await dialog.innerText()));
+    assert.equal(await dialog.locator('.nc-release-kicker').innerText(),dictionary['releaseNotes.kicker']);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));
-    await checkArtwork();
+    await checkLayout();
     if(locale==='en')await shot(`release-${version}-mobile-en`);
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push(`${version} includes changes since 0.11.3, reopens after upgrade once, restores focus/scroll, and fits 320px large text in 16 locales.`);
+  checks.push(`${version} introduces the first official release with four concise highlights; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales.`);
 }
 try{
   await checkRelease();

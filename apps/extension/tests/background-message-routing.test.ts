@@ -110,6 +110,38 @@ function inlinePort(sender: chrome.runtime.MessageSender) {
   return port;
 }
 
+describe('installation and update navigation', () => {
+  it('opens the library once on first installation', async () => {
+    const create = vi.spyOn(chrome.tabs, 'create');
+    for (const [listener] of vi.mocked(chrome.runtime.onInstalled.addListener).mock.calls)
+      listener({reason: 'install'} as chrome.runtime.InstalledDetails);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(create).toHaveBeenCalledExactlyOnceWith({url: `chrome-extension://${extensionId}/reader.html`});
+  });
+
+  it.each(['update', 'chrome_update', 'shared_module_update'] as const)('keeps %s in the background without opening or activating a tab', async reason => {
+    const existing = {id: 42, url: 'https://source.test/reading'};
+    tabs.set(existing.id, existing);
+    const create = vi.spyOn(chrome.tabs, 'create'), update = vi.spyOn(chrome.tabs, 'update');
+    for (const [listener] of vi.mocked(chrome.runtime.onInstalled.addListener).mock.calls)
+      listener({reason, previousVersion: '0.12.0'} as chrome.runtime.InstalledDetails);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(create).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect([...tabs.values()]).toEqual([existing]);
+  });
+
+  it('does not open the library on browser startup or worker initialization', async () => {
+    expect(tabs.size).toBe(0);
+    const create = vi.spyOn(chrome.tabs, 'create'), update = vi.spyOn(chrome.tabs, 'update');
+    for (const [listener] of vi.mocked(chrome.runtime.onStartup.addListener).mock.calls) listener();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(create).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(tabs.size).toBe(0);
+  });
+});
+
 describe('inline image port authorization', () => {
   const sender: chrome.runtime.MessageSender = {id:extensionId,url:'https://source.test/book',tab:{id:42} as chrome.tabs.Tab,frameId:0,documentId:'document'};
   it.each([{id:'another-extension'},{frameId:1},{tab:undefined}])('rejects an untrusted port sender: %j', async change => {

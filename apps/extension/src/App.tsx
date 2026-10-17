@@ -332,8 +332,7 @@ export function App(){
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
  const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag&&!shortcutScope
    &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
- const releaseNotesActive=!current&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag&&!shortcutScope
-   &&location.hash!=='#sites/request'
+ const releaseNotesActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag&&!shortcutScope
    &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  function nav(value:View){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);location.hash=value;setError('');}
  useShortcuts({

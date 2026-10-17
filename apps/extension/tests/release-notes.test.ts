@@ -7,29 +7,37 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('release notes first use', () => {
-  it('ships changes since 0.11.3 with one package version', async () => {
+  it('ships the first official release with one version and four concise localized highlights', async () => {
     const {releaseNotes} = await import('../src/ui/release-notes/content');
-    expect(version).toBe('0.12.0');
+    expect(version).toBe('1.0.0');
     expect(releaseNotes.version).toBe(version);
     expect(lock.version).toBe(version);
     expect(lock.packages[''].version).toBe(version);
     expect(releaseNotes.highlights.map(item => item.title)).toEqual([
-      'releaseNotes.enhancement.title', 'releaseNotes.directory.title', 'releaseNotes.documents.title',
-      'releaseNotes.sources.title', 'releaseNotes.reliability.title',
+      'releaseNotes.spreads.title', 'releaseNotes.export.title', 'releaseNotes.sources.title', 'releaseNotes.experience.title',
     ]);
-    expect(releaseNotes.highlights.find(item => 'sites' in item)).toMatchObject({
-      sites: ['COMIC FUZ', 'Zebrack', '再漫画', 'Manga One', 'Hachiraw', 'MangaTaro', 'WebtoonScan'],
-    });
     for (const item of releaseNotes.highlights) expect(zh[item.description].trim()).not.toBe('');
-    expect(zh['releaseNotes.intro']).toBe('v{version} · 本次更新亮点。');
-    expect(Object.entries(zh).filter(([key]) => key.startsWith('releaseNotes.')).some(([, value]) => value.includes('0.11.3'))).toBe(false);
-    expect(zh['releaseNotes.enhancement.description']).toContain('nunif / waifu2x');
-    expect(zh['releaseNotes.documents.title']).toContain('官网');
-    expect(zh['releaseNotes.hint']).toContain('默认关闭');
-    expect(Object.keys(zh).filter(key => /^releaseNotes\.(models|subscription|packs|account)\./.test(key))).toEqual([]);
+    expect(zh['releaseNotes.kicker']).toBe('首个正式版');
+    expect(zh['releaseNotes.spreads.title']).toContain('双页');
+    expect(zh['releaseNotes.export.description']).toContain('已有译图');
+    expect(zh['releaseNotes.sources.title']).toContain('22');
+    const dictionaries = import.meta.glob<Record<string, string>>('../src/i18n/dictionaries/*.json', {eager: true, import: 'default'});
+    expect(Object.keys(dictionaries)).toHaveLength(16);
+    const keys = Object.keys(zh).filter(key => key.startsWith('releaseNotes.'));
+    expect(keys).toHaveLength(14);
+    for (const dictionary of Object.values(dictionaries)) {
+      expect(Object.keys(dictionary).filter(key => key.startsWith('releaseNotes.'))).toEqual(keys);
+      for (const key of keys) expect(dictionary[key].trim(), key).not.toBe('');
+      expect(dictionary['releaseNotes.trigger']).toContain('{version}');
+      expect(dictionary['releaseNotes.sources.title']).toContain('22');
+      for (const item of releaseNotes.highlights) expect(dictionary[item.description].length).toBeLessThanOrEqual(160);
+      expect(Object.entries(dictionary).filter(([key]) => key.startsWith('releaseNotes.')).some(([, value]) => /0\.11\.3|0\.12\.0|nunif|waifu2x/.test(value))).toBe(false);
+      expect(keys).not.toContain('releaseNotes.hint');
+      expect(keys).not.toContain('releaseNotes.intro');
+    }
   });
 
-  it.each([null, '0.11.3', `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
+  it.each([null, '0.11.3', '0.12.0', `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
     const setItem = vi.fn();
     vi.stubGlobal('localStorage', {getItem: () => saved, setItem});
     const notes = await import('../src/ui/release-notes/content');

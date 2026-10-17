@@ -84,7 +84,8 @@ node scripts/verify_simple_reading.mjs
 | `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复，以及同 CFI 段内小幅滚动、连续重开的像素级位置保持、字号／屏宽变化后的文字锚点恢复、本书布局独立保存与恢复全局默认。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网；模拟浏览器通过不等同真机通过 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
-| `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明、首次提示、焦点恢复和 16 语大字号布局，`--release-only` 仅检查更新面板。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |
+| `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明只在进入书架后自动提示一次、手动重开、焦点恢复和 16 语大字号布局，`--release-only` 仅检查更新面板。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |
+| `verify_extension_upgrade.mjs` | 构建 Chrome MV3 后在仓库根运行；复制产物到独立 Chromium profile，以旧版本号夹具触发真实升级事件，检查首次安装仅开一个书架标签、升级不新建标签且不改变当前页面和激活状态。使用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，产物写入 artifacts/extension-upgrade，外网禁用；不代表商店自动更新或旧发布包兼容性验收 |
 | `verify_translation_overlay.mjs` | 真实 Chromium 像素、透明度、EXIF/ICC/首帧规范化、摘要与 bbox 校验；可使用实际 LLM 产物验证合成和导出 |
 | `verify_overlay_tiles.mjs [输出目录]` | Vite 5181 与真实 Chromium；以节点实际 WebP 编码生成横／竖 100000 像素样本，核验跨块字形、alpha、长页单覆盖、摘要拒绝、完整缓存命中与淘汰恢复、冻结 PNG 输入再现及 4800 万像素原图读取；另以自制 800×30000 漫画比较 PNG／JPEG 的体积、单次耗时、文字像素误差及截图。需要 Pillow／numpy，`PYTHON` 可指定引擎虚拟环境，`OVERLAY_TEST_WEB` 可指定 Vite origin；不调用模型或供应商 |
 | `verify_overlay_live.py` | 隔离 Docker 中心 + 本机 GPU + 真实文本 LLM；支持静态规范图片或整章目录，逐页保存 UUID、结果与统计，检查结果鉴权和 UUID 重放 |
