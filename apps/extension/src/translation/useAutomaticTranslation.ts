@@ -52,8 +52,13 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     });if(changed)commit({...copy,pages});}
   },[channel,commit]);
   useEffect(()=>{stamp.current++;if(!currentId){windowRef.current.update([]);visible.current=[];wake.current();}},[currentId,language]);
+  // Delivered results belong to the channel, not its language-specific runtime.
   useEffect(()=>{
-    setError('');jobs.current=[];
+    jobs.current=[];
+    return()=>{for(const release of resultReaders.current.values())release();resultReaders.current.clear();};
+  },[channel]);
+  useEffect(()=>{
+    setError('');
     if(!channel?.available)return;
     let stopped=false,running=false,wakePending=false,watching=false,pendingPrefetch=false,retry=0,watchedWindow='',submittedWindow='';
     let watchedIds=new Set<string>();
@@ -117,7 +122,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     };
     document.addEventListener('visibilitychange',foreground);window.addEventListener('online',foreground);window.addEventListener('offline',foreground);window.addEventListener('focus',foreground);
     void core.init().then(()=>{if(live()){render(n=>n+1);void prepareResults();schedule();void watch();}}).catch(e=>{if(live())setError(e.message);});
-    return()=>{stopped=true;watchController.abort();clearTimeout(timer);core.dispose();for(const release of resultReaders.current.values())release();resultReaders.current.clear();wake.current=()=>{};runtime.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('offline',foreground);window.removeEventListener('focus',foreground);};
+    return()=>{stopped=true;watchController.abort();clearTimeout(timer);core.dispose();wake.current=()=>{};runtime.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('offline',foreground);window.removeEventListener('focus',foreground);};
   },[channel,language,attach,commit,prepareResult]);
   useEffect(()=>{if(!channel)return;for(const copy of copies){const changed=applyChannelJobs(copy,jobs.current,channel.scope);if(changed!==copy)commit(changed);}},[copies,channel,commit]);
   const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[],immediate=false)=>{

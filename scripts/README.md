@@ -64,6 +64,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节归属与完整目录 |
 | `verify_comicpash.mjs`、站点 `tests/verify-*.mjs` | 站点协议与浏览器流程，环境及网络范围见各站点 README |
 | `verify_reading_translations.mjs` / `verify_reader_retry.mjs` / `verify_history_removal.mjs` | Vite 5176 模拟阅读器、分钟退避、恢复与重试 |
+| `verify_reader_language_cache.mjs` | Vite 5176 单页模拟服务；真实 React、IndexedDB 与图片解码检查缓存译图语言往返、原译图切换、零重复下载／翻译及阅读位置保持，不调用真实模型 |
 | `verify_reader_translation_status.mjs` | Vite 5176；真实 640×20000 合成图片与模拟服务，检查长图视口内提示、解码等待／失败后仅重载、无文字显式重译及重复点击保护、显示反馈、工具栏与阅读位置；不调用真实翻译模型 |
 | `verify_reading_api.mjs` | 临时 API／worker 与合成供应商，启动顺序见[翻译契约](../docs/READING_TRANSLATION_CONTRACT.md#9-验证入口) |
 | `verify_translation_channels.mjs` / `verify_translation_channel_host.mjs` | 渠道设置、模拟 MTU、后台中断与缓存，见[渠道规范](../docs/TRANSLATION_CHANNELS.md#验证) |
