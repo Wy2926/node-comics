@@ -51,6 +51,7 @@ async function checkRelease(){
   await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','0.12.0'));
   await page.reload();
   const dialog=page.getByRole('dialog'),trigger=page.getByRole('button',{name:`版本更新 · v${version}`,exact:true});
+  const shotRelease=async name=>dialog.screenshot({path:path.join(output,`${name}.png`)});
   await page.locator('.nc-account-heading').waitFor();
   assert.equal(await dialog.count(),0,'Opening the account must not prompt for release notes.');
   await page.getByRole('button',{name:'外观与设置',exact:true}).click();
@@ -67,6 +68,7 @@ async function checkRelease(){
   assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),4);
   await checkLayout();
   await shot(`release-${version}`);
+  await shotRelease(`release-${version}-panel`);
   await dialog.locator('.nc-release-content').evaluate(element=>element.scrollTop=element.scrollHeight);
   assert(await dialog.locator('.nc-release-footer button').isVisible());
   await shot(`release-${version}-details`);
@@ -82,14 +84,35 @@ async function checkRelease(){
     await page.setViewportSize({width:390,height:844});
     await visit(`scenario=member&theme=${theme}&largeText=1`);
     const more=page.getByRole('button',{name:'更多操作 · 主导航',exact:true});
-    if(await more.isVisible())await more.click();
+    if(!await trigger.isVisible() && await more.isVisible())await more.click();
     await trigger.click();
     await dialog.waitFor();
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkLayout();
     await shot(`release-${version}-mobile-${theme}`);
+    await shotRelease(`release-${version}-mobile-${theme}-panel`);
     await page.getByRole('button',{name:'知道了',exact:true}).click();
     await dialog.waitFor({state:'detached'});
+  }
+  for(const [width,height] of [[700,900],[520,780],[844,390]]){
+    await page.setViewportSize({width,height});
+    await visit('scenario=member&largeText=1');
+    const more=page.locator('.nc-header-utilities-trigger');
+    if(!await trigger.isVisible() && await more.isVisible())await more.click();
+    await trigger.click();
+    await dialog.waitFor();
+    await checkLayout();
+    assert(await dialog.locator('.nc-release-content').evaluate(element=>element.clientHeight>0 && element.scrollWidth<=element.clientWidth));
+    await page.locator('.nc-release-close').click();
+  }
+  await page.setViewportSize({width:1440,height:1100});
+  for(const accent of ['sky','rose','mint','iris','amber','slate']){
+    await visit(`scenario=member&theme=dark&accent=${accent}`);
+    await trigger.click();
+    await dialog.waitFor();
+    await checkLayout();
+    if(accent==='sky')await shotRelease(`release-${version}-dark-panel`);
+    await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:320,height:844});
   for(const locale of ['zh-CN','zh-TW','en','ja','ko','fr','de','es','pt-BR','it','ru','uk','pl','tr','vi','id']){
@@ -111,7 +134,7 @@ async function checkRelease(){
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push(`${version} introduces the first official release with four concise highlights; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales.`);
+  checks.push(`${version} introduces the first official release with four concise highlights; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
 }
 try{
   await checkRelease();
