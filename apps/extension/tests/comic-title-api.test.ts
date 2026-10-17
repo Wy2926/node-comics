@@ -10,9 +10,9 @@ describe('comic title API client',()=>{
     const [url,init]=fetch.mock.calls[0];expect(url).toBe('https://api.example/v1/comic-titles/translate');expect(JSON.parse(init.body)).toEqual({name:'星あかりの本屋',target_language:'zh-Hans'});expect(init.signal.aborted).toBe(false);controller.abort();expect(init.signal.aborted).toBe(true);expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token');
   });
   it('counts input code points rather than UTF-16 and does not apply the input limit to responses',async()=>{
-    const fetch=vi.fn().mockResolvedValue(Response.json({name:'a'.repeat(90),target_language:'en'}));vi.stubGlobal('fetch',fetch);const api=new Api('https://api.example');
-    await expect(api.translateComicTitle('𠮷'.repeat(60),'en')).resolves.toMatchObject({name:'a'.repeat(90)});
-    await expect(api.translateComicTitle('𠮷'.repeat(61),'en')).rejects.toMatchObject({status:422});await expect(api.translateComicTitle('a\u0000b','en')).rejects.toMatchObject({status:422});expect(fetch).toHaveBeenCalledTimes(1);
+    const fetch=vi.fn().mockResolvedValue(Response.json({name:'a'.repeat(150),target_language:'en'}));vi.stubGlobal('fetch',fetch);const api=new Api('https://api.example');
+    await expect(api.translateComicTitle('𠮷'.repeat(120),'en')).resolves.toMatchObject({name:'a'.repeat(150)});
+    await expect(api.translateComicTitle('𠮷'.repeat(121),'en')).rejects.toMatchObject({status:422});await expect(api.translateComicTitle('a\u0000b','en')).rejects.toMatchObject({status:422});expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('accepts null but rejects incomplete or malformed responses',async()=>{
     const fetch=vi.fn().mockResolvedValueOnce(Response.json({name:null,target_language:null})).mockResolvedValueOnce(Response.json({name:'Name',target_language:null}));vi.stubGlobal('fetch',fetch);const api=new Api('https://api.example');

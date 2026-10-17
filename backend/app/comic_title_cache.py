@@ -22,7 +22,7 @@ class TitleRecord(Base):
     __tablename__ = 'comic_title_cache'
     input_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     language: Mapped[str] = mapped_column(String(35), primary_key=True)
-    input_name: Mapped[str] = mapped_column(String(60))
+    input_name: Mapped[str] = mapped_column(String(120))
     name: Mapped[str | None] = mapped_column(String(2000))
     output_key: Mapped[str | None] = mapped_column(String(64), index=True)
     actual_language: Mapped[str | None] = mapped_column(String(35))

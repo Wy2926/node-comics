@@ -11201,10 +11201,10 @@
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 60,
+            "maxLength": 120,
             "minLength": 1,
             "title": "Name",
-            "description": "漫画名，最多 60 个 Unicode 字符"
+            "description": "漫画名，最多 120 个 Unicode 字符"
           },
           "target_language": {
             "type": "string",

@@ -108,8 +108,8 @@ export class ComicSearchSession {
     if(this.noSites(siteKeys))return;
     const title=this.snapshot.sourceTitle.trim();
     this.prepare();
-    if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title)){
-      this.emit({phase:'needs-query',titleState:'error',titleError:{kind:'invalid',message:msg('漫画名称需为 1–60 个字符，且不能包含控制字符。')}});return;
+    if(!title||[...title].length>120||/[\p{Cc}\p{Cf}]/u.test(title)){
+      this.emit({phase:'needs-query',titleState:'error',titleError:{kind:'invalid',message:msg('漫画名称需为 1–120 个字符，且不能包含控制字符。')}});return;
     }
     this.startUsage('translated');
     const generation=this.generation,controller=new AbortController();this.nameController=controller;

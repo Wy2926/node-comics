@@ -39,7 +39,7 @@ TITLE_INSTRUCTIONS = title_instructions(COMIC_TITLE_PROMPT)
 
 
 class TitleTranslationRequest(RequestBody):
-    name: str = Field(min_length=1, max_length=60, description='漫画名，最多 60 个 Unicode 字符')
+    name: str = Field(min_length=1, max_length=120, description='漫画名，最多 120 个 Unicode 字符')
     target_language: str = Field(min_length=2, max_length=35, pattern=LANGUAGE_PATTERN, description='目标语言代码，原样交给 LLM 选择适合的译名及实际语言')
 
     @field_validator('name')

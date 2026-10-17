@@ -20,6 +20,15 @@ beforeEach(()=>analytics.track.mockClear());
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
 
 describe('comic search session',()=>{
+  it('accepts 120 source title code points and rejects 121 without another request',async()=>{
+    const {session,deps}=setup();const title='𠮷'.repeat(120);
+    session.setSourceTitle(` ${title} `);await session.searchWithTranslatedTitle();
+    expect(deps.translateTitle).toHaveBeenCalledWith(title,'zh-Hans',expect.any(AbortSignal));
+    expect(session.getSnapshot().titleState).toBe('resolved');
+    session.setSourceTitle(title+'𠮷');await session.searchWithTranslatedTitle();
+    expect(deps.translateTitle).toHaveBeenCalledTimes(1);expect(deps.search).toHaveBeenCalledTimes(2);
+    expect(session.getSnapshot().titleError?.kind).toBe('invalid');
+  });
   it('applies a visible-site batch once, preserves hidden sites and ignores unchanged or unknown keys',()=>{
     const {session,deps}=setup({},Array.from({length:44},(_,index)=>site(String(index))));
     const listener=vi.fn();session.subscribe(listener);
@@ -178,7 +187,7 @@ describe('comic search session',()=>{
     session.searchManual('手动名称');await flush();expect(session.getSnapshot().results).toHaveLength(2);expect(deps.translateTitle).toHaveBeenCalledTimes(2);
   });
   it('keeps oversized resolved names editable instead of applying the API input length budget or searching an oversized query',async()=>{
-    const resolve=vi.fn().mockResolvedValueOnce({name:'名'.repeat(80),target_language:'zh-Hans'}).mockResolvedValueOnce({name:'名'.repeat(180),target_language:'zh-Hans'});
+    const resolve=vi.fn().mockResolvedValueOnce({name:'名'.repeat(150),target_language:'zh-Hans'}).mockResolvedValueOnce({name:'名'.repeat(180),target_language:'zh-Hans'});
     const {session,deps}=setup({translateTitle:resolve});await session.searchWithTranslatedTitle();await flush();expect(deps.search).toHaveBeenCalledTimes(2);
     session.setSourceTitle('另一作品');await session.searchWithTranslatedTitle();expect(session.getSnapshot().query).toHaveLength(180);expect(session.getSnapshot().phase).toBe('needs-query');expect(deps.search).toHaveBeenCalledTimes(2);
   });

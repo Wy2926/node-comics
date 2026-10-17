@@ -6,7 +6,7 @@ from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, create_engine, event, inspect, text
 
-HEAD = "document_workspaces_0018"
+HEAD = "comic_title_length_0019"
 NEW_TABLES = {"guest_sessions", "guest_daily_usage", "guest_daily_budgets", "quota_campaigns", "quota_campaign_awards", "quota_periods", "comic_title_cache", "system_settings",
               "translation_providers", "translation_provider_revisions", "billing_accounts",
               "billing_customers", "billing_price_bindings", "billing_orders", "billing_order_transitions", "billing_plans", "billing_plan_revisions", "billing_prices", "billing_terms", "billing_checkouts", "billing_subscriptions", "billing_events", "billing_invoices", "compute_claims", "upload_reservations", "translation_requests",
@@ -174,6 +174,27 @@ def test_title_cache_upgrade_preserves_existing_baseline_data(isolated_migration
             'support_request_admissions', 'upload_ingress_leases', 'upload_ingress_mutex',
             'translation_provider_requests'} & set(inspect(connection).get_table_names())
     assert_current_schema_matches_models(isolated_migration_database)
+
+
+def test_title_length_upgrade_preserves_cached_results_and_claims(isolated_migration_database):
+    from datetime import datetime
+    from app.comic_title_cache import TitleRecord
+    from app.models import User
+    from test_job_results_migration import migrate
+    engine, cache = isolated_migration_database, TitleRecord.__table__
+    migrate(engine, 'document_workspaces_0018')
+    with engine.begin() as connection:
+        connection.execute(User.__table__.insert().values(id='title-owner', subject='title-owner', name='fixture'))
+        connection.execute(cache.insert().values(input_key='a' * 64, language='en', input_name='漫' * 60,
+            name='Cached Title', output_key='b' * 64, actual_language='en', created_by='title-owner', ready=True))
+        connection.execute(cache.insert().values(input_key='c' * 64, language='en', input_name='待查询',
+            ready=False, token='title-claim', lease_until=datetime(2026, 10, 17)))
+        before = connection.execute(cache.select().order_by(cache.c.input_key)).all()
+    migrate(engine, 'head')
+    with engine.connect() as connection:
+        assert connection.execute(cache.select().order_by(cache.c.input_key)).all() == before
+        column = next(column for column in inspect(connection).get_columns('comic_title_cache') if column['name'] == 'input_name')
+        assert column['type'].length == 120 and not column['nullable']
 
 
 def test_gift_upgrade_preserves_calendar_segment_and_used_reserved_bucket(isolated_migration_database):

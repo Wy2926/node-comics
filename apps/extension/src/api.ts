@@ -68,7 +68,7 @@ export class Api {
   }
   async translateComicTitle(name:string,targetLanguage:string,signal?:AbortSignal):Promise<ComicTitleTranslation> {
     const title=name.trim();
-    if(!title||[...title].length>60||/[\p{Cc}\p{Cf}]/u.test(title))throw new ApiError(msg('漫画名称需为 1–60 个字符，且不能包含控制字符。'),'INVALID_COMIC_TITLE',422);
+    if(!title||[...title].length>120||/[\p{Cc}\p{Cf}]/u.test(title))throw new ApiError(msg('漫画名称需为 1–120 个字符，且不能包含控制字符。'),'INVALID_COMIC_TITLE',422);
     const result=await this.request<ComicTitleTranslation>('/v1/comic-titles/translate',{method:'POST',body:JSON.stringify({name:title,target_language:targetLanguage}),signal});
     if(!result||!((result.name===null&&result.target_language===null)||(typeof result.name==='string'&&!!result.name.trim()&&typeof result.target_language==='string'&&!!result.target_language.trim())))throw new ApiError(msg('名称服务返回了无效结果，请手动输入搜索名称。'),'INVALID_COMIC_TITLE_RESPONSE');
     return result;
