@@ -13,6 +13,7 @@ from classic_node.timing import record, stage, waiting_for
 from .assets import activate
 from .colors import ensure_stroke_contrast
 from .fonts import FONT_CHOICES, font_filename
+from .layout import associate_bubbles, fit_bubbles
 from .page_cache import page_images
 
 LANGUAGES = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'ko': 'KOR', 'en': 'ENG',
@@ -45,7 +46,8 @@ def serialize_region(region):
             'prob': float(region.prob), 'direction': region._direction,
             'default_stroke_width': float(region.default_stroke_width),
             'adjust_bg_color': bool(region.adjust_bg_color),
-            'line_spacing': float(region.line_spacing), 'letter_spacing': float(region.letter_spacing)}
+            'line_spacing': float(region.line_spacing), 'letter_spacing': float(region.letter_spacing),
+            'bubble_enclosed': getattr(region, 'bubble_enclosed', None)}
 
 
 class Renderer:
@@ -112,6 +114,7 @@ class Renderer:
             if not text.strip():
                 continue
             block = TextBlock(**data)
+            block.bubble_enclosed = data.get('bubble_enclosed')
             ensure_stroke_contrast(block)
             block.translation = text
             block.target_lang = target
@@ -134,6 +137,7 @@ class Renderer:
         with self._lock:
             if bubble_mask is not None and not bubble_prepared:
                 with stage('render_bubble_prepare'):
+                    associate_bubbles(blocks, bubble_mask)
                     bubble_mask = erode_bubble_mask(bubble_mask, 0.02)
             return self._render_blocks(original, cleaned, blocks, language, config, bubble_mask,
                                        bubble_components, mask_cache_bytes)
@@ -152,10 +156,11 @@ class Renderer:
                 # Reuse the same native 2% inset and labels as solid-fill.
                 labels = cached_bubble_labels(bubble_mask)
             for block in blocks:
-                # Use MTU's own enclosure test. A text detection rectangle or a
-                # partially overlapping segmentation is not a layout container.
-                inside = labels is not None and _region_lines_fully_inside_mask(
-                    block, build_region_reference_mask(block, bubble_mask, labels))
+                # Ownership uses the original mask, not its inset for padding.
+                # Legacy/direct prepared inputs without metadata stay strict.
+                inside = block.bubble_enclosed if block.bubble_enclosed is not None else (
+                    labels is not None and _region_lines_fully_inside_mask(
+                        block, build_region_reference_mask(block, bubble_mask, labels)))
                 (enclosed if inside else free).append(block)
             enclosed_texts = [block.translation for block in enclosed]
             if language not in ('zh-Hans', 'zh-Hant', 'ja'):
@@ -223,10 +228,13 @@ class Renderer:
                         text_render.set_font(block.font_family)
                         _apply_default_english_line_break_method(
                             block, round(block.font_size), None, config)
-                # Keep scaling enabled: upstream fits the actual mask, retains
-                # its layout anchor and handles paragraphs in a shared bubble.
+                enclosed, points = fit_bubbles(rendered, original, enclosed, enclosed_texts, config,
+                                               bubble_mask, labels, [block.dst_points for block in free])
+                # Layout and final scale are already resolved. Native painting
+                # uses those exact sizes/anchors without a second fit or scale.
                 rendered = asyncio.run(dispatch(rendered, enclosed, config, original,
-                    bubble_mask=bubble_mask, skip_text_replacements=True))
+                    bubble_mask=bubble_mask, skip_font_scaling=True, skip_text_replacements=True,
+                    layout_points=points))
             return rendered
 
 
@@ -386,6 +394,7 @@ class Engine:
                 detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
             with stage('analyze_bubble_mask'):
                 bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
+                associate_bubbles(regions, bubbles)
             with stage('analyze_refine'):
                 mask = await refine(regions, rgb, raw, dilation_offset=c.mask_dilation_offset,
                                     kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,

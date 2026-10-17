@@ -1,5 +1,6 @@
 """Real Qt/GPU acceptance; MTU_TEST_ASSETS opts in, MTU_TEST_BACKEND defaults to CUDA."""
 from concurrent.futures import ThreadPoolExecutor
+import math
 import json
 import os
 from pathlib import Path
@@ -84,6 +85,30 @@ def test_style_value_copy_keeps_all_mutable_children_independent(assets):
     assert style.stroke.color == '#111111' and style.outer_stroke.width == .2
     assert style.glow.blur == 3 and style.transform.scale_x == 2
     assert TextStyle().copy() == TextStyle()
+
+
+@pytest.mark.parametrize('shape', [(80, 150), (800, 800), (777, 1103)])
+def test_lama_scaling_preserves_thin_masks_and_original_paste_boundary(assets, shape):
+    from types import SimpleNamespace
+    Renderer(*assets)
+    from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter, resize_keep_aspect
+    image = np.full((*shape, 3), 29, np.uint8)
+    mask = np.zeros(shape, np.uint8)
+    mask[:, shape[1] // 3] = 255
+    mask[0, :shape[1] // 2] = 255
+    mask[-1, -10:] = 255
+    original = mask.copy()
+    mask.flags.writeable = False
+    owner = SimpleNamespace(logger=SimpleNamespace(info=lambda *args: None))
+    prep = LamaLargeInpainter._prepare_large_image(owner, image, mask, 512)
+    if max(shape) > 512:
+        coverage = resize_keep_aspect(mask.astype(np.float32), 512) > 0
+        assert np.all(prep['mask_resized'][:, :, 0][coverage] > 0)
+    model_output = np.full(prep['image_pad'].shape, 230, np.uint8)
+    result = LamaLargeInpainter._restore_large_output(owner, model_output, prep)
+    assert np.all(result[mask > 0] == 230)
+    np.testing.assert_array_equal(result[mask == 0], image[mask == 0])
+    np.testing.assert_array_equal(mask, original)
 
 
 def test_inpaint_crop_copy_cleanup_preserves_overlapping_window_order(assets):
@@ -375,6 +400,109 @@ def test_font_choices_survive_real_render_process_pool(assets, offline):
             assert list(workers.map(draw, choices * 2)) == expected * 2
     finally:
         pool.close()
+
+
+def private_layout_cases():
+    manifest = os.environ.get('MTU_TEST_LAYOUT_CASES')
+    if not manifest:
+        return [pytest.param(None, id='private-pages-disabled')]
+    path = Path(manifest).resolve()
+    return [pytest.param((path.parent, row), id=Path(row['image']).stem)
+            for row in json.loads(path.read_text(encoding='utf-8'))]
+
+
+@pytest.mark.parametrize('case', private_layout_cases())
+def test_private_page_refinement_preserves_detected_text(assets, case):
+    if case is None:
+        pytest.skip('Set MTU_TEST_LAYOUT_CASES to a private page manifest')
+    import asyncio
+    import cv2
+    from PIL import Image
+    from classic_node.runtime import decode_mask
+    from mtu_engine.engine import configuration
+    Renderer(*assets)
+    from manga_translator.mask_refinement import dispatch, _build_line_protect_mask
+    from manga_translator.utils import TextBlock
+    root, row = case
+    original = np.asarray(Image.open(root / row['image']).convert('RGB'))
+    analysis = json.loads((root / row['analysis']).read_text(encoding='utf-8'))
+    raw, bubbles = [decode_mask(analysis, key, original.shape[1::-1]) for key in ('raw_mask', 'bubble_mask')]
+    blocks = [TextBlock(**r) for r in analysis['regions']]
+    config = configuration()
+    mask = asyncio.run(dispatch(blocks, original, raw, bubble_mask=bubbles,
+        dilation_offset=config.mask_dilation_offset, kernel_size=config.kernel_size,
+        limit_mask_dilation_to_bubble_mask=True))
+    support = cv2.dilate(cv2.compare(raw, 0, cv2.CMP_GT), None, iterations=2)
+    selected = _build_line_protect_mask(blocks, original.shape[:2], expand_px=2 + config.kernel_size // 2)
+    assert np.all(mask[(support > 0) & (selected > 0)] == 255)
+    assert not np.shares_memory(mask, raw) and not np.shares_memory(mask, bubbles)
+    # A fresh production checkpoint must use exactly the tested repair mask.
+    np.testing.assert_array_equal(mask, decode_mask(analysis, 'mask', original.shape[1::-1]))
+
+
+@pytest.mark.parametrize('case', private_layout_cases())
+@pytest.mark.parametrize('language', ['zh-Hans', 'en'])
+@pytest.mark.parametrize('cache_bytes', [0, None])
+def test_private_page_layout_replays_fixed_checkpoints(bubble_layout, case, language, cache_bytes):
+    """Opt-in private pages: real Qt, unchanged GPU checkpoint and fixed text."""
+    if case is None:
+        pytest.skip('Set MTU_TEST_LAYOUT_CASES to a private page manifest')
+    import hashlib
+    import cv2
+    from PIL import Image
+    from classic_node.runtime import decode_mask
+    from manga_translator.utils import build_region_reference_mask, erode_bubble_mask
+    root, row = case
+    if row.get('language', language) != language:
+        pytest.skip('Private fixture supplies another target language')
+    source_path = root / row['image']
+    analysis = json.loads((root / row['analysis']).read_text(encoding='utf-8'))
+    assert hashlib.sha256(source_path.read_bytes()).hexdigest() == analysis['input_hash']
+    original = np.asarray(Image.open(source_path).convert('RGB'))
+    cleaned = np.asarray(Image.open(root / row['cleaned']).convert('RGB'))
+    repair_mask = decode_mask(analysis, 'mask', original.shape[1::-1])
+    np.testing.assert_array_equal(cleaned[repair_mask == 0], original[repair_mask == 0])
+    # Optional clean-only ROIs catch old glyphs before the new text can hide them.
+    # Keep private pixels/coordinates outside the repository; textured ROIs can
+    # specify their own background tolerance instead of requiring blanket white.
+    for check in row.get('clean_checks', []):
+        x1, y1, x2, y2 = check['bbox']
+        dark = np.max(cleaned[y1:y2, x1:x2], axis=2) < check.get('dark_below', 160)
+        assert np.count_nonzero(dark) <= check['max_dark_pixels'], check['bbox']
+    translated = json.loads((root / row['translations']).read_text(encoding='utf-8'))[source_path.name]
+    texts = [translated[s['id']] if language == row.get('language', 'zh-Hans') else s['source']
+             for s in analysis['segments']]
+    inset = erode_bubble_mask(decode_mask(analysis, 'bubble_mask', original.shape[1::-1]), .02)
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(inset, connectivity=8)
+    renderer, observed, native = bubble_layout
+    result = renderer.render(original, cleaned, analysis['regions'], texts, language, inset,
+        bubble_prepared=True, bubble_components=(labels, stats), mask_cache_bytes=cache_bytes)
+    assert result.shape == original.shape and np.any(result != cleaned)
+    assert len(observed) == len(texts)
+    expected = {tuple(np.asarray(region['lines']).ravel()): text
+                for region, text in zip(analysis['regions'], texts, strict=True)}
+    allowed = inset.copy()
+    height, width = original.shape[:2]
+    for index, block in enumerate(observed):
+        text = expected[tuple(block.lines.ravel())]  # Source geometry must not be rewritten.
+        actual = re.sub(r'\s*\[BR\]\s*', ' ' if language == 'en' else '', block.translation)
+        # Normal words stay intact. A narrow-caption recovery may introduce
+        # line-end hyphens; joining those must restore the original words.
+        joined = re.sub(r'-\[BR\]', '', block.translation).replace('[BR]', ' ')
+        expected_tokens = re.findall(r'\w+|[^\w\s]', text)
+        assert (re.findall(r'\w+|[^\w\s]', actual) == expected_tokens or
+                (language == 'en' and re.findall(r'\w+|[^\w\s]', joined) == expected_tokens))
+        assert block.font_size > 0
+        points = block.dst_points.reshape(-1, 2)
+        assert (points >= (1, 1)).all() and (points <= (width - 1, height - 1)).all()
+        if block.bubble_enclosed:
+            reference = build_region_reference_mask(block, inset, labels)
+            assert native._polygon_fully_inside_mask(points, reference)
+        else:
+            cv2.fillPoly(allowed, [np.rint(points).astype(np.int32)], 255)
+        for neighbor in observed[index+1:]:
+            assert not native._polygons_overlap(points, neighbor.dst_points)
+    assert not np.any(np.any(result != cleaned, axis=2) & (allowed == 0))
 
 
 @pytest.mark.parametrize(('language', 'text'), [
@@ -838,7 +966,7 @@ def test_translated_glyphs_stay_inside_bubble_mask(assets, offline, monkeypatch,
     models, fonts = assets
     renderer = Renderer(models, fonts)
     from manga_translator import rendering
-    from manga_translator.utils import TextBlock
+    from manga_translator.utils import TextBlock, erode_bubble_mask
     source = np.full((500, 600, 3), 255, dtype=np.uint8)
     block = TextBlock(np.array([[[230, 130], [350, 130], [350, 340], [230, 340]]]),
                       ['source'], font_size=56, direction='v')
@@ -858,9 +986,26 @@ def test_translated_glyphs_stay_inside_bubble_mask(assets, offline, monkeypatch,
     assert not np.any(painted & (mask == 0))
     assert re.sub(r'\s*\[BR\]\s*', ' ', observed[0].translation).split() == text.split()
     assert observed[0].font_size < block.font_size
-    # A narrow CJK source box must not force one tiny word per line forever.
-    assert observed[0].font_size >= 26
-    assert observed[0].translation.count('[BR]') < (4 if language == 'vi' else 8)
+    # Line counts and nominal sizes vary with the selected font. Keep whole
+    # words and verify the largest safe size, not the retired Bangers metrics.
+    assert_maximum_scaled_font(observed[0], erode_bubble_mask(mask, .02))
+
+
+def assert_maximum_scaled_font(block, mask):
+    """Measure actual glyphs, not a font-specific historical pixel-size floor."""
+    from mtu_engine.engine import configuration
+    from manga_translator import rendering
+    config = configuration()
+    config._current_region = block
+    rendering.text_render.set_font(block.font_family)
+    # The smallest layout font that could raise the final scaled size by 1px.
+    next_size = math.ceil((block.font_size + 1) / config.render.font_scale_ratio)
+    points = rendering._calc_region_dst_points_for_font(
+        region=block, font_size=next_size, render_horizontally=block.horizontal,
+        line_spacing_multiplier=block.line_spacing, letter_spacing_multiplier=block.letter_spacing,
+        config=config, anchor_mode='center')
+    assert rendering._polygon_fully_inside_mask(block.dst_points[0], mask)
+    assert not rendering._polygon_fully_inside_mask(points[0], mask)
 
 
 @pytest.mark.parametrize('text', ['NEW', 'STOP!', 'سلام'])
@@ -891,12 +1036,13 @@ def test_single_word_preserves_characters_without_internal_breaks(assets, offlin
     ('de', 'WUNDERSCHÖN.', 'hole'),
     ('de', 'WUNDERSCHÖN.', 'neighbor'),
 ])
-def test_single_word_uses_enclosing_bubble_without_splitting(assets, offline, monkeypatch, language, text, shape):
+@pytest.mark.parametrize('font_id', [None, 'patrick-hand'])
+def test_single_word_uses_enclosing_bubble_without_splitting(assets, offline, monkeypatch, language, text, shape, font_id):
     import cv2
     models, fonts = assets
     renderer = Renderer(models, fonts)
     from manga_translator import rendering
-    from manga_translator.utils import TextBlock
+    from manga_translator.utils import TextBlock, erode_bubble_mask
     source = np.full((1000, 500, 3), 255, dtype=np.uint8)
     # Actual narrow vertical source geometry; target words must fit the bubble,
     # not stay trapped inside the original 43px-wide OCR rectangle.
@@ -918,23 +1064,23 @@ def test_single_word_uses_enclosing_bubble_without_splitting(assets, offline, mo
         return result
 
     monkeypatch.setattr(rendering, 'dispatch', capture)
-    free_output = renderer.render(source, source, [region], [text], language, None)
+    free_output = renderer.render(source, source, [region], [text], language, None, font_id=font_id)
     free_mode, free = observed.pop()
     assert free_mode == 'smart_scaling' and free.translation == text
     assert np.any(free_output != source) and 0 < free.font_size < 20
-    output = renderer.render(source, source, [region], [text], language, mask)
+    output = renderer.render(source, source, [region], [text], language, mask, font_id=font_id)
     mode, enclosed = observed.pop()
     painted = np.any(output != source, axis=2)
     assert mode == 'balloon_fill' and painted.any()
     assert enclosed.translation == text and '[BR]' not in enclosed.translation
     assert not np.any(painted & (mask == 0))
     assert enclosed.font_size > 0
-    if shape != 'hole':
-        assert enclosed.font_size >= 20
+    assert enclosed.font_size > free.font_size
+    assert_maximum_scaled_font(enclosed, erode_bubble_mask(mask, .02))
     if shape == 'neighbor':
         assert not np.any(painted[:, 355:])
     # No per-page layout state may turn a later uncontained word into a bubble.
-    assert np.array_equal(renderer.render(source, source, [region], [text], language, None), free_output)
+    assert np.array_equal(renderer.render(source, source, [region], [text], language, None, font_id=font_id), free_output)
 
 
 @pytest.mark.parametrize(('texts', 'lefts', 'shape'), [
@@ -1000,3 +1146,317 @@ def test_long_translation_near_page_edge_preserves_all_words(assets, offline, mo
     assert points[:, 0].min() >= 1 and points[:, 0].max() <= 599
     assert points[:, 1].min() >= 1 and points[:, 1].max() <= 399
     assert re.sub(r'\s*\[BR\]\s*', ' ', observed[0].translation).split() == text.split()
+
+
+@pytest.fixture
+def bubble_layout(assets, offline, monkeypatch):
+    """Real Qt pixels and final native boxes; no OCR or model inference."""
+    renderer = Renderer(*assets)
+    from manga_translator import rendering
+    dispatch, observed = rendering.dispatch, []
+
+    async def capture(*args, **kwargs):
+        result = await dispatch(*args, **kwargs)
+        observed.extend(args[1])
+        return result
+
+    monkeypatch.setattr(rendering, 'dispatch', capture)
+    return renderer, observed, rendering
+
+
+@pytest.mark.parametrize('edge', ['left', 'right'])
+@pytest.mark.parametrize('cache_bytes', [0, None])
+@pytest.mark.parametrize('font_id', [None, 'noto-sans'])
+def test_narrow_caption_recovers_font_with_bounded_native_hyphenation(
+        bubble_layout, monkeypatch, edge, cache_bytes, font_id):
+    from manga_translator.utils import TextBlock, erode_bubble_mask
+    renderer, observed, native = bubble_layout
+    image = np.full((400, 300, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    x = 0 if edge == 'left' else 260
+    mask[10:390, x:x+40] = 255
+    region = serialize_region(TextBlock([[[x+8, 30], [x+30, 30], [x+30, 370], [x+8, 370]]],
+        ['source'], font_size=24, direction='v'))
+    snapshot = json.loads(json.dumps(region))
+    text = 'Extraordinary circumstances / Please proceed carefully.'
+    with monkeypatch.context() as baseline:
+        baseline.setattr(native.text_render, 'select_hyphenator', lambda *_: None)
+        renderer.render(image, image, [region], [text], 'en', mask,
+                        mask_cache_bytes=cache_bytes, font_id=font_id)
+    before = observed.pop()
+    calls, rectangle = [], native.find_largest_inscribed_rect
+
+    def counted(value):
+        calls.append(value.shape)
+        return rectangle(value)
+
+    monkeypatch.setattr(native, 'find_largest_inscribed_rect', counted)
+    result = renderer.render(image, image, [region], [text], 'en', mask,
+                             mask_cache_bytes=cache_bytes, font_id=font_id)
+    after = observed.pop()
+    assert region == snapshot
+    assert len(calls) == 1 and calls[0][1] < image.shape[1]  # One local alternative, never a page search.
+    assert after.font_size > before.font_size
+    assert '-[BR]' in after.translation
+    assert re.sub(r'-\[BR\]', '', after.translation).replace('[BR]', ' ').split() == text.split()
+    assert native._polygon_fully_inside_mask(after.dst_points[0], erode_bubble_mask(mask, .02))
+    points = after.dst_points.reshape(-1, 2)
+    assert (points >= (1, 1)).all() and (points <= (299, 399)).all()
+    painted = np.any(result != image, axis=2)
+    assert painted.any() and not np.any(painted & (erode_bubble_mask(mask, .02) == 0))
+    np.testing.assert_array_equal(after.lines, np.asarray(region['lines']))
+
+
+@pytest.mark.parametrize(('language', 'text', 'narrow'), [
+    ('en', 'Extraordinary circumstances / Please proceed carefully.', False),
+    ('en', 'Extraordinary[BR]circumstances / Please proceed carefully.', True),
+    ('en', 'Extraordinary', True),
+    ('ar', 'هذه ظروف استثنائية يرجى المتابعة بحذر', True),
+])
+def test_hyphenation_recovery_preserves_normal_explicit_single_and_unsupported_layouts(
+        bubble_layout, monkeypatch, language, text, narrow):
+    from manga_translator.utils import TextBlock
+    renderer, observed, native = bubble_layout
+    image = np.full((400, 300, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[10:390, 10:50 if narrow else 290] = 255
+    region = serialize_region(TextBlock([[[18, 30], [42, 30], [42, 370], [18, 370]]],
+        ['source'], font_size=24, direction='v'))
+    with monkeypatch.context() as baseline:
+        baseline.setattr(native.text_render, 'select_hyphenator', lambda *_: None)
+        expected = renderer.render(image, image, [region], [text], language, mask)
+    observed.clear()
+    actual = renderer.render(image, image, [region], [text], language, mask)
+    np.testing.assert_array_equal(actual, expected)
+    assert '-[BR]' not in observed[-1].translation
+
+
+def test_narrow_caption_recovery_reserves_other_paragraphs(bubble_layout):
+    from manga_translator.utils import TextBlock, erode_bubble_mask
+    renderer, observed, native = bubble_layout
+    image = np.full((500, 240, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[10:490, 90:138] = 255
+    regions = [serialize_region(TextBlock([[[102, y], [126, y], [126, y+100], [102, y+100]]],
+        ['source'], font_size=24, direction='v')) for y in (50, 320)]
+    texts = ['Extraordinary circumstances / Please proceed carefully.', 'Keep this paragraph.']
+    result = renderer.render(image, image, regions, texts, 'en', mask)
+    assert len(observed) == 2
+    assert not native._polygons_overlap(observed[0].dst_points, observed[1].dst_points)
+    for block, text in zip(observed, texts):
+        assert re.sub(r'-\[BR\]', '', block.translation).replace('[BR]', ' ').split() == text.split()
+    painted = np.any(result != image, axis=2)
+    assert painted.any() and not np.any(painted & (erode_bubble_mask(mask, .02) == 0))
+
+
+def test_narrow_caption_keeps_existing_layout_when_candidate_is_not_larger(bubble_layout, monkeypatch):
+    from manga_translator.utils import TextBlock
+    from manga_translator.rendering import auto_linebreak
+    renderer, observed, native = bubble_layout
+    image = np.full((400, 200, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[10:390, 10:50] = 255
+    region = serialize_region(TextBlock([[[18, 30], [42, 30], [42, 370], [18, 370]]],
+        ['source'], font_size=24, direction='v'))
+    text = 'Extraordinary circumstances / Please proceed carefully.'
+    with monkeypatch.context() as baseline:
+        baseline.setattr(native.text_render, 'select_hyphenator', lambda *_: None)
+        expected = renderer.render(image, image, [region], [text], 'en', mask)
+    calls = []
+
+    def no_improvement(font_size, value, *args, **kwargs):
+        calls.append(value)
+        return [value], []
+
+    monkeypatch.setattr(auto_linebreak, '_layout_horizontal_eng', no_improvement)
+    actual = renderer.render(image, image, [region], [text], 'en', mask)
+    assert calls == [text]
+    np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.parametrize('shape', ['concave', 'hole', 'tail'])
+@pytest.mark.parametrize('cache_bytes', [0, None])
+def test_irregular_bubble_recovers_readable_layout_without_changing_source(bubble_layout, shape, cache_bytes):
+    import cv2
+    from mtu_engine.layout import associate_bubbles
+    from manga_translator.utils import TextBlock, erode_bubble_mask
+    renderer, observed, native = bubble_layout
+    image = np.full((400, 500, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    if shape == 'concave':
+        mask[30:350, 20:210] = 255
+        mask[230:370, 20:430] = 255
+        lines = [[[25, 70], [190, 70], [190, 100], [25, 100]],
+                 [[25, 160], [190, 160], [190, 190], [25, 190]],
+                 [[25, 250], [405, 250], [405, 285], [25, 285]]]
+    elif shape == 'hole':
+        mask[20:380, 20:450] = 255
+        mask[140:240, 180:270] = 0
+        lines = [[[40, 80], [165, 80], [165, 110], [40, 110]],
+                 [[280, 260], [420, 260], [420, 290], [280, 290]]]
+    else:
+        mask[60:330, 140:450] = 255
+        cv2.fillPoly(mask, [np.array([[20, 100], [160, 100], [160, 180]])], 255)
+        lines = [[[70, 110], [120, 110], [120, 120], [70, 120]],
+                 [[160, 240], [410, 240], [410, 270], [160, 270]]]
+    block = TextBlock(lines, ['source'], font_size=26, direction='h', angle=1)
+    associate_bubbles([block], mask)
+    assert block.bubble_enclosed
+    region = serialize_region(block)
+    snapshot = json.loads(json.dumps(region))
+    text = '虽然很厉害但是我不想学一般人会选择更容易掌握的招式'
+    calls, rectangle = [], native.find_largest_inscribed_rect
+
+    def counted(value):
+        calls.append(value.shape)
+        return rectangle(value)
+
+    native.find_largest_inscribed_rect = counted
+    try:
+        output = renderer.render(image, image, [region], [text], 'zh-Hans', mask,
+                                 mask_cache_bytes=cache_bytes)
+    finally:
+        native.find_largest_inscribed_rect = rectangle
+    assert region == snapshot
+    assert len(calls) == 1 and calls[0][0] < image.shape[0]  # One ROI-only alternative.
+    painted = np.any(output != image, axis=2)
+    inset = erode_bubble_mask(mask, .02)
+    assert painted.any() and not np.any(painted & (inset == 0))
+    assert observed[-1].font_size >= 16
+    assert observed[-1].translation.replace('[BR]', '') == text
+    np.testing.assert_array_equal(observed[-1].lines, block.lines)
+    # The checkpoint carries ownership across inpaint/cache/IPC. Cached inset
+    # and cold raw-mask paths must produce identical pixels and source geometry.
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(inset, connectivity=8)
+    restored = renderer.render(image, image, [snapshot], [text], 'zh-Hans', inset,
+        bubble_prepared=True, bubble_components=(labels, stats), mask_cache_bytes=cache_bytes)
+    np.testing.assert_array_equal(restored, output)
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize('language,texts', [
+    ('zh-Hans', ['这是一段需要重新排版的文字不能挤到旁边', '中间这段文字也要保留', '最后一段同样需要空间']),
+    ('en', ['This paragraph needs room without covering its neighbors.',
+            'Keep the middle paragraph intact.', 'The final paragraph also needs space.']),
+])
+def test_shared_bubble_reserves_pending_and_placed_paragraphs(bubble_layout, reverse, language, texts):
+    import cv2
+    from manga_translator.utils import TextBlock, erode_bubble_mask
+    renderer, observed, native = bubble_layout
+    image = np.full((420, 600, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    cv2.ellipse(mask, (300, 210), (275, 180), 0, 0, 360, 255, -1)
+    lines = [
+        [[[75, 125], [130, 125], [130, 145], [75, 145]],
+         [[45, 205], [140, 205], [140, 225], [45, 225]]],
+        [[[270, 160], [330, 160], [330, 230], [270, 230]]],
+        [[[440, 160], [520, 160], [520, 230], [440, 230]]],
+    ]
+    regions = [serialize_region(TextBlock(value, ['source'], font_size=26, direction='h')) for value in lines]
+    if reverse:
+        regions, texts = regions[::-1], texts[::-1]
+    output = renderer.render(image, image, regions, texts, language, mask)
+    assert len(observed) == 3
+    for i, block in enumerate(observed):
+        assert block.font_size >= 10
+        assert ''.join(block.translation.replace('[BR]', '').split()) == ''.join(texts[i].split())
+        for other in observed[i+1:]:
+            assert not native._polygons_overlap(block.dst_points, other.dst_points)
+    painted = np.any(output != image, axis=2)
+    assert painted.any() and not np.any(painted & (erode_bubble_mask(mask, .02) == 0))
+
+
+@pytest.mark.parametrize('edge,box', [
+    ('top', (190, 0, 290, 38)), ('bottom', (190, 360, 290, 399)),
+    ('left', (0, 180, 80, 220)), ('right', (419, 180, 499, 220)),
+])
+@pytest.mark.parametrize('angle', [0, 18])
+def test_bubble_layout_checks_unclipped_page_edges(bubble_layout, edge, box, angle):
+    from manga_translator.utils import TextBlock
+    renderer, observed, _ = bubble_layout
+    image = np.full((400, 500, 3), 255, np.uint8)
+    mask = np.full(image.shape[:2], 255, np.uint8)
+    x1, y1, x2, y2 = box
+    block = TextBlock([[[x1, y1], [x2, y1], [x2, y2], [x1, y2]]],
+                      ['source'], font_size=30, angle=angle, direction='h')
+    text = '页面边缘的文字也应该完整保留不能被裁切或缩成看不清的小字'
+    output = renderer.render(image, image, [serialize_region(block)], [text], 'zh-Hans', mask)
+    points = observed[-1].dst_points.reshape(-1, 2)
+    assert (points >= (1, 1)).all() and (points <= (499, 399)).all(), edge
+    assert observed[-1].font_size >= 16
+    assert observed[-1].translation.replace('[BR]', '') == text
+    assert np.any(output != image)
+    assert np.array_equal(output[[0, -1]], image[[0, -1]])
+    assert np.array_equal(output[:, [0, -1]], image[:, [0, -1]])
+
+
+def test_safe_bubble_layout_does_not_search_alternate_rectangles(bubble_layout, monkeypatch):
+    from manga_translator.utils import TextBlock
+    renderer, observed, native = bubble_layout
+    image = np.full((300, 400, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[20:280, 20:380] = 255
+    block = TextBlock([[[100, 90], [300, 90], [300, 200], [100, 200]]], ['source'],
+                      font_size=26, direction='h')
+    monkeypatch.setattr(native, 'find_largest_inscribed_rect',
+                        lambda *_: pytest.fail('Normal CJK layout must keep its fast path'))
+    layouts, layout = [], native._layout_regions_to_font_size
+
+    def counted(*args, **kwargs):
+        if args[1]:
+            layouts.append(len(args[1]))
+        return layout(*args, **kwargs)
+
+    monkeypatch.setattr(native, '_layout_regions_to_font_size', counted)
+    result = renderer.render(image, image, [serialize_region(block)], ['正常气泡保持原有排版'], 'zh-Hans', mask)
+    assert np.any(result != image) and len(observed) == 1
+    assert layouts == [1]  # Paint the validated geometry without repeating Qt layout.
+
+
+def test_missing_safe_bubble_fails_without_publishing_erased_page(bubble_layout):
+    from manga_translator.utils import TextBlock
+    renderer, observed, _ = bubble_layout
+    image = np.full((100, 100, 3), 255, np.uint8)
+    block = TextBlock([[[20, 20], [80, 20], [80, 80], [20, 80]]], ['source'], font_size=24)
+    region = {**serialize_region(block), 'bubble_enclosed': True}
+    with pytest.raises(ValueError, match='No safe bubble layout'):
+        renderer.render(image, image, [region], ['保留原图'], 'zh-Hans', np.zeros(image.shape[:2], np.uint8),
+                        bubble_prepared=True)
+    assert not observed
+
+
+@pytest.mark.parametrize('language', ['zh-Hans', 'en'])
+def test_recovered_bubble_layout_matches_real_render_process_pool(assets, offline, language):
+    import cv2
+    from classic_node.render_pool import RenderPool, render_page
+    from mtu_engine.layout import associate_bubbles
+    renderer = Renderer(*assets)
+    from manga_translator.utils import TextBlock, erode_bubble_mask
+    image = np.full((360, 480, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    if language == 'en':
+        mask[20:340, 20:60] = 255
+        lines = [[[28, 40], [52, 40], [52, 320], [28, 320]]]
+        text = ['Extraordinary circumstances / Please proceed carefully.']
+    else:
+        mask[20:330, 20:200] = 255
+        mask[220:340, 20:450] = 255
+        lines = [[[24, 70], [190, 70], [190, 100], [24, 100]],
+                 [[30, 240], [430, 240], [430, 270], [30, 270]]]
+        text = ['异形气泡在子进程中同样保持安全排版和可读字号']
+    block = TextBlock(lines, ['source'], font_size=26, direction='h')
+    associate_bubbles([block], mask)
+    assert block.bubble_enclosed
+    regions = [serialize_region(block)]
+    inset = erode_bubble_mask(mask, .02)
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(inset, connectivity=8)
+    options = {'alpha': None, 'version': 'bubble-fixture', 'analysis': {'input_hash': '0' * 64},
+               'translated': {'analysis_hash': '1' * 64, 'revision': '2' * 64},
+               'bubble_prepared': True, 'bubble_components': (labels, stats)}
+    expected = render_page(renderer, image, image, regions, text, language, inset, **options)
+    pool = RenderPool(*assets, workers=2, threads=1)
+    try:
+        pool.warmup()
+        assert pool.render(image, image, regions, text, language, inset, **options) == expected
+    finally:
+        pool.close()

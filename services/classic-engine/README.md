@@ -45,6 +45,12 @@ AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`�
 
 真实模型测试设置 `MTU_TEST_ASSETS` 为准备目录后运行 `tests/test_mtu_integration.py`。中心联调使用同时安装后端依赖的环境运行 `backend/tests/test_compute_v3.py` 和 `backend/tests/test_compute_node_v3.py`；设置 `CLASSIC_TEST_MODELS` 可启用其中的真实 CUDA 用例。额外设置 `CLASSIC_TEST_INPUT` 为私有中文漫画图片，可验证阿拉伯语固定译文经真实节点上传覆盖图；图片留在仓库之外。模拟中心、真实模型效果、发布包和生产连接分别验收。
 
+私有实图嵌字回归另外设置 `MTU_TEST_LAYOUT_CASES`，指向仓库外的 JSON 数组清单；每项包含 `image`、`analysis`、`cleaned`、`translations` 四个路径，均相对清单目录解析。前三项分别为原图、`validate_mtu` 的分析检查点和清理图，译文文件沿用上述格式，默认提供简体中文固定文本；设置 `language: "en"` 可回放保存的英文译文。`pytest -q tests/test_mtu_integration.py -k private_page_layout` 校验原图摘要，并在零缓存／正常缓存下回放指定译文；未指定语言时同时回放中文固定译文和英文识别文本。检查字词、源几何、气泡／页面边界及段落碰撞，不重跑 OCR、不调用翻译供应商。清单、样本和输出不提交仓库。
+
+擦字回归使用同一清单和当前版本生成的检查点／清理图：`-k private_page` 同时回放真实蒙版精修，检查已选文字的检测支持未被丢弃，并与检查点逐像素核对。每项可加 `clean_checks` 数组；各项使用 `bbox: [x1,y1,x2,y2]`、`max_dark_pixels` 和可选 `dark_below`（默认 160）检查嵌字前清理区域的残字，不能用译文覆盖来替代擦字验收。坐标和容差由私有样本声明，含背景纹理或未检测文字的区域不得冒充纯色气泡通过。
+
+字号与换行验收使用实际所选字体：检查完整字词、绘制矩形和内缩蒙版，并验证单段无碰撞时是否已经达到当前锚点、换行及最终缩放规则下的最大安全字号；不把某一历史字体的固定字号或换行数当作所有字体的共同要求。`-k 'narrow_caption or hyphenation_recovery'` 额外检查细长框的受限连字符换行：还原断词后文本完整、字号确有提高、候选搜索有界，并覆盖共享段落、页面边缘及不应改变的普通／显式换行／单词／无字典语言路径。
+
 长图性能检查可运行 `python -m tools.benchmark_pages --input D:/samples/original --output D:/samples/bench.json --models .assets/models --concurrency 2`。对比实现时，在各自可信源码和重新准备的资产目录中，用相同依赖、样本、线程、渲染进程与缓存预算运行；每种图预热后默认测量三轮。报告记录阶段耗时、进程树 RSS、PyTorch 分配／保留显存峰值与检查点／输出哈希；PyTorch 指标不包含 ONNX 等全部 GPU 占用。测试 GPU 若使用非锁定 CUDA 环境，结果不能直接视为生产 GPU／锁定环境验收。固定英文长短文本只验证图像处理，不代表供应商翻译质量或线上端到端延迟。`--cache-mib` 是对照实验的每页预算，不是节点的固定缓存配置；生产由 `resident_bytes` 动态分配。整批墙钟包含读图和结果哈希检查，图像阶段耗时单独记录。输出报告不覆盖已有文件。
 
 增加 `--pipeline --resident-mib 8192 --total 12` 可运行真实八租约调度器和内存门控，逐轮循环输入目录内的长短图；页缓冲、IPC、缓存预算和本地回退均由调度器决定，不使用 `--cache-mib` 固定逐页额度。中心、文本和存储仍为本地模拟，报告包含每页阶段／排队耗时、缓存需求／分配／命中／重算及交付次数校验。`--auto-cpu` 验证当前启动资源规划器，手工线程／进程参数用于同资源 A/B。

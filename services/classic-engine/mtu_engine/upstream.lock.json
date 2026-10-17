@@ -58,6 +58,22 @@
         {
           "before": "        text = (text or '').strip()\n        if not text:\n            return 1\n\n    def _fits(fs: int) -> bool:\n",
           "after": "        text = (text or '').strip()\n        if not text:\n            return 1\n        # Normalize stable text once, not on every candidate font measurement.\n        text = legacy_line_breaks_to_document(text)\n\n    def _fits(fs: int) -> bool:\n"
+        },
+        {
+          "before": "                        and _region_lines_fully_inside_mask(region, region_bubble_mask)\n",
+          "after": "                        # Node Comics records ownership before the padding inset.\n                        and (getattr(region, 'bubble_enclosed', False)\n                             or _region_lines_fully_inside_mask(region, region_bubble_mask))\n"
+        },
+        {
+          "before": "    render_alpha: Optional[np.ndarray] = None,\n    bubble_mask: Optional[np.ndarray] = None,\n    ):\n",
+          "after": "    render_alpha: Optional[np.ndarray] = None,\n    bubble_mask: Optional[np.ndarray] = None,\n    layout_points: Optional[List[np.ndarray]] = None,\n    ):\n"
+        },
+        {
+          "before": "    dst_points_list, anchor_modes, debug_img = _layout_regions_to_font_size(\n        img,\n        text_regions,\n        config,\n        original_img,\n        return_debug_img,\n        skip_font_scaling=skip_font_scaling,\n        skip_text_replacements=skip_text_replacements,\n        bubble_mask=bubble_mask,\n    )\n    sync_translation_raw_from_layout(\n",
+          "after": "    if layout_points is None:\n        dst_points_list, anchor_modes, debug_img = _layout_regions_to_font_size(\n            img, text_regions, config, original_img, return_debug_img,\n            skip_font_scaling=skip_font_scaling,\n            skip_text_replacements=skip_text_replacements,\n            bubble_mask=bubble_mask,\n        )\n    else:\n        # Node Comics already fitted and validated these exact final rectangles.\n        if not skip_font_scaling or return_debug_img or len(layout_points) != len(text_regions):\n            raise ValueError('Invalid prepared text layout')\n        dst_points_list, anchor_modes, debug_img = layout_points, [], None\n    sync_translation_raw_from_layout(\n"
+        },
+        {
+          "before": "    _finalize_region_font_sizes(\n        text_regions,\n        dst_points_list,\n        anchor_modes,\n        config,\n        skip_font_scaling=skip_font_scaling,\n        debug_img=debug_img,\n    )\n    for region in text_regions:\n",
+          "after": "    if layout_points is None:\n        _finalize_region_font_sizes(\n            text_regions, dst_points_list, anchor_modes, config,\n            skip_font_scaling=skip_font_scaling, debug_img=debug_img,\n        )\n    for region in text_regions:\n"
         }
       ],
       "manga_translator/inpainting/ballon_fill.py": [
@@ -112,6 +128,14 @@
       ],
       "manga_translator/mask_refinement/__init__.py": [
         {
+          "before": "    if use_model_bubble_repair_intersection or limit_mask_dilation_to_bubble_mask:\n",
+          "after": "    # Node Comics: component splitting/CRF must not punch holes through known text.\n    # Reuse native line protection, the 2px text margin and final kernel radius.\n    line_protect_mask = _build_line_protect_mask(\n        text_regions, final_mask.shape[:2], expand_px=2 + kernel_size // 2)\n    source_mask = raw_mask\n    if source_mask.shape[:2] != final_mask.shape[:2]:\n        source_mask = cv2.resize(source_mask, final_mask.shape[1::-1], interpolation=cv2.INTER_LINEAR)\n    source_support = cv2.dilate(cv2.compare(source_mask, 0, cv2.CMP_GT), None, iterations=2)\n    final_mask[(source_support > 0) & (line_protect_mask > 0)] = 255\n\n    if use_model_bubble_repair_intersection or limit_mask_dilation_to_bubble_mask:\n"
+        },
+        {
+          "before": "                line_protect_mask = _build_line_protect_mask(\n                    text_regions=text_regions,\n                    image_shape=final_mask.shape[:2],\n                    expand_px=LINE_MIN_RECT_PROTECT_EXPAND_PX,\n                )\n                protected_restore_mask = (mask_before_clip > 0) & (line_protect_mask > 0) & (clipped_mask == 0)\n",
+          "after": "                # Only clip dilation outside known source support; inset/segmentation\n                # edges must not expose original strokes to the inpainter.\n                # This restores pre-clip pixels; it never fills entire line boxes.\n                protected_restore_mask = (mask_before_clip > 0) & (clipped_mask == 0) & (\n                    (line_protect_mask > 0) | (source_support > 0))\n"
+        },
+        {
           "before": "from typing import Callable, List, Optional, Tuple\n",
           "after": "import logging\nfrom typing import Callable, List, Optional, Tuple\n"
         },
@@ -126,6 +150,24 @@
         {
           "before": "                protected_pixels = int(np.count_nonzero(protected_restore_mask))\n                if protected_pixels > 0:\n                    clipped_mask[protected_restore_mask] = 255\n                removed_pixels = int(np.count_nonzero((final_mask > 0) & (clipped_mask == 0)))\n                logger.info(\n                    \"Bubble constrained dilation: \"\n                    f\"refined_components={total_components}, intersected_components={intersected_components}, \"\n                    f\"preserved_components={preserved_components}, removed_pixels={removed_pixels}, \"\n                    f\"protected_pixels={protected_pixels}, \"\n                    f\"output_pixels={int(np.count_nonzero(clipped_mask))}\"\n                )\n",
           "after": "                clipped_mask[protected_restore_mask] = 255\n                if logger.isEnabledFor(logging.INFO):\n                    protected_pixels = int(np.count_nonzero(protected_restore_mask))\n                    removed_pixels = int(np.count_nonzero((final_mask > 0) & (clipped_mask == 0)))\n                    logger.info(\n                        \"Bubble constrained dilation: \"\n                        f\"refined_components={total_components}, intersected_components={intersected_components}, \"\n                        f\"preserved_components={preserved_components}, removed_pixels={removed_pixels}, \"\n                        f\"protected_pixels={protected_pixels}, \"\n                        f\"output_pixels={int(np.count_nonzero(clipped_mask))}\"\n                    )\n"
+        }
+      ],
+      "manga_translator/inpainting/inpainting_lama_mpe.py": [
+        {
+          "before": "            mask_resized = resize_keep_aspect(mask_original, inpainting_size)\n",
+          "after": "            # Keep partial source coverage through uint8 interpolation before binarizing.\n            mask_resized = resize_keep_aspect(mask_original * 255, inpainting_size)\n"
+        },
+        {
+          "before": "            'img_original': image,\n",
+          "after": "            'img_original': image,\n            'mask_original': mask_original,  # Paste back only through the original repair mask.\n"
+        },
+        {
+          "before": "        mask_blend = prep['mask_resized']\n",
+          "after": "        mask_blend = prep['mask_original']\n"
+        },
+        {
+          "before": "            mask_blend = cv2.resize(mask_blend, (width, height), interpolation=cv2.INTER_NEAREST)\n            if mask_blend.ndim == 2:\n                mask_blend = mask_blend[:, :, None]\n",
+          "after": ""
         }
       ],
       "manga_translator/rendering/rich_text.py": [

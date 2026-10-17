@@ -8,6 +8,7 @@ from PIL import Image
 from classic_node import runtime as module
 from classic_node.protocol import NodeFailure, digest, png64
 from classic_node.runtime import Runtime
+from mtu_engine.fonts import FONT_CHOICES
 
 
 def fixture(monkeypatch, *, bubbles=True):
@@ -18,8 +19,9 @@ def fixture(monkeypatch, *, bubbles=True):
     bubble = np.full(rgb.shape[:2], 255, np.uint8) if bubbles else None
     runtime = Runtime.__new__(Runtime)
     runtime.version, runtime.render_pool = 'mask-fixture', None
+    runtime.supported_font_ids = list(FONT_CHOICES)
     region = SimpleNamespace(text='Hello')
-    monkeypatch.setattr(module, 'serialize_region', lambda _: {'lines': []})
+    monkeypatch.setattr(module, 'serialize_region', lambda _: {'lines': [], 'bubble_enclosed': False})
     runtime.engine = SimpleNamespace(analyze=lambda _: ([region], mask, raw, bubble),
         inpaint=lambda original, *_, **__: original.copy(),
         renderer=SimpleNamespace(render=lambda original, cleaned, *_args, **_kwargs: cleaned))
@@ -103,6 +105,35 @@ def test_prepared_bubble_arrays_bypass_eroded_and_raw_checkpoint_decode(monkeypa
     runtime.engine.renderer.render = render
     monkeypatch.setattr(module, 'decode_mask', lambda *_: pytest.fail('prepared page must not decode raw bubbles'))
     runtime.render(rgb, rgb, analysis, translated(analysis), 'en', None, masks=masks)
+
+
+def test_legacy_prepared_checkpoint_recovers_ownership_without_mutating_identity(monkeypatch):
+    import sys
+    from mtu_engine import layout
+    runtime, rgb, _ = fixture(monkeypatch)
+    analysis = runtime.analyze(rgb, 'a' * 64)
+    analysis['regions'][0].pop('bubble_enclosed')
+    identity = digest(analysis)
+    masks = {'bubble_inset': np.zeros(rgb.shape[:2], np.uint8)}
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils',
+                        SimpleNamespace(TextBlock=lambda **data: SimpleNamespace(**data)))
+    calls = []
+
+    def associate(blocks, raw):
+        assert np.all(raw == 255)  # Original checkpoint, not the empty inset.
+        calls.append(1)
+        blocks[0].bubble_enclosed = True
+
+    def render(original, cleaned, regions, *args, **kwargs):
+        assert regions[0]['bubble_enclosed'] is True
+        assert regions is not analysis['regions'] and kwargs['bubble_prepared']
+        return cleaned
+
+    monkeypatch.setattr(layout, 'associate_bubbles', associate)
+    runtime.engine.renderer.render = render
+    runtime.render(rgb, rgb, analysis, translated(analysis), 'en', None, masks=masks)
+    assert calls == [1] and digest(analysis) == identity
+    assert set(masks) == {'bubble_inset'}
 
 
 @pytest.mark.parametrize('name', ['mask', 'raw_mask', 'bubble_mask'])

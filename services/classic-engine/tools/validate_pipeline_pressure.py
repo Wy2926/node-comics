@@ -23,6 +23,7 @@ from classic_node.agent import Agent
 from classic_node.journal import Journal
 from classic_node.protocol import digest, pack_result, png64
 from classic_node.timing import collect
+from mtu_engine.fonts import DEFAULT_FONT_IDS
 
 
 def fixture_image():
@@ -38,6 +39,7 @@ def fixture_image():
 class FixtureRuntime:
     version = 'pressure-fixture'
     languages = ['en']
+    supported_font_ids = [DEFAULT_FONT_IDS['en']]
 
     def validate_analysis(self, analysis):
         assert analysis['version'] == self.version
@@ -69,7 +71,7 @@ class FixtureRuntime:
         return 0
 
     def render(self, original, cleaned, analysis, translated, language, alpha, *, mask_cache_bytes=None,
-               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False):
+               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False, font_id=None):
         if check_cancelled:
             check_cancelled()
         image = Image.fromarray(cleaned)

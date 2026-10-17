@@ -225,7 +225,18 @@ class Runtime:
         bubble = masks['bubble_inset'] if prepared else (
             decode_mask(analysis, 'bubble_mask', (original.shape[1], original.shape[0]), masks)
             if has_text and analysis.get('bubble_mask') is not None else None)
-        args = (original, cleaned, analysis['regions'], texts, language, bubble)
+        regions = analysis['regions']
+        if prepared and has_text and any(row.get('bubble_enclosed') is None for row in regions):
+            # Older compatible checkpoints predate ownership metadata. Recover
+            # it once from their raw mask without mutating the signed analysis
+            # or retaining another full-page mask in the page/IPC cache.
+            from manga_translator.utils import TextBlock
+            from mtu_engine.layout import associate_bubbles
+            blocks = [TextBlock(**row) for row in regions]
+            associate_bubbles(blocks, decode_mask(analysis, 'bubble_mask', original.shape[1::-1]))
+            regions = [dict(row, bubble_enclosed=block.bubble_enclosed)
+                       for row, block in zip(regions, blocks, strict=True)]
+        args = (original, cleaned, regions, texts, language, bubble)
         # Only output identity crosses the process boundary, not encoded masks
         # or the complete translation checkpoint already validated above.
         options = {'alpha': alpha, 'version': self.version,
