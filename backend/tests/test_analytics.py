@@ -100,6 +100,26 @@ def test_opds_categories_never_include_catalog_or_account_details(relay):
     assert 'private' not in requests[0].content.decode().lower()
 
 
+@pytest.mark.parametrize('event_name', [
+    'import_started', 'import_result', 'reader_open',
+    'reading_summary', 'reading_engaged', 'reader_activated',
+])
+def test_epub_format_is_relayed_without_private_metadata(relay, event_name):
+    client, requests, _ = relay
+    body = batch(
+        event(event_name, format='epub', filename='private.epub',
+              path='C:/private/book.epub', title='Private book'),
+        event(event_name, format='private.epub'))
+    assert client.post(URL, json=body).status_code == 204
+    assert len(requests) == 1
+    payload = json.loads(requests[0].content)
+    assert [item['name'] for item in payload['events']] == [event_name, event_name]
+    assert [item['params'] for item in payload['events']] == [
+        {'format': 'epub', 'session_id': body['session_id']},
+        {'session_id': body['session_id']},
+    ]
+
+
 @pytest.mark.parametrize('layout', ['continuous', 'single', 'double'])
 def test_accepts_only_implemented_reader_layouts(layout):
     valid = analytics.Event.model_validate(event('reader_open', layout=layout))
