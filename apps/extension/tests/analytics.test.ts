@@ -21,6 +21,12 @@ describe('analytics privacy and delivery',()=>{
     expect(sanitizeEvent('unknown',{})).toBeUndefined();
     expect(sanitizeEvent('reading_summary',{active_ms:Infinity,pages_viewed:-1})).toEqual({name:'reading_summary',params:{}});
   });
+  it('accepts only implemented reader layouts, including double-page reading',()=>{
+    for (const layout of ['continuous','single','double']) {
+      expect(sanitizeEvent('reader_open',{layout})).toEqual({name:'reader_open',params:{layout}});
+    }
+    expect(sanitizeEvent('reading_summary',{layout:'private-layout'})).toEqual({name:'reading_summary',params:{}});
+  });
   it('rejects unimplemented events and fields outside the active product contract',()=>{
     for(const name of ['translation_result','feature_error','login'])expect(sanitizeEvent(name,{})).toBeUndefined();
     expect(sanitizeEvent('import_result',{outcome:'success',count:1,success_count:1,failure_count:0,duplicate_count:0,cancelled_count:0})).toEqual({name:'import_result',params:{outcome:'success',count:1}});

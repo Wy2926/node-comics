@@ -96,6 +96,7 @@ export function EpubReader({
   onUpgrade,
   progressStatus,
 }: Props) {
+  const layout = settings.layout === 'double' ? 'single' : settings.layout;
   const viewport = useRef<HTMLDivElement>(null);
   const session = useRef<EpubSession | undefined>(undefined);
   const rendition = useRef<Rendition | undefined>(undefined);
@@ -111,8 +112,8 @@ export function EpubReader({
   const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
   const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
-  const latest = useRef({ copy, update, settings, fontSize, images, toggleControls });
-  latest.current = { copy, update, settings, fontSize, images, toggleControls };
+  const latest = useRef({ copy, update, settings, layout, fontSize, images, toggleControls });
+  latest.current = { copy, update, settings, layout, fontSize, images, toggleControls };
   const [position, setPosition] = useState<Location>();
   const [tocHref, setTocHref] = useState<string>();
   const leaveReader = () => {capturePosition.current?.();onBack();};
@@ -225,7 +226,7 @@ export function EpubReader({
         spread: "none",
         defaultDirection: latest.current.settings.direction,
         flow:
-          latest.current.settings.layout === "continuous"
+          latest.current.layout === "continuous"
             ? "scrolled-continuous"
             : "paginated",
       });
@@ -399,7 +400,7 @@ export function EpubReader({
     // EPUB.js changes flow/direction through overlapping clear/display operations,
     // especially for fixed layouts. Reopen the bounded session around the captured
     // source location instead; this runs only on an explicit layout/direction change.
-  }, [copy.id, copy.contentId, retry, settings.layout, settings.direction]);
+  }, [copy.id, copy.contentId, retry, layout, settings.direction]);
 
   useEffect(()=>{
     const save=()=>capturePosition.current?.();
@@ -441,7 +442,7 @@ export function EpubReader({
     <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
       modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)} allowsFeedback={false} onFeedback={() => {}}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
-    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={settings.layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
+    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
       <div ref={viewport} className="nc-epub-viewport" aria-busy={loading}/>
       {loading && <div className="nc-epub-status" role="status"><span className="spinner"/>{msg('加载中…')}</div>}
       {error && <div className="nc-epub-status" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>{msg('重试')}</button></div>}

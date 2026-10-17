@@ -26,16 +26,18 @@ export function ReaderScale({label, value, min, max, disabled, onChange}: {
   </div></div>;
 }
 
-export function ReaderDisplaySettings({settings, setSettings, onLayout, sizing, children}: {
+export function ReaderDisplaySettings({settings, setSettings, onLayout, sizing, children, allowDouble = false}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   onLayout(layout: Settings['layout']): void;
   sizing: ReactNode;
   children?: ReactNode;
+  allowDouble?: boolean;
 }) {
   return <>
-    <ReaderChoice label={msg('阅读布局')} value={settings.layout}
-      options={[{id: 'continuous', label: msg('连续阅读'), icon: <Icon name="list" size={16}/>}, {id: 'single', label: msg('单页阅读'), icon: <Icon name="page-unread" size={16}/> }]} onChange={onLayout}/>
+    <ReaderChoice label={msg('阅读布局')} value={!allowDouble && settings.layout === 'double' ? 'single' : settings.layout}
+      options={[{id: 'continuous', label: msg('连续阅读'), icon: <Icon name="list" size={16}/>}, {id: 'single', label: msg('单页阅读'), icon: <Icon name="page-unread" size={16}/>},
+        ...(allowDouble ? [{id: 'double' as const, label: msg('双页阅读'), icon: <Icon name="book" size={16}/>}]: [])]} onChange={onLayout}/>
     <ReaderChoice label={msg('阅读方向')} value={settings.direction}
       options={[{id: 'rtl', label: msg('从右向左'), icon: <Icon name="arrow" size={16} style={{transform: 'rotate(180deg)'}}/>}, {id: 'ltr', label: msg('从左向右'), icon: <Icon name="arrow" size={16}/>}]} onChange={direction => setSettings(value => ({...value, direction}))}/>
     {sizing}

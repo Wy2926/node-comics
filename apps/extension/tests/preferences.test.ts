@@ -54,6 +54,24 @@ it('preserves disabled/unlimited translation budgets and rejects malformed prefe
   expect(settings()).toMatchObject({ cacheLimitMb: defaults.cacheLimitMb, textScale: 1 });
   expect(settings()).not.toHaveProperty('translationMode');
 });
+it('persists all reader layouts, including double-page reading, across reloads', async () => {
+  for (const layout of ['continuous', 'single', 'double'] as const) {
+    await saveSettings({...defaults, layout});
+    expect(settings().layout).toBe(layout);
+  }
+  for (const layout of ['spread', '', 2, null]) {
+    localStorage.setItem('nc-settings', JSON.stringify({layout}));
+    expect(settings().layout).toBe(defaults.layout);
+  }
+});
+it('mirrors double-page reading to trusted extension settings and reader preferences', async () => {
+  const set = vi.fn(async () => {});
+  vi.stubGlobal('chrome', {storage: {local: {get: vi.fn(async () => ({})), set}}});
+  await saveSettings({...defaults, layout: 'double'});
+  expect(set).toHaveBeenCalledWith({'nc-reader-settings': {...defaults, layout: 'double'}});
+  expect(set).toHaveBeenCalledWith({preferences: {language: defaults.language, direction: defaults.direction, layout: 'double', fit: defaults.fit}});
+  expect(settings().layout).toBe('double');
+});
 it('enables discovery text translation by default and preserves the saved choice across reloads', async () => {
   expect(defaults.discoveryTextTranslation).toBe(true);
   expect(settings().discoveryTextTranslation).toBe(true);

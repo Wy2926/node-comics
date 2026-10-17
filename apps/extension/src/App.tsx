@@ -21,6 +21,7 @@ import { chooseSourceFiles, sourceImportOptions } from './comics/application/sou
 import { onMaterialized } from './comics/pages/service';
 import { initializeSources } from './comics/application/source-lifecycle';
 import { Reader } from './reader/Reader';
+import type {ChapterLoadOptions} from './reader/chapter-resources';
 import { readingViewKey } from './reader/view';
 import { API_BASE } from './service';
 import { inExtension, sourceFor, canFindAlternatives, consumeSearchSeed, type SourceSearchResult, type PageManifest } from './sources';
@@ -156,14 +157,23 @@ export function App(){
    const request=++readingEpoch.current;currentRef.current=id;setCurrentId(id);setReadingBusy(false);
    void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
  }
- async function loadEntry(id:string){
-   const request=readingLoadEpoch.current,isCurrent=()=>request===readingLoadEpoch.current&&api.isCurrent();
+ async function loadEntry(id:string,options:ChapterLoadOptions={}){
+   const request=readingLoadEpoch.current,target=copiesRef.current.find(copy=>copy.id===id);
+   const matches=(copy:ReadingEntry)=>copy.id===id&&copy.contentId===target?.contentId&&copy.generation===target?.generation;
+   const isCurrent=()=>!options.signal?.aborted&&request===readingLoadEpoch.current&&api.isCurrent()&&copiesRef.current.some(matches);
+   const assertCurrent=()=>{if(!target||!isCurrent())throw new DOMException('Reading context changed','AbortError');};
+   assertCurrent();
    try{
-     const entry=await getEntry(id);if(!isCurrent())return;
-     try{if(entry&&entry.readable!==false&&!entry.sourceRemoved)await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}
-     if(!isCurrent())return;const loaded=await readEntry(id,channelRef.current?.scope);if(!isCurrent())return;
-     setCopies(values=>values.map(copy=>copy.id!==id?copy:copy.contentId===loaded.contentId&&loaded.pages.some(page=>page.id===copy.pageId)?{...loaded,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:loaded));
-   }catch(error){if(isCurrent())setError((error as Error).message);}
+     const entry=await getEntry(id);assertCurrent();
+     let discoveryError:unknown;
+     try{if(entry&&entry.readable!==false&&!entry.sourceRemoved)await discoverEntryContent(id,options.signal);}
+     catch(error){if(!isCurrent()||(error as Error).name==='AbortError')throw error;discoveryError=error;}
+     assertCurrent();let loaded:ReadingEntry;
+     // Source descriptors survive translation changes; only the recovered result bindings must match the latest channel.
+     for(;;){const scope=channelRef.current?.scope;loaded=await readEntry(id,scope);assertCurrent();if(scope?.key===channelRef.current?.scope.key)break;}
+     setCopies(values=>!isCurrent()?values:values.map(copy=>!matches(copy)?copy:copy.contentId===loaded.contentId&&loaded.pages.some(page=>page.id===copy.pageId)?{...loaded,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:loaded));
+     if(discoveryError)throw discoveryError;
+   }catch(error){if(isCurrent()&&(error as Error).name!=='AbortError'&&!options.speculative)setError((error as Error).message);throw error;}
  }
  function findComic(comic:Comic){
    searchIntent.current++;

@@ -2,7 +2,12 @@ import {msg} from '../i18n/runtime';
 import type {Job,Mode,Page} from '../types';
 import {newestFirst,pendingStatuses} from './jobs';
 import type {TranslationState} from '../translation/automatic';
-export type ImageLoadState={scope:string;key?:string;phase:'reading'|'decoding'|'displaying'|'ready'|'error';error?:string;retry:()=>void};
+export type ImageLoadState={scope:string;key?:string;phase:'reading'|'decoding'|'displaying'|'ready'|'error';originalSettled?:boolean;error?:string;retry:()=>void};
+
+/** Source handoff is independent of the desired translation/enhancement's display state. */
+export function imagePrefetchReady(scope:string,shown:{scope:string}|undefined,load:ImageLoadState|undefined):boolean{
+  return shown?.scope===scope||load?.scope===scope&&load.originalSettled===true;
+}
 
 /** Loading retries never change the translation request or its billing identity. */
 export function displayTranslationState(state:TranslationState|undefined,load:ImageLoadState|undefined,resultKey?:string):TranslationState|undefined{

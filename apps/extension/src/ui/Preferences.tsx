@@ -49,16 +49,17 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
       </SettingRow>
       <TranslationModelPicker selection={modelSelection}/>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
-      <SettingRow title={msg("翻页方向")} description={msg("单页模式中的方向键遵循此设置。")}>
+      <SettingRow title={msg("翻页方向")} description={msg("翻页模式中的方向键遵循此设置。")}>
         <Select aria-label={msg("翻页方向")} value={settings.direction} onChange={e => setSettings(s => ({ ...s, direction: e.target.value as Settings['direction'] }))}>
           <option value="rtl">{msg("从右向左 · 日漫习惯")}</option>
           <option value="ltr">{msg("从左向右")}</option>
         </Select>
       </SettingRow>
       <SettingRow title={msg("阅读方式")} description={msg("连续阅读仅解码当前页附近的有限图片窗口。")}>
-        <Select aria-label={msg("阅读方式")} value={settings.layout} onChange={e => setSettings(s => ({ ...s, layout: e.target.value as Settings['layout'] }))}>
+        <Select aria-label={msg("阅读方式")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}}>
           <option value="continuous">{msg("连续纵向滚动")}</option>
           <option value="single">{msg("单页翻页")}</option>
+          <option value="double">{msg("双页阅读")}</option>
         </Select>
       </SettingRow>
 

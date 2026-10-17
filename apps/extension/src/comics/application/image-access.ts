@@ -18,9 +18,9 @@ export function processingInput(key:string,owner:string,sourceKey=key):Processin
     if(key.startsWith('result:'))await validateMaterializedResult(key);
   }};
 }
-export async function acquireImage(key:string,signal?:AbortSignal):Promise<Pick<PageLease,'blob'|'release'>>{
+export async function acquireImage(key:string,signal?:AbortSignal,priority:'current'|'prefetch'|'background'='current'):Promise<Pick<PageLease,'blob'|'release'>>{
   const reference=parsePageReference(key);
-  if(reference)return acquirePage({...reference,signal,purpose:'reading'});
+  if(reference)return acquirePage({...reference,signal,priority,purpose:'reading'});
   signal?.throwIfAborted();
   const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key)
     :key.startsWith('result:')?await readMaterializedResult(key,signal):resultInMemory(key)??await translationCache.get(key);

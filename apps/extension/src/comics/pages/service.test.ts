@@ -17,8 +17,9 @@ vi.mock('../../storage/downloads', async original => ({...await original<typeof 
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
-import {acquirePage,downloadKey,materializationId} from './service';
-import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from './identity';
+import {acquirePage,downloadKey,materializationId,type PageLease} from './service';
+import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference,parsePageReference} from './identity';
+import {ReaderImagePrefetch} from '../../reader/image-prefetch';
 import {SourceDatabaseSchemaError} from '../../storage/database';
 import {registerSourceDriver} from '../sources/registry';
 import {ImagePermissionsRequired} from '../../sources';
@@ -30,6 +31,22 @@ const renewable=()=>{
   const page={contentId:'revision',pageId:'page',name:'1',ordinal:0,locator:{url:'https://image.example/page.png',sourceId:'source-page',manifestId:'manifest',contentKey:'stable-content'}};
   put('pageDescriptors',['revision','page'],page);return page;
 };
+function queuedPage(pageId:string){
+  put('pageDescriptors',['revision',pageId],{name:pageId,ordinal:0,locator:{url:`https://image.example/${pageId}.png`,sourceId:pageId,manifestId:'manifest'}});
+  return {...request,pageId};
+}
+function controlledReads(){
+  const waiting=new Map<string,{resolve:(blob:Blob)=>void;signal:AbortSignal}>(),started:string[]=[];
+  let active=0,maximum=0;
+  mocks.sourceImage.mockImplementation(({pageId}:{pageId:string},signal:AbortSignal)=>{
+    started.push(pageId);maximum=Math.max(maximum,++active);
+    return new Promise<Blob>((resolve,reject)=>{
+      waiting.set(pageId,{resolve,signal});
+      signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
+    }).finally(()=>{active--;});
+  });
+  return {started,waiting,get maximum(){return maximum;},finish(pageId:string){waiting.get(pageId)!.resolve(new Blob([pageId],{type:'image/png'}));}};
+}
 beforeEach(() => {
   vi.clearAllMocks(); mocks.records.clear(); mocks.cache.clear();
   unregisterLocal=registerSourceDriver({id:'local',label:'Local test source',cachePages:false,cacheRanges:false,
@@ -151,13 +168,121 @@ describe('page leases and trusted source routing', () => {
     let resolve!: (blob:Blob)=>void;
     mocks.sourceImage.mockImplementation(() => new Promise<Blob>(done => {resolve=done;}));
     const controller = new AbortController();
-    const first = acquirePage({...request,signal:controller.signal});
-    const second = acquirePage(request);
+    const first = acquirePage({...request,signal:controller.signal,priority:'prefetch'});
+    const second = acquirePage({...request,priority:'current'});
     await vi.waitFor(() => expect(mocks.sourceImage).toHaveBeenCalledOnce());
     controller.abort(); await expect(first).rejects.toThrow();
     expect(mocks.sourceImage.mock.calls[0][1].aborted).toBe(false);
     resolve(new Blob(['pixels'],{type:'image/png'})); const lease = await second; lease.release();
     expect(mocks.prepare).toHaveBeenCalledOnce();
+  });
+  it.each(['held','inflight'] as const)('hands off %s next-chapter prefetch through real page leases with disk caching disabled',async state=>{
+    vi.useFakeTimers();
+    const unregister=registerSourceDriver({id:'website',label:'Uncached test source',cachePages:false,cacheRanges:false});
+    const reads=controlledReads(),requests:Promise<PageLease>[]=[];
+    const foregroundController=new AbortController(),reopenController=new AbortController();
+    const manager=new ReaderImagePrefetch((key,signal,priority)=>{
+      const work=acquirePage({...parsePageReference(key)!,signal,priority,purpose:'reading'});
+      requests.push(work);return work;
+    });
+    try{
+      const current={...request,entryId:'chapter-a',contentId:'revision-a',pageId:'last'};
+      const next={...request,entryId:'chapter-b',contentId:'revision-b',pageId:'first'};
+      for(const ref of [current,next]){
+        put('entries',ref.entryId,{id:ref.entryId,comicId:'comic',contentId:ref.contentId,generation:1,format:'website'});
+        put('pageDescriptors',[ref.contentId,ref.pageId],{name:ref.pageId,ordinal:0,locator:{url:`https://image.example/${ref.entryId}/${ref.pageId}.png`,sourceId:`${ref.entryId}-${ref.pageId}`,manifestId:'manifest'}});
+      }
+      const currentKey=pageReference(current),nextKey=pageReference(next);
+      const identities=new Map([current,next].map(ref=>[pageReference(ref),JSON.stringify([ref.entryId,ref.contentId,1,ref.pageId])]));
+      const options={scope:'reader/comic/original',identities,current:[currentKey],next:[nextKey],ready:true,enabled:true};
+      manager.update(options);await vi.advanceTimersByTimeAsync(150);
+      expect(reads.started).toEqual(['chapter-b-first']);
+      if(state==='held'){reads.finish('chapter-b-first');await requests[0];await vi.advanceTimersByTimeAsync(0);}
+      const sourceSignal=reads.waiting.get('chapter-b-first')!.signal;
+      manager.update({...options,current:[nextKey],next:[],ready:false});
+      expect(sourceSignal.aborted).toBe(false);
+      const foreground=acquirePage({...next,signal:foregroundController.signal,priority:'current'});requests.push(foreground);
+      if(state==='inflight')reads.finish('chapter-b-first');
+      const [prefetched,visible]=await Promise.all([requests[0],foreground]);
+      expect(visible.blob).toBe(prefetched.blob);
+      expect(mocks.sourceImage).toHaveBeenCalledOnce();expect(mocks.prepare).toHaveBeenCalledOnce();
+      expect(mocks.cacheGet).not.toHaveBeenCalled();expect(mocks.cachePut).not.toHaveBeenCalled();
+      manager.update({...options,current:[nextKey],next:[],ready:true});
+      manager.dispose();expect(sourceSignal.aborted).toBe(false);
+      visible.release();expect(sourceSignal.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);expect(vi.getTimerCount()).toBe(0);
+      // A fresh read after every lease is released proves the service removed the shared pending entry.
+      const reopened=acquirePage({...next,signal:reopenController.signal});requests.push(reopened);
+      await vi.advanceTimersByTimeAsync(0);expect(mocks.sourceImage).toHaveBeenCalledTimes(2);
+      reads.finish('chapter-b-first');const fresh=await reopened;
+      expect(fresh.blob).not.toBe(visible.blob);fresh.release();
+      expect(reads.waiting.get('chapter-b-first')!.signal.aborted).toBe(true);
+      expect(mocks.cacheGet).not.toHaveBeenCalled();expect(mocks.cachePut).not.toHaveBeenCalled();
+    }finally{
+      manager.dispose();foregroundController.abort();reopenController.abort();
+      for(const result of await Promise.allSettled(requests))if(result.status==='fulfilled')result.value.release();
+      unregister();vi.useRealTimers();
+    }
+  });
+  it.each(['prefetch','background'] as const)('promotes a queued %s request when a default foreground reader joins without another source read',async priority=>{
+    const reads=controlledReads();
+    const a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b']));
+    const earlier=acquirePage({...queuedPage('earlier'),priority:'prefetch'});
+    const target=queuedPage('target'),speculative=acquirePage({...target,priority}),foreground=acquirePage(target);
+    expect(reads.started).toHaveLength(2);
+    reads.finish('active-a');const aLease=await a;
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b','target']));
+    reads.finish('target');const [speculativeLease,foregroundLease]=await Promise.all([speculative,foreground]);
+    expect(speculativeLease.blob).toBe(foregroundLease.blob);
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b','target','earlier']));
+    reads.finish('earlier');reads.finish('active-b');const [earlierLease,bLease]=await Promise.all([earlier,b]);
+    expect(reads.maximum).toBe(2);
+    for(const lease of [aLease,bLease,earlierLease,speculativeLease,foregroundLease])lease.release();
+    expect(reads.started.filter(id=>id==='target')).toHaveLength(1);
+  });
+  it('never downgrades a queued foreground request when a background consumer joins',async()=>{
+    const reads=controlledReads(),a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));
+    await vi.waitFor(()=>expect(reads.started).toHaveLength(2));
+    const earlier=acquirePage({...queuedPage('earlier'),priority:'prefetch'}),target=queuedPage('target');
+    const foreground=acquirePage({...target,priority:'current'}),background=acquirePage({...target,priority:'background'});
+    reads.finish('active-a');const aLease=await a;
+    await vi.waitFor(()=>expect(reads.started[2]).toBe('target'));
+    reads.finish('target');const leases=await Promise.all([foreground,background]);
+    await vi.waitFor(()=>expect(reads.started[3]).toBe('earlier'));
+    reads.finish('active-b');reads.finish('earlier');leases.push(aLease,...await Promise.all([b,earlier]));
+    for(const lease of leases)lease.release();
+  });
+  it.each(['prefetch','current'] as const)('keeps a promoted shared read alive after its %s consumer cancels while queued',async canceled=>{
+    const reads=controlledReads(),a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));
+    await vi.waitFor(()=>expect(reads.started).toHaveLength(2));
+    const prefetchController=new AbortController(),currentController=new AbortController(),target=queuedPage('target');
+    const speculative=acquirePage({...target,priority:'prefetch',signal:prefetchController.signal});
+    const foreground=acquirePage({...target,priority:'current',signal:currentController.signal});
+    const rejected=canceled==='prefetch'?speculative:foreground,surviving=canceled==='prefetch'?foreground:speculative;
+    const abortResult=expect(rejected).rejects.toMatchObject({name:'AbortError'});
+    (canceled==='prefetch'?prefetchController:currentController).abort();await abortResult;
+    reads.finish('active-a');const aLease=await a;
+    await vi.waitFor(()=>expect(reads.started[2]).toBe('target'));
+    expect(reads.waiting.get('target')!.signal.aborted).toBe(false);
+    reads.finish('target');const targetLease=await surviving;
+    reads.finish('active-b');const bLease=await b;
+    expect(reads.started.filter(id=>id==='target')).toHaveLength(1);expect(reads.maximum).toBe(2);
+    for(const lease of [aLease,bLease,targetLease])lease.release();
+    expect(reads.waiting.get('target')!.signal.aborted).toBe(true);
+  });
+  it('does not read a promoted queued page after all consumers cancel and still drains following work',async()=>{
+    const reads=controlledReads(),a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));
+    await vi.waitFor(()=>expect(reads.started).toHaveLength(2));
+    const controller=new AbortController(),target=queuedPage('target');
+    const speculative=acquirePage({...target,priority:'prefetch',signal:controller.signal}),foreground=acquirePage({...target,signal:controller.signal});
+    const first=expect(speculative).rejects.toMatchObject({name:'AbortError'}),second=expect(foreground).rejects.toMatchObject({name:'AbortError'});
+    controller.abort();await Promise.all([first,second]);
+    const following=acquirePage({...queuedPage('following'),priority:'background'});
+    reads.finish('active-a');const aLease=await a;
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b','following']));
+    reads.finish('following');reads.finish('active-b');const leases=await Promise.all([following,b]);
+    for(const lease of [aLease,...leases])lease.release();
   });
   it('delivers source pixels when cache reads and token acquisition fail', async()=>{
     mocks.token.mockRejectedValue(Error('cache unavailable'));mocks.cacheGet.mockRejectedValue(Error('cache unavailable'));mocks.downloadGet.mockRejectedValue(Error('download store unavailable'));
@@ -194,8 +319,8 @@ describe('page leases and trusted source routing', () => {
     await expect(acquirePage(request)).rejects.toBe(error);
   });
   it('rechecks source access before sharing an already completed page lease',async()=>{
-    const lease=await acquirePage(request);
+    const lease=await acquirePage({...request,priority:'prefetch'});
     put('comics','comic',{id:'comic',source:{generation:2,connectionId:'connection',status:'revoked'}});
-    await expect(acquirePage(request)).rejects.toThrow('访问被撤销');expect(mocks.sourceImage).toHaveBeenCalledOnce();lease.release();
+    await expect(acquirePage({...request,priority:'current'})).rejects.toThrow('访问被撤销');expect(mocks.sourceImage).toHaveBeenCalledOnce();lease.release();
   });
 });

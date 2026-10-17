@@ -698,7 +698,7 @@ a {
   overscroll-behavior: contain;
   overflow-anchor: none;
 }
-.nc-reading-surface {
+.nc-reading-surface, .nc-reading-snapshot {
   padding: 0 12px 28px;
   min-height: 100%;
   display: flex;
@@ -792,6 +792,62 @@ a {
   padding: 0;
   gap: 0;
 }
+/* Paged reading has no footer in the image flow; its zero-height end still records completion. */
+.nc-reading-clip { display: contents; }
+.nc-reading-viewport:not([data-layout="continuous"])[data-layout] .nc-reading-clip {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow-x: clip;
+}
+.nc-reading-viewport:not([data-layout="continuous"])[data-layout] :is(.nc-reading-surface,.nc-reading-snapshot) {
+  flex: 1;
+  justify-content: center;
+  padding-block: 12px;
+}
+.nc-reading-viewport[data-swipe-enabled="true"] { touch-action: pan-y pinch-zoom; }
+.nc-reading-viewport[data-swipe-enabled="true"] .nc-page-image {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.nc-reading-viewport[data-swipe-phase="dragging"] { cursor: grabbing; user-select: none; }
+.nc-page-transition-clip {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.nc-page-transition {
+  position: absolute;
+  inset: 0;
+  background: var(--reading-background);
+  will-change: transform;
+}
+.nc-reader-end[data-paged="true"] {
+  height: 0;
+  padding: 0;
+  gap: 0;
+}
+.nc-reading-viewport[data-layout="double"] .nc-page-stack {
+  display: flex;
+  align-items: center;
+}
+.nc-reading-viewport[data-layout="double"] .nc-page-stack[data-direction="rtl"] {
+  flex-direction: row-reverse;
+}
+.nc-reading-viewport[data-layout="double"] .nc-manga-page { margin: 0; }
+.nc-paged-notice {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.nc-paged-notice p { margin: 0; }
 .nc-app .switch {
   height: 26px;
   width: 46px;
@@ -1492,7 +1548,7 @@ a {
   }
 }
 /* Reader controls and full-area sizing. */
-.nc-reading-surface {
+.nc-reading-surface, .nc-reading-snapshot {
   padding-bottom: 0;
 }
 .nc-manga-page {

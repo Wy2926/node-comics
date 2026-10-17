@@ -5,69 +5,94 @@ import type {ProcessingImage} from '../image-processing/contracts';
 import {EnhancementStatus} from './EnhancementStatus';
 import type {Job} from '../types';
 import {prepareReaderImage} from './prepare-image';
+import {createReaderImageURL,releaseReaderImageURL} from './image-urls';
 import type {ImageLoadState} from './presentation';
 import './image-notices.css';
 
 /** Pixel presentation owns URLs and decoding; its caller owns source access and persistence. */
 export type ShownImage={scope:string;key:string;job?:Job};
-type PreparedImage=ShownImage&{url:string;attempt:number};
-export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal)=>Promise<{blob:Blob;release():void}>;scope:string;blobKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage;defer?:boolean};
-export function ReaderPicture({acquire,scope,blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement,defer=false}:ReaderPictureProps){
-  const [loaded,setLoaded]=useState<PreparedImage>();const [candidate,setCandidate]=useState<PreparedImage>();const [failure,setFailure]=useState('');const [retry,setRetry]=useState(0);const urls=useRef(new Set<string>());
+type PreparedImage=ShownImage&{id:string;url:string};
+type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
+export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal)=>Promise<{blob:Blob;release():void}>;scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
+export function ReaderPicture({acquire,scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
+  const [loaded,setLoaded]=useState<PreparedImage>();const [displayError,setDisplayError]=useState('');const [retry,setRetry]=useState(0);const [revision,setRevision]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
-  const request=useRef<{url:string;signal:AbortSignal}|undefined>(undefined);
+  // At most one original, one selected result and one ready enhancement share this loader.
+  const requests=useRef(new Map<string,ImageRequest>());
   const [dismissed,setDismissed]=useState<string>();const retryButton=useRef<HTMLButtonElement>(null);
   const callback=useRef(onShown);callback.current=onShown;
   const loadCallback=useRef(onLoadState);loadCallback.current=onLoadState;
-  const identity=JSON.stringify([scope,blobKey,enhancement?.identity]);
-  const waitForCache=!!enhancement&&!enhancement.state&&!enhancement.blob;
+  const targetId=blobKey?JSON.stringify([scope,blobKey,job?.id]):undefined;
+  const originalId=originalKey===blobKey?targetId:originalKey?JSON.stringify([scope,originalKey,undefined]):undefined;
+  const enhancedId=targetId&&enhancement?.blob?JSON.stringify([targetId,enhancement.identity]):undefined;
   const reloadAction=useRef({onReload,reloadBusy});reloadAction.current={onReload,reloadBusy};
   const reload=useCallback(()=>{if(reloadAction.current.reloadBusy)return;if(!blobKey&&reloadAction.current.onReload)reloadAction.current.onReload();else setRetry(value=>value+1);},[blobKey]);
-  const missingError=blobKey?undefined:error;
-  const [preparing,setPreparing]=useState<'reading'|'decoding'|'displaying'>('reading');
   const shown=loaded?.scope===scope?loaded:undefined;
-  const pending=candidate?.scope===scope&&candidate.key===blobKey&&candidate.attempt===retry?candidate:undefined;
-  const revoke=(url:string)=>{if(url&&urls.current.delete(url))URL.revokeObjectURL(url);};
+  const rank=(id:string)=>id===enhancedId?2:id===targetId?1:id===originalId?0:-1;
+  const currentRequests=[...requests.current.values()].filter(request=>request.scope===scope&&rank(request.id)>=0&&(request.id!==enhancedId||request.blob===enhancement?.blob));
+  const pending=currentRequests.filter(request=>request.image&&request.image.url!==shown?.url&&rank(request.id)>=(shown?rank(shown.id):-1)).sort((a,b)=>rank(b.id)-rank(a.id))[0]?.image;
+  const candidate=useRef(pending);candidate.current=pending;
+  const targetRequest=currentRequests.find(request=>request.id===targetId);
+  const enhancedRequest=currentRequests.find(request=>request.id===enhancedId);
+  const originalRequest=currentRequests.find(request=>request.id===originalId);
+  const failure=displayError||enhancedRequest?.error||targetRequest?.error||(!shown&&originalRequest?.error)||(!blobKey?(error||msg("本地图片已清理，请重新导入原图。")):'');
+  // The foreground lease must exist before prefetch relinquishes its copy of this original.
+  const originalSettled=!originalKey||originalKey===blobKey&&!!job||!!originalRequest&&(!!originalRequest.release||!!originalRequest.error);
+  const revoke=(url:string)=>{if(url&&urls.current.delete(url))releaseReaderImageURL(url);};
+  const active=(request:ImageRequest)=>requests.current.get(request.id)===request&&!request.controller.signal.aborted;
+  const retire=(request:ImageRequest)=>{requests.current.delete(request.id);request.controller.abort();request.release?.();request.release=undefined;if(displayed.current?.url!==request.url)revoke(request.url);};
   const failureSignature=JSON.stringify([scope,blobKey,retry,failure]);
+  useEffect(()=>{setLoaded(current=>current?.scope===scope?current:undefined);setDisplayError('');setDismissed(undefined);},[scope,targetId,enhancedId,retry]);
   useEffect(()=>{if(dismissed===failureSignature)retryButton.current?.focus({preventScroll:true});},[dismissed,failureSignature]);
-  useEffect(()=>{let active=true;setFailure('');setDismissed(undefined);setCandidate(undefined);setPreparing('reading');if(defer)return;if(!blobKey){setLoaded(undefined);setFailure(missingError||msg("本地图片已清理，请重新导入原图。"));return;}
-    // Only the cache lookup gates display; queued/running enhancement never blocks the parent image.
-    if(waitForCache)return;
-    const controller=new AbortController(),loading={url:'',signal:controller.signal};request.current=loading;let release:(()=>void)|undefined;
-    const show=async(blob:Blob)=>{
-      controller.signal.throwIfAborted();
-      loading.url=URL.createObjectURL(blob);urls.current.add(loading.url);
-      setPreparing('decoding');
-      await prepareReaderImage(loading.url,controller.signal);
-      if(active){setCandidate({scope,key:blobKey,job,url:loading.url,attempt:retry});setPreparing('displaying');}else revoke(loading.url);
-    };
-    void (async()=>{
-      if(enhancement?.blob)await show(enhancement.blob);
-      else{
-        const lease=await acquire(blobKey,controller.signal);
-        if(!active||controller.signal.aborted){lease.release();return;}
-        release=lease.release;
-        // Keep the normal reader lease for the visible window so translation can share it.
-        await show(lease.blob);
-      }
-    })().catch(e=>{if(active)setFailure((e as Error).message);revoke(loading.url);loading.url='';});
-    return()=>{active=false;controller.abort();release?.();if(request.current===loading)request.current=undefined;if(displayed.current?.url!==loading.url)revoke(loading.url);};
-  },[identity,retry,missingError,enhancement?.blob,waitForCache,defer,acquire]);
-  useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url&&url!==candidate?.url&&url!==request.current?.url)revoke(url);},[loaded,candidate]);
-  useEffect(()=>()=>{for(const url of urls.current)URL.revokeObjectURL(url);urls.current.clear();},[]);
-  const isCurrent=(image:PreparedImage)=>pending===image&&request.current?.url===image.url&&!request.current.signal.aborted;
-  function confirm(image:PreparedImage,element:HTMLImageElement){if(isCurrent(image)){if(!element.naturalWidth||!element.naturalHeight){fail(image);return;}setLoaded(image);setCandidate(undefined);setFailure('');setDismissed(undefined);}}
+  useEffect(()=>{
+    const desired=new Map<string,{key:string;job?:Job;blob?:Blob}>();
+    const enhancedFailed=!!enhancedId&&!!requests.current.get(enhancedId)?.error;
+    const enhancedShown=!!enhancedId&&shown?.id===enhancedId;
+    // An already displayed result needs no fallback. An in-flight original survives target changes.
+    if(originalId&&originalKey&&originalId!==targetId&&(!shown||shown.id===originalId||!shown.job&&shown.key!==originalKey)&&(!enhancedId||enhancedFailed||requests.current.has(originalId)))desired.set(originalId,{key:originalKey});
+    if(targetId&&blobKey&&(!enhancedId||enhancedFailed||!enhancedShown&&requests.current.has(targetId)))desired.set(targetId,{key:blobKey,job});
+    if(enhancedId&&blobKey)desired.set(enhancedId,{key:blobKey,job,blob:enhancement?.blob});
+    let changed=false;
+    for(const request of requests.current.values()){
+      const next=desired.get(request.id);
+      if(!next||request.acquire!==acquire||request.blob!==next.blob||request.error&&request.attempt!==retry){retire(request);changed=true;}
+    }
+    for(const [id,input] of desired){
+      if(requests.current.has(id))continue;
+      const request:ImageRequest={id,scope,...input,attempt:retry,acquire,controller:new AbortController(),url:'',phase:'reading'};
+      requests.current.set(id,request);changed=true;
+      void (async()=>{
+        let blob=request.blob;
+        if(!blob){
+          const lease=await request.acquire(request.key,request.controller.signal);
+          if(!active(request)){lease.release();return;}
+          request.release=lease.release;blob=lease.blob;
+        }
+        request.controller.signal.throwIfAborted();
+        request.url=createReaderImageURL(blob);urls.current.add(request.url);request.phase='decoding';setRevision(value=>value+1);
+        await prepareReaderImage(request.url,request.controller.signal);
+        if(!active(request)){revoke(request.url);return;}
+        request.image={id,scope,key:request.key,job:request.job,url:request.url};request.phase='displaying';setRevision(value=>value+1);
+      })().catch(reason=>{if(active(request)){request.error=(reason as Error).message;request.image=undefined;setRevision(value=>value+1);}revoke(request.url);request.url='';});
+    }
+    if(changed)setRevision(value=>value+1);
+  },[scope,originalKey,targetId,enhancedId,enhancement?.blob,retry,acquire,shown,revision]);
+  useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url&&![...requests.current.values()].some(request=>request.url===url))revoke(url);},[loaded,revision]);
+  useEffect(()=>()=>{for(const request of requests.current.values())retire(request);for(const url of urls.current)releaseReaderImageURL(url);urls.current.clear();},[]);
+  const isCurrent=(image:PreparedImage)=>candidate.current===image&&requests.current.get(image.id)?.image===image&&!requests.current.get(image.id)?.controller.signal.aborted;
+  function confirm(image:PreparedImage,element:HTMLImageElement){if(isCurrent(image)){if(!element.naturalWidth||!element.naturalHeight){fail(image);return;}displayed.current=image;setLoaded(image);setDisplayError('');setDismissed(undefined);}}
   function fail(image:PreparedImage){
-    if(isCurrent(image)){setCandidate(undefined);setLoaded(current=>current?.url===image.url?shown:current);}
-    else if(shown===image&&displayed.current===image)setLoaded(current=>current?.url===image.url?undefined:current);
+    if(isCurrent(image))candidate.current=undefined;
+    else if(displayed.current===image){displayed.current=undefined;setLoaded(undefined);}
     else return;
-    if(request.current?.url===image.url)request.current.url='';
-    setFailure(msg('{0} 无法解码，请检查图片是否损坏。',{'0':alt}));
+    const message=msg('{0} 无法解码，请检查图片是否损坏。',{'0':alt}),request=requests.current.get(image.id);
+    if(request){request.image=undefined;request.error=message;request.url='';setRevision(value=>value+1);}else setDisplayError(message);
+    revoke(image.url);
   }
   // Commit the identity only after the actual display element loads; keep the old image until then.
-  useLayoutEffect(()=>{callback.current?.(shown);return()=>callback.current?.(undefined);},[shown?.scope,shown?.key]);
+  useLayoutEffect(()=>{callback.current?.(shown);return()=>callback.current?.(undefined);},[shown?.scope,shown?.key,shown?.job?.id]);
   // Cached bytes are not a displayed result. Report preparation through the actual DOM load.
-  const phase=failure?'error':shown&&shown.key===blobKey&&shown.attempt===retry?'ready':preparing;
-  useLayoutEffect(()=>{loadCallback.current?.({scope,key:blobKey,phase,error:failure||undefined,retry:reload});return()=>loadCallback.current?.(undefined);},[scope,blobKey,phase,failure,reload]);
+  const phase=failure?'error':shown&&shown.key===blobKey&&shown.job?.id===job?.id?'ready':targetRequest?.phase??enhancedRequest?.phase??'reading';
+  useLayoutEffect(()=>{loadCallback.current?.({scope,key:blobKey,phase,error:failure||undefined,retry:reload,originalSettled});return()=>loadCallback.current?.(undefined);},[scope,blobKey,phase,failure,reload,originalSettled]);
   return <><EnhancementStatus state={enhancement?.state} onRetry={()=>enhancement?.retry()}/>{[shown,pending].map(image=>image&&<img key={image.url} className={image===pending?'nc-page-image-pending':'nc-page-image'} src={image.url} alt={image===pending?'':`${alt}${image.job?msg("译图"):msg("原图")}`} aria-hidden={image===pending||undefined} style={image===pending?{position:'absolute',visibility:'hidden',pointerEvents:'none'}:undefined} data-result-job={image.job?.id??'original'} onLoad={event=>confirm(image,event.currentTarget)} onError={()=>fail(image)}/>)}{!shown&&!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&(shown&&dismissed===failureSignature?<button ref={retryButton} className="nc-image-failure-retry" title={failure} aria-label={msg('重试')} disabled={reloadBusy} onClick={e=>{e.stopPropagation();reload();}}><Icon name="refresh" size={16}/></button>:<div className={`nc-image-failure ${shown?'over-image':''}`} role="status">{shown&&<button className="nc-image-failure-dismiss" aria-label={msg('关闭错误提示')} onClick={e=>{e.stopPropagation();setDismissed(failureSignature);}}><Icon name="close" size={16}/></button>}<Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><div className="nc-image-failure-actions">{blobKey&&<button className="button secondary" disabled={reloadBusy} onClick={reload}>{msg('重试')}</button>}{onReload&&<button className="button secondary" disabled={reloadBusy} onClick={onReload}><Icon name="refresh" size={16}/>{msg('重新载入')}</button>}{!sourceUrl&&<button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>}{sourceUrl&&<a className="button secondary" href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div></div>)}</>;
 }

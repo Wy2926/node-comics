@@ -70,6 +70,14 @@ beforeEach(()=>{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('reader shortcut action integration',()=>{
+ it.each(['contentId','generation'] as const)('changes both comparison pixel scopes when %s changes without changing page IDs',field=>{
+  const props=fixture({settings:{...defaults,layout:'single'}});render(props);hooks.handlers['reader.compare']();
+  const scopes=()=>nodes(render(props)).filter(node=>typeof node.props.scope==='string').map(node=>node.props.scope);
+  const before=scopes();expect(before).toHaveLength(2);
+  props.copy={...props.copy,...(field==='contentId'?{contentId:'replacement-content'}:{generation:props.copy.generation+1})};
+  const after=scopes();expect(after).toHaveLength(2);
+  expect(after.every((scope,n)=>scope!==before[n])).toBe(true);
+ });
  it.each(['ltr','rtl'] as const)('uses reading direction only for left/right, not previous/next (%s)',direction=>{
   render(fixture({settings:{...defaults,direction}}));
   hooks.handlers['reader.left']();hooks.handlers['reader.right']();hooks.handlers['reader.previous']();hooks.handlers['reader.next']();hooks.handlers['reader.first']();hooks.handlers['reader.last']();
@@ -103,7 +111,38 @@ describe('reader shortcut action integration',()=>{
   expect(props.settings).toEqual({...defaults,layout:'single'});expect(view().fit).toBe('window');
   expect(actions.preserve).toHaveBeenCalledTimes(2);
   expect(actions.preserve.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(props.setSettings).mock.invocationCallOrder[0]);
-  render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();expect(props.settings).toEqual(defaults);expect(view().fit).toBe('width');
+  render(props);hooks.handlers['reader.layout']();expect(props.settings).toEqual({...defaults,layout:'double',direction:'rtl'});
+  render(props);expect(hooks.handlers['reader.fit']()).toBe(false);expect(view().fit).toBe('window');
+  hooks.handlers['reader.layout']();expect(props.settings).toEqual({...defaults,direction:'rtl'});
+  render(props);hooks.handlers['reader.fit']();expect(view().fit).toBe('width');
+ });
+ it.each(['ltr','rtl'] as const)('turns whole spreads from either selected page while honoring direction (%s)',direction=>{
+  render(fixture({settings:{...defaults,layout:'double',direction}}));
+  hooks.handlers['reader.left']();hooks.handlers['reader.right']();hooks.handlers['reader.previous']();hooks.handlers['reader.next']();
+  expect(actions.jump.mock.calls.map(([page])=>page)).toEqual(direction==='rtl'?[3,0,0,3]:[0,3,0,3]);
+ });
+ it('fits both pages without changing the saved fit and zoom, including when shortcuts are pressed',()=>{
+  const props=fixture({settings:{...defaults,layout:'double'}}),tree=render(props);
+  const pages=nodes(tree).filter(node=>node.props.className==='nc-manga-page');
+  expect(pages.map(page=>page.props['data-page-index'])).toEqual([1,2]);
+  expect(pages.reduce((width,page)=>width+(page.props.style as {width:number}).width,0)).toBeLessThanOrEqual(876);
+  const saved={...view()};
+  for(const action of ['reader.fit','reader.zoomIn','reader.zoomOut','reader.zoomReset'])expect(hooks.handlers[action]()).toBe(false);
+  expect(view()).toEqual(saved);expect(actions.preserve).not.toHaveBeenCalled();
+  hooks.handlers['reader.settings']();
+  expect(nodes(render(props)).some(node=>node.type===ReaderScale||node.type===ReaderChoice&&node.props.label==='图片适应方式')).toBe(false);
+ });
+ it('starts translation lookahead at the first displayed page after jumping to the second page of a spread',()=>{
+  const props=fixture({settings:{...defaults,layout:'double'}});render(props);hooks.handlers['reader.translation']();render(props);flushEffects();
+  const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
+  expect(targets.map(target=>target.page.id)).toEqual(['page-1','page-2','page-3','page-4']);
+  expect(visible.map(page=>page.id)).toEqual(['page-1','page-2']);
+ });
+ it.each(['single','double'] as const)('does not render footer content in %s mode and disables next when its last spread is shown',layout=>{
+  const props=fixture({settings:{...defaults,layout},copy:{...copy,pages:copy.pages.slice(0,3)}}),tree=render(props);
+  const end=nodes(tree).find(node=>node.props['data-paged']===true)!;
+  expect(nodes(end.props.children)).toEqual([]);
+  expect(nodes(tree).find(node=>node.props['aria-label']==='下一页')?.props.disabled).toBe(true);
  });
  it('defaults desktop sizing to width at 50 percent independently of global settings and restores the comic fit',()=>{
   const props=fixture({settings:{...defaults,fit:'width'}});const initial=render(props);

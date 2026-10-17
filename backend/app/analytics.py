@@ -59,7 +59,7 @@ ENUMS = {
     'outcome': {'success', 'failed', 'duplicate', 'cancelled', 'empty', 'partial', 'blocked', 'no_text'},
     'channel': {'official', 'local'},
     'mode': {'original', 'classic', 'compare'},
-    'layout': {'continuous', 'single'},
+    'layout': {'continuous', 'single', 'double'},
     'search_mode': {'direct', 'translated'},
     'error_code': {'network', 'permission', 'auth', 'quota', 'rate_limit', 'timeout', 'source_unavailable', 'unsupported', 'cancelled', 'unknown'},
     'target_language': LANGUAGES | {'zh-Hans', 'zh-Hant'},

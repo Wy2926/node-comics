@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {type Job,type Page} from '../src/types';
-import {pageTranslation,latestResults,readingImage} from '../src/reader/presentation';
+import {pageTranslation,latestResults,readingImage,imagePrefetchReady,type ImageLoadState} from '../src/reader/presentation';
 import {emptyPage} from '../src/reader/model';
 
 import {needsTranslation} from '../src/translation/automatic';
@@ -11,6 +11,25 @@ const page=(jobs:Job[]):Page=>({...emptyPage('page',800,1200),translationScope:s
 const noText=()=>job('no-text','no_text',3,{result:{key:'no-text',recoverable:true},result_available:true,
   delivery:{kind:'no_text',representation:'original',normalization_version:1,input_sha256:'a'.repeat(64),width:800,height:1200}});
 afterEach(()=>vi.unstubAllGlobals());
+describe('source-only prefetch readiness',()=>{
+  const load=(changes:Partial<ImageLoadState>={}):ImageLoadState=>({scope:'current-page',key:'result:translation',phase:'reading',retry:()=>{},...changes});
+  it('can prefetch while the translation is pending once the original lease is acquired',()=>{
+    expect(imagePrefetchReady('current-page',undefined,load({originalSettled:true}))).toBe(true);
+    expect(imagePrefetchReady('current-page',{scope:'current-page'},load())).toBe(true);
+  });
+  it('allows an independent original failure without waiting for the translated image',()=>{
+    expect(imagePrefetchReady('current-page',undefined,load({phase:'reading',originalSettled:true}))).toBe(true);
+  });
+  it('does not mistake a translated-image failure or ready flag for original lease handoff',()=>{
+    for(const phase of ['reading','decoding','displaying','ready','error'] as const)
+      expect(imagePrefetchReady('current-page',undefined,load({phase,originalSettled:false}))).toBe(false);
+  });
+  it('rejects pixels and source readiness from an old content or authorization scope',()=>{
+    expect(imagePrefetchReady('new-page',{scope:'current-page'},load({originalSettled:true}))).toBe(false);
+    expect(imagePrefetchReady('new-page',undefined,undefined)).toBe(false);
+    expect(imagePrefetchReady('new-page',{scope:'new-page'},load({originalSettled:true}))).toBe(true);
+  });
+});
 describe('per-page display',()=>{
   it('makes a confirmed unchanged original eligible for enhancement without materializing a translation',()=>{
     const original=noText(),p={...page([original]),blobKey:'original'};

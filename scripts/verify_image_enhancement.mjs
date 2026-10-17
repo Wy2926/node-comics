@@ -48,7 +48,12 @@ const cacheState=()=>page.evaluate(async()=>{
   return {bytes:(await processingCache.usage()).bytes,records};
 });
 const geometry=(target=page,index=0)=>first(target,index).evaluate(element=>{const box=element.querySelector('.nc-page-picture').getBoundingClientRect(),view=document.querySelector('.nc-reading-viewport');return {height:box.height,top:box.top,scroll:view.scrollTop};});
-async function toggle(target=page){await target.getByRole('button',{name:'阅读设置',exact:true}).click();await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await target.getByRole('button',{name:'阅读设置',exact:true}).click();}
+async function readerSettings(target=page){
+  const reveal=target.getByRole('button',{name:'显示阅读工具',exact:true});
+  if(await reveal.count())await reveal.click();
+  await target.getByRole('button',{name:'阅读设置',exact:true}).click();
+}
+async function toggle(target=page){await readerSettings(target);await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await readerSettings(target);}
 async function waitWidth(width,target=page,index=0){await first(target,index).locator('img.nc-page-image').last().waitFor();await target.waitForFunction(({width,index})=>document.querySelector(`.nc-manga-page[data-page-index="${index}"] .nc-comparison-pane:last-child img.nc-page-image`)?.naturalWidth===width,{width,index});}
 try {
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -132,20 +137,47 @@ try {
   const cachedJobs=await page.locator('.nc-manga-page img.nc-page-image').evaluateAll(images=>images.slice(0,2).map(image=>image.dataset.resultJob));
   await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
   await page.getByRole('button',{name:/^打开漫画 /}).waitFor();
-  await page.evaluate(jobs=>{
+  await page.evaluate(async jobs=>{
     window.channelFixture.parentReads.length=0;window.channelFixture.blockedParentJobs=jobs;
-    window.enhancementCacheProbe.reads.length=0;window.enhancementCacheProbe.displays.length=0;
+    const probe=window.enhancementCacheProbe;probe.reads.length=0;probe.displays.length=0;probe.pending=[];
+    const {processingCache}=await import('/src/image-processing/storage.ts'),read=processingCache.get.bind(processingCache);
+    let release;const gate=new Promise(resolve=>{release=resolve;});
+    processingCache.get=async(...args)=>{const blob=await read(...args);if(blob){probe.pending.push(args[0]);await gate;}return blob;};
+    probe.release=()=>{processingCache.get=read;release();};
   },cachedJobs);
   await page.getByRole('button',{name:/^打开漫画 /}).click();
+  await page.waitForFunction(()=>window.enhancementCacheProbe.pending.length>0);
+  await page.waitForFunction(()=>[0,1].every(index=>{
+    const image=document.querySelector(`.nc-manga-page[data-page-index="${index}"] img.nc-page-image`);
+    return image?.dataset.resultJob==='original'&&image.naturalWidth===640;
+  }));
+  await page.waitForFunction(()=>{
+    const image=document.querySelector('.nc-manga-page[data-page-index="2"] img.nc-page-image');
+    return image?.dataset.resultJob&&image.dataset.resultJob!=='original'&&image.naturalWidth>0;
+  });
+  assert.equal((await read()).enhancement.length,5);
+  await page.screenshot({path:path.join(out,'pending-cache-keeps-originals.png')});
+  await page.evaluate(()=>window.enhancementCacheProbe.release());
+  check('a held enhancement cache lookup leaves originals and available translations readable without another processing POST');
   await waitWidth(baseWidth*2);
+  await page.waitForFunction(({jobs,width})=>jobs.every(id=>[...document.querySelectorAll('img.nc-page-image')].some(image=>image.dataset.resultJob===id&&image.naturalWidth===width)),{jobs:cachedJobs,width:baseWidth*2});
   const warm=await page.evaluate(()=>({parents:window.channelFixture.parentReads,sourceKeys:window.channelFixture.parentSourceKeys,reads:window.enhancementCacheProbe.reads,displays:window.enhancementCacheProbe.displays}));
-  const isParent=key=>warm.sourceKeys.includes(key)||key.startsWith('result:')&&cachedJobs.includes(JSON.parse(key.slice(7))[1]);
-  assert(!warm.parents.some(id=>cachedJobs.includes(id)),JSON.stringify(warm));
-  assert(!warm.reads.some(isParent),JSON.stringify(warm));assert(!warm.displays.some(isParent),JSON.stringify(warm));
+  const isParent=key=>warm.sourceKeys.includes(key)||key.startsWith('result:');
+  // A pending cache lookup must not hold ordinary pixels. Those independent reads may
+  // start, but each selected result is acquired once and unavailable parents cannot
+  // prevent the cached enhancement from displaying or trigger another processing POST.
+  assert.equal(new Set(warm.parents).size,warm.parents.length,'Reopening must not repeat a selected result read');
+  for(const id of cachedJobs)assert(warm.parents.filter(parent=>parent===id).length<=1);
+  const preparedParents=warm.displays.filter(isParent);
+  assert.equal(new Set(preparedParents).size,preparedParents.length,'Ordinary fallback preparation is not duplicated');
+  assert(preparedParents.some(key=>key.startsWith('result:')),'The held lookup exercises translated parent preparation');
+  assert(!warm.displays.some(key=>key.startsWith('result:')&&cachedJobs.includes(JSON.parse(key.slice(7))[1])),'Unavailable translated parents never display');
+  assert(warm.displays.some(key=>key.startsWith('enhanced:')),'Existing enhancement bytes are displayed');
+  for(const index of [0,1])assert.equal(await first(page,index).locator('.nc-image-failure').count(),0);
   assert.equal((await read()).enhancement.length,5);assert.equal((await read()).translation,5);
   assert.deepEqual(await geometry(),before);
   await page.evaluate(()=>{window.channelFixture.blockedParentJobs=[];});
-  check('reopening cached enhancements reads/decodes neither source nor translation, works with unavailable parents, preserves position and sends no POST');
+  check('reopening cached enhancements tolerates unavailable translated parents, performs no duplicate parent preparation or POST, and preserves position');
   await page.evaluate(()=>window.channelFixture.clearProcessingCache(false));
   await first().getByRole('button',{name:'重试增强'}).waitFor();await waitWidth(baseWidth);
   assert.equal((await read()).enhancement.length,5);
@@ -159,7 +191,7 @@ try {
   value=await read();assert.equal(value.enhancement.length,7);assert.equal(value.translation,5);
   assert.deepEqual(await geometry(),before);
   check('cache clear never reprocesses automatically; failure retains translation; manual retry changes enhancement only');
-  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await readerSettings();
   await page.getByRole('switch',{name:'并排对照',exact:true}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('.nc-manga-page[data-page-index="0"] img.nc-page-image').length===2);
@@ -388,7 +420,7 @@ try {
     finally{await resultPage.close();}
   }
   assert.deepEqual(errors,[]);
-  await writeFile(path.join(out,'result.json'),JSON.stringify({checks,errors,before,requests:await read()},null,2));
+  await writeFile(path.join(out,'result.json'),JSON.stringify({checks,errors,before,warmCache:{resultReadAttempts:warm.parents.length,preparedParents:preparedParents.length},requests:await read()},null,2));
 } catch(error) {
   await page.screenshot({path:path.join(out,'failed.png'),fullPage:true}).catch(()=>{});
   console.error('page errors',errors);throw error;

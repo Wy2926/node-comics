@@ -68,6 +68,9 @@ node scripts/verify_simple_reading.mjs
 | `verify_image_enhancement.mjs` | Vite 5176 渠道夹具；完整译图字节再增强、同翻译窗口、单页预取与滚动补位、串行执行、开关、缓存、独立重试、并排对照与窄屏设置。只使用模拟 MTU／nunif 响应，不调用模型，见[图像增强](../docs/IMAGE_ENHANCEMENT.md#验证) |
 | `verify_translation_channel_live.mjs` | 真实回环 MTU；使用 `MTU_USERNAME`、`MTU_PASSWORD`、可选 `MTU_BASE_URL`，实际调用服务端引擎 |
 | `verify_reader_directory.mjs` | Vite 5181 的目录夹具；同端口 `reader-window-fixture.html` 检查有限图片窗口 |
+| `node --test apps/extension/tests/reader-pagination.browser.mjs` | 同一 Vite 5181 夹具的 `?pagination=1` 八页合成样本；单页无底部占位、双页整组适应桌面／窄屏／短窗口、封面与横图、RTL／LTR、整组翻页与跨章、直接跳页与重开恢复、两页翻译与对照、独立失败、已读条件和图片 URL 释放。`long=1` 增加末尾长图检查缩放恢复与末页无重载标已读，`chapters=2` 检查跨章。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，截图写入 `artifacts/reader-pagination/`（可用 `READER_PAGINATION_ARTIFACTS` 指定）；不代表真实来源、模型或真机验收 |
+| `node --test apps/extension/tests/reader-swipe.browser.mjs` | 同一 Vite 5181 图片阅读夹具；慢图／译图／对照图未就绪时仍可继续翻页、固定时长双层同步过渡、三布局原图独立显示与字节预读、译图失败后原图保留与独立重试、迟到原图不覆盖结果、正常动画和减少动态效果、鼠标／CDP 触屏横滑、RTL／LTR、短拖与原生滚动、双指与取消、交互控件隔离、已读证据及 URL 释放。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，截图写入 `artifacts/reader-swipe/`；本地缓存读取不等于源网络性能，CDP 触屏模拟不代替 Firefox Android／Orion 真机验收 |
+| `node --test apps/extension/tests/reader-next-chapter.browser.mjs` | 同一 Vite 5181 夹具；下一话初始空目录，受控发现延迟／失败，单页／双页末段目录与章尾首页预读、跨话进入、连续窗口跨话、部分清单、不递归第三话、取消与迟到结果、阅读位置／翻译／已读隔离。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，截图写入 `artifacts/reader-next-chapter/`；合成图片与本地缓存不代表真实源站加速 |
 | `node --test apps/extension/tests/shortcuts.browser.mjs` | Vite 5181 的隔离阅读器与选择器夹具；左侧锚点与连续滚动、固定标题／关闭／底栏、组合键录制／恢复、主题令牌、弹层保护与阅读位置恢复。使用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，不代替已安装扩展或原生划图授权验证 |
 | `node --test apps/extension/tests/modal.browser.mjs` | 同一 Vite 5181 的通用弹框夹具；长正文滚动时关闭按钮固定、焦点与背景位置恢复、嵌套下拉、关闭守卫、导入列表及短窗口大字号。沿用上述浏览器环境并阻断外网 |
 | `node --test apps/extension/tests/confirmation.browser.mjs` | 同一 Vite 5181 的操作弹窗夹具；真实合成文件导出、未完整发现提示、单项／批量移除、离线清理、文件重下载、断开／移除书库及失败重试；检查 16 语、320px 深色大字、固定底栏与焦点恢复。仅隔离数据和模拟来源，阻断外网，截图写入 `artifacts/confirmation-dialogs/` |

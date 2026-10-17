@@ -13,6 +13,14 @@ await page.route('**/*',route=>new URL(route.request().url()).origin===origin?ro
 const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 const viewport=page.locator('.nc-reading-viewport');
 const position=()=>viewport.evaluate(node=>node.scrollTop);
+const pageTop=(chapter,index)=>page.locator(`[data-copy-id="window-fixture-${chapter}"] [data-page-index="${index}"]`).evaluate(node=>node.getBoundingClientRect().top-node.closest('.nc-reading-viewport').getBoundingClientRect().top);
+const input=page.getByLabel('跳转页码',{exact:true});
+async function jump(number){
+ // ReaderNumberInput keeps draft text local until Enter blurs and commits it.
+ await input.fill(String(number));await input.press('Enter');await settle();
+ assert.equal(Number(await input.inputValue()),Number(number),'page input retains the requested numeric value');
+ assert.equal(Number(await page.getByLabel('阅读进度',{exact:true}).inputValue()),Number(number),'page input commits before scrolling');
+}
 async function refresh(){await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();}
 async function seek(chapter,selector,offset){
  const target=await page.evaluate(({chapter,selector,offset})=>{
@@ -26,8 +34,7 @@ try{
  await page.goto(origin+'/tests/reader-window-fixture.html');
  await page.locator('.nc-page-image').first().waitFor();await settle();
  await page.getByRole('button',{name:'翻译',exact:true}).click();await settle();
- const input=page.getByLabel('跳转页码',{exact:true});
- await input.fill('120');await settle();
+ await jump(120);
  const pending=await page.evaluate(()=>{
   const v=document.querySelector('.nc-reading-viewport');v.scrollTop+=12;const expected=v.scrollTop;
   // Deliver a React status commit before the browser dispatches its queued scroll event.
@@ -56,7 +63,7 @@ try{
  assert(Math.abs(await position()-backward)<1);checks.push('decoded translation replaces the original without moving the chapter gap');
  await page.screenshot({path:path.join(out,'chapter-gap.png')});
  // Crossing chapter 2 -> 3 evicts chapter 1; compare visual position, not absolute scrollTop.
- await seek(1,'.nc-page-stack',150);await input.fill('120');await settle();
+ await seek(1,'.nc-page-stack',150);await jump(120);
  await seek(2,'.nc-page-stack',-40);
  const headingTop=()=>page.locator('[data-copy-id="window-fixture-2"] .nc-page-stack').evaluate(node=>node.getBoundingClientRect().top-node.closest('.nc-reading-viewport').getBoundingClientRect().top);
  assert(Math.abs(await headingTop()-40)<1,'chapter eviction lost the heading offset');await refresh();
@@ -71,17 +78,22 @@ try{
   }
  }
  checks.push('wheel scrolling stays monotonic through translation updates');
- await input.fill('8');await settle();await page.locator('.nc-image-failure').first().waitFor();
+ await jump(8);await page.locator('.nc-image-failure').first().waitFor();
  const failed=await position();await refresh();assert(Math.abs(await position()-failed)<1);checks.push('image failure leaves the reading position stable');
- await input.fill('60');await settle();await seek(2,'.nc-page-stack',59*await page.locator('.nc-page-picture').first().evaluate(node=>node.getBoundingClientRect().height)+200);
- const saved=await position();await page.waitForTimeout(400);
+ await jump(60);await seek(2,'.nc-page-stack',59*await page.locator('.nc-page-picture').first().evaluate(node=>node.getBoundingClientRect().height)+200);
+ const saved=await position(),savedPageTop=await pageTop(2,59);await page.waitForTimeout(400);
  await page.getByRole('button',{name:'关闭并保存位置',exact:true}).click();await page.getByRole('button',{name:'重开阅读器',exact:true}).click();await settle();
- assert(Math.abs(await position()-saved)<1);checks.push('in-page saved position restores after reopening');
+ assert(Math.abs(await position()-saved)<1,`reopened position changed from ${saved} to ${await position()}`);
+ assert(Math.abs(await pageTop(2,59)-savedPageTop)<1,`reopened page top changed from ${savedPageTop} to ${await pageTop(2,59)}`);
+ checks.push('in-page saved scroll and visual page position restore after reopening');
  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
  const anchorBefore=await input.inputValue();await page.getByRole('switch',{name:'并排对照',exact:true}).click();await settle();
  assert.equal(await input.inputValue(),anchorBefore);await page.getByRole('button',{name:'关闭面板',exact:true}).click();
- await input.fill('060');await settle();
- const top=await page.locator('[data-copy-id="window-fixture-2"] [data-page-index="59"]').evaluate(node=>node.getBoundingClientRect().top-node.closest('.nc-reading-viewport').getBoundingClientRect().top);
- assert(Math.abs(top)<1);checks.push('comparison layout and explicit same-page navigation still restore correctly');
+ const comparisonPosition=await position();await jump('060');
+ assert(Math.abs(await position()-comparisonPosition)<1,'committing the current page number changed its reading anchor');
+ checks.push('same-page input preserves the in-page anchor');
+ await jump(59);await jump(60);
+ const top=await pageTop(2,59);
+ assert(Math.abs(top)<1);checks.push('comparison layout and explicit page navigation still restore correctly');
  assert.deepEqual(errors,[]);await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,liveTranslation:false},null,2));console.log(JSON.stringify({checks,errors}));
 }catch(error){await page.screenshot({path:path.join(out,'failure.png')});throw error;}finally{await browser.close();}

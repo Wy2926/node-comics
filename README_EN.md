@@ -33,7 +33,7 @@ When you need translation, enable translation and compare with the original. You
 - **Remote libraries**: Connect multiple OPDS catalogs and browse or read on demand, without importing the entire catalog. Supported resources can be saved offline.
 - **Discover and search**: Browse trending, popular, top-rated, and new manga on AniList, then search supported websites by title, alternative title, or translated title.
 - **Read offline**: Cache every directory and chapter of a website comic, select multiple source languages, track progress, pause and resume, and retry missing pages.
-- **Read your way**: Choose continuous scrolling or single-page reading, reading direction, zoom, and a separate reading background.
+- **Read your way**: Choose continuous scrolling, single-page reading, or manga-style two-page spreads, with reading direction, zoom, and a separate reading background.
 - **Translate when needed**: Switch between originals and translations, compare them side by side, and restore your reading position.
 - **Choose your translation service**: Use the official service or connect to a local manga-translator-ui instance. Local services do not require a NodeLane account.
 - **Personalize the interface**: Choose from 16 interface languages, six accent colors, light and dark modes, and adjustable text sizes.

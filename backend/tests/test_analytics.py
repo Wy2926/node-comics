@@ -100,6 +100,14 @@ def test_opds_categories_never_include_catalog_or_account_details(relay):
     assert 'private' not in requests[0].content.decode().lower()
 
 
+@pytest.mark.parametrize('layout', ['continuous', 'single', 'double'])
+def test_accepts_only_implemented_reader_layouts(layout):
+    valid = analytics.Event.model_validate(event('reader_open', layout=layout))
+    assert analytics.clean_params(valid) == {'layout': layout}
+    invalid = analytics.Event.model_validate(event('reader_open', layout='private-layout'))
+    assert analytics.clean_params(invalid) == {}
+
+
 def test_purchase_refund_and_unused_or_unknown_events_are_never_relayed(relay):
     client, requests, _ = relay
     unsupported = ('purchase', 'refund', 'translation_result', 'feature_error', 'login', 'arbitrary')

@@ -17,13 +17,23 @@ import {entryContentKind} from '../domain';
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
 interface Value { blob: Blob; identity: PageMaterialization; validate():Promise<void>; }
-interface Work { controller: AbortController; promise: Promise<Value>; users: number; }
+interface Work { controller: AbortController; promise: Promise<Value>; users: number; promote(priority:number):void; }
 const pending=new Map<string,Work>();
 const listeners=new Set<(identity:PageMaterialization)=>void>();
 let active=0;
 const queue:{priority:number;run:()=>void}[]=[];
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
-function schedule<T>(priority:number,action:()=>Promise<T>):Promise<T>{return new Promise((resolve,reject)=>{queue.push({priority,run:()=>{active++;action().then(resolve,reject).finally(()=>{active--;drain();});}});queue.sort((a,b)=>a.priority-b.priority);drain();});}
+function schedule<T>(priority:number,action:()=>Promise<T>){
+  let queued:typeof queue[number]|undefined;
+  const promise=new Promise<T>((resolve,reject)=>{
+    queued={priority,run:()=>{queued=undefined;active++;action().then(resolve,reject).finally(()=>{active--;drain();});}};
+    queue.push(queued);queue.sort((a,b)=>a.priority-b.priority);drain();
+  });
+  return {promise,promote(next:number){
+    // A foreground reader may join a speculative request before it has reached either source slot.
+    if(queued&&next<queued.priority){queued.priority=next;queue.sort((a,b)=>a.priority-b.priority);}
+  }};
+}
 function drain(){while(active<2&&queue.length)queue.shift()!.run();}
 export {downloadKey} from '../../storage/downloads';
 export const materializationId=(ref:PageReference)=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId]);
@@ -111,12 +121,12 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
 export async function acquirePage(request:PageRequest):Promise<PageLease>{
   request.signal?.throwIfAborted();
   const key=pageReference(request);let work=pending.get(key);
+  const priority=request.priority==='background'?2:request.priority==='prefetch'?1:0;
   if(!work){
     const controller=new AbortController();
-    const promise=schedule(request.priority==='background'?2:request.priority==='prefetch'?1:0,()=>read(request,controller.signal));
-    work={controller,promise,users:0};pending.set(key,work);
-    void promise.catch(()=>{});
-  }
+    work={controller,...schedule(priority,()=>read(request,controller.signal)),users:0};pending.set(key,work);
+    void work.promise.catch(()=>{});
+  }else work.promote(priority);
   const chosen=work;chosen.users++;let released=false;
   const release=()=>{if(released)return;released=true;request.signal?.removeEventListener('abort',abort);chosen.users--;if(!chosen.users){chosen.controller.abort();if(pending.get(key)===chosen)pending.delete(key);}};
   let rejectAbort:(error:unknown)=>void=()=>{};

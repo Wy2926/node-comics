@@ -32,7 +32,7 @@ export function ReaderTranslationSettings({settings, setSettings, caps, channelL
 
 /** Format-specific sizing and actions are slots, not a second settings implementation. */
 export function ReaderSettings({settings, setSettings, onLayout, sizing, children, immersive, onImmersive, onFullscreen,
-  onShortcuts, sourceUrl, onReload, busy, extraActions}: {
+  onShortcuts, sourceUrl, onReload, busy, extraActions, allowDouble = false}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   onLayout(layout: Settings['layout']): void;
@@ -46,9 +46,10 @@ export function ReaderSettings({settings, setSettings, onLayout, sizing, childre
   onReload?: () => void;
   busy?: boolean;
   extraActions?: ReactNode;
+  allowDouble?: boolean;
 }) {
   return <>
-    <ReaderDisplaySettings settings={settings} setSettings={setSettings} onLayout={onLayout} sizing={sizing}>{children}</ReaderDisplaySettings>
+    <ReaderDisplaySettings settings={settings} setSettings={setSettings} onLayout={onLayout} sizing={sizing} allowDouble={allowDouble}>{children}</ReaderDisplaySettings>
     <EnhancementToggle configure/>
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>
