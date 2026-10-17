@@ -1,6 +1,9 @@
 .nc-font-picker{display:grid;gap:10px;min-width:0;margin-top:16px}
 .nc-font-picker .field{margin:0}
 .nc-font-picker .nc-select{width:100%}
+.nc-font-picker.nc-font-picker-compact .field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,158px);align-items:center;gap:12px;margin:0}
+.nc-font-picker-compact .field>span:first-child{font-weight:700;overflow-wrap:anywhere}
+.nc-font-picker-compact .nc-select{min-width:0;min-height:40px;padding:8px;gap:6px;font-size:var(--text-small)}
 .nc-font-picker>.nc-muted{margin:0;font-size:var(--text-small);line-height:1.6}
 .nc-font-picker>[role=status]{margin:0;color:var(--muted);font-size:var(--text-small);line-height:1.6}
 .nc-font-picker>[role=alert]{margin:0;color:var(--warning);font-size:var(--text-small)}

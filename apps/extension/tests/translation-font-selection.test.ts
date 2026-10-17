@@ -144,6 +144,22 @@ describe('translation font selection',()=>{
     expect(markup.match(/style="font-family:Test Font;font-weight:400;font-synthesis:none"/g)).toHaveLength(2);
     expect(markup.match(/lang="ar" dir="rtl"/g)).toHaveLength(2);
   });
+  it('exposes popup action blocking without disabling native keyboard focus',()=>{
+    const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en',disabled:true,
+      selection:{fonts:catalog,value:()=>undefined,select:async()=>{}}}));
+    expect(markup).toContain('aria-disabled="true"');
+    expect(markup).not.toMatch(/<button[^>]*\sdisabled(?:=|\s|>)/);
+    expect(markup).toContain('data-value="comic-relief"');
+  });
+  it.each([true,false])('only omits the description for compact popup controls: %s',compact=>{
+    const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en',compact,
+      selection:{fonts:catalog,value:()=>undefined,select:async()=>{}}}));
+    expect(markup.includes('nc-font-picker-compact')).toBe(compact);
+    expect(markup.includes('字体按目标语言提供')).toBe(!compact);
+    expect(markup.includes('aria-describedby=')).toBe(!compact);
+    expect(markup).toContain('<span>翻译字体</span>');
+    expect(markup).toContain('data-value="comic-relief"');
+  });
   it.each(['zh-Hans','ja','ko','ar'])('uses target-language names and hides fonts on legacy services: %s',language=>{
     const font=TRANSLATION_FONTS.find(font=>font.languages.includes(language))!;
     const selected=renderToStaticMarkup(createElement(TranslationFontPicker,{language,selection:{fonts:catalog,value:()=>font.id,select:async()=>{}}}));

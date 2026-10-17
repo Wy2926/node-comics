@@ -13,6 +13,8 @@ import { useAppearance } from '../../src/ui/Appearance';
 import { AutoTranslateTabs } from '../../src/ui/AutoTranslateTabs';
 import { BrandLogo } from '../../src/ui/BrandLogo';
 import { TargetLanguage } from '../../src/ui/TargetLanguage';
+import {TranslationFontPicker} from '../../src/ui/TranslationFontPicker';
+import {useTranslationChannel} from '../../src/translation/channels/useChannel';
 import './popup.css';
 import {Scrollbars} from '../../src/ui/Scrollbars';
 import {useShortcutPreferences,useShortcuts} from '../../src/shortcuts/react';
@@ -28,10 +30,11 @@ function Popup({initialError=''}:{initialError?:string}){
  const [busy,setBusy]=useState(false),[opening,setOpening]=useState(false),[translating,setTranslating]=useState<'tab'|'region'>(),[saving,setSaving]=useState(false);
  const lock=useRef(false),openLock=useRef(false),saveLock=useRef(false);
  const [preferences,setPreferences]=useState(settings);useAppearance(preferences);
+ const {channel}=useTranslationChannel(),[fontSaving,setFontSaving]=useState(false);
  const shortcuts=useShortcutPreferences(),[browserShortcuts,setBrowserShortcuts]=useState<BrowserShortcuts>({});
  const nativeBindings=Object.values(browserShortcuts).map(browserShortcutBinding);
  const bindings=useMemo(()=>activeBindings(shortcuts.overrides),[shortcuts.overrides]);
- const disabled=busy||opening||!!translating||saving;
+ const disabled=busy||opening||!!translating||saving||fontSaving;
  const resolved=source?.url?sourceFor(source.url):undefined;
  const adapted=!!resolved&&resolved.definition.id!=='generic';
  const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
@@ -67,7 +70,7 @@ function Popup({initialError=''}:{initialError?:string}){
   finally{saveLock.current=false;setSaving(false);}
  }
  async function translate(kind:'tab'|'region'='tab'){
-  if(source?.id==null||lock.current||openLock.current||saveLock.current)return;
+  if(source?.id==null||disabled||lock.current||openLock.current||saveLock.current)return;
   openLock.current=true;setTranslating(kind);setError('');
   try{
    await requireHostAccess();
@@ -124,7 +127,8 @@ function Popup({initialError=''}:{initialError?:string}){
    <section className="nc-popup-translation" aria-label={msg("网页翻译")}>
     <div className="nc-popup-section-heading"><h1>{msg('网页翻译')}</h1>{adapted&&<span className="nc-comic-tag nc-popup-adapted"><Icon name="check" size={14}/>{msg('已适配')}</span>}<button className="nc-popup-request" disabled={disabled} onClick={()=>void openPage('sites/request')}>{msg('申请适配网站')}<Icon name="external" size={13}/></button></div>
     {sourceNotice&&<p className="nc-popup-notice" role="status">{sourceNotice}</p>}
-    <div className="nc-popup-language"><div><b>{msg("翻译成")}</b><p id="popup-language-hint">{msg("与设置中的默认目标语言同步")}</p></div><TargetLanguage value={preferences.language} onChange={language=>void changeLanguage(language)} disabled={disabled} describedBy="popup-language-hint"/></div>
+    <div className="nc-popup-language"><div><b>{msg("翻译成")}</b><p id="popup-language-hint">{msg("与设置中的默认目标语言同步")}</p></div><TargetLanguage value={preferences.language} caps={channel?.capabilities} onChange={language=>void changeLanguage(language)} disabled={disabled} describedBy="popup-language-hint"/></div>
+    <TranslationFontPicker compact selection={channel?.fontSelection} language={preferences.language} disabled={disabled} onSavingChange={setFontSaving}/>
     <AutoTranslateTabs enabled={preferences.autoTranslateTabs} onSaved={setPreferences} disabled={disabled}/>
     <button className="button primary full nc-comic-action" disabled={!source||disabled} onClick={()=>void translate()}><span className="nc-popup-action-label">{translating==='tab'?<><span className="spinner"/>{msg("正在启动翻译…")}</>:<><Icon name="spark" size={20}/>{msg("翻译当前标签页")}</>}</span>{nativeShortcutHint('nc-translate-tab')}</button>
     <p className="nc-popup-hint">{msg("留在原网页，当前图片与后三张随读随译。")}</p>
