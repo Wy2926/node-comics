@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Política de privacidade",
         "description": "Como NodeLane Comics lida com contas, imagens, permissões, tradução, assinaturas e exclusão.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Tradução de imagens de sites e testes de convidados",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Escopo e contato",
             "paragraphs": [
-              "Esta política cobre o site NodeLane Comics, extensão, serviços de leitura e tradução, mantidos pela equipe NodeLane Comics. Entre em contato com comics@nodelane.net sobre privacidade, acesso, correção ou exclusão. Atualizado em 4 de outubro de 2026. As alterações materiais serão explicadas nesta página e comunicadas de forma adequada."
+              "Esta política cobre o site NodeLane Comics, extensão, serviços de leitura e tradução, mantidos pela equipe NodeLane Comics. Entre em contato com comics@nodelane.net sobre privacidade, acesso, correção ou exclusão. Atualizado em 2026-10-17. As alterações materiais serão explicadas nesta página e comunicadas de forma adequada."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Permissões e armazenamento local",
             "paragraphs": [
               "A extensão declara na instalação o acesso a todos os sites e domínios de imagens HTTP/HTTPS, sem solicitar permissões por site ou domínio durante o uso. Você pode limitar o acesso nas configurações de extensões do navegador; se algum recurso parar de funcionar, restaure o acesso a todos os sites e tente novamente. Cookies e tokens de login do site de origem e o histórico de navegação não são enviados ao serviço oficial de tradução. Apenas as imagens selecionadas e os dados necessários à tarefa são processados.",
-              "A biblioteca, posição de leitura, preferências e dados locais importados ficam no navegador; a análise é local e as imagens relevantes são enviadas quando a tradução é solicitada. A biblioteca não é sincronizada automaticamente. O site mantém o estado da conta e autorização, tokens de acesso e atualização no armazenamento da sessão da guia atual. A extensão possui suas próprias regras de armazenamento de sessão. Limpar os dados do navegador pode desconectar você ou remover informações de leitura local. O progresso OPDS só é sincronizado quando a fonte oferece essa função e sua compatibilidade foi verificada. Em caso de falha, o progresso local é preservado. Isso não sincroniza toda a biblioteca nem os arquivos de origem. Após conectar, a senha e o token do MTU ficam salvos localmente neste computador. Com o mesmo endereço de serviço e nome de usuário, deixe a senha em branco para reutilizar a salva. Digite-a novamente se o endereço, usuário ou senha mudar, se ela deixar de ser válida ou se um perfil antigo contiver apenas um token. Salvar a senha e reconectar com o campo em branco requer a extensão 0.10.2 ou posterior; nas versões anteriores, digite a senha em cada reconexão."
+              "Biblioteca, posições, preferências e arquivos importados ficam no navegador, sem sincronização automática de toda a biblioteca. Ao se conectar a uma biblioteca OPDS que ofereça uma interface de progresso de leitura, a extensão pode sincronizar a posição de leitura com essa biblioteca. Essa é uma sincronização com a biblioteca de origem, não uma sincronização na nuvem da NodeLane. Login do site e tokens de acesso/renovação persistem no localStorage, com mudanças compartilhadas entre abas do mesmo navegador. sessionStorage guarda o estado temporário de autorização. Sair do site apaga sua sessão local, não a da extensão ou do provedor de identidade. Apagar dados do site pode remover login e histórico local."
             ]
           },
           {
             "title": "Prestadores de serviços e transferências",
             "paragraphs": [
               "A extensão oferece tradução. O processamento pode envolver detecção/OCR, modelos de texto, reparo de fundo local e composição tipográfica. Os provedores de texto processam o texto reconhecido necessário para tradução. Os provedores reais são configurados no servidor para a tarefa.",
-              "As imagens de tradução utilizam arquivos privados no servidor central; texto reconhecido, traduções e metadados necessários são armazenados no banco de dados. Os serviços de identidade, infraestrutura, tradução e pagamento processam dados conforme necessário, de acordo com as políticas aplicáveis. O processamento pode ocorrer fora da sua região. Não vendemos informações pessoais nem usamos quadrinhos enviados para direcionamento de anúncios. Não prometemos que todos os provedores não retenham nada ou nunca utilizem dados para treinamento; isso depende do fornecedor e do contrato. Não envie conteúdo confidencial não autorizado ou inadequado."
+              "Tradução de uma imagem: As imagens de tradução utilizam arquivos privados no servidor central; texto reconhecido, traduções e metadados necessários são armazenados no banco de dados. Os serviços de identidade, infraestrutura, tradução e pagamento processam dados conforme necessário, de acordo com as políticas aplicáveis. O processamento pode ocorrer fora da sua região. Não vendemos informações pessoais nem usamos quadrinhos enviados para direcionamento de anúncios. Não prometemos que todos os provedores não retenham nada ou nunca utilizem dados para treinamento; isso depende do fornecedor e do contrato. Não envie conteúdo confidencial não autorizado ou inadequado."
             ]
           },
           {
             "title": "Retenção e exclusão",
             "paragraphs": [
-              "Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados permanecem privados enquanto sua conta tiver uma solicitação válida. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
-              "Os resultados são reutilizados somente na mesma conta quando o conteúdo, o modo, o idioma e a configuração efetiva correspondem e uma solicitação válida permanece. Originais e resultados não são compartilhados entre usuários. O navegador combina sobreposições com sua própria imagem original; o servidor não mantém cópias originais permanentes. A exclusão de um registro de tradução revoga imediatamente o acesso ao servidor dessa solicitação. Outras solicitações válidas em sua conta permanecem utilizáveis; o arquivo de resultado é removido após a última solicitação válida ser revogada. As cópias baixadas ou armazenadas em cache podem permanecer no seu dispositivo até que você as apague.",
+              "Tradução de uma imagem: Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados permanecem privados enquanto sua conta tiver uma solicitação válida. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
+              "Tradução de uma imagem: Os resultados são reutilizados somente na mesma conta quando o conteúdo, o modo, o idioma e a configuração efetiva correspondem e uma solicitação válida permanece. Originais e resultados não são compartilhados entre usuários. O navegador combina sobreposições com sua própria imagem original; o servidor não mantém cópias originais permanentes. A exclusão de um registro de tradução revoga imediatamente o acesso ao servidor dessa solicitação. Outras solicitações válidas em sua conta permanecem utilizáveis; o arquivo de resultado é removido após a última solicitação válida ser revogada. As cópias baixadas ou armazenadas em cache podem permanecer no seu dispositivo até que você as apague.",
               "Para solicitações de exclusão de conta ou mais amplas, entre em contato conosco para verificação de identidade e escopo. Os registros de transações, auditorias ou segurança podem precisar de retenção para obrigações de serviço, disputas ou requisitos aplicáveis. Não é prometido um prazo único para eliminação de todos os registos; a resposta explicará o resultado e as restrições."
             ]
           },
           {
             "title": "Segurança, escolhas e menores",
             "paragraphs": [
-              "O servidor central verifica a autorização da conta e retorna os arquivos de resultados diretamente, sem emitir links de download assinados de curta duração. As chaves do provedor permanecem no back-end. Proteja sua conta e dispositivo e não compartilhe tokens de acesso. Você pode restringir o acesso a sites no navegador, interromper a tradução, sair ou remover dados locais do navegador; a funcionalidade necessária pode então ficar indisponível. O site não possui rastreadores de publicidade ou scripts analíticos de terceiros.",
+              "Tradução de uma imagem: O servidor central verifica a autorização da conta e retorna os arquivos de resultados diretamente, sem emitir links de download assinados de curta duração. As chaves do provedor permanecem no back-end. Proteja sua conta e dispositivo e não compartilhe tokens de acesso. Você pode restringir o acesso a sites no navegador, interromper a tradução, sair ou remover dados locais do navegador; a funcionalidade necessária pode então ficar indisponível. O site não possui rastreadores de publicidade ou scripts analíticos de terceiros.",
               "Os menores devem utilizar o serviço com conhecimento e orientação adequados dos responsáveis e obter a autorização necessária para assinaturas. Não envie informações pessoais confidenciais de crianças. Os tutores podem entrar em contato conosco para solicitar verificação e tratamento de processamento inadequado. Relate preocupações de segurança usando apenas informações necessárias e editadas; senhas e tokens não são necessários."
+            ]
+          },
+          {
+            "title": "Tradução completa de PDF / ZIP / CBZ",
+            "paragraphs": [
+              "A tradução completa exige login. PDF / ZIP / CBZ selecionados são enviados diretamente ao Cloudflare R2 privado. Nós de processamento analisam, reconhecem e renderizam páginas; modelos de texto processam o texto reconhecido necessário. R2 guarda entradas e o ZIP completo de imagens traduzidas; o banco guarda tarefas, texto e uso. Envios e downloads usam URLs assinadas temporárias. Não compartilhe: uma URL emitida pode funcionar até expirar.",
+              "Documentos não seguem a retenção prolongada das camadas de imagens. Padrões: concluir envio em 1 hora; arquivos enviados não iniciados expiram em 24 horas; entradas encerradas e saídas com falha são limpas após 1 hora; ZIP bem-sucedidos ficam por 7 dias. Consulte a validade na tarefa. Entradas ativas ou com resultado incerto podem ficar para recuperação. Temporários dos nós seguem procedimentos de recuperação e limpeza; registros necessários de tarefas, cobrança e segurança são retidos separadamente. O download do servidor expira; cópias baixadas ficam sob seu controle."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Termos de serviço",
         "description": "Condições de uso de NodeLane Comics, direitos de conteúdo, limitações de IA e assinaturas.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Serviço e contas",
             "paragraphs": [
-              "NodeLane Comics fornece serviços de extensão, leitura e tradução. Leia estes termos e a política de privacidade antes de usar; pare de usar o serviço se discordar. Atualizado em 4 de outubro de 2026. O site fornece informações de produtos, guias, downloads e gerenciamento de contas, não um catálogo de quadrinhos ou vendas de quadrinhos.",
-              "Use uma conta que você tenha direito de usar e proteja suas credenciais e dispositivo. Os benefícios e o acesso são verificados no servidor. Não se faça passar por terceiros, acesse seus registros privados, ignore limites de frequência ou imagem, interrompa serviços com automação abusiva ou ataque o produto e seus fornecedores. O uso indevido pode levar à restrição de acesso."
+              "NodeLane Comics fornece serviços de extensão, leitura e tradução. Leia estes termos e a política de privacidade antes de usar; pare de usar o serviço se discordar. Atualizado em 2026-10-17. O site fornece informações de produtos, guias, downloads e gerenciamento de contas, não um catálogo de quadrinhos ou vendas de quadrinhos.",
+              "Use uma conta que você tenha direito de usar e proteja suas credenciais e dispositivo. Os benefícios e o acesso são verificados no servidor. Não se faça passar por terceiros, acesse seus registros privados, ignore limites de frequência ou imagem, interrompa serviços com automação abusiva ou ataque o produto e seus fornecedores. O uso indevido pode levar à restrição de acesso.",
+              "O código da extensão usa GPL-3.0-only; componentes de terceiros mantêm suas licenças. Estes termos do serviço on-line não restringem direitos de uso, modificação ou redistribuição da GPL e não concedem direitos sobre quadrinhos."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Benefícios e assinaturas",
             "paragraphs": [
               membershipSummary,
-              "As assinaturas oferecem faturamento mensal ou anual. Preços, avaliações e franquias de páginas seguem a oferta selecionada, que é renovada automaticamente nesse intervalo. As alterações de preço aplicam-se a novas assinaturas; as assinaturas existentes mantêm o preço original e a versão de benefícios. Cancele antes da renovação."
+              "Novas assinaturas são trimestrais ou anuais, sem teste com cartão, com renovação automática nesse intervalo. Cada período contém 3/12 janelas mensais ancoradas na data UTC original de cobrança; páginas não acumulam nem podem ser antecipadas. Preços, tributos e benefícios seguem pedido e conta. Assinaturas existentes mantêm preço e versão de benefícios originais; testes e presentes antigos seguem seus registros.",
+              "Modelos gratuitos usam páginas gratuitas (incluindo presentes aplicáveis), de assinatura e compradas, nessa ordem. Modelos pagos usam apenas assinatura ou compras. Cada nova versão de página gerada com sucesso consome 1 página. Mesma solicitação, reutilização de resultado próprio válido e tentativas internas não cobram duas vezes; retraduzir expressamente uma nova versão conta. Falha, cancelamento ou ausência de texto traduzível liberam reservas pelas regras; resultados incertos são verificados. Os pacotes atuais não expiram nem se renovam. Tarefas que realmente consomem páginas compradas recebem os limites de admissão e a prioridade de execução PLUS do pacote; apenas ter saldo não dá admissão paga a tarefas que usam a cota gratuita. Ao se esgotar, o pacote deixa de conceder seus benefícios.",
+              "Taxa de admissão e saldo são separados. Padrão: 10 imagens novas por 60 segundos móveis para contas comuns e 100 para níveis pagos. Limites por hora só se aplicam quando configurados nos direitos; prevalecem os limites reais da conta e serviço. Mesma solicitação e reutilização válida não contam duas vezes; falhas ou cancelamentos aceitos podem ocupar a janela. Limites de imagem, concorrência e capacidade continuam, sem garantia de velocidade."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Assinaturas, cancelamento e reembolsos",
-        "description": "As assinaturas oferecem faturamento mensal ou anual. Preços, avaliações e franquias de páginas seguem a oferta selecionada, que é renovada automaticamente nesse intervalo. As alterações de preço aplicam-se a novas assinaturas; as assinaturas existentes mantêm o preço original e a versão de benefícios. Cancele antes da renovação.",
+        "description": "Novas assinaturas são trimestrais ou anuais, sem teste com cartão, com renovação automática nesse intervalo.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Avaliação e cobrança",
+            "title": "Planos atuais e renovação",
             "paragraphs": [
-              "As assinaturas oferecem faturamento mensal ou anual. Preços, avaliações e franquias de páginas seguem a oferta selecionada, que é renovada automaticamente nesse intervalo. As alterações de preço aplicam-se a novas assinaturas; as assinaturas existentes mantêm o preço original e a versão de benefícios. Cancele antes da renovação.",
-              "Contas elegíveis podem iniciar o teste indicado para seu plano, que exige um cartão. Assinar novamente ou escolher outro plano não renova a elegibilidade ao teste."
+              membershipSummary,
+              "Novas assinaturas são trimestrais ou anuais, sem teste com cartão, com renovação automática nesse intervalo. Cada período contém 3/12 janelas mensais ancoradas na data UTC original de cobrança; páginas não acumulam nem podem ser antecipadas. Preços, tributos e benefícios seguem pedido e conta. Assinaturas existentes mantêm preço e versão de benefícios originais; testes e presentes antigos seguem seus registros."
             ]
           },
           {
             "title": "Pare a renovação futura",
             "paragraphs": [
               "Faça login na conta do seu site ou use a entrada da conta de extensão para gerenciar a assinatura. O cancelamento interrompe a próxima renovação e não apaga automaticamente os benefícios já válidos; confie no vencimento mostrado em sua conta.",
-              "Cancele antes do término do período de avaliação se não desejar a renovação paga. Desinstalar, fechar o navegador ou sair não cancela a assinatura. Envie um e-mail para comics@nodelane.net se você não conseguir acessar sua conta."
+              "Cancele na conta do site antes da renovação. Para teste antigo, cancele antes do término original para evitar cobrança. Desinstalar, fechar o navegador ou sair não cancela a assinatura. Pedidos pagos permanecem separados, sem fusão, rateio ou reembolso automático. Compra incorreta ou dificuldade de acesso: comics@nodelane.net."
             ]
           },
           {
             "title": "Permissão de páginas versus pagamento",
             "paragraphs": [
-              "Uma reserva de tarefa é separada de uma transação de pagamento. Falha explícita libera páginas reservadas de acordo com as regras; um resultado desconhecido é verificado primeiro. Este não é um reembolso automático de taxas de assinatura. Os resultados válidos existentes permanecem acessíveis após a expiração da associação, enquanto novas tarefas utilizam o direito na aceitação."
+              "Reservas e pagamentos são separados. Falhas confirmadas liberam páginas pelas regras; resultados incertos são verificados, sem reembolso monetário automático. Após a assinatura expirar, resultados só continuam acessíveis durante sua própria retenção e com autorização válida. Novas tarefas usam os benefícios atuais."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Como funcionam os limites de tradução PLUS / Pro?",
-        "answer": "A mesma conta compartilha um limite de 100 novas imagens para traduzir em cada janela móvel de 60 segundos e 1.200 em cada janela móvel de 3.600 segundos, entre todos os dispositivos, modos e idiomas. O plano Grátis permite 10 em cada janela móvel de 60 segundos. Repetir a mesma solicitação ou reutilizar resultados válidos não conta novamente. Tarefas aceitas contam mesmo se falharem, forem canceladas ou não tiverem texto. Solicitações rejeitadas e transações de banco de dados revertidas liberam a vaga reservada na cota horária. Novas tentativas seguem as regras reais de admissão de novas tarefas. Esses limites não garantem velocidade de conclusão.",
+        "answer": "Taxa de admissão e saldo são separados. Padrão: 10 imagens novas por 60 segundos móveis para contas comuns e 100 para níveis pagos. Limites por hora só se aplicam quando configurados nos direitos; prevalecem os limites reais da conta e serviço. Mesma solicitação e reutilização válida não contam duas vezes; falhas ou cancelamentos aceitos podem ocupar a janela. Limites de imagem, concorrência e capacidade continuam, sem garantia de velocidade.",
         "relatedPath": "/pricing/"
       },
       {

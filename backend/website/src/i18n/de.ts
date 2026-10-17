@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Datenschutzrichtlinie",
         "description": "Wie NodeLane Comics mit Konten, Bildern, Berechtigungen, Übersetzungen, Abonnements und Löschungen umgeht.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Übersetzung von Website-Bildern und Gasttests",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Umfang und Kontakt",
             "paragraphs": [
-              "Diese Richtlinie gilt für die NodeLane Comics-Website, Erweiterungs-, Lese- und Übersetzungsdienste, die vom NodeLane Comics-Team gepflegt werden. Kontaktieren Sie comics@nodelane.net bezüglich Datenschutz, Zugriff, Korrektur oder Löschung. Aktualisiert am 4. Oktober 2026. Wesentliche Änderungen werden auf dieser Seite erläutert und entsprechend kommuniziert."
+              "Diese Richtlinie gilt für die NodeLane Comics-Website, Erweiterungs-, Lese- und Übersetzungsdienste, die vom NodeLane Comics-Team gepflegt werden. Kontaktieren Sie comics@nodelane.net bezüglich Datenschutz, Zugriff, Korrektur oder Löschung. Aktualisiert am 2026-10-17. Wesentliche Änderungen werden auf dieser Seite erläutert und entsprechend kommuniziert."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Berechtigungen und lokaler Speicher",
             "paragraphs": [
               "Die Erweiterung deklariert bei der Installation Zugriff auf alle HTTP/HTTPS-Websites und Bilddomains, ohne während der Nutzung einzelne Websites oder Domains zur Freigabe anzufragen. Du kannst den Zugriff in den Erweiterungseinstellungen des Browsers einschränken; funktionieren betroffene Funktionen nicht mehr, stelle den Zugriff auf alle Websites wieder her und versuche es erneut. Cookies und Anmeldetoken der Quellwebsite sowie der Browserverlauf werden nicht an den offiziellen Übersetzungsdienst gesendet. Verarbeitet werden nur ausgewählte Bilder und notwendige Aufgabendaten.",
-              "Die Bibliothek, Leseposition, Präferenzen und importierten lokalen Daten leben im Browser; Die Analyse erfolgt lokal und relevante Bilder werden gesendet, wenn eine Übersetzung angefordert wird. Die Bibliothek wird nicht automatisch synchronisiert. Die Website speichert den Konto- und Autorisierungsstatus sowie Zugriffs- und Aktualisierungstoken im Sitzungsspeicher der aktuellen Registerkarte. Die Erweiterung verfügt über eigene Sitzungsspeicherregeln. Durch das Löschen von Browserdaten können Sie sich abmelden oder lokale Leseinformationen entfernen. Der OPDS-Lesefortschritt wird nur synchronisiert, wenn die Quelle dies unterstützt und ihre Kompatibilität geprüft wurde. Bei einem Fehler bleibt der lokale Fortschritt erhalten. Die gesamte Bibliothek und Quelldateien werden dadurch nicht synchronisiert. Nach der Verbindung werden MTU-Passwort und Token lokal auf diesem Computer gespeichert. Bei gleicher Dienstadresse und gleichem Benutzernamen lässt du das Passwort leer, um das gespeicherte wiederzuverwenden. Gib es erneut ein, wenn sich Adresse, Benutzername oder Passwort ändern, es ungültig ist oder ein altes Profil nur einen Token enthält. Das Speichern des Passworts und die erneute Verbindung mit leerem Passwortfeld erfordern die Erweiterung in Version 0.10.2 oder neuer; in älteren Versionen muss das Passwort bei jeder erneuten Verbindung eingegeben werden."
+              "Regal, Lesepositionen, Einstellungen und importierte Dateien bleiben im Browser; das gesamte Regal wird nicht automatisch synchronisiert. Bei Verbindung mit einer OPDS-Bibliothek, die eine Schnittstelle für den Lesefortschritt unterstützt, kann die Erweiterung Lesepositionen mit dieser Bibliothek synchronisieren. Dies ist eine Synchronisierung mit der Quellbibliothek, keine NodeLane-Cloud-Synchronisierung. Website-Anmeldung sowie Zugriffs-/Aktualisierungstoken bleiben in localStorage, mit gemeinsamem Anmeldestatus über Tabs desselben Browsers. sessionStorage enthält den temporären Autorisierungsablauf. Abmelden auf der Website löscht deren lokale Sitzung, nicht die der Erweiterung oder des Identitätsanbieters. Das Löschen von Websitedaten kann Anmeldung und lokalen Verlauf entfernen."
             ]
           },
           {
             "title": "Dienstleister und Transfers",
             "paragraphs": [
               "Die Verarbeitung kann Erkennung/OCR, Textmodelle, lokale Hintergrundreparatur und Schriftsatz umfassen. Textanbieter verarbeiten den erkannten Text, der für die Übersetzung benötigt wird. Für die Aufgabe werden auf dem Server tatsächliche Anbieter konfiguriert.",
-              "Für Übersetzungsbilder werden private Dateien auf dem zentralen Server verwendet. Erkannter Text, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Identitäts-, Infrastruktur-, Übersetzungs- und Zahlungsdienste verarbeiten Daten nach Bedarf gemäß ihren geltenden Richtlinien. Die Verarbeitung kann außerhalb Ihrer Region erfolgen. Wir verkaufen keine personenbezogenen Daten und verwenden die eingereichten Comics nicht für zielgerichtete Werbung. Wir versprechen nicht, dass alle Anbieter keine Daten speichern oder niemals für Schulungen verwenden. Dies hängt vom Anbieter und der Vereinbarung ab. Übermitteln Sie keine unautorisierten oder ungeeigneten sensiblen Inhalte."
+              "Einzelbildübersetzung: Für Übersetzungsbilder werden private Dateien auf dem zentralen Server verwendet. Erkannter Text, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert. Identitäts-, Infrastruktur-, Übersetzungs- und Zahlungsdienste verarbeiten Daten nach Bedarf gemäß ihren geltenden Richtlinien. Die Verarbeitung kann außerhalb Ihrer Region erfolgen. Wir verkaufen keine personenbezogenen Daten und verwenden die eingereichten Comics nicht für zielgerichtete Werbung. Wir versprechen nicht, dass alle Anbieter keine Daten speichern oder niemals für Schulungen verwenden. Dies hängt vom Anbieter und der Vereinbarung ab. Übermitteln Sie keine unautorisierten oder ungeeigneten sensiblen Inhalte."
             ]
           },
           {
             "title": "Aufbewahrung und Löschung",
             "paragraphs": [
-              "Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der Übersetzung bleiben Overlay-Dateien erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
-              "Ergebnisse werden nur dann innerhalb desselben Kontos wiederverwendet, wenn Inhalt, Modus, Sprache und effektive Konfiguration übereinstimmen und eine gültige Anfrage verbleibt. Originale und Ergebnisse werden nicht zwischen Benutzern geteilt. Der Browser kombiniert Overlays mit seinem eigenen Originalbild; Der Server speichert keine dauerhaften Originalkopien. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen.",
+              "Einzelbildübersetzung: Originale sind temporäre Dateien auf dem zentralen Server und den Rechenknoten, die gelöscht werden, nachdem eine Aufgabe abgeschlossen, fehlgeschlagen oder abgebrochen wurde. Bei der Übersetzung bleiben Overlay-Dateien erhalten. Die Ergebnisse bleiben privat, solange für Ihr Konto eine gültige Anfrage vorliegt. Erkannte Texte, Übersetzungen und notwendige Metadaten werden in der Datenbank gespeichert.",
+              "Einzelbildübersetzung: Ergebnisse werden nur dann innerhalb desselben Kontos wiederverwendet, wenn Inhalt, Modus, Sprache und effektive Konfiguration übereinstimmen und eine gültige Anfrage verbleibt. Originale und Ergebnisse werden nicht zwischen Benutzern geteilt. Der Browser kombiniert Overlays mit seinem eigenen Originalbild; Der Server speichert keine dauerhaften Originalkopien. Durch das Löschen eines Übersetzungsdatensatzes wird der Serverzugriff dieser Anfrage sofort widerrufen. Andere gültige Anfragen in Ihrem Konto bleiben weiterhin nutzbar; Die Ergebnisdatei wird entfernt, nachdem die letzte gültige Anfrage widerrufen wurde. Heruntergeladene oder zwischengespeicherte Kopien verbleiben möglicherweise auf Ihrem Gerät, bis Sie sie löschen.",
               "Für Konto- oder umfassendere Löschungsanfragen kontaktieren Sie uns zur Identitäts- und Umfangsüberprüfung. Transaktions-, Audit- oder Sicherheitsaufzeichnungen müssen möglicherweise für Serviceverpflichtungen, Streitigkeiten oder geltende Anforderungen aufbewahrt werden. Es wird keine einheitliche Löschfrist für alle Aufzeichnungen versprochen; In der Antwort werden das Ergebnis und die Einschränkungen erläutert."
             ]
           },
           {
             "title": "Sicherheit, Entscheidungen und Minderjährige",
             "paragraphs": [
-              "Der zentrale Server prüft die Kontoautorisierung und gibt Ergebnisdateien direkt zurück, ohne kurzlebige signierte Download-Links auszugeben. Anbieterschlüssel bleiben im Backend. Schützen Sie Ihr Konto und Ihr Gerät und geben Sie keine Zugriffstoken weiter. Sie können den Website-Zugriff im Browser einschränken, die Übersetzung stoppen, sich abmelden oder lokale Browserdaten entfernen; Die erforderliche Funktionalität ist dann möglicherweise nicht verfügbar. Die Website verfügt über keine Werbe-Tracker oder Analyseskripte von Drittanbietern.",
+              "Einzelbildübersetzung: Der zentrale Server prüft die Kontoautorisierung und gibt Ergebnisdateien direkt zurück, ohne kurzlebige signierte Download-Links auszugeben. Anbieterschlüssel bleiben im Backend. Schützen Sie Ihr Konto und Ihr Gerät und geben Sie keine Zugriffstoken weiter. Sie können den Website-Zugriff im Browser einschränken, die Übersetzung stoppen, sich abmelden oder lokale Browserdaten entfernen; Die erforderliche Funktionalität ist dann möglicherweise nicht verfügbar. Die Website verfügt über keine Werbe-Tracker oder Analyseskripte von Drittanbietern.",
               "Minderjährige sollten den Dienst mit den entsprechenden Kenntnissen und Anleitungen eines Erziehungsberechtigten nutzen und die erforderliche Genehmigung für Abonnements einholen. Geben Sie keine sensiblen persönlichen Daten von Kindern weiter. Erziehungsberechtigte können sich mit uns in Verbindung setzen, um eine Überprüfung und Behandlung einer unangemessenen Verarbeitung anzufordern. Melden Sie Sicherheitsbedenken nur mit den erforderlichen, redigierten Informationen. Passwörter und Token sind nicht erforderlich."
+            ]
+          },
+          {
+            "title": "Übersetzung ganzer PDF / ZIP / CBZ",
+            "paragraphs": [
+              "Die Übersetzung ganzer Dateien erfordert eine Anmeldung. Gewählte PDF / ZIP / CBZ werden direkt in privates Cloudflare R2 geladen. Rechenknoten analysieren, erkennen und rendern Seiten; Textmodelle verarbeiten erforderlichen erkannten Text. R2 speichert Eingaben und das vollständige ZIP übersetzter Bilder, die Datenbank Aufgaben, Text und Nutzung. Upload und Download nutzen befristete signierte URLs. Nicht teilen: Ausgestellte URLs können bis zum Ablauf nutzbar bleiben.",
+              "Dokumente haben andere Fristen als langfristig gespeicherte Einzelbild-Overlays. Standard: Upload binnen 1 Stunde, Ablauf hochgeladener nicht gestarteter Dateien nach 24 Stunden, Bereinigung beendeter Eingaben und fehlgeschlagener Ausgaben nach 1 Stunde, erfolgreiche ZIPs für 7 Tage. Maßgeblich ist der Ablauf in der Aufgabe. Aktive oder ungeklärte Eingaben können zur Wiederherstellung bleiben. Temporäre Knotendateien folgen Wiederherstellungs-/Bereinigungsverfahren; notwendige Aufgaben-, Abrechnungs- und Sicherheitsdaten bleiben gesondert erhalten. Serverdownloads laufen ab; heruntergeladene Kopien verwalten Sie selbst."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Nutzungsbedingungen",
         "description": "Bedingungen für die Nutzung von NodeLane Comics, Inhaltsrechte, KI-Einschränkungen und Abonnements.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Service und Konten",
             "paragraphs": [
-              "NodeLane Comics bietet Erweiterungs-, Lese- und Übersetzungsdienste. Lesen Sie diese Bedingungen und die Datenschutzrichtlinie vor der Nutzung; Beenden Sie die Nutzung des Dienstes, wenn Sie damit nicht einverstanden sind. Aktualisiert am 4. Oktober 2026. Die Website bietet Produktinformationen, Anleitungen, Downloads und Kontoverwaltung, keinen Comic-Katalog oder Comic-Verkäufe.",
-              "Verwenden Sie ein Konto, zu dessen Nutzung Sie berechtigt sind, und schützen Sie Ihre Anmeldeinformationen und Ihr Gerät. Vorteile und Zugriff werden auf dem Server überprüft. Geben Sie sich nicht als andere aus, greifen Sie nicht auf deren private Aufzeichnungen zu, umgehen Sie keine Raten- oder Bildbeschränkungen, stören Sie Dienste nicht durch missbräuchliche Automatisierung und greifen Sie das Produkt und seine Anbieter nicht an. Bei Missbrauch kann es zu einer Zugangsbeschränkung kommen."
+              "NodeLane Comics bietet Erweiterungs-, Lese- und Übersetzungsdienste. Lesen Sie diese Bedingungen und die Datenschutzrichtlinie vor der Nutzung; Beenden Sie die Nutzung des Dienstes, wenn Sie damit nicht einverstanden sind. Aktualisiert am 2026-10-17. Die Website bietet Produktinformationen, Anleitungen, Downloads und Kontoverwaltung, keinen Comic-Katalog oder Comic-Verkäufe.",
+              "Verwenden Sie ein Konto, zu dessen Nutzung Sie berechtigt sind, und schützen Sie Ihre Anmeldeinformationen und Ihr Gerät. Vorteile und Zugriff werden auf dem Server überprüft. Geben Sie sich nicht als andere aus, greifen Sie nicht auf deren private Aufzeichnungen zu, umgehen Sie keine Raten- oder Bildbeschränkungen, stören Sie Dienste nicht durch missbräuchliche Automatisierung und greifen Sie das Produkt und seine Anbieter nicht an. Bei Missbrauch kann es zu einer Zugangsbeschränkung kommen.",
+              "Der Erweiterungsquellcode steht unter GPL-3.0-only; Drittkomponenten behalten eigene Lizenzen. Diese Onlinedienstbedingungen beschränken keine GPL-Rechte zur Nutzung, Änderung oder Weitergabe und gewähren keine Rechte an Comic-Inhalten."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Vorteile und Abonnements",
             "paragraphs": [
               membershipSummary,
-              "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen."
+              "Neue Abos werden derzeit vierteljährlich oder jährlich ohne Testphase mit Karte abgerechnet und automatisch verlängert. Der Zeitraum enthält 3/12 monatliche Kontingentfenster, verankert am ursprünglichen UTC-Abrechnungstag. Ungenutzte Seiten werden nicht übertragen, zukünftige nicht vorgezogen. Preise, Steuern und Rechte richten sich nach Bestellung und Konto. Bestehende Abos behalten ursprüngliche Preise und Rechteversionen; frühere Tests und Geschenke folgen ihren ursprünglichen Einträgen.",
+              "Kostenlose Modelle verbrauchen erst kostenlose Seiten einschließlich geltender Geschenke, dann Abo- und Kaufseiten. Bezahlmodelle nutzen nur Abo- oder Kaufseiten. Jede erfolgreich erzeugte neue Seitenversion kostet 1 Seite. Dieselbe Anfrage, eigene gültige Ergebniswiederverwendung und interne Wiederholungen kosten nicht doppelt; ausdrücklich neu übersetzte Versionen zählen. Fehler, Abbruch oder kein übersetzbarer Text geben Reservierungen regelgemäß frei; unklare Ergebnisse werden zuerst geprüft. Aktuelle Pakete laufen nicht ab und verlängern sich nicht automatisch. Aufgaben, die tatsächlich gekaufte Seiten verbrauchen, erhalten die PLUS-Annahmelimits und Ausführungspriorität des Pakets; ein Guthaben allein stuft Aufgaben mit kostenlosem Kontingent nicht auf die kostenpflichtige Annahme hoch. Nach Verbrauch gewährt das Paket keine weiteren Vorteile.",
+              "Annahmerate und Seitenguthaben sind getrennt. Standardmäßig: 10 neue Bilder je gleitenden 60 Sekunden für normale Konten, 100 für bezahlte Stufen. Stundenlimits gelten nur bei entsprechender Rechtekonfiguration; tatsächliche Konto- und Dienstgrenzen sind maßgeblich. Gleiche Anfrage und gültige Wiederverwendung zählen nicht doppelt; angenommene Fehler oder Abbrüche können das Zeitfenster belegen. Bild-, Parallelitäts- und Kapazitätsgrenzen gelten weiterhin, ohne Geschwindigkeitsgarantie."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Abonnements, Stornierung und Rückerstattungen",
-        "description": "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen.",
+        "description": "Neue Abos werden derzeit vierteljährlich oder jährlich ohne Testphase mit Karte abgerechnet und automatisch verlängert.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Testversion und Abrechnung",
+            "title": "Aktuelle Tarife und Verlängerung",
             "paragraphs": [
-              "Abonnements bieten eine monatliche oder jährliche Abrechnung. Preise, Testversionen und Seitenkontingente richten sich nach dem ausgewählten Angebot, das sich in diesem Zeitraum automatisch verlängert. Preisänderungen gelten für neue Abonnements; Bestehende Abonnements behalten ihre ursprüngliche Preis- und Leistungsversion. Vor der Verlängerung kündigen.",
-              "Berechtigte Konten können die für ihren Plan angezeigte kartenpflichtige Testversion starten. Durch ein erneutes Abonnieren oder Auswählen eines anderen Plans wird die Testberechtigung nicht zurückgesetzt."
+              membershipSummary,
+              "Neue Abos werden derzeit vierteljährlich oder jährlich ohne Testphase mit Karte abgerechnet und automatisch verlängert. Der Zeitraum enthält 3/12 monatliche Kontingentfenster, verankert am ursprünglichen UTC-Abrechnungstag. Ungenutzte Seiten werden nicht übertragen, zukünftige nicht vorgezogen. Preise, Steuern und Rechte richten sich nach Bestellung und Konto. Bestehende Abos behalten ursprüngliche Preise und Rechteversionen; frühere Tests und Geschenke folgen ihren ursprünglichen Einträgen."
             ]
           },
           {
             "title": "Stoppen Sie zukünftige Verlängerungen",
             "paragraphs": [
               "Melden Sie sich bei Ihrem Website-Konto an oder verwenden Sie den Erweiterungskontoeintrag, um das Abonnement zu verwalten. Durch die Stornierung wird die nächste Verlängerung gestoppt und bereits gültige Vorteile werden nicht automatisch gelöscht. Verlassen Sie sich auf das in Ihrem Konto angezeigte Ablaufdatum.",
-              "Kündigen Sie vor Ablauf der Testversion, wenn Sie keine kostenpflichtige Verlängerung wünschen. Durch die Deinstallation, das Schließen des Browsers oder das Abmelden wird ein Abonnement nicht gekündigt. Senden Sie eine E-Mail an comics@nodelane.net, wenn Sie nicht auf Ihr Konto zugreifen können."
+              "Vor Verlängerung im Website-Konto kündigen. Bei früheren Testphasen vor deren ursprünglichem Ende kündigen, um Zahlung zu vermeiden. Deinstallation, Browserschließen oder Abmelden kündigen nicht. Mehrere bezahlte Bestellungen bleiben getrennt, ohne automatische Zusammenführung, anteilige Verrechnung oder Erstattung. Fehlkauf oder Zugangsprobleme: comics@nodelane.net."
             ]
           },
           {
             "title": "Seitenvergütung versus Bezahlung",
             "paragraphs": [
-              "Eine Aufgabenreservierung ist von einem Zahlungsvorgang getrennt. Ein expliziter Fehler gibt reservierte Seiten gemäß den Regeln frei; ein unbekanntes Ergebnis wird zunächst verifiziert. Dabei handelt es sich nicht um eine automatische Rückerstattung der Abonnementgebühren. Gültige bestehende Ergebnisse bleiben nach Ablauf der Mitgliedschaft weiterhin zugänglich, während neue Aufgaben die Berechtigung bei Annahme nutzen."
+              "Reservierungen und Zahlungen sind getrennt. Bestätigte Fehler geben Seiten regelgemäß frei; unklare Ergebnisse werden geprüft, ohne automatische Geldrückzahlung. Nach Aboablauf sind Ergebnisse nur innerhalb ihrer eigenen Speicherfrist und bei gültiger Berechtigung zugänglich. Neue Aufgaben nutzen aktuelle Rechte."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Wie funktionieren die PLUS / Pro-Übersetzungslimits?",
-        "answer": "Ein Konto verfügt über ein Limit von 100 neuen Übersetzungsbildern pro laufenden 60 Sekunden und 1.200 pro laufenden 3.600 Sekunden für alle Geräte, Modi und Sprachen. Kostenlos erlaubt 10 pro rollenden 60 Sekunden. Das erneute Abspielen derselben Anfrage und die Wiederverwendung gültiger Ergebnisse werden nicht erneut gezählt. Angenommene Aufgaben zählen weiterhin, wenn sie fehlschlagen, abgebrochen werden oder keinen Text enthalten. Abgelehnte Anfragen oder zurückgesetzte Datenbanktransaktionen geben den reservierten stündlichen Slot frei. Wiederholungsversuche folgen den tatsächlichen Zulassungsregeln für neue Aufgaben. Diese Grenzwerte garantieren keine Abschlussgeschwindigkeit.",
+        "answer": "Annahmerate und Seitenguthaben sind getrennt. Standardmäßig: 10 neue Bilder je gleitenden 60 Sekunden für normale Konten, 100 für bezahlte Stufen. Stundenlimits gelten nur bei entsprechender Rechtekonfiguration; tatsächliche Konto- und Dienstgrenzen sind maßgeblich. Gleiche Anfrage und gültige Wiederverwendung zählen nicht doppelt; angenommene Fehler oder Abbrüche können das Zeitfenster belegen. Bild-, Parallelitäts- und Kapazitätsgrenzen gelten weiterhin, ohne Geschwindigkeitsgarantie.",
         "relatedPath": "/pricing/"
       },
       {

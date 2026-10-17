@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Kebijakan privasi",
         "description": "Bagaimana NodeLane Comics menangani akun, gambar, izin, terjemahan, langganan, dan penghapusan.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Terjemahan gambar situs web dan uji coba tamu",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Ruang lingkup dan kontak",
             "paragraphs": [
-              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 4 Oktober 2026. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
+              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 2026-10-17. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Izin dan penyimpanan lokal",
             "paragraphs": [
               "Ekstensi mendeklarasikan akses ke semua situs dan domain gambar HTTP/HTTPS saat instalasi, tanpa meminta izin per situs atau domain selama penggunaan. Anda dapat membatasi akses melalui pengaturan ekstensi browser; jika fitur terkait tidak berfungsi, pulihkan akses ke semua situs lalu coba lagi. Cookie situs sumber, token login, dan riwayat penelusuran tidak dikirim ke layanan terjemahan.",
-              "Posisi disimpan secara lokal. Sinkronisasi dengan sumber hanya tersedia jika sumber mendukungnya dan kompatibilitas telah diverifikasi. Jika sinkronisasi gagal, posisi lokal tetap tersimpan. Perpustakaan, posisi membaca, preferensi, dan data lokal yang diimpor ada di browser; penguraian bersifat lokal, dan gambar yang relevan dikirim saat terjemahan diminta. Perpustakaan tidak disinkronkan secara otomatis. Situs web menyimpan status akun dan otorisasi, mengakses dan menyegarkan token di penyimpanan sesi tab saat ini. Ekstensi ini memiliki aturan penyimpanan sesinya sendiri. Menghapus data browser dapat mengeluarkan Anda atau menghapus informasi bacaan lokal."
+              "Rak, posisi, preferensi dan berkas impor tetap di browser; seluruh rak tidak tersinkron otomatis. Saat terhubung ke pustaka OPDS yang mendukung antarmuka progres membaca, ekstensi dapat menyinkronkan posisi membaca dengan pustaka tersebut. Ini adalah sinkronisasi dengan pustaka sumber, bukan sinkronisasi cloud NodeLane. Login situs dan token akses/pembaruan disimpan menetap di localStorage, dengan perubahan login dibagikan antar-tab browser yang sama. sessionStorage menyimpan status otorisasi sementara. Keluar dari situs menghapus sesi lokal situs, bukan sesi ekstensi atau penyedia identitas. Menghapus data situs dapat menghapus login dan riwayat lokal."
             ]
           },
           {
             "title": "Penyedia layanan dan transfer",
             "paragraphs": [
               "Ekstensi memakai terjemahan. Pemrosesan mungkin melibatkan deteksi/OCR, model teks, perbaikan latar belakang lokal, dan pengaturan huruf. Penyedia teks memproses teks yang dikenali yang diperlukan untuk terjemahan. Penyedia sebenarnya dikonfigurasi di server untuk tugas tersebut.",
-              "Gambar terjemahan menggunakan file pribadi di server pusat; teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Layanan identitas, infrastruktur, penerjemahan, dan pembayaran memproses data sesuai kebutuhan, berdasarkan kebijakan yang berlaku. Pemrosesan mungkin terjadi di luar wilayah Anda. Kami tidak menjual informasi pribadi atau menggunakan komik yang dikirimkan untuk penargetan iklan. Kami tidak berjanji semua penyedia tidak menyimpan apa pun atau tidak pernah menggunakan data untuk pelatihan; ini tergantung pada penyedia dan perjanjian. Jangan mengirimkan konten sensitif yang tidak sah atau tidak sesuai."
+              "Terjemahan gambar tunggal: Gambar terjemahan menggunakan file pribadi di server pusat; teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Layanan identitas, infrastruktur, penerjemahan, dan pembayaran memproses data sesuai kebutuhan, berdasarkan kebijakan yang berlaku. Pemrosesan mungkin terjadi di luar wilayah Anda. Kami tidak menjual informasi pribadi atau menggunakan komik yang dikirimkan untuk penargetan iklan. Kami tidak berjanji semua penyedia tidak menyimpan apa pun atau tidak pernah menggunakan data untuk pelatihan; ini tergantung pada penyedia dan perjanjian. Jangan mengirimkan konten sensitif yang tidak sah atau tidak sesuai."
             ]
           },
           {
             "title": "Retensi dan penghapusan",
             "paragraphs": [
-              "Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
-              "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya.",
+              "Terjemahan gambar tunggal: Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+              "Terjemahan gambar tunggal: Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya.",
               "Untuk permintaan penghapusan akun atau yang lebih luas, hubungi kami untuk verifikasi identitas dan cakupan. Catatan transaksi, audit, atau keamanan mungkin memerlukan penyimpanan untuk kewajiban layanan, perselisihan, atau persyaratan yang berlaku. Tidak ada tenggat waktu penghapusan yang dijanjikan untuk semua catatan; tanggapannya akan menjelaskan hasil dan kendalanya."
             ]
           },
           {
             "title": "Keamanan, pilihan dan anak di bawah umur",
             "paragraphs": [
-              "Server pusat memeriksa otorisasi akun dan mengembalikan file hasil secara langsung, tanpa mengeluarkan tautan unduhan bertanda tangan yang berumur pendek. Kunci penyedia tetap berada di backend. Lindungi akun dan perangkat Anda, dan jangan bagikan token akses. Anda dapat membatasi akses situs melalui pengaturan ekstensi browser, menghentikan terjemahan, keluar, atau menghapus data browser lokal; fungsionalitas yang diperlukan mungkin tidak tersedia. Situs web ini tidak memiliki pelacak iklan atau skrip analitik pihak ketiga.",
+              "Terjemahan gambar tunggal: Server pusat memeriksa otorisasi akun dan mengembalikan file hasil secara langsung, tanpa mengeluarkan tautan unduhan bertanda tangan yang berumur pendek. Kunci penyedia tetap berada di backend. Lindungi akun dan perangkat Anda, dan jangan bagikan token akses. Anda dapat membatasi akses situs melalui pengaturan ekstensi browser, menghentikan terjemahan, keluar, atau menghapus data browser lokal; fungsionalitas yang diperlukan mungkin tidak tersedia. Situs web ini tidak memiliki pelacak iklan atau skrip analitik pihak ketiga.",
               "Anak di bawah umur harus menggunakan layanan ini dengan pengetahuan dan bimbingan wali yang sesuai dan mendapatkan izin yang diperlukan untuk berlangganan. Jangan kirimkan informasi pribadi sensitif anak-anak. Wali dapat menghubungi kami untuk meminta verifikasi dan penanganan pemrosesan yang tidak pantas. Laporkan masalah keamanan hanya dengan menggunakan informasi yang diperlukan dan telah disunting; kata sandi dan token tidak diperlukan."
+            ]
+          },
+          {
+            "title": "Terjemahan seluruh PDF / ZIP / CBZ",
+            "paragraphs": [
+              "Terjemahan seluruh berkas memerlukan login. PDF / ZIP / CBZ terpilih diunggah langsung ke Cloudflare R2 privat. Node komputasi mengurai, mengenali dan merender halaman; model teks memproses teks dikenali yang diperlukan. R2 menyimpan masukan dan ZIP lengkap gambar terjemahan; basis data menyimpan tugas, teks dan penggunaan. Unggah/unduh memakai URL bertanda tangan berbatas waktu. Jangan bagikan; URL yang diterbitkan dapat tetap berlaku hingga kedaluwarsa.",
+              "Dokumen memiliki masa simpan tersendiri, bukan aturan jangka panjang lapisan gambar tunggal. Default: unggahan selesai dalam 1 jam; berkas terunggah yang belum dimulai kedaluwarsa setelah 24 jam; masukan selesai dan keluaran gagal dibersihkan setelah jeda 1 jam; ZIP berhasil disimpan 7 hari. Lihat waktu kedaluwarsa tugas. Masukan aktif atau belum pasti dapat ditahan untuk pemulihan. Berkas sementara node mengikuti prosedur pemulihan/pembersihan; catatan tugas, tagihan dan keamanan yang diperlukan disimpan terpisah. Unduhan server berakhir; salinan unduhan Anda kelola sendiri."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Persyaratan layanan",
         "description": "Ketentuan penggunaan NodeLane Comics, hak konten, batasan AI, dan langganan.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Layanan dan akun",
             "paragraphs": [
-              "NodeLane Comics menyediakan layanan ekstensi, pembaca dan terjemahan. Baca ketentuan ini dan kebijakan privasi sebelum digunakan; berhenti menggunakan layanan ini jika Anda tidak setuju. Diperbarui 4 Oktober 2026. Situs web ini menyediakan informasi produk, panduan, unduhan, dan manajemen akun, bukan katalog komik atau penjualan komik.",
-              "Gunakan akun yang berhak Anda gunakan dan lindungi kredensial dan perangkat Anda. Manfaat dan akses diverifikasi di server. Jangan meniru identitas orang lain, mengakses catatan pribadi mereka, melewati batas kecepatan atau gambar, mengganggu layanan dengan otomatisasi yang menyesatkan, atau menyerang produk dan penyedianya. Penyalahgunaan dapat menyebabkan akses terbatas."
+              "NodeLane Comics menyediakan layanan ekstensi, pembaca dan terjemahan. Baca ketentuan ini dan kebijakan privasi sebelum digunakan; berhenti menggunakan layanan ini jika Anda tidak setuju. Diperbarui 2026-10-17. Situs web ini menyediakan informasi produk, panduan, unduhan, dan manajemen akun, bukan katalog komik atau penjualan komik.",
+              "Gunakan akun yang berhak Anda gunakan dan lindungi kredensial dan perangkat Anda. Manfaat dan akses diverifikasi di server. Jangan meniru identitas orang lain, mengakses catatan pribadi mereka, melewati batas kecepatan atau gambar, mengganggu layanan dengan otomatisasi yang menyesatkan, atau menyerang produk dan penyedianya. Penyalahgunaan dapat menyebabkan akses terbatas.",
+              "Kode ekstensi berlisensi GPL-3.0-only; komponen pihak ketiga mempertahankan lisensinya. Ketentuan layanan daring tidak membatasi hak penggunaan, perubahan atau distribusi ulang GPL dan tidak memberi hak atas komik."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Manfaat dan langganan",
             "paragraphs": [
               membershipSummary,
-              "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan."
+              "Langganan baru dibayar triwulanan atau tahunan, tanpa uji coba berkartu, dan diperpanjang otomatis. Setiap periode memiliki 3/12 jendela kuota bulanan berdasarkan tanggal tagihan UTC awal. Sisa halaman tidak dibawa dan kuota mendatang tidak dapat dipakai lebih awal. Harga, pajak dan hak mengikuti pesanan serta akun. Langganan lama mempertahankan harga dan versi hak awal; uji coba dan hadiah lama mengikuti catatan aslinya.",
+              "Model gratis memakai halaman gratis (termasuk hadiah yang berlaku), lalu langganan dan pembelian. Model berbayar hanya memakai langganan atau pembelian. Setiap versi halaman baru yang berhasil dibuat memakai 1 halaman. Permintaan sama, hasil valid milik sendiri dan percobaan internal tidak ditagih dua kali; versi terjemahan baru yang diminta tegas dihitung. Gagal, batal atau tanpa teks yang dapat diterjemahkan melepas reservasi sesuai aturan; hasil tidak pasti diperiksa dulu. Paket saat ini tidak kedaluwarsa dan tidak diperpanjang otomatis. Tugas yang benar-benar memakai halaman yang dibeli mendapat batas penerimaan dan prioritas pemrosesan tingkat PLUS dari paket tersebut; hanya memiliki saldo tidak menaikkan tugas yang memakai kuota gratis ke penerimaan berbayar. Setelah habis, paket tidak lagi memberikan manfaatnya.",
+              "Laju penerimaan dan saldo terpisah. Default: 10 gambar baru per 60 detik bergulir bagi akun biasa, 100 bagi tingkat berbayar. Batas per jam hanya berlaku jika diatur dalam hak; batas nyata akun dan layanan berlaku. Permintaan sama dan penggunaan ulang valid tidak dihitung dua kali; kegagalan atau pembatalan yang diterima dapat mengisi jendela laju. Batas gambar, konkurensi dan kapasitas tetap berlaku, tanpa jaminan kecepatan."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Langganan, pembatalan, dan pengembalian uang",
-        "description": "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan.",
+        "description": "Langganan baru dibayar triwulanan atau tahunan, tanpa uji coba berkartu, dan diperpanjang otomatis.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Uji coba dan penagihan",
+            "title": "Paket saat ini dan perpanjangan",
             "paragraphs": [
-              "Langganan menawarkan penagihan bulanan atau tahunan. Harga, uji coba, dan kuota halaman mengikuti penawaran yang dipilih, yang diperbarui secara otomatis pada interval tersebut. Perubahan harga berlaku untuk langganan baru; langganan yang ada tetap mempertahankan harga asli dan versi manfaatnya. Batalkan sebelum perpanjangan.",
-              "Akun yang memenuhi syarat dapat memulai uji coba dengan kartu yang ditampilkan untuk paketnya. Berlangganan kembali atau memilih paket lain tidak mengatur ulang kelayakan uji coba."
+              membershipSummary,
+              "Langganan baru dibayar triwulanan atau tahunan, tanpa uji coba berkartu, dan diperpanjang otomatis. Setiap periode memiliki 3/12 jendela kuota bulanan berdasarkan tanggal tagihan UTC awal. Sisa halaman tidak dibawa dan kuota mendatang tidak dapat dipakai lebih awal. Harga, pajak dan hak mengikuti pesanan serta akun. Langganan lama mempertahankan harga dan versi hak awal; uji coba dan hadiah lama mengikuti catatan aslinya."
             ]
           },
           {
             "title": "Hentikan pembaruan di masa mendatang",
             "paragraphs": [
               "Masuk ke akun situs web Anda atau gunakan entri akun ekstensi untuk mengelola langganan. Pembatalan menghentikan perpanjangan berikutnya dan tidak secara otomatis menghapus manfaat yang sudah berlaku; bergantung pada masa berlaku yang ditunjukkan di akun Anda.",
-              "Batalkan sebelum uji coba berakhir jika Anda tidak ingin perpanjangan berbayar. Mencopot pemasangan, menutup browser, atau keluar tidak membatalkan langganan. Email comics@nodelane.net jika Anda tidak dapat mengakses akun Anda."
+              "Batalkan melalui akun situs sebelum perpanjangan. Untuk uji coba lama, batalkan sebelum akhir aslinya agar tidak ditagih. Menghapus ekstensi, menutup browser atau keluar tidak membatalkan langganan. Pesanan terbayar tetap terpisah tanpa penggabungan, prorata atau pengembalian otomatis. Salah beli atau masalah akses: comics@nodelane.net."
             ]
           },
           {
             "title": "Tunjangan halaman versus pembayaran",
             "paragraphs": [
-              "Reservasi tugas terpisah dari transaksi pembayaran. Kegagalan eksplisit merilis halaman yang dicadangkan berdasarkan aturan; hasil yang tidak diketahui diverifikasi terlebih dahulu. Ini bukan pengembalian biaya berlangganan secara otomatis. Hasil valid yang ada tetap dapat diakses setelah keanggotaan berakhir, sementara tugas baru menggunakan hak pada saat penerimaan."
+              "Reservasi dan pembayaran terpisah. Kegagalan terkonfirmasi mengembalikan halaman sesuai aturan; hasil tidak pasti diperiksa, tanpa pengembalian uang otomatis. Setelah keanggotaan berakhir, hasil hanya dapat diakses selama masa simpan masing-masing dan izin masih valid. Tugas baru memakai hak saat ini."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Bagaimana cara kerja batas terjemahan PLUS / Pro?",
-        "answer": "Satu akun berbagi batas 100 gambar terjemahan baru dalam setiap periode bergulir 60 detik dan 1.200 gambar dalam setiap periode bergulir 3.600 detik untuk semua perangkat, mode, dan bahasa. Paket Gratis mengizinkan 10 gambar dalam setiap periode bergulir 60 detik. Pengiriman ulang permintaan yang sama dan penggunaan kembali hasil yang masih berlaku tidak dihitung lagi. Tugas yang sudah diterima tetap dihitung meskipun gagal, dibatalkan, atau tidak berisi teks. Permintaan yang ditolak atau transaksi basis data yang dibatalkan akan melepaskan slot kuota per jam yang dicadangkan. Percobaan ulang mengikuti aturan penerimaan tugas baru yang berlaku. Batas ini tidak menjamin kecepatan penyelesaian.",
+        "answer": "Laju penerimaan dan saldo terpisah. Default: 10 gambar baru per 60 detik bergulir bagi akun biasa, 100 bagi tingkat berbayar. Batas per jam hanya berlaku jika diatur dalam hak; batas nyata akun dan layanan berlaku. Permintaan sama dan penggunaan ulang valid tidak dihitung dua kali; kegagalan atau pembatalan yang diterima dapat mengisi jendela laju. Batas gambar, konkurensi dan kapasitas tetap berlaku, tanpa jaminan kecepatan.",
         "relatedPath": "/pricing/"
       },
       {

@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Gizlilik politikası",
         "description": "NodeLane Comics hesapları, görselleri, izinleri, çeviriyi, abonelikleri ve silme işlemlerini nasıl ele alır?",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Web sitesi görseli çevirisi ve konuk denemeleri",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Kapsam ve iletişim",
             "paragraphs": [
-              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 4 Ekim 2026'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
+              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 2026-10-17'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "İzinler ve yerel depolama",
             "paragraphs": [
               "Uzantı kurulum sırasında tüm HTTP/HTTPS sitelerine ve görsel alan adlarına erişim bildirir; kullanım sırasında her site veya alan adı için ayrı izin istemez. Tarayıcının uzantı ayarlarından erişimi kısıtlayabilirsiniz; ilgili özellikler çalışmazsa tüm sitelere erişimi geri açıp tekrar deneyin. Kaynak sitenin çerezleri, giriş belirteçleri ve tarama geçmişi çeviri hizmetine gönderilmez.",
-              "Konum yerelde saklanır. Kaynakla eşitleme yalnızca kaynak bu özelliği destekliyorsa ve uyumluluk doğrulanmışsa kullanılabilir. Eşitleme hatasında yerel konum korunur. Kitaplık, okuma konumu, tercihler ve içe aktarılan yerel veriler tarayıcıda canlı olarak bulunur; ayrıştırma yereldir ve çeviri istendiğinde ilgili görseller gönderilir. Kitaplık otomatik olarak senkronize edilmez. Web sitesi, hesap ve yetkilendirme durumunu, erişim ve yenileme belirteçlerini mevcut sekmenin oturum deposunda tutar. Uzantının kendi oturum depolama kuralları vardır. Tarayıcı verilerini temizlemek oturumunuzu kapatabilir veya yerel okuma bilgilerini kaldırabilir."
+              "Kitaplık, konumlar, tercihler ve içe aktarılan dosyalar tarayıcıda kalır; tüm kitaplık otomatik eşitlenmez. Okuma ilerlemesi arayüzünü destekleyen bir OPDS kitaplığına bağlanıldığında uzantı, okuma konumunu bu kitaplıkla eşitleyebilir. Bu, kaynak kitaplıkla yapılan eşitlemedir; NodeLane bulut eşitlemesi değildir. Site oturumu ve erişim/yenileme belirteçleri localStorage içinde kalıcı saklanır; aynı tarayıcının sekmeleri oturum değişikliklerini paylaşır. Geçici yetkilendirme durumu sessionStorage kullanır. Siteden çıkış yerel site oturumunu siler, uzantı veya kimlik sağlayıcı oturumunu değil. Site verilerini temizlemek oturumu ve yerel geçmişi silebilir."
             ]
           },
           {
             "title": "Servis sağlayıcılar ve transferler",
             "paragraphs": [
               "Uzantı çeviri kullanır. işleme, algılama/OCR, metin modelleri, yerel arka plan onarımı ve dizgiyi içerebilir. Metin sağlayıcılar, çeviri için gerekli olan tanınan metni işler. Gerçek sağlayıcılar sunucuda görev için yapılandırılmıştır.",
-              "Çeviri görselleri merkezi sunucudaki özel dosyaları kullanır; tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Kimlik, altyapı, çeviri ve ödeme hizmetleri, verileri gerektiği şekilde geçerli politikaları kapsamında işler. İşleme bölgenizin dışında gerçekleşebilir. Reklam hedefleme için kişisel bilgileri satmıyoruz veya gönderilen çizgi romanları kullanmıyoruz. Tüm sağlayıcıların hiçbir şeyi saklamayacağını veya verileri eğitim için asla kullanmayacağını garanti etmiyoruz; bu sağlayıcıya ve anlaşmaya bağlıdır. Yetkisiz veya uygun olmayan hassas içerik göndermeyin."
+              "Tek görsel çevirisi: Çeviri görselleri merkezi sunucudaki özel dosyaları kullanır; tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Kimlik, altyapı, çeviri ve ödeme hizmetleri, verileri gerektiği şekilde geçerli politikaları kapsamında işler. İşleme bölgenizin dışında gerçekleşebilir. Reklam hedefleme için kişisel bilgileri satmıyoruz veya gönderilen çizgi romanları kullanmıyoruz. Tüm sağlayıcıların hiçbir şeyi saklamayacağını veya verileri eğitim için asla kullanmayacağını garanti etmiyoruz; bu sağlayıcıya ve anlaşmaya bağlıdır. Yetkisiz veya uygun olmayan hassas içerik göndermeyin."
             ]
           },
           {
             "title": "Saklama ve silme",
             "paragraphs": [
-              "Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
-              "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir.",
+              "Tek görsel çevirisi: Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+              "Tek görsel çevirisi: Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir.",
               "Hesap silme veya daha geniş kapsamlı silme talepleri için kimlik ve kapsam doğrulaması amacıyla bizimle iletişime geçin. İşlem, denetim veya güvenlik kayıtlarının hizmet yükümlülükleri, anlaşmazlıklar veya geçerli gereksinimler nedeniyle saklanması gerekebilir. Tüm kayıtlar için tek bir silme tarihi sözü verilmemektedir; yanıt, sonucu ve kısıtlamaları açıklayacaktır."
             ]
           },
           {
             "title": "Güvenlik, seçimler ve reşit olmayanlar",
             "paragraphs": [
-              "Merkezi sunucu, hesap yetkilendirmesini kontrol eder ve kısa ömürlü imzalı indirme bağlantıları vermeden sonuç dosyalarını doğrudan döndürür. Sağlayıcı anahtarları arka uçta kalır. Hesabınızı ve cihazınızı koruyun ve erişim jetonlarını paylaşmayın. Tarayıcının uzantı ayarlarından site erişimini kısıtlayabilir, çeviriyi durdurabilir, oturumu kapatabilir veya yerel tarayıcı verilerini kaldırabilirsiniz; bu durumda gerekli işlevsellik kullanılamayabilir. Web sitesinde hiçbir reklam izleyici veya üçüncü taraf analiz komut dosyası yoktur.",
+              "Tek görsel çevirisi: Merkezi sunucu, hesap yetkilendirmesini kontrol eder ve kısa ömürlü imzalı indirme bağlantıları vermeden sonuç dosyalarını doğrudan döndürür. Sağlayıcı anahtarları arka uçta kalır. Hesabınızı ve cihazınızı koruyun ve erişim jetonlarını paylaşmayın. Tarayıcının uzantı ayarlarından site erişimini kısıtlayabilir, çeviriyi durdurabilir, oturumu kapatabilir veya yerel tarayıcı verilerini kaldırabilirsiniz; bu durumda gerekli işlevsellik kullanılamayabilir. Web sitesinde hiçbir reklam izleyici veya üçüncü taraf analiz komut dosyası yoktur.",
               "Reşit olmayanlar hizmeti uygun veli bilgisi ve rehberliği ile kullanmalı ve abonelikler için gerekli yetkiyi almalıdır. Çocukların hassas kişisel bilgilerini göndermeyin. Vasiler, doğrulama ve uygunsuz işlemenin ele alınmasını talep etmek için bizimle iletişime geçebilir. Yalnızca gerekli, düzeltilmiş bilgileri kullanarak güvenlik endişelerini bildirin; şifrelere ve belirteçlere ihtiyaç yoktur."
+            ]
+          },
+          {
+            "title": "Tam PDF / ZIP / CBZ çevirisi",
+            "paragraphs": [
+              "Tam dosya çevirisi oturum gerektirir. Seçilen PDF / ZIP / CBZ doğrudan özel Cloudflare R2 alanına yüklenir. İşlem düğümleri sayfaları ayrıştırır, tanır ve oluşturur; metin modelleri gerekli tanınmış metni işler. R2 girdileri ve tüm çevrilmiş görsellerin ZIP dosyasını, veritabanı görev, metin ve kullanımı saklar. Yükleme ve indirme süreli imzalı URL kullanır. Paylaşmayın; verilmiş URL süresi dolana kadar çalışabilir.",
+              "Belgeler, tek görsel katmanlarının uzun süreli saklama kuralına tabi değildir. Varsayılanlar: yükleme 1 saatte tamamlanır; yüklenmiş ama başlatılmamış dosya 24 saatte sona erer; bitmiş girdiler ve başarısız çıktılar 1 saat gecikmeyle temizlenir; başarılı ZIP 7 gün tutulur. Görevdeki son tarihe bakın. Etkin veya sonucu belirsiz girdiler kurtarma için kalabilir. Düğüm geçici dosyaları kurtarma/temizleme süreçlerine tabidir; gerekli görev, fatura ve güvenlik kayıtları ayrı tutulur. Sunucu indirmesi sona erer; indirilmiş kopyaları siz yönetirsiniz."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Hizmet şartları",
         "description": "NodeLane Comics kullanma koşulları, içerik hakları, AI sınırlamaları ve abonelikler.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Hizmet ve hesaplar",
             "paragraphs": [
-              "NodeLane Comics uzantı, okuyucu ve çeviri hizmetleri sağlar. Kullanmadan önce bu şartları ve gizlilik politikasını okuyun; katılmıyorsanız hizmeti kullanmayı bırakın. 4 Ekim 2026'da güncellendi. Web sitesi, çizgi roman kataloğu veya çizgi roman satışları değil, ürün bilgileri, kılavuzlar, indirmeler ve hesap yönetimi sağlar.",
-              "Kullanma hakkına sahip olduğunuz bir hesap kullanın ve kimlik bilgilerinizi ve cihazınızı koruyun. Avantajlar ve erişim sunucuda doğrulanır. Başkalarının kimliğine bürünmeyin, onların özel kayıtlarına erişmeyin, hız veya görüntü sınırlarını atlamayın, kötü amaçlı otomasyonla hizmetleri kesintiye uğratmayın veya ürüne ve sağlayıcılarına saldırmayın. Yanlış kullanım erişimin kısıtlanmasına neden olabilir."
+              "NodeLane Comics uzantı, okuyucu ve çeviri hizmetleri sağlar. Kullanmadan önce bu şartları ve gizlilik politikasını okuyun; katılmıyorsanız hizmeti kullanmayı bırakın. 2026-10-17'da güncellendi. Web sitesi, çizgi roman kataloğu veya çizgi roman satışları değil, ürün bilgileri, kılavuzlar, indirmeler ve hesap yönetimi sağlar.",
+              "Kullanma hakkına sahip olduğunuz bir hesap kullanın ve kimlik bilgilerinizi ve cihazınızı koruyun. Avantajlar ve erişim sunucuda doğrulanır. Başkalarının kimliğine bürünmeyin, onların özel kayıtlarına erişmeyin, hız veya görüntü sınırlarını atlamayın, kötü amaçlı otomasyonla hizmetleri kesintiye uğratmayın veya ürüne ve sağlayıcılarına saldırmayın. Yanlış kullanım erişimin kısıtlanmasına neden olabilir.",
+              "Uzantı kaynak kodu GPL-3.0-only kapsamındadır; üçüncü taraf bileşenler kendi lisanslarını korur. Çevrimiçi hizmet koşulları GPL kullanım, değişiklik veya yeniden dağıtım haklarını kısıtlamaz ve çizgi roman hakları vermez."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Avantajlar ve abonelikler",
             "paragraphs": [
               membershipSummary,
-              "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin."
+              "Yeni abonelikler üç aylık veya yıllıktır, kartlı deneme yoktur ve aynı aralıkta otomatik yenilenir. Dönem, ilk UTC faturalandırma tarihine bağlı 3/12 aylık kota penceresi içerir. Kullanılmayan sayfalar devretmez, gelecek kotalar erken kullanılamaz. Fiyat, vergi ve haklar sipariş ve hesaba bağlıdır. Mevcut abonelikler eski fiyat ve hak sürümünü korur; eski deneme ve hediyeler ilk kayıtlarını izler.",
+              "Ücretsiz modeller önce ücretsiz sayfaları (uygun hediyeler dahil), sonra abonelik ve satın alınan sayfaları kullanır. Ücretli modeller yalnızca abonelik veya satın alınanı kullanır. Başarıyla oluşturulan her yeni sayfa sürümü 1 sayfadır. Aynı istek, geçerli kendi sonucunu yeniden kullanma ve iç yeniden denemeler çift düşmez; açıkça istenen yeni çeviri sürümü sayılır. Hata, iptal veya çevrilebilir metin olmaması rezervasyonu kurallara göre serbest bırakır; belirsiz sonuç önce doğrulanır. Güncel paketlerin süresi dolmaz ve otomatik yenilenmezler. Satın alınan sayfaları gerçekten tüketen görevler, paketin PLUS düzeyindeki kabul sınırlarından ve yürütme önceliğinden yararlanır; yalnızca bakiye bulundurmak, ücretsiz kotayı kullanan görevleri ücretli kabul düzeyine yükseltmez. Tükendiğinde paket artık kendi avantajlarını sağlamaz.",
+              "Kabul hızı ile bakiye ayrıdır. Varsayılan: kayan 60 saniyede standart hesaplara 10, ücretli düzeylere 100 yeni görsel. Saatlik sınır yalnızca haklarda yapılandırılmışsa geçerlidir; gerçek hesap ve hizmet sınırları uygulanır. Aynı istek ve geçerli yeniden kullanım çift sayılmaz; kabul edilmiş hata veya iptal hız penceresini doldurabilir. Görsel, eşzamanlılık ve kapasite sınırları sürer; hız garantisi yoktur."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Abonelikler, iptaller ve geri ödemeler",
-        "description": "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin.",
+        "description": "Yeni abonelikler üç aylık veya yıllıktır, kartlı deneme yoktur ve aynı aralıkta otomatik yenilenir.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Deneme ve faturalandırma",
+            "title": "Güncel planlar ve yenileme",
             "paragraphs": [
-              "Abonelikler aylık veya yıllık faturalandırma sunar. Fiyatlar, denemeler ve sayfa izinleri seçilen teklife göre belirlenir ve bu teklif o aralıkta otomatik olarak yenilenir. Fiyat değişiklikleri yeni abonelikler için geçerlidir; mevcut abonelikler orijinal fiyat ve avantaj sürümlerini korur. Yenilemeden önce iptal edin.",
-              "Koşulları sağlayan hesaplar, planlarında gösterilen ve kart gerektiren denemeyi başlatabilir. Yeniden abone olmak veya başka bir plan seçmek deneme hakkını sıfırlamaz."
+              membershipSummary,
+              "Yeni abonelikler üç aylık veya yıllıktır, kartlı deneme yoktur ve aynı aralıkta otomatik yenilenir. Dönem, ilk UTC faturalandırma tarihine bağlı 3/12 aylık kota penceresi içerir. Kullanılmayan sayfalar devretmez, gelecek kotalar erken kullanılamaz. Fiyat, vergi ve haklar sipariş ve hesaba bağlıdır. Mevcut abonelikler eski fiyat ve hak sürümünü korur; eski deneme ve hediyeler ilk kayıtlarını izler."
             ]
           },
           {
             "title": "Gelecekteki yenilemeyi durdur",
             "paragraphs": [
               "Aboneliği yönetmek için web sitesi hesabınızda oturum açın veya uzantı hesabı girişini kullanın. İptal, bir sonraki yenilemeyi durdurur ve halihazırda geçerli olan avantajları otomatik olarak silmez; hesabınızda gösterilen süre sonuna güvenin.",
-              "Ücretli yenileme istemiyorsanız deneme süresi bitmeden iptal edin. Tarayıcıyı kaldırmak, kapatmak veya oturumu kapatmak aboneliği iptal etmez. Hesabınıza erişemiyorsanız comics@nodelane.net adresine e-posta gönderin."
+              "Yenilemeden önce site hesabından iptal edin. Eski denemeyi ücretlenmemek için ilk bitişinden önce iptal edin. Kaldırma, tarayıcıyı kapatma veya çıkış aboneliği iptal etmez. Ödenmiş siparişler ayrı kalır; otomatik birleştirme, orantılı hesaplama veya iade yapılmaz. Hatalı alım veya erişim sorunu: comics@nodelane.net."
             ]
           },
           {
             "title": "Sayfa kullanım hakki ve ödeme",
             "paragraphs": [
-              "Görev rezervasyonu ödeme işleminden ayrıdır. Açık hata, kurallar uyarınca ayrılmış sayfaları serbest bırakır; önce bilinmeyen bir sonuç doğrulanır. Bu, abonelik ücretlerinin otomatik olarak iadesi değildir. Geçerli mevcut sonuçlar üyeliğin sona ermesinden sonra da erişilebilir olmaya devam ederken, yeni görevler kabul sırasında bu yetkiyi kullanır."
+              "Rezervasyon ve ödeme ayrıdır. Kesin hatalar kurallara göre sayfaları bırakır; belirsiz sonuçlar doğrulanır, otomatik para iadesi yapılmaz. Üyelik bitince sonuçlar yalnızca kendi saklama süresi içinde ve yetki geçerliyken erişilebilir. Yeni görevler güncel hakları kullanır."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "PLUS / Pro çeviri sınırları nasıl çalışır?",
-        "answer": "Bir hesabın tüm cihazları, modları ve dilleri, her kayan 60 saniyelik dönemde 100 ve her kayan 3.600 saniyelik dönemde 1.200 yeni çeviri görseli sınırını paylaşır. Ücretsiz planda kayan 60 saniyelik dönemde 10 görsele izin verilir. Aynı isteğin tekrar gönderilmesi ve geçerli sonuçların yeniden kullanılması tekrar sayılmaz. Kabul edilen görevler başarısız olsa, iptal edilse veya metin içermese de sayılır. Reddedilen istekler veya geri alınan veritabanı işlemleri, ayrılan saatlik yeri serbest bırakır. Yeniden denemeler yeni görev kabul kurallarına tabidir. Bu sınırlar tamamlanma hızını garanti etmez.",
+        "answer": "Kabul hızı ile bakiye ayrıdır. Varsayılan: kayan 60 saniyede standart hesaplara 10, ücretli düzeylere 100 yeni görsel. Saatlik sınır yalnızca haklarda yapılandırılmışsa geçerlidir; gerçek hesap ve hizmet sınırları uygulanır. Aynı istek ve geçerli yeniden kullanım çift sayılmaz; kabul edilmiş hata veya iptal hız penceresini doldurabilir. Görsel, eşzamanlılık ve kapasite sınırları sürer; hız garantisi yoktur.",
         "relatedPath": "/pricing/"
       },
       {

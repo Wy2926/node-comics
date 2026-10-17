@@ -28,7 +28,7 @@ const guide=path.startsWith('/guides/')?d.guides.find(item=>`/guides/${item.slug
 const mobileGuide=mobilePlatforms.some(platform=>platform.slug===guide?.slug);
 const policy=d.policies[key];
 const article=guide??policy;
-const updated=guide?.updated??site.updated;
+const updated=article?.updated??site.updated;
 const relatedGuides=guide?.related ? guide.related.map(slug=>d.guides.find(item=>item.slug===slug)).filter((item):item is NonNullable<typeof item>=>!!item) : d.guides.filter(item=>item.slug!==guide?.slug).slice(0,3);
 const featureGuides=['local-comics','remote-library','manga-translation','manga-translation','translation-modes','local-comics'];
 const titles:Record<string,string>={features:t.seoFeaturesTitle,pricing:t.seoPricingTitle,download:t.seoDownloadTitle,guides:t.seoGuidesTitle,faq:t.seoFaqTitle,help:t.seoHelpTitle,about:t.seoAboutTitle,changelog:t.seoChangelogTitle,account:t.account,auth:t.callbackTitle};

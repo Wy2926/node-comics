@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Chính sách bảo mật",
         "description": "Cách NodeLane Comics xử lý tài khoản, hình ảnh, quyền, bản dịch, đăng ký và xóa.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Dịch hình ảnh website và khách dùng thử",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Phạm vi và liên hệ",
             "paragraphs": [
-              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 4 tháng 10 năm 2026. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
+              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 2026-10-17. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Quyền và lưu trữ cục bộ",
             "paragraphs": [
               "Tiện ích khai báo quyền truy cập tất cả website và miền ảnh HTTP/HTTPS khi cài đặt, không xin quyền riêng cho từng website hoặc miền trong lúc sử dụng. Bạn có thể giới hạn truy cập trong phần cài đặt tiện ích của trình duyệt; nếu tính năng liên quan ngừng hoạt động, hãy khôi phục quyền truy cập tất cả website rồi thử lại. Trang chưa bật dịch không quét ảnh. Cookie, mã đăng nhập và lịch sử của nguồn không gửi đến máy chủ dịch; dịch vùng chỉ lưu và gửi điểm ảnh được chọn.",
-              "Kệ sách, vị trí đọc, cài đặt và dữ liệu đã nhập nằm trong trình duyệt; toàn bộ kệ không tự đồng bộ. Website giữ thông tin xác thực trong bộ nhớ phiên của tab hiện tại. Sau khi kết nối MTU thành công, mật khẩu và mã được lưu trong kho thông tin đăng nhập cục bộ của tiện ích, xóa cùng kênh. Thông tin OPDS cũng lưu cục bộ. Xóa dữ liệu trình duyệt có thể làm mất đăng nhập, vị trí đọc và cấu hình kết nối. Lưu mật khẩu và kết nối lại với ô mật khẩu để trống cần tiện ích phiên bản 0.10.2 trở lên; ở phiên bản cũ hơn, bạn phải nhập mật khẩu mỗi lần kết nối lại."
+              "Kệ sách, vị trí, tùy chọn và tệp nhập nằm trong trình duyệt; cả kệ không tự đồng bộ. Khi kết nối với thư viện OPDS hỗ trợ giao diện tiến độ đọc, tiện ích có thể đồng bộ vị trí đọc với thư viện đó. Đây là đồng bộ với thư viện nguồn, không phải đồng bộ đám mây NodeLane. Phiên website và mã truy cập/làm mới được lưu bền trong localStorage, chia sẻ thay đổi đăng nhập giữa các tab cùng trình duyệt. sessionStorage giữ trạng thái ủy quyền tạm thời. Đăng xuất website xóa phiên cục bộ của website, không phải phiên tiện ích hay nhà cung cấp danh tính. Xóa dữ liệu trang có thể mất đăng nhập và lịch sử cục bộ."
             ]
           },
           {
             "title": "Nhà cung cấp dịch vụ và chuyển giao",
             "paragraphs": [
               "Tiện ích dùng dịch với nhận diện/OCR, dịch văn bản, sửa nền cục bộ và dàn chữ. Nhà cung cấp văn bản xử lý chữ được nhận diện cần thiết. Xử lý và API ngoài của MTU tùy cấu hình dịch vụ.",
-              "Hình ảnh dịch sử dụng file riêng tư trên máy chủ trung tâm; văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Các dịch vụ nhận dạng, cơ sở hạ tầng, dịch thuật và thanh toán xử lý dữ liệu khi cần thiết theo chính sách hiện hành của họ. Quá trình xử lý có thể diễn ra bên ngoài khu vực của bạn. Chúng tôi không bán thông tin cá nhân hoặc sử dụng truyện tranh đã gửi để nhắm mục tiêu quảng cáo. Chúng tôi không hứa rằng tất cả các nhà cung cấp sẽ không giữ lại gì hoặc không bao giờ sử dụng dữ liệu để đào tạo; điều này phụ thuộc vào nhà cung cấp và thỏa thuận. Không gửi nội dung nhạy cảm trái phép hoặc không phù hợp."
+              "Dịch ảnh đơn: Hình ảnh dịch sử dụng file riêng tư trên máy chủ trung tâm; văn bản được nhận dạng, bản dịch và siêu dữ liệu cần thiết được lưu trữ trong cơ sở dữ liệu. Các dịch vụ nhận dạng, cơ sở hạ tầng, dịch thuật và thanh toán xử lý dữ liệu khi cần thiết theo chính sách hiện hành của họ. Quá trình xử lý có thể diễn ra bên ngoài khu vực của bạn. Chúng tôi không bán thông tin cá nhân hoặc sử dụng truyện tranh đã gửi để nhắm mục tiêu quảng cáo. Chúng tôi không hứa rằng tất cả các nhà cung cấp sẽ không giữ lại gì hoặc không bao giờ sử dụng dữ liệu để đào tạo; điều này phụ thuộc vào nhà cung cấp và thỏa thuận. Không gửi nội dung nhạy cảm trái phép hoặc không phù hợp."
             ]
           },
           {
             "title": "Giữ lại và xóa",
             "paragraphs": [
-              "Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
-              "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
+              "Dịch ảnh đơn: Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
+              "Dịch ảnh đơn: Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
               "Đối với các yêu cầu xóa tài khoản hoặc phạm vi rộng hơn, hãy liên hệ với chúng tôi để xác minh danh tính và phạm vi. Hồ sơ giao dịch, kiểm toán hoặc bảo mật có thể cần được lưu giữ để phục vụ các nghĩa vụ dịch vụ, tranh chấp hoặc các yêu cầu hiện hành. Không có thời hạn xóa duy nhất nào được hứa hẹn cho tất cả hồ sơ; câu trả lời sẽ giải thích kết quả và những hạn chế."
             ]
           },
           {
             "title": "An ninh, lựa chọn và trẻ vị thành niên",
             "paragraphs": [
-              "Máy chủ trung tâm kiểm tra ủy quyền tài khoản và trả về trực tiếp các tệp kết quả mà không đưa ra các liên kết tải xuống đã ký trong thời gian ngắn. Khóa nhà cung cấp vẫn ở phần phụ trợ. Bảo vệ tài khoản và thiết bị của bạn và không chia sẻ mã thông báo truy cập. Bạn có thể giới hạn truy cập website trong phần cài đặt tiện ích của trình duyệt, ngừng dịch, đăng xuất hoặc xóa dữ liệu trình duyệt cục bộ; chức năng cần thiết sau đó có thể không có sẵn. Trang web không có trình theo dõi quảng cáo hoặc tập lệnh phân tích của bên thứ ba.",
+              "Dịch ảnh đơn: Máy chủ trung tâm kiểm tra ủy quyền tài khoản và trả về trực tiếp các tệp kết quả mà không đưa ra các liên kết tải xuống đã ký trong thời gian ngắn. Khóa nhà cung cấp vẫn ở phần phụ trợ. Bảo vệ tài khoản và thiết bị của bạn và không chia sẻ mã thông báo truy cập. Bạn có thể giới hạn truy cập website trong phần cài đặt tiện ích của trình duyệt, ngừng dịch, đăng xuất hoặc xóa dữ liệu trình duyệt cục bộ; chức năng cần thiết sau đó có thể không có sẵn. Trang web không có trình theo dõi quảng cáo hoặc tập lệnh phân tích của bên thứ ba.",
               "Trẻ vị thành niên nên sử dụng dịch vụ với kiến thức và hướng dẫn phù hợp của người giám hộ cũng như phải có được sự cho phép cần thiết để đăng ký. Không gửi thông tin cá nhân nhạy cảm của trẻ em. Người giám hộ có thể liên hệ với chúng tôi để yêu cầu xác minh và xử lý việc xử lý không phù hợp. Chỉ báo cáo những lo ngại về bảo mật bằng cách sử dụng thông tin cần thiết, đã được biên tập lại; mật khẩu và mã thông báo là không cần thiết."
+            ]
+          },
+          {
+            "title": "Dịch trọn PDF / ZIP / CBZ",
+            "paragraphs": [
+              "Dịch trọn tệp cần đăng nhập. PDF / ZIP / CBZ đã chọn được tải thẳng lên Cloudflare R2 riêng tư. Nút tính toán phân tích, nhận dạng và dựng trang; mô hình văn bản xử lý chữ nhận dạng cần thiết. R2 giữ đầu vào và ZIP đầy đủ ảnh đã dịch; cơ sở dữ liệu giữ tác vụ, văn bản và sử dụng. Tải lên/xuống dùng URL có chữ ký có thời hạn. Không chia sẻ; URL đã cấp có thể còn dùng được đến khi hết hạn.",
+              "Tài liệu có hạn riêng, không theo lưu giữ lâu dài của lớp phủ ảnh đơn. Mặc định: tải xong trong 1 giờ; tệp đã tải nhưng chưa bắt đầu hết hạn sau 24 giờ; đầu vào kết thúc và đầu ra lỗi được dọn sau 1 giờ; ZIP thành công giữ 7 ngày. Xem hạn trên tác vụ. Đầu vào đang chạy hoặc chưa rõ kết quả có thể giữ để khôi phục. Tệp tạm của nút theo quy trình khôi phục/dọn dẹp; hồ sơ tác vụ, hóa đơn và bảo mật cần thiết giữ riêng. Tải từ máy chủ hết hạn; bản đã tải do bạn quản lý."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Điều khoản dịch vụ",
         "description": "Điều kiện sử dụng NodeLane Comics, quyền nội dung, giới hạn AI và đăng ký.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Dịch vụ và tài khoản",
             "paragraphs": [
-              "NodeLane Comics cung cấp dịch vụ mở rộng, đọc và dịch thuật. Đọc các điều khoản này và chính sách quyền riêng tư trước khi sử dụng; ngừng sử dụng dịch vụ nếu bạn không đồng ý. Cập nhật ngày 4 tháng 10 năm 2026. Trang web cung cấp thông tin sản phẩm, hướng dẫn, tải xuống và quản lý tài khoản, không phải danh mục truyện tranh hay bán truyện tranh.",
-              "Sử dụng tài khoản bạn có quyền sử dụng và bảo vệ thông tin xác thực cũng như thiết bị của bạn. Lợi ích và quyền truy cập được xác minh trên máy chủ. Không mạo danh người khác, truy cập hồ sơ riêng tư của họ, tỷ lệ bỏ qua hoặc giới hạn hình ảnh, làm gián đoạn các dịch vụ bằng cách tự động hóa lạm dụng hoặc tấn công sản phẩm và các nhà cung cấp của nó. Việc sử dụng sai có thể dẫn đến hạn chế truy cập."
+              "NodeLane Comics cung cấp dịch vụ mở rộng, đọc và dịch thuật. Đọc các điều khoản này và chính sách quyền riêng tư trước khi sử dụng; ngừng sử dụng dịch vụ nếu bạn không đồng ý. Cập nhật ngày 2026-10-17. Trang web cung cấp thông tin sản phẩm, hướng dẫn, tải xuống và quản lý tài khoản, không phải danh mục truyện tranh hay bán truyện tranh.",
+              "Sử dụng tài khoản bạn có quyền sử dụng và bảo vệ thông tin xác thực cũng như thiết bị của bạn. Lợi ích và quyền truy cập được xác minh trên máy chủ. Không mạo danh người khác, truy cập hồ sơ riêng tư của họ, tỷ lệ bỏ qua hoặc giới hạn hình ảnh, làm gián đoạn các dịch vụ bằng cách tự động hóa lạm dụng hoặc tấn công sản phẩm và các nhà cung cấp của nó. Việc sử dụng sai có thể dẫn đến hạn chế truy cập.",
+              "Mã nguồn tiện ích dùng GPL-3.0-only; thành phần bên thứ ba giữ giấy phép riêng. Điều khoản dịch vụ trực tuyến không hạn chế quyền sử dụng, sửa đổi, phân phối lại theo GPL và không cấp quyền với truyện."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Lợi ích và đăng ký",
             "paragraphs": [
               membershipSummary,
-              "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn."
+              "Đăng ký mới trả theo quý hoặc năm, không dùng thử bằng thẻ và tự gia hạn cùng chu kỳ. Mỗi kỳ gồm 3/12 cửa sổ hạn mức tháng theo mốc thanh toán UTC ban đầu. Trang chưa dùng không chuyển tiếp, không dùng trước hạn mức tương lai. Giá, thuế và quyền theo đơn hàng và tài khoản. Đăng ký cũ giữ giá và phiên bản quyền ban đầu; thử nghiệm và quà tặng cũ theo hồ sơ gốc.",
+              "Mô hình miễn phí dùng trang miễn phí (gồm quà phù hợp), rồi trang đăng ký và đã mua. Mô hình trả phí chỉ dùng trang đăng ký hoặc đã mua. Mỗi phiên bản trang mới tạo thành công tính 1 trang. Cùng yêu cầu, dùng lại kết quả hợp lệ của mình và thử lại nội bộ không tính hai lần; bản dịch mới chủ động yêu cầu vẫn tính. Lỗi, hủy hoặc không có chữ để dịch giải phóng phần giữ theo quy tắc; kết quả chưa rõ được kiểm tra trước. Gói hiện tại không hết hạn và không tự gia hạn. Tác vụ thực sự trừ trang đã mua được áp dụng giới hạn tiếp nhận và ưu tiên xử lý cấp PLUS của gói; chỉ có số dư không nâng tác vụ dùng hạn mức miễn phí lên mức tiếp nhận trả phí. Khi dùng hết, gói không còn cung cấp các quyền lợi đó.",
+              "Tốc độ tiếp nhận và số dư là riêng. Mặc định: 10 ảnh mới mỗi 60 giây trượt cho tài khoản thường, 100 cho hạng trả phí. Giới hạn giờ chỉ áp dụng khi quyền có cấu hình; theo giới hạn thực của tài khoản và dịch vụ. Cùng yêu cầu và dùng lại hợp lệ không tính hai lần; lỗi hoặc hủy sau tiếp nhận có thể chiếm cửa sổ tốc độ. Vẫn có giới hạn ảnh, đồng thời và năng lực, không bảo đảm tốc độ hoàn thành."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Đăng ký, hủy bỏ và hoàn tiền",
-        "description": "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn.",
+        "description": "Đăng ký mới trả theo quý hoặc năm, không dùng thử bằng thẻ và tự gia hạn cùng chu kỳ.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Dùng thử và thanh toán",
+            "title": "Gói hiện tại và gia hạn",
             "paragraphs": [
-              "Đăng ký cung cấp thanh toán hàng tháng hoặc hàng năm. Giá cả, bản dùng thử và giới hạn trang tuân theo ưu đãi đã chọn, ưu đãi này sẽ tự động gia hạn trong khoảng thời gian đó. Thay đổi giá áp dụng cho đăng ký mới; đăng ký hiện tại giữ giá ban đầu và phiên bản lợi ích. Hủy trước khi gia hạn.",
-              "Tài khoản đủ điều kiện có thể bắt đầu bản dùng thử yêu cầu thẻ được hiển thị cho gói của mình. Đăng ký lại hoặc đổi gói không đặt lại điều kiện dùng thử."
+              membershipSummary,
+              "Đăng ký mới trả theo quý hoặc năm, không dùng thử bằng thẻ và tự gia hạn cùng chu kỳ. Mỗi kỳ gồm 3/12 cửa sổ hạn mức tháng theo mốc thanh toán UTC ban đầu. Trang chưa dùng không chuyển tiếp, không dùng trước hạn mức tương lai. Giá, thuế và quyền theo đơn hàng và tài khoản. Đăng ký cũ giữ giá và phiên bản quyền ban đầu; thử nghiệm và quà tặng cũ theo hồ sơ gốc."
             ]
           },
           {
             "title": "Dừng gia hạn trong tương lai",
             "paragraphs": [
               "Đăng nhập vào tài khoản trang web của bạn hoặc sử dụng mục nhập tài khoản tiện ích mở rộng để quản lý đăng ký. Việc hủy sẽ dừng lần gia hạn tiếp theo và không tự động xóa các lợi ích đã có hiệu lực; dựa vào thời hạn sử dụng được hiển thị trong tài khoản của bạn.",
-              "Hủy trước khi thời gian dùng thử kết thúc nếu bạn không muốn gia hạn trả phí. Việc gỡ cài đặt, đóng trình duyệt hoặc đăng xuất sẽ không hủy đăng ký. Gửi email tới comics@nodelane.net nếu bạn không thể truy cập vào tài khoản của mình."
+              "Hủy trên tài khoản website trước gia hạn. Với dùng thử cũ, hủy trước thời điểm kết thúc gốc để tránh thu phí. Gỡ tiện ích, đóng trình duyệt hay đăng xuất không hủy đăng ký. Đơn đã trả tiền giữ riêng, không tự gộp, tính chênh lệch hay hoàn tiền. Mua nhầm hoặc không truy cập được: comics@nodelane.net."
             ]
           },
           {
             "title": "Trợ cấp trang so với thanh toán",
             "paragraphs": [
-              "Việc đặt trước nhiệm vụ tách biệt với giao dịch thanh toán. Lỗi rõ ràng sẽ phát hành các trang dành riêng theo quy tắc; một kết quả không xác định được xác minh đầu tiên. Đây không phải là khoản hoàn trả tự động phí đăng ký. Các kết quả hiện có hợp lệ vẫn có thể truy cập được sau khi hết hạn thành viên, trong khi các nhiệm vụ mới sử dụng quyền khi được chấp nhận."
+              "Giữ trang và thanh toán là riêng. Lỗi đã xác nhận trả trang theo quy tắc; kết quả chưa rõ được kiểm tra, không tự hoàn tiền. Sau khi hết hội viên, kết quả chỉ còn truy cập trong hạn lưu riêng và khi quyền còn hợp lệ. Tác vụ mới theo quyền hiện tại."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Giới hạn dịch thuật PLUS / Pro hoạt động như thế nào?",
-        "answer": "Một tài khoản dùng chung giới hạn 100 ảnh dịch mới trong mỗi khoảng 60 giây trượt và 1.200 ảnh trong mỗi khoảng 3.600 giây trượt giữa mọi thiết bị, chế độ và ngôn ngữ. Gói Miễn phí cho phép 10 ảnh trong mỗi khoảng 60 giây trượt. Gửi lại cùng yêu cầu và dùng lại kết quả hợp lệ không bị tính thêm. Tác vụ đã tiếp nhận vẫn được tính nếu thất bại, bị hủy hoặc không có chữ. Yêu cầu bị từ chối hay giao dịch cơ sở dữ liệu bị hoàn tác sẽ trả lại suất đã giữ trong hạn mức theo giờ. Việc thử lại tuân theo quy tắc tiếp nhận tác vụ mới thực tế. Các giới hạn này không bảo đảm tốc độ hoàn thành.",
+        "answer": "Tốc độ tiếp nhận và số dư là riêng. Mặc định: 10 ảnh mới mỗi 60 giây trượt cho tài khoản thường, 100 cho hạng trả phí. Giới hạn giờ chỉ áp dụng khi quyền có cấu hình; theo giới hạn thực của tài khoản và dịch vụ. Cùng yêu cầu và dùng lại hợp lệ không tính hai lần; lỗi hoặc hủy sau tiếp nhận có thể chiếm cửa sổ tốc độ. Vẫn có giới hạn ảnh, đồng thời và năng lực, không bảo đảm tốc độ hoàn thành.",
         "relatedPath": "/pricing/"
       },
       {

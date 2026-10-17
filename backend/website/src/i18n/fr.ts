@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Politique de confidentialité",
         "description": "Comment NodeLane Comics gère les comptes, les images, les autorisations, la traduction, les abonnements et la suppression.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Traduction d’images de sites Web et essais invités",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Portée et contact",
             "paragraphs": [
-              "Cette politique couvre le site Web NodeLane Comics, les services d'extension, de lecture et de traduction, gérés par l'équipe NodeLane Comics. Contactez comics@nodelane.net à propos de la confidentialité, de l'accès, de la correction ou de la suppression. Mis à jour le 4 octobre 2026. Les changements importants seront expliqués sur cette page et communiqués de manière appropriée."
+              "Cette politique couvre le site Web NodeLane Comics, les services d'extension, de lecture et de traduction, gérés par l'équipe NodeLane Comics. Contactez comics@nodelane.net à propos de la confidentialité, de l'accès, de la correction ou de la suppression. Mis à jour le 2026-10-17. Les changements importants seront expliqués sur cette page et communiqués de manière appropriée."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Autorisations et stockage local",
             "paragraphs": [
               "L’extension déclare à l’installation l’accès à tous les sites et domaines d’images HTTP/HTTPS, sans demander d’autorisation site par site ou domaine par domaine pendant l’utilisation. Vous pouvez limiter cet accès dans les réglages des extensions du navigateur ; si des fonctions ne marchent plus, rétablissez l’accès à tous les sites et réessayez. Les cookies, les jetons de connexion du site source et l’historique de navigation ne sont pas envoyés au service officiel de traduction. Seules les images sélectionnées et les données nécessaires à la tâche sont traitées.",
-              "La bibliothèque, la position de lecture, les préférences et les données locales importées vivent dans le navigateur ; l'analyse est locale et les images pertinentes sont envoyées lorsque la traduction est demandée. La bibliothèque n'est pas automatiquement synchronisée. Le site Web conserve l’état du compte et de l’autorisation, les jetons d’accès et d’actualisation dans le stockage de session de l’onglet actuel. L'extension possède ses propres règles de stockage de session. La suppression des données du navigateur peut vous déconnecter ou supprimer les informations de lecture locale. La progression OPDS n’est synchronisée que si la source prend en charge cette fonction et que sa compatibilité a été vérifiée. En cas d’échec, la progression locale est conservée. Cela ne synchronise ni toute la bibliothèque ni les fichiers sources. Après connexion, le mot de passe et le jeton MTU sont conservés localement sur cet ordinateur. Avec la même adresse de service et le même nom d’utilisateur, laissez le mot de passe vide pour réutiliser celui enregistré. Saisissez-le à nouveau si l’adresse, le compte ou le mot de passe change, s’il n’est plus valide ou si un ancien profil ne contient qu’un jeton. L’enregistrement du mot de passe et la reconnexion avec un champ vide nécessitent l’extension 0.10.2 ou une version ultérieure ; les versions précédentes demandent le mot de passe à chaque reconnexion."
+              "Bibliothèque, positions, préférences et fichiers importés restent dans le navigateur, sans synchronisation automatique de toute la bibliothèque. Lorsque l’extension est connectée à une bibliothèque OPDS disposant d’une interface de progression de lecture, elle peut synchroniser la position de lecture avec cette bibliothèque. Il s’agit d’une synchronisation avec la bibliothèque source, et non d’une synchronisation cloud NodeLane. La connexion du site et les jetons d’accès/renouvellement persistent dans localStorage ; les changements sont partagés entre onglets du même navigateur. sessionStorage conserve l’état temporaire d’autorisation. Se déconnecter du site efface sa session locale, pas celle de l’extension ou du fournisseur d’identité. Effacer les données du site peut supprimer connexion et historique local."
             ]
           },
           {
             "title": "Prestataires et transferts",
             "paragraphs": [
               "Le traitement peut impliquer la détection/OCR, les modèles de texte, la réparation de l'arrière-plan local et la composition. Les fournisseurs de texte traitent le texte reconnu nécessaire à la traduction. Les fournisseurs réels sont configurés sur le serveur pour la tâche.",
-              "Les images de traduction utilisent des fichiers privés sur le serveur central ; le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données. Les services d’identité, d’infrastructure, de traduction et de paiement traitent les données selon les besoins, conformément à leurs politiques applicables. Le traitement peut avoir lieu en dehors de votre région. Nous ne vendons pas d'informations personnelles et n'utilisons pas les bandes dessinées soumises à des fins de ciblage publicitaire. Nous ne promettons pas que tous les prestataires ne conserveront rien ou n'utiliseront jamais les données à des fins de formation ; cela dépend du fournisseur et de l'accord. Ne soumettez pas de contenu sensible non autorisé ou inapproprié."
+              "Traduction d’une image : Les images de traduction utilisent des fichiers privés sur le serveur central ; le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données. Les services d’identité, d’infrastructure, de traduction et de paiement traitent les données selon les besoins, conformément à leurs politiques applicables. Le traitement peut avoir lieu en dehors de votre région. Nous ne vendons pas d'informations personnelles et n'utilisons pas les bandes dessinées soumises à des fins de ciblage publicitaire. Nous ne promettons pas que tous les prestataires ne conserveront rien ou n'utiliseront jamais les données à des fins de formation ; cela dépend du fournisseur et de l'accord. Ne soumettez pas de contenu sensible non autorisé ou inapproprié."
             ]
           },
           {
             "title": "Conservation et suppression",
             "paragraphs": [
-              "Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
-              "Les résultats sont réutilisés uniquement au sein du même compte lorsque le contenu, le mode, la langue et la configuration effective correspondent et qu'une demande valide demeure. Les originaux et les résultats ne sont pas partagés entre les utilisateurs. Le navigateur combine des superpositions avec sa propre image originale ; le serveur ne conserve pas de copies originales permanentes. La suppression d’un enregistrement de traduction révoque immédiatement l’accès au serveur de cette demande. Les autres demandes valides dans votre compte restent utilisables ; le fichier de résultats est supprimé après la révocation de la dernière demande valide. Les copies téléchargées ou mises en cache peuvent rester sur votre appareil jusqu'à ce que vous les effaciez.",
+              "Traduction d’une image : Les originaux sont des fichiers temporaires sur le serveur central et les nœuds de calcul, supprimés une fois qu'une tâche est terminée, échoue ou est annulée. La traduction conserve les fichiers superposés. Les résultats restent privés tant que votre compte a une demande valide. Le texte reconnu, les traductions et les métadonnées nécessaires sont stockés dans la base de données.",
+              "Traduction d’une image : Les résultats sont réutilisés uniquement au sein du même compte lorsque le contenu, le mode, la langue et la configuration effective correspondent et qu'une demande valide demeure. Les originaux et les résultats ne sont pas partagés entre les utilisateurs. Le navigateur combine des superpositions avec sa propre image originale ; le serveur ne conserve pas de copies originales permanentes. La suppression d’un enregistrement de traduction révoque immédiatement l’accès au serveur de cette demande. Les autres demandes valides dans votre compte restent utilisables ; le fichier de résultats est supprimé après la révocation de la dernière demande valide. Les copies téléchargées ou mises en cache peuvent rester sur votre appareil jusqu'à ce que vous les effaciez.",
               "Pour les demandes de suppression de compte ou plus larges, contactez-nous pour une vérification de l'identité et de la portée. Les enregistrements de transactions, d'audit ou de sécurité peuvent devoir être conservés pour des obligations de service, des litiges ou des exigences applicables. Aucun délai d'effacement unique n'est promis pour tous les documents ; la réponse expliquera le résultat et les contraintes."
             ]
           },
           {
             "title": "Sécurité, choix et mineurs",
             "paragraphs": [
-              "Le serveur central vérifie l'autorisation du compte et renvoie directement les fichiers de résultats, sans émettre de liens de téléchargement signés de courte durée. Les clés du fournisseur restent sur le backend. Protégez votre compte et votre appareil et ne partagez pas de jetons d'accès. Vous pouvez restreindre l’accès aux sites dans le navigateur, arrêter la traduction, vous déconnecter ou supprimer les données du navigateur local ; les fonctionnalités nécessaires peuvent alors être indisponibles. Le site Web ne dispose pas de trackers publicitaires ni de scripts d'analyse tiers.",
+              "Traduction d’une image : Le serveur central vérifie l'autorisation du compte et renvoie directement les fichiers de résultats, sans émettre de liens de téléchargement signés de courte durée. Les clés du fournisseur restent sur le backend. Protégez votre compte et votre appareil et ne partagez pas de jetons d'accès. Vous pouvez restreindre l’accès aux sites dans le navigateur, arrêter la traduction, vous déconnecter ou supprimer les données du navigateur local ; les fonctionnalités nécessaires peuvent alors être indisponibles. Le site Web ne dispose pas de trackers publicitaires ni de scripts d'analyse tiers.",
               "Les mineurs doivent utiliser le service avec les connaissances et conseils appropriés d'un tuteur et obtenir l'autorisation nécessaire pour les abonnements. Ne soumettez pas d’informations personnelles sensibles sur les enfants. Les tuteurs peuvent nous contacter pour demander une vérification et un traitement en cas de traitement inapproprié. Signaler les problèmes de sécurité en utilisant uniquement les informations nécessaires et expurgées ; les mots de passe et les jetons ne sont pas nécessaires."
+            ]
+          },
+          {
+            "title": "Traduction complète de PDF / ZIP / CBZ",
+            "paragraphs": [
+              "La traduction complète exige une connexion. Les PDF / ZIP / CBZ choisis sont envoyés directement vers Cloudflare R2 privé. Les nœuds de calcul analysent, reconnaissent et rendent les pages ; les modèles textuels traitent le texte reconnu nécessaire. R2 conserve les entrées et le ZIP complet d’images traduites ; la base conserve tâches, texte et usage. Envois et téléchargements utilisent des URL signées temporaires, à ne pas partager ; une URL émise peut rester utilisable jusqu’à son expiration.",
+              "Les documents ne suivent pas la conservation longue des calques d’images. Par défaut : envoi à terminer en 1 heure, fichier envoyé mais non démarré expirant après 24 heures, nettoyage des entrées terminées et sorties échouées après un délai de 1 heure, ZIP réussi conservé 7 jours. L’échéance affichée sur la tâche fait foi. Les entrées actives ou au résultat incertain peuvent rester pour récupération. Les fichiers temporaires des nœuds suivent les procédures de récupération/nettoyage ; les dossiers nécessaires de tâches, facturation et sécurité sont conservés séparément. Après expiration, le téléchargement serveur cesse ; les copies téléchargées restent sous votre contrôle."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Conditions d'utilisation",
         "description": "Conditions d'utilisation de NodeLane Comics, droits de contenu, limitations de l'IA et abonnements.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Service et comptes",
             "paragraphs": [
-              "NodeLane Comics fournit des services d'extension, de lecture et de traduction. Lisez ces conditions et la politique de confidentialité avant utilisation ; arrêtez d'utiliser le service si vous n'êtes pas d'accord. Mis à jour le 4 octobre 2026. Le site Web fournit des informations sur les produits, des guides, des téléchargements et une gestion de compte, et non un catalogue de bandes dessinées ou des ventes de bandes dessinées.",
-              "Utilisez un compte que vous êtes autorisé à utiliser et protégez vos informations d'identification et votre appareil. Les avantages et l'accès sont vérifiés sur le serveur. N'usurpez pas l'identité d'autrui, n'accédez pas à leurs dossiers privés, ne contournez pas les limites de débit ou d'image, ne perturbez pas les services avec une automatisation abusive ou n'attaquez pas le produit et ses fournisseurs. Une mauvaise utilisation peut conduire à un accès restreint."
+              "NodeLane Comics fournit des services d'extension, de lecture et de traduction. Lisez ces conditions et la politique de confidentialité avant utilisation ; arrêtez d'utiliser le service si vous n'êtes pas d'accord. Mis à jour le 2026-10-17. Le site Web fournit des informations sur les produits, des guides, des téléchargements et une gestion de compte, et non un catalogue de bandes dessinées ou des ventes de bandes dessinées.",
+              "Utilisez un compte que vous êtes autorisé à utiliser et protégez vos informations d'identification et votre appareil. Les avantages et l'accès sont vérifiés sur le serveur. N'usurpez pas l'identité d'autrui, n'accédez pas à leurs dossiers privés, ne contournez pas les limites de débit ou d'image, ne perturbez pas les services avec une automatisation abusive ou n'attaquez pas le produit et ses fournisseurs. Une mauvaise utilisation peut conduire à un accès restreint.",
+              "Le code source de l’extension est sous GPL-3.0-only ; les composants tiers gardent leurs licences. Ces conditions du service en ligne ne restreignent pas les droits d’utilisation, modification ou redistribution accordés par la GPL et n’accordent aucun droit sur les mangas."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Avantages et abonnements",
             "paragraphs": [
               membershipSummary,
-              "Les abonnements proposent une facturation mensuelle ou annuelle. Les prix, les essais et les allocations de pages suivent l'offre sélectionnée, qui se renouvelle automatiquement à cet intervalle. Les modifications de prix s'appliquent aux nouveaux abonnements ; les abonnements existants conservent leur prix et leur version d'avantages d'origine. Annuler avant le renouvellement."
+              "Les nouveaux abonnements sont trimestriels ou annuels, sans essai avec carte, et se renouvellent automatiquement. Chaque période comprend 3/12 fenêtres mensuelles ancrées sur la date de facturation UTC initiale, sans report ni avance de pages. Prix, taxes et droits suivent la commande et le compte. Les abonnements existants gardent leur prix et version de droits ; les anciens essais et cadeaux suivent leurs conditions enregistrées.",
+              "Les modèles gratuits utilisent les pages gratuites (cadeaux applicables inclus), puis celles de l’abonnement et des lots. Les modèles payants utilisent seulement abonnement ou lots. Chaque nouvelle version de page réussie coûte 1 page. Même requête, résultat personnel valide réutilisé et reprises internes ne sont pas facturés deux fois ; une nouvelle version expressément retraduite est décomptée. Échec, annulation ou absence de texte traduisible libèrent les réservations selon les règles ; un résultat incertain est vérifié. Les lots actuels n’expirent pas et ne se renouvellent pas. Les tâches qui consomment réellement des pages achetées bénéficient des limites d’admission et de la priorité d’exécution PLUS du lot ; détenir un solde ne fait pas passer les tâches utilisant le quota gratuit à l’admission payante. Une fois épuisé, le lot ne donne plus ses avantages.",
+              "Débit d’admission et solde sont distincts. Par défaut : 10 nouvelles images par 60 secondes glissantes pour un compte standard, 100 pour un niveau payant. Un plafond horaire ne s’applique que s’il est configuré dans les droits ; les limites réelles du compte et du service prévalent. Même requête et réutilisation valide ne comptent pas deux fois ; un échec ou une annulation après admission peut occuper la fenêtre. Les limites d’images, de concurrence et de capacité restent applicables, sans garantie de vitesse."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Abonnements, annulations et remboursements",
-        "description": "Les abonnements proposent une facturation mensuelle ou annuelle. Les prix, les essais et les allocations de pages suivent l'offre sélectionnée, qui se renouvelle automatiquement à cet intervalle. Les modifications de prix s'appliquent aux nouveaux abonnements ; les abonnements existants conservent leur prix et leur version d'avantages d'origine. Annuler avant le renouvellement.",
+        "description": "Les nouveaux abonnements sont trimestriels ou annuels, sans essai avec carte, et se renouvellent automatiquement.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Essai et facturation",
+            "title": "Offres actuelles et renouvellement",
             "paragraphs": [
-              "Les abonnements proposent une facturation mensuelle ou annuelle. Les prix, les essais et les allocations de pages suivent l'offre sélectionnée, qui se renouvelle automatiquement à cet intervalle. Les modifications de prix s'appliquent aux nouveaux abonnements ; les abonnements existants conservent leur prix et leur version d'avantages d'origine. Annuler avant le renouvellement.",
-              "Les comptes éligibles peuvent démarrer l’essai indiqué pour leur offre, avec une carte bancaire. Se réabonner ou changer d’offre ne réinitialise pas l’éligibilité à l’essai."
+              membershipSummary,
+              "Les nouveaux abonnements sont trimestriels ou annuels, sans essai avec carte, et se renouvellent automatiquement. Chaque période comprend 3/12 fenêtres mensuelles ancrées sur la date de facturation UTC initiale, sans report ni avance de pages. Prix, taxes et droits suivent la commande et le compte. Les abonnements existants gardent leur prix et version de droits ; les anciens essais et cadeaux suivent leurs conditions enregistrées."
             ]
           },
           {
             "title": "Arrêtez le renouvellement futur",
             "paragraphs": [
               "Connectez-vous à votre compte de site Web ou utilisez l'entrée de compte d'extension pour gérer l'abonnement. L'annulation arrête le prochain renouvellement et n'efface pas automatiquement les prestations déjà valables ; comptez sur l'expiration indiquée sur votre compte.",
-              "Annulez avant la fin de l’essai si vous ne souhaitez pas de renouvellement payant. La désinstallation, la fermeture du navigateur ou la déconnexion n'annule pas un abonnement. Envoyez un e-mail à comics@nodelane.net si vous ne pouvez pas accéder à votre compte."
+              "Annulez dans le compte du site avant le renouvellement. Pour un ancien essai, annulez avant sa fin initiale pour éviter la facturation. Désinstaller, fermer le navigateur ou se déconnecter n’annule pas l’abonnement. Plusieurs commandes payées restent distinctes, sans fusion, prorata ni remboursement automatique. Erreur d’achat ou accès impossible : comics@nodelane.net."
             ]
           },
           {
             "title": "Allocation de page par rapport au paiement",
             "paragraphs": [
-              "Une réservation de tâche est distincte d'une transaction de paiement. Un échec explicite libère les pages réservées selon les règles ; un résultat inconnu est vérifié en premier. Il ne s'agit pas d'un remboursement automatique des frais d'abonnement. Les résultats existants valides restent accessibles après l'expiration de l'adhésion, tandis que les nouvelles tâches utilisent le droit lors de l'acceptation."
+              "Réservations de pages et paiements sont distincts. Un échec confirmé libère les pages selon les règles ; un résultat incertain est vérifié, sans remboursement monétaire automatique. Après expiration de l’abonnement, les résultats restent accessibles uniquement pendant leur conservation propre et avec une autorisation valide. Les nouvelles tâches suivent les droits actuels."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Comment fonctionnent les limites de traduction PLUS / Pro ?",
-        "answer": "Un même compte partage une limite de 100 nouvelles images à traduire sur toute fenêtre glissante de 60 secondes et de 1 200 sur toute fenêtre glissante de 3 600 secondes, tous appareils, modes et langues confondus. L’offre Gratuit autorise 10 images sur toute fenêtre glissante de 60 secondes. Réenvoyer la même demande ou réutiliser un résultat valide ne compte pas à nouveau. Les tâches acceptées comptent même si elles échouent, sont annulées ou ne contiennent aucun texte. Les demandes rejetées ou les transactions de base de données annulées libèrent la place réservée dans le quota horaire. Les nouvelles tentatives suivent les règles effectives d’admission des nouvelles tâches. Ces limites ne garantissent aucun délai de réalisation.",
+        "answer": "Débit d’admission et solde sont distincts. Par défaut : 10 nouvelles images par 60 secondes glissantes pour un compte standard, 100 pour un niveau payant. Un plafond horaire ne s’applique que s’il est configuré dans les droits ; les limites réelles du compte et du service prévalent. Même requête et réutilisation valide ne comptent pas deux fois ; un échec ou une annulation après admission peut occuper la fenêtre. Les limites d’images, de concurrence et de capacité restent applicables, sans garantie de vitesse.",
         "relatedPath": "/pricing/"
       },
       {

@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Polityka prywatności",
         "description": "Jak NodeLane Comics obsługuje konta, obrazy, uprawnienia, tłumaczenia, subskrypcje i usuwanie.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Tłumaczenie obrazu strony internetowej i testy gościnne",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Zakres i kontakt",
             "paragraphs": [
-              "Niniejsza polityka dotyczy witryny internetowej NodeLane Comics, jej rozszerzenia, usług czytnika i tłumaczeń, prowadzonych przez zespół NodeLane Comics. Skontaktuj się z comics@nodelane.net w sprawie prywatności, dostępu, poprawiania lub usuwania. Zaktualizowano 4 października 2026 r. Istotne zmiany zostaną wyjaśnione na tej stronie i odpowiednio przekazane."
+              "Niniejsza polityka dotyczy witryny internetowej NodeLane Comics, jej rozszerzenia, usług czytnika i tłumaczeń, prowadzonych przez zespół NodeLane Comics. Skontaktuj się z comics@nodelane.net w sprawie prywatności, dostępu, poprawiania lub usuwania. Zaktualizowano 2026-10-17 r. Istotne zmiany zostaną wyjaśnione na tej stronie i odpowiednio przekazane."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Uprawnienia i pamięć lokalna",
             "paragraphs": [
               "Podczas instalacji rozszerzenie deklaruje dostęp do wszystkich stron i domen obrazów HTTP/HTTPS, bez proszenia o zgodę dla poszczególnych stron lub domen podczas używania. Dostęp można ograniczyć w ustawieniach rozszerzeń przeglądarki; jeśli powiązane funkcje przestaną działać, przywróć dostęp do wszystkich stron i spróbuj ponownie. Cookies źródłowej strony, tokeny logowania i historia przeglądania nie są wysyłane do usługi tłumaczenia.",
-              "Pozycja jest zapisywana lokalnie. Synchronizacja ze źródłem jest dostępna tylko wtedy, gdy źródło ją obsługuje, a zgodność została sprawdzona. Przy błędzie synchronizacji lokalna pozycja pozostaje zachowana. Biblioteka, pozycja czytania, preferencje i zaimportowane dane lokalne są dostępne w przeglądarce; analiza ma charakter lokalny, a odpowiednie obrazy są wysyłane, gdy wymagane jest tłumaczenie. Biblioteka nie jest automatycznie synchronizowana. Strona przechowuje stan konta i autoryzację, tokeny dostępu i odświeżania w pamięci sesji bieżącej karty. Rozszerzenie ma własne zasady przechowywania sesji. Wyczyszczenie danych przeglądarki może spowodować wylogowanie lub usunięcie informacji o czytaniu lokalnym."
+              "Półka, pozycje, preferencje i importowane pliki pozostają w przeglądarce; cała półka nie synchronizuje się automatycznie. Po połączeniu z biblioteką OPDS obsługującą interfejs postępu czytania rozszerzenie może synchronizować pozycję czytania z tą biblioteką. Jest to synchronizacja z biblioteką źródłową, a nie synchronizacja w chmurze NodeLane. Logowanie strony i tokeny dostępu/odświeżania trwale zapisujemy w localStorage, ze zmianami między kartami tej samej przeglądarki. sessionStorage przechowuje tymczasowy stan autoryzacji. Wylogowanie ze strony usuwa jej lokalną sesję, nie sesję rozszerzenia lub dostawcy tożsamości. Usunięcie danych witryny może usunąć logowanie i historię lokalną."
             ]
           },
           {
             "title": "Usługodawcy i transfery",
             "paragraphs": [
               "Rozszerzenie używa tłumaczenia. przetwarzanie może obejmować wykrywanie/OCR, modele tekstowe, lokalną naprawę tła i skład. Dostawcy tekstu przetwarzają rozpoznany tekst potrzebny do tłumaczenia. Rzeczywiści dostawcy są skonfigurowani na serwerze dla tego zadania.",
-              "Obrazy tłumaczeń korzystają z prywatnych plików na serwerze centralnym; rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usługi związane z tożsamością, infrastrukturą, tłumaczeniami i płatnościami przetwarzają dane w razie potrzeby, zgodnie z obowiązującymi politykami. Przetwarzanie może odbywać się poza Twoim regionem. Nie sprzedajemy danych osobowych ani nie wykorzystujemy przesłanych komiksów do kierowania reklam. Nie obiecujemy, że wszyscy dostawcy niczego nie zachowają ani nigdy nie wykorzystają danych do celów szkoleniowych; zależy to od dostawcy i umowy. Nie przesyłaj nieautoryzowanych lub nieodpowiednich treści wrażliwych."
+              "Tłumaczenie pojedynczego obrazu: Obrazy tłumaczeń korzystają z prywatnych plików na serwerze centralnym; rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usługi związane z tożsamością, infrastrukturą, tłumaczeniami i płatnościami przetwarzają dane w razie potrzeby, zgodnie z obowiązującymi politykami. Przetwarzanie może odbywać się poza Twoim regionem. Nie sprzedajemy danych osobowych ani nie wykorzystujemy przesłanych komiksów do kierowania reklam. Nie obiecujemy, że wszyscy dostawcy niczego nie zachowają ani nigdy nie wykorzystają danych do celów szkoleniowych; zależy to od dostawcy i umowy. Nie przesyłaj nieautoryzowanych lub nieodpowiednich treści wrażliwych."
             ]
           },
           {
             "title": "Przechowywanie i usuwanie",
             "paragraphs": [
-              "Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
-              "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz.",
+              "Tłumaczenie pojedynczego obrazu: Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+              "Tłumaczenie pojedynczego obrazu: Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz.",
               "W przypadku żądań usunięcia konta lub szerszych wniosków skontaktuj się z nami w celu weryfikacji tożsamości i zakresu. Rejestry transakcji, audytów lub bezpieczeństwa mogą wymagać przechowywania ze względu na zobowiązania serwisowe, spory lub obowiązujące wymagania. Nie ma określonego terminu usunięcia wszystkich zapisów; odpowiedź wyjaśni wynik i ograniczenia."
             ]
           },
           {
             "title": "Bezpieczeństwo, wybory i nieletni",
             "paragraphs": [
-              "Serwer centralny sprawdza autoryzację konta i bezpośrednio zwraca pliki wynikowe, bez wydawania krótkotrwałych podpisanych linków do pobierania. Klucze dostawcy pozostają w zapleczu. Chroń swoje konto i urządzenie i nie udostępniaj tokenów dostępu. Możesz ograniczyć dostęp do stron w ustawieniach rozszerzeń przeglądarki, zatrzymać tłumaczenie, wylogować się lub usunąć dane lokalnej przeglądarki; niezbędna funkcjonalność może być wtedy niedostępna. Witryna nie zawiera modułów do śledzenia reklam ani skryptów analitycznych stron trzecich.",
+              "Tłumaczenie pojedynczego obrazu: Serwer centralny sprawdza autoryzację konta i bezpośrednio zwraca pliki wynikowe, bez wydawania krótkotrwałych podpisanych linków do pobierania. Klucze dostawcy pozostają w zapleczu. Chroń swoje konto i urządzenie i nie udostępniaj tokenów dostępu. Możesz ograniczyć dostęp do stron w ustawieniach rozszerzeń przeglądarki, zatrzymać tłumaczenie, wylogować się lub usunąć dane lokalnej przeglądarki; niezbędna funkcjonalność może być wtedy niedostępna. Witryna nie zawiera modułów do śledzenia reklam ani skryptów analitycznych stron trzecich.",
               "Osoby niepełnoletnie powinny korzystać z usługi, mając odpowiednią wiedzę i wskazówki opiekuna oraz uzyskując niezbędne zezwolenia na subskrypcję. Nie podawaj wrażliwych danych osobowych dzieci. Opiekunowie mogą skontaktować się z nami, aby poprosić o weryfikację i zajęcie się niewłaściwym przetwarzaniem. Zgłaszaj obawy dotyczące bezpieczeństwa, korzystając wyłącznie z niezbędnych, zredagowanych informacji; hasła i tokeny nie są potrzebne."
+            ]
+          },
+          {
+            "title": "Tłumaczenie całego PDF / ZIP / CBZ",
+            "paragraphs": [
+              "Tłumaczenie całego pliku wymaga logowania. Wybrane PDF / ZIP / CBZ trafiają bezpośrednio do prywatnego Cloudflare R2. Węzły obliczeniowe analizują, rozpoznają i renderują strony; modele tekstowe przetwarzają niezbędny rozpoznany tekst. R2 przechowuje wejścia i pełny ZIP przetłumaczonych obrazów, baza — zadania, tekst i użycie. Przesyłanie i pobieranie korzysta z czasowych podpisanych URL. Nie udostępniaj ich: wydany URL może działać do wygaśnięcia.",
+              "Dokumenty mają inne terminy niż długie przechowywanie nakładek pojedynczych obrazów. Domyślnie: przesłanie w 1 godzinę; przesłane, nierozpoczęte pliki wygasają po 24 godzinach; zakończone wejścia i nieudane wyjścia są czyszczone po 1 godzinie; udane ZIP przechowujemy 7 dni. Sprawdź termin w zadaniu. Aktywne lub nierozstrzygnięte wejścia mogą pozostać do odzyskania. Pliki tymczasowe węzłów podlegają procedurom odzyskiwania i czyszczenia; niezbędne rejestry zadań, rozliczeń i bezpieczeństwa pozostają osobno. Pobieranie z serwera wygasa; pobrane kopie kontrolujesz samodzielnie."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Warunki usługi",
         "description": "Warunki korzystania z NodeLane Comics, prawa do treści, ograniczenia AI i subskrypcje.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Serwis i konta",
             "paragraphs": [
-              "NodeLane Comics zapewnia usługi rozszerzenia, czytnika i tłumaczenia. Przed użyciem przeczytaj niniejsze warunki i politykę prywatności; przestań korzystać z usługi, jeśli się z tym nie zgadzasz. Zaktualizowano 4 października 2026 r. Witryna zawiera informacje o produktach, przewodniki, pliki do pobrania i zarządzanie kontem, a nie katalog komiksów ani sprzedaż komiksów.",
-              "Korzystaj z konta, do którego masz prawo, i chroń swoje dane uwierzytelniające oraz urządzenie. Korzyści i dostęp weryfikowane są na serwerze. Nie podszywaj się pod inne osoby, nie uzyskuj dostępu do ich prywatnych rejestrów, nie omijaj limitów szybkości lub obrazu, nie zakłócaj usług poprzez nadużycie automatyzacji ani nie atakuj produktu i jego dostawców. Niewłaściwe użycie może prowadzić do ograniczonego dostępu."
+              "NodeLane Comics zapewnia usługi rozszerzenia, czytnika i tłumaczenia. Przed użyciem przeczytaj niniejsze warunki i politykę prywatności; przestań korzystać z usługi, jeśli się z tym nie zgadzasz. Zaktualizowano 2026-10-17 r. Witryna zawiera informacje o produktach, przewodniki, pliki do pobrania i zarządzanie kontem, a nie katalog komiksów ani sprzedaż komiksów.",
+              "Korzystaj z konta, do którego masz prawo, i chroń swoje dane uwierzytelniające oraz urządzenie. Korzyści i dostęp weryfikowane są na serwerze. Nie podszywaj się pod inne osoby, nie uzyskuj dostępu do ich prywatnych rejestrów, nie omijaj limitów szybkości lub obrazu, nie zakłócaj usług poprzez nadużycie automatyzacji ani nie atakuj produktu i jego dostawców. Niewłaściwe użycie może prowadzić do ograniczonego dostępu.",
+              "Kod rozszerzenia jest na GPL-3.0-only; składniki zewnętrzne zachowują własne licencje. Warunki usługi online nie ograniczają praw GPL do używania, modyfikowania i rozpowszechniania ani nie nadają praw do komiksów."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Korzyści i subskrypcje",
             "paragraphs": [
               membershipSummary,
-              "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem."
+              "Nowe subskrypcje są kwartalne lub roczne, bez próby wymagającej karty, i odnawiają się automatycznie. Okres obejmuje 3/12 miesięcznych okien limitu według pierwotnej daty rozliczenia UTC. Niewykorzystane strony nie przechodzą dalej, przyszłych nie można użyć wcześniej. Ceny, podatki i korzyści wynikają z zamówienia i konta. Istniejące subskrypcje zachowują pierwotną cenę i wersję uprawnień; dawne próby i prezenty podlegają swoim zapisom.",
+              "Modele bezpłatne zużywają strony bezpłatne (z właściwymi prezentami), potem subskrypcję i zakupy. Płatne modele tylko subskrypcję lub zakupy. Każda pomyślnie wygenerowana nowa wersja strony kosztuje 1 stronę. Ten sam wniosek, własny ważny wynik i wewnętrzne ponowienia nie są naliczane dwukrotnie; świadomie zlecona nowa wersja tłumaczenia jest naliczana. Błąd, anulowanie lub brak tekstu do tłumaczenia zwalniają rezerwacje zgodnie z zasadami; niepewne wyniki są sprawdzane. Obecne pakiety nie wygasają ani nie odnawiają się automatycznie. Zadania faktycznie zużywające zakupione strony otrzymują limity przyjmowania i priorytet wykonania PLUS danego pakietu; samo posiadanie salda nie daje płatnego trybu przyjmowania zadaniom korzystającym z bezpłatnego limitu. Po wyczerpaniu pakiet nie zapewnia już swoich korzyści.",
+              "Tempo przyjmowania i saldo są oddzielne. Domyślnie: 10 nowych obrazów na ruchome 60 sekund dla zwykłych kont, 100 dla płatnych poziomów. Limit godzinowy obowiązuje tylko, gdy zapisano go w uprawnieniach; stosuje się rzeczywiste limity konta i usługi. Ten sam wniosek i ważne ponowne użycie nie liczą się dwa razy; przyjęte błędy lub anulowania mogą zajmować okno. Limity obrazu, współbieżności i wydajności nadal obowiązują, bez gwarancji szybkości."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Subskrypcje, anulowanie i zwroty pieniędzy",
-        "description": "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem.",
+        "description": "Nowe subskrypcje są kwartalne lub roczne, bez próby wymagającej karty, i odnawiają się automatycznie.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Wersja próbna i rozliczenia",
+            "title": "Obecne plany i odnowienie",
             "paragraphs": [
-              "Subskrypcje oferują rozliczenia miesięczne lub roczne. Ceny, okresy próbne i limity stron są zgodne z wybraną ofertą, która odnawia się automatycznie w określonych odstępach czasu. Zmiany cen dotyczą nowych abonamentów; istniejące subskrypcje zachowują pierwotną cenę i wersję korzyści. Anuluj przed odnowieniem.",
-              "Konta spełniające warunki mogą rozpocząć okres próbny wskazany dla wybranego planu. Wymagane jest podanie karty. Ponowna subskrypcja ani zmiana planu nie odnawia prawa do okresu próbnego."
+              membershipSummary,
+              "Nowe subskrypcje są kwartalne lub roczne, bez próby wymagającej karty, i odnawiają się automatycznie. Okres obejmuje 3/12 miesięcznych okien limitu według pierwotnej daty rozliczenia UTC. Niewykorzystane strony nie przechodzą dalej, przyszłych nie można użyć wcześniej. Ceny, podatki i korzyści wynikają z zamówienia i konta. Istniejące subskrypcje zachowują pierwotną cenę i wersję uprawnień; dawne próby i prezenty podlegają swoim zapisom."
             ]
           },
           {
             "title": "Zatrzymaj przyszłą odnowę",
             "paragraphs": [
               "Zaloguj się na swoje konto w witrynie lub użyj wpisu konta rozszerzenia, aby zarządzać subskrypcją. Anulowanie wstrzymuje kolejne odnowienie i nie powoduje automatycznego usunięcia już ważnych korzyści; polegać na wygaśnięciu wskazanym na Twoim koncie.",
-              "Anuluj przed zakończeniem okresu próbnego, jeśli nie chcesz płatnego odnowienia. Odinstalowanie, zamknięcie przeglądarki lub wylogowanie nie powoduje anulowania subskrypcji. Wyślij e-mail na adres comics@nodelane.net, jeśli nie możesz uzyskać dostępu do swojego konta."
+              "Anuluj na koncie witryny przed odnowieniem. Dawną próbę anuluj przed pierwotnym końcem, by uniknąć opłaty. Odinstalowanie, zamknięcie przeglądarki lub wylogowanie nie anuluje subskrypcji. Opłacone zamówienia pozostają oddzielne, bez automatycznego łączenia, proporcjonalnych rozliczeń lub zwrotów. Pomyłka albo brak dostępu: comics@nodelane.net."
             ]
           },
           {
             "title": "Dodatek strony a płatność",
             "paragraphs": [
-              "Rezerwacja zadania jest odrębna od transakcji płatniczej. Wyraźna awaria zwalnia zarezerwowane strony zgodnie z regułami; nieznany wynik jest weryfikowany w pierwszej kolejności. Nie jest to automatyczny zwrot opłat abonamentowych. Prawidłowe istniejące wyniki pozostają dostępne po wygaśnięciu członkostwa, natomiast nowe zadania wykorzystują uprawnienia w momencie akceptacji."
+              "Rezerwacje i płatności są oddzielne. Potwierdzone błędy zwracają strony zgodnie z zasadami; niepewne wyniki są sprawdzane, bez automatycznego zwrotu pieniędzy. Po wygaśnięciu członkostwa wyniki są dostępne tylko w swoim okresie przechowywania i przy ważnej autoryzacji. Nowe zadania korzystają z bieżących praw."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "Jak działają limity tłumaczenia PLUS / Pro?",
-        "answer": "Jedno konto ma wspólny limit 100 nowych obrazów tłumaczeń na 60 sekund i 1200 na 3600 sekund na różnych urządzeniach, w trybach i językach. Za darmo pozwala na 10 na 60 sekund. Powtórzenie tego samego żądania i ponowne wykorzystanie prawidłowych wyników nie są liczone ponownie. Zaakceptowane zadania nadal się liczą, jeśli zawiodą, zostaną anulowane lub nie będą zawierać żadnego tekstu. Odrzucone żądania lub wycofane transakcje bazy danych zwalniają zarezerwowany przedział godzinowy. Ponowne próby są zgodne z rzeczywistymi zasadami przyjmowania nowych zadań. Limity te nie gwarantują szybkości zakończenia.",
+        "answer": "Tempo przyjmowania i saldo są oddzielne. Domyślnie: 10 nowych obrazów na ruchome 60 sekund dla zwykłych kont, 100 dla płatnych poziomów. Limit godzinowy obowiązuje tylko, gdy zapisano go w uprawnieniach; stosuje się rzeczywiste limity konta i usługi. Ten sam wniosek i ważne ponowne użycie nie liczą się dwa razy; przyjęte błędy lub anulowania mogą zajmować okno. Limity obrazu, współbieżności i wydajności nadal obowiązują, bez gwarancji szybkości.",
         "relatedPath": "/pricing/"
       },
       {

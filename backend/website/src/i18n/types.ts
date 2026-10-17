@@ -7,7 +7,7 @@ export interface GuideSection {
   table?:{headers:string[];rows:string[][]};
 }
 export interface Guide {slug:string;title:string;description:string;category:string;minutes:number;published?:string;updated?:string;related?:string[];sections:GuideSection[]}
-export interface Policy {title:string;description:string;sections:GuideSection[]}
+export interface Policy {title:string;description:string;updated:string;sections:GuideSection[]}
 export interface UI {
   brandName:string;
   notFoundTitle:string;

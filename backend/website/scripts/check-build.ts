@@ -39,6 +39,15 @@ for (const file of htmlFiles) {
   if ($('link[rel=canonical]').length !== 1 || canonical !== site.url + canonicalRoute) errors.push(`${label}: canonical must match its own static route`);
   const route = new URL(canonical || site.url).pathname;
   const locale = localeFromPath(route);
+  const policyKey = basePath(route).split('/')[1];
+  const policy = dictionaries[locale].documents.policies[policyKey];
+  if (policy) {
+    if ($('.meta time').attr('datetime') !== policy.updated) errors.push(`${label}: stale policy revision`);
+    // The article renderer must not silently omit any privacy or billing disclosure.
+    const paragraphs = policy.sections.flatMap(section => section.paragraphs);
+    const articleText = $('.prose').text();
+    if (paragraphs.some(text => !articleText.includes(text))) errors.push(`${label}: missing policy paragraph`);
+  }
   if (!noindex || $('.site-header').length) {
     if ($('.header-download[data-install-extension]').attr('href') !== localPath('/download/', locale)) errors.push(`${label}: installation must retain a localized no-script fallback`);
     if ($('body').attr('data-install-stores') !== JSON.stringify(site.stores)) errors.push(`${label}: installation destinations must use the official store configuration`);

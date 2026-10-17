@@ -412,6 +412,7 @@ export default {
       "privacy": {
         "title": "Privacy policy",
         "description": "How NodeLane Comics handles accounts, images, permissions, translation, subscriptions and deletion.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Website image translation and guest trials",
@@ -424,7 +425,7 @@ export default {
           {
             "title": "Scope and contact",
             "paragraphs": [
-              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated October 4, 2026. Material changes will be explained on this page and communicated appropriately."
+              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated 2026-10-17. Material changes will be explained on this page and communicated appropriately."
             ]
           },
           {
@@ -446,29 +447,36 @@ export default {
             "title": "Permissions and local storage",
             "paragraphs": [
               "The extension declares access to all HTTP/HTTPS websites and image domains at installation, without requesting access site by site or domain by domain during use. You can still restrict access in the browser’s extension settings; affected features may stop working until you restore access to all websites and retry. Source-site cookies, login tokens and browsing history are not uploaded to NodeLane. Remote library authorization and MTU passwords and tokens are stored on this device and sent only to their configured service as needed; removing a connection removes its saved credentials. Saving passwords and reconnecting with a blank password require extension 0.10.2 or later; earlier versions require the password on each reconnection.",
-              "The shelf, local reading positions, preferences and imported files live in the browser. Supported remote sources may read and write progress when the source exposes that capability; the whole shelf is not automatically synchronized. Translation sends only selected images and necessary task information to the chosen channel. Website account tokens remain in the current tab’s session storage; clearing browser data can remove sessions and local reading data."
+              "The shelf, reading positions, preferences and imported files stay in the browser; the whole shelf is not automatically synced. When connected to an OPDS library that supports a reading-progress interface, the extension can sync reading positions with that library. This is synchronization with the source library, not NodeLane cloud synchronization. Website sign-in and access/refresh tokens persist in localStorage, with sign-in changes shared across tabs in the same browser. Temporary authorization-flow state uses sessionStorage. Website sign-out clears its local session, not the extension or identity-provider session. Clearing site data can remove sign-in and local history."
             ]
           },
           {
             "title": "Service providers and transfers",
             "paragraphs": [
               "Translation processing may involve detection/OCR, text models, local background repair and typesetting. Text providers process the recognized text needed for translation. Actual providers are configured on the server for the task.",
-              "Translation images use private files on the central server; recognized text, translations and necessary metadata are stored in the database. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
+              "Single-image translation: Translation images use private files on the central server; recognized text, translations and necessary metadata are stored in the database. Identity, infrastructure, translation and payment services process data as needed, under their applicable policies. Processing may occur outside your region. We do not sell personal information or use submitted comics for ad targeting. We do not promise all providers retain nothing or never use data for training; this depends on the provider and agreement. Do not submit unauthorized or unsuitable sensitive content."
             ]
           },
           {
             "title": "Retention and deletion",
             "paragraphs": [
-              "Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
-              "Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
+              "Single-image translation: Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
+              "Single-image translation: Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
               "For account or broader deletion requests, contact us for identity and scope verification. Transaction, audit or security records may need retention for service obligations, disputes or applicable requirements. No single erasure deadline is promised for all records; the response will explain the outcome and constraints."
             ]
           },
           {
             "title": "Security, choices and minors",
             "paragraphs": [
-              "The central server checks account authorization and returns result files directly, without issuing short-lived signed download links. Provider keys stay on the backend. Protect your account and device, and do not share access tokens. You may restrict website access in the browser’s extension settings, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
+              "Single-image translation: The central server checks account authorization and returns result files directly, without issuing short-lived signed download links. Provider keys stay on the backend. Protect your account and device, and do not share access tokens. You may restrict website access in the browser’s extension settings, stop translation, sign out or remove local browser data; necessary functionality may then be unavailable. The website has no advertising trackers or third-party analytics scripts.",
               "Minors should use the service with appropriate guardian knowledge and guidance and obtain necessary authorization for subscriptions. Do not submit children’s sensitive personal information. Guardians may contact us to request verification and handling of inappropriate processing. Report security concerns using necessary, redacted information only; passwords and tokens are not needed."
+            ]
+          },
+          {
+            "title": "Whole PDF / ZIP / CBZ translation",
+            "paragraphs": [
+              "Whole-document translation requires sign-in. Selected PDF / ZIP / CBZ files upload directly to private Cloudflare R2. Compute nodes read, parse, recognize and render pages; text models process the necessary recognized text. R2 stores inputs and the complete translated-image ZIP; the database stores tasks, text and usage. Uploads and downloads use time-limited signed URLs. Do not share them; issued URLs may remain usable until expiry.",
+              "Documents have separate retention, not the long-term single-image overlay rules. By default, uploads must finish within 1 hour and uploaded but unstarted files expire after 24 hours. Inputs for active or unresolved tasks may remain for recovery. Terminal inputs and failed outputs are scheduled for cleanup after a default 1-hour delay; successful ZIPs remain for 7 days by default. Use the expiry shown on the task. Node temporary files follow recovery and cleanup procedures; necessary task, billing and security records are retained separately. Server downloads expire; downloaded copies remain under your control."
             ]
           }
         ]
@@ -476,12 +484,14 @@ export default {
       "terms": {
         "title": "Terms of service",
         "description": "Conditions for using NodeLane Comics, content rights, AI limitations and subscriptions.",
+        "updated": "2026-10-17",
         "sections": [
           {
             "title": "Service and accounts",
             "paragraphs": [
-              "NodeLane Comics provides an extension, reader and translation services. Read these terms and the privacy policy before use; stop using the service if you disagree. Updated October 4, 2026. The website supplies product information, guides, downloads, account management and separate image translation, without a comic content library or comic sales.",
-              "Use an account you are entitled to use and protect your credentials and device. Benefits and access are verified on the server. Do not impersonate others, access their private records, bypass rate or image limits, disrupt services with abusive automation, or attack the product and its providers. Misuse may lead to restricted access."
+              "NodeLane Comics provides an extension, reader and translation services. Read these terms and the privacy policy before use; stop using the service if you disagree. Updated 2026-10-17. The website supplies product information, guides, downloads, account management and separate image translation, without a comic content library or comic sales.",
+              "Use an account you are entitled to use and protect your credentials and device. Benefits and access are verified on the server. Do not impersonate others, access their private records, bypass rate or image limits, disrupt services with abusive automation, or attack the product and its providers. Misuse may lead to restricted access.",
+              "Extension source code is licensed under GPL-3.0-only; third-party components retain their own licenses. These online-service terms do not restrict the use, modification or redistribution rights granted by the GPL, and grant no rights to comic content."
             ]
           },
           {
@@ -495,7 +505,9 @@ export default {
             "title": "Benefits and subscriptions",
             "paragraphs": [
               membershipSummary,
-              "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal."
+              "New subscriptions currently bill quarterly or annually, without a card-required trial, and automatically renew at that interval. Quarterly/annual periods contain 3/12 monthly allowance windows anchored to the original UTC billing date. Unused monthly pages do not roll over and future allowances cannot be used early. The selected order and account records determine prices, taxes and benefits. Existing subscriptions retain their original price and benefit version; legacy trials and gifts follow their original records.",
+              "Free models use free allowance (including applicable gifts), then subscription pages, then purchased pages. Paid models use only subscription or purchased pages. Each successfully generated new page version uses 1 page. Replaying a request, reusing your valid result and internal retries do not charge twice; explicitly generating a new translation version is chargeable. Failure, cancellation or no translatable text releases reservations under the rules; unknown outcomes are verified first. Current non-expiring packs do not renew. Tasks that actually consume purchased pages receive the pack’s PLUS-tier admission limits and scheduling priority; merely holding a balance does not upgrade tasks that use free allowance to paid-tier admission. Once exhausted, the pack no longer grants its benefits.",
+              "Admission rates and page balances are separate. Defaults are 10 new images per rolling 60 seconds for standard accounts and 100 for paid tiers. Hourly caps apply only when configured in the entitlement; actual account and service limits govern. The same request and valid-result reuse are not counted twice; accepted failures or cancellations may still occupy the rate window. Image, concurrency and capacity limits still apply; page allowances do not promise completion speed."
             ]
           },
           {
@@ -509,26 +521,27 @@ export default {
       },
       "refund": {
         "title": "Subscriptions, cancellation and refunds",
-        "description": "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
+        "description": "New subscriptions currently bill quarterly or annually, without a card-required trial, and automatically renew at that interval.",
+        "updated": "2026-10-17",
         "sections": [
           {
-            "title": "Trial and billing",
+            "title": "Current plans and renewal",
             "paragraphs": [
-              "Subscriptions offer monthly or annual billing. Prices, trials and page allowances follow the selected offer, which renews automatically at that interval. Price changes apply to new subscriptions; existing subscriptions keep their original price and benefit version. Cancel before renewal.",
-              "Eligible accounts may start the card-required trial shown for their plan. Re-subscribing or selecting a different plan does not reset trial eligibility."
+              membershipSummary,
+              "New subscriptions currently bill quarterly or annually, without a card-required trial, and automatically renew at that interval. Quarterly/annual periods contain 3/12 monthly allowance windows anchored to the original UTC billing date. Unused monthly pages do not roll over and future allowances cannot be used early. The selected order and account records determine prices, taxes and benefits. Existing subscriptions retain their original price and benefit version; legacy trials and gifts follow their original records."
             ]
           },
           {
             "title": "Stop future renewal",
             "paragraphs": [
               "Sign in to your website account or use the extension account entry to manage the subscription. Cancellation stops the next renewal and does not automatically erase benefits already valid; rely on the expiry shown in your account.",
-              "Cancel before the trial ends if you do not want paid renewal. Uninstalling, closing the browser or signing out does not cancel a subscription. Email comics@nodelane.net if you cannot access your account."
+              "Cancel through the website account page before the next renewal. For a legacy trial, cancel before its original end to avoid paid renewal. Uninstalling, closing the browser or signing out does not cancel a subscription. Multiple paid orders remain separate, without automatic merging, proration or refunds. For mistaken purchases or access problems, contact comics@nodelane.net."
             ]
           },
           {
             "title": "Page allowance versus payment",
             "paragraphs": [
-              "A task reservation is separate from a payment transaction. Explicit failure releases reserved pages under the rules; an unknown result is verified first. This is not an automatic refund of subscription fees. Valid existing results remain accessible after membership expiry, while new tasks use the entitlement at acceptance."
+              "Translation reservations and payments are separate. Confirmed failures release pages under the rules; unknown outcomes are verified first, not automatically refunded as money. After membership expires, existing results remain accessible only within their own retention period and while authorization is valid. New tasks use current entitlements."
             ]
           },
           {
@@ -599,7 +612,7 @@ export default {
       {
         "id": "plus-limits",
         "question": "How do PLUS / Pro translation limits work?",
-        "answer": "One account shares a limit of 100 new translation images per rolling 60 seconds and 1,200 per rolling 3,600 seconds across devices, modes and languages. Free allows 10 per rolling 60 seconds. Replaying the same request and reusing valid results are not counted again. Accepted tasks still count if they fail, are canceled or contain no text. Rejected requests or rolled-back database transactions release the reserved hourly slot. Retries follow the actual new-task admission rules. These limits do not guarantee completion speed.",
+        "answer": "Admission rates and page balances are separate. Defaults are 10 new images per rolling 60 seconds for standard accounts and 100 for paid tiers. Hourly caps apply only when configured in the entitlement; actual account and service limits govern. The same request and valid-result reuse are not counted twice; accepted failures or cancellations may still occupy the rate window. Image, concurrency and capacity limits still apply; page allowances do not promise completion speed.",
         "relatedPath": "/pricing/"
       },
       {
