@@ -1,7 +1,6 @@
 {
   "翻译字体": "Czcionka tłumaczenia",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Czcionki są dobierane do języka docelowego. Zmiany dotyczą tylko nowych zadań; istniejące obrazy trzeba ręcznie przetłumaczyć ponownie.",
-  "正在加载字体预览…": "Ładowanie podglądu czcionki…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Nie udało się wczytać podglądów czcionek. Otwórz listę ponownie, aby spróbować jeszcze raz. Ustawienia tłumaczenia pozostają bez zmian.",
   "此字体暂不可用，请选择其他字体。": "Ta czcionka jest obecnie niedostępna. Wybierz inną.",
   "展开全部 {0} 个网站": "Pokaż wszystkie witryny ({0})",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 nowe strony z komiksami",
   "releaseNotes.sources.description": "Odkrywaj więcej japońskich oryginałów i komiksów w innych językach.",
   "releaseNotes.experience.title": "Nowa przyjemność z czytania",
-  "releaseNotes.experience.description": "Czytelniejsze ustawienia, płynniejsze ładowanie i tłumaczenie.",
+  "releaseNotes.experience.description": "Podgląd i wybór czcionek dla języka docelowego, czytelniejsze ustawienia oraz płynniejsze ładowanie i tłumaczenie.",
   "翻译书名与简介": "Tłumacz tytuły i opisy",
   "翻译中…": "Tłumaczenie…",
   "查看原文": "Pokaż oryginał",

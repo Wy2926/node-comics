@@ -20,7 +20,7 @@ function loadPreview(family:string,url:string){
   return entry.promise;
 }
 
-export function TranslationFontPicker({selection,language,compact=false,disabled=false,onSavingChange}:{selection?:FontSelection;language:string;compact?:boolean;disabled?:boolean;onSavingChange?:(saving:boolean)=>void}){
+export function TranslationFontPicker({selection,language}:{selection?:FontSelection;language:string}){
   const id=useId(),value=effectiveTranslationFont(selection?.fonts,language,selection?.value(language)),choices=availableTranslationFonts(selection?.fonts,language);
   const restoreFocus=useRef<{language:string;value:string|undefined}|undefined>(undefined);
   const [saving,setSaving]=useState(false),[error,setError]=useState(''),[expanded,setExpanded]=useState(false);
@@ -50,29 +50,28 @@ export function TranslationFontPicker({selection,language,compact=false,disabled
     return()=>{current=false;};
   },[requestKey,expanded]);
   const failed=requested.some(preview=>states[preview.url]==='failed'&&!loadedFaces.get(preview.url)?.loaded);
-  const loading=requested.some(preview=>states[preview.url]!=='failed'&&!loadedFaces.get(preview.url)?.loaded);
   function fontStyle(fontId:string):CSSProperties{
     const preview=translationFontPreview(fontId,language);
     return {fontFamily:preview&&loadedFaces.get(preview.url)?.loaded?preview.family:undefined,fontWeight:400,fontSynthesis:'none'};
   }
   async function choose(next:string){
-    if(!selection||saving||disabled||!choices.some(font=>font.id===next))return;
+    if(!selection||saving||!choices.some(font=>font.id===next))return;
     restoreFocus.current=document.activeElement===document.getElementById(id)?{language,value:next}:undefined;
-    setSaving(true);onSavingChange?.(true);setError('');
-    try{await selection.select(language,next);}catch(error){restoreFocus.current=undefined;setError((error as Error).message);}finally{setSaving(false);onSavingChange?.(false);}
+    setSaving(true);setError('');
+    try{await selection.select(language,next);}catch(error){restoreFocus.current=undefined;setError((error as Error).message);}finally{setSaving(false);}
   }
   if(!selection||!choices.length)return null;
-  return <div className={`nc-font-picker${compact?' nc-font-picker-compact':''}`}>
+  return <div className="nc-font-picker">
     <label className="field" htmlFor={id}><span>{msg('翻译字体')}</span>
       {/* Keep keyboard focus while saving; native disabled would blur the trigger. */}
-      <Select id={id} aria-label={msg('翻译字体')} aria-describedby={compact?undefined:id+'-note'} value={value??''} aria-disabled={saving||disabled||undefined} aria-busy={saving||undefined}
-        onClick={event=>{if(saving||disabled)event.preventDefault();}} onKeyDown={event=>{if((saving||disabled)&&!['Tab','Escape'].includes(event.key)){event.preventDefault();event.stopPropagation();}}}
+      <Select id={id} aria-label={msg('翻译字体')} aria-describedby={id+'-note'} value={value??''} aria-disabled={saving||undefined} aria-busy={saving||undefined}
+        onClick={event=>{if(saving)event.preventDefault();}} onKeyDown={event=>{if(saving&&!['Tab','Escape'].includes(event.key)){event.preventDefault();event.stopPropagation();}}}
         onOpenChange={setExpanded} onChange={event=>void choose(event.target.value)}>
         {choices.map(font=><SelectOption key={font.id} value={font.id} style={fontStyle(font.id)} lang={language} dir={language==='ar'?'rtl':'ltr'}>{translationFontName(font,language)}</SelectOption>)}
       </Select>
     </label>
-    {!compact&&<p id={id+'-note'} className="nc-muted">{msg('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。')}</p>}
-    {(failed||loading)&&<p role="status">{failed?msg('字体预览加载失败，重新展开列表可重试，不影响翻译设置。'):msg('正在加载字体预览…')}</p>}
+    <p id={id+'-note'} className="nc-muted">{msg('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。')}</p>
+    {failed&&<p role="status">{msg('字体预览加载失败，重新展开列表可重试，不影响翻译设置。')}</p>}
     {error&&<p role="alert">{error}</p>}
   </div>;
 }

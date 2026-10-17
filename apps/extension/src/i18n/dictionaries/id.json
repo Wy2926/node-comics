@@ -1,7 +1,6 @@
 {
   "翻译字体": "Font terjemahan",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Font tersedia sesuai bahasa tujuan. Perubahan hanya berlaku untuk tugas baru; terjemahkan ulang gambar yang sudah ada secara manual.",
-  "正在加载字体预览…": "Memuat pratinjau font…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Pratinjau font gagal dimuat. Buka kembali daftar untuk mencoba lagi. Pengaturan terjemahan tidak berubah.",
   "此字体暂不可用，请选择其他字体。": "Font ini sedang tidak tersedia. Pilih font lain.",
   "展开全部 {0} 个网站": "Tampilkan semua {0} situs",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 situs komik baru",
   "releaseNotes.sources.description": "Temukan lebih banyak karya asli Jepang dan komik dalam berbagai bahasa.",
   "releaseNotes.experience.title": "Pengalaman membaca yang segar",
-  "releaseNotes.experience.description": "Pengaturan lebih rapi, pemuatan dan terjemahan lebih lancar.",
+  "releaseNotes.experience.description": "Pratinjau dan pilih font terjemahan sesuai bahasa tujuan, dengan pengaturan lebih rapi serta pemuatan dan terjemahan lebih lancar.",
   "翻译书名与简介": "Terjemahkan judul dan deskripsi",
   "翻译中…": "Menerjemahkan…",
   "查看原文": "Lihat teks asli",

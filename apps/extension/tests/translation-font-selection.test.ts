@@ -135,7 +135,7 @@ describe('translation font selection',()=>{
     const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'ko',selection:{fonts:catalog,value:()=>undefined,select:async()=>{}}}));
     expect(markup).toContain(translationFontName(TRANSLATION_FONTS.find(font=>font.id==='gaegu')!,'ko'));expect(markup).not.toContain('Patrick Hand');expect(markup).not.toContain('nc-font-preview');
     const selected=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'ko',selection:{fonts:catalog,value:()=> 'gaegu',select:async()=>{}}}));
-    expect(selected).toContain('正在加载字体预览');expect(selected).not.toContain('nc-font-preview');expect(selected).not.toContain('font-family:');
+    expect(selected).not.toContain('正在加载字体预览');expect(selected).not.toContain('role="status"');expect(selected).not.toContain('nc-font-preview');expect(selected).not.toContain('font-family:');
     expect(selected).not.toContain('data-value=""');expect(selected).not.toContain('保留原字体');
     expect(renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en'}))).toBe('');
   });
@@ -144,19 +144,13 @@ describe('translation font selection',()=>{
     expect(markup.match(/style="font-family:Test Font;font-weight:400;font-synthesis:none"/g)).toHaveLength(2);
     expect(markup.match(/lang="ar" dir="rtl"/g)).toHaveLength(2);
   });
-  it('exposes popup action blocking without disabling native keyboard focus',()=>{
-    const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en',disabled:true,
+  it('keeps the font behavior description accessible in translation settings',()=>{
+    const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en',
       selection:{fonts:catalog,value:()=>undefined,select:async()=>{}}}));
-    expect(markup).toContain('aria-disabled="true"');
-    expect(markup).not.toMatch(/<button[^>]*\sdisabled(?:=|\s|>)/);
-    expect(markup).toContain('data-value="comic-relief"');
-  });
-  it.each([true,false])('only omits the description for compact popup controls: %s',compact=>{
-    const markup=renderToStaticMarkup(createElement(TranslationFontPicker,{language:'en',compact,
-      selection:{fonts:catalog,value:()=>undefined,select:async()=>{}}}));
-    expect(markup.includes('nc-font-picker-compact')).toBe(compact);
-    expect(markup.includes('字体按目标语言提供')).toBe(!compact);
-    expect(markup.includes('aria-describedby=')).toBe(!compact);
+    expect(markup).toContain('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。');
+    const note=markup.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(note).toBeTruthy();
+    expect(markup).toContain(`<p id="${note}" class="nc-muted">`);
     expect(markup).toContain('<span>翻译字体</span>');
     expect(markup).toContain('data-value="comic-relief"');
   });

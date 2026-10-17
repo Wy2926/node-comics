@@ -1,7 +1,6 @@
 {
   "翻译字体": "Phông chữ bản dịch",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Phông chữ được cung cấp theo ngôn ngữ đích. Thay đổi chỉ áp dụng cho tác vụ mới; cần dịch lại thủ công các ảnh hiện có.",
-  "正在加载字体预览…": "Đang tải bản xem trước phông chữ…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Không tải được bản xem trước phông chữ. Mở lại danh sách để thử lại. Cài đặt dịch không bị ảnh hưởng.",
   "此字体暂不可用，请选择其他字体。": "Phông chữ này hiện không khả dụng. Hãy chọn phông chữ khác.",
   "展开全部 {0} 个网站": "Hiện tất cả {0} trang web",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "Thêm 22 trang truyện tranh",
   "releaseNotes.sources.description": "Khám phá thêm truyện gốc tiếng Nhật và truyện bằng nhiều ngôn ngữ khác.",
   "releaseNotes.experience.title": "Trải nghiệm đọc mới mẻ",
-  "releaseNotes.experience.description": "Cài đặt gọn gàng hơn, tải và dịch mượt mà hơn.",
+  "releaseNotes.experience.description": "Xem trước và chọn phông chữ dịch theo ngôn ngữ đích, với cài đặt gọn gàng hơn, tải và dịch mượt mà hơn.",
   "翻译书名与简介": "Dịch tên truyện và mô tả",
   "翻译中…": "Đang dịch…",
   "查看原文": "Xem bản gốc",

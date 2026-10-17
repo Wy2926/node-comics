@@ -1,7 +1,6 @@
 {
   "翻译字体": "Fonte da tradução",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "As fontes dependem do idioma de destino. As alterações só valem para novas tarefas; traduza novamente as imagens existentes manualmente.",
-  "正在加载字体预览…": "Carregando prévia da fonte…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Não foi possível carregar as prévias das fontes. Reabra a lista para tentar novamente. As configurações de tradução não foram afetadas.",
   "此字体暂不可用，请选择其他字体。": "Esta fonte está indisponível no momento. Escolha outra.",
   "展开全部 {0} 个网站": "Mostrar todos os {0} sites",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 novos sites de quadrinhos",
   "releaseNotes.sources.description": "Encontre mais obras japonesas e quadrinhos em outros idiomas.",
   "releaseNotes.experience.title": "Uma experiência renovada",
-  "releaseNotes.experience.description": "Configurações mais claras, carregamento e tradução mais fluidos.",
+  "releaseNotes.experience.description": "Pré-visualize e escolha fontes para o idioma de destino, com configurações mais claras, carregamento e tradução mais fluidos.",
   "翻译书名与简介": "Traduzir títulos e sinopses",
   "翻译中…": "Traduzindo…",
   "查看原文": "Ver original",

@@ -1,7 +1,6 @@
 {
   "翻译字体": "Police de traduction",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Les polices dépendent de la langue cible. Les changements ne concernent que les nouvelles tâches ; retraduisez manuellement les images existantes.",
-  "正在加载字体预览…": "Chargement de l’aperçu…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Les aperçus des polices n’ont pas pu être chargés. Rouvrez la liste pour réessayer. Les paramètres de traduction sont conservés.",
   "此字体暂不可用，请选择其他字体。": "Cette police est indisponible pour le moment. Choisissez-en une autre.",
   "展开全部 {0} 个网站": "Afficher les {0} sites",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 nouveaux sites de BD",
   "releaseNotes.sources.description": "Découvrez plus d’œuvres japonaises et de BD dans d’autres langues.",
   "releaseNotes.experience.title": "Une lecture renouvelée",
-  "releaseNotes.experience.description": "Des réglages plus clairs, un chargement et une traduction plus fluides.",
+  "releaseNotes.experience.description": "Prévisualisez et choisissez les polices selon la langue cible, avec des réglages plus clairs, un chargement et une traduction plus fluides.",
   "翻译书名与简介": "Traduire les titres et résumés",
   "翻译中…": "Traduction…",
   "查看原文": "Voir le texte original",

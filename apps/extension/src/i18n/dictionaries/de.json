@@ -1,7 +1,6 @@
 {
   "翻译字体": "Übersetzungsschrift",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Schriften werden passend zur Zielsprache angeboten. Änderungen gelten nur für neue Aufgaben; vorhandene Bilder müssen manuell erneut übersetzt werden.",
-  "正在加载字体预览…": "Schriftvorschau wird geladen…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Die Schriftvorschau konnte nicht geladen werden. Öffne die Liste erneut, um es noch einmal zu versuchen. Die Übersetzungseinstellungen bleiben unverändert.",
   "此字体暂不可用，请选择其他字体。": "Diese Schrift ist derzeit nicht verfügbar. Bitte wählen Sie eine andere.",
   "展开全部 {0} 个网站": "Alle {0} Websites anzeigen",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 neue Comic-Websites",
   "releaseNotes.sources.description": "Mehr japanische Originale und Comics in anderen Sprachen entdecken.",
   "releaseNotes.experience.title": "Frischer Lesekomfort",
-  "releaseNotes.experience.description": "Übersichtlichere Einstellungen, flüssigeres Laden und Übersetzen.",
+  "releaseNotes.experience.description": "Übersetzungsschriften nach Zielsprache ansehen und wählen, mit klareren Einstellungen, flüssigerem Laden und Übersetzen.",
   "翻译书名与简介": "Titel und Beschreibungen übersetzen",
   "翻译中…": "Wird übersetzt…",
   "查看原文": "Original anzeigen",

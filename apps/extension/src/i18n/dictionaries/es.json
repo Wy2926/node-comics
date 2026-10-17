@@ -1,7 +1,6 @@
 {
   "翻译字体": "Fuente de traducción",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Las fuentes dependen del idioma de destino. Los cambios solo se aplican a tareas nuevas; vuelve a traducir manualmente las imágenes existentes.",
-  "正在加载字体预览…": "Cargando vista previa…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "No se pudieron cargar las vistas previas. Vuelve a abrir la lista para reintentar. La configuración de traducción no cambia.",
   "此字体暂不可用，请选择其他字体。": "Esta fuente no está disponible ahora. Elige otra.",
   "展开全部 {0} 个网站": "Mostrar los {0} sitios",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 nuevos sitios de cómics",
   "releaseNotes.sources.description": "Descubre más obras japonesas y cómics en otros idiomas.",
   "releaseNotes.experience.title": "Una experiencia renovada",
-  "releaseNotes.experience.description": "Ajustes más claros, carga y traducción más fluidas.",
+  "releaseNotes.experience.description": "Previsualiza y elige fuentes según el idioma de destino, con ajustes más claros, carga y traducción más fluidas.",
   "翻译书名与简介": "Traducir títulos y sinopsis",
   "翻译中…": "Traduciendo…",
   "查看原文": "Ver original",

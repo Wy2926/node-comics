@@ -1,7 +1,6 @@
 {
   "翻译字体": "Çeviri yazı tipi",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Yazı tipleri hedef dile göre sunulur. Değişiklikler yalnızca yeni görevleri etkiler; mevcut görselleri elle yeniden çevirin.",
-  "正在加载字体预览…": "Yazı tipi önizlemesi yükleniyor…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Yazı tipi önizlemeleri yüklenemedi. Yeniden denemek için listeyi tekrar açın. Çeviri ayarları değişmedi.",
   "此字体暂不可用，请选择其他字体。": "Bu yazı tipi şu anda kullanılamıyor. Başka bir yazı tipi seçin.",
   "展开全部 {0} 个网站": "{0} sitenin tümünü göster",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 yeni çizgi roman sitesi",
   "releaseNotes.sources.description": "Daha fazla Japonca eser ve farklı dillerde çizgi roman keşfedin.",
   "releaseNotes.experience.title": "Yenilenen okuma deneyimi",
-  "releaseNotes.experience.description": "Daha sade ayarlar, daha akıcı yükleme ve çeviri.",
+  "releaseNotes.experience.description": "Hedef dile göre çeviri yazı tiplerini önizleyip seçin. Daha sade ayarlar, daha akıcı yükleme ve çeviri.",
   "翻译书名与简介": "Başlıkları ve açıklamaları çevir",
   "翻译中…": "Çevriliyor…",
   "查看原文": "Orijinali görüntüle",

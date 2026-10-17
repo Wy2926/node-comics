@@ -7,6 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {fonts}=JSON.parse(await readFile('backend/shared/translation-fonts.json','utf8'));
 const out=path.resolve('artifacts/popup-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
@@ -40,20 +41,26 @@ await context.addInitScript(()=>{if(location.protocol==='chrome-extension:')chro
 const checks=[],errors=[];let supportSubmissions=0,nativeGeometry;context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const origin='chrome-extension://'+new URL(worker.url()).hostname;
+const popupFontRequests=[];
+context.on('request',request=>{if(request.resourceType()==='font'&&request.frame().url()===origin+'/popup.html')popupFontRequests.push(request.url());});
 const languageOptions=[['zh-Hans','简体中文'],['zh-Hant','繁體中文'],['en','English'],['ja','日本語'],['ko','한국어'],['fr','Français']];
-await context.route('https://**/*',route=>{const request=route.request(),url=request.url();if(url.includes('/v1/support-requests')&&request.method()==='POST')supportSubmissions++;if(request.isNavigationRequest())return route.fulfill({contentType:'text/html;charset=utf-8',body:'<!doctype html><title>ADAPTED SOURCE TITLE</title><body>Isolated popup fixture</body>'});return route.fulfill({json:url.includes('/capabilities')?{result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true}],languages:languageOptions.map(([id,label])=>({id,label})),limits:{},entitlements:null}:url.includes('/auth/config')?{dev_auth:true}:{}});});
+await context.route('https://**/*',route=>{const request=route.request(),url=request.url();if(url.includes('/v1/support-requests')&&request.method()==='POST')supportSubmissions++;if(request.isNavigationRequest())return route.fulfill({contentType:'text/html;charset=utf-8',body:'<!doctype html><title>ADAPTED SOURCE TITLE</title><body>Isolated popup fixture</body>'});return route.fulfill({json:url.includes('/capabilities')?{result_protocol:'overlay-v1',modes:[{id:'classic',enabled:true}],languages:languageOptions.map(([id,label])=>({id,label})),translation_fonts:fonts,limits:{},entitlements:null}:url.includes('/auth/config')?{dev_auth:true}:{}});});
 // Installation opens a welcome tab asynchronously; it must not steal popup/source selection.
-const welcome=context.pages().find(page=>page.url()===origin+'/reader.html')??await context.waitForEvent('page',{predicate:page=>page.url()===origin+'/reader.html'});
+const waitForWelcome=async page=>{await page.waitForURL(origin+'/reader.html');return page;};
+const welcome=context.pages().find(page=>page.url()===origin+'/reader.html')??await Promise.any([
+ ...context.pages().map(waitForWelcome),context.waitForEvent('page').then(waitForWelcome),
+]);
 await welcome.close();
 const source=await context.newPage();
 const tabId=async url=>worker.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url)?.id,url);
 let popup;
 async function openPopup(target=source,{locale='zh-CN'}={}){
  await worker.evaluate(async id=>chrome.tabs.update(id,{active:true}),await tabId(target.url()));
- const event=context.waitForEvent('page',{predicate:page=>page.url()===origin+'/popup.html'});await worker.evaluate(async origin=>chrome.tabs.create({url:origin+'/popup.html',active:false}),origin);popup=await event;await popup.setViewportSize({width:420,height:600});await popup.waitForLoadState();
+ const event=context.waitForEvent('page');await worker.evaluate(async origin=>chrome.tabs.create({url:origin+'/popup.html',active:false}),origin);popup=await event;await popup.waitForURL(origin+'/popup.html');await popup.setViewportSize({width:420,height:600});await popup.waitForLoadState();
  await popup.locator('.nc-popup-language [role="combobox"]').waitFor();
  await popup.waitForFunction(locale=>document.documentElement.lang===locale,locale);
  await popup.waitForFunction(()=>!document.body.textContent.includes('正在读取当前标签页'));
+ assert.equal(await popup.locator('.nc-font-picker').count(),0,'Popup must not expose font selection or its loading status');
  return popup;
 }
 const messages=()=>worker.evaluate(async()=>((await chrome.storage.session.get('fixtureMessages')).fixtureMessages??[])
@@ -85,7 +92,9 @@ async function assertNativePopup(){
    return {width:view.innerWidth,height:view.innerHeight,contentWidth:doc.documentElement.scrollWidth,
     mainHeight:main.getBoundingClientRect().height,scrollHeight:scroll.clientHeight,
     switchHeight:doc.querySelector('.switch').getBoundingClientRect().height,
-    shortcuts:view.getComputedStyle(doc.querySelector('.nc-popup-shortcut')).display};
+    shortcuts:view.getComputedStyle(doc.querySelector('.nc-popup-shortcut')).display,
+    fontPickers:doc.querySelectorAll('.nc-font-picker').length,
+    fontRequests:view.performance.getEntriesByType('resource').filter(entry=>entry.name.includes('/fonts/translation/')).length};
   });
   assert.equal(nativeGeometry.width,420,'Native popup must establish its own desktop width');
   assert.equal(nativeGeometry.contentWidth,420);
@@ -93,6 +102,7 @@ async function assertNativePopup(){
   assert(nativeGeometry.mainHeight<=600&&nativeGeometry.scrollHeight>200);
   assert(nativeGeometry.switchHeight<44,'Desktop popup must not inherit phone hit-area geometry');
   assert.notEqual(nativeGeometry.shortcuts,'none');
+  assert.equal(nativeGeometry.fontPickers,0);assert.equal(nativeGeometry.fontRequests,0);
  }finally{await popup.evaluate(()=>chrome.extension.getViews({type:'popup'}).forEach(view=>view.close()));}
 }
 try{
@@ -144,7 +154,9 @@ try{
  await worker.evaluate(async()=>{const key='nc-reader-settings',data=await chrome.storage.local.get(key);await chrome.storage.local.set({[key]:{...data[key],textScale:1.25},'nc-shortcuts':{version:1,overrides:{'app.settings':['Ctrl+Alt+Shift+Meta+PageDown','Ctrl+Alt+Shift+Meta+ArrowRight']}}});});await popup.waitForFunction(()=>getComputedStyle(document.documentElement).fontSize==='20px'&&document.querySelectorAll('.nc-popup-tool-grid > button:nth-child(3) kbd').length===2);await assertPopupLayout();await screenshot('popup-long-shortcuts-large-text');check('两个长替代键在 1.25 字号下完整换行，卡片内部和 Popup 均无横向溢出');
  await worker.evaluate(async()=>{const key='nc-reader-settings',data=await chrome.storage.local.get(key);await chrome.storage.local.set({[key]:{...data[key],textScale:1},'nc-shortcuts':{version:1,overrides:{}}});});await popup.waitForFunction(()=>getComputedStyle(document.documentElement).fontSize==='16px'&&document.querySelector('.nc-popup-tool-grid > button:nth-child(3) kbd')?.textContent==='Alt + ,');
  // Reader and popup use real shared extension storage in both directions.
- const reader=await context.newPage();await reader.goto(origin+'/reader.html#settings');await reader.getByRole('button',{name:'知道了',exact:true}).click();await selectOption(reader.getByRole('combobox',{name:'默认目标语言'}),'ja');
+ const reader=await context.newPage();await reader.goto(origin+'/reader.html#settings');await selectOption(reader.getByRole('combobox',{name:'默认目标语言'}),'ja');
+ await reader.getByRole('combobox',{name:'翻译字体',exact:true}).waitFor();
+ check('服务提供字体能力时，设置页仍显示翻译字体选择');
  await popup.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='ja');assert.equal((await preferences()).language,'ja');
  await selectOption(popup.getByRole('combobox',{name:'默认目标语言'}),'en');await reader.waitForFunction(()=>document.querySelector('[role="combobox"][aria-label="默认目标语言"]')?.getAttribute('data-value')==='en');assert.equal((await preferences()).language,'en');check('Popup 与已打开的设置页面双向同步同一默认语言');
  await reader.evaluate(()=>{const value=JSON.parse(localStorage.getItem('nc-settings'));value.direction='ltr';value.cacheLimitMb=512;localStorage.setItem('nc-settings',JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key:'nc-settings'}));});
@@ -200,6 +212,7 @@ await source.goto(site+'/new');await openPopup();await source.goto(site+'/change
  await source.reload();assert.equal(await source.evaluate(()=>[...document.documentElement.children].some(el=>el.style.zIndex==='2147483646')),false);
  await popup.close();await openPopup();assert.equal(await autoSwitch(popup).getAttribute('aria-checked'),'false');await popup.getByRole('button',{name:'翻译当前标签页',exact:true}).click();await popup.waitForEvent('close');await hostVisible();check('关闭自动翻译后，手动翻译按钮仍可使用');
  assert.equal(permissionRequests,0);assert.equal(await worker.evaluate(()=>globalThis.fixturePermissionRequests),0);check('Popup、设置和后台全流程没有申请网站访问权限');
+ assert.deepEqual(popupFontRequests,[]);check('Popup 首次打开、重新打开和切换目标语言均不加载字体预览');
  assert.equal(supportSubmissions,0);assert.deepEqual(errors,[]);await writeFile(path.join(out,'report.json'),JSON.stringify({checks,errors,permissionRequests,supportSubmissions,nativeGeometry,nativeShortcut,nativeTranslateShortcut,scope:'Built MV3 in isolated Chromium; local image fixture, intercepted adapted-site navigation and API responses, simulated access restrictions and no live translation provider'},null,2));console.log('Artifacts: '+out);console.log('Checks: '+checks.length);
 }catch(failure){
  if(popup&&!popup.isClosed()){await popup.screenshot({path:path.join(out,'popup-failure.png')}).catch(()=>{});await writeFile(path.join(out,'popup-failure.html'),await popup.content().catch(()=>''));}

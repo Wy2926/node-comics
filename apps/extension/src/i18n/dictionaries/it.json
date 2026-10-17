@@ -1,7 +1,6 @@
 {
   "翻译字体": "Carattere della traduzione",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "I caratteri dipendono dalla lingua di destinazione. Le modifiche valgono solo per le nuove attività; ritraduci manualmente le immagini esistenti.",
-  "正在加载字体预览…": "Caricamento dell’anteprima…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Impossibile caricare le anteprime. Riapri l’elenco per riprovare. Le impostazioni di traduzione restano invariate.",
   "此字体暂不可用，请选择其他字体。": "Questo carattere non è al momento disponibile. Scegline un altro.",
   "展开全部 {0} 个网站": "Mostra tutti i {0} siti",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 nuovi siti di fumetti",
   "releaseNotes.sources.description": "Scopri più opere giapponesi e fumetti in altre lingue.",
   "releaseNotes.experience.title": "Un’esperienza rinnovata",
-  "releaseNotes.experience.description": "Impostazioni più chiare, caricamento e traduzione più fluidi.",
+  "releaseNotes.experience.description": "Visualizza l’anteprima e scegli i caratteri per la lingua di destinazione, con impostazioni più chiare, caricamento e traduzione più fluidi.",
   "翻译书名与简介": "Traduci titoli e descrizioni",
   "翻译中…": "Traduzione…",
   "查看原文": "Visualizza originale",

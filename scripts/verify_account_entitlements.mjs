@@ -61,7 +61,7 @@ async function checkRelease(){
   await dialog.waitFor();
   assert.equal(await dialog.locator('.nc-release-version').innerText(),version);
   assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
-  for(const text of ['首个正式版','双页','翻页','CBZ','ZIP','PDF','22','已有译图'])
+  for(const text of ['首个正式版','双页','翻页','CBZ','ZIP','PDF','22','已有译图','按目标语言预览和选择翻译字体'])
     assert((await dialog.innerText()).includes(text));
   assert(!/资费大幅降低|nunif|waifu2x|官网|升级不会|版本入口|WeLoMa/.test(await dialog.innerText()));
   assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),4);
@@ -102,6 +102,7 @@ async function checkRelease(){
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
     assert(!/0\.11\.3|0\.12\.0/.test(await dialog.innerText()));
     assert.equal(await dialog.locator('.nc-release-kicker').innerText(),dictionary['releaseNotes.kicker']);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').last().locator('p').innerText(),dictionary['releaseNotes.experience.description']);
     assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));

@@ -9,12 +9,15 @@ const web='http://127.0.0.1:5176',out=path.resolve(process.env.FONT_VALIDATION_O
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});
 const context=await browser.newContext({viewport:{width:1280,height:1000}}),page=await context.newPage();
-const checks=[],errors=[],loadedFonts=new Set(),requests=[];
+const checks=[],errors=[],loadedFonts=new Set(),requests=[],settingsLayouts=[];
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 page.on('pageerror',error=>errors.push(error.message));
 page.on('request',request=>{if(request.url().endsWith('.woff2'))requests.push(request.url());});
 await context.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
 const fixture=web+'/tests/reader-fixture.html?fonts=1&auto=fonts&long';
+let releaseFonts;
+const fontGate=new Promise(resolve=>{releaseFonts=resolve;});
+await page.route('**/fonts/translation/*.woff2',async route=>{await fontGate;await route.continue();});
 async function dismissNotes(target=page){
   await target.getByRole('combobox',{name:'翻译字体',exact:true}).waitFor();
   const notes=target.locator('.nc-release-notes[open]');
@@ -51,15 +54,55 @@ async function listFits(target=page){
   const list=await fontList(target),bounds=await list.evaluate(element=>({left:element.getBoundingClientRect().left,right:element.getBoundingClientRect().right,top:element.getBoundingClientRect().top,bottom:element.getBoundingClientRect().bottom,width:innerWidth,height:innerHeight,overflow:element.scrollWidth>element.clientWidth+1}));
   assert(bounds.left>=-1&&bounds.right<=bounds.width+1&&bounds.top>=-1&&bounds.bottom<=bounds.height+1&&!bounds.overflow,JSON.stringify(bounds));
 }
+async function textScale(value,target=page){
+  await target.evaluate(value=>{
+    const saved=JSON.parse(localStorage.getItem('nc-settings'));saved.textScale=value;
+    localStorage.setItem('nc-settings',JSON.stringify(saved));window.dispatchEvent(new StorageEvent('storage',{key:'nc-settings'}));
+  },value);
+  await target.waitForFunction(value=>getComputedStyle(document.documentElement).fontSize===`${16*value}px`,value);
+}
+async function settingsLayout(target=page){
+  const layout=await target.evaluate(()=>{
+    const rect=selector=>{const element=document.querySelector(selector),bounds=element.getBoundingClientRect();return {left:bounds.left,right:bounds.right,width:bounds.width};};
+    const picker=document.querySelector('.nc-font-picker');
+    return {viewport:innerWidth,textScale:parseFloat(getComputedStyle(document.documentElement).fontSize)/16,touch:matchMedia('(pointer:coarse)').matches,
+      language:rect('[aria-label="默认目标语言"]'),model:rect('.nc-model-trigger'),font:rect('.nc-font-picker .nc-select'),
+      overflow:picker.scrollWidth>picker.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1};
+  });
+  assert(!layout.overflow,JSON.stringify(layout));
+  for(const control of [layout.language,layout.model]){
+    assert(Math.abs(layout.font.width-control.width)<1&&Math.abs(layout.font.right-control.right)<1,JSON.stringify(layout));
+  }
+  const trigger=target.getByRole('combobox',{name:'翻译字体',exact:true});
+  await trigger.click();await listFits(target);
+  const menu=await(await fontList(target)).boundingBox();
+  assert(Math.abs(menu.width-Math.min(Math.max(layout.font.width,180),layout.viewport-16))<1,JSON.stringify({layout,menu}));
+  await trigger.press('Escape');settingsLayouts.push(layout);
+}
 const state=()=>page.evaluate(()=>({translations:window.readerFixture.translationRequests,jobs:window.readerFixture.jobs,submitted:window.readerFixture.submitted}));
 const position=()=>page.locator('.nc-reading-viewport').evaluate(element=>element.scrollTop);
 async function finish(){await page.getByRole('button',{name:'模拟完成',exact:true}).click();}
-async function fontInReader(value){await page.locator('.nc-translation-trigger').click();await selectValue('翻译字体',value);await page.getByRole('button',{name:'关闭面板',exact:true}).click();}
+async function fontInReader(value){
+  const bounds=await page.locator('.nc-reading-viewport').boundingBox();
+  await page.mouse.move(bounds.x+2,bounds.y+bounds.height/2);
+  await page.locator('.nc-translation-trigger').click();await selectValue('翻译字体',value);await page.getByRole('button',{name:'关闭面板',exact:true}).click();
+}
 try{
-  await page.goto(fixture+'#settings');await dismissNotes();
+  const initialFontRequest=page.waitForRequest('**/fonts/translation/*.woff2');
+  await page.goto(fixture+'#settings',{waitUntil:'domcontentloaded'});await dismissNotes();await initialFontRequest;
   const initialLanguage=await page.getByRole('combobox',{name:'默认目标语言',exact:true}).getAttribute('data-value');
   const initialDefault=catalog.fonts.find(font=>font.id===catalog.defaults[initialLanguage]);
+  const pickerGeometry=()=>page.locator('.nc-font-picker').evaluate(element=>({height:element.getBoundingClientRect().height,nextOffset:element.nextElementSibling.getBoundingClientRect().top-element.getBoundingClientRect().top,status:!!element.querySelector('[role="status"]')}));
+  const loadingLayout={before:await pickerGeometry()};
+  assert.equal(loadingLayout.before.status,false,'pending font previews must not insert a loading row');
+  assert.equal(await page.locator('.nc-font-picker .nc-select').isEnabled(),true);
+  await page.locator('.nc-font-picker').screenshot({path:path.join(out,'font-preview-pending.png')});
+  releaseFonts();
   await preview(initialDefault,initialLanguage);
+  loadingLayout.after=await pickerGeometry();assert.deepEqual(loadingLayout.after,loadingLayout.before,'loading a font must preserve the picker height and following settings position');
+  await page.locator('.nc-font-picker').screenshot({path:path.join(out,'font-preview-loaded.png')});
+  await page.unroute('**/fonts/translation/*.woff2');
+  check('a pending font remains selectable without a loading message; completing the preview preserves picker height and following settings position');
   assert.deepEqual(requests,[web+'/fonts/translation/'+initialDefault.id+'.woff2'],'a closed initial picker loads only its explicit language default');
   assert.equal(await page.locator('.nc-font-preview').count(),0);
   const languages=await optionValues('默认目标语言');
@@ -123,6 +166,16 @@ try{
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('nc-translation-channels')));
   assert(Object.values(saved.fontPreferences).some(value=>value.en===first.id));
   check('font and target-language preferences survive a full reload and storage re-read');
+  for(const scale of [1,1.25]){
+    await textScale(scale);
+    for(const width of [1280,768,700,390,320]){
+      await page.setViewportSize({width,height:1000});await settingsLayout();
+      if(width===1280&&scale===1)await page.locator('.settings-card:has(.nc-font-picker)').screenshot({path:path.join(out,'settings-width-1280-1.png')});
+      if(width===320&&scale===1.25)await page.screenshot({path:path.join(out,'settings-width-320-1.25.png')});
+    }
+  }
+  check('font, language and model controls align at 1280/768/700/390/320px with normal and 1.25 text scale; menus stay within the viewport');
+  await textScale(1);await page.setViewportSize({width:1280,height:1000});
   await page.screenshot({path:path.join(out,'desktop-settings.png'),fullPage:true});
 
   const fontTrigger=page.getByRole('combobox',{name:'翻译字体',exact:true});
@@ -220,6 +273,13 @@ try{
   await preview(second,'en',failurePage);
   assert.equal(await failureTrigger.getAttribute('aria-expanded'),'false');
   await failurePage.locator('.nc-font-picker').screenshot({path:path.join(out,'font-load-recovered.png')});
+  for(const scale of [1,1.25]){
+    await textScale(scale,failurePage);
+    for(const width of [390,320]){await failurePage.setViewportSize({width,height:844});await settingsLayout(failurePage);}
+  }
+  await failurePage.locator('.nc-font-picker').scrollIntoViewIfNeeded();
+  await failurePage.screenshot({path:path.join(out,'settings-phone-large-text.png')});
+  check('390/320px touch layouts retain matching control widths and bounded menus at normal and 1.25 text scale');
   await failureContext.close();check('failed previews report failure; reopening retries and delayed loaded labels fit the mobile dropdown and remain touch-selectable');
   const legacyContext=await browser.newContext(),legacyPage=await legacyContext.newPage(),legacyRequests=[];
   await legacyContext.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
@@ -229,8 +289,8 @@ try{
   assert.equal(await legacyPage.locator('.nc-font-picker').count(),0);assert.deepEqual(legacyRequests,[]);
   await legacyContext.close();check('older services without font capabilities expose no font picker and fetch no font resources');
   assert.deepEqual(errors,[]);
-  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,fontCount:catalog.fonts.length,languageCount:languages.length,localizedPreviews,counts:Object.fromEntries(languages.map(({value})=>[value,catalog.fonts.filter(font=>font.languages.includes(value)).length])),liveProvider:false},null,2));
+  await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,loadingLayout,settingsLayouts,fontCount:catalog.fonts.length,languageCount:languages.length,localizedPreviews,counts:Object.fromEntries(languages.map(({value})=>[value,catalog.fonts.filter(font=>font.languages.includes(value)).length])),liveProvider:false},null,2));
 }catch(error){
   await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});
   await writeFile(path.join(out,'failure.json'),JSON.stringify({error:error.stack,checks,errors,state:await state().catch(()=>null)},null,2));throw error;
-}finally{await browser.close();}
+}finally{releaseFonts();await browser.close();}

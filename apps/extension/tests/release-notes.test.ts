@@ -21,6 +21,7 @@ describe('release notes first use', () => {
     expect(zh['releaseNotes.spreads.title']).toContain('双页');
     expect(zh['releaseNotes.export.description']).toContain('已有译图');
     expect(zh['releaseNotes.sources.title']).toContain('22');
+    expect(zh['releaseNotes.experience.description']).toContain('按目标语言预览和选择翻译字体');
     const dictionaries = import.meta.glob<Record<string, string>>('../src/i18n/dictionaries/*.json', {eager: true, import: 'default'});
     expect(Object.keys(dictionaries)).toHaveLength(16);
     const keys = Object.keys(zh).filter(key => key.startsWith('releaseNotes.'));

@@ -1,7 +1,6 @@
 {
   "翻译字体": "Translation font",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Fonts are offered by target language. Changes apply only to new tasks; retranslate existing images manually.",
-  "正在加载字体预览…": "Loading font preview…",
   "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Font previews could not load. Reopen the list to retry. Your translation settings are unaffected.",
   "此字体暂不可用，请选择其他字体。": "This font is currently unavailable. Choose another font.",
   "展开全部 {0} 个网站": "Show all {0} sites",
@@ -232,7 +231,7 @@
   "releaseNotes.sources.title": "22 new comic sites",
   "releaseNotes.sources.description": "Find more Japanese originals and comics in other languages.",
   "releaseNotes.experience.title": "A fresh reading experience",
-  "releaseNotes.experience.description": "Cleaner settings, smoother loading and translation.",
+  "releaseNotes.experience.description": "Preview and choose translation fonts for your target language, with cleaner settings and smoother loading and translation.",
   "翻译书名与简介": "Translate titles and descriptions",
   "翻译中…": "Translating…",
   "查看原文": "View original",

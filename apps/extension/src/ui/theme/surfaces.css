@@ -96,11 +96,11 @@
 .nc-app .setting-row { gap: 24px; }
 .nc-app .setting-row>div:first-child { min-width: 0; }
 .nc-app .setting-row p { max-width: 42em; }
-.nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: center; gap: 24px; }
-.nc-preferences :is(.setting-row, .nc-model-picker) > :is(.nc-select, div:has(> .nc-select)) { width: 100%; min-width: 0; max-width: 20rem; justify-self: end; }
+.nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker, .nc-font-picker .field) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: center; gap: 24px; }
+.nc-preferences :is(.setting-row, .nc-model-picker, .nc-font-picker .field) > :is(.nc-select, div:has(> .nc-select)) { width: 100%; min-width: 0; max-width: 20rem; justify-self: end; }
 .nc-preferences .setting-row > div > .nc-select { width: 100%; min-width: 0; }
-.nc-preferences .nc-model-picker { margin: 0; padding-block: 22px; border-bottom: 1px solid var(--line); }
-.nc-preferences .nc-model-picker > span { font-size: 1rem; font-weight: 550; }
+.nc-preferences :is(.nc-model-picker, .nc-font-picker) { margin: 0; padding-block: 22px; border-bottom: 1px solid var(--line); }
+.nc-preferences :is(.nc-model-picker > span, .nc-font-picker .field > span) { font-size: 1rem; font-weight: 550; }
 .nc-app .nc-theme-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .nc-app .nc-theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .nc-app .nc-theme-options button { min-width: 0; justify-content: flex-start; text-align: start; overflow-wrap: anywhere; }
@@ -166,10 +166,10 @@
   .nc-app .setting-row p { margin-top: 5px; line-height: 1.55; }
   .nc-app .setting-row:has(> .switch) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .nc-app .setting-row > :is(.nc-select, .api-input, .button) { width: 100%; min-width: 0; max-width: 100%; }
-  .nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker) { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .nc-preferences :is(.setting-row, .nc-model-picker) > :is(.nc-select, div:has(> .nc-select)) { max-width: 100%; }
-  .nc-preferences .nc-model-picker { padding-block: 14px; }
-  .nc-preferences .nc-model-picker > span { font-size: var(--text-small); }
+  .nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker, .nc-font-picker .field) { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .nc-preferences :is(.setting-row, .nc-model-picker, .nc-font-picker .field) > :is(.nc-select, div:has(> .nc-select)) { max-width: 100%; }
+  .nc-preferences :is(.nc-model-picker, .nc-font-picker) { padding-block: 14px; }
+  .nc-preferences :is(.nc-model-picker > span, .nc-font-picker .field > span) { font-size: var(--text-small); }
   .nc-app .nc-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
   .nc-app .nc-theme-options button { min-width: 0; min-height: 44px; justify-content: flex-start; text-align: start; overflow-wrap: anywhere; }
   .nc-app .privacy-note { padding: 14px; min-width: 0; }
