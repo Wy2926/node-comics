@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Leggi a doppia pagina. Traduci a modo tuo.",
+        "items": [
+          "Lettura a doppia pagina — Affianca le pagine, scorri o fai clic per sfogliarle e salva layout, direzione di lettura e zoom per ogni manga.",
+          "Tutti i capitoli in un’esportazione — Salva i capitoli in ordine in CBZ, ZIP o PDF, con originali o traduzioni già disponibili nella lingua di destinazione attuale. Le pagine senza traduzione mantengono l’originale; l’esportazione non avvia nuove traduzioni.",
+          "22 nuove voci nel catalogo siti — Tra cui WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation e Lagoon Scans, per più originali giapponesi e fumetti multilingue. L’elenco completo è nella directory dei siti supportati.",
+          "Anteprima dei caratteri di traduzione — Visualizza e scegli i caratteri disponibili per la lingua di destinazione. Al primo utilizzo, la lingua di traduzione segue quella del browser ed è modificabile in qualsiasi momento.",
+          "Lettura più fluida — Le pagine vicine e il capitolo successivo vengono precaricati; gli originali restano visibili mentre si preparano le traduzioni. Impostazioni e scelta del modello sono più semplici, e cambiare lingua di traduzione mantiene la posizione di lettura."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Pagine più nitide. Fonti più facili da trovare.",

@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Czytaj rozkładówki. Tłumacz po swojemu.",
+        "items": [
+          "Czytanie dwóch stron naraz — Wyświetlaj strony obok siebie, przewracaj je gestem lub kliknięciem i zapisuj układ, kierunek czytania oraz powiększenie dla każdej mangi.",
+          "Wszystkie rozdziały w jednym eksporcie — Zapisuj rozdziały po kolei jako CBZ, ZIP lub PDF, z oryginałami lub istniejącymi tłumaczeniami w bieżącym języku docelowym. Strony bez tłumaczenia zachowują oryginał; eksport nie uruchamia nowych tłumaczeń.",
+          "22 nowe wpisy w katalogu stron — W tym WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation i Lagoon Scans: więcej japońskich oryginałów i komiksów w wielu językach. Pełna lista znajduje się w katalogu obsługiwanych stron.",
+          "Podgląd czcionek tłumaczenia — Przeglądaj i wybieraj dostępne czcionki dla języka docelowego. Przy pierwszym użyciu język tłumaczenia jest ustawiany zgodnie z językiem przeglądarki i można go później zmienić.",
+          "Płynniejsze czytanie — Sąsiednie strony i kolejny rozdział wczytują się wcześniej, a podczas przygotowywania tłumaczeń widoczne są oryginały. Uproszczono ustawienia i wybór modelu; zmiana języka tłumaczenia zachowuje pozycję czytania."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Wyraźniejsze strony. Łatwiejsze szukanie.",

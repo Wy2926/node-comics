@@ -64,9 +64,25 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
+test('1.0.0 leads every changelog with five user-facing highlights',()=>{
+  for(const locale of locales){
+    const release=dictionaries[locale].documents.releases[0];
+    assert.equal(release.id,'1.0.0',locale);
+    assert.equal(release.date,'2026-10-17',locale);
+    assert.ok(release.title.includes(release.id),locale);
+    assert.equal(release.items.length,5,locale);
+    assert.equal(new Set(release.items).size,5,locale);
+    assert.ok(release.items.every(item=>item.trim().length>0),locale);
+    for(const term of ['CBZ','ZIP','PDF']) assert.ok(release.items[1].includes(term),`${locale}: ${term}`);
+    for(const term of ['22','WeLoMa','RawKuro','Raw1001','Comic RIDE','Young Animal','LHTranslation','Lagoon Scans'])
+      assert.ok(release.items[2].includes(term),`${locale}: ${term}`);
+    assert.doesNotMatch([release.title,...release.items].join(' '),/待发布|待商店发布|pending (?:store )?release|AMO|SHA-256|manifest\.key|git commit/i,locale);
+  }
+});
+
 test('0.12.0 and 0.11.3 describe user-facing features in every locale',()=>{
   for(const locale of locales){
-    const releases=dictionaries[locale].documents.releases.slice(0,2);
+    const releases=dictionaries[locale].documents.releases.filter(({id})=>id==='0.12.0'||id==='0.11.3');
     assert.deepEqual(releases.map(({id,date})=>[id,date]),[['0.12.0','2026-10-13'],['0.11.3','2026-10-10']],locale);
     for(const release of releases){
       assert.ok(release.title.includes(release.id!),locale);

@@ -79,6 +79,27 @@ for (const file of htmlFiles) {
       } else if (faq) errors.push(`${label}: FAQ schema should describe the full FAQ page only`);
     } catch { errors.push(`${label}: invalid JSON-LD graph`); }
   });
+  if (basePath(route) === '/changelog/') {
+    const releases = dictionaries[locale].documents.releases;
+    const articles = $('.release');
+    const feed = load(await readFile(join(root, localPath('/feed.xml', locale)), 'utf8'), { xmlMode: true });
+    const items = feed('channel > item');
+    if (articles.length !== releases.length || items.length !== releases.length) errors.push(`${label}: missing changelog or RSS entries`);
+    releases.forEach((release, index) => {
+      const article = articles.eq(index), item = items.eq(index);
+      const anchor = `release-${release.id ?? release.date}`;
+      const url = `${canonical}#${anchor}`;
+      if (article.attr('id') !== anchor || article.find('time').attr('datetime') !== release.date
+        || article.find('h2').text() !== release.title
+        || JSON.stringify(article.find('li').toArray().map(node => $(node).text())) !== JSON.stringify(release.items))
+        errors.push(`${label}: changelog content mismatch ${anchor}`);
+      const description = release.items.join(locale === 'zh-CN' ? '；' : '; ');
+      if (item.find('title').text() !== release.title || item.find('link').text() !== url || item.find('guid').text() !== url
+        || item.find('description').text() !== description
+        || item.find('pubDate').text() !== new Date(`${release.date}T00:00:00+08:00`).toUTCString())
+        errors.push(`${label}: RSS content mismatch ${anchor}`);
+    });
+  }
   if (basePath(route) === '/sites/') {
     const cards = $('.supported-site');
     const graph = JSON.parse($('script[type="application/ld+json"]').text())['@graph'];

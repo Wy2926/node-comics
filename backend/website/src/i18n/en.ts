@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Read in spreads. Translate your way.",
+        "items": [
+          "Two-page reading — Read pages side by side, swipe or click to turn them, and save layout, direction and zoom preferences for each comic.",
+          "Every chapter, one export — Save chapters in order as CBZ, ZIP or PDF, using originals or existing translations in your current target language. Pages without a translation keep the original; exporting does not start new translations.",
+          "22 new site entries — Including WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation and Lagoon Scans, with more Japanese originals and multilingual comics. See the supported-sites directory for the full list.",
+          "Preview your translation font — Browse and choose available fonts for your target language. On first use, the translation language follows your browser language and can be changed at any time.",
+          "Smoother reading — Load nearby pages and the next chapter ahead of time, and show originals while translations are being prepared. Settings and model selection are simpler, and changing the translation language keeps your reading position."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Clearer pages. Easier discovery.",

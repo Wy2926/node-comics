@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Đọc hai trang. Dịch theo ý bạn.",
+        "items": [
+          "Đọc hai trang cạnh nhau — Vuốt hoặc nhấp để lật trang, đồng thời lưu bố cục, hướng đọc và mức thu phóng cho từng bộ truyện.",
+          "Xuất toàn bộ chương trong một lần — Lưu các chương theo thứ tự dưới dạng CBZ, ZIP hoặc PDF, dùng ảnh gốc hoặc bản dịch đã có ở ngôn ngữ đích hiện tại. Trang chưa có bản dịch sẽ giữ ảnh gốc; việc xuất không bắt đầu bản dịch mới.",
+          "Thêm 22 mục trang web — Bao gồm WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation và Lagoon Scans, với nhiều bản gốc tiếng Nhật và truyện đa ngôn ngữ hơn. Xem danh sách đầy đủ trong danh mục trang web được hỗ trợ.",
+          "Xem trước phông chữ dịch — Xem và chọn phông chữ khả dụng cho ngôn ngữ đích. Lần đầu sử dụng, ngôn ngữ dịch được đặt theo ngôn ngữ trình duyệt và có thể đổi bất cứ lúc nào.",
+          "Đọc liền mạch hơn — Tải trước các trang lân cận và chương tiếp theo, hiển thị ảnh gốc trong khi chuẩn bị bản dịch. Cài đặt và lựa chọn mô hình được đơn giản hóa; đổi ngôn ngữ dịch vẫn giữ vị trí đọc."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Trang rõ hơn. Tìm dễ hơn.",

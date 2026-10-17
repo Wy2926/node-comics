@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Baca dua halaman. Terjemahkan sesukamu.",
+        "items": [
+          "Baca dua halaman berdampingan — Geser atau klik untuk membalik halaman, lalu simpan tata letak, arah baca, dan zoom untuk setiap manga.",
+          "Semua bab dalam satu ekspor — Simpan bab secara berurutan sebagai CBZ, ZIP, atau PDF, memakai gambar asli atau terjemahan yang sudah ada dalam bahasa tujuan saat ini. Halaman tanpa terjemahan tetap memakai gambar asli; ekspor tidak memulai terjemahan baru.",
+          "22 entri situs baru — Termasuk WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation, dan Lagoon Scans, dengan lebih banyak karya asli Jepang dan komik multibahasa. Lihat daftar lengkap di direktori situs yang didukung.",
+          "Pratinjau font terjemahan — Lihat dan pilih font yang tersedia untuk bahasa tujuan. Saat pertama digunakan, bahasa terjemahan mengikuti bahasa peramban dan dapat diubah kapan saja.",
+          "Membaca lebih lancar — Halaman terdekat dan bab berikutnya dimuat lebih awal, sementara gambar asli ditampilkan saat terjemahan disiapkan. Pengaturan dan pemilihan model lebih sederhana; mengganti bahasa terjemahan tetap mempertahankan posisi baca."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Halaman lebih jernih. Sumber lebih mudah dicari.",

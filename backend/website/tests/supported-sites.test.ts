@@ -29,6 +29,11 @@ test('website uses the complete extension directory without copying or fetching 
     const { listSupportedSites } = await server.ssrLoadModule(fileURLToPath(new URL('../../../apps/extension/src/sources/registry/sites.ts', import.meta.url)));
     const expected = listSupportedSites();
     assert.ok(expected.length > 0);
+    // Count directory entries, including distinct domains, within this release's date range.
+    const additions = supportedSites.filter((site: { adaptedOn: string }) => site.adaptedOn > '2026-10-13' && site.adaptedOn <= '2026-10-17');
+    assert.equal(additions.length, 22, '1.0.0 must include all 22 announced site entries');
+    assert.equal(new Set(additions.map((site: { url: string }) => site.url)).size, 22);
+    assert.deepEqual(additions.filter((site: { adapterId: string }) => site.adapterId === 'rawkuro').map((site: { id: string }) => site.id).sort(), ['raw1001', 'rawkuro']);
     assert.deepEqual(supportedSites.map(({ icon, anchor, ...site }: Record<string, unknown>) => site), expected.map(({ icon, ...site }: Record<string, unknown>) => site));
     assert.equal(new Set(supportedSites.map((site: { anchor: string }) => site.anchor)).size, expected.length);
     for (const site of supportedSites) {

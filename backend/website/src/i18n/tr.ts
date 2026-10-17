@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Çift sayfa okuyun. Dilediğiniz gibi çevirin.",
+        "items": [
+          "Çift sayfa okuma — Sayfaları yan yana görüntüleyin, kaydırarak veya tıklayarak çevirin; düzen, okuma yönü ve yakınlaştırma tercihlerini her manga için kaydedin.",
+          "Tüm bölümler tek dışa aktarmada — Bölümleri sırasıyla CBZ, ZIP veya PDF olarak, orijinallerle ya da mevcut hedef dildeki hazır çevirilerle kaydedin. Çevirisi olmayan sayfalar orijinal kalır; dışa aktarma yeni çeviri başlatmaz.",
+          "22 yeni site kaydı — WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation ve Lagoon Scans dahil, daha fazla Japonca orijinal ve çok dilli çizgi roman. Tam liste için desteklenen siteler dizinine bakın.",
+          "Çeviri yazı tiplerini önizleyin — Hedef diliniz için kullanılabilir yazı tiplerini inceleyip seçin. İlk kullanımda çeviri dili tarayıcı diline göre ayarlanır ve istediğiniz zaman değiştirilebilir.",
+          "Daha akıcı okuma — Yakındaki sayfalar ve sonraki bölüm önceden yüklenir; çeviriler hazırlanırken orijinaller gösterilir. Ayarlar ve model seçimi sadeleştirildi; çeviri dilini değiştirmek okuma konumunuzu korur."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Daha net sayfalar. Daha kolay keşif.",

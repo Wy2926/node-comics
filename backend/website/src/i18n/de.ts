@@ -641,6 +641,18 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.0.0",
+        "date": "2026-10-17",
+        "title": "1.0.0 · Doppelseiten lesen. Individuell übersetzen.",
+        "items": [
+          "Lesen auf Doppelseiten — Seiten nebeneinander anzeigen, per Wischen oder Klicken umblättern und Layout, Leserichtung sowie Zoom für jeden Manga speichern.",
+          "Alle Kapitel in einem Export — Kapitel der Reihe nach als CBZ, ZIP oder PDF speichern, mit Originalen oder vorhandenen Übersetzungen in der aktuellen Zielsprache. Seiten ohne Übersetzung behalten das Original; der Export startet keine neuen Übersetzungen.",
+          "22 neue Website-Einträge — Darunter WeLoMa, RawKuro, Raw1001, Comic RIDE, Young Animal, LHTranslation und Lagoon Scans, mit mehr japanischen Originalen und mehrsprachigen Comics. Die vollständige Liste steht im Verzeichnis unterstützter Websites.",
+          "Übersetzungsschriften mit Vorschau — Verfügbare Schriften für die Zielsprache ansehen und auswählen. Beim ersten Start richtet sich die Übersetzungssprache nach der Browsersprache und lässt sich jederzeit ändern.",
+          "Flüssiger lesen — Benachbarte Seiten und das nächste Kapitel werden vorgeladen; während Übersetzungen vorbereitet werden, bleiben die Originale sichtbar. Einstellungen und Modellauswahl sind übersichtlicher, und ein Sprachwechsel behält die Leseposition bei."
+        ]
+      },
+      {
         "id": "0.12.0",
         "date": "2026-10-13",
         "title": "0.12.0 · Klarere Seiten. Einfacher entdecken.",
