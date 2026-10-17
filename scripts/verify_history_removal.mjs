@@ -34,7 +34,7 @@ try{
   await inLibrary();
   await page.goBack();
   await page.waitForURL(url=>url.hash==='#settings');
-  await page.getByRole('heading',{name:'外观与偏好',exact:true}).waitFor();
+  await page.getByRole('region',{name:'外观与偏好',exact:true}).waitFor();
   await page.goForward();
   await inLibrary();
   check('legacy hash changes, browser back and forward retain valid navigation');

@@ -36,11 +36,10 @@
     /* Settings are rows, not a stack of full-width desktop controls. */
     .nc-app :is(.settings-card, .nc-purchases) { padding: 12px; }
     .nc-app .settings-card { margin-bottom: 12px; }
-    .nc-app .nc-preferences>.page-title { margin-bottom: 12px; }
     .nc-app .nc-preferences>.settings-card>h3 { margin-bottom: 0; padding-bottom: 8px; }
-    .nc-app .setting-row { gap: var(--nc-phone-gap); padding-block: 10px; }
+    .nc-app .setting-row, .nc-preferences .nc-model-picker { gap: var(--nc-phone-gap); padding-block: 10px; }
     .nc-app .setting-row b { overflow-wrap: anywhere; }
-    .nc-app .setting-row:has(> .nc-select, > div > .nc-select) { grid-template-columns: minmax(0, 1fr) minmax(min(9rem, 55%), 46%); align-items: center; }
+    .nc-app .setting-row:has(> .nc-select, > div > .nc-select), .nc-app .nc-preferences .nc-model-picker { grid-template-columns: minmax(0, 1fr) minmax(min(9rem, 55%), 46%); align-items: center; }
     .nc-app .setting-row p { margin-top: 4px; font-size: var(--text-caption); line-height: 1.45; }
     .nc-app .setting-row>.nc-select { padding-inline: 8px; }
     .nc-app .setting-row>div:has(> .nc-select) { min-width: 0; }

@@ -7,7 +7,7 @@ import {AutoTranslateTabs} from './AutoTranslateTabs';
 import {TargetLanguage} from './TargetLanguage';
 import { Icon } from '../icons';
 import { AppearanceSettings } from './Appearance';
-import { PageTitle, SettingRow } from './components';
+import { SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
 import {EnhancementSettings} from './EnhancementSettings';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
@@ -22,39 +22,13 @@ type Props = {
   onOpenShortcuts?: () => void;
 };
 export function Preferences({ settings, setSettings, caps, modelSelection, children, onOpenShortcuts }: Props) {
-  return <div className="nc-preferences">
-    <PageTitle icon="settings" eyebrow={msg("MAKE IT YOURS")} title={msg("外观与偏好")} description={msg("调成你喜欢的阅读节奏，偏好保存在本机。")} />
+  return <div className="nc-preferences" role="region" aria-label={msg('外观与偏好')}>
     <AppearanceSettings settings={settings} onChange={setSettings}>
       <InterfaceLanguage value={settings.uiLanguage} onChange={uiLanguage=>setSettings(s=>({...s,uiLanguage}))}/>
-      <div className="setting-row">
-        <div><b>{msg('翻译书名与简介')}</b></div>
-        <button type="button" className={'switch '+(settings.discoveryTextTranslation?'on':'')}
-          role="switch" aria-label={msg('翻译书名与简介')} aria-checked={settings.discoveryTextTranslation}
-          onClick={()=>setSettings(s=>({...s,discoveryTextTranslation:!s.discoveryTextTranslation}))}><i/></button>
-      </div>
     </AppearanceSettings>
-    {onOpenShortcuts && <section className="settings-card">
-      <h3><Icon name="keyboard"/>{msg('键盘快捷键')}</h3>
-      <SettingRow title={msg('自定义快捷键')} description={msg('页面内快捷键保存在本机，按键盘位置识别；输入文字时不会触发。浏览器快捷键单独管理。')}>
-        <button type="button" className="button secondary" aria-haspopup="dialog" onClick={onOpenShortcuts}><Icon name="keyboard"/>{msg('自定义快捷键')}</button>
-      </SettingRow>
-    </section>}
-    <TranslationChannels/>
-    <EnhancementSettings/>
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
-      <SettingRow title={msg("默认目标语言")} description={msg("翻译支持 16 个语言选项，已有译图版本保留。")}>
-        <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
-      </SettingRow>
-      <TranslationModelPicker selection={modelSelection}/>
-      <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
-      <SettingRow title={msg("翻页方向")} description={msg("翻页模式中的方向键遵循此设置。")}>
-        <Select aria-label={msg("翻页方向")} value={settings.direction} onChange={e => setSettings(s => ({ ...s, direction: e.target.value as Settings['direction'] }))}>
-          <option value="rtl">{msg("从右向左 · 日漫习惯")}</option>
-          <option value="ltr">{msg("从左向右")}</option>
-        </Select>
-      </SettingRow>
       <SettingRow title={msg("默认阅读布局")} description={msg("未单独设置布局的漫画使用此默认值。")}>
         <Select aria-label={msg("默认阅读布局")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}}>
           <option value="continuous">{msg("连续")}</option>
@@ -62,8 +36,32 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
           <option value="double">{msg("双页")}</option>
         </Select>
       </SettingRow>
-
+      <SettingRow title={msg('翻页方向')} description={msg('翻页模式中的方向键遵循此设置。')}>
+        <Select aria-label={msg('翻页方向')} value={settings.direction} onChange={e=>setSettings(s=>({...s,direction:e.target.value as Settings['direction']}))}>
+          <option value="rtl">{msg('从右向左 · 日漫习惯')}</option><option value="ltr">{msg('从左向右')}</option>
+        </Select>
+      </SettingRow>
     </section>
+    <TranslationChannels>
+      <SettingRow title={msg('默认目标语言')} description={msg('翻译支持 16 个语言选项，已有译图版本保留。')}>
+        <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
+      </SettingRow>
+      <TranslationModelPicker selection={modelSelection}/>
+      <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
+      <div className="setting-row">
+        <div><b>{msg('翻译书名与简介')}</b></div>
+        <button type="button" className={'switch '+(settings.discoveryTextTranslation?'on':'')}
+          role="switch" aria-label={msg('翻译书名与简介')} aria-checked={settings.discoveryTextTranslation}
+          onClick={()=>setSettings(s=>({...s,discoveryTextTranslation:!s.discoveryTextTranslation}))}><i/></button>
+      </div>
+    </TranslationChannels>
+    <EnhancementSettings/>
+    {onOpenShortcuts && <section className="settings-card">
+      <h3><Icon name="keyboard"/>{msg('键盘快捷键')}</h3>
+      <SettingRow title={msg('自定义快捷键')} description={msg('页面内快捷键保存在本机，按键盘位置识别；输入文字时不会触发。浏览器快捷键单独管理。')}>
+        <button type="button" className="button secondary" aria-haspopup="dialog" onClick={onOpenShortcuts}><Icon name="keyboard"/>{msg('自定义快捷键')}</button>
+      </SettingRow>
+    </section>}
     <section className="settings-card">
       <h3>
         <Icon name="storage" />{msg("图片与隐私")}</h3>

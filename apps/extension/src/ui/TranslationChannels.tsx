@@ -1,4 +1,4 @@
-import {useEffect,useId,useState} from 'react';
+import {useEffect,useId,useState,type ReactNode} from 'react';
 import {msg} from '../i18n/runtime';
 import {availableChannelProtocols,connectChannel,listChannels,removeChannel,savedChannelSecretFields,selectChannel,subscribeChannels,type ChannelProfile} from '../translation/channels';
 import {Icon} from '../icons';
@@ -14,7 +14,7 @@ export function ChannelGuide({url}:{url?:string}){
   </a>;
 }
 
-export function TranslationChannels(){
+export function TranslationChannels({children}:{children?:ReactNode}){
   const formId=useId();
   const definitions=availableChannelProtocols();
   const protocols=definitions.filter(item=>item.configurable);
@@ -160,6 +160,7 @@ export function TranslationChannels(){
       </div>
     </fieldset>
     {error&&editing===undefined&&<p role="alert" className="error">{error}</p>}
+    {children}
     {editing!==undefined&&<Modal className="nc-channel-dialog" title={editing?msg('重新连接翻译渠道'):msg('添加翻译渠道')} onClose={close} footer={
       <div className="nc-channel-form-actions">
         <button className="button secondary" type="button" disabled={busy} onClick={close}>{msg('取消')}</button>

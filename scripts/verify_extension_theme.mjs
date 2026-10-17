@@ -57,7 +57,7 @@ try{
  const target=page.getByRole('combobox',{name:'默认目标语言',exact:true}),original=await target.getAttribute('data-value');await target.click();await page.getByRole('listbox').waitFor();await shot('settings-dropdown');await target.press('End');await target.press('Escape');assert.equal(await target.getAttribute('data-value'),original);assert(await target.evaluate(el=>el===document.activeElement));
  for(const [theme,label] of [['sky','晴空蓝'],['rose','樱花粉'],['mint','薄荷绿'],['iris','鸢尾紫'],['amber','琥珀橙'],['slate','石墨灰']])for(const mode of ['light','dark']){
   await page.getByRole('button',{name:label,exact:true}).click();await selectOption(page.getByRole('combobox',{name:'亮暗外观',exact:true}),mode);await noOverflow();await shot('settings-'+theme+'-'+mode);
-  assert(await page.locator('.nc-page-scrollbar-thumb').evaluate(element=>getComputedStyle(element).backgroundColor===getComputedStyle(document.querySelector('.nc-heading-star')).color),'The page thumb must use the selected accent');
+  assert(await page.locator('.nc-page-scrollbar-thumb').evaluate(element=>getComputedStyle(element).backgroundColor===getComputedStyle(document.querySelector('.settings-card h3 svg')).color),'The page thumb must use the selected accent');
   const panelStyle=element=>{const style=getComputedStyle(element);return {border:style.borderTop,borderRadius:style.borderRadius,shadow:style.boxShadow};};
   const sharedPanel=await page.locator('.settings-card').first().evaluate(panelStyle);
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'搜索漫画',exact:true}).click();
