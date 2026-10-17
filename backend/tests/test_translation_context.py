@@ -89,7 +89,8 @@ def test_frozen_guidance_and_ocr_ids_survive_repair_and_paid_replay(text_case, m
 
     def invoke(messages, profile, *, json_schema):
         calls.append(messages)
-        assert messages[0]['content'] == frozen['text_prompt'] + '\nTarget: "zh-Hans"'
+        assert messages[0]['content'] == ('Translate every input text into 简体中文 (Simplified Chinese).\n'
+                                          'Write all translation values in the target language.\n\n' + frozen['text_prompt'])
         assert [row['role'] for row in messages] == ['system', 'user']
         assert json.loads(messages[1]['content']) == {row['id']: row['source'] for row in segments}
         assert json_schema['schema']['required'] == ['comic_title', 'b001']

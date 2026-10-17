@@ -7,7 +7,7 @@ import math
 import time
 from sqlalchemy import func, or_, select
 from .adapters.llm import TextError
-from .adapters.text import LEGACY_SYSTEM, call_text, groups, input_bound, parse_translations
+from .adapters.text import LANGUAGE_CODE_VERSIONS, LEGACY_SYSTEM, call_text, groups, input_bound, parse_translations
 from .assets import available
 from .db import session_factory
 from .errors import ProcessingError
@@ -110,14 +110,16 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
         if count >= profile['max_attempts']:
             raise TextError('TEXT_RETRY_EXHAUSTED', '此文本组已达到自动调用次数上限')
         prompt = job.config.get('text_prompt', LEGACY_SYSTEM)
-        reserved = _cost_micros(profile, input_bound(segments, language, prompt), profile['max_output_tokens'])
+        language_names = job.config.get('prompt_version', 'comic-json-v9') not in LANGUAGE_CODE_VERSIONS
+        reserved = _cost_micros(profile, input_bound(segments, language, prompt, language_names),
+                               profile['max_output_tokens'])
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
                         group_index=group_index, sequence=sequence + 1,
                         provider_id=profile['provider_id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)
         reserve_request(provider, call.id)
         db.add(call)
         db.commit()  # Intent and full unknown-cost reservation must exist before any request.
-        return call.id, profile, count + 1, prompt
+        return call.id, profile, count + 1, prompt, language_names
 
 
 def complete_call(call_id, lease_id, response=None, error=None, translations=None):
@@ -156,7 +158,7 @@ def translate_group(job_id, lease_id, index, segments, language, before_call=Non
         if before_call:
             before_call()
         try:
-            call_id, profile, sequence, prompt = reserve_call(job_id, lease_id, index, segments, language)
+            call_id, profile, sequence, prompt, language_names = reserve_call(job_id, lease_id, index, segments, language)
         except TextError as error:
             if error.code != 'TEXT_RATE_LIMITED':
                 raise
@@ -169,7 +171,7 @@ def translate_group(job_id, lease_id, index, segments, language, before_call=Non
             raise
         response = None
         try:
-            response = call_text(segments, language, profile, prompt)
+            response = call_text(segments, language, profile, prompt, language_names)
             translations = parse_translations(response.content, segments)
             complete_call(call_id, lease_id, response=response, translations=translations)
             return

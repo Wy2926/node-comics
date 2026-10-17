@@ -262,7 +262,7 @@ def test_worker_uses_frozen_model_after_plan_scope_and_revision_changes(text_cas
         db.commit()
     assert resolve_credentials(original) == 'isolated-test-text-key'
     calls = []
-    def model(segments, language, profile, prompt):
+    def model(segments, language, profile, prompt, language_names):
         calls.append(profile)
         return TextResponse('{"b001":"你好"}', {'input_tokens': 10, 'output_tokens': 2}, 'frozen')
     monkeypatch.setattr(classic, 'call_text', model)

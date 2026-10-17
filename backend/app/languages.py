@@ -16,3 +16,15 @@ LANGUAGES = {'zh-Hans': '简体中文', 'zh-Hant': '繁體中文', 'en': 'Englis
              'fr': 'Français', 'es': 'Español', 'pt-BR': 'Português (Brasil)', 'de': 'Deutsch',
              'it': 'Italiano', 'ru': 'Русский', 'pl': 'Polski', 'uk': 'Українська',
              'tr': 'Türkçe', 'vi': 'Tiếng Việt', 'id': 'Bahasa Indonesia', 'ar': 'العربية'}
+
+# Only model instructions use these names; APIs, jobs and rendering keep codes.
+LLM_LANGUAGE_NAMES = {
+    code: english if LANGUAGES[code] == english else f'{LANGUAGES[code]} ({english})'
+    for code, english in {
+        'zh-Hans': 'Simplified Chinese', 'zh-Hant': 'Traditional Chinese', 'en': 'English',
+        'ja': 'Japanese', 'ko': 'Korean', 'fr': 'French', 'es': 'Spanish',
+        'pt-BR': 'Brazilian Portuguese', 'de': 'German', 'it': 'Italian', 'ru': 'Russian',
+        'pl': 'Polish', 'uk': 'Ukrainian', 'tr': 'Turkish', 'vi': 'Vietnamese',
+        'id': 'Indonesian', 'ar': 'Arabic',
+    }.items()
+}

@@ -69,13 +69,13 @@ OpenAI 请求仅发送文字，关闭流式与服务端存储；输出 token 有
 
 ### 正文 LLM 文本格式
 
-新任务使用 `comic-json-v13` 协议版本，在受理时将完整有效提示词冻结为任务配置的 `text_prompt`，与供应商版本、输出上限一起进入缓存身份；不把提示词加入需严格匹配凭据版本的 `text` profile。所有分组、自动重试和重启恢复使用该快照，已完成 ID 的译文检查点直接复用。已冻结的旧版提示词保持原文；没有 `text_prompt` 的升级前任务继续原 `comic-json-v9` 内置提示词和当前兼容 JSON 解析器。后台字段与生效规则见[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)。API、文本 worker、文档 worker 与 maintenance 须配套发布，全部切换后才可保存新后台配置；旧代码不能读取含新增提示词字段的设置，也不会使用新任务的提示词快照。回退须先排空／处理新版本在途与未知任务，并恢复旧代码兼容的系统设置，不能单独回退镜像。计算节点须支持跳过空字符串绘字。独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
+新任务使用 `comic-json-v14` 协议版本，在受理时将完整有效提示词冻结为任务配置的 `text_prompt`，与供应商版本、输出上限一起进入缓存身份；不把提示词加入需严格匹配凭据版本的 `text` profile。所有分组、自动重试和重启恢复使用该快照，已完成 ID 的译文检查点直接复用。已冻结的旧版提示词保持原文；没有 `text_prompt` 的升级前任务继续原 `comic-json-v9` 内置提示词和当前兼容 JSON 解析器。后台字段与生效规则见[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)。API、文本 worker、文档 worker 与 maintenance 须配套发布，全部切换后才可保存新后台配置；旧代码不能读取含新增提示词字段的设置，也不会使用新任务的提示词快照。回退须先排空／处理新版本在途与未知任务，并恢复旧代码兼容的系统设置，不能单独回退镜像。计算节点须支持跳过空字符串绘字。独立引擎 CLI 的编号文本翻译入口不属于此后端协议。
 
 Chat Completions 与 Responses 共用原有紧凑 JSON 输出契约，源文本和译文只采用 JSON：顶层直接为段落 ID 到文本的对象映射，不携带 `translations` 包装。正文逐组生成严格 JSON Schema，禁止额外字段，组内所有 ID 必填且值为字符串；提示词和本地完整性校验同时执行。使用标准库编码和解析；模型 HTTP 信封、内部检查点及发给节点的 `translations` 包装分别遵循各自协议。
 
 Chat Completions 发送 `response_format.type=json_schema` 与 `json_schema.strict=true`；Responses 发送 `text.format` 中的同等定义。OpenRouter 同时发送 `provider.require_parameters=true`，只向支持请求参数的端点路由。正文供应商必须支持严格结构化输出；不支持时按上游错误终止，不静默移除约束。漫画名及其他未传 Schema 的通用调用保持原请求参数。[OpenAI 结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)、[OpenRouter 结构化输出](https://openrouter.ai/docs/guides/features/structured-outputs)
 
-目标语言放在系统指令的 `Target: "zh-Hans"` 中，用户消息只包含 ID 到 OCR 原文的 JSON 对象，避免模型在译文中复制目标语言字段。请求只使用 system＋OCR 两条消息，不附加作品名。输入示例：
+目标语言以完整名称写入系统消息开头的直接翻译指令，例如 `Translate every input text into 简体中文 (Simplified Chinese).`，用户消息只包含 ID 到 OCR 原文的 JSON 对象，避免模型在译文中复制目标语言字段。完整语言名称、指令顺序与旧任务恢复规则见[系统设置](SYSTEM_SETTINGS.md#llm-翻译提示词)。请求只使用 system＋OCR 两条消息，不附加作品名。输入示例：
 
 ```json
 {"0":"Hello, friend!","1":"Let's go!"}

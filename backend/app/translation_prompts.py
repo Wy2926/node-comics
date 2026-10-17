@@ -1,4 +1,7 @@
-"""Editable translation guidance; wire contracts remain in each caller."""
+"""Editable translation guidance and shared target-language instructions."""
+import json
+
+from .languages import LLM_LANGUAGE_NAMES
 
 MAX_PROMPT_LENGTH = 8000
 
@@ -13,3 +16,11 @@ PROMPT_DEFAULTS = {
     'comic_translation_prompt': COMIC_TRANSLATION_PROMPT,
     'comic_title_prompt': COMIC_TITLE_PROMPT,
 }
+
+
+def target_instructions(system, language, language_names=True):
+    if not language_names:
+        # Frozen older jobs must keep their original request bytes.
+        return system + '\nTarget: ' + json.dumps(language, ensure_ascii=False)
+    return (f'Translate every input text into {LLM_LANGUAGE_NAMES[language]}.\n'
+            'Write all translation values in the target language.\n\n' + system)

@@ -94,7 +94,7 @@ def test_empty_group_and_text_length_boundary():
 def test_source_payload_omits_image_geometry_and_bounds_actual_json():
     segments = [{'id': 'a', 'source': 'Hello, "friend"!\n你好', 'bbox': [1, 2, 3, 4]}]
     result = messages(segments, 'en')
-    assert result[0]['content'].endswith('Target: "en"')
+    assert result[0]['content'].startswith('Translate every input text into English.\n')
     assert json.loads(result[1]['content']) == {'a': segments[0]['source']}
     bound = input_bound(segments, 'en')
     assert bound >= len(json.dumps({'messages': result, 'response_format': {

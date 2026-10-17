@@ -130,7 +130,8 @@ def test_compact_prompt_resumes_old_checkpoint_with_original_page_ids(text_case,
         state.translations = {'0': ''}
         db.commit()
     called = []
-    def model(batch, language, profile, prompt):
+    def model(batch, language, profile, prompt, language_names):
+        assert language_names is False
         ids = [segment['id'] for segment in batch]
         called.append(ids)
         assert list(json.loads(messages(batch, language)[1]['content'])) == ids
@@ -186,7 +187,7 @@ def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case
         provider = configure_text_provider(db, job.config['text']['provider_id'], max_output_tokens=32768)
         job.config = {**job.config, 'text': snapshot(db, provider.id)['text']}
         db.commit()
-    call_id, _, _, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
+    call_id, _, _, _, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
     with session_factory()() as db:
         call = db.get(TextCall, call_id)
         sent_bytes = len(json.dumps({'messages': messages(SEGMENTS, 'zh-Hans'), 'response_format': {
@@ -217,7 +218,7 @@ def test_decimal_metering_keeps_integer_costs_and_frozen_prices(text_case, monke
         db.commit()
         configure_text_provider(db, provider.id, input_rate=1.125, output_rate=2.5)
     monkeypatch.setattr(classic, 'input_bound', lambda *args: 5)
-    call_id, frozen, _, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
+    call_id, frozen, _, _, _ = classic.reserve_call(job_id, lease_id, 0, SEGMENTS, 'zh-Hans')
     assert frozen == profile
     with session_factory()() as db:
         call = db.get(TextCall, call_id)
@@ -298,7 +299,7 @@ def test_unknown_call_keeps_metering_without_cost_cap_and_stops_at_attempt_limit
 
 def test_late_translation_accounts_usage_without_overwriting_new_generation(text_case):
     job, lease = text_case
-    call, _, _, _ = classic.reserve_call(job, lease, 0, SEGMENTS, 'zh-Hans')
+    call, _, _, _, _ = classic.reserve_call(job, lease, 0, SEGMENTS, 'zh-Hans')
     with session_factory()() as db:
         db.get(JobStage, db.get(ExecutionLease, lease).stage_id).generation += 1
         db.commit()

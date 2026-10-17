@@ -22,11 +22,12 @@ def test_document_prompt_keeps_all_ocr_in_user_data_without_interpolation():
     original = json.dumps(pages, ensure_ascii=False)
     prompt = messages(pages, 'zh-Hant', SYSTEM)
     assert [row['role'] for row in prompt] == ['system', 'user']
-    assert prompt[0]['content'] == SYSTEM + '\nTarget: "zh-Hant"'
+    assert prompt[0]['content'] == ('Translate every input text into 繁體中文 (Traditional Chinese).\n'
+                                    'Write all translation values in the target language.\n\n' + SYSTEM)
     assert hostile not in prompt[0]['content']
     assert json.loads(prompt[-1]['content']) == {'pages': pages}
     assert json.dumps(pages, ensure_ascii=False) == original
-    assert PROMPT_VERSION == 'comic-document-v6'
+    assert PROMPT_VERSION == 'comic-document-v7'
     # A fixed instruction block, not a repeated per-page prompt or glossary.
     assert len(SYSTEM.encode()) < 4096
     assert input_bound(prompt) == len(json.dumps(
