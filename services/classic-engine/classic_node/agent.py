@@ -183,7 +183,7 @@ class Agent:
         sent_at = time.monotonic()
         response = self.transport.post('/nodes/register', {'protocol_version': 3,
             'engine_version': self.runtime.version, 'resource_id': self.local['resource_id'],
-            'device': 'cuda:' + str(self.local['engine']['gpu']),
+            'device': self.local['engine'].get('backend', 'cuda') + ':' + str(self.local['engine']['gpu']),
             'supported_languages': self.runtime.languages, 'ready': True, 'result_formats': ['overlay-v1', 'overlay-tiles-v1'],
             'document_protocol': self.documents.protocol()})
         if response['protocol_version'] != 3:

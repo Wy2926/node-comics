@@ -1,4 +1,4 @@
-"""Real Qt and CUDA acceptance; opt in with a prepared MTU_TEST_ASSETS directory."""
+"""Real Qt/GPU acceptance; MTU_TEST_ASSETS opts in, MTU_TEST_BACKEND defaults to CUDA."""
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -197,7 +197,7 @@ def test_long_page_cross_seam_lines_are_complete_without_duplicate_ocr(assets, o
         torch.cuda.empty_cache()
         blocks = group_output([], [line.pts for line in lines], 720, 12930)
         assert len(lines) == 30 and sum(len(block.lines) for block in blocks) == 30
-        english = Paddle(models, 'en', 0, 2)
+        english = Paddle(models, 'en', 0, 2, backend=os.environ.get('MTU_TEST_BACKEND', 'cuda'))
         grouped = [Quadrilateral(np.asarray(line), '', 1) for block in blocks for line in block.lines]
         asyncio.run(english.recognize(rgb, grouped, config.ocr))
         assert [line.text for line in grouped] == [sentence] * 30
@@ -495,7 +495,8 @@ def test_native_48px_colors_reuse_ocr_and_keep_failure_fallback_offline(assets, 
 
 def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypatch):
     models, fonts = assets
-    engine = Engine(models, fonts)
+    backend = os.environ.get('MTU_TEST_BACKEND', 'cuda')
+    engine = Engine(models, fonts, backend=backend)
     try:
         color_batches = []
         estimate_colors = engine.colors.predictor._estimate_colors_batch
@@ -506,8 +507,10 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
         engine.warmup()
         assert color_batches == [2]  # Both known-text and fallback models were warmed.
         for probe in engine.probes.values():
-            assert probe.session.get_providers()[0] == 'CUDAExecutionProvider'
-            assert int(probe.session.get_provider_options()['CUDAExecutionProvider']['device_id']) == engine.gpu
+            provider = 'DmlExecutionProvider' if backend == 'amd' else 'CUDAExecutionProvider'
+            assert probe.session.get_providers()[0] == provider
+            if backend == 'cuda':
+                assert int(probe.session.get_provider_options()[provider]['device_id']) == engine.gpu
             assert probe.session.get_session_options().intra_op_num_threads == 2
         assert engine.recognizers is engine.probes
         assert len({id(probe.session) for probe in engine.probes.values()}) == 3
@@ -608,15 +611,16 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
 
 def test_missing_cuda_fails_before_loading_an_alternate_backend(monkeypatch):
     import torch
+    monkeypatch.setattr(torch.version, 'hip', None)
     monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
-    with pytest.raises(RuntimeError, match='NVIDIA CUDA GPU is required'):
+    with pytest.raises(RuntimeError, match='CPU fallback is disabled'):
         Engine('missing', [])
 
 
 def test_long_lines_and_partial_ocr_continue_at_different_positions(assets, offline, monkeypatch):
     from PIL import Image, ImageDraw, ImageFont
     models, fonts = assets
-    engine = Engine(models, fonts)
+    engine = Engine(models, fonts, backend=os.environ.get('MTU_TEST_BACKEND', 'cuda'))
     sentences = ['We read a new story together at the library.',
                  'The evening sky was full of distant stars.',
                  'Our next adventure begins early tomorrow.']

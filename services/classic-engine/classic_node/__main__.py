@@ -12,7 +12,7 @@ from .operations import LOG, Operations, configure_logging, report_fatal
 
 
 def main():
-    parser = argparse.ArgumentParser(description='MTU NVIDIA CUDA/Qt overlay compute v3 node')
+    parser = argparse.ArgumentParser(description='MTU GPU/Qt overlay compute v3 node (CUDA by default)')
     parser.add_argument('command', choices=['check', 'run', 'pending'])
     parser.add_argument('--config', default='node.local.json')
     parser.add_argument('--bundle-root')
@@ -58,7 +58,8 @@ def execute(args):
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
                 'cpu_resources': config.get('_cpu_resources'),
                 'execution_settings': execution_settings(config),
-                'inpainting_backend': 'pytorch-cuda-fp32', 'renderer': 'mtu-pyqt6'}))
+                'inpainting_backend': ('pytorch-hip-fp32' if config['engine'].get('backend', 'cuda') == 'amd'
+                                       else 'pytorch-cuda-fp32'), 'renderer': 'mtu-pyqt6'}))
         finally:
             runtime.close()
         return 0

@@ -1,0 +1,47 @@
+[project]
+name = "node-comics-amd-environment"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "node-comics-classic-engine",
+    "torch[device-gfx1030]",
+    "torchvision[device-gfx1030]",
+    "onnxruntime-directml==1.24.4",
+    "amd-torch-device-gfx1030==2.13.0+rocm10.1.0",
+    "amd-torchvision-device-gfx1030==0.28.0+rocm10.1.0",
+    "rocm==10.1.0",
+    "rocm-sdk-core==10.1.0",
+    "rocm-sdk-libraries==10.1.0",
+    "rocm-sdk-device-gfx1030==10.1.0",
+]
+
+[dependency-groups]
+test = ["pytest>=8"]
+
+[tool.uv]
+environments = ["sys_platform == 'win32' and platform_machine == 'AMD64'"]
+exclude-dependencies = ["onnxruntime-gpu", "onnxruntime"]
+override-dependencies = [
+    "torch[device-gfx1030]==2.13.0+rocm10.1.0",
+    "torchvision[device-gfx1030]==0.28.0+rocm10.1.0",
+]
+
+[tool.uv.sources]
+# Reuse shared requirements without installing CUDA package metadata or copying code.
+# Run python -m classic_node from the classic-engine directory.
+node-comics-classic-engine = { path = "../..", package = false }
+comic-document-files = { path = "../../../../backend/document_files" }
+torch = { url = "https://stable.repo.amd.com/rocm/whl-next/torch/torch-2.13.0%2Brocm10.1.0-cp312-cp312-win_amd64.whl" }
+torchvision = { url = "https://stable.repo.amd.com/rocm/whl-next/torchvision/torchvision-0.28.0%2Brocm10.1.0-cp312-cp312-win_amd64.whl" }
+amd-torch-device-gfx1030 = { index = "amd" }
+amd-torchvision-device-gfx1030 = { index = "amd" }
+rocm = { index = "amd" }
+rocm-sdk-core = { index = "amd" }
+rocm-sdk-libraries = { index = "amd" }
+rocm-sdk-device-gfx1030 = { index = "amd" }
+pydensecrf = { url = "https://github.com/hgmzhn/manga-translator-ui/releases/download/v1.7.6/pydensecrf-1.0-cp312-cp312-win_amd64.whl" }
+
+[[tool.uv.index]]
+name = "amd"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
+explicit = true

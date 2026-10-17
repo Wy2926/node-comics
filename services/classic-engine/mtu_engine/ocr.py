@@ -16,6 +16,9 @@ from .page_cache import bgr, crop as cached_crop, normalized
 
 OCR_IMAGE_SHAPE = (3, 48, 320)
 OCR_MAX_WIDTH = 3200  # PaddleX's standard recognition width limit.
+# Windows AMD driver safety: DML submissions across languages must not overlap.
+# CUDA retains its original independent per-model locks.
+_DML_INFERENCE_LOCK = Lock()
 
 
 def allocation_failure(error):
@@ -52,9 +55,9 @@ def short_crop(crop):
 
 class _LockedSession:
     """Serialize one resident model's inference, not RapidOCR preprocessing/CTC."""
-    def __init__(self, session):
+    def __init__(self, session, lock=None):
         self._session = session
-        self._lock = Lock()
+        self._lock = Lock() if lock is None else lock
 
     def __call__(self, batch):
         record('ocr_batches', 1)
@@ -68,10 +71,10 @@ class _LockedSession:
 
 class Recognizer(TextRecognizer):
     def __init__(self, model, batch_size=ENGINE_DEFAULTS['ocr_batch_size'],
-                 min_batch_size=ENGINE_DEFAULTS['ocr_min_batch_size'], recover=None):
+                 min_batch_size=ENGINE_DEFAULTS['ocr_min_batch_size'], recover=None, *, inference_lock=None):
         # Reuse the prepared CUDA session and official dictionary via MTU's
         # decoder; do not initialize/download another model or dictionary.
-        self.session = _LockedSession(OrtInferSession({'session': model.session}))
+        self.session = _LockedSession(OrtInferSession({'session': model.session}), inference_lock)
         self.postprocess_op = lambda predictions, *args, **kwargs: (
             [model._decode_ctc(prediction) for prediction in predictions], [])
         self.rec_batch_num = batch_size
@@ -141,7 +144,9 @@ class Paddle:
                  batch_size=ENGINE_DEFAULTS['ocr_batch_size'],
                  min_batch_size=ENGINE_DEFAULTS['ocr_min_batch_size'],
                  arena_extend_strategy=ENGINE_DEFAULTS['ocr_arena_extend_strategy'],
-                 arena_shrinkage=ENGINE_DEFAULTS['ocr_arena_shrinkage']):
+                 arena_shrinkage=ENGINE_DEFAULTS['ocr_arena_shrinkage'], backend='cuda'):
+        if backend not in ('cuda', 'amd'):
+            raise ValueError('backend must be cuda or amd')
         from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         from manga_translator.utils.onnx_runtime import create_inference_session, import_onnxruntime
         ort = import_onnxruntime()
@@ -155,14 +160,26 @@ class Paddle:
         options.inter_op_num_threads = 1
         options.add_session_config_entry('session.intra_op.allow_spinning', '0')
         options.add_session_config_entry('session.inter_op.allow_spinning', '0')
-        model.session, _ = create_inference_session(ort,
-            str(directory / f'{language}_PP-OCRv5_rec_mobile_infer.onnx'),
-            device='cuda', sess_options=options,
-            cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'HEURISTIC',
-                          'arena_extend_strategy': arena_extend_strategy},
-            fallback_to_cpu=False, logger=model.logger)
-        if model.session.get_providers()[0] != 'CUDAExecutionProvider':
-            raise RuntimeError('PP-OCR requires ONNX Runtime CUDAExecutionProvider')
+        model_path = str(directory / f'{language}_PP-OCRv5_rec_mobile_infer.onnx')
+        provider = 'CUDAExecutionProvider'
+        if backend == 'amd':
+            provider = 'DmlExecutionProvider'
+            if provider not in ort.get_available_providers():
+                raise RuntimeError('AMD OCR requires the separate onnxruntime-directml environment')
+            options.enable_mem_pattern = False
+            options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            model.session = ort.InferenceSession(model_path, sess_options=options,
+                                                 providers=[(provider, {'device_id': gpu})])
+            # CUDA arena options and CUDA allocation recovery do not apply to DML.
+            arena_shrinkage = False
+        else:
+            model.session, _ = create_inference_session(ort, model_path,
+                device='cuda', sess_options=options,
+                cuda_options={'device_id': gpu, 'cudnn_conv_algo_search': 'HEURISTIC',
+                              'arena_extend_strategy': arena_extend_strategy},
+                fallback_to_cpu=False, logger=model.logger)
+        if model.session.get_providers()[0] != provider:
+            raise RuntimeError(f'PP-OCR requires ONNX Runtime {provider}')
         model.session.disable_fallback()
         if model.session.get_outputs()[0].shape[-1] != len(model.char_dict):
             raise ValueError('PP-OCR model/dictionary mismatch')
@@ -174,7 +191,10 @@ class Paddle:
             # native session call, preprocessing, sorting, batching and decoder.
             model.session.run = partial(model.session.run, run_options=options)
         self.session = model.session
-        self.recognizer = Recognizer(model, batch_size, min_batch_size, partial(release_cuda_cache, gpu))
+        self.recognizer = Recognizer(model, batch_size,
+            batch_size if backend == 'amd' else min_batch_size,
+            None if backend == 'amd' else partial(release_cuda_cache, gpu),
+            inference_lock=_DML_INFERENCE_LOCK if backend == 'amd' else None)
 
     def probe(self, crops):
         return self.recognizer.read(crops)

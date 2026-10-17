@@ -54,6 +54,10 @@ def test_paddle_delegates_memory_policy_to_native_ort(monkeypatch, tmp_path, shr
     assert (runs[0].entries if shrink else runs[0]) == (
         {'memory.enable_memory_arena_shrinkage': 'gpu:2'} if shrink else None)
     assert paddle.recognizer.rec_batch_num == 3
+    from mtu_engine.ocr import _DML_INFERENCE_LOCK, release_cuda_cache
+    assert paddle.recognizer.session._lock is not _DML_INFERENCE_LOCK
+    assert paddle.recognizer.min_batch_size == 1
+    assert paddle.recognizer.recover.func is release_cuda_cache and paddle.recognizer.recover.args == (2,)
     paddle.close()
     paddle.close()
     assert 'run' not in vars(session)
@@ -80,6 +84,49 @@ def test_native_ort_run_options_remain_compatible_with_rapidocr():
         np.testing.assert_array_equal(adapter(inputs), expected)
     finally:
         del session.run
+
+
+@pytest.mark.parametrize('failure', [None, 'unavailable', 'cpu-fallback', 'dictionary'])
+def test_amd_sessions_share_only_the_inference_lock_and_never_cuda_policy(monkeypatch, tmp_path, failure):
+    calls = []
+    class Options:
+        def add_session_config_entry(self, *args):
+            pass
+    class Session:
+        def __init__(self, path, **kwargs):
+            calls.append(kwargs)
+        def get_providers(self):
+            return ['CPUExecutionProvider' if failure == 'cpu-fallback' else 'DmlExecutionProvider']
+        def disable_fallback(self):
+            self.fallback_disabled = True
+        def get_outputs(self):
+            return [SimpleNamespace(shape=[2 if failure == 'dictionary' else 1])]
+    def unexpected(*args, **kwargs):
+        raise AssertionError('AMD must not initialize CUDA or use CUDA RunOptions')
+    ort = SimpleNamespace(SessionOptions=Options, InferenceSession=Session, RunOptions=unexpected,
+        ExecutionMode=SimpleNamespace(ORT_SEQUENTIAL='sequential'), set_default_logger_severity=lambda _: None,
+        get_available_providers=lambda: [] if failure == 'unavailable' else ['DmlExecutionProvider'])
+    monkeypatch.setitem(sys.modules, 'manga_translator.ocr.model_paddleocr', SimpleNamespace(
+        ModelPaddleOCR=lambda _: SimpleNamespace(_load_char_dict=lambda _: ['x'])))
+    monkeypatch.setitem(sys.modules, 'manga_translator.utils.onnx_runtime', SimpleNamespace(
+        create_inference_session=unexpected, import_onnxruntime=lambda: ort))
+    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    if failure:
+        with pytest.raises((RuntimeError, ValueError)):
+            Paddle(tmp_path, 'ch', 0, 4, backend='amd')
+        return
+    first, second = [Paddle(tmp_path, lang, 0, 4, backend='amd') for lang in ('ch', 'en')]
+    assert first.session is not second.session
+    assert first.recognizer.session._lock is second.recognizer.session._lock
+    assert first.recognizer.min_batch_size == first.recognizer.rec_batch_num == 4
+    assert first.recognizer.recover is None and first.session.fallback_disabled
+    for call in calls:
+        assert call['providers'] == [('DmlExecutionProvider', {'device_id': 0})]
+        options = call['sess_options']
+        assert options.enable_mem_pattern is False and options.execution_mode == 'sequential'
+        assert options.intra_op_num_threads == 4 and options.inter_op_num_threads == 1
+    first.close()
+    second.close()
 
 
 def _prediction(batch):

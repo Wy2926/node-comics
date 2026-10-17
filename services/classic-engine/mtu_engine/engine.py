@@ -236,12 +236,12 @@ class Renderer:
 class Engine:
     def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None,
                  ocr_batch_size=None, ocr_min_batch_size=None, color_batch_size=None, detect_batch_size=None,
-                 ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None):
+                 ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None, backend='cuda'):
         from classic_node.config import ENGINE_DEFAULTS
         import cv2
         import torch
-        if not torch.cuda.is_available() or not 0 <= gpu < torch.cuda.device_count():
-            raise RuntimeError('An NVIDIA CUDA GPU is required; there is no CPU/DirectML fallback')
+        from .backend import validate_backend
+        validate_backend(backend, gpu)
         self.models = Path(models)
         self.gpu = gpu
         self.keep_lang = keep_lang
@@ -284,11 +284,16 @@ class Engine:
                 model.logger.setLevel(logging.CRITICAL + 1)
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
-                asyncio.run(model.load('cuda'))
+                if backend == 'amd' and model is self.inpainter:
+                    asyncio.run(model.load('cuda', force_torch=True))
+                else:
+                    asyncio.run(model.load('cuda'))
             self.colors = Colors(self.color_model, color_batch_size)
             options = {'batch_size': ocr_batch_size, 'min_batch_size': ocr_min_batch_size,
                        'arena_extend_strategy': ocr_arena_extend_strategy, 'arena_shrinkage': ocr_arena_shrinkage}
             options = {key: ENGINE_DEFAULTS['ocr_' + key] if value is None else value for key, value in options.items()}
+            if backend == 'amd':
+                options['backend'] = backend
             self.probes = {language: Paddle(self.models, language, gpu, threads, **options)
                            for language in ('en', 'ch', 'korean')}
             self.recognizers = self.probes

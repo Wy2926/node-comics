@@ -43,9 +43,11 @@
 | `document_control_workers` | 2，可选 2／3；文件领取、心跳和状态同步共用的控制池；不是文件 GPU 并发 |
 | `resident_bytes` | 1 GiB；在途页面缓冲、渲染 IPC 与蒙版缓存预算，不含模型、GPU 工作空间和进程常驻内存 |
 | `document_spool_bytes` | 6 GiB，256 MiB–16 GiB；所有文档工作目录的共享应用磁盘预算，与中心限制取较小值；部署还需持久盘硬配额 |
-| `engine` | 模型位置、CUDA 设备、算子线程、检测与修复尺寸、字体 |
+| `engine` | 模型位置、可选后端、GPU 设备、算子线程、检测与修复尺寸、字体 |
 
-推理批量和显存池策略也保存在同一个私有配置的 `engine` 内，不与 CPU 线程数或页并发混用：
+`engine.backend` 默认为 `cuda`，显式设为 `amd` 才启用独立 Windows HIP＋DirectML 环境；不能在 CUDA 环境仅改配置就运行 AMD。支持范围与环境隔离见 [classic-engine](../services/classic-engine/README.md#可选-amd-环境windows--rx-6900-xt)。AMD 当前要求单卡且 `gpu: 0`，不自动切换或降级 CPU；独立节点身份、状态目录与依赖环境必须分开。
+
+推理批量和显存池策略也保存在同一个私有配置的 `engine` 内，不与 CPU 线程数或页并发混用。下表 arena、`ocr_min_batch_size` 和分配失败缩批仅适用于 CUDA；AMD 使用固定 `ocr_batch_size`、不执行 CUDA arena 或缓存回收策略：
 
 | 字段 | 默认值与用途 |
 | --- | --- |
@@ -92,4 +94,4 @@ heartbeat、claim、updates 各有独立通道，各最多一个在途请求。`
 
 仓库包含 [classic-engine](../services/classic-engine/README.md) 源码、模型清单和测试；模型权重与字体需另行准备。产品允许选择某目标语言，不代表已有可用节点，也不代表 OCR 能可靠识别该源语言。接入引擎需要自行验证源语言 OCR、目标字体、换行、缺字和排版边界，并准确报告能力。交互与恢复见[计算协议](COMPUTE_PROTOCOL.md)。
 
-`engine.gpu` 是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎接受 `models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang` 及上表推理选项；未知参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`threads` 同时约束 PyTorch、ORT 辅助算子和 OpenCV 的 CPU 线程，不增加租约并发或 CUDA 推理批次；多核节点应结合容器 CPU 配额、分析耗时与并发嵌字负载实测调整。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 DBNet／OCR／LaMa 与 Qt 嵌字后再登记能力；GPU 初始化失败不降级 CPU。
+`engine.gpu` 在默认后端中是非负 NVIDIA CUDA 设备索引，Windows／Linux 使用同一路径。引擎接受 `backend`、`models`、`gpu`、`threads`、`detect_size`、`inpainting_size`、`font`、`keep_lang` 及上表推理选项；未知参数直接拒绝。默认检测边长 1280，修复边长 512（可选 768／1024）。`threads` 同时约束 PyTorch、ORT 辅助算子和 OpenCV 的 CPU 线程，不增加租约并发或 GPU 推理批次；多核节点应结合容器 CPU 配额、分析耗时与并发嵌字负载实测调整。`keep_lang` 默认为 `null`；只有限定源语言的节点／对照测试才配置 ISO 639-1 语言码（如 `zh`），不匹配的识别段落保持原图。用所选设备完成预热、真实 DBNet／OCR／LaMa 与 Qt 嵌字后再登记能力；GPU 初始化失败不降级 CPU。

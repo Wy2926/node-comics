@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 from .resources import resolve_cpu_resources
 
-ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto',
+ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto', 'backend': 'cuda',
     'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None,
     'ocr_batch_size': 4, 'ocr_min_batch_size': 1, 'color_batch_size': 4, 'detect_batch_size': 4,
     'ocr_arena_extend_strategy': 'kSameAsRequested', 'ocr_arena_shrinkage': True}
@@ -81,7 +81,9 @@ def load(path):
     if value['engine']['threads'] != 'auto' and (type(value['engine']['threads']) is not int or value['engine']['threads'] < 1):
         raise ValueError('engine.threads must be auto or a positive integer')
     if type(value['engine']['gpu']) is not int or value['engine']['gpu'] < 0:
-        raise ValueError('gpu must be an NVIDIA CUDA device index')
+        raise ValueError('gpu must be a nonnegative device index')
+    if value['engine']['backend'] not in ('cuda', 'amd'):
+        raise ValueError('backend must be cuda or amd')
     if type(value['engine']['inpainting_size']) is not int or value['engine']['inpainting_size'] not in (512, 768, 1024):
         raise ValueError('inpainting_size must be 512, 768 or 1024')
     if type(value['engine']['detect_size']) is not int or not 512 <= value['engine']['detect_size'] <= 2048:

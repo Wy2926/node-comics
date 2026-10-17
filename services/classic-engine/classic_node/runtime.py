@@ -48,6 +48,7 @@ class Runtime:
     def __init__(self, config):
         self.config = config
         options = config['engine']
+        backend = options.get('backend', 'cuda')
         assets = model_identity(options['models'])
         self.engine = Engine(**options)
         self.render_pool = None
@@ -62,11 +63,12 @@ class Runtime:
                 for directory in ('mtu_engine', 'classic_node')
                 for path in sorted((source / directory).glob('*.py'))}
         dependencies = {name: package_version(name) for name in (
-            'torch', 'torchvision', 'onnxruntime-gpu', 'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
+            'torch', 'torchvision', 'onnxruntime-directml' if backend == 'amd' else 'onnxruntime-gpu',
+            'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
             'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr',
             'PySide6-Essentials', 'shiboken6', 'mahotas', 'manga-ocr',
             'transformers', 'huggingface-hub', 'tokenizers')}
-        self.version = 'mtu-cuda-v1-' + digest({'upstream': LOCK['source']['revision'],
+        self.version = f'mtu-{backend}-v1-' + digest({'upstream': LOCK['source']['revision'],
             'code': code, 'assets': assets, 'dependencies': dependencies,
             'fonts': [file_hash(path) for path in options['font']],
             'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'threads', 'gpu'}}})[:32]

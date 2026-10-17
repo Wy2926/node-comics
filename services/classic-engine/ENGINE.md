@@ -17,6 +17,14 @@
 
 `mtu_engine/` 只处理上游加载、阶段调用、输入校验和协议数据映射。MTU、BallonsTranslator、Comic Translate 源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录；MTU 的局部计算、重复准备精简和完整单词气泡字号适配补丁，在同一锁文件按文件记录有序的替换前后内容，准备时各严格匹配一次并记录修改后的文件摘要。修改范围见 [THIRD_PARTY.md](THIRD_PARTY.md)，其余上游文件保持原样；RapidOCR 包按 `uv.lock` 固定版本与摘要。`classic_node/` 管理租约、检查点、网络和覆盖文件。不维护自研排版、气泡推测、修复、文字分类算法或模型转换链路。
 
+## 可选后端
+
+上表为默认 `cuda` 路径，现有 CUDA 依赖、设备选择、模型精度、页调度、批量、各模型锁和 ORT arena 策略不变。后端仅在启动时选择，不在页面阶段自动切换或降级 CPU。
+
+显式 `amd` 使用独立 Windows gfx1030 环境：检测、MangaLens、Manga OCR、取色与 LaMa 使用 PyTorch HIP，沿用 PyTorch 的 `cuda` 设备 API；LaMa 显式选择上游 `force_torch`，防止进入未准备的 ONNX 路径。三个 PP-OCR 使用原始 ONNX 模型与 ONNX Runtime DirectML，RapidOCR、CTC、分组和 Qt 嵌字复用同一代码，不复制整套管线。当前仅验收 RX 6900 XT 单卡设备 0，环境和运行方法见 [README](README.md#可选-amd-环境windows--rx-6900-xt)。
+
+DirectML 按[上游要求](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html)关闭 memory pattern 并使用顺序执行。因本机驱动跨 OCR 会话并发曾发生崩溃，AMD 三个语言模型共用推理锁，裁图、预处理和 CTC 不进入锁；CUDA 仍各模型独立锁，互不串行。该锁牺牲 AMD 多语言 OCR 的重叠机会以保证稳定性，吞吐需按同样本实测，不能套用 CUDA 数据。AMD 不使用 CUDA arena 配置、缩批恢复或 `empty_cache()`；提供器不可用或整会话退回 CPU 时启动失败，允许 ORT 原生少量 CPU 形状算子分区。模型、字体和协议不变，运行指纹区分 `mtu-cuda-v1-` 与 `mtu-amd-v1-` 及各自 ORT 分发版本。
+
 ## 排版配置
 
 字芯色与单层描边色从抹字前原图确定，描边比例保持 0.1，最终字号比例 0.96。仅处理通过 OCR／源语言筛选的段落。整段所有有效原生行裁图均无明显彩色时，直接使用黑字白边，不调用 48px 模型；不要求气泡包围、白底比例或黑色笔画比例，灰字、灰底、反白字和轻微色偏都可走默认配色。该简化不保留原来的灰度、黑白反转及特殊无彩色字体样式。

@@ -31,6 +31,20 @@ def test_no_supported_font_rejects_before_claim(monkeypatch, tmp_path):
         runtime.Runtime(config)
 
 
+def test_backend_identity_queries_only_its_own_ort_distribution(monkeypatch, tmp_path):
+    config = prepare(monkeypatch, tmp_path, str.isascii)
+    packages = []
+    monkeypatch.setattr(runtime, 'package_version', lambda name: (packages.append(name), 'test')[1])
+    cuda = runtime.Runtime(config)
+    assert cuda.version.startswith('mtu-cuda-v1-')
+    assert 'onnxruntime-gpu' in packages and 'onnxruntime-directml' not in packages
+    packages.clear()
+    config['engine']['backend'] = 'amd'
+    amd = runtime.Runtime(config)
+    assert amd.version.startswith('mtu-amd-v1-') and amd.version != cuda.version
+    assert 'onnxruntime-directml' in packages and 'onnxruntime-gpu' not in packages
+
+
 def test_resolved_cpu_settings_start_only_cpu_pool_and_do_not_change_identity(monkeypatch, tmp_path):
     config = prepare(monkeypatch, tmp_path, str.isascii)
     config.update(render_workers=1, _render_threads=2)

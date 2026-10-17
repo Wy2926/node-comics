@@ -45,7 +45,8 @@ def run(args):
                  if key.endswith('_batch_size') or key.startswith('ocr_arena_')}
     if inference['ocr_min_batch_size'] > inference['ocr_batch_size']:
         raise ValueError('ocr_min_batch_size must not exceed ocr_batch_size')
-    config = {'engine': {**inference, 'models': str(args.models.resolve()), 'threads': args.threads,
+    config = {'engine': {**inference, 'backend': getattr(args, 'backend', 'cuda'),
+                         'models': str(args.models.resolve()), 'threads': args.threads,
                          'font': [str(assets / 'fonts' / f['name']) for f in fonts]},
               'render_workers': args.render_workers,
               '_render_threads': resources['render_threads'] if resources else 1}
@@ -57,7 +58,8 @@ def run(args):
     reserve_mib = getattr(args, 'reserve_vram_mib', 0)
     reserved_vram = torch.empty(reserve_mib * 1024 ** 2, dtype=torch.uint8, device='cuda') if reserve_mib else None
     runtime = Runtime(config)
-    report = {'engine': runtime.version, 'torch': torch.__version__, 'cuda': torch.version.cuda,
+    report = {'engine': runtime.version, 'backend': config['engine']['backend'],
+              'torch': torch.__version__, 'cuda': torch.version.cuda, 'hip': torch.version.hip,
               'gpu': torch.cuda.get_device_name(), 'threads': args.threads,
               'concurrency': args.concurrency, 'render_workers': args.render_workers,
               'cache_bytes_per_page': args.cache_mib * 1024 ** 2,
@@ -157,6 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('--input', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--models', type=Path, required=True)
+    parser.add_argument('--backend', choices=('cuda', 'amd'), default='cuda')
     parser.add_argument('--repeats', type=int, choices=range(1, 21), default=3)
     parser.add_argument('--concurrency', type=int, choices=range(1, 9), default=1)
     parser.add_argument('--render-workers', type=int, choices=range(1, 9), default=2)

@@ -1,4 +1,4 @@
-"""Run real CUDA/Qt pages with fixed translations, preserving inputs and stage evidence."""
+"""Run real GPU/Qt pages with fixed translations, preserving inputs and stage evidence."""
 import argparse
 import hashlib
 from io import BytesIO
@@ -28,6 +28,7 @@ def run(args):
     output.mkdir(parents=True, exist_ok=True)
     fonts = json.loads((args.models.parent / 'licenses/font-sources.json').read_text(encoding='utf-8'))['fonts']
     options = {'models': str(args.models.resolve()), 'keep_lang': args.keep_lang,
+               'backend': getattr(args, 'backend', 'cuda'),
                'font': [str((args.models.parent / 'fonts' / f['name']).resolve()) for f in fonts]}
     started = perf_counter()
     runtime = Runtime({'engine': options})
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--reference', type=Path)
     parser.add_argument('--models', type=Path, default=Path('.assets/models'))
+    parser.add_argument('--backend', choices=('cuda', 'amd'), default='cuda')
     parser.add_argument('--translations', type=Path)
     parser.add_argument('--language', choices=list(LANGUAGES), default='en')
     parser.add_argument('--keep-lang', help='Optional ISO 639-1 source filter, e.g. zh for the Chinese-only comparison')

@@ -4,7 +4,7 @@
 
 ## 开发运行
 
-需要 Python 3.12、uv、NVIDIA 显卡及支持 CUDA 12.6 的驱动。Windows 和 Linux 均使用 PyTorch CUDA 与 ONNX Runtime CUDA。Linux 系统库由 [Dockerfile](../compute-node/linux/Dockerfile) 提供。
+默认需要 Python 3.12、uv、NVIDIA 显卡及支持 CUDA 12.6 的驱动。Windows 和 Linux 默认使用 PyTorch CUDA 与 ONNX Runtime CUDA；不自动探测切换后端。Linux 系统库由 [Dockerfile](../compute-node/linux/Dockerfile) 提供。
 
 在本目录执行：
 
@@ -16,6 +16,22 @@ uv sync --locked --extra test
 ```
 
 先复制 [node.example.json](node.example.json) 为私有 `node.local.json`，填写中心 HTTPS 地址及独立节点身份。`prepare_mtu` 从校验缓存重新生成 `.assets/` 下的 `upstream`、`models`、`fonts`、`licenses`、`hyphenation` 目录，移除已停用资产；这些目录仅存放生成文件。`check` 校验资产、字体和 GPU 预热；`run` 才注册接单。运行时不下载资产。Linux 将 Python 路径改为 `.venv/bin/python`。
+
+### 可选 AMD 环境（Windows / RX 6900 XT）
+
+仅显式配置 `engine.backend: "amd"` 启用；未配置或设为 `"cuda"` 均保持 NVIDIA 路径。当前 AMD 组合为 TheRock/ROCm PyTorch HIP 与 PP-OCR DirectML，限定单 GPU、设备 0 的 Windows x64 主机；HIP 与 DirectML 的设备 0 必须为同一张 Radeon。其他架构、多显卡／混合显卡和 AMD Linux 未验收。PyTorch HIP 沿用其原生 `torch.cuda` API，不使用 ZLUDA、不改驱动或系统 PATH。实现边界见 [ENGINE.md](ENGINE.md#可选后端)。
+
+从本目录运行以下命令；[独立项目](environments/amd/pyproject.toml)复用公共依赖声明，但使用自己的 `uv.lock` 和 `environments/amd/.venv`，不向默认 `.venv` 安装 AMD 包。清除外部 `UV_PROJECT_ENVIRONMENT` 覆盖，不使用 `--active`，不混装三种 ONNX Runtime 分发包。
+
+```powershell
+uv sync --project environments/amd --locked --group test
+uv run --project environments/amd --locked python -m tools.prepare_mtu --output D:/amd-node/assets --cache D:/amd-node/downloads
+uv run --project environments/amd --locked python -m classic_node check --config D:/amd-node/node.local.json
+```
+
+资产仍用 `tools.prepare_mtu`，为 AMD 指定独立输出目录，并将私有配置的 `engine.models`、`engine.font` 指向该目录；设置 `engine.backend: "amd"`、`engine.gpu: 0` 和独立 `state_dir`。不要复用正在接单的节点身份、状态或资产准备目录。`check` 只做本地校验和预热；只有明确授权接入中心后才运行 `run`。现有 Windows 发布包和 Linux NVIDIA 构建仍使用根 CUDA 锁文件，不包含此 AMD 环境。
+
+AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`；真实模型测试另外设置 `MTU_TEST_BACKEND=amd`。2 万／5 万像素图应先单页测量再增加并发；不能因使用相同并发参数便推断与 RTX 5060 容量或性能相同。
 
 ## 验证
 

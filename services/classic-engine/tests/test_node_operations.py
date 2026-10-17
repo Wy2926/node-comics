@@ -49,6 +49,25 @@ def registration():
                        'heartbeat_seconds': 10, 'poll_seconds': 20}}
 
 
+@pytest.mark.parametrize('backend', [None, 'cuda', 'amd'])
+def test_registration_reports_selected_backend_without_changing_protocol(tmp_path, backend):
+    sent = []
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=registration())
+    agent, transport, journal = make_agent(tmp_path, handler)
+    if backend is not None:
+        agent.local['engine']['backend'] = backend
+    try:
+        agent.register()
+        assert sent[0]['device'] == (backend or 'cuda') + ':0'
+        assert sent[0]['protocol_version'] == 3 and sent[0]['supported_languages'] == ['en']
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
 def test_attach_and_image_stage_never_sample_or_write_diagnostics(tmp_path, monkeypatch):
     from classic_node.timing import record
     agent, transport, journal = make_agent(tmp_path, lambda _: httpx.Response(200, json=registration()))
@@ -304,13 +323,16 @@ def test_persistent_operator_stop_prevents_restart(tmp_path, monkeypatch):
     assert not (tmp_path / 'owner.sqlite3').exists()
 
 
-def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypatch):
+@pytest.mark.parametrize('backend', [None, 'cuda', 'amd'])
+def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypatch, capsys, backend):
     from classic_node import __main__ as cli
     import sys
     bundle = tmp_path / '节点 程序'
     bundle.mkdir()
     (bundle / 'release.json').write_text(json.dumps({'fonts': ['fonts/font.otf']}))
     config = {'engine': {'models': 'old-machine/models', 'font': ['old-machine/font']}}
+    if backend is not None:
+        config['engine']['backend'] = backend
     monkeypatch.setattr(cli, 'load', lambda _: config)
     observed = {}
     class FakeRuntime:
@@ -325,6 +347,8 @@ def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypat
     config['engine']['gpu'] = 0
     monkeypatch.setitem(sys.modules, 'classic_node.runtime', SimpleNamespace(Runtime=FakeRuntime))
     assert cli.execute(SimpleNamespace(command='check', config='elsewhere/node.json', bundle_root=bundle)) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['inpainting_backend'] == ('pytorch-hip-fp32' if backend == 'amd' else 'pytorch-cuda-fp32')
     assert observed['models'] == str(bundle / 'models')
     assert observed['font'] == [str(bundle / 'fonts/font.otf')]
     assert observed['warmup'] and observed['closed']
