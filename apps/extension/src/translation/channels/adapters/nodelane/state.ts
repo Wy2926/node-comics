@@ -5,10 +5,11 @@ import type {TranslationState} from '../../../automatic';
 import {quotaErrors,exhausted} from './operations';
 import {translationScope,type LocalOperation} from './store';
 import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
+import {selectedFontAvailable} from '../../../fonts';
 
 const upgradeState=(reason:'not_allowed'|'quota_exhausted'):TranslationState=>({kind:'upgrade',message:reason==='not_allowed'?msg('当前权益不支持'):msg('额度不足')});
 
-export function translationState({page,mode,language,modelId,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;modelId?:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
+export function translationState({page,mode,language,modelId,fontId,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;modelId?:string;fontId?:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
   if(!userId)return active?{kind:'login',message:msg("登录后自动翻译")}:undefined;
   const t=pageTranslation(page,mode,language,translationScope(origin,userId));
   if(operation?.state==='blocked'){
@@ -30,6 +31,7 @@ export function translationState({page,mode,language,modelId,userId,origin,activ
   if(page.translationError)return {kind:'error',message:page.translationError};
   // Baseline capabilities are for local recovery, not evidence of denied access.
   if(!caps||!rights)return {kind:'waiting',message:msg('准备翻译…')};
+  if(!selectedFontAvailable(caps.translation_fonts,language,fontId))return {kind:'error',message:msg('此字体暂不可用，请选择其他字体。'),retryable:false};
   if(!selectedModelAvailable(caps.translation_models,modelId)){
     const models=caps.translation_models?.filter(model=>!modelId||model.id===modelId);
     if(models?.some(model=>model.unavailable_reason==='quota_exhausted'))return upgradeState('quota_exhausted');

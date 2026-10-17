@@ -1,0 +1,225 @@
+{
+  "fonts": [
+    {
+      "id": "lxgw-wenkai-light",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ]
+    },
+    {
+      "id": "comic-relief",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "id"
+      ]
+    },
+    {
+      "id": "patrick-hand",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "pl",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "gaegu",
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-naskh-arabic",
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "lxgw-wenkai",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ]
+    },
+    {
+      "id": "noto-sans-cjk-light",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-serif-cjk",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "klee-one",
+      "languages": [
+        "ja"
+      ]
+    },
+    {
+      "id": "gowun-dodum",
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "gowun-batang",
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "nanum-pen",
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "pangolin",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "andika",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "nunito",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "amiri",
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "harmattan",
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "mada",
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "noto-sans-cjk",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-sans",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "noto-sans-arabic",
+      "languages": [
+        "ar"
+      ]
+    }
+  ],
+  "defaults": {
+    "zh-Hans": "noto-sans-cjk",
+    "zh-Hant": "noto-sans-cjk",
+    "ja": "noto-sans-cjk",
+    "ko": "noto-sans-cjk",
+    "en": "comic-relief",
+    "fr": "comic-relief",
+    "es": "comic-relief",
+    "pt-BR": "comic-relief",
+    "de": "comic-relief",
+    "it": "comic-relief",
+    "ru": "comic-relief",
+    "pl": "comic-relief",
+    "uk": "comic-relief",
+    "tr": "comic-relief",
+    "vi": "pangolin",
+    "id": "comic-relief",
+    "ar": "noto-sans-arabic"
+  }
+}

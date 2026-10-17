@@ -352,5 +352,6 @@ class Pipeline:
                     ipc, cache_bytes = reservations[page]
                     operation = lambda p=page, budget=cache_bytes, pooled=bool(ipc): self.agent.runtime.render(p.rgb, p.cleaned, p.analysis, p.translations, p.lease['language'], p.alpha,
                         mask_cache_bytes=budget, use_render_pool=pooled, check_cancelled=p.check, masks=p.masks,
+                        **({'font_id': p.lease['config']['font_id']} if p.lease['config'].get('font_id') is not None else {}),
                         **({'allow_tiles': True} if p.lease['config'].get('result_format') == 'overlay-tiles-v1' else {}))
                 self.submit(page, pool, page.step, operation)

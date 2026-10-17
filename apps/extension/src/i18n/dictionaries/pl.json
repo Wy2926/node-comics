@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Czcionka tłumaczenia",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Czcionki są dobierane do języka docelowego. Zmiany dotyczą tylko nowych zadań; istniejące obrazy trzeba ręcznie przetłumaczyć ponownie.",
+  "正在加载字体预览…": "Ładowanie podglądu czcionki…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Nie udało się wczytać podglądów czcionek. Otwórz listę ponownie, aby spróbować jeszcze raz. Ustawienia tłumaczenia pozostają bez zmian.",
+  "此字体暂不可用，请选择其他字体。": "Ta czcionka jest obecnie niedostępna. Wybierz inną.",
   "展开全部 {0} 个网站": "Pokaż wszystkie witryny ({0})",
   "收起网站": "Pokaż mniej witryn",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Wyszukiwane są tylko zaznaczone strony pasujące do filtrów. Zmiany dotyczą następnego wyszukiwania.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Wygląd i preferencje",
   "阅读偏好": "Preferencje czytania",
   "默认目标语言": "Domyślny język docelowy",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "Tłumaczenie obsługuje 16 języków. Istniejące przetłumaczone obrazy zostają zachowane.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Dostępne języki zależą od kanału tłumaczenia. Istniejące przetłumaczone obrazy zostają zachowane.",
   "翻页方向": "Kierunek przewracania strony",
   "翻页模式中的方向键遵循此设置。": "Klawisze strzałek w trybach stronicowanych uwzględniają to ustawienie.",
   "从右向左 · 日漫习惯": "Od prawej do lewej · Japońskie nawyki komiksowe",

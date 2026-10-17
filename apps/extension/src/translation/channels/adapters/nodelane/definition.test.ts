@@ -14,6 +14,7 @@ import {resultBlobKey} from '../../../../storage/translations/results';
 import {cacheInput,readInput} from '../../../input/cache';
 import {hashFile} from '../../../../importers/hash';
 import {readChannelSettings,writeChannelSettings} from '../../configuration';
+import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../../../../../backend/shared/translation-fonts';
 
 const auth=vi.hoisted(()=>({value:{session:null} as AuthState,listeners:new Set<()=>void>()}));
 vi.mock('../../../../auth/storage',()=>({
@@ -105,6 +106,56 @@ describe('NodeLane channel boundary',()=>{
     expect(runtime.stateFor(target(0),true)).toEqual({kind:'login',message:'登录后自动翻译'});
     await expect(runtime.submit([target(0)])).rejects.toThrow('登录');
     expect(caps).toHaveBeenCalledOnce();expect(rights).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();connection.dispose();
+  });
+  it('isolates saved fonts by user/service/language and resolves stale choices to supported defaults',async()=>{
+    const saved=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
+    const fonts=TRANSLATION_FONTS.map(({id,languages})=>({id,languages}));
+    const readCaps=vi.spyOn(Api.prototype,'capabilities').mockResolvedValue({...capabilities,translation_fonts:fonts});
+    vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const first=session();auth.value={session:first};
+    const connection=await definition.open(profile,{},()=>true),key=connection.key;
+    await connection.fontSelection!.select('en','patrick-hand');
+    await connection.fontSelection!.select('ko','gaegu');
+    await expect(connection.fontSelection!.select('en','gaegu')).rejects.toThrow('不可用');connection.dispose();
+    const settings=await readChannelSettings();
+    await writeChannelSettings({...settings,fontPreferences:{...settings.fontPreferences,'other-center':{en:'patrick-hand'}}});
+    auth.value={session:session()};
+    const other=await definition.open(profile,{},()=>true);expect(other.fontSelection!.value('en')).toBe(defaultTranslationFont('en')?.id);other.dispose();
+    auth.value={session:first};readCaps.mockResolvedValue({...capabilities,translation_fonts:[{id:'comic-relief',languages:['en']},{id:'gaegu',languages:['ko']}]});
+    const restored=await definition.open(profile,{},()=>true);
+    expect(restored.key).not.toBe(key);expect(restored.fontSelection!.value('en')).toBe('comic-relief');expect(restored.fontSelection!.value('ko')).toBe('gaegu');
+    await expect(restored.fontSelection!.select('en','patrick-hand')).rejects.toThrow('不可用');
+    await restored.fontSelection!.select('en');
+    expect((await readChannelSettings()).fontPreferences).toEqual({[restored.scope.key]:{en:'comic-relief',ko:'gaegu'},'other-center':{en:'patrick-hand'}});restored.dispose();
+    readCaps.mockResolvedValue(capabilities);
+    const legacy=await definition.open(profile,{},()=>true);expect(legacy.fontSelection!.value('en')).toBeUndefined();
+    await expect(legacy.fontSelection!.select('en')).rejects.toThrow('不可用');legacy.dispose();
+  });
+  it.each([undefined,'','retired-font','lxgw-wenkai'])('resolves deferred font preference %s after capabilities load and freezes the effective ID',async stored=>{
+    const saved=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
+    auth.value={session:session()};
+    const fonts=TRANSLATION_FONTS.map(({id,languages})=>({id,languages}));
+    const caps=vi.spyOn(Api.prototype,'capabilities').mockResolvedValue({...capabilities,translation_fonts:fonts});
+    vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const scope=JSON.stringify([API_ORIGIN,auth.value.session!.user.id,'overlay-v1']);
+    await writeChannelSettings({activeId:'nodelane',profiles:[],fontPreferences:{[scope]:{...(stored===undefined?{}:{'zh-Hans':stored})}}});
+    const submit=vi.spyOn(Api.prototype,'translate').mockImplementation(async(id,body)=>snapshot(id,body));
+    const connection=await definition.open(profile,{},()=>true,{deferPolicy:true});
+    const runtime=connection.createRuntime({...options(),prepareInput:async()=>originalInput(0)});
+    expect(caps).not.toHaveBeenCalled();expect(connection.fontSelection!.value('zh-Hans')).toBeUndefined();
+    await runtime.submit([target(0)]);
+    const expected=stored==='lxgw-wenkai'?stored:defaultTranslationFont('zh-Hans')!.id;
+    expect(submit).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({font_id:expected}));
+    expect(connection.fontSelection!.value('zh-Hans')).toBe(expected);connection.dispose();
+  });
+  it('omits font_id when an older service exposes no font capability',async()=>{
+    auth.value={session:session()};
+    vi.spyOn(Api.prototype,'capabilities').mockResolvedValue(capabilities);vi.spyOn(Api.prototype,'entitlements').mockResolvedValue(entitlement());
+    const submit=vi.spyOn(Api.prototype,'translate').mockImplementation(async(id,body)=>snapshot(id,body));
+    const connection=await definition.open(profile,{},()=>true),runtime=connection.createRuntime({...options(),fontId:'comic-relief',prepareInput:async()=>originalInput(0)});
+    await runtime.submit([target(0)]);expect(submit).toHaveBeenCalledOnce();expect(submit.mock.calls[0][1]).not.toHaveProperty('font_id');connection.dispose();
   });
   it('notifies on session changes and ignores token-only refreshes',async()=>{
     const first=session();auth.value={session:first};const changed=vi.fn(),unsubscribe=definition.subscribe!(changed);

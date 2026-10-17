@@ -36,13 +36,14 @@ def ipc_bytes(width, height, components=0):
 def render_page(renderer, original, cleaned, regions, translations, language, bubble_mask, *,
                 alpha, version, analysis, translated, allow_tiles=False, mask_cache_bytes=None,
                 check_cancelled=None, bubble_prepared=False, bubble_components=None, output_budget=None,
-                full_image_max_bytes=None):
+                full_image_max_bytes=None, font_id=None):
     """The same whole-page operation serves child workers and local fallback."""
     import numpy as np
     started = perf_counter()
     try:
         rendered = renderer.render(original, cleaned, regions, translations, language, bubble_mask,
                                    mask_cache_bytes=mask_cache_bytes,
+                                   **({'font_id': font_id} if font_id is not None else {}),
                                    **({'bubble_prepared': True, 'bubble_components': bubble_components}
                                       if bubble_prepared else {})) if any(text.strip() for text in translations) else cleaned
     finally:
@@ -157,7 +158,7 @@ def _views(segment, shape, components=0):
 
 def _render_shared(name, shape, regions, translations, language, mask_cache_bytes, has_alpha,
                    version, analysis, translated, allow_tiles, bubble_prepared=False, components=0,
-                   full_image_max_bytes=None):
+                   full_image_max_bytes=None, font_id=None):
     segment, arrays, packed, timings, error_code = None, {}, None, {}, None
     try:
         segment = SharedMemory(name=name)
@@ -171,7 +172,7 @@ def _render_shared(name, shape, regions, translations, language, mask_cache_byte
                 version=version, analysis=analysis, translated=translated,
                 allow_tiles=allow_tiles, mask_cache_bytes=mask_cache_bytes, bubble_prepared=bubble_prepared,
                 bubble_components=(arrays['labels'], arrays['stats']) if components else None,
-                output_budget=_output_cpu, full_image_max_bytes=full_image_max_bytes)
+                output_budget=_output_cpu, full_image_max_bytes=full_image_max_bytes, font_id=font_id)
     except NodeFailure as error:
         error_code = error.code if error.code in _OUTPUT_ERRORS else 'CLASSIC_RENDER_WORKER_FAILED'
     except BaseException:
@@ -282,7 +283,7 @@ class RenderPool:
     def render(self, original, cleaned, regions, translations, language, bubble_mask, *,
                alpha=None, version, analysis, translated, allow_tiles=False,
                mask_cache_bytes=None, check_cancelled=None, bubble_prepared=False, bubble_components=None,
-               full_image_max_bytes=None):
+               full_image_max_bytes=None, font_id=None):
         import numpy as np
         has_alpha = alpha is not None
         components = len(bubble_components[1]) if bubble_components is not None else 0
@@ -345,7 +346,7 @@ class RenderPool:
                     future = pool.submit(_render_shared, segment.name, original.shape[:2], regions,
                                          translations, language, mask_cache_bytes, has_alpha,
                                          version, analysis, translated, allow_tiles, bubble_prepared, components,
-                                         full_image_max_bytes)
+                                         full_image_max_bytes, font_id)
                 except (BrokenProcessPool, RuntimeError):
                     # Retire outside this non-reentrant lifecycle lock.
                     pass

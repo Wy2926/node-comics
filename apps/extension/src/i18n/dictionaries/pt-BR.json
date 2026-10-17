@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Fonte da tradução",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "As fontes dependem do idioma de destino. As alterações só valem para novas tarefas; traduza novamente as imagens existentes manualmente.",
+  "正在加载字体预览…": "Carregando prévia da fonte…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Não foi possível carregar as prévias das fontes. Reabra a lista para tentar novamente. As configurações de tradução não foram afetadas.",
+  "此字体暂不可用，请选择其他字体。": "Esta fonte está indisponível no momento. Escolha outra.",
   "展开全部 {0} 个网站": "Mostrar todos os {0} sites",
   "收起网站": "Mostrar menos sites",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "A busca inclui apenas sites marcados que correspondam aos filtros. As alterações valem para a próxima busca.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Aparência e Preferências",
   "阅读偏好": "Preferências de leitura",
   "默认目标语言": "Idioma alvo padrão",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "A tradução oferece 16 opções de idioma. As imagens já traduzidas são mantidas.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Os idiomas disponíveis dependem do canal de tradução. As imagens já traduzidas são mantidas.",
   "翻页方向": "Direção de giro da página",
   "翻页模式中的方向键遵循此设置。": "As teclas de seta nos modos paginados respeitam esta configuração.",
   "从右向左 · 日漫习惯": "Da direita para a esquerda · Hábitos de quadrinhos japoneses",

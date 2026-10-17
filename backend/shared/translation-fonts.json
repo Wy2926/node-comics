@@ -1,0 +1,404 @@
+{
+  "fonts": [
+    {
+      "id": "lxgw-wenkai-light",
+      "name": "LXGW WenKai Light",
+      "names": {
+        "zh-Hans": "霞鹜文楷 细体",
+        "zh-Hant": "霞鶩文楷 細體",
+        "ja": "霞鶩文楷 ライト"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ]
+    },
+    {
+      "id": "comic-relief",
+      "name": "Comic Relief Regular",
+      "names": {
+        "en": "Comic Relief Regular",
+        "fr": "Comic Relief normal",
+        "es": "Comic Relief normal",
+        "pt-BR": "Comic Relief regular",
+        "de": "Comic Relief normal",
+        "it": "Comic Relief normale",
+        "ru": "Комик Релиф обычный",
+        "pl": "Comic Relief zwykły",
+        "uk": "Комік Реліф звичайний",
+        "tr": "Comic Relief normal",
+        "id": "Comic Relief reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "id"
+      ]
+    },
+    {
+      "id": "patrick-hand",
+      "name": "Patrick Hand",
+      "names": {
+        "en": "Patrick Hand",
+        "fr": "Patrick Hand manuscrit",
+        "es": "Patrick Hand manuscrita",
+        "pt-BR": "Patrick Hand manuscrita",
+        "de": "Patrick Hand Handschrift",
+        "it": "Patrick Hand manoscritto",
+        "pl": "Patrick Hand odręczny",
+        "tr": "Patrick Hand el yazısı",
+        "vi": "Patrick Hand viết tay",
+        "id": "Patrick Hand tulisan tangan"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "pl",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "gaegu",
+      "name": "Gaegu Regular",
+      "names": {
+        "ko": "개구체"
+      },
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-naskh-arabic",
+      "name": "Noto Naskh Arabic Regular",
+      "names": {
+        "ar": "نوتو نسخ عربي"
+      },
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "lxgw-wenkai",
+      "name": "LXGW WenKai Regular",
+      "names": {
+        "zh-Hans": "霞鹜文楷 常规",
+        "zh-Hant": "霞鶩文楷 標準",
+        "ja": "霞鶩文楷 レギュラー"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ]
+    },
+    {
+      "id": "noto-sans-cjk-light",
+      "name": "Noto Sans CJK Light",
+      "names": {
+        "zh-Hans": "诺托黑体 细体",
+        "zh-Hant": "諾托黑體 細體",
+        "ja": "ノトゴシック ライト",
+        "ko": "노토 산스 라이트"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-serif-cjk",
+      "name": "Noto Serif CJK Regular",
+      "names": {
+        "zh-Hans": "诺托宋体 常规",
+        "zh-Hant": "諾托宋體 標準",
+        "ja": "ノト明朝 レギュラー",
+        "ko": "노토 세리프"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "klee-one",
+      "name": "Klee One Regular",
+      "names": {
+        "ja": "クレー ワン"
+      },
+      "languages": [
+        "ja"
+      ]
+    },
+    {
+      "id": "gowun-dodum",
+      "name": "Gowun Dodum",
+      "names": {
+        "ko": "고운돋움"
+      },
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "gowun-batang",
+      "name": "Gowun Batang Regular",
+      "names": {
+        "ko": "고운바탕"
+      },
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "nanum-pen",
+      "name": "Nanum Pen Script",
+      "names": {
+        "ko": "나눔손글씨 펜"
+      },
+      "languages": [
+        "ko"
+      ]
+    },
+    {
+      "id": "pangolin",
+      "name": "Pangolin",
+      "names": {
+        "en": "Pangolin",
+        "fr": "Pangolin manuscrit",
+        "es": "Pangolin manuscrita",
+        "pt-BR": "Pangolin manuscrita",
+        "de": "Pangolin Handschrift",
+        "it": "Pangolin manoscritto",
+        "ru": "Панголин рукописный",
+        "pl": "Pangolin odręczny",
+        "uk": "Панголін рукописний",
+        "tr": "Pangolin el yazısı",
+        "vi": "Pangolin viết tay",
+        "id": "Pangolin tulisan tangan"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "andika",
+      "name": "Andika Regular",
+      "names": {
+        "en": "Andika Regular",
+        "fr": "Andika normal",
+        "es": "Andika normal",
+        "pt-BR": "Andika regular",
+        "de": "Andika normal",
+        "it": "Andika normale",
+        "ru": "Андика обычный",
+        "pl": "Andika zwykły",
+        "uk": "Андіка звичайний",
+        "tr": "Andika normal",
+        "vi": "Andika thường",
+        "id": "Andika reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "nunito",
+      "name": "Nunito Regular",
+      "names": {
+        "en": "Nunito Regular",
+        "fr": "Nunito normal",
+        "es": "Nunito normal",
+        "pt-BR": "Nunito regular",
+        "de": "Nunito normal",
+        "it": "Nunito normale",
+        "ru": "Нунито обычный",
+        "pl": "Nunito zwykły",
+        "uk": "Нуніто звичайний",
+        "tr": "Nunito normal",
+        "vi": "Nunito thường",
+        "id": "Nunito reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "amiri",
+      "name": "Amiri Regular",
+      "names": {
+        "ar": "أميري"
+      },
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "harmattan",
+      "name": "Harmattan Regular",
+      "names": {
+        "ar": "هارمتان"
+      },
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "mada",
+      "name": "Mada Regular",
+      "names": {
+        "ar": "مدى"
+      },
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "noto-sans-cjk",
+      "name": "Noto Sans CJK Regular",
+      "names": {
+        "zh-Hans": "诺托黑体 常规",
+        "zh-Hant": "諾托黑體 標準",
+        "ja": "ノトゴシック レギュラー",
+        "ko": "노토 산스"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
+    },
+    {
+      "id": "noto-sans",
+      "name": "Noto Sans Regular",
+      "names": {
+        "en": "Noto Sans Regular",
+        "fr": "Noto Sans normal",
+        "es": "Noto Sans normal",
+        "pt-BR": "Noto Sans regular",
+        "de": "Noto Sans normal",
+        "it": "Noto Sans normale",
+        "ru": "Ното Санс обычный",
+        "pl": "Noto Sans zwykły",
+        "uk": "Ното Санс звичайний",
+        "tr": "Noto Sans normal",
+        "vi": "Noto Sans thường",
+        "id": "Noto Sans reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
+    },
+    {
+      "id": "noto-sans-arabic",
+      "name": "Noto Sans Arabic Regular",
+      "names": {
+        "ar": "نوتو سنس عربي"
+      },
+      "languages": [
+        "ar"
+      ]
+    }
+  ],
+  "defaults": {
+    "zh-Hans": "noto-sans-cjk",
+    "zh-Hant": "noto-sans-cjk",
+    "ja": "noto-sans-cjk",
+    "ko": "noto-sans-cjk",
+    "en": "comic-relief",
+    "fr": "comic-relief",
+    "es": "comic-relief",
+    "pt-BR": "comic-relief",
+    "de": "comic-relief",
+    "it": "comic-relief",
+    "ru": "comic-relief",
+    "pl": "comic-relief",
+    "uk": "comic-relief",
+    "tr": "comic-relief",
+    "vi": "pangolin",
+    "id": "comic-relief",
+    "ar": "noto-sans-arabic"
+  },
+  "samples": {
+    "zh-Hans": "别担心，我们的冒险才刚刚开始！",
+    "zh-Hant": "別擔心，我們的冒險才剛剛開始！",
+    "ja": "大丈夫、僕たちの冒険はこれからだ！",
+    "ko": "걱정 마, 우리의 모험은 이제 시작이야!",
+    "en": "Don't worry! Our adventure is just beginning.",
+    "fr": "Ne t'inquiète pas ! Notre aventure ne fait que commencer.",
+    "es": "¡No te preocupes! Nuestra aventura acaba de empezar.",
+    "pt-BR": "Não se preocupe! Nossa aventura está só começando.",
+    "de": "Keine Sorge! Unser großes Abenteuer beginnt erst.",
+    "it": "Non preoccuparti! La nostra avventura è appena iniziata.",
+    "ru": "Не волнуйся! Наше приключение ещё только начинается.",
+    "pl": "Nie martw się! Nasza przygoda właśnie się zaczyna.",
+    "uk": "Не хвилюйся! Наша пригода тільки починається.",
+    "tr": "Endişelenme! Maceramız daha yeni başlıyor.",
+    "vi": "Đừng lo! Cuộc phiêu lưu của chúng ta chỉ mới bắt đầu.",
+    "id": "Jangan khawatir! Petualangan kita baru saja dimulai.",
+    "ar": "لا تقلق، مغامرتنا بدأت للتو!"
+  }
+}

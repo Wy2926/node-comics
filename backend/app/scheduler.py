@@ -10,6 +10,7 @@ from .models import Asset, Attempt, ClassicState, Job, now, uid
 from .queue_models import ComputeNode, ExecutionLease, JobStage, SchedulerMutex
 from .translation_models import TranslationProvider
 from .translation_provider_limits import unavailable_providers
+from .translation_fonts import supports_font
 
 ACTIVE = {"awaiting_upload", "validating_upload", "queued", "running", "outcome_unknown"}
 IMAGE_STAGES = {"page"}
@@ -81,6 +82,10 @@ def _eligible_stages(node, stages, at, *, stage_ids=None, blocked_providers=()):
     if not (node.runtime_report or {}).get('overlay_tiles'):
         result_format = Job.config['result_format'].as_string()
         eligible = eligible.where(or_(JobStage.name != 'page', result_format.is_(None), result_format != 'overlay-tiles-v1'))
+    if 'page' in stages:
+        font_id = Job.config['font_id'].as_string()
+        eligible = eligible.where(or_(~image_stage, supports_font(font_id, Job.target_language,
+            (node.runtime_report or {}).get('supported_font_ids', []))))
     if stage_ids is not None:
         eligible = eligible.where(JobStage.id.in_(stage_ids))
     if "text" in stages:

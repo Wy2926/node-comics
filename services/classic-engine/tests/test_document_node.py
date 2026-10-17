@@ -1047,12 +1047,15 @@ def test_document_decode_uses_existing_normalized_runtime_contract(agent):
     assert len(decoded) == 2 and 'normalization_version' not in page.lease['input']
 
 
-def test_document_render_uses_lease_page_limit_from_its_workspace(agent):
+@pytest.mark.parametrize('font_id', [None, 'comic-relief'])
+def test_document_render_uses_lease_page_limit_from_its_workspace(agent, font_id):
     pending_pools(agent)
     page = add_document(agent, action='doc_prepare')
     page.lease['file_limits'] = {'max_page_bytes': 4096}
     workspace = agent.documents.workspace(page)
     page.lease['action'], page.step = 'doc_render', 'render'
+    if font_id is not None:
+        page.lease['config'] = {'font_id': font_id}
     page.rgb = page.cleaned = np.zeros((10, 10, 3), dtype=np.uint8)
     page.analysis, page.translations = analysis_for(page), page.lease['translations']
     calls = []
@@ -1061,6 +1064,7 @@ def test_document_render_uses_lease_page_limit_from_its_workspace(agent):
     agent.pipeline.render.finish()
     assert page.future.result() is None and len(calls) == 1
     assert calls[0]['full_image_max_bytes'] == workspace.limits.max_page_bytes == 4096
+    assert calls[0].get('font_id') == font_id
 
 
 def test_full_host_affine_book_has_one_source_get_and_only_final_zip_put(agent):

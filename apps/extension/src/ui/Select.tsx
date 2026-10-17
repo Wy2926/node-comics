@@ -1,4 +1,4 @@
-import {Children, Fragment, isValidElement, useId, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode} from 'react';
+import {Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode} from 'react';
 import {Icon} from '../icons';
 import {menuPosition, visibleViewport} from './visual-viewport';
 import './select.css';
@@ -11,6 +11,7 @@ export type SelectChangeEvent = {
 export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'defaultValue' | 'onChange' | 'children' | 'type'> & {
   value: string | number;
   onChange: (event: SelectChangeEvent) => void;
+  onOpenChange?: (open: boolean) => void;
   children?: ReactNode;
   /** Custom button content; option labels still drive selection and type-ahead. */
   trigger?: ReactNode;
@@ -18,7 +19,7 @@ export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'de
   menuWidth?: number;
 };
 type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode};
-type Option = {value: string; label: string; disabled: boolean; icon?: ReactNode};
+type Option = {value: string; label: string; disabled: boolean; icon?: ReactNode} & Pick<SelectOptionProps, 'style' | 'lang' | 'dir'>;
 
 /** Declarative option for Select. Icons are decorative; labels stay plain text for type-ahead. */
 export function SelectOption(_props: SelectOptionProps) { return null; }
@@ -34,12 +35,12 @@ function readOptions(children: ReactNode, disabled = false): Option[] {
     if (child.type === Fragment || child.type === 'optgroup') return readOptions(child.props.children, disabled || !!child.props.disabled);
     if ((child.type !== 'option' && child.type !== SelectOption) || child.props.hidden) return [];
     const label = child.props.label ?? textContent(child.props.children);
-    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled, icon: child.props.icon}];
+    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled, icon: child.props.icon, style: child.props.style, lang: child.props.lang, dir: child.props.dir}];
   });
 }
 
 /** Single selection. Focus stays on the button; Escape cancels, Enter/Tab commit. */
-export function Select({value, onChange, children, trigger, placement = 'auto', menuWidth = 180, disabled, id, name, className = '', onKeyDown, onClick, onBlur, ...props}: SelectProps) {
+export function Select({value, onChange, onOpenChange, children, trigger, placement = 'auto', menuWidth = 180, disabled, id, name, className = '', onKeyDown, onClick, onBlur, ...props}: SelectProps) {
   const generatedId = useId(), buttonId = id ?? `nc-select-${generatedId}`, listId = `${buttonId}-list`;
   const buttonRef = useRef<HTMLButtonElement>(null), listRef = useRef<HTMLSpanElement>(null);
   const touchingList = useRef(false);
@@ -52,6 +53,7 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
   const expanded = open && !unavailable;
   const activeIndex = enabled.includes(active) ? active : enabled.includes(selected) ? selected : enabled[0];
   const label = props['aria-label'] ?? (props['aria-labelledby'] ? undefined : implicitLabel);
+  useEffect(() => { onOpenChange?.(expanded); }, [expanded, onOpenChange]);
 
   useLayoutEffect(() => {
     if (props['aria-label'] || props['aria-labelledby']) return;
@@ -109,6 +111,9 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
     position();
     const resize = new ResizeObserver(position);
     resize.observe(button);
+    resize.observe(list);
+    // Styled labels can reflow after their font loads, even when the list is height-constrained.
+    list.querySelectorAll('.nc-select-label[style]').forEach(label => resize.observe(label));
     const scroll = (event: Event) => { if (event.target !== list) position(); };
     const dismiss = (event: PointerEvent) => { if (!list.contains(event.target as Node) && !button.contains(event.target as Node)) close(); };
     window.addEventListener('resize', position);
@@ -182,7 +187,7 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
       aria-expanded={expanded} aria-controls={listId} aria-activedescendant={expanded && activeIndex !== undefined ? `${listId}-${activeIndex}` : undefined}
       onKeyDown={keyDown} onBlur={event => { if (!touchingList.current) close(); onBlur?.(event); }}
       onClick={event => { onClick?.(event); if (!event.defaultPrevented) { event.currentTarget.focus({preventScroll: true}); if (expanded) close(); else show(); } }}>
-      {trigger ?? <><span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value">{options[selected]?.label ?? String(value)}</span></span>
+      {trigger ?? <><span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value" style={options[selected]?.style} lang={options[selected]?.lang} dir={options[selected]?.dir}>{options[selected]?.label ?? String(value)}</span></span>
       <Icon name="chevron" size={16} className="nc-select-chevron"/></>}
     </button>
     {name && <input type="hidden" name={name} value={value} disabled={unavailable} form={props.form}/>}
@@ -201,7 +206,7 @@ export function Select({value, onChange, children, trigger, placement = 'auto', 
         className="nc-select-option" data-active={expanded && index === activeIndex || undefined}
         onPointerMove={event => { if (event.pointerType !== 'touch' && !option.disabled) setActive(index); }}
         onClick={event => { event.preventDefault(); event.stopPropagation(); choose(index); }}>
-        <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label">{option.label}</span></span><Icon name="check" size={16} className="nc-select-check"/>
+        <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label" style={option.style} lang={option.lang} dir={option.dir}>{option.label}</span></span><Icon name="check" size={16} className="nc-select-check"/>
       </span>)}
     </span>
   </>;

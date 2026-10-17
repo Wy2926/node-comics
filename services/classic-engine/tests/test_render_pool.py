@@ -24,7 +24,7 @@ from classic_node.timing import collect, record
 
 class FakeRenderer:
     def render(self, original, cleaned, regions, translations, language, mask, *, mask_cache_bytes=None,
-               bubble_prepared=False, bubble_components=None):
+               bubble_prepared=False, bubble_components=None, font_id=None):
         assert not original.flags.writeable and not cleaned.flags.writeable and not mask.flags.writeable
         if regions:
             Path(regions[0]['started']).touch()
@@ -41,6 +41,8 @@ class FakeRenderer:
         result = np.bitwise_xor(original, cleaned)
         result[:, :, 0] ^= mask
         result[0, 0, 1] = (mask_cache_bytes or 0) % 256
+        if font_id is not None:
+            result[0, 1, 1] = sum(font_id.encode()) % 256
         if bubble_prepared:
             labels, stats = bubble_components
             assert not labels.flags.writeable and not stats.flags.writeable
@@ -107,6 +109,23 @@ def pool(monkeypatch):
 def render(pool, inputs, language='en', **kwargs):
     original, cleaned, mask = inputs
     return pool.render(original, cleaned, [], ['text'], language, mask, **(identity() | kwargs))
+
+
+def test_spawn_keeps_concurrent_font_choices_isolated(pool, inputs):
+    instance, _ = pool
+    instance.warmup()
+    choices = ['comic-relief', 'patrick-hand', None] * 3
+    expected = {}
+    readonly = tuple(value.copy() for value in inputs)
+    for value in readonly:
+        value.flags.writeable = False
+    for font_id in choices[:3]:
+        expected[font_id] = rp.render_page(FakeRenderer(), readonly[0], readonly[1], [], ['text'], 'en', readonly[2],
+                                         alpha=None, font_id=font_id, **identity())
+    assert len({item['output_bytes'] for item in expected.values()}) == 3
+    with ThreadPoolExecutor(max_workers=3) as workers:
+        actual = list(workers.map(lambda font_id: render(instance, inputs, font_id=font_id), choices))
+    assert actual == [expected[font_id] for font_id in choices]
 
 
 def test_spawn_preserves_inputs_pixels_and_persistent_workers(pool, inputs):

@@ -220,6 +220,7 @@ def my_entitlements(user: User = Depends(identity), db: Session = Depends(get_db
 def capabilities(db: Session = Depends(get_db), user: User | None = Depends(optional_identity)):
     cfg = settings()
     from .translation_selection import model_catalog
+    from .translation_fonts import font_catalog
     entitlements = entitlements_json(db, user) if user else None
     models, classic_enabled = model_catalog(db, user, entitlements['service_plan'] if entitlements else 'guest')
     from datetime import timedelta
@@ -235,6 +236,7 @@ def capabilities(db: Session = Depends(get_db), user: User | None = Depends(opti
             "limits": {"max_bytes": cfg.max_upload_bytes, "max_pixels": cfg.max_dimension ** 2, "max_dimension": cfg.max_dimension, "max_translation_ids": 32},
             "entitlements": entitlements,
             "translation_models": models,
+            "translation_fonts": font_catalog(),
             "unknown_release_seconds": cfg.unknown_release_seconds}
 
 

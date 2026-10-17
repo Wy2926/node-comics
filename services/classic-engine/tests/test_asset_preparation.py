@@ -28,7 +28,8 @@ def test_recognition_inventory_keeps_shared_paddle_and_manga_without_openocr():
 def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cache(tmp_path, monkeypatch):
     output, cache = tmp_path / 'prepared', tmp_path / 'download-cache'
     stale = ('models/openocr/openocr_svtrv2_ch.pth', 'upstream/openocr/svtrv2_ch.yml',
-             'upstream/openocr/LICENSE', 'licenses/openocr-unused.txt')
+             'upstream/openocr/LICENSE', 'licenses/openocr-unused.txt',
+             'fonts/RetiredFont.ttf', 'licenses/RetiredFont-OFL.txt')
     for name in stale:
         path = output / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,6 +85,7 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
     assert not any('openocr' in url.lower() for url in downloads)
     assert not any('openocr' in name.lower() for name in manifest['files'])
     assert all(not (output / name).exists() for name in stale)
+    assert {path.name for path in (output / 'fonts').iterdir()} == {'Test.ttf'}
     assert sample.read_bytes() == b'private user sample'
     assert cached_sample.read_bytes() == b'existing cache content'
     assert 'upstream/manga_ocr/LICENSE' in manifest['files']

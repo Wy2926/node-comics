@@ -13,7 +13,7 @@
 | 文字蒙版 | MTU mask refinement／DenseCRF、膨胀、气泡边界限制 |
 | 抹字 | MTU 纯色气泡填充；剩余区域使用原生 LaMa Large 512 FP32 CUDA，按连通区域修复 |
 | 嵌字 | MTU Qt 渲染器：QTextLayout、QRawFont、QPainter，在 CPU 离屏绘制 |
-| 字体 | Bangers、霞鹜漫黑、Jua、Comic Relief Bold、Lalezar；保留 Noto 字体回退，Qt 负责字形塑形 |
+| 字体 | 按目标语言选择固定目录中的细／常规字重字体；空值使用该语言的明确默认字体；保留 Noto 字体回退，Qt 负责字形塑形 |
 
 `mtu_engine/` 只处理上游加载、阶段调用、输入校验和协议数据映射。MTU、BallonsTranslator、Comic Translate 源码按 [upstream.lock.json](mtu_engine/upstream.lock.json) 的提交和归档 SHA-256 下载到准备目录；MTU 的局部计算、重复准备精简和完整单词气泡字号适配补丁，在同一锁文件按文件记录有序的替换前后内容，准备时各严格匹配一次并记录修改后的文件摘要。修改范围见 [THIRD_PARTY.md](THIRD_PARTY.md)，其余上游文件保持原样；RapidOCR 包按 `uv.lock` 固定版本与摘要。`classic_node/` 管理租约、检查点、网络和覆盖文件。不维护自研排版、气泡推测、修复、文字分类算法或模型转换链路。
 
@@ -55,7 +55,11 @@ DirectML 按[上游要求](https://onnxruntime.ai/docs/execution-providers/Direc
 
 所有语言共用的气泡最大内接矩形搜索仅去掉参考蒙版外围全空的行列，保留上游直方图／栈算法、全部连通区域、孔洞与同面积择优顺序，并将结果坐标还原到整页。已缓存的蒙版直接使用连通区域统计包围框，避免再次扫描整页找边界。非中日目标继续使用该结果进行完整单词排版，不关闭气泡适配。仅对本页预算已保留的只读参考蒙版缓存四个矩形坐标；不额外持有蒙版，不增加整页缓存预算，换页或退出时一起清除。未缓存蒙版也使用紧包围范围搜索，长图不会因为缓存不足退回逐像素扫描空白页边。
 
-漫画字体按目标文字体系选择：拉丁字母（包括越南语）使用 Bangers，俄／乌使用 Comic Relief Bold，中／日使用霞鹜漫黑，韩文使用 Jua，阿拉伯文使用 Lalezar。Noto Sans、Noto Sans CJK 和完整 Noto Sans Arabic 保留缺字回退；不通过人工加粗或改写字形制造漫画字体。字体文件、原始声明与摘要统一记录在 [assets.json](../compute-node/assets.json)。
+可选字体与目标语言范围由 [fonts.json](mtu_engine/fonts.json) 定义；租约 `config.font_id` 仅选择固定文件，不接受客户端路径、URL 或任意字体名。节点只声明已准备且 Qt 能加载的字体，中心仅向支持该 ID 的节点调度。每次渲染独立创建字体配置和段落，选择随任务传入持久子进程及内存回退路径，不修改节点全局默认。Qt 按文件解析字族及字重，避免同族 Regular 被 Bold 替代；上游字体状态为线程局部，同一 Renderer 仍串行保护原生排版缓存。
+
+每种目标语言的默认字体由目录中的 `default_languages` 定义，按现有选项中笔画较厚实的实字体效果选择：简／繁中文、日语和韩语使用 Noto Sans CJK Regular，越南语使用 Pangolin，阿拉伯语使用 Noto Sans Arabic，其余拉丁／西里尔字母语言使用 Comic Relief Regular。当前默认均为物理常规字重 400，不选 Light 300，不以相同的字重数值声称不同字族的视觉厚度一致。省略、`null` 或空字符串都解析为该具体字体，不再保留旧的粗体默认文件或任意首项回退。Noto Sans、Noto Sans CJK 和完整 Noto Sans Arabic 保留缺字回退；不通过人工加粗或改写字形制造漫画字体。主字体不支持的混合文字仍交由 Qt 回退和塑形。字体文件、原始声明与摘要统一记录在 [assets.json](../compute-node/assets.json)，运行时不下载字体；新增字体只增加节点分发大小和每个渲染进程的注册／字体内存，不增加逐页网络请求或图像模型调用。
+
+当前目录提供 21 个可选文件、17 种目标语言各 5–7 项，偏向 Light／Regular。CJK 通用 Noto 使用 SC 字形文件，字形覆盖包含中日韩，但不承诺各区域首选字形完全相同。完整字体合计约 140 MiB，相对原 8 文件增加约 118 MiB；本地 Windows CPU Qt 新进程各三轮对照中，Renderer 初始化的 RSS 增量中位数由约 251 MiB 增至 370 MiB，额外约 120 MiB／渲染进程。初始化耗时落在约 3.7–5.0 秒的噪声范围，不能据此宣称稳定变快或变慢。主进程及每个渲染子进程均需计入字体常驻内存；更轻的部署可只准备所需字体，但节点必须按实际文件声明能力，不能接收未安装字体任务。浏览器仅打包本地化字体名与固定示例子集（合计约 388 KiB），收起时仅加载选中字体，展开时加载当前语言选项并复用已加载资源；真实 GPU 全流程吞吐与生产机器内存仍需部署前单独验收。
 
 `keep_lang` 默认为 `null`，处理所有识别段落。显式配置 ISO 639-1 源语言（例如 `zh`）时，使用上游 TextBlock／py3langid 语言判断筛选段落，其余原文保留。接收任意源语言的公共节点不得设置此筛选值。
 

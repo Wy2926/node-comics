@@ -434,6 +434,24 @@ def test_real_render_thread_does_not_hold_compute_slot(agent):
             rendering.future.result(timeout=5)
 
 
+def test_rendering_uses_each_pages_frozen_font_choice(agent):
+    isolate_pipeline_pools(agent)
+    choices = ['comic-relief', 'patrick-hand', None]
+    pages = [add_page(agent, index) for index in range(len(choices))]
+    for page, font_id in zip(pages, choices):
+        page.step = 'render'
+        render_analysis(page)
+        if font_id is not None:
+            page.lease['config']['font_id'] = font_id
+    seen = []
+    agent.runtime.render = lambda *args, **kwargs: seen.append(kwargs.get('font_id'))
+    agent.pipeline.render_workers = 3
+    agent.pipeline.tick()
+    for index in range(len(choices)):
+        agent.pipeline.render.finish(index)
+    assert seen == choices
+
+
 def test_inpaint_progress_is_not_queued_behind_older_unanalyzed_pages(agent):
     isolate_pipeline_pools(agent)
     agent.local['local_pages'] = 1

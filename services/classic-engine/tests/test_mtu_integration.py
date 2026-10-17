@@ -12,6 +12,7 @@ import pytest
 
 from classic_node.runtime import LANGUAGE_PROBES
 from mtu_engine.engine import Engine, Renderer, serialize_region
+from mtu_engine.fonts import DEFAULT_FONT_IDS, FONT_CHOICES
 from classic_node.config import ENGINE_DEFAULTS
 from mtu_engine.ocr import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
 
@@ -258,6 +259,122 @@ def test_qt_worker_multilingual_text_and_region_fit_offline(assets, offline, mon
         assert np.array_equal(repeated, outputs[list(LANGUAGE_PROBES).index('en')])
         empty = workers.submit(renderer.render, source, source, [region], [''], 'en', mask).result()
         assert np.array_equal(empty, source)
+
+
+@pytest.mark.parametrize('font_id', FONT_CHOICES)
+def test_selected_regular_or_light_font_uses_its_physical_face_and_fallback(assets, offline, font_id):
+    from PyQt6.QtGui import QRawFont
+    renderer = Renderer(*assets)
+    from manga_translator.rendering.text_render import _fonts
+    filename, languages = FONT_CHOICES[font_id]
+    path = renderer.font_by_name[filename]
+    sample = 'مرحبًا بالعالم' if languages[0] == 'ar' else LANGUAGE_PROBES[languages[0]]
+    expected = QRawFont(path, 48)
+    assert expected.isValid() and expected.weight() <= 400
+    _fonts.set_font(path)
+    _, _, layout, _ = _fonts._create_text_layout(sample, 48)
+    runs = layout.glyphRuns()
+    assert runs and all(index != 0 for run in runs for index in run.glyphIndexes())
+    assert all(run.rawFont().familyName() == expected.familyName() for run in runs)
+    assert all(run.rawFont().styleName() == expected.styleName() and run.rawFont().weight() <= 400 for run in runs)
+    assert all(run.rawFont().weight() == (300 if font_id.endswith('-light') else 400) for run in runs)
+    # A mixed-script name must stay visible even when absent from the chosen face.
+    fallback_sample = sample + (' مُحَمَّد' if expected.supportsCharacter(ord('龘')) else ' 龘')
+    _, _, mixed, _ = _fonts._create_text_layout(fallback_sample, 48)
+    assert all(index != 0 for run in mixed.glyphRuns() for index in run.glyphIndexes())
+    assert any(run.rawFont().familyName() != expected.familyName() for run in mixed.glyphRuns())
+
+
+def test_selected_fonts_cover_all_languages_and_do_not_mix_between_render_threads(assets, offline):
+    renderer = Renderer(*assets)
+    from manga_translator.utils import TextBlock
+    block = TextBlock(np.array([[[70, 60], [530, 60], [530, 260], [70, 260]]]),
+                      ['source'], font_size=36, direction='h')
+    region = serialize_region(block)
+    source = np.full((320, 600, 3), 255, np.uint8)
+    choices = [(font_id, language) for font_id, (_, languages) in FONT_CHOICES.items() for language in languages]
+    assert set(renderer.font_ids) == set(FONT_CHOICES)
+
+    def draw(choice):
+        font_id, language = choice
+        return renderer.render(source, source, [region], [LANGUAGE_PROBES[language]], language, None, font_id=font_id)
+
+    expected = [draw(choice) for choice in choices]
+    assert all(np.any(result != source) for result in expected)
+    with ThreadPoolExecutor(3) as workers:
+        actual = list(workers.map(draw, choices * 2))
+    for result, reference in zip(actual, expected * 2):
+        assert np.array_equal(result, reference)
+    assert not np.array_equal(draw(('comic-relief', 'en')), draw(('patrick-hand', 'en')))
+
+
+def test_unselected_null_and_empty_fonts_render_each_language_default(assets, offline, monkeypatch):
+    renderer = Renderer(*assets)
+    from manga_translator.utils import TextBlock
+    block = TextBlock(np.array([[[70, 60], [530, 60], [530, 260], [70, 260]]]),
+                      ['source'], font_size=36, direction='h')
+    region = serialize_region(block)
+    source = np.full((320, 600, 3), 255, np.uint8)
+    selected = []
+    render_blocks = renderer._render_blocks
+
+    def capture(original, cleaned, blocks, language, config, *args):
+        selected.append((language, config.render.font_family, [block.font_family for block in blocks]))
+        return render_blocks(original, cleaned, blocks, language, config, *args)
+
+    monkeypatch.setattr(renderer, '_render_blocks', capture)
+    for language, default in DEFAULT_FONT_IDS.items():
+        args = (source, source, [region], [LANGUAGE_PROBES[language]], language, None)
+        expected = renderer.render(*args, font_id=default)
+        assert np.any(expected != source), language
+        assert np.array_equal(renderer.render(*args), expected), language
+        for font_id in (None, ''):
+            assert np.array_equal(renderer.render(*args, font_id=font_id), expected), language
+        filename = renderer.font_by_name[FONT_CHOICES[default][0]]
+        assert selected[-4:] == [(language, filename, [filename])] * 4
+
+
+def test_renderer_rejects_unknown_or_uninstalled_default_without_first_font_fallback(assets, offline):
+    renderer = Renderer(*assets)
+    source = np.full((30, 40, 3), 255, np.uint8)
+    args = (source, source, [], [], 'en', None)
+    with pytest.raises(ValueError, match='Unsupported translation font'):
+        renderer.render(*args, font_id='unknown')
+    renderer.font_by_name.pop(FONT_CHOICES[DEFAULT_FONT_IDS['en']][0])
+    for font_id in (None, '', DEFAULT_FONT_IDS['en']):
+        with pytest.raises(ValueError, match='Translation font is not installed'):
+            renderer.render(*args, font_id=font_id)
+
+
+def test_font_choices_survive_real_render_process_pool(assets, offline):
+    from classic_node.render_pool import RenderPool, render_page
+    renderer = Renderer(*assets)
+    from manga_translator.utils import TextBlock
+    source = np.full((240, 420, 3), 255, np.uint8)
+    block = TextBlock(np.array([[[40, 40], [380, 40], [380, 200], [40, 200]]]),
+                      ['source'], font_size=30, direction='h')
+    regions = [serialize_region(block)]
+    options = {'alpha': None, 'version': 'font-fixture', 'analysis': {'input_hash': '0' * 64},
+               'translated': {'analysis_hash': '1' * 64, 'revision': '2' * 64}}
+    choices = [('en', 'comic-relief'), ('en', 'patrick-hand'), ('en', None), ('en', ''),
+               ('zh-Hans', 'lxgw-wenkai-light'), ('zh-Hans', 'lxgw-wenkai'),
+               ('zh-Hans', 'noto-sans-cjk-light'), ('zh-Hans', 'noto-sans-cjk'),
+               ('ko', 'gaegu'), ('ar', 'noto-naskh-arabic'), ('ar', ''), ('ja', None)]
+    expected = [render_page(renderer, source, source, regions, [LANGUAGE_PROBES[language]], language, None,
+                            font_id=font_id, **options) for language, font_id in choices]
+    pool = RenderPool(*assets, workers=2, threads=1)
+    try:
+        pool.warmup()
+
+        def draw(choice):
+            language, font_id = choice
+            return pool.render(source, source, regions, [LANGUAGE_PROBES[language]], language, None,
+                               font_id=font_id, **options)
+
+        with ThreadPoolExecutor(3) as workers:
+            assert list(workers.map(draw, choices * 2)) == expected * 2
+    finally:
+        pool.close()
 
 
 @pytest.mark.parametrize(('language', 'text'), [
@@ -686,7 +803,7 @@ def test_long_lines_and_partial_ocr_continue_at_different_positions(assets, offl
 
 
 @pytest.mark.parametrize(('filename', 'family'), [
-    ('Lalezar-Regular.ttf', 'Lalezar'),
+    ('NotoNaskhArabic-Regular.ttf', 'Noto Naskh Arabic'),
     ('NotoSansArabic.ttf', 'Noto Sans Arabic'),
 ])
 def test_arabic_native_shaping_bidi_and_diacritics_offline(assets, offline, filename, family):

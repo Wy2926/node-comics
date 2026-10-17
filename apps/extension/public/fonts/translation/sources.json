@@ -1,0 +1,555 @@
+{
+  "fonts": [
+    {
+      "id": "lxgw-wenkai-light",
+      "name": "LXGW WenKai Light",
+      "names": {
+        "zh-Hans": "霞鹜文楷 细体",
+        "zh-Hant": "霞鶩文楷 細體",
+        "ja": "霞鶩文楷 ライト"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ],
+      "file": "lxgw-wenkai-light.woff2",
+      "sha256": "a0f93a12717ed1fc419710868ac69d607d71f164e1390e86fc80271fb2230921",
+      "bytes": 15004,
+      "source": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Light.ttf",
+      "source_sha256": "a347c7161ec38677646e361b5280ddb621671bbb97ecfd829ec9dd4e326f6081",
+      "source_version": "Version 1.530; October 13, 2026",
+      "license": "SIL Open Font License 1.1",
+      "notice": "LXGWWenKai-OFL.txt",
+      "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
+    },
+    {
+      "id": "comic-relief",
+      "name": "Comic Relief Regular",
+      "names": {
+        "en": "Comic Relief Regular",
+        "fr": "Comic Relief normal",
+        "es": "Comic Relief normal",
+        "pt-BR": "Comic Relief regular",
+        "de": "Comic Relief normal",
+        "it": "Comic Relief normale",
+        "ru": "Комик Релиф обычный",
+        "pl": "Comic Relief zwykły",
+        "uk": "Комік Реліф звичайний",
+        "tr": "Comic Relief normal",
+        "id": "Comic Relief reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "id"
+      ],
+      "file": "comic-relief.woff2",
+      "sha256": "be44d878b7002f2ab49c37152b1d1d782622ef887e38bc81afaab9f7ddf56cf6",
+      "bytes": 11796,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/ComicRelief-Regular.ttf",
+      "source_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+      "source_version": "Version 1.200; ttfautohint (v1.8.4.7-5d5b)",
+      "license": "SIL Open Font License 1.1",
+      "notice": "comicrelief-OFL.txt",
+      "notice_sha256": "009b3056cef5c9bcaff872bfb0e27fa4a0f8cc6f6984cc490caf5618748d766b"
+    },
+    {
+      "id": "patrick-hand",
+      "name": "Patrick Hand",
+      "names": {
+        "en": "Patrick Hand",
+        "fr": "Patrick Hand manuscrit",
+        "es": "Patrick Hand manuscrita",
+        "pt-BR": "Patrick Hand manuscrita",
+        "de": "Patrick Hand Handschrift",
+        "it": "Patrick Hand manoscritto",
+        "pl": "Patrick Hand odręczny",
+        "tr": "Patrick Hand el yazısı",
+        "vi": "Patrick Hand viết tay",
+        "id": "Patrick Hand tulisan tangan"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "pl",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "file": "patrick-hand.woff2",
+      "sha256": "2840455a769df404595e598f4b1f9ef7c232926c09abcc7aac5aa7de57fc2172",
+      "bytes": 15836,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/patrickhand/PatrickHand-Regular.ttf",
+      "source_sha256": "0f173b3e6cb6d1af25babf7f0057c5ac4ee11f9992b0469bb817e967ef4ad0fc",
+      "source_version": "Version 1.003;PS 001.003;hotconv 1.0.70;makeotf.lib2.5.58329; ttfautohint (v0.94.20-1c74) -l 8 -r 50 -G 200 -x 14 -w \"gGD\" -c -f",
+      "license": "SIL Open Font License 1.1",
+      "notice": "patrickhand-OFL.txt",
+      "notice_sha256": "377f4f9c19e935228552478eb68cc2ed82910988a60ba60e2ac73b09f32d02d1"
+    },
+    {
+      "id": "gaegu",
+      "name": "Gaegu Regular",
+      "names": {
+        "ko": "개구체"
+      },
+      "languages": [
+        "ko"
+      ],
+      "file": "gaegu.woff2",
+      "sha256": "1dac5f6764eafa0170173d169a54280debe2eee8564108332e74f4ab6bca7e45",
+      "bytes": 8684,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gaegu/Gaegu-Regular.ttf",
+      "source_sha256": "aa52c98336f7c62e2896fc8b12b56a75d5b476d88a2f104b0980f4f7ce0adfc3",
+      "source_version": "Version 1.00",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gaegu-OFL.txt",
+      "notice_sha256": "53a9ce47085d9fef613c7ecb3730dc80d25962510bbea231b89564f58240f251"
+    },
+    {
+      "id": "noto-naskh-arabic",
+      "name": "Noto Naskh Arabic Regular",
+      "names": {
+        "ar": "نوتو نسخ عربي"
+      },
+      "languages": [
+        "ar"
+      ],
+      "file": "noto-naskh-arabic.woff2",
+      "sha256": "a41621bcf2842acd36ab9d2d2b9c9587ce3f07aec6f4b6108c8824395e3c4e79",
+      "bytes": 10600,
+      "source": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Regular.ttf",
+      "source_sha256": "2f4b88e6ee50fa82c617e2d1d4ba18281cb1c6cd71c3af3ec64970c23995db4b",
+      "source_version": "Version 2.012; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D arab -f none -a qsq -X \"\"",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoNaskhArabic-LICENSE",
+      "notice_sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+    },
+    {
+      "id": "lxgw-wenkai",
+      "name": "LXGW WenKai Regular",
+      "names": {
+        "zh-Hans": "霞鹜文楷 常规",
+        "zh-Hant": "霞鶩文楷 標準",
+        "ja": "霞鶩文楷 レギュラー"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ],
+      "file": "lxgw-wenkai.woff2",
+      "sha256": "e742e6a5ee6f1c63329c5079000384151eea2c485b130c8519e239ec3df0b617",
+      "bytes": 13796,
+      "source": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Regular.ttf",
+      "source_sha256": "bf73f995c05f3f7baf7840b9d76d8d9678c8b150a020946a394ca63c67ed1350",
+      "source_version": "Version 1.530; October 13, 2026",
+      "license": "SIL Open Font License 1.1",
+      "notice": "LXGWWenKai-OFL.txt",
+      "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
+    },
+    {
+      "id": "noto-sans-cjk-light",
+      "name": "Noto Sans CJK Light",
+      "names": {
+        "zh-Hans": "诺托黑体 细体",
+        "zh-Hant": "諾托黑體 細體",
+        "ja": "ノトゴシック ライト",
+        "ko": "노토 산스 라이트"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ],
+      "file": "noto-sans-cjk-light.woff2",
+      "sha256": "d5ae4a341b09a8a9ad4d9d3e174bc0f7a2b7f7de043d802eb6d08771537ca18c",
+      "bytes": 24132,
+      "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Light.otf",
+      "source_sha256": "e78bbbe1573bbb006156c1198f5c8cd6329470cb6e0b6702c7a3c83913db4abf",
+      "source_version": "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansCJK-LICENSE",
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "id": "noto-serif-cjk",
+      "name": "Noto Serif CJK Regular",
+      "names": {
+        "zh-Hans": "诺托宋体 常规",
+        "zh-Hant": "諾托宋體 標準",
+        "ja": "ノト明朝 レギュラー",
+        "ko": "노토 세리프"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ],
+      "file": "noto-serif-cjk.woff2",
+      "sha256": "e3d3ab9a5e6c99bf8e37b54124fa898b202a42f4b80d5801e1202264a2a73eb6",
+      "bytes": 36700,
+      "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf",
+      "source_sha256": "18e4072f01dad3965a72ae8afee7d6dac447c4eb6d454e0084ed5c9c1fc0091f",
+      "source_version": "Version 2.001;hotconv 1.1.0;makeotfexe 2.6.0",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansCJK-LICENSE",
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "id": "klee-one",
+      "name": "Klee One Regular",
+      "names": {
+        "ja": "クレー ワン"
+      },
+      "languages": [
+        "ja"
+      ],
+      "file": "klee-one.woff2",
+      "sha256": "b38dc3af63c89d9bba3698f52909f88db54e23270eb3c38e4bb436ed52c873fa",
+      "bytes": 37928,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/kleeone/KleeOne-Regular.ttf",
+      "source_sha256": "bf4063f030cc2ae6adf0a11424a1888e5c0eb4438f1f6d02f52294af868e9b3a",
+      "source_version": "Version 1.100",
+      "license": "SIL Open Font License 1.1",
+      "notice": "kleeone-OFL.txt",
+      "notice_sha256": "e376b0df8e8a2345a9533db6f0a5333a1107975569ad9d1973a7ee557161ca38"
+    },
+    {
+      "id": "gowun-dodum",
+      "name": "Gowun Dodum",
+      "names": {
+        "ko": "고운돋움"
+      },
+      "languages": [
+        "ko"
+      ],
+      "file": "gowun-dodum.woff2",
+      "sha256": "7968a8750a92316560298c4c5721ac7de27bb649a02c349d9e1de7fe7467f548",
+      "bytes": 6216,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowundodum/GowunDodum-Regular.ttf",
+      "source_sha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+      "source_version": "Version 2.000",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gowundodum-OFL.txt",
+      "notice_sha256": "a7c73f9521cd646bbdfb6684c99a62311bbd7bce11898dc11ef0b3c69eda1aca"
+    },
+    {
+      "id": "gowun-batang",
+      "name": "Gowun Batang Regular",
+      "names": {
+        "ko": "고운바탕"
+      },
+      "languages": [
+        "ko"
+      ],
+      "file": "gowun-batang.woff2",
+      "sha256": "e8f066bad310b8304e3a53e2507c74ddd32125da8cc4a495f6870e52be11b876",
+      "bytes": 6612,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowunbatang/GowunBatang-Regular.ttf",
+      "source_sha256": "466c593e7147412e748af4856d5ad14709b5a860bdf62b9c2546f2c5874e9849",
+      "source_version": "Version 2.000",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gowunbatang-OFL.txt",
+      "notice_sha256": "49a57cc769fa9affd6eefb9070a61e3d3f6b757c97cafb15848bc6d1c81acc78"
+    },
+    {
+      "id": "nanum-pen",
+      "name": "Nanum Pen Script",
+      "names": {
+        "ko": "나눔손글씨 펜"
+      },
+      "languages": [
+        "ko"
+      ],
+      "file": "nanum-pen.woff2",
+      "sha256": "4fabc79b9d62af3c534ed7fa4213b496d3254b3086d6e2055e68942a0ed3765a",
+      "bytes": 7788,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/nanumpenscript/NanumPenScript-Regular.ttf",
+      "source_sha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+      "source_version": "Version 1.10",
+      "license": "SIL Open Font License 1.1",
+      "notice": "nanumpenscript-OFL.txt",
+      "notice_sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f"
+    },
+    {
+      "id": "pangolin",
+      "name": "Pangolin",
+      "names": {
+        "en": "Pangolin",
+        "fr": "Pangolin manuscrit",
+        "es": "Pangolin manuscrita",
+        "pt-BR": "Pangolin manuscrita",
+        "de": "Pangolin Handschrift",
+        "it": "Pangolin manoscritto",
+        "ru": "Панголин рукописный",
+        "pl": "Pangolin odręczny",
+        "uk": "Панголін рукописний",
+        "tr": "Pangolin el yazısı",
+        "vi": "Pangolin viết tay",
+        "id": "Pangolin tulisan tangan"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "file": "pangolin.woff2",
+      "sha256": "0f18468fd4fbad83d44b98717efe1fd10ba72a34672a17fe215209b99df8bc72",
+      "bytes": 49760,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/pangolin/Pangolin-Regular.ttf",
+      "source_sha256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+      "source_version": "Version 1.101",
+      "license": "SIL Open Font License 1.1",
+      "notice": "pangolin-OFL.txt",
+      "notice_sha256": "b4fc1d55ce610f255c5712f8169543f9610536d002deb99bbc99bfbba9f8a560"
+    },
+    {
+      "id": "andika",
+      "name": "Andika Regular",
+      "names": {
+        "en": "Andika Regular",
+        "fr": "Andika normal",
+        "es": "Andika normal",
+        "pt-BR": "Andika regular",
+        "de": "Andika normal",
+        "it": "Andika normale",
+        "ru": "Андика обычный",
+        "pl": "Andika zwykły",
+        "uk": "Андіка звичайний",
+        "tr": "Andika normal",
+        "vi": "Andika thường",
+        "id": "Andika reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "file": "andika.woff2",
+      "sha256": "e5d93e77cc5e0514abd39a31f6a812ce0ec2ec57fb0df215d4df2bec92bc74bc",
+      "bytes": 23816,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/andika/Andika-Regular.ttf",
+      "source_sha256": "202b96b1f174a4a43baefe885b40dacacb81786755efd08ed4b7704e79c45515",
+      "source_version": "Version 6.101",
+      "license": "SIL Open Font License 1.1",
+      "notice": "andika-OFL.txt",
+      "notice_sha256": "43ee152fcd7be0c6eb3468f3012e776cb75bf88f5dec548be0aa4619bf438f9e"
+    },
+    {
+      "id": "nunito",
+      "name": "Nunito Regular",
+      "names": {
+        "en": "Nunito Regular",
+        "fr": "Nunito normal",
+        "es": "Nunito normal",
+        "pt-BR": "Nunito regular",
+        "de": "Nunito normal",
+        "it": "Nunito normale",
+        "ru": "Нунито обычный",
+        "pl": "Nunito zwykły",
+        "uk": "Нуніто звичайний",
+        "tr": "Nunito normal",
+        "vi": "Nunito thường",
+        "id": "Nunito reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "file": "nunito.woff2",
+      "sha256": "27dbd0c5bba13442055bd7860b18c1dd5299fad06942a7f50da7474896ea04dd",
+      "bytes": 13856,
+      "source": "https://raw.githubusercontent.com/google/fonts/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Regular.ttf",
+      "source_sha256": "880ead818af373b0da8c2a3e493f7d0a9c1db149a67a867b04f0952c475d667a",
+      "source_version": "Version 3.601; ttfautohint (v1.8.2.53-6de2)",
+      "license": "SIL Open Font License 1.1",
+      "notice": "nunito-OFL.txt",
+      "notice_sha256": "580df76c95a1ec5ab878ceb25bb3d85c6a076804e9c970c8c6972aea775fdf65"
+    },
+    {
+      "id": "amiri",
+      "name": "Amiri Regular",
+      "names": {
+        "ar": "أميري"
+      },
+      "languages": [
+        "ar"
+      ],
+      "file": "amiri.woff2",
+      "sha256": "71e77f0a32f9392e22f2fb08f0224988a2ffeae887c8adaee3344444f0665e96",
+      "bytes": 16136,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/amiri/Amiri-Regular.ttf",
+      "source_sha256": "ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7",
+      "source_version": "Version 1.002",
+      "license": "SIL Open Font License 1.1",
+      "notice": "amiri-OFL.txt",
+      "notice_sha256": "72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22"
+    },
+    {
+      "id": "harmattan",
+      "name": "Harmattan Regular",
+      "names": {
+        "ar": "هارمتان"
+      },
+      "languages": [
+        "ar"
+      ],
+      "file": "harmattan.woff2",
+      "sha256": "6fa8f859776a4dfea475a1c389ca7025a08b63fb24279a970c73490a77be8bf3",
+      "bytes": 9892,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/harmattan/Harmattan-Regular.ttf",
+      "source_sha256": "5fbaafc51ad21663729b168afaff5f28d3e3087f1fc736ada32d7cd99674c0e0",
+      "source_version": "Version 4.400",
+      "license": "SIL Open Font License 1.1",
+      "notice": "harmattan-OFL.txt",
+      "notice_sha256": "8625c5d464ebfe457d071266178fc8b699ccdb7bd58051d53046b3e06806f4e1"
+    },
+    {
+      "id": "mada",
+      "name": "Mada Regular",
+      "names": {
+        "ar": "مدى"
+      },
+      "languages": [
+        "ar"
+      ],
+      "file": "mada.woff2",
+      "sha256": "be96c45e6e0d3de12c9dabd5c5539be5674040fd1069763ccd9db7e5863705eb",
+      "bytes": 10176,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/mada/Mada%5Bwght%5D.ttf",
+      "source_sha256": "bf4d193ee78cea2fd8bdc9e64e5cb7e8a19ff76ab74f97a9a4a0e80f8f4cefde",
+      "source_version": "Version 1.5",
+      "license": "SIL Open Font License 1.1",
+      "notice": "mada-OFL.txt",
+      "notice_sha256": "e15f74b13b1a30c878f162b2ce10aff4668d0e8ec8dae41dc61c1c12aa6d9eb9"
+    },
+    {
+      "id": "noto-sans-cjk",
+      "name": "Noto Sans CJK Regular",
+      "names": {
+        "zh-Hans": "诺托黑体 常规",
+        "zh-Hant": "諾托黑體 標準",
+        "ja": "ノトゴシック レギュラー",
+        "ko": "노토 산스"
+      },
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ],
+      "file": "noto-sans-cjk.woff2",
+      "sha256": "b4bec050a93b5763a1a716c53bf39b6cda806c22b3ca9d4f9ba98c8de51cf146",
+      "bytes": 25440,
+      "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+      "source_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+      "source_version": "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansCJK-LICENSE",
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "id": "noto-sans",
+      "name": "Noto Sans Regular",
+      "names": {
+        "en": "Noto Sans Regular",
+        "fr": "Noto Sans normal",
+        "es": "Noto Sans normal",
+        "pt-BR": "Noto Sans regular",
+        "de": "Noto Sans normal",
+        "it": "Noto Sans normale",
+        "ru": "Ното Санс обычный",
+        "pl": "Noto Sans zwykły",
+        "uk": "Ното Санс звичайний",
+        "tr": "Noto Sans normal",
+        "vi": "Noto Sans thường",
+        "id": "Noto Sans reguler"
+      },
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "file": "noto-sans.woff2",
+      "sha256": "02268d32b490dbf0ded50b7960679a47db9c62119a3ddf624c5552cbde72ddf0",
+      "bytes": 18168,
+      "source": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+      "source_sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+      "source_version": "Version 2.008; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\"",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSans-LICENSE",
+      "notice_sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+    },
+    {
+      "id": "noto-sans-arabic",
+      "name": "Noto Sans Arabic Regular",
+      "names": {
+        "ar": "نوتو سنس عربي"
+      },
+      "languages": [
+        "ar"
+      ],
+      "file": "noto-sans-arabic.woff2",
+      "sha256": "8712467f67fb7458d4b1f2d5d1b10c0c6e1ab8f60711c669082a1aa0b7db1819",
+      "bytes": 34716,
+      "source": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
+      "source_sha256": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+      "source_version": "Version 2.012",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansArabic-OFL.txt",
+      "notice_sha256": "07fc70bfeb985cc1a87a8587d0a0c80bab11c86c9dc3fd95b6f0cb332f983e96"
+    }
+  ]
+}

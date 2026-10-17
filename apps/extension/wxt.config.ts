@@ -11,7 +11,7 @@ export default defineConfig({
   zip: {
     // Preserve relative imports to shared image and model code in review sources.
     sourcesRoot: fileURLToPath(new URL('../../', import.meta.url)),
-    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'LICENSE'],
+    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'backend/shared/translation-fonts.{ts,json}', 'LICENSE'],
   },
   vite:()=>({
     plugins:[importAssets(),unrarCsp(),pdfjsCsp()],
@@ -39,6 +39,7 @@ export default defineConfig({
     icons: {16:'brand/icon-16.png',32:'brand/icon-32.png',48:'brand/icon-48.png',128:'brand/icon-128.png'},
     permissions: ['activeTab', 'scripting', 'storage', 'contextMenus', 'identity', 'alarms', 'declarativeNetRequestWithHostAccess', 'webRequest'],
     host_permissions: ['https://*/*', 'http://*/*'],
+    web_accessible_resources: [{resources:['fonts/translation/*.woff2'],matches:['https://*/*','http://*/*']}],
     action: { default_title: '__MSG_actionTitle__', default_icon: {16:'brand/icon-16.png',24:'brand/icon-24.png',32:'brand/icon-32.png'} },
     commands: {
       'nc-translate-tab':{suggested_key:{default:'Alt+Shift+Y'},description:'__MSG_commandTranslateTab__'},

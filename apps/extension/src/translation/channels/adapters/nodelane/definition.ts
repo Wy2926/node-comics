@@ -15,6 +15,7 @@ import {loadTranslationInput} from '../../../input/load';
 import {readChannelSettings,updateChannelSettings} from '../../configuration';
 import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
 import {pageTranslation} from '../../../../reader/presentation';
+import {effectiveTranslationFont,selectedFontAvailable} from '../../../fonts';
 
 // These baseline choices keep sign-in and cached views reachable without a network request.
 // New requests still require a successful policy refresh; the server enforces its actual limits.
@@ -67,7 +68,7 @@ export const definition:ChannelDefinition={
     const authorization=session?sessionAuthorization(session.id):undefined;
     const api=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),live,authorization);
     let caps=baselineCapabilities(),rights:Entitlements|undefined,policyError='';
-    const selectedModel=(await readChannelSettings()).modelPreferences?.[scope.key];
+    const preferences=await readChannelSettings(),selectedModel=preferences.modelPreferences?.[scope.key],selectedFonts=preferences.fontPreferences?.[scope.key]??{};
     if(session&&!openOptions?.deferPolicy){
       try{caps=await api.capabilities();rights=await api.entitlements();assertCurrent(live);}
       catch(error){assertCurrent(live);if((await readAuth()).session?.id!==session.id)throw error;policyError=(error as Error).message;}
@@ -75,11 +76,21 @@ export const definition:ChannelDefinition={
       try{caps=await api.capabilities();assertCurrent(live);}catch{assertCurrent(live);}
     }
     const connection:ChannelConnection={
-      key:JSON.stringify([profile.id,profile.revision,session?.id??null,selectedModel??null]),scope,label:'NodeLane',
+      key:JSON.stringify([profile.id,profile.revision,session?.id??null,selectedModel??null,selectedFonts]),scope,label:'NodeLane',
       get modelSelection(){return {value:selectedModel,models:caps.translation_models,async select(value?:string){
         assertCurrent(live);
         if(value&&!selectedModelAvailable(caps.translation_models,value))throw Error(msg('此翻译方式暂不可用'));
         await updateChannelSettings(settings=>{const modelPreferences={...settings.modelPreferences};if(value)modelPreferences[scope.key]=value;else delete modelPreferences[scope.key];return {...settings,modelPreferences};});
+      }};},
+      get fontSelection(){return {value:(language:string)=>effectiveTranslationFont(caps.translation_fonts,language,selectedFonts[language]),fonts:caps.translation_fonts,async select(language:string,value?:string){
+        assertCurrent(live);
+        const chosen=effectiveTranslationFont(caps.translation_fonts,language,value);
+        if(!chosen||value&&chosen!==value)throw Error(msg('此字体暂不可用，请选择其他字体。'));
+        await updateChannelSettings(settings=>{
+          const fontPreferences={...settings.fontPreferences},languages={...fontPreferences[scope.key]};
+          languages[language]=chosen;fontPreferences[scope.key]=languages;
+          return {...settings,fontPreferences};
+        });
       }};},
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
@@ -105,7 +116,8 @@ export const definition:ChannelDefinition={
         const current=()=>active&&live()&&options.isCurrent();
         const runtimeApi=new Api(API_BASE,session?.token??'',new RequestPool(UPLOAD_CONCURRENCY),current,session?sessionAuthorization(session.id):undefined);
         const modelId=options.modelId??selectedModel;
-        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,modelId,canSubmit:target=>!!caps.modes.find(mode=>mode.id===target.mode)?.enabled&&supportsLanguage(caps,target.mode,options.language)&&selectedModelAvailable(caps.translation_models,modelId),onModelRejected:async()=>{const fresh=await runtimeApi.capabilities();assertCurrent(current);caps=fresh;options.onChange();},getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
+        const fontId=()=>effectiveTranslationFont(caps.translation_fonts,options.language,options.fontId??selectedFonts[options.language]);
+        const core=userId?new TranslationCoordinator({api:runtimeApi,userId,language:options.language,modelId,get fontId(){return fontId();},canSubmit:target=>!!caps.modes.find(mode=>mode.id===target.mode)?.enabled&&supportsLanguage(caps,target.mode,options.language)&&selectedModelAvailable(caps.translation_models,modelId)&&selectedFontAvailable(caps.translation_fonts,options.language,fontId()),onModelRejected:async()=>{const fresh=await runtimeApi.capabilities();assertCurrent(current);caps=fresh;options.onChange();},getBlob:options.getBlob,readOriginal:options.readOriginal,prepareInput:options.prepareInput,limits:()=>caps.limits,tiles:()=>caps.representations?.includes('overlay-tiles-v1')??false,rights:()=>rights,onJobs:options.onJobs,onChange:options.onChange}):undefined;
         const requireCore=()=>{assertCurrent(current);if(!core)throw Error(msg('请先登录'));return core;};
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},
@@ -122,7 +134,7 @@ export const definition:ChannelDefinition={
           get waitingIds(){return core?.waitingIds??[];},
           get retryDelay(){return core?.retryDelay??0;},
           stateFor(target,requested,error=''){
-            return translationState({page:target.page,mode:target.mode,language:options.language,modelId,userId,origin:API_ORIGIN,active:requested,caps,rights,error:error||policyError,operation:core?.records.find(record=>record.entryId===target.entryId&&record.pageId===target.page.id&&record.mode===target.mode)});
+            return translationState({page:target.page,mode:target.mode,language:options.language,modelId,fontId:fontId(),userId,origin:API_ORIGIN,active:requested,caps,rights,error:error||policyError,operation:core?.records.find(record=>record.entryId===target.entryId&&record.pageId===target.page.id&&record.mode===target.mode)});
           },
           async refresh(){
             if(!core)return;assertCurrent(current);

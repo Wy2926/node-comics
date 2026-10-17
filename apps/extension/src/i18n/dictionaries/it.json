@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Carattere della traduzione",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "I caratteri dipendono dalla lingua di destinazione. Le modifiche valgono solo per le nuove attività; ritraduci manualmente le immagini esistenti.",
+  "正在加载字体预览…": "Caricamento dell’anteprima…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Impossibile caricare le anteprime. Riapri l’elenco per riprovare. Le impostazioni di traduzione restano invariate.",
+  "此字体暂不可用，请选择其他字体。": "Questo carattere non è al momento disponibile. Scegline un altro.",
   "展开全部 {0} 个网站": "Mostra tutti i {0} siti",
   "收起网站": "Mostra meno siti",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "La ricerca include solo i siti selezionati che corrispondono ai filtri. Le modifiche valgono per la prossima ricerca.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Aspetto e preferenze",
   "阅读偏好": "Preferenze di lettura",
   "默认目标语言": "lingua di destinazione predefinita",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "La traduzione supporta 16 lingue. Le immagini già tradotte vengono conservate.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Le lingue disponibili dipendono dal canale di traduzione. Le immagini già tradotte vengono conservate.",
   "翻页方向": "Direzione di rotazione della pagina",
   "翻页模式中的方向键遵循此设置。": "I tasti freccia nelle modalità a pagine rispettano questa impostazione.",
   "从右向左 · 日漫习惯": "Da destra a sinistra · Abitudini comiche giapponesi",

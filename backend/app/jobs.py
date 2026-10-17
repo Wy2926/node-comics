@@ -7,6 +7,7 @@ from .models import Asset, Job, now, uid
 from .entitlements import admission_policy, free_model_policy, locked_user, require_entitlement, reserve, settle
 from .providers import configuration, digest
 from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
+from .translation_fonts import resolve_font
 
 TERMINAL = {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}
 
@@ -106,17 +107,21 @@ def find_reusable(db, user, asset, mode, language, config):
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
-               source_sha256=None, request_hash_override=None, result_format='overlay-v1', model_id=None):
+               source_sha256=None, request_hash_override=None, result_format='overlay-v1', model_id=None, font_id=None):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
     sha = asset.sha256 if asset else source_sha256
     if not sha or (asset and asset.kind != "original"):
         problem("INVALID_INPUT_ASSET", "翻译需要有效原图身份", 422)
-    request_hash = request_hash_override or digest([sha, mode, language, force])
+    request_identity = [sha, mode, language, force]
+    if font_id:
+        request_identity.append({'font_id': font_id})
+    request_hash = request_hash_override or digest(request_identity)
     existing = job_for_request(db, user.id, key, request_hash)
     if existing:
         return existing
+    font_id = resolve_font(font_id, language)
     at = now()
     model_reason = None
     if model_id:
@@ -128,6 +133,7 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
             plan_id=policy.service_plan)
     if result_format == 'overlay-tiles-v1':
         config = {**config, 'result_format': result_format, 'version': digest([config['version'], result_format])}
+    config = {**config, 'font_id': font_id, 'version': digest([config['version'], {'font_id': font_id}])}
     cached = None if force else find_reusable(db, user, sha, mode, language, config)
     if cached:
         return remember_request(db, user.id, key, request_hash, cached)

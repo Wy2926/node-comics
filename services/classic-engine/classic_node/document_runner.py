@@ -316,6 +316,7 @@ class DocumentRunner:
         return self.agent.runtime.render(
             page.rgb, page.cleaned, page.analysis, page.translations, page.lease['language'], page.alpha,
             use_render_pool=bool(ipc), mask_cache_bytes=cache_bytes, check_cancelled=page.check, masks=page.masks,
+            **({'font_id': page.lease['config']['font_id']} if page.lease.get('config', {}).get('font_id') is not None else {}),
             full_image_max_bytes=self.workspace(page).limits.max_page_bytes)
 
     def persist(self, page):

@@ -1,19 +1,20 @@
 import {browserOverlay} from './overlay-fixture';
 import {saveSession} from '../src/auth/storage';
 import {API_ORIGIN} from '../src/service';
-import {defaults,type Job,type Entitlements,type TranslationInput,type TranslationSnapshot} from '../src/types';
-import {saveSettings} from '../src/comics/application/preferences';
+import {defaults,languageLabels,type Job,type Entitlements,type TranslationInput,type TranslationSnapshot} from '../src/types';
+import {saveSettings,settings} from '../src/comics/application/preferences';
+import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../backend/shared/translation-fonts';
 import {seedReaderFixture} from './reader-fixture-data';
 import {saveProcessingProfile,updateProcessingSettings} from '../src/image-processing/settings';
 import {hashFile} from '../src/importers/hash';
 
 if(location.origin!=='http://127.0.0.1:5176')throw Error('Use a new profile on the isolated http://127.0.0.1:5176 origin.');
-const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScenario=parameters.get('auto');
+const origin=API_ORIGIN,parameters=new URLSearchParams(location.search),autoScenario=parameters.get('auto'),fontsScenario=parameters.get('fonts')==='1';
 if(parameters.has('enhancement')){
   await saveProcessingProfile('nunif','Fixture enhancement',{url:location.origin+'/fixture-nunif/'});
   await updateProcessingSettings(value=>({...value,enabled:false}));
 }
-await saveSettings({...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
+await saveSettings(fontsScenario&&localStorage.getItem('nc-settings')?settings():{...defaults,fit:parameters.has('long')?'width':defaults.fit,uiLanguage:'zh-CN',appearance:parameters.get('theme')==='dark'?'dark':'light'});
 await saveSession({id:crypto.randomUUID(),expiresAt:Date.now()+3600000,refreshAt:Date.now()+3540000,credential:{kind:'development'},token:'isolated-fixture-token',user:{id:autoScenario?'fixture-'+autoScenario:'fixture-reader',name:'隔离阅读验收',role:'reader'},apiOrigin:origin});
 const originalFetch=window.fetch.bind(window);
 const height=parameters.has('native-long')?20000:900,overlay=await browserOverlay(height),blob=overlay.blob;
@@ -33,7 +34,7 @@ if(autoScenario==='lite')rights.modes.classic={...rights.modes.classic,unlimited
 const activeCount=()=>[...jobs.values()].filter(j=>['awaiting_upload','validating_upload','queued','running','outcome_unknown'].includes(j.status)).length;
 for(const copy of stored)for(const page of copy.pages)for(const job of page.jobs)Object.assign(job,{image_sha256:page.imageSha256});
 
-const state={modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,enhancements:[] as {sha256:string;bytes:number;width:number;height:number}[],enhancementFail:false,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(status:'succeeded'|'no_text'|'unchanged'='succeeded'){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status=status==='unchanged'?'succeeded':status;if(status==='unchanged')next.delivery={kind:'translated',representation:'original',normalization_version:1,input_sha256:next.image_sha256!,width:640,height};state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
+const state={legacyFonts:!fontsScenario,modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,enhancements:[] as {sha256:string;bytes:number;width:number;height:number}[],enhancementFail:false,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(status:'succeeded'|'no_text'|'unchanged'='succeeded'){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status=status==='unchanged'?'succeeded':status;if(status==='unchanged')next.delivery={kind:'translated',representation:'original',normalization_version:1,input_sha256:next.image_sha256!,width:640,height};state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 Object.assign(window,{readerFixture:state});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
@@ -56,14 +57,14 @@ window.fetch=async(input,init={})=>{
   if(state.offline||state.failDownloads&&url.pathname.endsWith('/result'))throw Error('网络连接失败（隔离验收）');
   if(state.failNext){state.failNext=false;throw Error('网络连接失败（隔离验收）');}
   const body=typeof init.body==='string'?JSON.parse(init.body):{};
-  if(url.pathname==='/v1/capabilities')return json({...(!state.legacyModels?{translation_models:[{id:'fixture-standard',name:'标准模型',requires_paid:false,available:true},{id:'fixture-premium',name:'进阶模型',requires_paid:true,available:state.modelPaid,unavailable_reason:state.modelPaid?null:'not_allowed'}]}:{}),result_protocol:'overlay-v1',representations:['overlay-v1','overlay-tiles-v1'],modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:10000000000,max_dimension:100000},entitlements:rights});
+  if(url.pathname==='/v1/capabilities')return json({...(!state.legacyFonts?{translation_fonts:TRANSLATION_FONTS.map(({id,languages})=>({id,languages}))}:{}),...(!state.legacyModels?{translation_models:[{id:'fixture-standard',name:'标准模型',requires_paid:false,available:true},{id:'fixture-premium',name:'进阶模型',requires_paid:true,available:state.modelPaid,unavailable_reason:state.modelPaid?null:'not_allowed'}]}:{}),result_protocol:'overlay-v1',representations:['overlay-v1','overlay-tiles-v1'],modes:[{id:'classic',enabled:true,unit_cost:state.price}],languages:fontsScenario?Object.entries({...languageLabels,ar:'العربية'}).map(([id,label])=>({id,label})):[{id:'zh-Hans',label:'简体中文'},{id:'en',label:'English'},{id:'ja',label:'日本語'}],limits:{max_translation_ids:32,max_bytes:20971520,max_pixels:10000000000,max_dimension:100000},entitlements:rights});
   if(url.pathname==='/v1/auth/config')return json({mode:'dev',dev_auth:true});
   if(url.pathname==='/v1/me/entitlements')return json(rights);
   if(url.pathname==='/v1/me/usage/summary')return json({entitlements:rights,timezone:'Asia/Shanghai',start_date:'2026-09-14',end_date:'2026-09-20',generated_at:new Date().toISOString(),delivered:0,free_delivered:0,included_delivered:0,by_mode:{},quota_used:{},days:[]});
   if(url.pathname==='/v1/me/usage')return json({entitlements:rights,items:[],total:0});
   const snapshot=(id:string):TranslationSnapshot|undefined=>{
     const j=jobs.get(operations.get(id)??id);if(!j)return;
-    return {id,model:j.model,requested_model_id:j.requested_model_id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?(j.delivery??overlay.result(id,j.image_sha256!)):null};
+    return {id,...(!state.legacyFonts?{font_id:j.font_id??null}:{}),model:j.model,requested_model_id:j.requested_model_id,mode:j.mode,target_language:j.target_language,image_sha256:j.image_sha256,created_at:j.created_at,updated_at:j.updated_at,state:j.status==='awaiting_upload'?'needs_input':j.status==='validating_upload'?'queued':j.status==='outcome_unknown'||j.status==='unknown_released'?'needs_attention':j.status==='cancelled'?'failed':j.status==='no_text'?'succeeded':j.status,error:j.error,result:j.status==='no_text'?{kind:'no_text',representation:'original',normalization_version:1,input_sha256:j.image_sha256!,width:640,height}:j.status==='succeeded'?(j.delivery??overlay.result(id,j.image_sha256!)):null};
   };
   if(url.pathname==='/v1/translations/events'){
     const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};
@@ -89,11 +90,14 @@ window.fetch=async(input,init={})=>{
     const prior='retry_of' in value?snapshot(value.retry_of):'regenerate_of' in value?snapshot(value.regenerate_of):undefined;
     const sha='image' in value?value.image.sha256:prior?.image_sha256,mode='image' in value?value.mode:prior!.mode,language='image' in value?value.target_language:prior!.target_language;
     const index=sha?imageOrdinals[sha]:undefined;if(index===undefined)throw Error('Unknown fixture image identity.');
-    const matching='image' in value?[...jobs.values()].filter(j=>j.image_sha256===sha&&j.mode===mode&&j.target_language===language&&(state.legacyModels||j.requested_model_id===value.model_id)).at(-1):undefined;
+    const defaultFont=state.legacyFonts?null:defaultTranslationFont(language)?.id??null;
+    const fontId='image' in value?value.font_id||defaultFont:'regenerate_of' in value&&Object.hasOwn(value,'font_id')?value.font_id||defaultFont:prior?.font_id??null;
+    if(!state.legacyFonts&&fontId&&!TRANSLATION_FONTS.some(font=>font.id===fontId&&font.languages.includes(language)))return json({error:{code:'TRANSLATION_FONT_LANGUAGE_UNSUPPORTED',message:'所选字体不支持目标语言，请重新选择'}},422);
+    const matching='image' in value?[...jobs.values()].filter(j=>j.image_sha256===sha&&j.mode===mode&&j.target_language===language&&(state.legacyFonts||(j.font_id??null)===fontId)&&(state.legacyModels||j.requested_model_id===value.model_id)).at(-1):undefined;
     if(matching){operations.set(id,matching.id);return json(snapshot(id));}
     if(Date.now()<state.rateBlockedUntil)return new Response(JSON.stringify({error:{code:'IMAGE_RATE_LIMITED',message:'等待翻译'}}),{status:429,headers:{'Content-Type':'application/json','Retry-After':String(Math.ceil((state.rateBlockedUntil-Date.now())/1000))}});
     if(rights.modes[mode].quota?.available===0)return json({error:{code:'DAILY_QUOTA_EXHAUSTED',message:'升级权益，继续翻译'}},403);
-    const j:Job={...job(index,'awaiting_upload'),...(!state.legacyModels?{requested_model_id:value.model_id,model:{id:value.model_id??'fixture-standard',name:value.model_id==='fixture-premium'?'进阶模型':'标准模型'}}:{}),id,mode,target_language:language,image_sha256:sha,created_at:new Date().toISOString()};jobs.set(id,j);operations.set(id,id);state.submitted.push(index);
+    const j:Job={...job(index,'awaiting_upload'),...(!state.legacyFonts?{font_id:fontId}:{}),...(!state.legacyModels?{requested_model_id:value.model_id,model:{id:value.model_id??'fixture-standard',name:value.model_id==='fixture-premium'?'进阶模型':'标准模型'}}:{}),id,mode,target_language:language,image_sha256:sha,created_at:new Date().toISOString()};jobs.set(id,j);operations.set(id,id);state.submitted.push(index);
     if(state.unknown){state.unknown=false;throw Error('Fixture response lost after acceptance');}
     return json(snapshot(id),202);
   }

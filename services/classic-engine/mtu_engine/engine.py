@@ -12,6 +12,7 @@ from classic_node.timing import record, stage, waiting_for
 
 from .assets import activate
 from .colors import ensure_stroke_contrast
+from .fonts import FONT_CHOICES, font_filename
 from .page_cache import page_images
 
 LANGUAGES = {'zh-Hans': 'CHS', 'zh-Hant': 'CHT', 'ja': 'JPN', 'ko': 'KOR', 'en': 'ENG',
@@ -80,6 +81,9 @@ class Renderer:
         # shaping, line breaking, size search, glyph rasterization and compositing.
         text_render.set_font(self.families[0])
         self.raw_fonts = [QRawFont(path, 24) for path in self.fonts]
+        if not all(font.isValid() for font in self.raw_fonts):
+            raise ValueError('Invalid prepared font')
+        self.font_ids = [key for key, (filename, _) in FONT_CHOICES.items() if filename in self.font_by_name]
         self._lock = Lock()
 
     def covers(self, text):
@@ -87,24 +91,17 @@ class Renderer:
                    for char in text if not char.isspace())
 
     def render(self, original, cleaned, regions, translations, language, bubble_mask, *, mask_cache_bytes=None,
-               bubble_prepared=False, bubble_components=None):
+               bubble_prepared=False, bubble_components=None, font_id=None):
         from manga_translator.config import Direction
         from manga_translator.utils import TextBlock, erode_bubble_mask
         from manga_translator.rendering.rich_text import legacy_line_breaks_to_document
         config = configuration()
         target = LANGUAGES[language]
         config.translator.target_lang = target
-        if language in ('zh-Hans', 'zh-Hant', 'ja'):
-            font = 'LXGWMarkerGothic-Regular.ttf'
-        elif language == 'ko':
-            font = 'Jua-Regular.ttf'
-        elif language == 'ar':
-            font = 'Lalezar-Regular.ttf'
-        elif language in ('ru', 'uk'):
-            font = 'ComicRelief-Bold.ttf'
-        else:
-            font = 'Bangers-Regular.ttf'
-        config.render.font_family = self.font_by_name.get(font, self.fonts[0])
+        font = font_filename(language, font_id)
+        if font not in self.font_by_name:
+            raise ValueError('Translation font is not installed')
+        config.render.font_family = self.font_by_name[font]
         if language not in ('zh-Hans', 'zh-Hant', 'ja'):
             config.render.direction = Direction.h
             # MTU explicitly supports this word-based layout switch for every

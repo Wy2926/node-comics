@@ -4,6 +4,7 @@ from conftest import login
 from app.db import session_factory
 from app.node_config import NodeConfig
 from app.queue_models import ComputeNode
+from app.translation_fonts import FONT_LANGUAGES
 
 
 def provision(client, resource='machine:cuda:0'):
@@ -19,7 +20,8 @@ def provision(client, resource='machine:cuda:0'):
 def register(client, auth, resource='machine:cuda:0', **extra):
     return client.post('/internal/compute/v3/nodes/register', headers=auth, json={
         'protocol_version': 3, 'engine_version': 'test-v2', 'ready': True,
-        'supported_languages': ['en'], 'device': 'cuda:0', 'resource_id': resource, **extra})
+        'supported_languages': ['en'], 'supported_font_ids': list(FONT_LANGUAGES),
+        'device': 'cuda:0', 'resource_id': resource, **extra})
 
 
 def test_unique_credentials_never_leak_and_cannot_impersonate(client):

@@ -238,10 +238,12 @@ def inspect_job(job_id):
 
 def control_node(db, stage="page"):
     from app.queue_models import ComputeNode
+    from app.translation_fonts import FONT_LANGUAGES
     node_id = "test-control-" + stage
     if not db.get(ComputeNode, node_id):
         db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id=node_id, name=node_id, resource_id=node_id, capabilities=[stage], capacity=1,
-                           engine_version="test-v3" if stage == "page" else "control", device="fixture"))
+                           engine_version="test-v3" if stage == "page" else "control", device="fixture",
+                           runtime_report={'supported_font_ids': list(FONT_LANGUAGES)}))
         db.flush()
     return node_id
 

@@ -185,6 +185,7 @@ class Agent:
             'engine_version': self.runtime.version, 'resource_id': self.local['resource_id'],
             'device': self.local['engine'].get('backend', 'cuda') + ':' + str(self.local['engine']['gpu']),
             'supported_languages': self.runtime.languages, 'ready': True, 'result_formats': ['overlay-v1', 'overlay-tiles-v1'],
+            'supported_font_ids': self.runtime.supported_font_ids,
             'document_protocol': self.documents.protocol()})
         if response['protocol_version'] != 3:
             raise NodeFailure('PROTOCOL_MISMATCH')

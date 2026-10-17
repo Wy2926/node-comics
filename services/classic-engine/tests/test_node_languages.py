@@ -12,7 +12,7 @@ def prepare(monkeypatch, tmp_path, covers):
     monkeypatch.setattr(runtime, 'model_identity', lambda *args: {})
     monkeypatch.setattr(runtime, 'package_version', lambda *args: 'test')
     monkeypatch.setattr(runtime, 'Engine', lambda **kwargs: SimpleNamespace(
-        renderer=SimpleNamespace(covers=covers), close=lambda: None))
+        renderer=SimpleNamespace(covers=covers, font_ids=['comic-relief']), close=lambda: None))
     return {'engine': {'models': 'unused', 'gpu': 0, 'font': [str(font)]}}
 
 
@@ -20,6 +20,7 @@ def test_ascii_font_reports_only_renderable_targets(monkeypatch, tmp_path):
     config = prepare(monkeypatch, tmp_path, str.isascii)
     node = runtime.Runtime(config)
     assert node.languages == ['en', 'id']
+    assert node.supported_font_ids == ['comic-relief']
     first = node.version
     (tmp_path / 'font.fixture').write_bytes(b'changed font')
     assert runtime.Runtime(config).version != first
@@ -29,6 +30,13 @@ def test_no_supported_font_rejects_before_claim(monkeypatch, tmp_path):
     config = prepare(monkeypatch, tmp_path, lambda text: False)
     with pytest.raises(ValueError, match='Fonts do not cover'):
         runtime.Runtime(config)
+
+
+def test_language_default_mapping_changes_runtime_fingerprint(monkeypatch, tmp_path):
+    config = prepare(monkeypatch, tmp_path, str.isascii)
+    first = runtime.Runtime(config).version
+    monkeypatch.setattr(runtime, 'DEFAULT_FONT_IDS', {**runtime.DEFAULT_FONT_IDS, 'en': 'patrick-hand'})
+    assert runtime.Runtime(config).version != first
 
 
 def test_backend_identity_queries_only_its_own_ort_distribution(monkeypatch, tmp_path):

@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Çeviri yazı tipi",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Yazı tipleri hedef dile göre sunulur. Değişiklikler yalnızca yeni görevleri etkiler; mevcut görselleri elle yeniden çevirin.",
+  "正在加载字体预览…": "Yazı tipi önizlemesi yükleniyor…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Yazı tipi önizlemeleri yüklenemedi. Yeniden denemek için listeyi tekrar açın. Çeviri ayarları değişmedi.",
+  "此字体暂不可用，请选择其他字体。": "Bu yazı tipi şu anda kullanılamıyor. Başka bir yazı tipi seçin.",
   "展开全部 {0} 个网站": "{0} sitenin tümünü göster",
   "收起网站": "Daha az site göster",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Yalnızca filtrelere uyan seçili sitelerde arama yapılır. Değişiklikler sonraki aramada geçerli olur.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Görünüm ve Tercihler",
   "阅读偏好": "Okuma Tercihleri",
   "默认目标语言": "Varsayılan hedef dil",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "Çeviri 16 dil seçeneğini destekler. Mevcut çevrilmiş görseller korunur.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Kullanılabilir diller çeviri kanalına bağlıdır. Mevcut çevrilmiş görseller korunur.",
   "翻页方向": "Sayfa çevirme yönü",
   "翻页模式中的方向键遵循此设置。": "Sayfalı modlardaki ok tuşları bu ayara uyar.",
   "从右向左 · 日漫习惯": "Sağdan sola · Japon çizgi roman alışkanlıkları",

@@ -23,6 +23,7 @@ from .request_models import RequestBody
 from .scheduler import ACTIVE, lock_scheduler, touch_job
 from .schemas import TranslationHistoryResponse, TranslationResponse, TranslationsResponse
 from .translation_limits import acquire_control, release_control
+from .translation_fonts import RequestedFont, resolve_font
 from .translation_requests import TranslationRequest
 from .upload_models import UploadReservation
 from .uploads import create_upload
@@ -43,6 +44,8 @@ class TranslationInput(RequestBody):
     target_language: Language | None = None
     model_id: str | None = Field(default=None, min_length=1, max_length=36,
         pattern=r'^[a-zA-Z0-9_-]+$', strict=True, exclude=True)
+    font_id: RequestedFont = Field(default=None, exclude=True,
+        description='嵌字字体。普通请求省略、null 或空字符串使用目标语言默认字体；重试继承；重译省略继承，null 或空字符串选用语言默认。')
     retry_of: UUID | None = None
     regenerate_of: UUID | None = None
     acknowledge_unknown_cost: bool = False
@@ -170,6 +173,7 @@ def translation_json(db, row, *, context=None):
         'image_sha256': entry.source_sha256 if entry else descriptor['image']['sha256'],
         'input_expires_at': iso(upload.expires_at) if upload else None,
         'requested_model_id': descriptor.get('model_id'), 'model': descriptor.get('model'),
+        'font_id': entry.config.get('font_id') if entry else descriptor.get('font_id'),
         'result': result, 'error': error, 'created_at': iso(row.created_at),
         'updated_at': iso(row.revoked_at or (entry.changed_at if entry else row.created_at))}
 
@@ -178,6 +182,8 @@ def accept_translation(db, user, request_id, body):
     content = body.model_dump(mode='json')
     if body.model_id is not None:
         content['model_id'] = body.model_id
+    if body.font_id is not None or (body.regenerate_of is not None and 'font_id' in body.model_fields_set):
+        content['font_id'] = body.font_id
     if body.result_format != 'overlay-v1':
         content['result_format'] = body.result_format
     signature = digest(content)
@@ -190,7 +196,7 @@ def accept_translation(db, user, request_id, body):
             problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销或过期', 410)
         return old
     image, mode, language = body.image, body.mode, body.target_language
-    result_format, model_id = body.result_format, body.model_id
+    result_format, model_id, font_id = body.result_format, body.model_id, body.font_id
     previous_id = body.retry_of or body.regenerate_of
     if previous_id:
         previous = owned_translation(db, user.id, previous_id)
@@ -211,6 +217,13 @@ def accept_translation(db, user, request_id, body):
             if model_id is not None and model_id != inherited_model:
                 problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原模型选择；换模型请重新翻译', 409)
             model_id = inherited_model
+        inherited_font = resolve_font(entry.config.get('font_id'), language)
+        if body.retry_of:
+            if font_id is not None and font_id != inherited_font:
+                problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原字体；换字体请重新翻译', 409)
+            font_id = inherited_font
+        elif 'font_id' not in body.model_fields_set:
+            font_id = inherited_font
         result_format = (previous.descriptor or {}).get('result_format', 'overlay-v1')
         if body.result_format != 'overlay-v1' and body.result_format != result_format:
             problem('IDEMPOTENCY_CONFLICT', '重试必须沿用原结果格式', 409)
@@ -218,10 +231,11 @@ def accept_translation(db, user, request_id, body):
         problem('MODE_UNSUPPORTED', '分块覆盖仅用于常规翻译', 422)
     if image.byte_size > settings().max_upload_bytes:
         problem('IMAGE_TOO_LARGE', '图片大小超过限制', 413)
+    font_id = resolve_font(font_id, language)
     asset = None  # Inputs are private to each actual job, never claimed by hash.
     entry = create_job(db, user, asset, mode, language, request_id, operation='translation',
         force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature,
-        result_format=result_format, model_id=model_id)
+        result_format=result_format, model_id=model_id, font_id=font_id)
     row = db.get(TranslationRequest, (user.id, request_id))
     row.descriptor = {**(row.descriptor or {}), 'image': image.model_dump(), 'mode': mode, 'target_language': language,
         'retry_of': str(body.retry_of) if body.retry_of else None,
@@ -229,6 +243,8 @@ def accept_translation(db, user, request_id, body):
         'acknowledge_unknown_cost': body.acknowledge_unknown_cost}
     if model_id is not None:
         row.descriptor = {**row.descriptor, 'model_id': model_id}
+    if font_id is not None:
+        row.descriptor = {**row.descriptor, 'font_id': font_id}
     if result_format != 'overlay-v1':
         row.descriptor = {**row.descriptor, 'result_format': result_format}
     if entry.status == 'awaiting_upload':

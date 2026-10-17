@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Police de traduction",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Les polices dépendent de la langue cible. Les changements ne concernent que les nouvelles tâches ; retraduisez manuellement les images existantes.",
+  "正在加载字体预览…": "Chargement de l’aperçu…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Les aperçus des polices n’ont pas pu être chargés. Rouvrez la liste pour réessayer. Les paramètres de traduction sont conservés.",
+  "此字体暂不可用，请选择其他字体。": "Cette police est indisponible pour le moment. Choisissez-en une autre.",
   "展开全部 {0} 个网站": "Afficher les {0} sites",
   "收起网站": "Afficher moins de sites",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Seuls les sites cochés correspondant aux filtres sont recherchés. Les modifications s’appliquent à la prochaine recherche.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Apparence et préférences",
   "阅读偏好": "Préférences de lecture",
   "默认目标语言": "Langue cible par défaut",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "La traduction prend en charge 16 langues. Les images déjà traduites sont conservées.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Les langues disponibles dépendent du canal de traduction. Les images déjà traduites sont conservées.",
   "翻页方向": "Sens de rotation des pages",
   "翻页模式中的方向键遵循此设置。": "Les touches fléchées des modes paginés respectent ce paramètre.",
   "从右向左 · 日漫习惯": "De droite à gauche · Habitudes comiques japonaises",

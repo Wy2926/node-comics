@@ -23,6 +23,7 @@ from .config import settings
 from .db import get_db, session_factory
 from .errors import ProcessingError, problem
 from .languages import Language, LANGUAGES
+from .translation_fonts import FontId, FONT_LANGUAGES, resolve_font, supports_font
 from .models import Asset, Attempt, ClassicState, Job, now
 from .node_config import NodeConfig
 from .providers import digest
@@ -133,6 +134,7 @@ def lease_payload(db, lease):
     return {'lease_id': lease.id, 'lease_token': lease.token, 'job_id': job.id, 'generation': lease.generation,
             'status': 'active', 'expires_at': stamp(lease.expires_at), 'limits': lease.limits,
             'input': input_descriptor(db, lease, source), 'config': {'engine': {'protocol_version': 3},
+                'font_id': resolve_font(job.config.get('font_id'), job.target_language),
                 **({'result_format': 'overlay-tiles-v1'} if job.config.get('result_format') == 'overlay-tiles-v1' else {})},
             'language': job.target_language, 'analysis': analysis,
             'analysis_hash': digest(analysis) if analysis else None,
@@ -148,6 +150,7 @@ class Registration(RequestBody):
     ready: bool
     document_protocol: Literal[1, 2] | None = None
     result_formats: list[Literal['overlay-v1', 'overlay-tiles-v1']] = Field(default_factory=lambda: ['overlay-v1'], max_length=2)
+    supported_font_ids: list[FontId] = Field(default_factory=list, max_length=len(FONT_LANGUAGES))
 
 
 @router.post('/nodes/register')
@@ -156,14 +159,26 @@ def register(body: Registration, identity=Depends(node_auth), db: Session = Depe
     node = scoped_node(db, identity)
     if body.resource_id != node.resource_id or body.engine_version == 'control':
         problem('NODE_RESOURCE_MISMATCH', '节点资源或引擎身份不匹配', 409)
-    leases = list(db.scalars(select(ExecutionLease).join(JobStage, JobStage.id == ExecutionLease.stage_id).where(
-        ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None), JobStage.name == 'page')))
+    leased = db.execute(select(ExecutionLease, Job.config['font_id'].as_string(), Job.target_language)
+        .join(JobStage, JobStage.id == ExecutionLease.stage_id).join(Job, Job.id == ExecutionLease.job_id).where(
+            ExecutionLease.node_id == identity, ExecutionLease.completed_at.is_(None), JobStage.name == 'page')).all()
+    # A downgraded runtime must not resume pages or owned document workspaces
+    # without their frozen font (or the effective default of historical jobs).
+    from .documents.models import Document
+    unsupported_document = db.scalar(select(Job.id).join(Document, Document.job_id == Job.id).where(
+        Document.owner_node_id == identity, Job.status.not_in(('succeeded', 'failed', 'cancelled')),
+        ~supports_font(Job.config['font_id'].as_string(), Job.target_language, body.supported_font_ids)).limit(1))
+    if unsupported_document or any(lease.expires_at > now() and resolve_font(font_id, language) not in body.supported_font_ids
+                                  for lease, font_id, language in leased):
+        problem('NODE_FONT_CAPABILITY_CONFLICT', '节点仍有未完成的字体任务，请保留其字体支持或等待任务恢复', 409)
+    leases = [lease for lease, _, _ in leased]
     node.engine_version, node.device = body.engine_version, body.device
     node.capabilities = ['page'] if body.ready else []
     if body.ready and body.document_protocol == 2:
         node.capabilities += ['doc_prepare', 'doc_ocr', 'doc_render', 'doc_zip']
     node.supported_languages = list(dict.fromkeys(body.supported_languages))
     node.runtime_report = {'protocol_version': 3, 'ready': body.ready, 'languages': body.supported_languages,
+        'supported_font_ids': list(dict.fromkeys(body.supported_font_ids)) if body.ready else [],
         'overlay_tiles': body.ready and 'overlay-tiles-v1' in body.result_formats,
         'document_protocol': body.document_protocol if body.ready else None}
     node.applied_config_version, node.config_error, node.heartbeat_at = node.config_version, None, now()

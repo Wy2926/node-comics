@@ -15,6 +15,7 @@ from PIL import ImageDraw
 from classic_node.protocol import NodeFailure, digest, pack_result, png64
 from classic_node.pipeline import Pipeline
 from classic_node.runtime import Runtime
+from mtu_engine.fonts import DEFAULT_FONT_IDS, FONT_CHOICES
 
 
 def fixture(alpha=None):
@@ -31,6 +32,7 @@ def fixture(alpha=None):
     runtime._render_fallback_warned = set()
     runtime.config = {}
     runtime.version = 'test'
+    runtime.supported_font_ids = list(FONT_CHOICES)
     runtime.engine = SimpleNamespace(renderer=SimpleNamespace(render=lambda original, cleaned, *args, **kwargs: cleaned))
     analysis = {'version': runtime.version, 'format': Runtime.ANALYSIS_FORMAT, 'input_hash': metadata['sha256'], 'segments': [{'id': '0'}],
                 'regions': [{'bbox': [0, 0, 80, 64]}]}
@@ -87,7 +89,7 @@ def test_render_cache_budget_reaches_renderer_without_changing_result_identity(m
     runtime, data, metadata, analysis, translated = fixture()
     rgb, alpha = runtime.decode(data, metadata)
     budgets = []
-    def draw(original, cleaned, *args, mask_cache_bytes=None):
+    def draw(original, cleaned, *args, mask_cache_bytes=None, font_id=None):
         budgets.append(mask_cache_bytes)
         rendered = cleaned.copy()
         rendered[10, 10] = (100, 101, 102)
@@ -99,6 +101,41 @@ def test_render_cache_budget_reaches_renderer_without_changing_result_identity(m
         assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha, mask_cache_bytes=budget) == uncapped
     assert budgets == [None, 0, 1024, rgb.shape[0] * rgb.shape[1]]
     assert (digest(analysis), digest(translated)) == original_identity
+
+
+@pytest.mark.parametrize('pooled', [False, True])
+@pytest.mark.parametrize('font_id', [None, '', 'comic-relief'])
+def test_selected_font_reaches_local_and_pooled_renderer_without_mutating_checkpoint(monkeypatch, pooled, font_id):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    identity = digest(analysis), digest(translated)
+    calls = []
+    if pooled:
+        runtime.render_pool = SimpleNamespace(render=lambda *args, **kwargs: calls.append(kwargs))
+    else:
+        monkeypatch.setattr(runtime.engine.renderer, 'render',
+                            lambda original, cleaned, *args, **kwargs: (calls.append(kwargs), cleaned)[1])
+    runtime.render(rgb, rgb, analysis, translated, 'en', alpha, font_id=font_id)
+    assert calls[0]['font_id'] == (font_id or DEFAULT_FONT_IDS['en'])
+    assert (digest(analysis), digest(translated)) == identity
+
+
+@pytest.mark.parametrize('font_id', ['../font.ttf', 'gaegu', 'unknown', ' ', [], 4])
+def test_unknown_missing_and_language_incompatible_fonts_are_rejected_before_render(monkeypatch, font_id):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    monkeypatch.setattr(runtime.engine.renderer, 'render', lambda *_a, **_k: pytest.fail('No rendering'))
+    with pytest.raises(NodeFailure, match='CLASSIC_FONT_UNSUPPORTED'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha, font_id=font_id)
+
+
+@pytest.mark.parametrize('font_id', [None, '', 'comic-relief'])
+def test_uninstalled_explicit_and_default_fonts_cannot_silently_select_another_font(font_id):
+    runtime, data, metadata, analysis, translated = fixture()
+    rgb, alpha = runtime.decode(data, metadata)
+    runtime.supported_font_ids = []
+    with pytest.raises(NodeFailure, match='CLASSIC_FONT_UNSUPPORTED'):
+        runtime.render(rgb, rgb, analysis, translated, 'en', alpha, font_id=font_id)
 
 
 def test_zero_visible_diff_returns_successful_original_without_artifact():
@@ -126,7 +163,7 @@ def test_pool_renders_with_same_identity_and_receives_budget_and_cancellation():
                           mask_cache_bytes=1234, check_cancelled=check) == expected
     assert len(calls) == 1 and len(checks) == 2
     assert calls[0][1] == {'mask_cache_bytes': 1234, 'check_cancelled': check,
-        'alpha': alpha, 'version': runtime.version, 'allow_tiles': False,
+        'alpha': alpha, 'version': runtime.version, 'allow_tiles': False, 'font_id': DEFAULT_FONT_IDS['en'],
         'analysis': {'input_hash': analysis['input_hash']},
         'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']}}
     assert runtime.render(rgb, rgb, analysis, translated, 'en', alpha, use_render_pool=False) == expected

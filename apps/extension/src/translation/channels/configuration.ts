@@ -3,14 +3,17 @@ import type {ChannelProfile} from './contracts';
 
 export const channelSettingsKey='nc-translation-channels';
 export const defaultChannel:ChannelProfile={id:'nodelane',adapterId:'nodelane',name:'NodeLane',revision:1,settings:{}};
-export interface ChannelSettings {activeId:string;profiles:ChannelProfile[];modelPreferences?:Record<string,string>;}
+export interface ChannelSettings {activeId:string;profiles:ChannelProfile[];modelPreferences?:Record<string,string>;fontPreferences?:Record<string,Record<string,string>>;}
 const defaults=():ChannelSettings=>({activeId:defaultChannel.id,profiles:[]});
 function normalize(value:unknown):ChannelSettings {
   if(!value||typeof value!=='object')return defaults();
   const input=value as ChannelSettings;
   const profiles=Array.isArray(input.profiles)?input.profiles.filter(p=>p&&typeof p.id==='string'&&p.id!==defaultChannel.id&&typeof p.adapterId==='string'&&typeof p.name==='string'&&Number.isSafeInteger(p.revision)&&p.revision>0&&p.settings&&Object.values(p.settings).every(v=>typeof v==='string')):[];
   const modelPreferences=input.modelPreferences&&typeof input.modelPreferences==='object'?Object.fromEntries(Object.entries(input.modelPreferences).filter(([,id])=>typeof id==='string'&&id.length>0&&id.length<=36)):undefined;
-  return {activeId:input.activeId===defaultChannel.id||profiles.some(p=>p.id===input.activeId)?input.activeId:defaultChannel.id,profiles,...(modelPreferences?{modelPreferences}:{})};
+  const fontPreferences=input.fontPreferences&&typeof input.fontPreferences==='object'?Object.fromEntries(Object.entries(input.fontPreferences)
+    .filter(([,languages])=>languages&&typeof languages==='object'&&!Array.isArray(languages))
+    .map(([scope,languages])=>[scope,Object.fromEntries(Object.entries(languages).filter(([language,id])=>language.length<=16&&typeof id==='string'&&id.length>0&&id.length<=64))])):undefined;
+  return {activeId:input.activeId===defaultChannel.id||profiles.some(p=>p.id===input.activeId)?input.activeId:defaultChannel.id,profiles,...(modelPreferences?{modelPreferences}:{}),...(fontPreferences?{fontPreferences}:{})};
 }
 export async function readChannelSettings():Promise<ChannelSettings>{
   if(typeof chrome!=='undefined'&&chrome.storage?.local)return normalize((await chrome.storage.local.get(channelSettingsKey))[channelSettingsKey]);

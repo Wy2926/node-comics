@@ -56,6 +56,7 @@ def execute(args):
             runtime.warmup()
             print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
+                'supported_font_ids': runtime.supported_font_ids,
                 'cpu_resources': config.get('_cpu_resources'),
                 'execution_settings': execution_settings(config),
                 'inpainting_backend': ('pytorch-hip-fp32' if config['engine'].get('backend', 'cuda') == 'amd'

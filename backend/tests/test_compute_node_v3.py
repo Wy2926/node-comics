@@ -25,6 +25,7 @@ from app.models import Asset, Job
 from app.queue_models import JobStage
 from app.scheduler import claim_stage
 from app.storage import get_store
+from app.translation_fonts import FONT_LANGUAGES
 from app.workers import run_control_stage
 from test_compute_v3 import analysis_for, v3  # noqa: F401
 
@@ -32,6 +33,7 @@ from test_compute_v3 import analysis_for, v3  # noqa: F401
 class FixtureRuntime:
     version = 'test-v3'
     languages = ['en']
+    supported_font_ids = list(FONT_LANGUAGES)
 
     def validate_analysis(self, analysis):
         assert 'regions' in analysis  # Controller fixtures use their own image format.
@@ -39,6 +41,7 @@ class FixtureRuntime:
     def __init__(self):
         self.analyzed = 0
         self.rendered = 0
+        self.render_fonts = []
 
     def decode(self, data, metadata):
         return (data, metadata), None
@@ -68,10 +71,11 @@ class FixtureRuntime:
         return 0
 
     def render(self, original, source, analysis, translated, language, alpha, *, mask_cache_bytes=None,
-               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False):
+               use_render_pool=True, check_cancelled=None, masks=None, allow_tiles=False, font_id=None):
         if check_cancelled:
             check_cancelled()
         self.rendered += 1
+        self.render_fonts.append(font_id)
         image = Image.open(BytesIO(source[0])).convert('RGB')
         stream = BytesIO()
         Image.new('RGBA', (1, 1), (1, 2, 3, 255)).save(stream, 'WEBP', lossless=True)
@@ -122,6 +126,32 @@ def drive(agent, jobs, timeout=15, *, schedule=False, expected='succeeded'):
             return
         time.sleep(.03)
     pytest.fail('node/controller did not complete: ' + str(states))
+
+
+def test_font_selection_reaches_actual_node_client_without_extra_text_call(v3, tmp_path, png):
+    from conftest import login, upload
+    from app.models import TextCall
+    from sqlalchemy import func
+
+    auth = login(v3['client'], 'font-reader')
+    asset = upload(v3['client'], auth, png)
+    result = create(v3['client'], auth, asset, key='selected-font', language='en', font_id='comic-relief')
+    assert result.status_code == 202, result.text
+    runtime = FixtureRuntime()
+    runtime.supported_font_ids = ['comic-relief']
+    agent, transport, journal = node_for(v3, tmp_path, 1, runtime)
+    try:
+        agent.register()
+        agent.claim()
+        drive(agent, [result.json()['id']])
+        assert runtime.analyzed == runtime.rendered == 1
+        assert runtime.render_fonts == ['comic-relief']
+        with session_factory()() as db:
+            assert db.scalar(select(func.count()).select_from(TextCall)) == 1
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
 
 
 def test_definitive_output_rejection_reports_failure_once_and_drains_buffers(v3, tmp_path):

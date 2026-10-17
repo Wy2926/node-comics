@@ -8700,6 +8700,13 @@
             },
             "type": "array",
             "title": "Translation Models"
+          },
+          "translation_fonts": {
+            "items": {
+              "$ref": "#/components/schemas/TranslationFontCapability"
+            },
+            "type": "array",
+            "title": "Translation Fonts"
           }
         },
         "type": "object",
@@ -10657,6 +10664,37 @@
             "type": "array",
             "maxItems": 2,
             "title": "Result Formats"
+          },
+          "supported_font_ids": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "lxgw-wenkai-light",
+                "comic-relief",
+                "patrick-hand",
+                "gaegu",
+                "noto-naskh-arabic",
+                "lxgw-wenkai",
+                "noto-sans-cjk-light",
+                "noto-serif-cjk",
+                "klee-one",
+                "gowun-dodum",
+                "gowun-batang",
+                "nanum-pen",
+                "pangolin",
+                "andika",
+                "nunito",
+                "amiri",
+                "harmattan",
+                "mada",
+                "noto-sans-cjk",
+                "noto-sans",
+                "noto-sans-arabic"
+              ]
+            },
+            "type": "array",
+            "maxItems": 21,
+            "title": "Supported Font Ids"
           }
         },
         "additionalProperties": false,
@@ -11252,6 +11290,27 @@
         ],
         "title": "TranslationArtifactResponse"
       },
+      "TranslationFontCapability": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Languages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "languages"
+        ],
+        "title": "TranslationFontCapability"
+      },
       "TranslationHistoryResponse": {
         "properties": {
           "items": {
@@ -11352,6 +11411,45 @@
               }
             ],
             "title": "Model Id"
+          },
+          "font_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lxgw-wenkai-light",
+                  "comic-relief",
+                  "patrick-hand",
+                  "gaegu",
+                  "noto-naskh-arabic",
+                  "lxgw-wenkai",
+                  "noto-sans-cjk-light",
+                  "noto-serif-cjk",
+                  "klee-one",
+                  "gowun-dodum",
+                  "gowun-batang",
+                  "nanum-pen",
+                  "pangolin",
+                  "andika",
+                  "nunito",
+                  "amiri",
+                  "harmattan",
+                  "mada",
+                  "noto-sans-cjk",
+                  "noto-sans",
+                  "noto-sans-arabic"
+                ]
+              },
+              {
+                "type": "string",
+                "const": ""
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Id",
+            "description": "嵌字字体。普通请求省略、null 或空字符串使用目标语言默认字体；重试继承；重译省略继承，null 或空字符串选用语言默认。"
           },
           "retry_of": {
             "anyOf": [
@@ -11511,6 +11609,17 @@
               }
             ],
             "title": "Requested Model Id"
+          },
+          "font_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Id"
           },
           "model": {
             "anyOf": [

@@ -35,7 +35,7 @@ classic-node = "classic_node.__main__:main"
 include = ["mtu_engine*", "classic_node*"]
 
 [tool.setuptools.package-data]
-mtu_engine = ["upstream.lock.json"]
+mtu_engine = ["upstream.lock.json", "fonts.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

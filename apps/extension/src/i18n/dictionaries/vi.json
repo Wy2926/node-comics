@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Phông chữ bản dịch",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Phông chữ được cung cấp theo ngôn ngữ đích. Thay đổi chỉ áp dụng cho tác vụ mới; cần dịch lại thủ công các ảnh hiện có.",
+  "正在加载字体预览…": "Đang tải bản xem trước phông chữ…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Không tải được bản xem trước phông chữ. Mở lại danh sách để thử lại. Cài đặt dịch không bị ảnh hưởng.",
+  "此字体暂不可用，请选择其他字体。": "Phông chữ này hiện không khả dụng. Hãy chọn phông chữ khác.",
   "展开全部 {0} 个网站": "Hiện tất cả {0} trang web",
   "收起网站": "Thu gọn trang web",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Chỉ tìm trên các trang đã chọn và phù hợp với bộ lọc. Thay đổi áp dụng cho lần tìm kiếm tiếp theo.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Ngoại hình và sở thích",
   "阅读偏好": "Tùy chọn đọc",
   "默认目标语言": "Ngôn ngữ đích mặc định",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "Hỗ trợ dịch sang 16 ngôn ngữ. Các ảnh đã dịch được giữ lại.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Ngôn ngữ khả dụng tùy thuộc vào kênh dịch. Các ảnh đã dịch được giữ lại.",
   "翻页方向": "Hướng lật trang",
   "翻页模式中的方向键遵循此设置。": "Các phím mũi tên trong chế độ lật trang tuân theo cài đặt này.",
   "从右向左 · 日漫习惯": "Từ phải sang trái · Thói quen truyện tranh của người Nhật",

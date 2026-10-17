@@ -1,0 +1,267 @@
+[
+  {
+    "id": "lxgw-wenkai-light",
+    "file": "LXGWWenKai-Light.ttf",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "comic-relief",
+    "file": "ComicRelief-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "id"
+    ],
+    "default_languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "id"
+    ]
+  },
+  {
+    "id": "patrick-hand",
+    "file": "PatrickHand-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "pl",
+      "tr",
+      "vi",
+      "id"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "gaegu",
+    "file": "Gaegu-Regular.ttf",
+    "languages": [
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "noto-naskh-arabic",
+    "file": "NotoNaskhArabic-Regular.ttf",
+    "languages": [
+      "ar"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "lxgw-wenkai",
+    "file": "LXGWWenKai-Regular.ttf",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "noto-sans-cjk-light",
+    "file": "NotoSansCJKsc-Light.otf",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "noto-serif-cjk",
+    "file": "NotoSerifCJKsc-Regular.otf",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "klee-one",
+    "file": "KleeOne-Regular.ttf",
+    "languages": [
+      "ja"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "gowun-dodum",
+    "file": "GowunDodum-Regular.ttf",
+    "languages": [
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "gowun-batang",
+    "file": "GowunBatang-Regular.ttf",
+    "languages": [
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "nanum-pen",
+    "file": "NanumPenScript-Regular.ttf",
+    "languages": [
+      "ko"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "pangolin",
+    "file": "Pangolin-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "vi",
+      "id"
+    ],
+    "default_languages": [
+      "vi"
+    ]
+  },
+  {
+    "id": "andika",
+    "file": "Andika-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "vi",
+      "id"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "nunito",
+    "file": "Nunito-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "vi",
+      "id"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "amiri",
+    "file": "Amiri-Regular.ttf",
+    "languages": [
+      "ar"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "harmattan",
+    "file": "Harmattan-Regular.ttf",
+    "languages": [
+      "ar"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "mada",
+    "file": "Mada.ttf",
+    "languages": [
+      "ar"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "noto-sans-cjk",
+    "file": "NotoSansCJKsc-Regular.otf",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "default_languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ]
+  },
+  {
+    "id": "noto-sans",
+    "file": "NotoSans-Regular.ttf",
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "pt-BR",
+      "de",
+      "it",
+      "ru",
+      "pl",
+      "uk",
+      "tr",
+      "vi",
+      "id"
+    ],
+    "default_languages": []
+  },
+  {
+    "id": "noto-sans-arabic",
+    "file": "NotoSansArabic.ttf",
+    "languages": [
+      "ar"
+    ],
+    "default_languages": [
+      "ar"
+    ]
+  }
+]

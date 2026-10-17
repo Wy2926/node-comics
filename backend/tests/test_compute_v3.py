@@ -21,6 +21,7 @@ from app.providers import digest
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import claim_stage
 from app.storage import LocalStore
+from app.translation_fonts import FONT_LANGUAGES
 from app.workers import run_control_stage
 from test_node_management import provision
 
@@ -52,7 +53,8 @@ def v3(client, monkeypatch, png):
         record.desired_config = {**record.desired_config, 'execution_slots': 4}
         db.commit()
     registration = {'protocol_version': 3, 'engine_version': 'test-v3', 'resource_id': 'test:cuda:0',
-                    'device': 'fixture', 'ready': True, 'supported_languages': ['en', 'zh-Hans']}
+                    'device': 'fixture', 'ready': True, 'supported_languages': ['en', 'zh-Hans'],
+                    'supported_font_ids': list(FONT_LANGUAGES)}
     response = client.post(PREFIX + '/nodes/register', headers=auth, json=registration)
     assert response.status_code == 200, response.text
     assert 'no-store' in response.headers['cache-control']

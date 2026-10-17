@@ -12,16 +12,18 @@ import {TranslationChannels} from './TranslationChannels';
 import {EnhancementSettings} from './EnhancementSettings';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
 import {TranslationModelPicker} from './TranslationModelPicker';
-import type {ModelSelection} from '../translation/channels/contracts';
+import {TranslationFontPicker} from './TranslationFontPicker';
+import type {ModelSelection,FontSelection} from '../translation/channels/contracts';
 type Props = {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
   caps?: Capabilities;
   modelSelection?: ModelSelection;
+  fontSelection?: FontSelection;
   children?: ReactNode;
   onOpenShortcuts?: () => void;
 };
-export function Preferences({ settings, setSettings, caps, modelSelection, children, onOpenShortcuts }: Props) {
+export function Preferences({ settings, setSettings, caps, modelSelection, fontSelection, children, onOpenShortcuts }: Props) {
   return <div className="nc-preferences" role="region" aria-label={msg('外观与偏好')}>
     <AppearanceSettings settings={settings} onChange={setSettings}>
       <InterfaceLanguage value={settings.uiLanguage} onChange={uiLanguage=>setSettings(s=>({...s,uiLanguage}))}/>
@@ -43,10 +45,11 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
       </SettingRow>
     </section>
     <TranslationChannels>
-      <SettingRow title={msg('默认目标语言')} description={msg('翻译支持 16 个语言选项，已有译图版本保留。')}>
+      <SettingRow title={msg('默认目标语言')} description={msg('可选语言由翻译渠道提供，已有译图版本保留。')}>
         <TargetLanguage value={settings.language} caps={caps} onChange={language=>setSettings(s=>({...s,language}))}/>
       </SettingRow>
       <TranslationModelPicker selection={modelSelection}/>
+      <TranslationFontPicker selection={fontSelection} language={settings.language}/>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <div className="setting-row">
         <div><b>{msg('翻译书名与简介')}</b></div>

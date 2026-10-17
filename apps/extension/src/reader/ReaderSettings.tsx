@@ -5,17 +5,19 @@ import {fallbackLanguages, type Capabilities, type Settings} from '../types';
 import {LanguageFlag} from '../ui/LanguageFlag';
 import {Select, SelectOption} from '../ui/Select';
 import {TranslationModelPicker} from '../ui/TranslationModelPicker';
-import type {ModelSelection} from '../translation/channels/contracts';
+import {TranslationFontPicker} from '../ui/TranslationFontPicker';
+import type {ModelSelection,FontSelection} from '../translation/channels/contracts';
 import {EnhancementToggle} from '../ui/EnhancementSettings';
 import {ReaderDisplaySettings} from './ReaderOptions';
 export {ReaderChoice, ReaderScale} from './ReaderOptions';
 
-export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, modelSelection, note}: {
+export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, modelSelection, fontSelection, note}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   caps?: Capabilities;
   channelLabel?: string;
   modelSelection?: ModelSelection;
+  fontSelection?: FontSelection;
   note: string;
 }) {
   const languages = caps?.languages ?? fallbackLanguages;
@@ -26,6 +28,7 @@ export function ReaderTranslationSettings({settings, setSettings, caps, channelL
         {languages.map(language => <SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}
       </Select></label>
     <TranslationModelPicker selection={modelSelection}/>
+    <TranslationFontPicker selection={fontSelection} language={settings.language}/>
     <p className="nc-muted nc-default-mode-note">{note}</p>
   </>;
 }

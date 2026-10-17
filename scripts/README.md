@@ -47,6 +47,8 @@ node scripts/verify_simple_reading.mjs
 | `verify_discovery.mjs` | 生产 MV3 发现／详情／来源导入、返回位置、分页失败／限流及主题的隔离 HTTP 夹具；含设置中的默认开启文字翻译开关及持久化、可见书名／简介自动翻译、并发与缓存、原文切换、简介控制同行与展开位置、限流重试和取消；`--text-only` 聚焦设置、文字交互与布局，`--detail-only` 检查关闭自动翻译后的手动入口、手机年份旁操作／长标题评分／长简介与别名自然展开、桌面固定底部操作及返回位置，`--live` 只检查真实 AniList 公共列表和详情。`DISCOVERY_OUTPUT` 可指定仓库外的验收产物目录 |
 | `verify_text_translation.mjs` | 生产 MV3 匿名 Google 无密钥文字翻译，用自制书名／简介核对真实译文、无凭据 POST 与缓存；不调用名称模型或图片翻译 |
 | `verify_simple_reading.mjs` / `verify_source_database_baseline.mjs` | 单来源导入、格式、书架、批量移除、新库和重启恢复 |
+| `verify_translation_fonts.mjs` | Vite 5176 的隔离字体验收：17 种目标语言各至少 5 项、下拉选项以目标语言字体名真实渲染 WOFF2、按展开状态加载与跨语言复用、保存刷新、RTL／窄屏、预览失败、切换不自动重译与阅读位置保持、显式重译及恢复默认；合成 API，不调用模型，沿用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM` |
+| `verify_translation_fonts_extension.mjs` | 隔离 profile 加载构建后的 MV3 副本，核对 21 个 WOFF2 的字节与摘要、扩展页和 HTTP 网页的真实字体加载，以及未开放资源的访问拒绝；不调用模型，沿用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM`／`TEST_EXTENSION_DIR` |
 | `verify_shelf_cards.mjs` | 隔离 MV3 卡片的相对时间、无时钟图标、标题与阅读位置省略、深浅主题、窄屏和 CBZ 续读恢复；使用上方自制样本与浏览器环境变量 |
 | `verify_shelf_performance.mjs` | 隔离 MV3 书架的重复切换、封面复用、数据库读取量、菜单与滚动位置；`SHELF_PERF_BOOKS=17` 指定漫画数，`SHELF_PERF_LABEL=before` 记录基准，默认 `after` 检查读取范围与封面复用，`SHELF_PERF_EXTENSION` 可指定对照构建 |
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
@@ -129,6 +131,10 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 分块脚本默认读取 `http://127.0.0.1:4323`，可通过 `WEBSITE_TRANSLATION_URL` 指向其他回环端口；可设置 `TEST_CHROMIUM` 与 `PLAYWRIGHT_MODULE` 指定本机浏览器和依赖。
 
 ## 辅助工具
+
+`prepare_translation_font_previews.py` 从[计算节点字体清单](../services/compute-node/assets.json)中已下载的完整字体和原始许可生成插件离线 WOFF2 样例，只包含[目标语言字体名与固定对照示例](../backend/shared/translation-fonts.json)的字形。先校验来源 SHA-256、每种语言默认字体及名称、示例的字形覆盖，派生子集重命名为 `Node Comics Preview …` 并保留原版权和 OFL 声明；`sources.json` 记录原字体版本、来源和原始／派生摘要，并同步后端、引擎独立部署包中的字体目录与默认映射 JSON。使用 `uv run --no-project --with "fonttools[woff]==4.59.1" python scripts/prepare_translation_font_previews.py --source <字体与许可目录>` 重建，默认覆盖 `apps/extension/public/fonts/translation/` 中同名生成文件。完整字体只由计算节点准备和分发，不打入插件；预览资源由插件设置按需加载，不从外部字体服务获取。
+
+`node scripts/preview_translation_fonts.mjs [输出目录]` 使用上述真实 WOFF2 生成可离线打开的字体对照页，以及全部 17 个目标语言的同句、同字号气泡 PNG；默认输出 `artifacts/translation-fonts/preview/`，使用 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM` 指定浏览器依赖，不访问网络。预览不模拟特定漫画页的最终自动字号与排版。
 
 `probe_page_image_access.mjs` 使用临时研究扩展比较图片像素、原始字节和浏览器缓存；可选 `PROBE_DEBUGGER`、`PROBE_PAGE_CAPTURE`、`PROBE_REQUEST_CONTEXT` 仅影响实验扩展，不改变产品权限。
 

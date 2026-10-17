@@ -1,0 +1,6 @@
+.nc-font-picker{display:grid;gap:10px;min-width:0;margin-top:16px}
+.nc-font-picker .field{margin:0}
+.nc-font-picker .nc-select{width:100%}
+.nc-font-picker>.nc-muted{margin:0;font-size:var(--text-small);line-height:1.6}
+.nc-font-picker>[role=status]{margin:0;color:var(--muted);font-size:var(--text-small);line-height:1.6}
+.nc-font-picker>[role=alert]{margin:0;color:var(--warning);font-size:var(--text-small)}

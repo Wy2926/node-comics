@@ -5,3 +5,6 @@
 # Preserve the recorded checksums of vendored flag assets on Windows checkouts.
 apps/extension/public/flags/* text eol=lf
 apps/extension/public/licenses/flag-icons.txt text eol=lf
+# Preserve checksum-pinned upstream font notices verbatim, including whitespace.
+apps/extension/public/fonts/translation/*-OFL.txt -text -whitespace
+apps/extension/public/fonts/translation/*-LICENSE -text -whitespace

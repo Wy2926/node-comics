@@ -39,7 +39,7 @@ def make_agent(tmp_path, handler):
               'resource_id': 'test:cuda:0', 'engine': {'gpu': 0}, 'local_pages': 1, 'max_leases': 1}
     transport = Transport(config, control_transport=httpx.MockTransport(handler))
     journal = Journal(tmp_path)
-    agent = Agent(config, SimpleNamespace(version='test-v2', languages=['en']), transport, journal)
+    agent = Agent(config, SimpleNamespace(version='test-v2', languages=['en'], supported_font_ids=['comic-relief']), transport, journal)
     return agent, transport, journal
 
 
@@ -62,6 +62,7 @@ def test_registration_reports_selected_backend_without_changing_protocol(tmp_pat
         agent.register()
         assert sent[0]['device'] == (backend or 'cuda') + ':0'
         assert sent[0]['protocol_version'] == 3 and sent[0]['supported_languages'] == ['en']
+        assert sent[0]['supported_font_ids'] == ['comic-relief']
     finally:
         agent.close()
         transport.close()
@@ -339,6 +340,7 @@ def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypat
         def __init__(self, value):
             observed.update(value['engine'])
             self.version, self.languages = 'fixture', ['en']
+            self.supported_font_ids = []
             self.engine = SimpleNamespace(inpainter=SimpleNamespace(backend='fixture'))
         def warmup(self):
             observed['warmup'] = True

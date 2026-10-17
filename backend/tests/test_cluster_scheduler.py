@@ -18,6 +18,7 @@ from app.models import Asset, ClassicState, Job, User, now, uid
 from app.queue_models import ComputeNode, ExecutionLease, JobStage
 from app.scheduler import claim_stage, current_lease, lock_scheduler, release_lease
 from app.storage import LocalStore
+from app.translation_fonts import FONT_LANGUAGES
 from test_classic import encoded, text_database
 
 
@@ -41,7 +42,8 @@ def scheduler_case(text_database):
             LocalStore().put('isolated/' + owner.id, b'fixture', 'image/png', kind='original')
         for index in range(4):
             db.add(ComputeNode(applied_config_version=1, supported_languages=['zh-Hans', 'zh-Hant', 'ja', 'en', 'ko'], id='node-' + str(index), name='device', capabilities=['page'],
-                               capacity=1, resource_id='physical-' + str(index), engine_version='fixture-build', device='cpu'))
+                               capacity=1, resource_id='physical-' + str(index), engine_version='fixture-build', device='cpu',
+                               runtime_report={'supported_font_ids': list(FONT_LANGUAGES)}))
         db.commit()
     return config
 
@@ -216,7 +218,8 @@ def test_claim_uses_one_connection_and_preserves_caller_uncommitted_writes(sched
             db.flush()
             db.add(ComputeNode(id=node_id, name='pending node', resource_id=node_id,
                 capabilities=['page'], capacity=1, engine_version='fixture-build',
-                device='cpu', supported_languages=['zh-Hans'], applied_config_version=1))
+                device='cpu', supported_languages=['zh-Hans'], applied_config_version=1,
+                runtime_report={'supported_font_ids': list(FONT_LANGUAGES)}))
             db.add(JobStage(id=stage_id, job_id=job_id, name='page', status='ready'))
             db.add(ClassicState(job_id=job_id, analysis={'segments': [], 'quality_flags': []}))
             if flush_first:

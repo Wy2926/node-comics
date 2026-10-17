@@ -27,14 +27,27 @@
     "detect_size": 1280,
     "inpainting_size": 512,
     "font": [
-      ".assets/fonts/Bangers-Regular.ttf",
-      ".assets/fonts/ComicRelief-Bold.ttf",
-      ".assets/fonts/Jua-Regular.ttf",
-      ".assets/fonts/Lalezar-Regular.ttf",
-      ".assets/fonts/LXGWMarkerGothic-Regular.ttf",
+      ".assets/fonts/LXGWWenKai-Light.ttf",
+      ".assets/fonts/ComicRelief-Regular.ttf",
+      ".assets/fonts/PatrickHand-Regular.ttf",
+      ".assets/fonts/Gaegu-Regular.ttf",
+      ".assets/fonts/NotoNaskhArabic-Regular.ttf",
       ".assets/fonts/NotoSans-Regular.ttf",
       ".assets/fonts/NotoSansCJKsc-Regular.otf",
-      ".assets/fonts/NotoSansArabic.ttf"
+      ".assets/fonts/NotoSansArabic.ttf",
+      ".assets/fonts/LXGWWenKai-Regular.ttf",
+      ".assets/fonts/NotoSansCJKsc-Light.otf",
+      ".assets/fonts/NotoSerifCJKsc-Regular.otf",
+      ".assets/fonts/KleeOne-Regular.ttf",
+      ".assets/fonts/GowunDodum-Regular.ttf",
+      ".assets/fonts/GowunBatang-Regular.ttf",
+      ".assets/fonts/NanumPenScript-Regular.ttf",
+      ".assets/fonts/Pangolin-Regular.ttf",
+      ".assets/fonts/Andika-Regular.ttf",
+      ".assets/fonts/Nunito-Regular.ttf",
+      ".assets/fonts/Amiri-Regular.ttf",
+      ".assets/fonts/Harmattan-Regular.ttf",
+      ".assets/fonts/Mada.ttf"
     ]
   }
 }

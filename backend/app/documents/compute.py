@@ -23,6 +23,7 @@ from ..queue_models import ComputeClaim, ComputeNode, ExecutionLease, JobStage
 from ..request_models import RequestBody
 from ..scheduler import (current_lease, has_eligible_work, lock_scheduler, release_lease,
                          start_lease, touch_job)
+from ..translation_fonts import resolve_font, supports_font
 from .config import get_document_settings
 from .models import Document, DocumentPage
 from .storage import DocumentStoreError, get_document_store
@@ -168,6 +169,7 @@ def payload(db, lease):
         'page_index': stage.page_index, 'generation': lease.generation, 'action': stage.name,
         'workspace_generation': document.workspace_generation, 'status': 'active',
         'expires_at': stamp(lease.expires_at), 'language': job.target_language, 'limits': lease.limits,
+        'config': {'font_id': resolve_font(job.config.get('font_id'), job.target_language)},
         'file_limits': lease.limits['file_limits']}
     if stage.name == 'doc_prepare':
         ref = {'key': document.source_key, 'sha256': document.source_sha256,
@@ -248,7 +250,9 @@ def claim(node_id: str, body: ClaimRequest, identity=Depends(node_auth), db: Ses
                     or_(JobStage.name == 'doc_prepare', Document.reserved_at.is_not(None)),
                     Job.cancel_requested.is_(False), Job.discard_output.is_(False),
                     JobStage.name.in_(stages), JobStage.name.in_(node.capabilities), JobStage.status == 'ready',
-                    JobStage.available_at <= now(), Job.target_language.in_(node.supported_languages))
+                    JobStage.available_at <= now(), Job.target_language.in_(node.supported_languages),
+                    supports_font(Job.config['font_id'].as_string(), Job.target_language,
+                                  node.runtime_report.get('supported_font_ids', [])))
                 .order_by(JobStage.available_at, JobStage.id).limit(1)).first()
             if row:
                 stage, job, document = row

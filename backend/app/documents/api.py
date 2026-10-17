@@ -25,6 +25,7 @@ from ..translation_models import TranslationProvider
 from ..translation_providers import _provider_query
 from ..translation_routing import choose_provider
 from ..translation_selection import policy_resolver
+from ..translation_fonts import resolve_font
 from .config import MAX_PAGES, MAX_SOURCE_BYTES, get_document_settings
 from .models import Document, DocumentPage, DocumentQuotaAllocation
 from .quota import reserve_document
@@ -168,6 +169,7 @@ def _model(db, user, body):
                                'channel': row.channel, **row.config}, prompt_version=PROMPT_VERSION,
                               text_prompt=system_prompt(get_request_limits(db).comic_translation_prompt))
     config['document'] = {'service_plans': row.text_plan_ids, 'model_name': row.name}
+    config['font_id'] = resolve_font(None, body.target_language)
     config['version'] = digest(config)
     return config, policy
 

@@ -40,7 +40,7 @@ def test_claim_throughput(scheduler_case, pages, nodes):
             if node is None:
                 node = ComputeNode(id=f'node-{i}', name='bench', resource_id=f'bench:{i}',
                     engine_version=template.engine_version, device='fixture', capabilities=['page'],
-                    supported_languages=['zh-Hans'])
+                    supported_languages=['zh-Hans'], runtime_report=template.runtime_report)
                 db.add(node)
             node.capacity = 4
         for start in range(0, pages, 1000):

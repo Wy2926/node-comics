@@ -1,4 +1,9 @@
 {
+  "翻译字体": "Font terjemahan",
+  "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Font tersedia sesuai bahasa tujuan. Perubahan hanya berlaku untuk tugas baru; terjemahkan ulang gambar yang sudah ada secara manual.",
+  "正在加载字体预览…": "Memuat pratinjau font…",
+  "字体预览加载失败，重新展开列表可重试，不影响翻译设置。": "Pratinjau font gagal dimuat. Buka kembali daftar untuk mencoba lagi. Pengaturan terjemahan tidak berubah.",
+  "此字体暂不可用，请选择其他字体。": "Font ini sedang tidak tersedia. Pilih font lain.",
   "展开全部 {0} 个网站": "Tampilkan semua {0} situs",
   "收起网站": "Tampilkan lebih sedikit situs",
   "仅搜索符合筛选条件且已勾选的网站，修改仅影响下次搜索。": "Hanya situs yang dicentang dan sesuai filter yang dicari. Perubahan berlaku untuk pencarian berikutnya.",
@@ -631,7 +636,7 @@
   "外观与偏好": "Penampilan dan Preferensi",
   "阅读偏好": "Preferensi Membaca",
   "默认目标语言": "Bahasa target default",
-  "翻译支持 16 个语言选项，已有译图版本保留。": "Terjemahan mendukung 16 pilihan bahasa. Gambar yang sudah diterjemahkan tetap disimpan.",
+  "可选语言由翻译渠道提供，已有译图版本保留。": "Bahasa yang tersedia bergantung pada kanal terjemahan. Gambar yang sudah diterjemahkan tetap disimpan.",
   "翻页方向": "Arah pembalikan halaman",
   "翻页模式中的方向键遵循此设置。": "Tombol panah dalam mode berhalaman mengikuti pengaturan ini.",
   "从右向左 · 日漫习惯": "Dari kanan ke kiri · Kebiasaan komik Jepang",

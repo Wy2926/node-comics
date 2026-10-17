@@ -4,7 +4,7 @@ import type {InputProfile} from '../../../input/limits';
 import {openSourceDatabase, type DatabaseSchema} from '../../../../storage/database';
 import {mergeJobs} from '../../../../reader/jobs';
 
-export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;modelId?:string;image:TranslationImage;sourceSha256?:string;inputProfile?:InputProfile;inputSize?:{width:number;height:number};blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;deniedPolicy?:string;deniedImageLimit?:number;createdAt:number;}
+export interface LocalOperation {id:string;requestId:string;scope:string;entryId:string;pageId:string;mode:Mode;language:string;modelId?:string;fontId?:string;image:TranslationImage;sourceSha256?:string;inputProfile?:InputProfile;inputSize?:{width:number;height:number};blobKey?:string;pageRef?:PageReference;request:TranslationInput;state:'local'|'uncertain'|'accepted'|'deferred'|'blocked';result?:TranslationSnapshot;error?:string;errorCode?:string;retryAt?:number;deniedPolicy?:string;deniedImageLimit?:number;createdAt:number;}
 export interface SyncState {id:string;imageRetryAt?:number;controlRetryAt?:number;}
 interface StoredJob {scope:string;id:string;sourceSha256?:string;job:Job;}
 const storedJob=(scope:string,job:Job):StoredJob=>({scope,id:job.id,sourceSha256:job.source_image_sha256??job.image_sha256,job});
@@ -49,7 +49,7 @@ export async function readOperations(ids:readonly string[]):Promise<LocalOperati
   });
 }
 export const readOperation=(id:string)=>transaction<LocalOperation|undefined>('operations','readonly',s=>s.get(id));
-/** Only the visible page's model intents, never a chapter/account-wide scan. */
+/** Only the visible page's model/font intents, never a chapter/account-wide scan. */
 export const readPageOperations=(scope:string,entryId:string,pageId:string,mode:Mode,language:string)=>
   transaction<LocalOperation[]>('operations','readonly',s=>s.index('pageIntent').getAll([scope,entryId,pageId,mode,language]));
 export async function saveOperation(value:LocalOperation){

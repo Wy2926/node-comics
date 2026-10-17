@@ -4,7 +4,7 @@
 
 ## 职责与执行位
 
-中心负责受理、有限候选内的简单会员优先分配、租约授权、文本调用、持久检查点和一次结算；可信自管节点负责图像解码、像素校验、检测、OCR、抹字、固定字体嵌字及无损覆盖输出。中心只解析有界文件结构和元数据，不解码原图、掩膜或结果像素。节点质量声明不等于中心已验收模型效果。
+中心负责受理、有限候选内的简单会员优先分配、租约授权、文本调用、持久检查点和一次结算；可信自管节点负责图像解码、像素校验、检测、OCR、抹字、按冻结字体选项嵌字及无损覆盖输出。中心只解析有界文件结构和元数据，不解码原图、掩膜或结果像素。节点质量声明不等于中心已验收模型效果。
 
 `execution_slots` 是未释放整页租约数，下载、等待文本、交付均占租约；GPU 计算并发由节点的 `local_pages` 控制。新 claim 每批最多分配 4 页，并发 claim 和到期未回收租约均计入容量。缩容、停用只限制新领取；取消要求停止本地工作并确认。配置默认值与语言能力见[节点配置](NODE_CONFIGURATION.md)。
 
@@ -42,7 +42,7 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 
 | 操作 | 请求 | 响应 |
 | --- | --- | --- |
-| `POST /nodes/register` | `protocol_version:3`、引擎版本、资源 ID、设备、语言、ready、可选 result_formats | 协议版本、server_time、config、该身份未释放的 leases |
+| `POST /nodes/register` | `protocol_version:3`、引擎版本、资源 ID、设备、语言、ready、可选 result_formats、supported_font_ids | 协议版本、server_time、config、该身份未释放的 leases |
 | `POST /nodes/{id}/claim` | request_id、config_version、count（1–32） | 原 request_id、server_time、config、leases；新分配最多 4 页；空批可带短退避提示 |
 | `POST /nodes/{id}/updates` | revision、wait_seconds（0–20）、config_version、can_claim、最多 32 项 leases 快照 | revision、claim_ready、变化的 leases；配置变化时带 config；不续租、不领取 |
 | `POST /nodes/{id}/heartbeat` | config_version、leases 中的 lease_id、lease_token、translations_revision、phase | server_time、config、逐项续期／停止／终态；只返回更新的译文 |
@@ -72,6 +72,8 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 输入必须已规范化为静态单帧和 sRGB：EXIF 方向为 1／缺省；带 ICC 的源图必须先完成颜色转换，再移除 ICC，节点拒绝仍带 ICC 的输入。节点不变换已绑定摘要的输入。节点接受 PNG、JPEG、WebP，图片字节与单边准入统一由中心执行，默认 128 MiB、单边 100000，不设独立总像素上限；节点关闭 Pillow 隐含的总像素限制。中心校验文件长度、摘要、容器结构、尺寸和规范化元数据；节点下载不得超过中心声明的 byte_size，首次完整解码再核对尺寸、摘要和 MIME。损坏像素以 `INPUT_INVALID` 终结该页，发生在 OCR 和文本调用之前；工作内存不足以 `INPUT_MEMORY_EXCEEDED` 终结，不反复重试相同输入。节点的工作内存、并发、检查点与结果传输预算仍独立有效。
 
 注册的 `result_formats` 缺省为 `["overlay-v1"]`；仓库节点声明 `["overlay-v1","overlay-tiles-v1"]`，中心在 ready 报告中记录分块能力。分块租约带 `config.result_format=overlay-tiles-v1`，只分配给支持该格式的节点；未协商分块的任务不能提交分块结果。检查点格式仍由 v3 协议约束。格式声明不代替尺寸支持及完整像素校验能力：中心、节点与客户端须按[部署规范](DEPLOYMENT.md)配套升级，核实校验职责后才能开放流量。
+
+注册的 `supported_font_ids` 缺省为空列表，仅声明该节点已准备并能加载的字体 ID。任务的 `config.font_id` 随任务配置冻结并参与结果缓存身份，只分配给声明该 ID 的节点；领取重试和注册恢复沿用原配置。在途字体租约未排空时不得降级移除字体支持，否则注册返回 `409 NODE_FONT_CAPABILITY_CONFLICT`。ID 必须属于固定字体目录且支持目标语言，不传字体文件路径、URL 或任意字体名。节点按文件指定实际字族和字重，缺字由已注册的回退字体补齐；未安装或语言不兼容以 `CLASSIC_FONT_UNSUPPORTED` 失败，不能静默改用其他主字体。旧客户端、文件任务或历史检查点省略 `font_id`、传 `null` 或空字符串时使用目标语言的具体默认字体，调度仍要求节点支持该字体，不再使用旧的粗体默认文件。字体不改变 OCR、文本内容或译文 revision；文本检查点无需重复存放字体。
 
 analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 4 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。节点生成掩膜时检查非空像素，恢复已有检查点时在恢复文本工作前解码并校验掩膜；中心只校验其文件结构、尺寸和区域元数据。相同分析重复提交不会重新打开文本任务。
 

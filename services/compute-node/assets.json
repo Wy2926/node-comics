@@ -1,49 +1,90 @@
 {
   "fonts": [
     {
-      "name": "Bangers-Regular.ttf",
-      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/bangers/Bangers-Regular.ttf",
-      "notice": "bangers-OFL.txt",
-      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/bangers/OFL.txt",
-      "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
-      "notice_sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7",
-      "license": "SIL Open Font License 1.1"
+      "id": "lxgw-wenkai-light",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ],
+      "name": "LXGWWenKai-Light.ttf",
+      "url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Light.ttf",
+      "sha256": "a347c7161ec38677646e361b5280ddb621671bbb97ecfd829ec9dd4e326f6081",
+      "license": "SIL Open Font License 1.1",
+      "notice": "LXGWWenKai-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/OFL.txt",
+      "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
     },
     {
-      "name": "ComicRelief-Bold.ttf",
-      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/ComicRelief-Bold.ttf",
+      "id": "comic-relief",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "id"
+      ],
+      "name": "ComicRelief-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/ComicRelief-Regular.ttf",
+      "sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+      "license": "SIL Open Font License 1.1",
       "notice": "comicrelief-OFL.txt",
       "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/comicrelief/OFL.txt",
-      "sha256": "33aee007212b696afd57d50c901135cd723cd188f7ad98f3a1c572ea64e8f0d5",
-      "notice_sha256": "009b3056cef5c9bcaff872bfb0e27fa4a0f8cc6f6984cc490caf5618748d766b",
-      "license": "SIL Open Font License 1.1"
+      "notice_sha256": "009b3056cef5c9bcaff872bfb0e27fa4a0f8cc6f6984cc490caf5618748d766b"
     },
     {
-      "name": "Jua-Regular.ttf",
-      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/jua/Jua-Regular.ttf",
-      "notice": "jua-OFL.txt",
-      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/jua/OFL.txt",
-      "sha256": "769677aef240bfc3b9965f2b50748075bff885e6c6992fc591a3fb268279f898",
-      "notice_sha256": "44a7c6e4c5572392ae122d3b1d8c6ba6fd640a7797e675384585d947f2773e3c",
-      "license": "SIL Open Font License 1.1"
+      "id": "patrick-hand",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "pl",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "name": "PatrickHand-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/patrickhand/PatrickHand-Regular.ttf",
+      "sha256": "0f173b3e6cb6d1af25babf7f0057c5ac4ee11f9992b0469bb817e967ef4ad0fc",
+      "license": "SIL Open Font License 1.1",
+      "notice": "patrickhand-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/patrickhand/OFL.txt",
+      "notice_sha256": "377f4f9c19e935228552478eb68cc2ed82910988a60ba60e2ac73b09f32d02d1"
     },
     {
-      "name": "Lalezar-Regular.ttf",
-      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/lalezar/Lalezar-Regular.ttf",
-      "notice": "lalezar-OFL.txt",
-      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/lalezar/OFL.txt",
-      "sha256": "7b80807bc831f141de0f7dcf6816412bf0c548968d548c5156ca388733390ea9",
-      "notice_sha256": "327bac41d89cf9f32e0efe353228018e1661cff458a5d4905714958514df7bd5",
-      "license": "SIL Open Font License 1.1"
+      "id": "gaegu",
+      "languages": [
+        "ko"
+      ],
+      "name": "Gaegu-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gaegu/Gaegu-Regular.ttf",
+      "sha256": "aa52c98336f7c62e2896fc8b12b56a75d5b476d88a2f104b0980f4f7ce0adfc3",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gaegu-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gaegu/OFL.txt",
+      "notice_sha256": "53a9ce47085d9fef613c7ecb3730dc80d25962510bbea231b89564f58240f251"
     },
     {
-      "name": "LXGWMarkerGothic-Regular.ttf",
-      "url": "https://raw.githubusercontent.com/lxgw/LxgwMarkerGothic/11ea67e3a46ea84bef4767e6d90bc5c005e13716/fonts/ttf/LXGWMarkerGothic-Regular.ttf",
-      "notice": "LXGWMarkerGothic-OFL.txt",
-      "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwMarkerGothic/11ea67e3a46ea84bef4767e6d90bc5c005e13716/OFL.txt",
-      "sha256": "dfcef2074fcd6695a8bd128fe1a1a96c376b636171a7985b6836448221b5a87a",
-      "notice_sha256": "58e494ff4a5177d593a97ffc482f4069f59f54a0d4049fd29e531d3b1009e8b4",
-      "license": "SIL Open Font License 1.1"
+      "id": "noto-naskh-arabic",
+      "languages": [
+        "ar"
+      ],
+      "name": "NotoNaskhArabic-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Regular.ttf",
+      "sha256": "2f4b88e6ee50fa82c617e2d1d4ba18281cb1c6cd71c3af3ec64970c23995db4b",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoNaskhArabic-LICENSE",
+      "notice_url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE",
+      "notice_sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
     },
     {
       "name": "NotoSans-Regular.ttf",
@@ -52,7 +93,22 @@
       "license": "SIL Open Font License 1.1",
       "notice": "NotoSans-LICENSE",
       "notice_url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE",
-      "notice_sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+      "notice_sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+      "id": "noto-sans",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ]
     },
     {
       "name": "NotoSansCJKsc-Regular.otf",
@@ -61,7 +117,14 @@
       "license": "SIL Open Font License 1.1",
       "notice": "NotoSansCJK-LICENSE",
       "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
-      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "id": "noto-sans-cjk",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ]
     },
     {
       "name": "NotoSansArabic.ttf",
@@ -70,7 +133,221 @@
       "license": "SIL Open Font License 1.1",
       "notice": "NotoSansArabic-OFL.txt",
       "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/notosansarabic/OFL.txt",
-      "notice_sha256": "07fc70bfeb985cc1a87a8587d0a0c80bab11c86c9dc3fd95b6f0cb332f983e96"
+      "notice_sha256": "07fc70bfeb985cc1a87a8587d0a0c80bab11c86c9dc3fd95b6f0cb332f983e96",
+      "id": "noto-sans-arabic",
+      "languages": [
+        "ar"
+      ]
+    },
+    {
+      "id": "lxgw-wenkai",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja"
+      ],
+      "name": "LXGWWenKai-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Regular.ttf",
+      "sha256": "bf73f995c05f3f7baf7840b9d76d8d9678c8b150a020946a394ca63c67ed1350",
+      "license": "SIL Open Font License 1.1",
+      "notice": "LXGWWenKai-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/OFL.txt",
+      "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
+    },
+    {
+      "id": "noto-sans-cjk-light",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ],
+      "name": "NotoSansCJKsc-Light.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Light.otf",
+      "sha256": "e78bbbe1573bbb006156c1198f5c8cd6329470cb6e0b6702c7a3c83913db4abf",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansCJK-LICENSE",
+      "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "id": "noto-serif-cjk",
+      "languages": [
+        "zh-Hans",
+        "zh-Hant",
+        "ja",
+        "ko"
+      ],
+      "name": "NotoSerifCJKsc-Regular.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf",
+      "sha256": "18e4072f01dad3965a72ae8afee7d6dac447c4eb6d454e0084ed5c9c1fc0091f",
+      "license": "SIL Open Font License 1.1",
+      "notice": "NotoSansCJK-LICENSE",
+      "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+      "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "id": "klee-one",
+      "languages": [
+        "ja"
+      ],
+      "name": "KleeOne-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/kleeone/KleeOne-Regular.ttf",
+      "sha256": "bf4063f030cc2ae6adf0a11424a1888e5c0eb4438f1f6d02f52294af868e9b3a",
+      "license": "SIL Open Font License 1.1",
+      "notice": "kleeone-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/kleeone/OFL.txt",
+      "notice_sha256": "e376b0df8e8a2345a9533db6f0a5333a1107975569ad9d1973a7ee557161ca38"
+    },
+    {
+      "id": "gowun-dodum",
+      "languages": [
+        "ko"
+      ],
+      "name": "GowunDodum-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowundodum/GowunDodum-Regular.ttf",
+      "sha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gowundodum-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowundodum/OFL.txt",
+      "notice_sha256": "a7c73f9521cd646bbdfb6684c99a62311bbd7bce11898dc11ef0b3c69eda1aca"
+    },
+    {
+      "id": "gowun-batang",
+      "languages": [
+        "ko"
+      ],
+      "name": "GowunBatang-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowunbatang/GowunBatang-Regular.ttf",
+      "sha256": "466c593e7147412e748af4856d5ad14709b5a860bdf62b9c2546f2c5874e9849",
+      "license": "SIL Open Font License 1.1",
+      "notice": "gowunbatang-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowunbatang/OFL.txt",
+      "notice_sha256": "49a57cc769fa9affd6eefb9070a61e3d3f6b757c97cafb15848bc6d1c81acc78"
+    },
+    {
+      "id": "nanum-pen",
+      "languages": [
+        "ko"
+      ],
+      "name": "NanumPenScript-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/nanumpenscript/NanumPenScript-Regular.ttf",
+      "sha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+      "license": "SIL Open Font License 1.1",
+      "notice": "nanumpenscript-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/nanumpenscript/OFL.txt",
+      "notice_sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f"
+    },
+    {
+      "id": "pangolin",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "name": "Pangolin-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/pangolin/Pangolin-Regular.ttf",
+      "sha256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+      "license": "SIL Open Font License 1.1",
+      "notice": "pangolin-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/pangolin/OFL.txt",
+      "notice_sha256": "b4fc1d55ce610f255c5712f8169543f9610536d002deb99bbc99bfbba9f8a560"
+    },
+    {
+      "id": "andika",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "name": "Andika-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/andika/Andika-Regular.ttf",
+      "sha256": "202b96b1f174a4a43baefe885b40dacacb81786755efd08ed4b7704e79c45515",
+      "license": "SIL Open Font License 1.1",
+      "notice": "andika-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/andika/OFL.txt",
+      "notice_sha256": "43ee152fcd7be0c6eb3468f3012e776cb75bf88f5dec548be0aa4619bf438f9e"
+    },
+    {
+      "id": "nunito",
+      "languages": [
+        "en",
+        "fr",
+        "es",
+        "pt-BR",
+        "de",
+        "it",
+        "ru",
+        "pl",
+        "uk",
+        "tr",
+        "vi",
+        "id"
+      ],
+      "name": "Nunito-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Regular.ttf",
+      "sha256": "880ead818af373b0da8c2a3e493f7d0a9c1db149a67a867b04f0952c475d667a",
+      "license": "SIL Open Font License 1.1",
+      "notice": "nunito-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/OFL.txt",
+      "notice_sha256": "580df76c95a1ec5ab878ceb25bb3d85c6a076804e9c970c8c6972aea775fdf65"
+    },
+    {
+      "id": "amiri",
+      "languages": [
+        "ar"
+      ],
+      "name": "Amiri-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/amiri/Amiri-Regular.ttf",
+      "sha256": "ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7",
+      "license": "SIL Open Font License 1.1",
+      "notice": "amiri-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/amiri/OFL.txt",
+      "notice_sha256": "72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22"
+    },
+    {
+      "id": "harmattan",
+      "languages": [
+        "ar"
+      ],
+      "name": "Harmattan-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/harmattan/Harmattan-Regular.ttf",
+      "sha256": "5fbaafc51ad21663729b168afaff5f28d3e3087f1fc736ada32d7cd99674c0e0",
+      "license": "SIL Open Font License 1.1",
+      "notice": "harmattan-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/harmattan/OFL.txt",
+      "notice_sha256": "8625c5d464ebfe457d071266178fc8b699ccdb7bd58051d53046b3e06806f4e1"
+    },
+    {
+      "id": "mada",
+      "languages": [
+        "ar"
+      ],
+      "name": "Mada.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/mada/Mada%5Bwght%5D.ttf",
+      "sha256": "bf4d193ee78cea2fd8bdc9e64e5cb7e8a19ff76ab74f97a9a4a0e80f8f4cefde",
+      "license": "SIL Open Font License 1.1",
+      "notice": "mada-OFL.txt",
+      "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/mada/OFL.txt",
+      "notice_sha256": "e15f74b13b1a30c878f162b2ce10aff4668d0e8ec8dae41dc61c1c12aa6d9eb9"
     }
   ]
 }

@@ -15,6 +15,7 @@ from app.languages import LANGUAGES
 from app.models import Asset, now, uid
 from app.queue_models import ComputeNode
 from app.scheduler import claim_stage, current_lease, lock_scheduler, release_lease, touch_job
+from app.translation_fonts import FONT_LANGUAGES
 from app.workers import fail_stage, finish_job, finish_stopped_lease, _heartbeat
 
 
@@ -27,7 +28,7 @@ class SyntheticPageWorker:
             db.add(ComputeNode(id=self.node_id, name=self.node_id, resource_id=self.node_id,
                 capabilities=['page'], capacity=1, engine_version='synthetic-test-v3', device='fixture',
                 supported_languages=list(LANGUAGES), applied_config_version=1,
-                runtime_report={'ready': True, 'protocol_version': 3}))
+                runtime_report={'ready': True, 'protocol_version': 3, 'supported_font_ids': list(FONT_LANGUAGES)}))
             db.commit()
 
     def run_once(self):

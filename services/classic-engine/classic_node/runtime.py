@@ -12,6 +12,7 @@ from PIL import Image
 
 from mtu_engine.assets import LOCK, file_hash, verify
 from mtu_engine.engine import Engine, serialize_region
+from mtu_engine.fonts import DEFAULT_FONT_IDS, FONT_CHOICES, resolve_font_id
 from .render_pool import RenderPool, RenderPoolError, RenderMemoryError, ipc_bytes, render_page
 from .operations import LOG
 from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64
@@ -55,6 +56,7 @@ class Runtime:
         self._render_warning_lock = Lock()
         self._render_fallback_warned = set()
         self.languages = [lang for lang, probe in LANGUAGE_PROBES.items() if self.engine.renderer.covers(probe)]
+        self.supported_font_ids = self.engine.renderer.font_ids
         if not self.languages:
             self.engine.close()
             raise ValueError('Fonts do not cover any supported target language')
@@ -70,6 +72,7 @@ class Runtime:
             'transformers', 'huggingface-hub', 'tokenizers')}
         self.version = f'mtu-{backend}-v1-' + digest({'upstream': LOCK['source']['revision'],
             'code': code, 'assets': assets, 'dependencies': dependencies,
+            'font_choices': FONT_CHOICES, 'default_font_ids': DEFAULT_FONT_IDS,
             'fonts': [file_hash(path) for path in options['font']],
             'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'threads', 'gpu'}}})[:32]
         if config.get('render_workers', 1) > 1:
@@ -200,9 +203,15 @@ class Runtime:
 
     def render(self, original, cleaned, analysis, translated, language, alpha, *, allow_tiles=False,
                mask_cache_bytes=None, use_render_pool=True, check_cancelled=None, masks=None,
-               full_image_max_bytes=None):
+               full_image_max_bytes=None, font_id=None):
         if check_cancelled:
             check_cancelled()
+        try:
+            font_id = resolve_font_id(language, font_id)
+        except ValueError:
+            raise NodeFailure('CLASSIC_FONT_UNSUPPORTED') from None
+        if font_id not in self.supported_font_ids:
+            raise NodeFailure('CLASSIC_FONT_UNSUPPORTED')
         self.validate_analysis(analysis)
         if (translated['analysis_hash'] != digest(analysis) or translated['language'] != language
                 or set(translated['translations']) != {item['id'] for item in analysis['segments']}
@@ -222,7 +231,7 @@ class Runtime:
         options = {'alpha': alpha, 'version': self.version,
                    'analysis': {'input_hash': analysis['input_hash']},
                    'translated': {'analysis_hash': translated['analysis_hash'], 'revision': translated['revision']},
-                   'allow_tiles': allow_tiles, 'mask_cache_bytes': mask_cache_bytes}
+                   'allow_tiles': allow_tiles, 'mask_cache_bytes': mask_cache_bytes, 'font_id': font_id}
         if full_image_max_bytes is not None:
             options['full_image_max_bytes'] = full_image_max_bytes
         if prepared:
