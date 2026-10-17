@@ -55,9 +55,17 @@ def check(config_path, *, local_only=False):
             'memory_mib': int(gpu[2]), 'driver_cuda': version.value, 'model_warmup': 'pending'}
         code = 'NODE_PARSER_SANDBOX_UNAVAILABLE'
         result['checks']['security'] = host_security()
-        check_parser_sandbox(state, require_sandbox=True)
-        result['checks']['security'].update(parser='landlock-seccomp', document_protocol=2,
-                                           denial_probe=True)
+        try:
+            check_parser_sandbox(state, require_sandbox=True)
+        except Exception:
+            result['checks']['security'].update(document_protocol=None, denial_probe=False,
+                                               code=code)
+            # Do not silently abandon file work after a host capability loss.
+            if existing.exists() and any(existing.iterdir()):
+                raise
+        else:
+            result['checks']['security'].update(parser='landlock-seccomp', document_protocol=2,
+                                               denial_probe=True)
         if not local_only:
             code = 'NODE_CONTROL_TLS_UNREACHABLE'
             url = urlsplit(config['control_url'])

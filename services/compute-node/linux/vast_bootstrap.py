@@ -107,9 +107,8 @@ def host_preflight():
     libc = ctypes.CDLL(None, use_errno=True)
     abi = libc.syscall(444, 0, 0, 1)
     event('host_preflight', landlock_abi=max(0, abi))
-    if abi < 3:
-        raise ValueError('PDF/ZIP parsing requires a host with Landlock ABI >= 3')
-    ctypes.CDLL('libseccomp.so.2')
+    # File parsing is an optional capability, probed by node preflight and
+    # registration. Older hosts can still install and run ordinary image jobs.
     driver = ctypes.CDLL('libcuda.so.1')
     version = ctypes.c_int()
     if driver.cuInit(0) or driver.cuDriverGetVersion(ctypes.byref(version)) or version.value < 12000:

@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 if sys.platform == 'linux':
     spec = importlib.util.spec_from_file_location('vast_bootstrap', Path(__file__).with_name('vast_bootstrap.py'))
@@ -19,6 +19,25 @@ if sys.platform == 'linux':
 
 @unittest.skipUnless(sys.platform == 'linux', 'Vast bootstrap requires Linux')
 class VastBootstrapTests(unittest.TestCase):
+    def test_old_or_missing_landlock_does_not_block_image_node_install(self):
+        driver = Mock()
+        driver.cuInit.return_value = 0
+        def version(pointer):
+            pointer._obj.value = 12060
+            return 0
+        driver.cuDriverGetVersion.side_effect = version
+        for abi in (-1, 0, 1, 2, 3, 6):
+            with self.subTest(abi=abi), patch.object(boot.ctypes, 'CDLL',
+                    side_effect=[Mock(syscall=Mock(return_value=abi)), driver]), \
+                    patch.object(boot, 'event') as event:
+                boot.host_preflight()
+                event.assert_called_once_with('host_preflight', landlock_abi=max(0, abi))
+        driver.cuInit.return_value = 1
+        with patch.object(boot.ctypes, 'CDLL',
+                side_effect=[Mock(syscall=Mock(return_value=1)), driver]), \
+                self.assertRaisesRegex(ValueError, 'CUDA 12 driver'):
+            boot.host_preflight()
+
     @unittest.skipUnless(shutil.which('git'), 'requires Git')
     def test_pinned_git_fetch_extracts_code_only_and_reuses_checkout(self):
         with tempfile.TemporaryDirectory() as directory:

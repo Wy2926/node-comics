@@ -27,7 +27,7 @@ Vast 使用 **已有 CUDA 基础环境 + 固定源码版本 + 目标机在线安
 2. 在服务器拉取固定 commit 的必要源码。
 3. 下载固定版本 uv，按 uv.lock 执行 uv sync --locked，在该版本自己的 venv 中安装依赖。
 4. 复用 [资产准备器](../../classic-engine/tools/prepare_mtu.py)，在线下载带摘要的原生模型、上游源码、字体、词典及许可；不进行模型转换。
-5. 新版本验证解析、模型摘要、Python 原生依赖、Qt 字体及真实 GPU 预热，通过后才切换并交给 Supervisor。当前已完成版本重跑仅检查身份、配置和服务状态，不重复资产全量校验、GPU 预热或 Supervisor 重载；真正启动工作进程仍执行完整运行预检。
+5. 新版本探测文件解析能力，验证模型摘要、Python 原生依赖、Qt 字体及真实 GPU 预热，通过后才切换并交给 Supervisor。文件解析沙箱不可用时仍可安装和启动单图节点，不声明文件协议能力。当前已完成版本重跑仅检查身份、配置和服务状态，不重复资产全量校验、GPU 预热或 Supervisor 重载；真正启动工作进程仍执行完整运行预检。
 
 PyTorch／ONNX Runtime 等仍需要匹配的 Python 包；这些包在目标机按锁文件拉取，不复制 Vast 的 CUDA 环境。首次安装依赖网络与磁盘，后续复用缓存。节点保持正常出网，不加防火墙或主进程断网限制，也不改变 Vast 的 Caddy、portal、tunnel 服务。
 
@@ -110,7 +110,7 @@ tail -n 50 /var/lib/node-comics/supervisor.log
 
 预检代码区分 NODE_CONFIG_INVALID、NODE_STATE_DISK_LOW、NODE_GPU_DRIVER_UNAVAILABLE、NODE_PARSER_SANDBOX_UNAVAILABLE、NODE_CONTROL_TLS_UNREACHABLE，不输出令牌、签名地址或文件内容。早于工作进程启动的错误还记录在 /var/lib/node-comics/startup-logs。model_warmup=pending 不能作为 GPU 验收。
 
-PDF／ZIP 解析仅在子进程内使用 Landlock ABI ≥3 与 libseccomp，不依赖用户命名空间、privileged 或 SYS_ADMIN；节点主进程正常连接中心和存储。每次启动实测解析及越界拒绝能力。宿主内核不支持时应更换合适宿主，安装脚本不修改宿主内核。文件工作目录在等待 LLM 时保留，详见[整本文件翻译](../../../docs/DOCUMENT_TRANSLATION.md)。
+PDF／ZIP 解析仅在子进程内使用 Landlock ABI ≥3 与 libseccomp，不依赖用户命名空间、privileged 或 SYS_ADMIN；节点主进程正常连接中心和存储。每次启动实测解析及越界拒绝能力；不通过时报告 document_protocol=null，仅运行单图任务，不绕过文件解析隔离。已有文件工作目录但沙箱能力丢失时仍拒绝启动，避免遗留任务被静默搁置。需要文件任务时应更换合适宿主，安装脚本不修改宿主内核。文件工作目录在等待 LLM 时保留，详见[整本文件翻译](../../../docs/DOCUMENT_TRANSLATION.md)。
 
 ## 验证
 
@@ -119,6 +119,7 @@ python -m unittest discover -s services/compute-node/linux -p test_container.py
 python -m unittest discover -s services/compute-node/linux -p test_vast_bootstrap.py
 python -m unittest discover -s services/compute-node/linux -p test_bootstrap_transactions.py
 python -m unittest discover -s services/compute-node/linux -p test_prepare_template.py
+python -m unittest discover -s services/compute-node/linux -p test_preflight.py
 NODE_TEST_SANDBOX=1 python services/compute-node/linux/test_parser_sandbox.py
 ~~~
 
