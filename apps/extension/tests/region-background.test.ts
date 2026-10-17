@@ -96,6 +96,24 @@ beforeEach(async()=>{
 afterEach(()=>{vi.unstubAllGlobals();});
 
 describe('region background capture and admission',()=>{
+  it('initializes and freezes the browser target on a background-first region translation',async()=>{
+    Object.assign(navigator,{languages:['ja-JP'],language:'ja-JP'});
+    const saved:Record<string,unknown>={},listeners:Array<(changes:Record<string,unknown>,area:string)=>void>=[];
+    mocks.localSettings.mockImplementation(async()=>structuredClone(saved));
+    const set=vi.fn(async(values:Record<string,unknown>)=>{
+      const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{oldValue:saved[key],newValue}]));
+      Object.assign(saved,structuredClone(values));
+      for(const notify of listeners)notify(changes,'local');
+    });
+    Object.assign(chrome.storage.local,{set});
+    Object.assign(chrome.storage.onChanged,{addListener:(listener:typeof listeners[number])=>listeners.push(listener)});
+    await worker();
+    expect(await send(message('NC_REGION_CAPTURE'))).toMatchObject({ok:true});
+    expect(await send(message('NC_REGION_SUBMIT'))).toMatchObject({ok:true,data:{language:'ja',submitted:true}});
+    expect(saved['nc-reader-settings']).toMatchObject({language:'ja'});
+    expect(channel.createRuntime).toHaveBeenCalledWith(expect.objectContaining({language:'ja'}));
+    expect(set).toHaveBeenCalledOnce();
+  });
   it('freezes capture-only bytes without admitting a task until the trusted submit step',async()=>{
     expect(await send(message('NC_REGION_CAPTURE'))).toMatchObject({ok:true,data:{submitted:false,width:100,height:80}});
     expect(records.get('selection-7')?.submitted).toBe(false);expect(blobs.get('selection-7:source')).toBe(source);

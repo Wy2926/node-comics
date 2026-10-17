@@ -43,6 +43,7 @@ it.each([false,true])('registers Firefox import without setAccessLevel and opens
 
 it('connects Firefox reader settings without a Chromium-only access-level API',async()=>{
   const set=vi.fn(async()=>{}),addListener=vi.fn();
+  vi.stubGlobal('localStorage',{setItem:vi.fn()});
   vi.stubGlobal('chrome',{storage:{local:{get:async()=>({}),set},onChanged:{addListener}}});
   await expect(connectReaderSettings(defaults)).resolves.toBeUndefined();
   expect(set).toHaveBeenCalledWith({'nc-reader-settings':defaults});

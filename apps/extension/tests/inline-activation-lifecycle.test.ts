@@ -97,6 +97,24 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('remembers the browser language on a background-first translation without invalidating it',async()=>{
+    Object.assign(navigator,{languages:['zh-TW'],language:'zh-TW'});
+    const saved:Record<string,unknown>={};
+    mocks.localSettings.mockImplementation(async()=>structuredClone(saved));
+    const set=vi.fn(async(values:Record<string,unknown>)=>{
+      const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{oldValue:saved[key],newValue}]));
+      Object.assign(saved,structuredClone(values));
+      for(const notify of storageListeners)notify(changes,'local');
+    });
+    Object.assign(chrome.storage.local,{set});
+    expect(await send(request())).toMatchObject({ok:true});
+    expect(options[0].language).toBe('zh-Hant');
+    expect(saved['nc-reader-settings']).toMatchObject({language:'zh-Hant'});
+    Object.assign(navigator,{languages:['de-DE'],language:'de-DE'});
+    expect(await send(request(2))).toMatchObject({ok:true});
+    expect(options.at(-1)?.language).toBe('zh-Hant');
+    expect(set).toHaveBeenCalledOnce();
+  });
   it('enhances confirmed no-text originals throughout the reading window and restores sources on disable',async()=>{
     const settings:ProcessingSettings={enabled:true,activeId:'local',cacheLimitMb:10240,
       profiles:[{id:'local',adapterId:'nunif',name:'Local',revision:1,settings:{url:'http://localhost/'}}]};

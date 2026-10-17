@@ -10,11 +10,11 @@ import {MAX_COMIC_IMAGES} from '../sources/shared/geometry';
 import type {ReadingTarget} from '../translation/automatic';
 import {MAX_READING_TARGETS} from '../reading-window';
 import { matchesPage } from '../translation/sync';
-import { defaults, type Job, type Page, type Settings } from '../types';
+import { type Job, type Page, type Settings } from '../types';
 import { automaticTabsAllowed, registerAutomaticTabs } from './auto-tabs';
 import type { InlineRequest, InlineResponse, InlineResult } from './protocol';
 import {INLINE_RESULT_PORT, INLINE_SOURCE_PORT, receiveImage, serveImage} from './blob-transfer';
-import { settingsKey } from './settings';
+import { readReaderSettings, settingsKey, translationLanguageChanged } from './settings';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
 import { registerInlineThemeBackground } from './theme';
 import {activationKey, currentInlineActivation, type InlineActivation as Activation} from './activation';
@@ -131,7 +131,7 @@ async function context(tabId:number,navigationId:string,activity:RequestActivity
 }
 async function createContext(tabId:number,navigationId:string,activity:RequestActivity):Promise<Context>{
   assertCurrent(activity.current);
-  const saved=await chrome.storage.local.get([settingsKey]),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>};
+  const settings=await readReaderSettings();
   assertCurrent(activity.current);
   const key=JSON.stringify([settings.language,navigationId,configGeneration]);
   const previous=contexts.get(tabId);if(previous?.key===key){previous.settings=settings;return previous;}
@@ -451,7 +451,7 @@ export function registerInlineBackground(){
       }
     }).catch(()=>{});
   });
-  chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey],before=change?.oldValue as Partial<Settings>|undefined,after=change?.newValue as Partial<Settings>|undefined;if(area==='local'&&change&&before?.language!==after?.language)invalidate();});
+  chrome.storage.onChanged.addListener((changes,area)=>{const change=changes[settingsKey];if(area==='local'&&change&&translationLanguageChanged(change.oldValue,change.newValue))invalidate();});
   chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.url||change.status==='loading')retireTab(tabId);});
   chrome.tabs.onRemoved.addListener(retireTab);
   chrome.runtime.onMessage.addListener((message,sender,respond)=>{

@@ -108,8 +108,12 @@ export function App(){
  useEffect(()=>{if(view==='search')setSearchPageVisited(true);},[view]);
  useEffect(()=>{if(view==='discover')setDiscoveryVisited(true);},[view]);
  useEffect(()=>{if(libraryActive)setLibraryVisited(true);},[libraryActive]);
- const [settings,setSettings]=useState<Settings>(readSettings),auth=useSession(),account=auth.session;
+ const [settings,applySettings]=useState<Settings>(readSettings),auth=useSession(),account=auth.session;
  const settingsRef=useRef(settings);settingsRef.current=settings;
+ const setSettings=useCallback((change:Settings|((previous:Settings)=>Settings))=>{
+  const next=typeof change==='function'?change(settingsRef.current):change;
+  settingsRef.current=next;applySettings(next);void saveSettings(next);
+ },[]);
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState(''),[drag,setDrag]=useState(false);
  const [progressStatus,setProgressStatus]=useState<ReadingProgressStatus>('local');
  const [readingProgress]=useState(()=>new ReadingProgress(undefined,setProgressStatus));
@@ -285,8 +289,8 @@ export function App(){
    return()=>{stopped=true;};
  },[channel?.scope.key]);
  useEffect(()=>onMaterialized(identity=>setCopies(values=>values.map(c=>c.contentId===identity.contentId?{...c,pages:c.pages.map(p=>p.id===identity.pageId?{...p,imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime,width:identity.width,height:identity.height}:p)}:c))),[]);
- useEffect(()=>{void saveSettings(settings);},[settings]);
- useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null){const next=readSettings();setSettings(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
+ // Initialization and other surfaces already persisted their values; only user changes write back.
+ useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null){const next=readSettings();settingsRef.current=next;applySettings(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
  useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setShortcutScope(location.hash==='#settings/shortcuts'?'web':undefined);leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
  useEffect(()=>()=>{readingEpoch.current++;readingLoadEpoch.current++;libraryEpoch.current++;for(const controller of catalogRequests.current.keys())controller.abort();},[]);
  useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);void(async()=>{try{const value=await api.capabilities();if(live){setCaps(value);setUsage(value.entitlements??undefined);}}catch{/* Keep local reading available offline. */}})();return()=>{live=false;};},[api]);

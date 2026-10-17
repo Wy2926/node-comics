@@ -3,7 +3,7 @@ import {msg} from '../i18n/runtime';
 import {hashFile} from '../importers/hash';
 import {serveImage} from '../inline/blob-transfer';
 import {suspendInline} from '../inline/background';
-import {settingsKey} from '../inline/settings';
+import {readReaderSettings,settingsKey,translationLanguageChanged} from '../inline/settings';
 import {emptyPage} from '../reader/model';
 import {mergeJobs} from '../reader/jobs';
 import {pageTranslation} from '../reader/presentation';
@@ -11,7 +11,7 @@ import {safeImageUrl} from '../sources';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
 import {prepareTranslationInput,type PreparedInput} from '../translation/input/prepare';
 import {matchesPage} from '../translation/sync';
-import {defaults,supportsLanguage,type Capabilities,type Settings} from '../types';
+import {supportsLanguage,type Capabilities} from '../types';
 import {captureRegion} from './capture';
 import {sameViewport,validViewport} from './geometry';
 import {REGION_IMAGE_PORT,regionActivationKey,type RegionIdentity,type RegionRequest,type RegionResponse,type RegionImageRequest} from './protocol';
@@ -147,7 +147,7 @@ async function context(record:RegionRecord):Promise<Context> {
   const channel=await openActiveChannel(current);
   try{
     assertCurrent(current);
-    const saved=await chrome.storage.local.get(settingsKey),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>};
+    const settings=await readReaderSettings();
     assertCurrent(current);
     if(record.submitted&&(record.scope!==channel.scope.key||record.channelKey!==channel.key||record.language!==settings.language))
       throw Error(msg('翻译设置已变化，请重新框选。'));
@@ -158,7 +158,7 @@ async function context(record:RegionRecord):Promise<Context> {
 async function prepare(ctx:Context) {
   if(ctx.record.submitted)return;
   const {channel}=ctx,current=()=>ctx.active&&channel.isCurrent();
-  const saved=await chrome.storage.local.get(settingsKey),settings:Settings={...defaults,...saved[settingsKey] as Partial<Settings>};
+  const settings=await readReaderSettings();
   if(!channel.capabilities.modes.some(mode=>mode.id==='classic'&&mode.enabled)||!supportsLanguage(channel.capabilities,'classic',settings.language))
     throw Error(msg('此翻译方式暂不可用'));
   const source=await readRegionBlob(ctx.record,'source');assertCurrent(current);if(!source)throw changed();
@@ -256,7 +256,7 @@ export function registerRegionBackground() {
   };
   subscribeChannels(invalidate);
   chrome.storage.onChanged.addListener((changes,area)=>{
-    if(area==='local'&&changes[settingsKey]&&(changes[settingsKey].oldValue as Settings|undefined)?.language!==(changes[settingsKey].newValue as Settings|undefined)?.language)invalidate();
+    if(area==='local'&&changes[settingsKey]&&translationLanguageChanged(changes[settingsKey].oldValue,changes[settingsKey].newValue))invalidate();
     if(area==='session')for(const [key,value] of Object.entries(changes))if(key.startsWith('nc-region:')&&!value.newValue){
       const id=Number(key.slice('nc-region:'.length));if(!activatedTabs.has(id))continue;
       void navigator.locks.request('nc-inline-activation:'+id,async()=>{
