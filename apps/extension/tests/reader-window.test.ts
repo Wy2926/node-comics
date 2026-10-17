@@ -5,13 +5,30 @@ import type {ReadingEntry,Page} from '../src/types';
 
 const chapter=(id:string,count:number):ReadingEntry=>({id,title:id,source:'local',sourceKey:id,pages:Array.from({length:count},(_,index)=>({id:`${id}-${index}`,name:`${index}`,width:800,height:1000+index,jobs:[],outputBlobs:{}} as Page)),generation:1,createdAt:0,updatedAt:0,pageId:`${id}-0`,relativeOffset:0,discoveryComplete:true});
 describe('bounded reader geometry',()=>{
+ it.each([{width:390,height:640},{width:1200,height:900},{width:1200,height:80}])('uses the full reading width without a hidden surface gutter in %j',viewport=>{
+  const page={width:800,height:1200};
+  for(const zoom of [50,100,200]){
+   const frame=pageFrame(page,viewport,'width',zoom);
+   expect(frame.width).toBe(viewport.width*zoom/100);
+   expect(frame.width/frame.height).toBeCloseTo(page.width/page.height);
+  }
+ });
+ it.each([{width:800,height:1200},{width:1600,height:900}])('fits single or continuous pages to at least one complete viewport axis without padding: %j',page=>{
+  for(const viewport of [{width:390,height:640},{width:1200,height:900},{width:1200,height:80}]){
+   const frame=pageFrame(page,viewport,'window');
+   expect(frame.width).toBeLessThanOrEqual(viewport.width+1e-8);
+   expect(frame.height).toBeLessThanOrEqual(viewport.height+1e-8);
+   expect(Math.min(Math.abs(frame.width-viewport.width),Math.abs(frame.height-viewport.height))).toBeLessThan(1e-8);
+   expect(frame.width/frame.height).toBeCloseTo(page.width/page.height);
+  }
+ });
  it('keeps both comparison panes readable on phones, using the existing horizontal canvas scroll',()=>{
   const page={width:800,height:1200},phone={width:390,height:640};
   const regular=pageFrame(page,phone,'width'),comparison=pageFrame(page,phone,'width',100,true);
   expect(comparison.width).toBe(regular.width*2);
   expect(comparison.height).toBe(regular.height);
   const desktop=pageFrame(page,{width:1200,height:900},'width',100,true);
-  expect(desktop.width).toBe(1176);
+  expect(desktop.width).toBe(1200);
  });
  it('retains the current page and fractional anchor when a phone rotates in comparison mode',()=>{
   const book=chapter('phone-book',50),index=25,relativeOffset=.42;

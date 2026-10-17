@@ -6,6 +6,8 @@ import type {ReadingView} from '../src/reader/view';
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
 const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
+const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn(),clickCapture:vi.fn()}));
+vi.mock('../src/reader/useSpreadZoom',()=>({useSpreadZoom:()=>spreadZoom}));
 vi.mock('react',async original=>({
  ...await original<typeof import('react')>(),
  useState:<T,>(initial?:T|(()=>T))=>{
@@ -62,6 +64,7 @@ function click(tree:ReactElement,match:(node:ReactElement<Record<string,unknown>
 beforeEach(()=>{
  hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;
  for(const action of Object.values(actions))action.mockClear();
+ spreadZoom.change.mockClear();spreadZoom.reset.mockClear();
  installDictionary('zh-CN',{});
  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});
  vi.stubGlobal('document',{querySelector:()=>null,addEventListener:vi.fn(),removeEventListener:vi.fn()});
@@ -108,13 +111,55 @@ describe('reader shortcut action integration',()=>{
  });
  it('changes layout and fit through the same preserving controls while retaining unrelated settings',()=>{
   const props=fixture();render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();
-  expect(props.settings).toEqual({...defaults,layout:'single'});expect(view().fit).toBe('window');
+  expect(props.settings).toEqual(defaults);expect(view()).toMatchObject({layout:'single',fit:'window'});
   expect(actions.preserve).toHaveBeenCalledTimes(2);
-  expect(actions.preserve.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(props.setSettings).mock.invocationCallOrder[0]);
-  render(props);hooks.handlers['reader.layout']();expect(props.settings).toEqual({...defaults,layout:'double',direction:'rtl'});
+  render(props);hooks.handlers['reader.layout']();expect(view()).toMatchObject({layout:'double',direction:'rtl'});
   render(props);expect(hooks.handlers['reader.fit']()).toBe(false);expect(view().fit).toBe('window');
-  hooks.handlers['reader.layout']();expect(props.settings).toEqual({...defaults,direction:'rtl'});
+  hooks.handlers['reader.layout']();expect(view()).toMatchObject({layout:'continuous',direction:'rtl'});
   render(props);hooks.handlers['reader.fit']();expect(view().fit).toBe('width');
+  expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings).toEqual(defaults);
+ });
+ it('inherits later global defaults without pinning a layout when only opening or zooming a comic',()=>{
+  const props=fixture(),layout=(tree:ReactElement)=>nodes(tree).find(node=>node.props.className==='nc-reading-viewport')?.props['data-layout'];
+  expect(layout(render(props))).toBe('continuous');flushEffects();expect(view()).not.toHaveProperty('layout');
+  hooks.handlers['reader.zoomIn']();props.settings={...props.settings,layout:'single'};
+  expect(layout(render(props))).toBe('single');flushEffects();expect(view()).not.toHaveProperty('layout');
+  props.settings={...props.settings,layout:'double'};expect(layout(render(props))).toBe('double');
+  expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it('remembers each comic across chapters and reopening without changing the global defaults',()=>{
+  const stored=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
+  const a=fixture({viewKey:'comic-a'});render(a);hooks.handlers['reader.layout']();render(a);hooks.handlers['reader.layout']();render(a);flushEffects();
+  const chosen={...view()};expect(chosen).toMatchObject({layout:'double',direction:'rtl'});
+  a.copy={...a.copy,id:'chapter-two'};render(a);expect(view()).toEqual(chosen);
+  hooks.states=[];const b=fixture({viewKey:'comic-b',settings:{...defaults,layout:'single'}});render(b);flushEffects();
+  expect(view().layout).toBeUndefined();expect(view().direction).toBeUndefined();
+  hooks.handlers['reader.layout']();render(b);hooks.handlers['reader.layout']();render(b);flushEffects();expect(view().layout).toBe('continuous');
+  hooks.states=[];a.settings={...defaults,layout:'single'};const reopened=render(a);
+  expect(view()).toEqual(chosen);expect(nodes(reopened).find(node=>node.props.className==='nc-reading-viewport')?.props['data-layout']).toBe('double');
+  expect(a.setSettings).not.toHaveBeenCalled();expect(b.setSettings).not.toHaveBeenCalled();
+ });
+ it('treats an explicit same-as-default choice as an override and can return to following defaults',()=>{
+  const props=fixture();render(props);hooks.handlers['reader.settings']();
+  const options=()=>nodes(render(props)).find(node=>node.type===ReaderSettings)!.props as unknown as Parameters<typeof ReaderSettings>[0];
+  options().onLayout('continuous');expect(view().layout).toBe('continuous');
+  props.settings={...props.settings,layout:'single'};expect(options().layout).toBe('continuous');
+  options().onDirection('rtl');expect(view().direction).toBe('rtl');
+  options().onLayout(undefined);expect(view().layout).toBeUndefined();expect(view().direction).toBe('rtl');
+  expect(nodes(render(props)).find(node=>node.props.className==='nc-reading-viewport')?.props['data-layout']).toBe('single');
+  expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it('keeps a comic layout selected before phone dimensions arrive',()=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});render(props);
+  hooks.handlers['reader.layout']();expect(view().layout).toBe('single');
+  props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
+  render(props);flushEffects();expect(view().layout).toBe('single');expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it('allows local layout changes when preference storage cannot be read or written',()=>{
+  vi.stubGlobal('localStorage',{getItem:()=>{throw Error('Unavailable');},setItem:()=>{throw Error('Full');}});
+  const props=fixture();render(props);hooks.handlers['reader.layout']();
+  expect(()=>{render(props);flushEffects();}).not.toThrow();expect(view().layout).toBe('single');expect(props.setSettings).not.toHaveBeenCalled();
  });
  it.each(['ltr','rtl'] as const)('turns whole spreads from either selected page while honoring direction (%s)',direction=>{
   render(fixture({settings:{...defaults,layout:'double',direction}}));
@@ -125,12 +170,16 @@ describe('reader shortcut action integration',()=>{
   const props=fixture({settings:{...defaults,layout:'double'}}),tree=render(props);
   const pages=nodes(tree).filter(node=>node.props.className==='nc-manga-page');
   expect(pages.map(page=>page.props['data-page-index'])).toEqual([1,2]);
-  expect(pages.reduce((width,page)=>width+(page.props.style as {width:number}).width,0)).toBeLessThanOrEqual(876);
+  expect(pages.reduce((width,page)=>width+(page.props.style as {width:number}).width,0)).toBe(900);
   const saved={...view()};
-  for(const action of ['reader.fit','reader.zoomIn','reader.zoomOut','reader.zoomReset'])expect(hooks.handlers[action]()).toBe(false);
+  expect(hooks.handlers['reader.fit']()).toBe(false);
+  for(const action of ['reader.zoomIn','reader.zoomOut','reader.zoomReset'])hooks.handlers[action]();
+  expect(spreadZoom.change.mock.calls.map(([value])=>typeof value==='function'?value(100):value)).toEqual([110,90,100]);
   expect(view()).toEqual(saved);expect(actions.preserve).not.toHaveBeenCalled();
   hooks.handlers['reader.settings']();
-  expect(nodes(render(props)).some(node=>node.type===ReaderScale||node.type===ReaderChoice&&node.props.label==='图片适应方式')).toBe(false);
+  const controls=nodes(render(props));
+  expect(controls.some(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式')).toBe(false);
+  expect(controls.find(node=>node.type===ReaderScale)?.props).toMatchObject({value:100,min:100,max:400});
  });
  it('starts translation lookahead at the first displayed page after jumping to the second page of a spread',()=>{
   const props=fixture({settings:{...defaults,layout:'double'}});render(props);hooks.handlers['reader.translation']();render(props);flushEffects();
@@ -144,26 +193,34 @@ describe('reader shortcut action integration',()=>{
   expect(nodes(end.props.children)).toEqual([]);
   expect(nodes(tree).find(node=>node.props['aria-label']==='下一页')?.props.disabled).toBe(true);
  });
+ it.each(['continuous','single','double'] as const)('does not add an invisible gutter to the full-width %s canvas or its swipe decision',layout=>{
+  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'original',zoom:100,fit:'width'}),setItem:vi.fn()});
+  const elements=nodes(render(fixture({settings:{...defaults,layout}})));
+  for(const className of ['nc-reading-clip','nc-reading-surface']){
+   expect(elements.find(node=>node.props.className===className)?.props.style).toEqual({minWidth:900});
+  }
+  expect(elements.find(node=>node.props.className==='nc-reading-viewport')?.props['data-swipe-enabled']).toBe(layout!=='continuous');
+ });
  it('defaults desktop sizing to width at 50 percent independently of global settings and restores the comic fit',()=>{
   const props=fixture({settings:{...defaults,fit:'width'}});const initial=render(props);
   expect(view()).toEqual({mode:'classic',preference:'original',zoom:50,fit:'width'});
   const pageWidth=(tree:ReactElement)=>nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number};
-  expect(pageWidth(initial).width).toBe(438);
-  hooks.handlers['reader.fit']();const fitted=render(props);expect(pageWidth(fitted).width).toBe(220);
+  expect(pageWidth(initial).width).toBe(450);
+  hooks.handlers['reader.fit']();const fitted=render(props);expect(pageWidth(fitted).width).toBeCloseTo(700/3);
   expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings.fit).toBe('width');
   hooks.handlers['reader.settings']();const settings=render(props);
   const choice=nodes(settings).find(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式')!;
   expect(choice.props.value).toBe('window');(choice.props.onChange as (value:string)=>void)('width');
   expect(view().fit).toBe('width');expect(props.setSettings).not.toHaveBeenCalled();expect(actions.preserve).toHaveBeenCalledTimes(2);
   hooks.states=[];vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:100,fit:'width'}),setItem:vi.fn()});
-  const restored=render(props);expect(view()).toEqual({mode:'classic',preference:'translation',zoom:100,fit:'width'});expect(pageWidth(restored).width).toBe(876);
+  const restored=render(props);expect(view()).toEqual({mode:'classic',preference:'translation',zoom:100,fit:'width'});expect(pageWidth(restored).width).toBe(900);
  });
  it('applies a first long-image preset once and preserves the saved view across reopening and ordinary chapters',()=>{
   const stored=new Map<string,string>(),setItem=vi.fn((key:string,value:string)=>stored.set(key,value));
   vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem});
   const long=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
   const tree=render(long);expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
-  expect((nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(438);
+  expect((nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(450);
   flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual(view());
   hooks.states=[];render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
   expect(long.setSettings).not.toHaveBeenCalled();

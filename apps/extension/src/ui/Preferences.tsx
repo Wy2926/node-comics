@@ -55,11 +55,11 @@ export function Preferences({ settings, setSettings, caps, modelSelection, child
           <option value="ltr">{msg("从左向右")}</option>
         </Select>
       </SettingRow>
-      <SettingRow title={msg("阅读方式")} description={msg("连续阅读仅解码当前页附近的有限图片窗口。")}>
-        <Select aria-label={msg("阅读方式")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}}>
-          <option value="continuous">{msg("连续纵向滚动")}</option>
-          <option value="single">{msg("单页翻页")}</option>
-          <option value="double">{msg("双页阅读")}</option>
+      <SettingRow title={msg("默认阅读布局")} description={msg("未单独设置布局的漫画使用此默认值。")}>
+        <Select aria-label={msg("默认阅读布局")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}}>
+          <option value="continuous">{msg("连续")}</option>
+          <option value="single">{msg("单页")}</option>
+          <option value="double">{msg("双页")}</option>
         </Select>
       </SettingRow>
 

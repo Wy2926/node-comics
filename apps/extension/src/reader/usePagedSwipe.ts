@@ -1,5 +1,6 @@
 import {useLayoutEffect, useRef, type MouseEventHandler, type RefObject} from 'react';
 import {pageSnapshot} from './page-snapshot';
+import {READER_INTERACTIVE} from './reader-input';
 
 type Turn = -1 | 1;
 type Phase = 'dragging' | 'entering' | 'settling';
@@ -17,7 +18,6 @@ type Options = {
  onSettled?:()=>void;
 };
 type Controls = {turn:(delta:Turn)=>false|void;cancel:()=>void;sync:()=>void;click:()=>boolean};
-const INTERACTIVE='a,button,input,select,textarea,[contenteditable]:not([contenteditable="false"]),[role="button"],[role="link"],[role="slider"],[role="textbox"],[role="combobox"],[role="checkbox"],[role="radio"],[role="switch"],[role="tab"],[role="spinbutton"],[role="searchbox"],[role="listbox"],[role="treeitem"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="option"],[data-no-swipe]';
 
 /** Only the live spread owns reading state; the outgoing visual layer lasts for one bounded slide. */
 export function usePagedSwipe(options:Options){
@@ -110,9 +110,12 @@ export function usePagedSwipe(options:Options){
    viewport.scrollWidth>viewport.clientWidth+1||(window.visualViewport?.scale??1)>1;
   const deltaFor=(x:number):Turn=>(x<0?1:-1)*(latest.current.direction==='rtl'?-1:1) as Turn;
   const down=(event:PointerEvent)=>{
+   // A fresh press is not the trailing click of the previous drag, which some
+   // touch browsers omit entirely after preventDefault or pointer capture.
+   if(event.isPrimary!==false&&event.button===0)clickUntil=0;
    if(unavailable()||phase||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
    const target=event.target as Element|null;
-   if(target?.closest?.(INTERACTIVE)||window.getSelection?.()?.toString())return;
+   if(target?.closest?.(READER_INTERACTIVE)||window.getSelection?.()?.toString())return;
    gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastTime:event.timeStamp,velocity:0,offset:0,dragging:false};
   };
   const allDown=(event:PointerEvent)=>{

@@ -71,7 +71,7 @@ async function reachable(page, name) {
 
 async function showTools(page) {
   if (await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden'))) {
-    await page.getByRole('button', {name: '显示阅读工具', exact: true}).click();
+    await page.keyboard.press('Escape');
   }
 }
 
@@ -206,6 +206,32 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
           await page.setViewportSize({width: 844, height: 390});
           await mobileGeometry(page);
           await page.screenshot({path: path.join(output, `${engine}-landscape.png`)});
+          await t.test('comic layout persists independently of global defaults and can return to inheritance', async () => {
+            const globalSettings = () => page.locator('output[aria-label="全局阅读设置"]').textContent().then(JSON.parse);
+            const storedView = () => page.evaluate(() => JSON.parse(localStorage.getItem('epub-artwork-ui-fixture')));
+            const before = await location(page), globalBefore = await globalSettings();
+            await showTools(page);
+            await page.getByRole('button', {name: '阅读设置', exact: true}).click();
+            const choice = page.getByRole('group', {name: '阅读布局', exact: true});
+            assert.equal(await choice.getByRole('button', {name: '默认', exact: true}).getAttribute('aria-pressed'), 'true');
+            await choice.getByRole('button', {name: '单页', exact: true}).click(); await ready(page);
+            await page.getByRole('button', {name: '关闭面板', exact: true}).click();
+            assert.equal(await page.locator('.nc-epub-stage').getAttribute('data-epub-flow'), 'paginated');
+            assert.equal((await storedView()).layout, 'single');
+            assert.deepEqual(await globalSettings(), globalBefore);
+            assert.equal((await location(page)).href, before.href, 'Layout switching retains the document chapter');
+            const saved = await location(page);
+            await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
+            await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await ready(page);
+            assert.equal(await page.locator('.nc-epub-stage').getAttribute('data-epub-flow'), 'paginated');
+            assert.equal((await location(page)).cfi.split(':')[0], saved.cfi.split(':')[0]);
+            await showTools(page); await page.getByRole('button', {name: '阅读设置', exact: true}).click();
+            await choice.getByRole('button', {name: '默认', exact: true}).click(); await ready(page);
+            assert.equal(await page.locator('.nc-epub-stage').getAttribute('data-epub-flow'), 'scrolled-continuous');
+            assert.equal((await storedView()).layout, undefined);
+            assert.deepEqual(await globalSettings(), globalBefore);
+            await page.screenshot({path: path.join(output, `${engine}-comic-layout-default.png`)});
+          });
         } else if (scenario === 'close-while-loading') {
           await page.getByRole('button', {name: '关闭阅读器', exact: true}).click();
           await page.evaluate(() => {

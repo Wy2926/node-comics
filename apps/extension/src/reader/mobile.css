@@ -13,12 +13,15 @@
     min-height: 0;
   }
 
-  /* Non-immersive layout reserves chrome space; phone.css overlays immersive tools. */
+  /* Only non-immersive chrome reserves space, including in narrow desktop windows. */
   .nc-app .nc-reader .nc-reading-viewport {
     margin: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px))
       env(safe-area-inset-right, 0px)
       calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom, 0px))
       env(safe-area-inset-left, 0px);
+  }
+  .nc-app .nc-reader.is-immersive .nc-reading-viewport {
+    margin-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
   }
 
   .nc-app .nc-reader .nc-reader-rail {
@@ -144,25 +147,22 @@
   .nc-app .nc-reader .nc-translation-popover .nc-drawer-title { margin-bottom: 0; }
   .nc-app .nc-reader .nc-translation-popover .field { font-size: var(--text-body); }
   .nc-app .nc-reader .nc-translation-popover .nc-default-mode-note { font-size: var(--text-small); }
-  .nc-app .nc-reader .nc-reader-choices { flex-wrap: wrap; }
-  .nc-app .nc-reader .nc-reader-choices button { min-height: 44px; white-space: normal; font-size: var(--text-small); }
+  .nc-app .nc-reader .nc-reader-choices.segmented { flex-wrap: wrap; }
+  .nc-app .nc-reader .nc-reader-choices.segmented button { min-height: 44px; font-size: var(--text-small); }
   .nc-app .nc-reader .nc-reader-option { gap: 12px; padding-block: 16px; }
   .nc-app .nc-reader .nc-reader-option .icon-button { min-width: 44px; min-height: 44px; }
   .nc-app .nc-reader .nc-reader-option .switch { flex: none; }
-  .nc-app .nc-reader .nc-stack-actions .button { min-height: 44px; }
+  .nc-app .nc-reader .nc-reader-actions > .button {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
 
   .nc-app .nc-reader .nc-directory-search input { font-size: max(16px, 1rem); }
   .nc-app .nc-reader .nc-directory-search button,
   .nc-app .nc-reader .nc-chapter-expand,
   .nc-app .nc-reader .nc-directory-tabs button { min-width: 44px; min-height: 44px; }
   .nc-app .nc-reader .nc-directory-footer { max-height: 20%; overflow: auto; }
-
-  .nc-app .nc-reader .nc-reveal {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    width: 48px;
-    height: 48px;
-  }
 
   .nc-app .nc-reader .nc-reading-progress {
     left: calc(8px + env(safe-area-inset-left, 0px));

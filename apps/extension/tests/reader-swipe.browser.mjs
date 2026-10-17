@@ -117,9 +117,12 @@ const idle = () => page.waitForFunction(() => !document.querySelector('.nc-readi
 
 async function reader({failure = false, long = false, chapters = false, controlled = false, pages, holdPages = [], holdResults = [], failResults = []} = {}) {
   await page.goto(`${origin}/tests/reader-window-fixture.html?pagination=1${failure ? '&failure=1' : ''}${long ? '&long=1' : ''}${chapters ? '&chapters=2' : ''}${pages === 16 ? '&pages=16' : ''}${controlled ? `&controlledReads=1&holdPages=${holdPages.join(',')}&holdResults=${holdResults.join(',')}&failResults=${failResults.join(',')}` : ''}`);
-  await pageNumber().waitFor();
+  await viewport().waitFor();
   await page.waitForFunction(async () => (await import('/src/shortcuts/store.ts')).getShortcutSnapshot().ready);
   await shown(1, [1]);
+  // Startup may outlast immersive chrome's idle timer. Reveal through the real shortcut.
+  await page.keyboard.press('Escape');
+  await pageNumber().waitFor();
   assert.equal(await page.locator('.nc-page-turn-status').count(), 0, 'No blocking page-preparation notice is mounted');
 }
 async function selected(number, visible, chapter = 0) {
@@ -285,7 +288,7 @@ test('mouse single-page LTR and RTL swipes animate in reading order and preserve
 });
 
 test('mouse double-page gestures move the entire RTL spread, respect landscape pages, and support LTR', async () => {
-  await reader(); await layout('双页阅读'); await jump(2); await shown(2, [2, 3]);
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
   const positions = await cells().evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
   await resetTrace(); await mouseDrag(230, {release: false});
   assert.equal(await viewport().getAttribute('data-swipe-phase'), 'dragging');
@@ -305,7 +308,7 @@ test('navigation buttons and keyboard use the same outgoing/incoming animation a
   await resetTrace(); await page.getByRole('button', {name: '下一页', exact: true}).click();
   await shown(2, [2]); await assertAnimation(-1);
   await resetTrace(); await page.keyboard.press('PageDown'); await shown(3, [3]); await assertAnimation(-1);
-  await layout('双页阅读'); await shown(3, [2, 3]);
+  await layout('双页'); await shown(3, [2, 3]);
   await resetTrace(); await page.keyboard.press('ArrowLeft'); await shown(4, [4]); await assertAnimation(1);
   await resetTrace(); await page.getByRole('button', {name: '上一页', exact: true}).click();
   await shown(2, [2, 3]); await assertAnimation(-1);
@@ -342,7 +345,7 @@ test('mobile CDP touch swipes animate single pages and RTL double spreads withou
   await page.setViewportSize({width: 390, height: 844}); await reader();
   await resetTrace(); await touchDrag(-140); await shown(2, [2]); await assertAnimation(-1, {dragged: true});
   assert.equal(await page.evaluate(() => window.__swipePointer.type), 'touch');
-  await layout('双页阅读'); await shown(2, [2, 3]);
+  await layout('双页'); await shown(2, [2, 3]);
   await resetTrace(); await touchDrag(140); await shown(4, [4]); await assertAnimation(1, {dragged: true});
   await resetTrace(); await touchDrag(-140); await shown(2, [2, 3]); await assertAnimation(-1, {dragged: true});
   await page.screenshot({path: resolve(artifacts, 'mobile-double-settled.png')});
@@ -436,7 +439,7 @@ test('opening settings, changing layout and closing the reader cancel unfinished
   await page.keyboard.press('s');
   await page.mouse.up();
   await settings().waitFor();
-  await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: '双页阅读', exact: true}).click();
+  await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: '双页', exact: true}).click();
   await closeSettings(); await assertNoLateNavigation(1, [1]);
   await mouseDrag(230, {release: false});
   await page.getByRole('button', {name: '关闭并保存位置', exact: true}).evaluate(element => element.click());
@@ -475,7 +478,7 @@ test('reduced motion selects a permanently loading page immediately and permits 
 });
 
 test('a failed half-spread can still be swiped away and repeated navigation releases old image URLs', async () => {
-  await reader({failure: true}); await layout('双页阅读'); await jump(5); await shown(5, [5, 6], 1);
+  await reader({failure: true}); await layout('双页'); await jump(5); await shown(5, [5, 6], 1);
   await viewport().getByText('图片暂不可用', {exact: true}).waitFor();
   const old = await viewport().locator('img.nc-page-image').evaluateAll(images => images.map(image => image.src));
   await resetTrace(); await mouseDrag(230); await shown(7, [7, 8]); await assertAnimation(1, {dragged: true});
@@ -594,7 +597,7 @@ test('a permanently loading translation does not hold a single-page turn or bloc
 
 test('double-page comparison shows independent original fallbacks while a source and translated result remain pending', async () => {
   await reader({controlled: true, holdPages: [7], holdResults: [8]});
-  await layout('双页阅读'); await jump(5); await shown(5, [5, 6]);
+  await layout('双页'); await jump(5); await shown(5, [5, 6]);
   await page.getByRole('button', {name: '完成模拟翻译', exact: true}).click();
   await openSettings(); await settings().getByRole('switch', {name: '并排对照', exact: true}).click(); await closeSettings();
   await shown(5, [5, 6], 4);
@@ -652,7 +655,7 @@ test('single-page lookahead reads only next-page bytes without extra idle image 
 });
 
 test('double-page byte lookahead stays within the next spread and creates no speculative image URLs', async () => {
-  await reader({controlled: true}); await layout('双页阅读'); await jump(5); await shown(5, [5, 6]);
+  await reader({controlled: true}); await layout('双页'); await jump(5); await shown(5, [5, 6]);
   await page.waitForFunction(() => [7, 8].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
   await page.waitForTimeout(150); await shown(5, [5, 6]);
   assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 2);
@@ -665,7 +668,7 @@ test('double-page byte lookahead stays within the next spread and creates no spe
 });
 
 test('continuous layout uses the same bounded byte lookahead after its eleven decoded pages', async () => {
-  await reader({controlled: true, pages: 16}); await layout('连续阅读');
+  await reader({controlled: true, pages: 16}); await layout('连续');
   await shown(1, Array.from({length: 11}, (_, index) => index + 1));
   await page.waitForFunction(() => [12, 13].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
   await page.waitForTimeout(200);
@@ -675,16 +678,16 @@ test('continuous layout uses the same bounded byte lookahead after its eleven de
   assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), 11);
   assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 11);
   assert.equal(await oldLayer().count(), 0);
-  await layout('单页阅读'); await shown(1, [1]);
+  await layout('单页'); await shown(1, [1]);
   await page.waitForFunction(() => window.__swipeUrls.active.size === 1);
   await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
   await page.waitForFunction(() => window.__swipeUrls.active.size === 0);
 });
 
 const originalFirstLayouts = [
-  {name: 'single', label: '单页阅读', number: 2, visible: [2], next: [3]},
-  {name: 'double', label: '双页阅读', number: 5, visible: [5, 6], next: [7, 8]},
-  {name: 'continuous', label: '连续阅读', number: 1, visible: Array.from({length: 11}, (_, index) => index + 1), next: [12, 13]}
+  {name: 'single', label: '单页', number: 2, visible: [2], next: [3]},
+  {name: 'double', label: '双页', number: 5, visible: [5, 6], next: [7, 8]},
+  {name: 'continuous', label: '连续', number: 1, visible: Array.from({length: 11}, (_, index) => index + 1), next: [12, 13]}
 ];
 const primaryImage = number => surface().locator(`[data-page-id="${pageId(number)}"] .nc-comparison-pane:last-child img.nc-page-image`);
 async function pixels(number, result = false) {

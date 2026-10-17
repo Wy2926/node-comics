@@ -82,7 +82,7 @@ try{
   check('idle reading reuses SSE for 22 seconds with zero repeated HTTP reads, including ten focus events');
   await jump(1);
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
-  await page.getByRole('button',{name:'单页阅读',exact:true}).click();
+  await page.getByRole('button',{name:'单页',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const nextJob=await page.evaluate(()=>window.readerFixture.finishNext());assert(nextJob);
   await page.waitForFunction(()=>window.readerFixture.requests.some(path=>path.endsWith('/result')));
@@ -93,7 +93,7 @@ try{
   check('single-page reader downloads the next completed translation while still showing page 1');
   await page.screenshot({path:path.join(out,'reading.png')});
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
-  await page.getByRole('button',{name:'连续阅读',exact:true}).click();
+  await page.getByRole('button',{name:'连续',exact:true}).click();
   await page.getByRole('button',{name:'铺满宽度',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   await page.locator('.nc-reading-viewport').evaluate(node=>{node.scrollTop=200;});

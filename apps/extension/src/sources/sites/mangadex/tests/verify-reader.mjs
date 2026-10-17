@@ -241,7 +241,7 @@ try{
     checks.push('Removing the chosen group automatically falls back to the remaining release without blocking, while retaining the removed content and progress');
     const retained=await state();failFeed=true;await assert.rejects(refresh());assert.equal((await state()).entries.length,retained.entries.length);
     checks.push('Failed full catalog refresh preserves all existing language and release records');
-    failFeed=false;await setLayout('单页阅读');await waitEntry(ids.en1,3);await reader.getByRole('button',{name:'下一页',exact:true}).click();await waitEntry(ids.en2a,1);
+    failFeed=false;await setLayout('单页');await waitEntry(ids.en1,3);await reader.getByRole('button',{name:'下一页',exact:true}).click();await waitEntry(ids.en2a,1);
     await jump(2,ids.en2a);await reader.getByRole('button',{name:'下一页',exact:true}).click();await waitEntry(ids.zh3,1);
     await jump(3,ids.zh3);await reader.getByRole('button',{name:'下一页',exact:true}).click();await waitEntry(ids.vi4,1);
     checks.push('Single-page next-page navigation crosses logical chapters using the same automatic language selection without an explicit navigation reload');

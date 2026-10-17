@@ -90,14 +90,14 @@ try{
  const compared=await sample('comparison',2);assert.equal(compared.liveUrls,20);
  await page.screenshot({path:path.join(out,'comparison.png')});
  checks.push('Comparison retains full-resolution originals and translations within eleven pages; the bad page stays isolated');
- await settings(async()=>{await page.getByRole('switch',{name:'并排对照',exact:true}).click();await page.getByRole('button',{name:'单页阅读',exact:true}).click();});
+ await settings(async()=>{await page.getByRole('switch',{name:'并排对照',exact:true}).click();await page.getByRole('button',{name:'单页',exact:true}).click();});
  await decoded([3]);
  await page.waitForFunction(()=>document.querySelectorAll('.nc-reading-viewport .nc-manga-page').length===1&&window.readerPreloadMetrics().liveUrls===1);
  const single=await sample('single');assert.equal(single.selectedPages,1);
  await page.getByRole('button',{name:'下一页',exact:true}).click();await decoded([4]);await sample('single-next');
  await page.getByRole('button',{name:'上一页',exact:true}).click();await decoded([3]);await sample('single-previous');
  checks.push('Single-page mode loads one image and supports forward/back navigation');
- await settings(()=>page.getByRole('button',{name:'连续阅读',exact:true}).click());
+ await settings(()=>page.getByRole('button',{name:'连续',exact:true}).click());
  await input.fill('8');await cell(7).locator('.nc-image-failure').waitFor();await decoded([6,8]);
  const failedTop=await position();await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();assert(Math.abs(await position()-failedTop)<1);
  await cell(7).getByRole('button',{name:'重试',exact:true}).click();await cell(7).locator('.nc-image-failure').waitFor();await sample('failed-page');

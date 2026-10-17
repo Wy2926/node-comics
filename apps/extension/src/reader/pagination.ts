@@ -48,8 +48,8 @@ export function spreadAt(spreads: readonly PageSpread[], index: number): PageSpr
 export function spreadFrames(pages: readonly PageSize[], viewport: {width: number; height: number}, compare = false): {width: number; height: number}[] {
   if (!pages.length) return [];
   const ratios = pages.map(page => aspectRatio(page) * (compare ? 2 : 1));
-  const availableWidth = Number.isFinite(viewport.width) ? Math.max(0, viewport.width - 24) : 0;
-  const availableHeight = Number.isFinite(viewport.height) ? Math.max(0, viewport.height - 24) : 0;
+  const availableWidth = Number.isFinite(viewport.width) ? Math.max(0, viewport.width) : 0;
+  const availableHeight = Number.isFinite(viewport.height) ? Math.max(0, viewport.height) : 0;
   const height = Math.min(availableHeight, availableWidth / ratios.reduce((sum, ratio) => sum + ratio, 0));
   return ratios.map(ratio => ({width: height * ratio, height}));
 }

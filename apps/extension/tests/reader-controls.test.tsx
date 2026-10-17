@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {FocusEvent, KeyboardEvent, PointerEvent} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
 
 // Run the shared image/EPUB chrome hook with real fake-timer scheduling.
 // Browser focus-visible semantics are additionally checked in the local reader.
@@ -98,6 +99,25 @@ describe('immersive reader controls', () => {
     expect(controls.hidden).toBe(false);
     expect(shell().className).toContain('is-immersive');
     advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it.each([true, false].flatMap(immersive => [true, false].map(hidden => ({immersive, hidden}))))(
+    'never renders a floating settings/reveal button (immersive: $immersive, hidden: $hidden)', ({immersive, hidden}) => {
+      const markup = renderToStaticMarkup(<ReaderShell {...controls} ref={controls.root} background="gray"
+        immersive={immersive} hidden={hidden}><main>Reader content</main></ReaderShell>);
+      expect(markup).toContain('<main>Reader content</main>');
+      expect(markup).not.toContain('<button');
+      expect(markup).not.toContain('nc-reveal');
+    },
+  );
+
+  it('reveals hidden tools with Escape without requiring a floating button', () => {
+    advance(); expect(controls.hidden).toBe(true);
+    const escape = vi.mocked(window.addEventListener).mock.calls.find(([type]) => type === 'keydown')![1] as (event: globalThis.KeyboardEvent) => void;
+    escape({key: 'Escape', defaultPrevented: false, isComposing: false, keyCode: 27} as globalThis.KeyboardEvent);
+    render();
+    expect(controls.hidden).toBe(false);
+    expect(vi.getTimerCount()).toBe(1);
   });
 
   it('toggles tools on content taps without leaving a hide timer running', () => {

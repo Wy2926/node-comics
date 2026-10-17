@@ -2,7 +2,7 @@
 import type {PageView} from './presentation';
 import type {Page,Settings} from '../types';
 
-export type ReadingView = PageView & {zoom:number;fit:Settings['fit']};
+export type ReadingView = PageView & {zoom:number;fit:Settings['fit'];layout?:Settings['layout'];direction?:Settings['direction']};
 
 export function readingViewDefaults():ReadingView{return {mode:'classic',preference:'original',zoom:100,fit:'window'};}
 /** Desktop sizing is immediate; only compact readers need dimensions to detect long images. */
@@ -12,7 +12,7 @@ export function initialReadingView(page?:Pick<Page,'width'|'height'>,compact=fal
   return {...readingViewDefaults(),...(page.height>=page.width*3?{fit:'width' as const}:{})};
 }
 
-/** Display choice, image fit and proportional zoom belong to this comic only. */
+/** Comic choices share one record; absent layout/direction inherit the global defaults. */
 export function readingViewKey(comicId:string){return 'nc-comic-view:'+comicId;}
 export function readStoredReadingView(key:string):ReadingView|undefined{
   try{
@@ -20,8 +20,10 @@ export function readStoredReadingView(key:string):ReadingView|undefined{
     const value=JSON.parse(raw);
     const zoom=typeof value?.zoom==='number'&&Number.isFinite(value.zoom)&&value.zoom>=40&&value.zoom<=200&&value.zoom%10===0?value.zoom:100;
     const fit:Settings['fit']=value?.fit==='width'?'width':'window';
-    if(value&&value.mode==='classic'&&(value.preference==='original'||value.preference==='translation'))return {mode:value.mode,preference:value.preference,zoom,fit};
-    return {mode:'classic',preference:'original',zoom,fit};
+    const layout:Settings['layout']|undefined=value?.layout==='continuous'||value?.layout==='single'||value?.layout==='double'?value.layout:undefined;
+    const direction:Settings['direction']|undefined=value?.direction==='ltr'||value?.direction==='rtl'?value.direction:undefined;
+    const preference=value?.mode==='classic'&&value.preference==='translation'?'translation':'original';
+    return {mode:'classic',preference,zoom,fit,...(layout?{layout}:{}),...(direction?{direction}:{})};
   }catch{/* Missing or corrupt preferences never opt a comic into translation. */}
   return readingViewDefaults();
 }

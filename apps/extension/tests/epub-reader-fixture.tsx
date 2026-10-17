@@ -172,6 +172,7 @@ function Fixture() {
       <output aria-label="模拟状态">{events.slice(-12).join(' | ')}</output><br/>
       <output aria-label="图片状态">{JSON.stringify(copy.pages.map(page=>({id:page.id,scope:page.translationScope,jobs:page.jobs.map(job=>({id:job.id,status:job.status,result:job.result})),outputs:Object.keys(page.outputBlobs),error:page.translationError})))}</output><br/>
       <output aria-label="保存位置">{JSON.stringify(copy.documentLocation)}</output><br/>
+      <output aria-label="全局阅读设置">{JSON.stringify(settings)}</output><br/>
       <output aria-label="界面提示">{notice}</output>
     </details>
   </div>;

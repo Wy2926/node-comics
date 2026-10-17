@@ -699,7 +699,7 @@ a {
   overflow-anchor: none;
 }
 .nc-reading-surface, .nc-reading-snapshot {
-  padding: 0 12px 28px;
+  padding: 0;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -803,7 +803,6 @@ a {
 .nc-reading-viewport:not([data-layout="continuous"])[data-layout] :is(.nc-reading-surface,.nc-reading-snapshot) {
   flex: 1;
   justify-content: center;
-  padding-block: 12px;
 }
 .nc-reading-viewport[data-swipe-enabled="true"] { touch-action: pan-y pinch-zoom; }
 .nc-reading-viewport[data-swipe-enabled="true"] .nc-page-image {
@@ -836,6 +835,12 @@ a {
   flex-direction: row-reverse;
 }
 .nc-reading-viewport[data-layout="double"] .nc-manga-page { margin: 0; }
+.nc-reading-viewport[data-layout="double"] { overflow: clip; }
+.nc-reading-viewport[data-zoomed="true"] { cursor: grab; touch-action: none; }
+.nc-reading-viewport[data-zoomed="true"] .nc-page-image { -webkit-user-drag: none; user-select: none; }
+.nc-reading-viewport[data-zoom-dragging="true"] { cursor: grabbing; user-select: none; }
+.nc-reading-viewport[data-page-turn="left"]:not([data-zoomed="true"]) { cursor: url('./assets/cursors/reader-turn-left.svg') 3 16, pointer; }
+.nc-reading-viewport[data-page-turn="right"]:not([data-zoomed="true"]) { cursor: url('./assets/cursors/reader-turn-right.svg') 29 16, pointer; }
 .nc-paged-notice {
   position: absolute;
   bottom: 12px;
@@ -1027,29 +1032,29 @@ a {
 .nc-reader-option>div:first-child {
   min-width: 0;
 }
-.nc-stack-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.nc-reader-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 18px;
+}
+.nc-app .nc-reader-actions > .button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px;
+  font-size: var(--text-small);
+  text-align: start;
+}
+.nc-reader-actions > .button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .nc-reader .field {
   margin: 0 0 20px;
-}
-.nc-reveal {
-  position: absolute;
-  bottom: 16px;
-  right: 20px;
-  z-index: 32;
-  color: var(--reading-ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  height: 42px;
-  width: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  opacity: .85;
 }
 /* Existing settings controls share the same type scale and semantic surfaces. */
 .nc-app .page-title {
@@ -1548,9 +1553,6 @@ a {
   }
 }
 /* Reader controls and full-area sizing. */
-.nc-reading-surface, .nc-reading-snapshot {
-  padding-bottom: 0;
-}
 .nc-manga-page {
   margin-bottom: 0;
 }
@@ -1562,6 +1564,7 @@ a {
 }
 .nc-reader-choices {
   width: 100%;
+  min-width: 0;
 }
 .nc-app .nc-reader-choices button {
   display: inline-flex;
@@ -1569,8 +1572,31 @@ a {
   justify-content: center;
   gap: 7px;
   flex: 1;
+  min-width: 0;
   padding: 8px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.nc-reader-choice-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.nc-app .nc-reader-choice-cards button {
+  flex-direction: column;
+  min-height: 76px;
+  padding: 10px;
+  text-align: center;
+  font-size: var(--text-small);
+}
+.nc-reader-choice-cards button > span {
+  min-width: 0;
+  max-width: 100%;
+}
+.nc-app .nc-reader-choice-cards .button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .nc-reader .nc-ahead-field {
   margin-top: 20px;
@@ -1714,6 +1740,9 @@ a {
 }
 .nc-reader .nc-reading-viewport {
   margin-inline: var(--reader-gutter);
+}
+.nc-reader.is-immersive .nc-reading-viewport {
+  margin-inline: 0;
 }
 .nc-reader-rail {
   position: absolute;

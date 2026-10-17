@@ -4,8 +4,8 @@ export function pageFrame(page: Pick<Page,'width'|'height'>, viewport: {width:nu
   const ratio = Math.max(1,page.width) / Math.max(1,page.height) * (compare ? 2 : 1);
   // On a narrow canvas, comparison is a horizontally pannable pair of readable
   // pages, not two half-phone thumbnails. Existing scroll/anchor handling applies.
-  const availableWidth = Math.max(1,viewport.width - 24) * (compare && viewport.width <= 700 ? 2 : 1);
-  const availableHeight = Math.max(1,viewport.height - 40);
+  const availableWidth = Math.max(1,viewport.width) * (compare && viewport.width <= 700 ? 2 : 1);
+  const availableHeight = Math.max(1,viewport.height);
   const width = (fit === 'window' ? Math.min(availableWidth,availableHeight * ratio) : availableWidth) * zoom / 100;
   return {width, height:width / ratio};
 }

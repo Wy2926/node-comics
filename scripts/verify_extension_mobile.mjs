@@ -291,20 +291,23 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         await mouse.goto(web);await mouse.getByRole('navigation',{name:'主导航'}).waitFor();await importComic(mouse);
         await mouse.locator('.nc-page-image').first().waitFor({timeout:60000});await hidden(mouse);
         const area=mouse.locator('.nc-reading-viewport'),before=await area.boundingBox();
-        assert(before.x>0,'Desktop side tool space was removed');
+        assert.equal(before.x,0,'Immersive desktop side tools still reserve canvas space');
+        assert.equal(before.width,1280,'Immersive desktop canvas does not fill the width');
+        assert.equal(await mouse.locator('.nc-reveal').count(),0,'Immersive reader retains a corner settings button');
         await mouse.mouse.move(2,450);await visible(mouse);
         assert.deepEqual(await area.boundingBox(),before,'Desktop reveal changed canvas geometry');
         await mouse.getByRole('button',{name:'阅读设置',exact:true}).hover();await mouse.waitForTimeout(1600);
         assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Stationary mouse hover hid the toolbar');
         await mouse.mouse.move(640,450);await hidden(mouse);
-        await mouse.getByRole('button',{name:'显示阅读工具',exact:true}).click();
+        await mouse.keyboard.press('Escape');await visible(mouse);
         const number=mouse.getByRole('spinbutton',{name:'跳转页码',exact:true});
         await number.fill('2');await mouse.mouse.move(640,450);await mouse.waitForTimeout(1600);
         assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Page-number editing hid the toolbar');
         await number.press('Enter');await hidden(mouse);await mouse.screenshot({path:path.join(out,`${engine}-reader-desktop-hidden.png`)});
         await mouse.setViewportSize({width:650,height:900});await hidden(mouse);
-        assert((await area.boundingBox()).y>0,'Phone full-height canvas leaked into a narrow desktop window');
-        check('desktop geometry, hover/leave, numeric keyboard focus and narrow-window phone isolation');
+        assert.equal((await area.boundingBox()).y,0,'Immersive narrow-window tools still reserve canvas height');
+        assert.equal((await area.boundingBox()).height,900,'Immersive narrow-window canvas does not fill the height');
+        check('desktop and narrow-window immersive geometry, hover/leave and numeric keyboard focus');
       }finally{await desktop.close();}
     }
     if(!readerOnly){

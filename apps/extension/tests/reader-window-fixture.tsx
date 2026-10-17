@@ -6,6 +6,8 @@ import {flushSync} from 'react-dom';
 import {Reader} from '../src/reader/Reader';
 import type {ChapterLoadOptions} from '../src/reader/chapter-resources';
 import {ShortcutPanel} from '../src/ui/shortcuts/ShortcutPanel';
+import {Preferences} from '../src/ui/Preferences';
+import {useUiLocale} from '../src/i18n/react';
 import {useShortcuts} from '../src/shortcuts/react';
 import {Api} from '../src/api';
 import {defaults,type Page,type ReadingEntry,type Settings} from '../src/types';
@@ -18,7 +20,7 @@ import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
 const api=new Api(location.origin+'/fixture-disabled');
-const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1';
+const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
 const width=highResolution?4000:800,height=highResolution?6000:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:120;
 const failedIndex=pagination?(query.get('failure')==='1'?5:-1):7;
 const originalKey=(chapter:number,index:number)=>pagination?`inline-original:pagination-fixture-${chapter}-${index}`:highResolution?`inline-original:window-fixture-high-${chapter}-${index}`:'inline-original:window-fixture';
@@ -86,11 +88,14 @@ if(lazyChapters){
  Object.assign(window,{__readerFixtureManifests:{events:manifestEvents,hold:holdManifest,release:releaseManifest,failNext:failManifest}});
 }
 function Fixture(){
+ useUiLocale();
  const [shortcutsOpen,setShortcutsOpen]=useState(false);
+ const [preferencesOpen,setPreferencesOpen]=useState(false),[comic,setComic]=useState<'A'|'B'>('A');
  useShortcuts({'app.shortcuts':()=>setShortcutsOpen(true)});
  const requestedLayout=query.get('initialLayout'),initialLayout=requestedLayout==='continuous'||requestedLayout==='double'?requestedLayout:pagination?'single':'continuous';
  const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[0].id),[config,setConfig]=useState<Settings>({...defaults,layout:initialLayout,direction:initialLayout==='double'?'rtl':defaults.direction,fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
+ const viewKey=layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
  const copy=copies.find(value=>value.id===id)!;
  const update=useCallback((next:ReadingEntry)=>setCopies(previous=>previous.map(value=>value.id===next.id?next:value)),[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async(entryId:string)=>setMarkedRead(previous=>[...previous,entryId]),[]);
@@ -120,9 +125,15 @@ function Fixture(){
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
+  {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+   <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>
+   {(['A','B'] as const).map(value=><button key={value} aria-pressed={comic===value} onClick={()=>{setComic(value);setPreferencesOpen(false);setMounted(true);}}>漫画 {value}</button>)}
+   {chapterCount>1&&<button disabled={id===copies.at(-1)?.id} onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button>}
+   <output hidden data-testid="global-reading-settings">{JSON.stringify({layout:config.layout,direction:config.direction,comic,viewKey})}</output>
+  </div>}
   <output hidden data-testid="reading-window">{readingWindow}</output><output hidden data-testid="marked-read">{JSON.stringify(markedRead)}</output>
   {lazyChapters&&<output hidden data-testid="chapter-state">{JSON.stringify({active:id,chapters:copies.map(chapter=>({id:chapter.id,pages:chapter.pages.length,complete:chapter.discoveryComplete,pageId:chapter.pageId}))})}</output>}
-  {mounted&&<Reader key={mounted?'reader':'closed'} viewKey={pagination?'isolated-pagination-fixture':'isolated-window-fixture'} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} notify={setStatus} onReadingWindow={observeWindow} api={api} busy={false}/>}
+  {layoutSettings&&preferencesOpen?<div style={{overflow:'auto',minHeight:0}}><Preferences settings={config} setSettings={setConfig}/></div>:mounted&&<Reader key={viewKey} viewKey={viewKey} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} onFind={layoutSettings?()=>setStatus('已触发寻找其他语言'):undefined} onReload={layoutSettings?()=>setStatus('已触发重新载入'):undefined} notify={setStatus} onReadingWindow={observeWindow} api={api} busy={false}/>}
   {shortcutsOpen&&<ShortcutPanel initialScope="reader" onClose={()=>setShortcutsOpen(false)}/>}
  </div>;
 }

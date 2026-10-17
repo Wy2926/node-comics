@@ -49,9 +49,12 @@ async function reader({layout = 'single', pages = 16, incomplete = false, hold =
   if (hold.length) query.set('holdManifests', hold.join(','));
   if (fail.length) query.set('failManifests', fail.join(','));
   await page.goto(`${origin}/tests/reader-window-fixture.html?${query}`);
-  await pageNumber().waitFor();
+  await viewport().waitFor();
   await page.waitForFunction(async () => (await import('/src/shortcuts/store.ts')).getShortcutSnapshot().ready);
   if (layout !== 'continuous') await shown(1, [1]);
+  // Startup may outlast immersive chrome's idle timer. Reveal through the real shortcut.
+  await page.keyboard.press('Escape');
+  await pageNumber().waitFor();
 }
 async function shown(number, visible, chapter = 0) {
   await page.waitForFunction(({number, visible}) => {

@@ -145,6 +145,18 @@ describe('paged swipe animation',()=>{
   const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();expect(click.stopPropagation).toHaveBeenCalledOnce();
   f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();
  });
+ it.each([false,true])('accepts a fresh primary press when the previous drag emitted no click, even with blocked=%s',blocked=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});f.finish();
+  if(blocked)f.render({blocked:true});
+  f.pointer('pointerdown',500,100,{pointerType:'touch',pointerId:2});f.pointer('pointerup',500,100,{pointerType:'touch',pointerId:2});
+  const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);
+  expect(click.preventDefault).not.toHaveBeenCalled();expect(click.stopPropagation).not.toHaveBeenCalled();expect(f.options.onTurn).not.toHaveBeenCalled();
+ });
+ it.each([{button:2},{pointerId:2,isPrimary:false}])('does not clear trailing-click suppression for a non-primary press: %j',press=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});f.finish();
+  f.pointer('pointerdown',500,100,press);
+  const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();
+ });
  it('dampens an unavailable boundary without wrapping or preparing a snapshot',()=>{
   const f=fixture({canTurn:delta=>delta===1});f.pointer('pointerdown',400);f.pointer('pointermove',700,100,{timeStamp:200});
   const offset=Number(f.surface.style.transform.match(/translate3d\(([^p]+)/)?.[1]);expect(offset).toBeGreaterThan(0);expect(offset).toBeLessThan(60);

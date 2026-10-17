@@ -34,23 +34,30 @@ import {ReaderShell,ReaderNavigation,ReaderTools,ReaderSettingsButton,ReaderDraw
 import {ReaderChoice as Choice,ReaderScale,ReaderSettings,ReaderTranslationSettings} from './ReaderSettings';
 import {useReaderControls} from './useReaderControls';
 import {usePagedSwipe} from './usePagedSwipe';
+import {usePagedNavigation} from './usePagedNavigation';
+import {useSpreadZoom} from './useSpreadZoom';
+import {ignoreReaderClick} from './reader-input';
 import {useReaderPrefetch} from './useReaderPrefetch';
 import type {ChapterLoadOptions} from './chapter-resources';
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
 type Props={progressStatus?:ReadingProgressStatus;backLabel?:string;backText?:string;onFind?:()=>void;searchOpen?:boolean;onOpenShortcuts:()=>void;onSourceLanguageChange?:(language:string|undefined)=>void;viewKey:string;directory?:ReadingDirectory;catalogLoading?:boolean;onContinueCatalog?:()=>void;onReload?:(entryId:string)=>void;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingEntry[];onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;sourceStatus?:string;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;copy:ReadingEntry;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingEntry)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,entryId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(entryId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[],immediate?:boolean)=>void;caps?:Capabilities;modelSelection?:import('../translation/channels/contracts').ModelSelection;translationScope?:string;allowsFeedback?:boolean;channelLabel?:string;api:Api;busy:boolean;};
 type Panel='directory'|'translation'|'settings';
-export function Reader({progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,translationScope,allowsFeedback=false,channelLabel,api,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
-const motion=useRef(false),surface=useRef<HTMLDivElement>(null);
+export function Reader({progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings:globalSettings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,translationScope,allowsFeedback=false,channelLabel,api,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
+const motion=useRef(false),surface=useRef<HTMLDivElement>(null),spreadStack=useRef<HTMLDivElement>(null);
 const [moving,setMoving]=useState(false);
+const [compactAtOpen]=useState(isCompactReaderDevice);
+const [savedView,setView]=useState<ReadingView|undefined>(()=>{
+ const page=copy.pages.find(page=>page.id===copy.pageId)??copy.pages[0];
+ return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
+});
+const view=savedView??readingViewDefaults();
+// Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
+const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
 const {index,indexRef,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
-// Descriptor views can contain placeholder dimensions; materialization supplies the real image identity and size.
-const [compactAtOpen]=useState(isCompactReaderDevice);
-const initialView=initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
-const [savedView,setView]=useState<ReadingView|undefined>(()=>readStoredReadingView(viewKey)??initialView);const [compare,setCompare]=useState(false);
-const view=savedView??readingViewDefaults();
+const [compare,setCompare]=useState(false);
 const [feedback,setFeedback]=useState<{job:Job;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
 const [loads,setLoads]=useState<Record<string,ImageLoadState|undefined>>({});
 const {root,panel,setPanel,togglePanel,closePanel,immersive,setImmersive,hidden,reveal,toggleControls,fullscreen}=useReaderControls<Panel>({blocked:!!feedback||analyticsBlocked||searchOpen,notify});
@@ -77,7 +84,12 @@ useEffect(()=>{if(!moving&&shown&&copy.comicId&&copy.catalogUpdateRevision)void 
 const streamPages=useMemo(()=>stream.filter(chapter=>resources.ready(chapter)).flatMap(c=>c.pages.map(p=>({page:p,key:pageKey(c,p.id),entryId:c.id}))),[stream,resourceVersion]);
 useEffect(()=>{setFeedback(undefined);},[copy.id]);
 useEffect(()=>{setActual({});setLoads({});setFeedback(undefined);},[scopeBase]);
-useEffect(()=>{if(!savedView&&initialView){preserve();setView(previous=>previous??initialView);}},[savedView,page?.id,page?.imageSha256,page?.width,page?.height]);
+useEffect(()=>{
+ if(savedView)return;
+ // Compact defaults wait for real image dimensions, not descriptor placeholders.
+ const initialView=initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
+ if(initialView){preserve();setView(previous=>previous??initialView);}
+},[savedView,page?.id,page?.imageSha256,page?.width,page?.height]);
 useEffect(()=>{if(savedView)saveReadingView(viewKey,savedView);},[viewKey,savedView]);
 useEffect(()=>{
  if(!viewport.current)return;
@@ -114,6 +126,10 @@ const contentWidth=spread?spreadPages.reduce((width,page)=>width+frame(page).wid
  :settings.layout==='single'?(page?frame(page).width:0)
  :stream.reduce((width,chapter)=>chapter.pages.reduce((width,page)=>Math.max(width,frame(page).width),width),0);
 const swipeBlocked=!!searchOpen||!!feedback||!!analyticsBlocked||!!panel;
+const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layout==='double'&&!!page,blocked:swipeBlocked||moving,
+ resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,spreadPages.map(p=>[p.width,p.height])]),
+});
+const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)>0:(spread?.end??indexRef.current+1)<copy.pages.length||!!next);
 const imageWindows=useMemo(()=>windows.filter(({copy:chapter,start,end})=>end>start&&resources.ready(chapter)),[windows,resourceVersion]);
 // The chosen next chapter is metadata only in paged layouts, never a hidden reading/translation window.
 const aheadChapter=next&&resources.ready(next)&&imageWindows.at(-1)?.copy.id===copy.id?next:undefined;
@@ -130,12 +146,13 @@ useReaderPrefetch({scope:JSON.stringify([viewKey,scopeBase]),identities:prefetch
  current:imageWindows.flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).flatMap(p=>p.blobKey?[p.blobKey]:[])),
  next:aheadPages.flatMap(p=>p.blobKey?[p.blobKey]:[]),enabled:resources.ready(copy),ready:windowReady&&!moving,
 });
-const swipe=usePagedSwipe({viewport,surface,enabled:settings.layout!=='continuous'&&!!page,blocked:swipeBlocked,direction:settings.direction,
+const swipe=usePagedSwipe({viewport,surface,enabled:settings.layout!=='continuous'&&!!page,blocked:swipeBlocked||spreadZoom.zoomed,direction:settings.direction,
  identity:JSON.stringify([copy.id,copy.contentId,copy.generation,page?.id]),
  resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,settings.layout,settings.direction,viewportSize.width,viewportSize.height,fit,zoom,compare,mode,preference,scopeBase]),
- canTurn:offset=>!!page&&(offset<0?(spread?.start??indexRef.current)>0:(spread?.end??indexRef.current+1)<copy.pages.length||!!next),
+ canTurn,
  onTurn:movePage,onActivityChange:active=>{motion.current=active;setMoving(active);},onSettled:settleMotion,
 });
+const pagedNavigation=usePagedNavigation({viewport,enabled:settings.layout!=='continuous'&&!!page,blocked:swipeBlocked||spreadZoom.zoomed||moving,direction:settings.direction,canTurn,onTurn:swipe.turn});
 useLayoutEffect(()=>{restore();},[viewportSize,fit,zoom,compare,settings.layout,!!page]);
 // Bindings and event arbitration belong to the shared runner; these are the same reader actions as the controls.
 useShortcuts({
@@ -165,8 +182,8 @@ useEffect(()=>{
  onReadingWindow(preference==='original'?[]:readingTargets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page),navigationReason.current==='direct');
 },[readingTargets,streamPages,decodedSet,preference,onReadingWindow]);
 useEffect(()=>()=>onReadingWindow([],[]),[onReadingWindow]);
-function navigate(offset:-1|1){if(!page)return false;return swipe.turn(offset);}
-function jump(n:number){swipe.cancel();jumpImmediately(n);}
+function navigate(offset:-1|1){if(!page)return false;if(spreadZoom.zoomed){if(swipeBlocked||!canTurn(offset))return false;swipe.cancel();spreadZoom.reset();movePage(offset);return;}return swipe.turn(offset);}
+function jump(n:number){swipe.cancel();spreadZoom.reset();jumpImmediately(n);}
 function movePage(offset:-1|1){
  if(!page)return false;
  const current=spreadAt(spreads,indexRef.current);
@@ -176,11 +193,12 @@ function reloadContent(chapter:ReadingEntry){if(busy||!onReload)return;swipe.can
 function leaveReader(){swipe.cancel();preserve();persist();onBack();}
 function openShortcuts(){setPanel(undefined);reveal();onOpenShortcuts();}
 function findComic(){swipe.cancel();preserve();persist();setPanel(undefined);onFind?.();}
-function changeLayout(layout:Settings['layout']){swipe.cancel();preserve();setSettings(s=>({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}
+function changeLayout(layout:Settings['layout']|undefined){swipe.cancel();preserve();updateView(view=>({...view,layout,...(layout==='double'&&settings.layout!=='double'?{direction:'rtl' as const}:{})}));}
+function changeDirection(direction:Settings['direction']){swipe.cancel();preserve();updateView(view=>({...view,direction}));}
 function updateView(change:(view:ReadingView)=>ReadingView){setView(previous=>change(previous??view));}
 function changeFit(fit:Settings['fit']){if(settings.layout==='double')return false;preserve();updateView(view=>({...view,fit}));}
 function changeZoom(value:number|((zoom:number)=>number)){
- if(!page||settings.layout==='double')return false;preserve();
+ if(!page)return false;if(settings.layout==='double'){spreadZoom.change(value);return;}preserve();
  updateView(view=>{const nextZoom=Math.max(40,Math.min(200,typeof value==='function'?value(view.zoom):value));return nextZoom===view.zoom?view:{...view,zoom:nextZoom};});
 }
 function toggleCompare(){
@@ -211,10 +229,10 @@ const sourceActions=!sourceRemoved&&<>
 const readerPanel=panel&&<ReaderDrawer kind={panel} title={{directory:msg('目录'),translation:msg('翻译设置'),settings:msg('阅读设置')}[panel]} label={{directory:msg('漫画目录'),translation:msg('翻译选项'),settings:msg('阅读设置')}[panel]} onClose={closePanel}>
 {panel==='directory'&&sourceStatus&&<div className="nc-source-status" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}
 {panel==='directory'?<ComicDirectory catalogLoading={catalogLoading} onContinueCatalog={onContinueCatalog} directory={directory??{title:copy.title,entries:[],groups:[],chapters:[]}} index={index} pageCount={copy.pages.length} onNavigate={(id,pageId,rememberChoice)=>{swipe.cancel();preserve();persist();onNavigate(id,pageId,rememberChoice);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}><ThumbnailDirectory pages={resources.ready(copy)?copy.pages:[]} index={index} mode='classic' language={settings.language} translationScope={translationScope} onJump={n=>{jump(n);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}/></ComicDirectory>:<div className="nc-drawer-content">
-{panel==='translation'?<ReaderTranslationSettings settings={settings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} modelSelection={modelSelection} note={msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}/>:<ReaderSettings allowDouble settings={settings} setSettings={setSettings} onLayout={changeLayout}
- sizing={settings.layout!=='double'&&<><Choice label={msg('图片适应方式')} value={fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/><ReaderScale label={msg('缩放')} value={zoom} min={40} max={200} onChange={changeZoom}/></>}
- immersive={immersive} onImmersive={()=>setImmersive(v=>!v)} onFullscreen={()=>void fullscreen()} onShortcuts={openShortcuts} onReload={onReload?()=>reloadContent(copy):undefined} sourceUrl={copy.sourceUrl} busy={busy}
- extraActions={onFind&&<button className="button secondary" onClick={findComic}><Icon name="translate"/>{msg('寻找其他语言')}</button>}>
+{panel==='translation'?<ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} modelSelection={modelSelection} note={msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}/>:<ReaderSettings allowDouble settings={globalSettings} setSettings={setSettings} layout={view.layout} direction={settings.direction} onLayout={changeLayout} onDirection={changeDirection}
+ sizing={<>{settings.layout!=='double'&&<Choice label={msg('图片适应方式')} value={fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/>}<ReaderScale label={msg('缩放')} value={settings.layout==='double'?Math.round(spreadZoom.zoom):zoom} min={settings.layout==='double'?100:40} max={settings.layout==='double'?400:200} onChange={changeZoom}/></>}
+ immersive={immersive} onImmersive={()=>setImmersive(v=>!v)} onFullscreen={()=>void fullscreen()} onShortcuts={openShortcuts} onReload={onReload?()=>reloadContent(copy):undefined} busy={busy}
+ extraActions={onFind&&<button className="button secondary" onClick={findComic}><Icon name="translate"/><span>{msg('寻找其他语言')}</span></button>}>
  <div className="nc-reader-option"><div><b>{msg('并排对照')}</b><p>{msg('原图与当前模式最新译图')}</p></div><button className={`switch ${compare?'on':''}`} role="switch" aria-label={msg('并排对照')} aria-checked={compare} onClick={toggleCompare}><i/></button></div>
 </ReaderSettings>}
 </div>}
@@ -230,8 +248,8 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 </ReaderNavigation>
 <PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} allowsFeedback={allowsFeedback} selectedView={preference==='original'?'original':mode} shownJob={allowsFeedback?shownJob:undefined} onView={selectView} onFeedback={()=>shownJob&&setFeedback({job:{...shownJob},number:index+1})} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
 {sourceStatus&&panel!=='directory'&&<div className="nc-source-status nc-source-action nc-reader-controls" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}
-<div className="nc-reading-viewport" data-layout={settings.layout} data-swipe-enabled={settings.layout!=='continuous'&&!swipeBlocked&&contentWidth+24<=viewportSize.width+1} data-scrollbar-mode="hidden" ref={viewport} onScroll={scroll} data-decoded-pages={decodedSet.size} data-page-count={copy.pages.length} onClickCapture={swipe.clickCapture} onClick={e=>{if(e.defaultPrevented||(e.target as Element).closest('button,a,input,select,textarea,[role="button"],[contenteditable]')||window.getSelection()?.toString())return;toggleControls();}}>
-<div className="nc-reading-clip" style={{minWidth:contentWidth+24}}><div className="nc-reading-surface" ref={surface} style={{minWidth:contentWidth+24}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" data-direction={settings.direction} ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
+<div className="nc-reading-viewport" data-layout={settings.layout} data-swipe-enabled={settings.layout!=='continuous'&&!swipeBlocked&&!spreadZoom.zoomed&&contentWidth<=viewportSize.width+1} data-scrollbar-mode="hidden" ref={viewport} onScroll={scroll} data-decoded-pages={decodedSet.size} data-page-count={copy.pages.length} onPointerDown={pagedNavigation.onPointerDown} onPointerMove={pagedNavigation.onPointerMove} onPointerLeave={pagedNavigation.onPointerLeave} onClickCapture={e=>{swipe.clickCapture(e);spreadZoom.clickCapture(e);}} onClick={e=>{if(ignoreReaderClick(e)||pagedNavigation.click(e))return;toggleControls();}}>
+<div className="nc-reading-clip" style={{minWidth:contentWidth}}><div className="nc-reading-surface" ref={surface} style={{minWidth:contentWidth}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" data-direction={settings.direction} ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);if(chapter.id===copy.id)spreadStack.current=node;}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
 const load=imageLoad(chapter,p,targetKey),state=displayTranslationState(translationState(chapter.id,p,pageView.mode),load,targetJob?targetKey:undefined);
 const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey} ref={node=>{if(node)cells.current.set(cellKey,node);else cells.current.delete(cellKey);}} data-page-id={p.id} data-page-index={n} style={{width}}>
 <div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture scope={`${identity}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined} onLoadState={state=>recordLoad(`${cellKey}:compare`,state)}/></div>}<div className="nc-comparison-pane"><BlobPicture scope={identity} originalKey={p.blobKey} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}

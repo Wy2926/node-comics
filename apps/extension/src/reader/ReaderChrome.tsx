@@ -75,7 +75,6 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
     onFocusCapture={revealControl}
     onBlurCapture={immersive && !hidden ? revealControl : undefined}>
     {children}
-    {hidden && <button className="nc-reveal" aria-label={msg('显示阅读工具')} onClick={reveal}><Icon name="settings" size={20}/></button>}
   </div>;
 }
 

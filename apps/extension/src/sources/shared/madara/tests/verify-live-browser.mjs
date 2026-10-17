@@ -81,8 +81,7 @@ async function navigate(section) {
   // Use the actual reader Back button first, then the normal product navigation.
   const back = reader.locator('button[data-reader-back-trigger="true"]');
   if (await back.count()) {
-    const reveal = reader.getByRole('button', {name: '显示阅读工具', exact: true});
-    if (await reveal.isVisible()) await reveal.click();
+    if (await reader.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden'))) await reader.keyboard.press('Escape');
     await back.click();
     await reader.locator('.nc-reader').waitFor({state: 'detached'});
   }

@@ -49,11 +49,14 @@ const pageId = (number, chapter = 0) => `window-page-${chapter}-${number - 1}`;
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const snapshot = name => page.locator(`[data-testid="${name}"]`).textContent().then(JSON.parse);
 
-async function reader({failure = false, long = false, chapters = false} = {}) {
-  await page.goto(`${origin}/tests/reader-window-fixture.html?pagination=1${failure ? '&failure=1' : ''}${long ? '&long=1' : ''}${chapters ? '&chapters=2' : ''}`);
-  await pageNumber().waitFor();
+async function reader({failure = false, long = false, chapters = false, layoutSettings = false} = {}) {
+  await page.goto(`${origin}/tests/reader-window-fixture.html?pagination=1${failure ? '&failure=1' : ''}${long ? '&long=1' : ''}${chapters ? '&chapters=2' : ''}${layoutSettings ? '&layoutSettings=1' : ''}`);
+  await viewport().waitFor();
   await page.waitForFunction(async () => (await import('/src/shortcuts/store.ts')).getShortcutSnapshot().ready);
   await shown(1, [1]);
+  // Startup may outlast immersive chrome's idle timer. Reveal through the real shortcut.
+  await page.keyboard.press('Escape');
+  await pageNumber().waitFor();
 }
 
 async function shown(number, visible, imageCount = visible.length, chapter = 0) {
@@ -84,6 +87,40 @@ async function layout(value) {
   await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: value, exact: true}).click();
   await closeSettings();
 }
+const comicView = comic => page.evaluate(key => JSON.parse(localStorage.getItem(key) || '{}'), `isolated-layout-comic-${comic}`);
+async function expectLayout(value) {
+  await page.waitForFunction(value => document.querySelector('.nc-reading-viewport')?.getAttribute('data-layout') === value, value);
+  await settle();
+}
+async function expectLayoutChoice(value) {
+  await openSettings();
+  assert.equal(await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: value, exact: true}).getAttribute('aria-pressed'), 'true');
+  await closeSettings();
+}
+async function globalLayout(value) {
+  await page.getByRole('button', {name: '全局阅读偏好', exact: true}).click();
+  await page.getByRole('combobox', {name: '默认阅读布局', exact: true}).click();
+  await page.getByRole('option', {name: value, exact: true}).click();
+  await page.getByRole('button', {name: '返回阅读器', exact: true}).click();
+  await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
+}
+async function switchComic(comic) {
+  await page.getByRole('button', {name: `漫画 ${comic}`, exact: true}).click();
+  await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
+}
+async function assertTurnCursor(side) {
+  const value = await viewport().evaluate(async element => {
+    const cursor = getComputedStyle(element).cursor, src = cursor.match(/url\("([^"]+)"\)/)?.[1];
+    if (!src) return {cursor};
+    const svg = new DOMParser().parseFromString(await (await fetch(src)).text(), 'image/svg+xml');
+    const path = svg.querySelector('path'), image = new Image(); image.src = src; await image.decode();
+    return {cursor, size: [image.naturalWidth, image.naturalHeight], path: path?.getAttribute('d'), transform: path?.getAttribute('transform')};
+  });
+  assert.match(value.cursor, new RegExp(`\\) ${side === 'right' ? 29 : 3} 16, pointer$`));
+  assert.deepEqual(value.size, [32, 32]);
+  assert.equal(value.path, 'M2 9h11V4l9 8-9 8v-5H2Z');
+  assert.equal(value.transform, side === 'left' ? 'translate(24 0) scale(-1 1)' : null);
+}
 async function jump(number) {
   await pageNumber().fill(String(number));
   await pageNumber().press('Enter');
@@ -91,9 +128,10 @@ async function jump(number) {
 }
 async function assertFits(label) {
   const metrics = await viewport().evaluate(element => {
-    const outer = element.getBoundingClientRect();
+    const outer = element.getBoundingClientRect(), surface = getComputedStyle(element.querySelector('.nc-reading-surface'));
     return {width: element.clientWidth, height: element.clientHeight, scrollWidth: element.scrollWidth, scrollHeight: element.scrollHeight,
       scrollLeft: element.scrollLeft, scrollTop: element.scrollTop,
+      padding: [surface.paddingTop, surface.paddingRight, surface.paddingBottom, surface.paddingLeft].map(parseFloat),
       pages: [...element.querySelectorAll('.nc-manga-page')].map(page => {
         const box = page.getBoundingClientRect();
         return {left: box.left - outer.left, top: box.top - outer.top, right: box.right - outer.left, bottom: box.bottom - outer.top};
@@ -104,6 +142,7 @@ async function assertFits(label) {
   assert(metrics.scrollHeight <= metrics.height + 1, `${label}: vertical overflow ${metrics.scrollHeight} > ${metrics.height}`);
   assert.equal(metrics.scrollLeft, 0, `${label}: horizontal position stays at zero`);
   assert.equal(metrics.scrollTop, 0, `${label}: vertical position stays at zero`);
+  assert.deepEqual(metrics.padding, [0, 0, 0, 0], `${label}: the reading surface reserves no decorative padding`);
   for (const box of metrics.pages) {
     assert(box.left >= -1 && box.right <= metrics.width + 1, `${label}: full page width stays in the viewport`);
     assert(box.top >= -1 && box.bottom <= metrics.height + 1, `${label}: full page height stays in the viewport`);
@@ -112,6 +151,10 @@ async function assertFits(label) {
     assert.equal(end.height, 0, `${label}: end sentinel cannot reserve footer space`);
     assert.equal(end.text, '', `${label}: pagination has no in-flow page-number/footer copy`);
   }
+  const usedWidth = Math.max(...metrics.pages.map(box => box.right)) - Math.min(...metrics.pages.map(box => box.left));
+  const usedHeight = Math.max(...metrics.pages.map(box => box.bottom)) - Math.min(...metrics.pages.map(box => box.top));
+  assert(Math.abs(usedWidth - metrics.width) <= 2 || Math.abs(usedHeight - metrics.height) <= 2,
+    `${label}: fit uses a complete viewport axis (${usedWidth}x${usedHeight} in ${metrics.width}x${metrics.height}), with only aspect-ratio letterboxing`);
 }
 
 test('single-page window fit removes footer space at the first, middle, landscape and final pages', async () => {
@@ -125,7 +168,7 @@ test('single-page window fit removes footer space at the first, middle, landscap
 });
 
 test('double pages default to manga RTL, separate the cover and landscape, and navigate by a whole spread', async () => {
-  await reader(); await layout('双页阅读'); await shown(1, [1]);
+  await reader(); await layout('双页'); await shown(1, [1]);
   assert.equal(await viewport().getAttribute('data-layout'), 'double');
   assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
   await page.keyboard.press('ArrowLeft'); await shown(2, [2, 3]);
@@ -144,7 +187,7 @@ test('double pages default to manga RTL, separate the cover and landscape, and n
 });
 
 test('LTR reverses visual and arrow navigation without changing the selected page', async () => {
-  await reader(); await layout('双页阅读'); await jump(3); await shown(3, [2, 3]);
+  await reader(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
   await openSettings();
   await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从左向右', exact: true}).click();
   await closeSettings(); await shown(3, [2, 3]);
@@ -155,7 +198,7 @@ test('LTR reverses visual and arrow navigation without changing the selected pag
 });
 
 test('a complete double spread fits desktop, narrow and short viewports without scrolling', async () => {
-  await reader(); await layout('双页阅读'); await jump(2); await shown(2, [2, 3]);
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
   for (const size of [{width: 1280, height: 900}, {width: 360, height: 740}, {width: 1280, height: 360}]) {
     await page.setViewportSize(size); await settle(); await shown(2, [2, 3]);
     await assertFits(`${size.width}x${size.height}`);
@@ -164,9 +207,9 @@ test('a complete double spread fits desktop, narrow and short viewports without 
 });
 
 test('direct jumps, layout changes and reopen preserve the selected page identity inside a spread', async () => {
-  await reader(); await layout('双页阅读'); await jump(3); await shown(3, [2, 3]);
-  await layout('单页阅读'); await shown(3, [3]);
-  await layout('双页阅读'); await shown(3, [2, 3]);
+  await reader(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
+  await layout('单页'); await shown(3, [3]);
+  await layout('双页'); await shown(3, [2, 3]);
   await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
   assert.match(await page.locator('[aria-label="保存位置"]').textContent(), /^window-page-0-2 · 0\.000$/);
   await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [2, 3]);
@@ -174,24 +217,219 @@ test('direct jumps, layout changes and reopen preserve the selected page identit
   await assertFits('reopened third-page selection');
 });
 
-test('double mode leaves saved single-page fit and zoom intact and hides irrelevant sizing controls', async () => {
+test('double inspection zoom leaves saved single-page fit and zoom intact', async () => {
   await reader(); await openSettings();
   await settings().getByRole('group', {name: '图片适应方式', exact: true}).getByRole('button', {name: '铺满宽度', exact: true}).click();
   await settings().getByRole('button', {name: '放大', exact: true}).click();
-  await closeSettings(); await layout('双页阅读'); await shown(1, [1]);
+  await closeSettings(); await layout('双页'); await shown(1, [1]);
   await openSettings();
   assert.equal(await settings().getByRole('group', {name: '图片适应方式', exact: true}).count(), 0);
-  assert.equal(await settings().getByRole('button', {name: '放大', exact: true}).count(), 0);
+  await settings().getByRole('button', {name: '放大', exact: true}).click();
+  assert(Math.abs(Number(await viewport().getAttribute('data-spread-zoom')) - 110) < .01);
   await closeSettings();
-  await page.keyboard.press('='); await page.keyboard.press('w');
-  await assertFits('double ignores single-page sizing shortcuts');
-  await layout('单页阅读'); await openSettings();
+  await page.keyboard.press('0'); await page.keyboard.press('w');
+  await assertFits('double reset restores its fitted size');
+  await layout('单页'); await openSettings();
   assert.equal(await settings().getByRole('group', {name: '图片适应方式', exact: true}).locator('[aria-pressed="true"]').textContent(), '铺满宽度');
   await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('110%', {exact: true}).waitFor();
 });
 
+const zoomMetrics = () => viewport().evaluate(element => {
+  const stack = element.querySelector('.nc-page-stack'), box = stack.getBoundingClientRect();
+  const matrix = new DOMMatrixReadOnly(getComputedStyle(stack).transform === 'none' ? undefined : getComputedStyle(stack).transform);
+  return {scale: Number(element.dataset.spreadZoom || 100), x: matrix.m41, y: matrix.m42,
+    box: {x: box.x, y: box.y, width: box.width, height: box.height},
+    scrollLeft: element.scrollLeft, scrollTop: element.scrollTop, urls: window.__paginationUrls.created,
+    images: element.querySelectorAll('img.nc-page-image').length, hidden: element.closest('.nc-reader').classList.contains('controls-hidden')};
+});
+async function wheelAt(delta, x = .55, y = .55) {
+  const box = await viewport().boundingBox();
+  await page.mouse.move(box.x + box.width * x, box.y + box.height * y);
+  await page.mouse.wheel(0, delta); await settle();
+}
+
+async function inspectSpread() {
+  const initial = await zoomMetrics();
+  await wheelAt(-300);
+  const enlarged = await zoomMetrics(), outer = await viewport().boundingBox();
+  assert(enlarged.scale > 100, 'A real wheel event enlarges the fitted spread');
+  await page.mouse.move(outer.x + outer.width * .5, outer.y + outer.height * .5);
+  await page.mouse.down();
+  await page.mouse.move(outer.x + outer.width * .5 + 90, outer.y + outer.height * .5 + 70, {steps: 8});
+  await page.mouse.up(); await settle();
+  const panned = await zoomMetrics();
+  assert(Math.abs(panned.x - enlarged.x) > 20 || Math.abs(panned.y - enlarged.y) > 20, 'The enlarged spread is also panned before changing layout');
+  assert.equal(panned.urls, initial.urls, 'Inspection reuses the displayed image resources');
+}
+
+async function assertNormalZoom(layout, number, zoom, mounted) {
+  await expectLayout(layout);
+  await page.waitForFunction(id => {
+    const image = document.querySelector(`.nc-manga-page[data-page-id="${id}"] img.nc-page-image`);
+    return image?.complete && image.naturalWidth > 0;
+  }, pageId(number));
+  await settle();
+  const metrics = await viewport().evaluate((element, id) => {
+    const cell = element.querySelector(`.nc-manga-page[data-page-id="${id}"]`), image = cell.querySelector('img.nc-page-image');
+    return {width: element.clientWidth, pageWidth: cell.getBoundingClientRect().width, imageWidth: image.getBoundingClientRect().width,
+      stacks: [...element.querySelectorAll('.nc-page-stack')].map(stack => ({inline: stack.style.transform, computed: getComputedStyle(stack).transform})),
+      zoomed: element.getAttribute('data-zoomed'), spreadZoom: element.getAttribute('data-spread-zoom'), dragging: element.getAttribute('data-zoom-dragging'),
+      pages: element.querySelectorAll('.nc-manga-page').length, images: element.querySelectorAll('img.nc-page-image').length,
+      urls: window.__paginationUrls.active.size};
+  }, pageId(number));
+  for (const stack of metrics.stacks) {
+    assert.equal(stack.inline, '', `${layout}: no spread transform remains on a reused stack`);
+    assert.equal(stack.computed, 'none', `${layout}: the stack is not visually enlarged or panned`);
+  }
+  assert.deepEqual([metrics.zoomed, metrics.spreadZoom, metrics.dragging], [null, null, null]);
+  assert(Math.abs(metrics.pageWidth - metrics.width * zoom / 100) < 2, `${layout}: actual page width ${metrics.pageWidth} agrees with saved ${zoom}% of ${metrics.width}`);
+  assert(Math.abs(metrics.imageWidth - metrics.pageWidth) < 2, `${layout}: the displayed image has the same untransformed width as its page`);
+  assert.equal(await pageNumber().inputValue(), String(number), `${layout}: the selected page identity is retained`);
+  assert.match(await page.locator('[aria-label="保存位置"]').textContent(), new RegExp(`^${pageId(number)} · 0\\.000$`));
+  assert.equal(await mounted.evaluate(element => element === document.querySelector('.nc-reading-viewport')), true, 'Recovery does not remount the reader');
+  const saved = await comicView('A');
+  assert.equal(saved.zoom, zoom); assert.equal(saved.fit, 'width');
+  const limit = layout === 'continuous' ? 11 : 1;
+  assert(metrics.pages <= limit && metrics.images <= limit && metrics.urls <= limit, `${layout}: decoded pages and active images stay bounded`);
+  return metrics;
+}
+
+for (const scenario of [
+  {name: 'continuous on the cover', target: 'continuous', choice: '连续', number: 1},
+  {name: 'single on a selected second spread page', target: 'single', choice: '单页', number: 3},
+  {name: 'the inherited global single default', target: 'single', choice: '默认', number: 3},
+  {name: 'continuous through the layout shortcut', target: 'continuous', shortcut: true, number: 3},
+]) test(`leaving double inspection restores saved zoom for ${scenario.name} without reopening`, async t => {
+  await reader({layoutSettings: true});
+  const mounted = await viewport().elementHandle();
+  assert.deepEqual([(await comicView('A')).fit, (await comicView('A')).zoom], ['width', 50]);
+  await layout('双页'); await jump(scenario.number); await shown(scenario.number, scenario.number === 1 ? [1] : [2, 3]);
+  const leave = async () => {
+    if (scenario.shortcut) await page.keyboard.press('m');
+    else await layout(scenario.choice);
+  };
+  await inspectSpread(); await leave();
+  const restored = await assertNormalZoom(scenario.target, scenario.number, 50, mounted);
+  t.diagnostic(JSON.stringify({layout: scenario.target, page: scenario.number, savedZoom: 50, ...restored}));
+  assert.equal((await comicView('A')).layout, scenario.choice === '默认' ? undefined : scenario.target);
+  assert.equal((await snapshot('global-reading-settings')).layout, 'single');
+  await openSettings();
+  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('50%', {exact: true}).waitFor();
+  if (scenario.target === 'continuous' && scenario.number === 1) await page.screenshot({path: resolve(artifacts, 'spread-zoom-reset-continuous-50.png')});
+  await settings().getByRole('button', {name: '放大', exact: true}).click();
+  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('60%', {exact: true}).waitFor();
+  await closeSettings(); await assertNormalZoom(scenario.target, scenario.number, 60, mounted);
+  await page.screenshot({path: resolve(artifacts, `spread-zoom-reset-${scenario.target}-${scenario.number}-${scenario.shortcut ? 'shortcut' : scenario.choice === '默认' ? 'default' : 'choice'}.png`)});
+  await layout('双页'); await shown(scenario.number, scenario.number === 1 ? [1] : [2, 3]);
+  assert.equal((await zoomMetrics()).scale, 100); await assertFits('Re-entered double mode starts fitted');
+  await inspectSpread(); await leave();
+  await assertNormalZoom(scenario.target, scenario.number, 60, mounted);
+  await mounted.dispose();
+});
+
+test('double wheel zoom is pointer-anchored, bounded, and reuses displayed images', async () => {
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
+  const before = await zoomMetrics(), outer = await viewport().boundingBox();
+  const point = {x: outer.x + outer.width * .55, y: outer.y + outer.height * .55};
+  const u = (point.x - before.box.x) / before.box.width, v = (point.y - before.box.y) / before.box.height;
+  await wheelAt(-300);
+  const enlarged = await zoomMetrics();
+  assert(enlarged.scale > 100 && enlarged.scale < 400);
+  assert(Math.abs(enlarged.box.x + enlarged.box.width * u - point.x) < 2, 'pointer X stays over the same pixels');
+  assert(Math.abs(enlarged.box.y + enlarged.box.height * v - point.y) < 2, 'pointer Y stays over the same pixels');
+  assert.equal(enlarged.urls, before.urls); assert.equal(enlarged.images, 2);
+  assert.equal(await viewport().getAttribute('data-swipe-enabled'), 'false');
+  await page.mouse.move(outer.x + outer.width * .15, point.y);
+  assert.equal(await viewport().evaluate(element => getComputedStyle(element).cursor), 'grab');
+  await page.screenshot({path: resolve(artifacts, 'double-pointer-zoom.png')});
+  await wheelAt(-10000); await wheelAt(-10000); assert.equal((await zoomMetrics()).scale, 400);
+  for (let i = 0; i < 3; i++) await wheelAt(10000);
+  await assertFits('minimum is the whole fitted spread');
+  assert.equal((await zoomMetrics()).scale, 100);
+  assert.equal(await viewport().getAttribute('data-swipe-enabled'), 'true');
+});
+
+test('zoomed spread drags in both axes without turning pages or toggling controls', async () => {
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
+  await wheelAt(-300); const before = await zoomMetrics(), outer = await viewport().boundingBox();
+  await page.mouse.move(outer.x + outer.width * .5, outer.y + outer.height * .5);
+  await page.mouse.down(); await page.mouse.move(outer.x + outer.width * .5 + 100, outer.y + outer.height * .5 + 80, {steps: 8}); await page.mouse.up(); await settle();
+  const moved = await zoomMetrics();
+  assert(Math.abs(moved.x - before.x - 100) < 2); assert(Math.abs(moved.y - before.y - 80) < 2);
+  assert.equal(moved.hidden, before.hidden); assert.equal(await pageNumber().inputValue(), '2');
+  assert.equal(moved.scrollLeft, 0); assert.equal(moved.scrollTop, 0);
+  assert.equal(await viewport().getAttribute('data-zoom-dragging'), null);
+  await page.getByRole('button', {name: /^更新模拟翻译状态/}).click();
+  const refreshed = await zoomMetrics(); assert.equal(refreshed.scale, moved.scale); assert.equal(refreshed.x, moved.x); assert.equal(refreshed.y, moved.y);
+  await page.keyboard.press('PageDown'); await shown(4, [4]); await assertFits('explicit navigation resets inspection zoom');
+  await wheelAt(-300); await page.setViewportSize({width: 980, height: 740}); await settle();
+  await assertFits('resize resets inspection zoom');
+});
+
+test('translated image replacement keeps double zoom and pan with a bounded DOM', async () => {
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
+  await page.getByRole('button', {name: '翻译', exact: true}).click();
+  await wheelAt(-300); const before = await zoomMetrics();
+  await page.getByRole('button', {name: '完成模拟翻译', exact: true}).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.nc-reading-viewport img.nc-page-image')].every(image => image.dataset.resultJob !== 'original'));
+  const after = await zoomMetrics();
+  assert.equal(after.scale, before.scale); assert.equal(after.x, before.x); assert.equal(after.y, before.y); assert.equal(after.images, 2);
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  assert.match(await page.locator('[aria-label="保存位置"]').textContent(), /^window-page-0-1 · 0\.000$/);
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(2, [2, 3]); await assertFits('reopen retains page, not temporary pan');
+});
+
+for (const mode of ['单页', '双页']) for (const direction of ['从左向右', '从右向左']) test(`${mode} edge clicks follow ${direction}, center toggles controls and hover hints match`, async () => {
+  await reader(); await layout(mode); await jump(2); await shown(2, mode === '双页' ? [2, 3] : [2]);
+  await openSettings(); await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: direction, exact: true}).click(); await closeSettings();
+  const box = await viewport().boundingBox(), left = {x: box.x + box.width * .15, y: box.y + box.height * .5}, right = {x: box.x + box.width * .85, y: left.y};
+  const next = direction === '从左向右' ? right : left;
+  await page.mouse.move(next.x, next.y);
+  assert.equal(await viewport().getAttribute('title'), '下一页');
+  await assertTurnCursor(direction === '从左向右' ? 'right' : 'left');
+  await page.mouse.click(next.x, next.y); await shown(mode === '双页' ? 4 : 3, mode === '双页' ? [4] : [3]);
+  const previous = direction === '从左向右' ? left : right;
+  await page.mouse.move(previous.x, previous.y);
+  await assertTurnCursor(direction === '从左向右' ? 'left' : 'right');
+  await page.mouse.click(previous.x, previous.y); await shown(2, mode === '双页' ? [2, 3] : [2]);
+  await page.mouse.move(box.x + box.width * .5, left.y);
+  assert.equal(await viewport().getAttribute('title'), null);
+  assert.doesNotMatch(await viewport().evaluate(element => getComputedStyle(element).cursor), /url\(|resize/);
+  const hidden = (await zoomMetrics()).hidden;
+  await page.mouse.click(box.x + box.width * .5, left.y);
+  assert.equal((await zoomMetrics()).hidden, !hidden); assert.equal(await pageNumber().inputValue(), '2');
+});
+
+test('continuous modified clicks leave controls untouched while plain center taps still toggle them', async () => {
+  await reader(); await layout('连续');
+  const box = await viewport().boundingBox(), x = box.x + box.width / 2, y = box.y + box.height / 2;
+  const hidden = () => page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden'));
+  assert.equal(await hidden(), false);
+  await page.keyboard.down('Control');
+  try {await page.mouse.click(x, y);} finally {await page.keyboard.up('Control');}
+  await settle(); assert.equal(await hidden(), false, 'Modified clicks must not hide reader controls');
+  await page.mouse.click(x, y); await settle(); assert.equal(await hidden(), true);
+  await page.mouse.click(x, y); await settle(); assert.equal(await hidden(), false);
+  assert.equal(await pageNumber().inputValue(), '1');
+});
+
+test('double touch pan suppresses its synthetic tap and minimum zoom restores swipe', async () => {
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]); await wheelAt(-300);
+  const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true});
+  const box = await viewport().boundingBox(), x = Math.round(box.x + box.width / 2), y = Math.round(box.y + box.height / 2), before = await zoomMetrics();
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y, id: 1}]});
+  for (let n = 1; n <= 5; n++) await cdp.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + 20 * n, y: y + 10 * n, id: 1}]});
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await settle();
+  const after = await zoomMetrics(); assert(after.x > before.x + 80); assert(after.y > before.y + 30);
+  assert.equal(await pageNumber().inputValue(), '2'); assert.equal(after.hidden, before.hidden);
+  await page.keyboard.press('0'); await assertFits('touch pan reset');
+  await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 220, y, {steps: 8}); await page.mouse.up(); await shown(4, [4]);
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: Math.round(box.x + box.width * .15), y, id: 1}]});
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await shown(5, [5, 6]);
+});
+
 test('both spread pages are translation targets and four comparison images still fit the window', async () => {
-  await reader(); await layout('双页阅读'); await jump(3); await shown(3, [2, 3]);
+  await reader(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
   await page.getByRole('button', {name: '完成模拟翻译', exact: true}).click();
   await page.getByRole('button', {name: '翻译', exact: true}).click(); await shown(3, [2, 3]);
   await page.waitForFunction(() => {
@@ -209,7 +447,7 @@ test('both spread pages are translation targets and four comparison images still
 });
 
 test('one failed page does not block its partner or navigation and never marks the chapter read', async () => {
-  await reader({failure: true}); await layout('双页阅读');
+  await reader({failure: true}); await layout('双页');
   for (const [number, visible] of [[2, [2, 3]], [4, [4]], [5, [5, 6]]]) {
     await jump(number); await shown(number, visible, number === 5 ? 1 : visible.length);
   }
@@ -223,7 +461,7 @@ test('one failed page does not block its partner or navigation and never marks t
 });
 
 test('skipping pages does not mark read; displaying every spread marks read exactly once at the final pair', async () => {
-  await reader(); await layout('双页阅读'); await jump(7); await shown(7, [7, 8]);
+  await reader(); await layout('双页'); await jump(7); await shown(7, [7, 8]);
   assert.deepEqual(await snapshot('marked-read'), []);
   for (const [number, visible] of [[1, [1]], [2, [2, 3]], [4, [4]], [5, [5, 6]], [7, [7, 8]]]) {
     await jump(number); await shown(number, visible);
@@ -235,7 +473,7 @@ test('skipping pages does not mark read; displaying every spread marks read exac
 });
 
 test('spread navigation keeps at most two decoded pages and releases off-screen image URLs', async () => {
-  await reader(); await layout('双页阅读'); await jump(2); await shown(2, [2, 3]);
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
   const oldUrls = await viewport().locator('img.nc-page-image').evaluateAll(images => images.map(image => image.src));
   await jump(5); await shown(5, [5, 6]);
   await page.waitForFunction(urls => urls.every(url => window.__paginationUrls.revoked.has(url)), oldUrls);
@@ -252,8 +490,8 @@ test('spread navigation keeps at most two decoded pages and releases off-screen 
 });
 
 test('continuous to single-page switching preserves a long page offset when the window resizes', async () => {
-  await reader({long: true}); await layout('连续阅读'); await jump(9);
-  await layout('单页阅读'); await shown(9, [9]);
+  await reader({long: true}); await layout('连续'); await jump(9);
+  await layout('单页'); await shown(9, [9]);
   await openSettings();
   await settings().getByRole('group', {name: '图片适应方式', exact: true}).getByRole('button', {name: '铺满宽度', exact: true}).click();
   await closeSettings(); await shown(9, [9]);
@@ -279,14 +517,14 @@ test('fitting the final already-loaded long page into a spread marks read withou
   const source = await finalImage.getAttribute('src');
   assert.deepEqual(await snapshot('marked-read'), [], 'A loaded final page is not read while its bottom remains below the viewport');
   assert(await viewport().evaluate(element => element.scrollHeight > element.clientHeight + 1000));
-  await layout('双页阅读'); await shown(9, [9]); await assertFits('long final page fitted into spread');
+  await layout('双页'); await shown(9, [9]); await assertFits('long final page fitted into spread');
   assert.equal(await cells().count(), 1, 'No partner can mount and trigger another pageShown callback for this regression');
   assert.equal(await finalImage.getAttribute('src'), source, 'Changing geometry reuses the displayed image and does not fabricate a new load event');
   await page.waitForFunction(() => document.querySelector('[data-testid="marked-read"]').textContent === '["window-fixture-0"]');
 });
 
 test('one forward action from the final spread opens the next chapter cover without pairing across chapters', async () => {
-  await reader({chapters: true}); await layout('双页阅读'); await jump(8); await shown(8, [7, 8]);
+  await reader({chapters: true}); await layout('双页'); await jump(8); await shown(8, [7, 8]);
   assert(await page.getByRole('button', {name: '下一页', exact: true}).isEnabled());
   await page.getByRole('button', {name: '下一页', exact: true}).click(); await shown(1, [1], 1, 1);
   assert.equal(await viewport().locator('.nc-stream-chapter').count(), 1);
@@ -294,4 +532,169 @@ test('one forward action from the final spread opens the next chapter cover with
   await assertFits('next chapter cover');
   await page.keyboard.press('PageDown'); await shown(2, [2, 3], 2, 1);
   assert.deepEqual(await snapshot('marked-read'), [], 'Skipping a chapter cannot mark it read while crossing the boundary');
+});
+
+test('comic layouts inherit the real global preference until overridden and Default clears only the comic override', async () => {
+  await reader({layoutSettings: true});
+  await expectLayoutChoice('默认'); assert.equal((await comicView('A')).layout, undefined);
+  await globalLayout('双页'); await expectLayout('double'); await shown(1, [1]);
+  await expectLayoutChoice('默认'); assert.equal((await comicView('A')).layout, undefined);
+  await layout('单页'); await expectLayout('single');
+  assert.equal((await comicView('A')).layout, 'single'); assert.equal((await snapshot('global-reading-settings')).layout, 'double');
+  await switchComic('B'); await expectLayout('double'); await expectLayoutChoice('默认');
+  assert.equal((await comicView('B')).layout, undefined);
+  await globalLayout('连续'); await expectLayout('continuous'); await expectLayoutChoice('默认');
+  assert.equal((await comicView('B')).layout, undefined);
+  await switchComic('A'); await expectLayout('single'); await expectLayoutChoice('单页');
+  assert.equal((await snapshot('global-reading-settings')).layout, 'continuous');
+  await layout('默认'); await expectLayout('continuous'); await expectLayoutChoice('默认');
+  assert.equal((await comicView('A')).layout, undefined);
+  assert.equal((await snapshot('global-reading-settings')).layout, 'continuous');
+});
+
+test('an explicit comic layout equal to the global default survives global changes, reopen, and refresh', async () => {
+  await reader({layoutSettings: true}); await globalLayout('双页'); await expectLayout('double');
+  await layout('双页'); await expectLayoutChoice('双页');
+  assert.equal((await comicView('A')).layout, 'double');
+  await globalLayout('连续'); await expectLayout('double'); await expectLayoutChoice('双页');
+  assert.equal((await snapshot('global-reading-settings')).layout, 'continuous');
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click();
+  await expectLayout('double'); await shown(1, [1]);
+  await page.reload(); await expectLayout('double'); await shown(1, [1]);
+  await page.keyboard.press('Escape'); await expectLayoutChoice('双页');
+  assert.equal((await comicView('A')).layout, 'double');
+  assert.equal((await snapshot('global-reading-settings')).layout, 'single', 'Fixture global state resets on reload, but the real comic storage still wins');
+  await switchComic('B'); await expectLayout('single'); await expectLayoutChoice('默认');
+});
+
+test('comic direction and layout persist across chapters without changing global defaults or the other comic', async () => {
+  await reader({layoutSettings: true, chapters: true}); await layout('双页'); await shown(1, [1]);
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
+  assert.equal((await snapshot('global-reading-settings')).direction, 'ltr');
+  assert.deepEqual([(await comicView('A')).layout, (await comicView('A')).direction], ['double', 'rtl']);
+  await openSettings();
+  await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从左向右', exact: true}).click();
+  await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从右向左', exact: true}).click();
+  await closeSettings();
+  await page.getByRole('button', {name: '切下一章', exact: true}).click(); await shown(1, [1], 1, 1);
+  await expectLayout('double');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
+  assert.equal((await snapshot('global-reading-settings')).viewKey, 'isolated-layout-comic-A');
+  assert.equal((await snapshot('global-reading-settings')).direction, 'ltr');
+  await switchComic('B'); await expectLayout('single');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'ltr');
+  assert.equal((await comicView('B')).direction, undefined);
+  await switchComic('A'); await expectLayout('double');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
+});
+
+async function readerLocale(locale, scale = 1) {
+  const labels = await page.evaluate(async ({locale, scale}) => {
+    await (await import('/src/i18n/load.ts')).setUiLanguage(locale);
+    document.documentElement.style.setProperty('--text-scale', String(scale));
+    const {msg} = await import('/src/i18n/runtime.ts');
+    return ['阅读设置', '阅读布局', '默认', '连续', '单页', '双页', '打开来源'].map(key => msg(key));
+  }, {locale, scale});
+  await settle();
+  await page.evaluate(() => document.fonts.ready);
+  await settle();
+  return labels;
+}
+
+async function assertCardGrid(group, label, count = 4) {
+  const bounds = await group.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return {width: innerWidth, left: box.left, right: box.right, client: element.clientWidth, scroll: element.scrollWidth,
+      columns: getComputedStyle(element).gridTemplateColumns.split(' ').length,
+      buttons: [...element.querySelectorAll('button')].map(button => {
+        const item = button.getBoundingClientRect(), textRects = [];
+        const texts = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+        while (texts.nextNode()) if (texts.currentNode.textContent.trim()) {
+          const range = document.createRange(); range.selectNodeContents(texts.currentNode);
+          for (const rect of range.getClientRects()) textRects.push({left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom});
+        }
+        return {left: item.left, right: item.right, top: item.top, bottom: item.bottom,
+          width: button.clientWidth, scroll: button.scrollWidth, textRects};
+      })};
+  });
+  assert.equal(bounds.buttons.length, count, `${label}: all available choices are rendered`);
+  assert.equal(bounds.columns, 2, `${label}: two equal-width columns`);
+  assert(bounds.left >= 0 && bounds.right <= bounds.width + 1, `${label}: grid stays in the screen`);
+  assert(bounds.scroll <= bounds.client + 1, `${label}: no horizontal grid overflow`);
+  for (const button of bounds.buttons) {
+    assert(button.left >= bounds.left - 1 && button.right <= bounds.right + 1, `${label}: card stays inside its grid`);
+    assert(button.scroll <= button.width + 1, `${label}: label does not create horizontal overflow`);
+    assert(button.bottom - button.top >= 44, `${label}: usable touch target`);
+    assert(button.textRects.length > 0, `${label}: visible text is retained`);
+    for (const text of button.textRects) {
+      assert(text.left >= button.left - 1 && text.right <= button.right + 1 && text.top >= button.top - 1 && text.bottom <= button.bottom + 1,
+        `${label}: every label line stays inside its card without clipping`);
+    }
+  }
+  if (count === 4) {
+    assert.equal(Math.round(bounds.buttons[0].top), Math.round(bounds.buttons[1].top), `${label}: first row`);
+    assert.equal(Math.round(bounds.buttons[2].top), Math.round(bounds.buttons[3].top), `${label}: second row`);
+    assert(bounds.buttons[2].top >= bounds.buttons[0].bottom, `${label}: rows do not overlap`);
+  }
+}
+
+for (const width of [320, 390, 1280]) test(`layout and action cards fit all 16 locales in ${width}px reader settings`, async () => {
+  await page.setViewportSize({width, height: 844}); await reader({layoutSettings: true}); await openSettings();
+  const locales = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'];
+  for (const scale of [1, 1.25]) for (const locale of locales) {
+    const [title, layoutLabel, defaultLabel, continuousLabel, singleLabel, doubleLabel, sourceLabel] = await readerLocale(locale, scale);
+    const dialog = page.getByRole('dialog', {name: title, exact: true});
+    const choices = dialog.getByRole('group', {name: layoutLabel, exact: true}), actions = dialog.locator('.nc-reader-actions');
+    assert.deepEqual(await choices.getByRole('button').allTextContents(), [defaultLabel, continuousLabel, singleLabel, doubleLabel]);
+    assert.equal(await choices.getByRole('button', {name: defaultLabel, exact: true}).getAttribute('aria-pressed'), 'true');
+    await choices.scrollIntoViewIfNeeded();
+    await settle();
+    await assertCardGrid(choices, `${locale}/${scale} layouts`);
+    if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) await page.screenshot({path: resolve(artifacts, `settings-layout-${locale}-${scale}.png`)});
+    await actions.scrollIntoViewIfNeeded();
+    await settle();
+    await assertCardGrid(actions, `${locale}/${scale} actions`);
+    assert.equal(await dialog.getByRole('link', {name: sourceLabel, exact: true}).count(), 0);
+    assert(await dialog.locator('.nc-drawer-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${locale}/${scale}: entire settings panel has no horizontal overflow`);
+    if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) {
+      await dialog.locator('.nc-drawer-content').evaluate(element => {element.scrollTo({top: element.scrollHeight, behavior: 'instant'});});
+      await settle();
+      await page.screenshot({path: resolve(artifacts, `settings-actions-${locale}-${scale}.png`)});
+    }
+  }
+  await readerLocale('zh-CN');
+  const choices = settings().getByRole('group', {name: '阅读布局', exact: true});
+  await choices.getByRole('button', {name: '双页', exact: true}).click(); await closeSettings(); await expectLayout('double');
+});
+
+test('reader action cards keep reload and find callbacks and the shortcut panel', async () => {
+  await reader({layoutSettings: true}); await openSettings();
+  assert.deepEqual(await settings().locator('.nc-reader-actions button').allTextContents(), ['寻找其他语言', '全屏阅读', '重新载入', '键盘快捷键']);
+  await settings().getByRole('button', {name: '重新载入', exact: true}).click();
+  await page.getByText('已触发重新载入', {exact: true}).waitFor();
+  await settings().getByRole('button', {name: '键盘快捷键', exact: true}).click();
+  await page.getByRole('dialog', {name: '键盘快捷键', exact: true}).waitFor();
+  await page.keyboard.press('Escape'); await openSettings();
+  await settings().getByRole('button', {name: '寻找其他语言', exact: true}).click();
+  await page.getByText('已触发寻找其他语言', {exact: true}).waitFor();
+  assert.equal(await settings().count(), 0); await shown(1, [1]);
+});
+
+test('continuous width fit uses both viewport edges without an artificial surface gutter', async () => {
+  await reader(); await layout('连续'); await openSettings();
+  await settings().getByRole('group', {name: '图片适应方式', exact: true}).getByRole('button', {name: '铺满宽度', exact: true}).click();
+  await closeSettings(); await jump(1);
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({width, height: 844}); await settle();
+    const sizes = await viewport().evaluate(element => {
+      const outer = element.getBoundingClientRect(), image = element.querySelector('.nc-manga-page').getBoundingClientRect();
+      const surface = getComputedStyle(element.querySelector('.nc-reading-surface'));
+      return {width: element.clientWidth, scroll: element.scrollWidth, left: image.left - outer.left, right: image.right - outer.left,
+        padding: [surface.paddingTop, surface.paddingRight, surface.paddingBottom, surface.paddingLeft].map(parseFloat)};
+    });
+    assert.deepEqual(sizes.padding, [0, 0, 0, 0]); assert(sizes.scroll <= sizes.width + 1);
+    assert(Math.abs(sizes.left) <= 1 && Math.abs(sizes.right - sizes.width) <= 1, `${width}: continuous width fit reaches both sides`);
+  }
+  await page.screenshot({path: resolve(artifacts, 'continuous-edge-to-edge-320.png')});
 });

@@ -61,27 +61,29 @@ describe('whole-spread frames', () => {
   it('fits portraits of different proportions at the same height without stretching either image', () => {
     const pages = [{width: 800, height: 1200}, {width: 900, height: 1200}];
     const frames = spreadFrames(pages, {width: 1400, height: 800});
-    expect(frames.map(frame => frame.height)).toEqual([776, 776]);
+    expect(frames.map(frame => frame.height)).toEqual([800, 800]);
     for (let index = 0; index < pages.length; index++) {
       expect(frames[index].width / frames[index].height).toBeCloseTo(pages[index].width / pages[index].height);
     }
-    expect(frames.reduce((sum, frame) => sum + frame.width, 0)).toBeLessThanOrEqual(1376);
+    expect(frames.reduce((sum, frame) => sum + frame.width, 0)).toBeLessThanOrEqual(1400);
   });
 
   it('gives a standalone landscape image the whole available width', () => {
     const [frame] = spreadFrames([landscape], {width: 1000, height: 900});
-    expect(frame).toEqual({width: 976, height: 610});
+    expect(frame).toEqual({width: 1000, height: 625});
   });
 
   it.each([false, true])('fits tall and narrow viewports without scroll overflow (comparison=%s)', compare => {
-    for (const viewport of [{width: 390, height: 640}, {width: 1200, height: 80}, {width: 80, height: 1200}, {width: 25, height: 25}]) {
+    for (const viewport of [{width: 390, height: 640}, {width: 1200, height: 80}, {width: 80, height: 1200}, {width: 25, height: 25}, {width: 10, height: 10}]) {
       const pages = [portrait, {width: 1000, height: 1900}];
       const frames = spreadFrames(pages, viewport, compare);
       expect(frames[0].height).toBe(frames[1].height);
-      expect(frames.reduce((sum, frame) => sum + frame.width, 0)).toBeLessThanOrEqual(viewport.width - 24 + 1e-8);
+      const width = frames.reduce((sum, frame) => sum + frame.width, 0);
+      expect(width).toBeLessThanOrEqual(viewport.width + 1e-8);
+      expect(Math.min(Math.abs(width - viewport.width), Math.abs(frames[0].height - viewport.height))).toBeLessThan(1e-8);
       for (let index = 0; index < pages.length; index++) {
         expect(frames[index].height).toBeGreaterThan(0);
-        expect(frames[index].height).toBeLessThanOrEqual(viewport.height - 24);
+        expect(frames[index].height).toBeLessThanOrEqual(viewport.height);
         expect(frames[index].width / frames[index].height).toBeCloseTo(pages[index].width / pages[index].height * (compare ? 2 : 1));
       }
     }
@@ -93,7 +95,7 @@ describe('whole-spread frames', () => {
     const comparison = spreadFrames([portrait, portrait], viewport, true);
     expect(comparison[0].width).toBeCloseTo(normal[0].width);
     expect(comparison[0].height).toBeCloseTo(normal[0].height / 2);
-    expect(comparison.reduce((sum, frame) => sum + frame.width, 0)).toBeCloseTo(366);
+    expect(comparison.reduce((sum, frame) => sum + frame.width, 0)).toBeCloseTo(390);
   });
 
   it.each([
@@ -101,14 +103,14 @@ describe('whole-spread frames', () => {
     {width: 800, height: -1}, {width: NaN, height: 1200}, {width: 800, height: Infinity},
   ])('uses a finite square fallback for unavailable source dimensions %j', page => {
     const [frame] = spreadFrames([page], {width: 600, height: 800});
-    expect(frame).toEqual({width: 576, height: 576});
+    expect(frame).toEqual({width: 600, height: 600});
     const [comparison] = spreadFrames([page], {width: 600, height: 800}, true);
-    expect(comparison).toEqual({width: 576, height: 288});
+    expect(comparison).toEqual({width: 600, height: 300});
   });
 
   it.each([
-    {width: 0, height: 800}, {width: 1200, height: 0}, {width: 24, height: 800},
-    {width: 800, height: 24}, {width: 10, height: 10}, {width: NaN, height: 800}, {width: 800, height: Infinity},
+    {width: 0, height: 800}, {width: 1200, height: 0}, {width: -24, height: 800},
+    {width: 800, height: -24}, {width: -10, height: -10}, {width: NaN, height: 800}, {width: 800, height: Infinity},
   ])('keeps a temporarily unmeasurable viewport finite and nonnegative %j', viewport => {
     expect(spreadFrames([portrait, portrait], viewport)).toEqual([{width: 0, height: 0}, {width: 0, height: 0}]);
   });

@@ -31,35 +31,36 @@ export function ReaderTranslationSettings({settings, setSettings, caps, channelL
 }
 
 /** Format-specific sizing and actions are slots, not a second settings implementation. */
-export function ReaderSettings({settings, setSettings, onLayout, sizing, children, immersive, onImmersive, onFullscreen,
-  onShortcuts, sourceUrl, onReload, busy, extraActions, allowDouble = false}: {
+export function ReaderSettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, children, immersive, onImmersive, onFullscreen,
+  onShortcuts, onReload, busy, extraActions, allowDouble = false}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
-  onLayout(layout: Settings['layout']): void;
+  layout?: Settings['layout'];
+  direction: Settings['direction'];
+  onLayout(layout: Settings['layout'] | undefined): void;
+  onDirection(direction: Settings['direction']): void;
   sizing: ReactNode;
   children?: ReactNode;
   immersive: boolean;
   onImmersive(): void;
   onFullscreen(): void;
   onShortcuts(): void;
-  sourceUrl?: string;
   onReload?: () => void;
   busy?: boolean;
   extraActions?: ReactNode;
   allowDouble?: boolean;
 }) {
   return <>
-    <ReaderDisplaySettings settings={settings} setSettings={setSettings} onLayout={onLayout} sizing={sizing} allowDouble={allowDouble}>{children}</ReaderDisplaySettings>
+    <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing} allowDouble={allowDouble}>{children}</ReaderDisplaySettings>
     <EnhancementToggle configure/>
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>
     </div>
-    <div className="nc-stack-actions">
+    <div className="nc-reader-actions">
       {extraActions}
-      <button className="button secondary" onClick={onFullscreen}><Icon name="expand"/>{msg('全屏阅读')}</button>
-      {onReload && <button className="button secondary" disabled={busy} onClick={onReload}><Icon name="refresh"/>{msg('重新载入')}</button>}
-      {sourceUrl && <a className="button secondary" href={sourceUrl} target="_blank" rel="noreferrer">{msg('打开来源')}</a>}
-      <button className="button secondary" onClick={onShortcuts}><Icon name="keyboard"/>{msg('键盘快捷键')}</button>
+      <button className="button secondary" onClick={onFullscreen}><Icon name="expand"/><span>{msg('全屏阅读')}</span></button>
+      {onReload && <button className="button secondary" disabled={busy} onClick={onReload}><Icon name="refresh"/><span>{msg('重新载入')}</span></button>}
+      <button className="button secondary" onClick={onShortcuts}><Icon name="keyboard"/><span>{msg('键盘快捷键')}</span></button>
     </div>
   </>;
 }

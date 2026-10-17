@@ -49,8 +49,7 @@ const cacheState=()=>page.evaluate(async()=>{
 });
 const geometry=(target=page,index=0)=>first(target,index).evaluate(element=>{const box=element.querySelector('.nc-page-picture').getBoundingClientRect(),view=document.querySelector('.nc-reading-viewport');return {height:box.height,top:box.top,scroll:view.scrollTop};});
 async function readerSettings(target=page){
-  const reveal=target.getByRole('button',{name:'显示阅读工具',exact:true});
-  if(await reveal.count())await reveal.click();
+  if(await target.locator('.nc-reader').evaluate(element=>element.classList.contains('controls-hidden')))await target.keyboard.press('Escape');
   await target.getByRole('button',{name:'阅读设置',exact:true}).click();
 }
 async function toggle(target=page){await readerSettings(target);await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await readerSettings(target);}
@@ -269,7 +268,7 @@ try {
     await waiting.waitForFunction(()=>window.channelFixture.requests.length===5);
     await waitWidth(baseWidth,waiting);
     await waiting.getByRole('button',{name:'阅读设置',exact:true}).click();
-    await waiting.getByRole('button',{name:'单页阅读',exact:true}).click();
+    await waiting.getByRole('button',{name:'单页',exact:true}).click();
     await waiting.getByRole('button',{name:'阅读设置',exact:true}).click();
     const preparedPages=await waiting.evaluate(async()=>1+(await import('/src/reading-window.ts')).MAX_READING_TARGETS);
     const expandWindow=()=>waiting.locator('.nc-reading-viewport').evaluate(view=>{
@@ -349,7 +348,7 @@ try {
     const notes=single.locator('.nc-release-notes[open]');if(await notes.count())await notes.locator('.nc-release-close').click();
     await single.getByRole('button',{name:/^打开漫画 /}).click();
     await single.getByRole('button',{name:'阅读设置',exact:true}).click();
-    await single.getByRole('button',{name:'单页阅读',exact:true}).click();
+    await single.getByRole('button',{name:'单页',exact:true}).click();
     await single.getByRole('button',{name:'阅读设置',exact:true}).click();
     const before=await geometry(single);
     await toggle(single);
