@@ -177,6 +177,58 @@ def test_empty_translation_checkpoint_replay_and_delivery_do_not_repeat_call(tex
         assert payload['translations'] == expected and payload['revision']
 
 
+@pytest.mark.parametrize('repair', [False, True])
+def test_all_empty_group_retries_with_metering_without_saving_empty_checkpoint(text_case, monkeypatch, repair):
+    import json
+    job_id, lease_id = text_case
+    segments = [{'id': 'b001', 'source': 'Library hours'}, {'id': 'b002', 'source': 'Open daily'}]
+    with session_factory()() as db:
+        db.get(ClassicState, job_id).analysis = analysis(segments)
+        db.commit()
+    requests = []
+    valid = {'b001': 'Opening hours', 'b002': ''}
+    def model(*args):
+        with session_factory()() as db:
+            assert db.get(ClassicState, job_id).translations == {}
+        requests.append(len(requests) + 1)
+        values = valid if repair and len(requests) == 2 else {'b001': '', 'b002': ' \n\t '}
+        return TextResponse(json.dumps(values), {'input_tokens': 100, 'output_tokens': 5},
+                            'empty-group-' + str(len(requests)))
+    monkeypatch.setattr(classic, 'call_text', model)
+    monkeypatch.setattr(classic, 'wait_for_retry', lambda *args: None)
+    if repair:
+        assert classic.run_text_stage(job_id, lease_id) == {'translations': valid}
+        assert classic.run_text_stage(job_id, lease_id) == {'translations': valid}
+    else:
+        with pytest.raises(TextError, match='TEXT_INVALID_RESPONSE'):
+            classic.run_text_stage(job_id, lease_id)
+        with pytest.raises(TextError, match='TEXT_RETRY_EXHAUSTED'):
+            classic.run_text_stage(job_id, lease_id)
+    with session_factory()() as db:
+        calls = db.scalars(select(TextCall).order_by(TextCall.sequence)).all()
+        assert len(calls) == len(requests) == (2 if repair else 3)
+        assert [call.error_code for call in calls] == (
+            ['TEXT_INVALID_RESPONSE', None] if repair else ['TEXT_INVALID_RESPONSE'] * 3)
+        assert all(call.usage == {'input_tokens': 100, 'output_tokens': 5}
+                   and call.accounted_micros == 650 and call.cost_state == 'estimated' for call in calls)
+        assert [call.request_id for call in calls] == ['empty-group-' + str(index) for index in requests]
+        assert db.get(ClassicState, job_id).translations == (valid if repair else {})
+
+
+def test_saved_all_empty_group_is_not_revalidated_or_called_again(text_case, monkeypatch):
+    job_id, lease_id = text_case
+    segments = [{'id': 'b001', 'source': 'Library hours'}, {'id': 'b002', 'source': 'Open daily'}]
+    saved = {segment['id']: '' for segment in segments}
+    with session_factory()() as db:
+        state = db.get(ClassicState, job_id)
+        state.analysis, state.translations = analysis(segments), saved
+        db.commit()
+    monkeypatch.setattr(classic, 'call_text', lambda *args: pytest.fail('Saved IDs must not trigger another call'))
+    assert classic.run_text_stage(job_id, lease_id) == {'translations': saved}
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(TextCall)) == 0
+
+
 def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case):
     import json
     from app.adapters.text import messages, response_schema

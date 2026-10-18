@@ -108,9 +108,13 @@ def parse_translations(content, segments):
             if not isinstance(text, str) or len(text) > 2000 or '\x00' in text or any(0xD800 <= ord(c) <= 0xDFFF for c in text):
                 raise ValueError()
             result[key] = text.strip()
+        # A single empty value can intentionally suppress OCR noise, but an
+        # entirely empty multi-segment response is not a usable translation.
+        if len(result) > 1 and not any(result.values()):
+            raise ValueError()
         return result
     except (ValueError, TypeError, KeyError, RecursionError):
-        raise TextError("TEXT_INVALID_RESPONSE", "译文 JSON 结构不完整，将在次数与处理时限内重试", retryable=True) from None
+        raise TextError("TEXT_INVALID_RESPONSE", "译文 JSON 结构或内容无效，将在次数与处理时限内重试", retryable=True) from None
 
 
 def call_text(segments, language, profile, system=SYSTEM, language_names=True):

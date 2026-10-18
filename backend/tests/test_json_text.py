@@ -66,6 +66,17 @@ def test_reordered_keys_and_json_whitespace_preserve_ids():
 def test_empty_translation_preserves_its_id_and_other_translations(empty):
     raw = json.dumps({'a': empty, 'b': '  translated  '})
     assert parse_translations(raw, [{'id': 'a'}, {'id': 'b'}]) == {'a': '', 'b': 'translated'}
+    assert parse_translations(json.dumps({'a': empty}), [{'id': 'a'}]) == {'a': ''}
+
+
+@pytest.mark.parametrize('empty', ['', ' \n\t ', '\u3000\u00a0'])
+@pytest.mark.parametrize('count', [2, 9])
+def test_all_empty_multi_segment_response_enters_bounded_retry(empty, count):
+    segments = [{'id': str(index), 'source': 'Library opening hours'} for index in range(count)]
+    raw = json.dumps({segment['id']: empty for segment in segments})
+    with pytest.raises(TextError) as exc:
+        parse_translations(raw, segments)
+    assert exc.value.code == 'TEXT_INVALID_RESPONSE' and exc.value.retryable
 
 
 def test_standard_json_escapes_are_accepted():
