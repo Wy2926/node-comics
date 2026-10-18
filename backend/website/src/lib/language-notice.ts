@@ -1,4 +1,5 @@
-import {basePath, languageNames, locales, type Locale} from '../i18n/locales';
+import {basePath, locales, type Locale} from '../i18n/locales';
+import {languageNoticeCopy} from '../i18n/language-notice';
 import {languageSuggestion, languageTarget, preferenceCookie} from './language-preference';
 import {bindHeaderMenus} from './header-menu';
 
@@ -27,13 +28,22 @@ if (notice && notice.dataset.enabled === 'true') {
   try { cookie = document.cookie; } catch { /* Cookie access is optional. */ }
   const target = languageSuggestion(location.pathname, notice.dataset.locale as Locale, navigator.languages, cookie, dismissed);
   if (target) {
+    // The visitor may not understand the page language, including its controls.
+    const copy = languageNoticeCopy[target];
+    notice.lang = target;
+    notice.dir = target === 'ar' ? 'rtl' : 'ltr';
+    notice.querySelector<HTMLElement>('[data-language-title]')!.textContent = copy.title;
     const message = notice.querySelector<HTMLElement>('[data-language-message]')!;
     const link = notice.querySelector<HTMLAnchorElement>('a')!;
-    message.textContent = notice.dataset.message!.replace('{language}', languageNames[target]);
+    const dismiss = notice.querySelector('button')!;
+    message.textContent = copy.message;
+    link.textContent = copy.switch;
     link.href = languageTarget(new URL(location.href), target);
     link.lang = target;
+    link.hreflang = target;
     link.addEventListener('click', () => remember(target));
-    notice.querySelector('button')!.addEventListener('click', () => {
+    dismiss.textContent = copy.dismiss;
+    dismiss.addEventListener('click', () => {
       notice.hidden = true;
       try { sessionStorage.setItem(dismissedKey, target); } catch { /* Dismissal still works on this page. */ }
     });

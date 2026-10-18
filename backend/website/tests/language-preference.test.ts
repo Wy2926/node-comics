@@ -22,3 +22,14 @@ test('suggestion respects manual choice, dismissal and in-progress private flows
 test('manual switch keeps the current article, query and anchor',()=>{
   assert.equal(languageTarget(new URL('https://comics.nodelane.net/en/guides/local-comics/?from=help#section-2'),'pt-BR'),'/pt-br/guides/local-comics/?from=help#section-2');
 });
+test('suggestions use the first supported browser language rather than the page language',()=>{
+  for (const target of locales) {
+    const current = target === 'ar' ? 'en' : 'ar';
+    assert.equal(languageSuggestion(localPath('/features/',current),current,['fa',target,'en']),target);
+  }
+  assert.equal(languageSuggestion('/en/','en',['zh-CN']),'zh-CN');
+  assert.equal(languageSuggestion('/en/','en',['fa','en','zh-CN']),undefined);
+  assert.equal(languageSuggestion('/en/','en',[]),undefined);
+  assert.equal(languageSuggestion('/en/','en',['fa']),undefined);
+  assert.equal(languageSuggestion('/en/','en',['zh-CN'],'nc-site-locale=invalid'),'zh-CN');
+});

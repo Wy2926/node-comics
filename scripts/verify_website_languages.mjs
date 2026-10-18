@@ -22,6 +22,115 @@ async function context(locale,options={},owner=browser){
   return value;
 }
 async function noOverflow(page){assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow: '+page.url());}
+async function verifyLanguageNotices(){
+  const switchLabels={
+    'zh-CN':'切换到简体中文','zh-TW':'切換到繁體中文',en:'Switch to English',ja:'日本語に切り替える',ko:'한국어로 전환',
+    fr:'Passer au français',es:'Cambiar a español','pt-BR':'Mudar para português',de:'Auf Deutsch wechseln',it:'Passa all’italiano',
+    ru:'Перейти на русский',pl:'Przełącz na polski',uk:'Перейти на українську',tr:'Türkçeye geç',vi:'Chuyển sang tiếng Việt',id:'Gunakan bahasa Indonesia',ar:'التبديل إلى العربية',
+  };
+  for(const locale of languages){
+    // Exercise both directions independently of the surrounding page language.
+    const source=locale==='ar'||locale==='zh-CN'?'en':'ar';
+    const route=`/${prefix(source)}guides/local-comics/?from=language-notice#section-2`;
+    const value=await context(locale),page=await value.newPage();
+    try {
+      await page.goto(origin+route);
+      const notice=page.locator('[data-language-notice]');
+      await notice.waitFor({state:'visible'});
+      assert.equal(page.url(),origin+route,'no automatic redirect');
+      assert.equal(await page.locator('html').getAttribute('lang'),source,'page content keeps its URL language');
+      assert.equal(await notice.getAttribute('lang'),locale,'notice uses the visitor’s supported browser language');
+      assert.equal(await notice.getAttribute('dir'),locale==='ar'?'rtl':'ltr');
+      assert.equal(await notice.locator('a').textContent(),switchLabels[locale]);
+      assert.equal(await notice.locator('a').getAttribute('hreflang'),locale);
+      assert((await notice.locator('[data-language-title]').textContent()).trim());
+      assert((await notice.locator('[data-language-message]').textContent()).trim());
+      assert((await notice.locator('button').textContent()).trim());
+      assert.equal(await notice.evaluate(node=>node.contains(document.activeElement)),false,'notice must not steal focus');
+      assert.equal(await page.locator('link[rel=alternate][hreflang]').count(),18);
+      assert.equal(new URL(await page.locator('link[rel=canonical]').getAttribute('href')).pathname,new URL(page.url()).pathname);
+      for(const width of [1440,320]){
+        await page.setViewportSize({width,height:800});
+        await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
+        await noOverflow(page);
+        assert(await notice.evaluate(node=>{
+          const box=node.getBoundingClientRect();
+          return box.left>=0&&box.right<=innerWidth&&box.top>=0&&box.bottom<=innerHeight&&node.scrollWidth<=node.clientWidth;
+        }),`${locale}: notice fits at ${width}px with large text`);
+        for(const control of [notice.locator('a'),notice.locator('button')]){
+          assert(await control.evaluate(node=>{
+            const box=node.getBoundingClientRect();
+            return node.contains(document.elementFromPoint(box.x+box.width/2,box.y+box.height/2));
+          }),`${locale}: notice action is not obscured`);
+        }
+        if(['zh-CN','en','ar'].includes(locale))await page.screenshot({path:path.join(out,`notice-${locale}-${width}.png`)});
+      }
+      const destination=`/${prefix(locale)}guides/local-comics/?from=language-notice#section-2`;
+      await notice.locator('a').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForURL(origin+destination);
+      assert.equal(await page.locator('html').getAttribute('lang'),locale);
+      assert.equal((await value.cookies()).find(cookie=>cookie.name==='nc-site-locale')?.value,locale);
+      await page.goBack();
+      await page.waitForURL(origin+route);
+      assert.equal(await page.locator('html').getAttribute('lang'),source,'Back restores the original language URL');
+      assert.equal(await notice.isVisible(),false,'manual choice suppresses further suggestions without redirecting Back');
+    } finally {await value.close();}
+  }
+  const dismissed=await context('fr-FR'),dismissedPage=await dismissed.newPage();
+  try {
+    await dismissedPage.goto(origin+'/');
+    const notice=dismissedPage.locator('[data-language-notice]');
+    await notice.waitFor({state:'visible'});
+    assert.equal(await notice.locator('button').textContent(),'Pas maintenant');
+    await notice.locator('button').click();
+    await dismissedPage.goto(origin+'/features/');
+    assert.equal(await notice.isVisible(),false,'dismissal lasts for this tab session');
+    assert.equal((await dismissed.cookies()).some(cookie=>cookie.name==='nc-site-locale'),false,'not now does not save a permanent preference');
+  } finally {await dismissed.close();}
+  const blocked=await context('zh-CN');
+  await blocked.addInitScript(()=>{
+    Object.defineProperty(document,'cookie',{get:()=>{throw new Error('disabled');},set:()=>{throw new Error('disabled');}});
+    Object.defineProperty(window,'sessionStorage',{get:()=>{throw new Error('disabled');}});
+  });
+  try {
+    const page=await blocked.newPage();
+    await page.goto(origin+'/en/features/?from=language-notice#main');
+    const notice=page.locator('[data-language-notice]');
+    await notice.waitFor({state:'visible'});
+    await notice.locator('button').click();
+    assert.equal(await notice.isVisible(),false,'dismissal works without storage');
+    await page.reload();
+    await notice.waitFor({state:'visible'});
+    await notice.locator('a').click();
+    await page.waitForURL(origin+'/features/?from=language-notice#main');
+  } finally {await blocked.close();}
+  const noScript=await context('zh-CN',{javaScriptEnabled:false});
+  try {
+    const page=await noScript.newPage();
+    await page.goto(origin+'/en/features/');
+    assert.equal(await page.locator('[data-language-notice]').isVisible(),false);
+    assert.equal(await page.locator('.language-menu a').count(),17);
+    await page.locator('.language-menu summary').click();
+    await page.locator('.language-menu a[lang="zh-CN"]').click();
+    await page.waitForURL(origin+'/features/');
+  } finally {await noScript.close();}
+  const privateContext=await context('fr-FR');
+  try {
+    const page=await privateContext.newPage();
+    for(const route of ['translate/','account/','payment/success/','uninstall/']){
+      await page.goto(origin+'/'+route);
+      assert.equal(await page.locator('[data-language-notice]').isVisible(),false,'private flow: '+route);
+      assert.equal(new URL(page.url()).pathname,'/'+route);
+    }
+    await page.goto(origin+'/fr/account/?price=lite-year#account');
+    // Production may defer modules through Cloudflare Rocket Loader after load.
+    await page.waitForFunction(()=>document.querySelector('.language-menu a[lang=de]')?.getAttribute('href')==='/de/account/?price=lite-year#account');
+  } finally {await privateContext.close();}
+  assert.deepEqual(failures,[]);
+  await writeFile(path.join(out,'notice-verification.json'),JSON.stringify({languages:17,widths:[1440,320],textScale:1.25,bidirectional:true,keyboardSwitch:true,backNavigation:true,dismissal:true,storageUnavailable:true,noJavaScript:true,privateFlows:true,automaticRedirect:false,pageErrors:failures},null,2));
+  console.log('Verified browser-language notices in 17 locales, LTR/RTL, desktop/320px large text, keyboard switching, Back, dismissal, unavailable storage, no-JS and private flows.');
+}
 async function verifyHeaderLayout(){
   const value=await context('en'),page=await value.newPage();
   const widths=[1920,1441,1440,1366,1281,1280,1101,1100,900,761,760,480,390,320];
@@ -124,6 +233,7 @@ async function verifyTouchMenus(owner,device,name){
   } finally {await value.close();}
 }
 async function verify(){
+  if(process.argv.includes('--notices-only')){await verifyLanguageNotices();return;}
   await verifyHeaderLayout();
   if(process.argv.includes('--header-only'))return;
   const keyboardContext=await context('zh-CN'),keyboard=await keyboardContext.newPage();
@@ -147,6 +257,7 @@ async function verify(){
   await writeFile(path.join(out,'menu-verification.json'),JSON.stringify({origin,touch:['android-chromium','iphone-webkit'],keyboardDismissal:true,backNavigation:true,queryAndAnchor:true,pageErrors:failures},null,2));
   console.log('Verified desktop keyboard dismissal, Android/WebKit touch language and navigation menus, Back navigation, query and anchor preservation.');
   if(process.argv.includes('--menus-only'))return;
+  await verifyLanguageNotices();
   for(const locale of languages){
     const value=await context(locale),page=await value.newPage();
     await page.goto(`${origin}/${prefix(locale)}`);
@@ -167,29 +278,8 @@ async function verify(){
     }
     await value.close();
   }
-  // Mismatch suggests a switch without navigating; clicking keeps the article and anchor.
-  const german=await context('de-DE'),page=await german.newPage();
-  await page.goto(origin+'/guides/local-comics/#section-2');
-  const notice=page.locator('[data-language-notice]');
-  await notice.waitFor({state:'visible'});
-  assert.equal(new URL(page.url()).pathname,'/guides/local-comics/');
-  assert.equal(await notice.locator('a').getAttribute('href'),'/de/guides/local-comics/#section-2');
-  assert.equal(await page.evaluate(()=>document.activeElement?.tagName),'BODY');
-  await page.screenshot({path:path.join(out,'language-suggestion-desktop.png')});
-  await notice.locator('a').click();
-  await page.waitForURL('**/de/guides/local-comics/#section-2');
-  assert.equal(await page.locator('html').getAttribute('lang'),'de');
-  assert.equal((await german.cookies()).find(cookie=>cookie.name==='nc-site-locale')?.value,'de');
-  await page.goto(origin+'/');
-  assert.equal(await page.locator('[data-language-notice]').isVisible(),false,'manual preference suppresses suggestions');
-  await german.close();
   const french=await context('fr-FR',{viewport:{width:320,height:740}}),mobile=await french.newPage();
-  await mobile.goto(origin+'/');
-  await mobile.locator('[data-language-notice]').waitFor({state:'visible'});
-  await noOverflow(mobile);
-  await mobile.locator('[data-language-notice] button').click();
-  await mobile.goto(origin+'/features/');
-  assert.equal(await mobile.locator('[data-language-notice]').isVisible(),false,'dismissal lasts through this tab session');
+  await mobile.goto(origin+'/fr/features/');
   await mobile.locator('.language-menu summary').click();
   const menu=mobile.locator('.language-menu nav');
   assert(await menu.evaluate(node=>node.scrollHeight>node.clientHeight),'seventeen-language menu must scroll');
@@ -200,29 +290,6 @@ async function verify(){
   await noOverflow(mobile);
   assert.equal((await french.cookies()).find(cookie=>cookie.name==='nc-site-locale')?.value,'id');
   await french.close();
-  const privateContext=await context('fr-FR'),privatePage=await privateContext.newPage();
-  for(const route of ['translate/','account/','payment/success/','uninstall/']){
-    await privatePage.goto(origin+'/'+route);
-    assert.equal(await privatePage.locator('[data-language-notice]').isVisible(),false,'private flow: '+route);
-    assert.equal(new URL(privatePage.url()).pathname,'/'+route);
-  }
-  await privatePage.goto(origin+'/fr/account/?price=lite-year#account');
-  // Production may defer modules through Cloudflare Rocket Loader after load.
-  await privatePage.waitForFunction(()=>document.querySelector('.language-menu a[lang=de]')?.getAttribute('href')==='/de/account/?price=lite-year#account');
-  assert.equal(await privatePage.locator('.language-menu a[lang=de]').getAttribute('href'),'/de/account/?price=lite-year#account');
-  await privateContext.close();
-  // Optional browser storage must not disable the suggestion or manual link.
-  const blocked=await context('fr-FR');
-  await blocked.addInitScript(()=>{
-    Object.defineProperty(document,'cookie',{get:()=>{throw new Error('disabled');},set:()=>{throw new Error('disabled');}});
-    Object.defineProperty(window,'sessionStorage',{get:()=>{throw new Error('disabled');}});
-  });
-  const blockedPage=await blocked.newPage();
-  await blockedPage.goto(origin+'/');
-  await blockedPage.locator('[data-language-notice]').waitFor({state:'visible'});
-  await blockedPage.locator('[data-language-notice] a').click();
-  await blockedPage.waitForURL('**/fr/');
-  await blocked.close();
   assert.deepEqual(failures,[]);
   await writeFile(path.join(out,'verification.json'),JSON.stringify({languages:17,pages:68,desktop:true,mobile:true,touch:['android-chromium','iphone-webkit'],keyboardDismissal:true,backNavigation:true,suggestions:'click only',manualPreference:true,dismissal:true,privateFlows:true,storageUnavailable:true,pageErrors:failures},null,2));
   console.log('Verified 17 languages, 68 public pages, Android/WebKit touch language and navigation menus, keyboard dismissal, Back navigation, suggestions, preferences, private flows and unavailable storage.');
