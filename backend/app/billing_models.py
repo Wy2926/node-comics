@@ -62,14 +62,19 @@ class BillingPrice(Base):
     currency: Mapped[str] = mapped_column(String(3))
     unit_amount: Mapped[int] = mapped_column(Integer)
     interval: Mapped[str] = mapped_column(String(8))
+    billing_type: Mapped[str] = mapped_column(String(12), default=lambda context:
+        'onetime' if context.get_current_parameters()['interval'] == 'once' else 'recurring',
+        server_default='recurring')
     status: Mapped[str] = mapped_column(String(16), default='draft')
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     __table_args__ = (ForeignKeyConstraint(['plan_revision_id', 'plan_id'],
             ['billing_plan_revisions.id', 'billing_plan_revisions.plan_id']),
         CheckConstraint("environment IN ('test', 'live')"),
         CheckConstraint("interval IN ('month', 'quarter', 'year', 'once')", name='ck_billing_price_interval'),
+        CheckConstraint("(billing_type = 'recurring' AND interval IN ('month', 'quarter', 'year')) OR "
+            "(billing_type = 'onetime' AND interval IN ('quarter', 'year', 'once'))", name='ck_billing_price_type'),
         CheckConstraint("status IN ('draft', 'active', 'archived')"), CheckConstraint('unit_amount > 0'),
-        Index('uq_billing_active_offer', 'plan_id', 'environment', 'currency', 'interval', unique=True,
+        Index('uq_billing_active_offer', 'plan_id', 'environment', 'currency', 'interval', 'billing_type', unique=True,
             sqlite_where=text("status = 'active'"), postgresql_where=text("status = 'active'")))
 
 
@@ -187,7 +192,8 @@ class BillingTerm(Base):
     __tablename__ = 'billing_terms'
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'))
-    subscription_id: Mapped[str] = mapped_column(ForeignKey('billing_subscriptions.id'), index=True)
+    subscription_id: Mapped[str | None] = mapped_column(ForeignKey('billing_subscriptions.id'), index=True)
+    billing_order_id: Mapped[str | None] = mapped_column(ForeignKey('billing_orders.id', name='fk_billing_term_order'))
     price_id: Mapped[str] = mapped_column(ForeignKey('billing_prices.id'))
     invoice_id: Mapped[str | None] = mapped_column(ForeignKey('billing_invoices.id'))
     kind: Mapped[str] = mapped_column(String(8))
@@ -195,6 +201,10 @@ class BillingTerm(Base):
     ends_at: Mapped[datetime] = mapped_column(DateTime)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (CheckConstraint("kind IN ('trial', 'paid')"), CheckConstraint('ends_at > starts_at'),
+        CheckConstraint('(subscription_id IS NOT NULL AND billing_order_id IS NULL) OR '
+            '(subscription_id IS NULL AND billing_order_id IS NOT NULL AND kind = \'paid\' AND invoice_id IS NULL)',
+            name='ck_billing_term_source'),
+        UniqueConstraint('billing_order_id', name='uq_billing_term_order'),
         UniqueConstraint('subscription_id', 'kind', 'starts_at'),
         Index('ix_billing_terms_owner_dates', 'owner_id', 'ends_at', 'starts_at'))
 

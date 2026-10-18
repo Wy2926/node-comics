@@ -53,7 +53,8 @@ def environment(resource):
 def approved_price(price, expected):
     environment(price)
     recurring = price.get('recurring') or {}
-    cadence = (not recurring and price.get('type') == 'one_time') if expected.interval == 'once' else (
+    billing_type = expected.billing_type
+    cadence = (not recurring and price.get('type') == 'one_time') if billing_type == 'onetime' else (
         recurring.get('interval') == ('month' if expected.interval == 'quarter' else expected.interval)
         and recurring.get('interval_count') == (3 if expected.interval == 'quarter' else 1)
         and recurring.get('usage_type') == 'licensed')

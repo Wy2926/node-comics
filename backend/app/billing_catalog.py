@@ -44,9 +44,14 @@ def initialize_catalog(db):
             trial_days=product.get('trial_days', 0), trial_classic_pages=product.get('trial_classic_pages', 0)))
         db.flush()
         for interval, amount in product['prices'].items():
-            db.add(BillingPrice(id=f'{plan_id}-{interval}-v1', plan_id=plan_id, plan_revision_id=f'{plan_id}-v1',
-                environment=environment, currency=DEFAULT_CATALOG['currency'], unit_amount=amount,
-                interval=interval, status='draft'))
+            variants = [('', 'onetime' if interval == 'once' else 'recurring')]
+            if interval in ('quarter', 'year') and not product.get('trial_days', 0):
+                variants.append(('-prepaid', 'onetime'))
+            for suffix, billing_type in variants:
+                db.add(BillingPrice(id=f'{plan_id}-{interval}{suffix}-v1', plan_id=plan_id,
+                    plan_revision_id=f'{plan_id}-v1', environment=environment,
+                    currency=DEFAULT_CATALOG['currency'], unit_amount=amount,
+                    interval=interval, billing_type=billing_type, status='draft'))
 
 
 class BenefitsRequest(RequestBody):
@@ -87,6 +92,16 @@ class PriceRequest(RequestBody):
     currency: str = Field(pattern=r'^[a-z]{3}$')
     unit_amount: int = Field(gt=0, le=100_000_000)
     interval: Literal['month', 'quarter', 'year', 'once']
+    billing_type: Literal['recurring', 'onetime'] | None = None
+
+    @model_validator(mode='after')
+    def payment_type(self):
+        if self.billing_type is None:
+            self.billing_type = 'onetime' if self.interval == 'once' else 'recurring'
+        if (self.interval == 'once' and self.billing_type != 'onetime'
+                or self.interval == 'month' and self.billing_type != 'recurring'):
+            raise ValueError('One-time membership supports only quarter or year; page packs use once')
+        return self
 
 
 class BindingRequest(RequestBody):
@@ -136,7 +151,7 @@ def price_json(db, price):
     revision = db.get(BillingPlanRevision, price.plan_revision_id)
     return {'id': price.id, 'plan_id': price.plan_id, 'plan_revision_id': revision.id,
         'name': revision.name, 'version': revision.version, 'currency': price.currency,
-        'unit_amount': price.unit_amount, 'interval': price.interval,
+        'unit_amount': price.unit_amount, 'interval': price.interval, 'billing_type': price.billing_type,
         'monthly_classic_pages': revision.monthly_classic_pages,
         'hourly_image_limit': revision.hourly_image_limit,
         'service_plan_id': revision.service_plan_id or revision.plan_id,
@@ -145,7 +160,7 @@ def price_json(db, price):
 
 
 def offers(db, *, interval=None):
-    """Published quotes for one billing category; subscriptions are the default."""
+    """Published quotes for one billing category; memberships are the default."""
     from .billing_providers import provider_enabled, provider_environment
     selected = default_provider(db)
     bindings = list(db.scalars(select(BillingPriceBinding).where(BillingPriceBinding.status == 'active',
@@ -158,7 +173,7 @@ def offers(db, *, interval=None):
     result = []
     period = BillingPrice.interval == interval if interval else BillingPrice.interval != 'once'
     for price in db.scalars(select(BillingPrice).where(BillingPrice.status == 'active', period)
-            .order_by(BillingPrice.plan_id, BillingPrice.interval, BillingPrice.currency)):
+            .order_by(BillingPrice.plan_id, BillingPrice.interval, BillingPrice.billing_type, BillingPrice.currency)):
         channels = available.get(price.id, [])
         if channels:
             value = price_json(db, price)
@@ -258,7 +273,9 @@ def create_price(body: PriceRequest, db: Session = Depends(get_db), actor: User 
     if not revision:
         problem('NOT_FOUND', '产品权益版本不存在', 404)
     if (body.interval == 'once') != (revision.quota_pages > 0):
-        problem('BILLING_PRICE_INTERVAL_INVALID', '额度包只能使用一次性价格，订阅只能使用月付、季付或年付价格', 422)
+        problem('BILLING_PRICE_INTERVAL_INVALID', '额度包使用 once 周期，会员使用月付、季付或年付周期', 422)
+    if body.billing_type == 'onetime' and revision.trial_days:
+        problem('BILLING_PRICE_TRIAL_INVALID', '一次付清的会员价格不包含试用，请选择无试用权益版本', 422)
     db.add(BillingPrice(**body.model_dump(), plan_id=revision.plan_id))
     record_audit(db, actor.id, 'billing.price.create', 'billing_price', body.id, after=body.model_dump())
     db.commit()
@@ -324,9 +341,8 @@ def publish_binding(binding_id: str, body: PriceState, db: Session = Depends(get
         archived_ids = list(db.scalars(select(BillingPriceBinding.id).where(BillingPriceBinding.price_id == binding.price_id,
             BillingPriceBinding.provider == binding.provider, BillingPriceBinding.environment == binding.environment,
             BillingPriceBinding.status == 'active', BillingPriceBinding.id != binding.id)))
-        db.execute(update(BillingPriceBinding).where(BillingPriceBinding.price_id == binding.price_id,
-            BillingPriceBinding.provider == binding.provider, BillingPriceBinding.environment == binding.environment,
-            BillingPriceBinding.status == 'active').values(status='archived'))
+        if archived_ids:
+            db.execute(update(BillingPriceBinding).where(BillingPriceBinding.id.in_(archived_ids)).values(status='archived'))
     binding.status = body.status
     record_audit(db, actor.id, 'billing.binding.status', 'billing_price_binding', binding.id,
         before=before, after={'status': binding.status}, details={'automatically_archived_ids': archived_ids})
@@ -352,10 +368,10 @@ def publish_price(price_id: str, body: PriceState, db: Session = Depends(get_db)
             validate_binding(binding, price, revision)
         archived_ids = list(db.scalars(select(BillingPrice.id).where(BillingPrice.plan_id == price.plan_id,
             BillingPrice.environment == price.environment, BillingPrice.currency == price.currency,
-            BillingPrice.interval == price.interval, BillingPrice.status == 'active', BillingPrice.id != price.id)))
-        db.execute(update(BillingPrice).where(BillingPrice.plan_id == price.plan_id,
-            BillingPrice.environment == price.environment, BillingPrice.currency == price.currency,
-            BillingPrice.interval == price.interval, BillingPrice.status == 'active').values(status='archived'))
+            BillingPrice.interval == price.interval, BillingPrice.billing_type == price.billing_type,
+            BillingPrice.status == 'active', BillingPrice.id != price.id)))
+        if archived_ids:
+            db.execute(update(BillingPrice).where(BillingPrice.id.in_(archived_ids)).values(status='archived'))
     price.status = body.status
     record_audit(db, actor.id, 'billing.price.status', 'billing_price', price.id,
         before=before, after={'status': price.status}, details={'automatically_archived_ids': archived_ids})

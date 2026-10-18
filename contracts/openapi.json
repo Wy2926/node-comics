@@ -9991,6 +9991,21 @@
               "once"
             ],
             "title": "Interval"
+          },
+          "billing_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "recurring",
+                  "onetime"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billing Type"
           }
         },
         "additionalProperties": false,

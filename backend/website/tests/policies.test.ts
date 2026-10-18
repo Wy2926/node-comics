@@ -2,6 +2,18 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {dictionaries, locales} from '../src/i18n';
 import {publishedModels, publishedOffers} from '../src/data/published-plans';
+import {prepaidMembershipCopy} from '../src/i18n/prepaid-membership';
+
+test('prepaid terms and refund pages disclose no renewal, queued purchases and monthly allowance in every locale',()=>{
+  for(const locale of locales){
+    const copy=prepaidMembershipCopy(locale);
+    for(const key of ['terms','refund']){
+      const section=dictionaries[locale].documents.policies[key].sections.find(section=>section.title===copy.status);
+      assert.deepEqual(section?.paragraphs,[copy.notice,copy.quotaRule],`${locale}: ${key}`);
+    }
+    assert.ok(dictionaries[locale].documents.faqs.find(faq=>faq.id==='cancel-subscription')?.answer.startsWith(copy.notice),locale);
+  }
+});
 
 test('all policies have an explicit revision and preserve separate data-processing disclosures', () => {
   for (const locale of locales) {

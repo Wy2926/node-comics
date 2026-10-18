@@ -69,7 +69,8 @@ def seed_catalog(db, ids):
         remote = creem.call('GET', '/products/' + ids[key])
         if not isinstance(remote, dict) or remote.get('object') != 'product' or type(remote.get('price')) is not int:
             raise SeedError('CREEM_TEST_PRODUCT_INVALID')
-        creem.approved_product(remote, ids[key], SimpleNamespace(unit_amount=amount, currency='usd', interval=interval), 0)
+        creem.approved_product(remote, ids[key], SimpleNamespace(unit_amount=amount, currency='usd', interval=interval,
+            billing_type='onetime' if interval == 'once' else 'recurring'), 0)
 
     catalog.lock_catalog(db)
     if db.get(BillingSettings, 1) is None:

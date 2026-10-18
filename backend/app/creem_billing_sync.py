@@ -167,6 +167,7 @@ def sync_subscription(subscription_id, transaction_id=None, event_id=None):
         require(account is not None)
         bind_checkout_customer(db, row, customer_id, subscription=True)
         price = db.get(BillingPrice, row.price_id)
+        require(price.billing_type == 'recurring', 'CREEM_PLAN_MISMATCH')
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
         sub = db.get(BillingSubscription, resource_key('creem', subscription_id), populate_existing=True)
         previous_status = sub.status if sub else None
@@ -228,7 +229,7 @@ def sync_session(session_id):
     bind_session(checkout_id, session)
     with session_factory()() as db:
         row = db.get(BillingCheckout, checkout_id)
-        purchase = db.get(BillingPrice, row.price_id).interval == 'once'
+        purchase = db.get(BillingPrice, row.price_id).billing_type == 'onetime'
     if purchase:
         from .billing_purchases import sync_creem_purchase
         sync_creem_purchase(checkout_id)

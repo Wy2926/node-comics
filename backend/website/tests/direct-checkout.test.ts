@@ -18,6 +18,7 @@ import { publishedSubscriptions } from '../src/data/published-plans';
 const month: BillingOffer = { id:'lite-month',name:'Lite',plan_id:'lite',plan_revision_id:'v1',currency:'usd',unit_amount:599,interval:'month',monthly_classic_pages:0,trial_days:7,trial_classic_pages:0,channels:[{provider:'creem',binding_id:'binding',trial_days:7,trial_classic_pages:0}] };
 const year: BillingOffer = {...month,id:'lite-year',unit_amount:5999,interval:'year'};
 const pack:BillingOffer={...month,id:'pack',plan_id:'pages',interval:'once',quota_pages:100,quota_validity_days:null,service_plan_id:'lite',trial_days:0};
+const prepaid:BillingOffer={...year,id:'lite-year-prepaid',billing_type:'onetime',trial_days:0};
 const billing: Billing = {enabled:true,providers:[],provider:null,environment:'test',trial_eligible:true,subscription_checkout:null,offers:[month,year],entitlement_expires_at:null,gift:null,subscription:null};
 const pendingCheckout=(price:BillingOffer,provider:BillingProvider='creem',key:string|null=null):PendingCheckout=>({id:'checkout-'+price.id,provider,price,idempotency_key:key,error:null});
 function memoryStorage(){
@@ -104,6 +105,64 @@ test('all page packs remain available to members, gifts and pending subscription
   for(const extra of [{},{subscription:{status:'active'} as Billing['subscription']},{gift:{state:'active' as const,starts_at:null,ends_at:null,days:30}},{subscription_checkout:pendingCheckout(year)}]){
     assert.deepEqual(checkoutSelection({...billing,...extra,quota_offers:[pack]},pack.id),{price_id:pack.id,provider:'creem'});
   }
+});
+
+test('prepaid renewal is allowed without permitting automatic billing or bypassing a real subscription or gift',()=>{
+  const prepaid_membership={price:prepaid,starts_at:'2026-01-01T00:00:00Z',ends_at:'2099-01-01T00:00:00Z'};
+  const status={...billing,offers:[prepaid,year],prepaid_membership,entitlement_expires_at:prepaid_membership.ends_at};
+  assert.deepEqual(checkoutSelection(status,prepaid.id),{price_id:prepaid.id,provider:'creem'});
+  assert.equal(checkoutSelection(status,year.id),null);
+  const ended={status:'canceled',paid_ends_at:'2000-01-01T00:00:00Z',trial_ends_at:null} as Billing['subscription'];
+  assert.deepEqual(checkoutSelection({...status,subscription:ended},prepaid.id),{price_id:prepaid.id,provider:'creem'});
+  for(const extra of [{subscription:{status:'active'} as Billing['subscription']},{gift:{state:'scheduled' as const,starts_at:null,ends_at:null,days:30}}]){
+    assert.equal(checkoutSelection({...status,...extra},prepaid.id),null);
+  }
+  assert.deepEqual(checkoutSelection({...status,prepaid_membership:{...prepaid_membership,ends_at:'2000-01-01T00:00:00Z'}},year.id),{price_id:year.id,provider:'creem'});
+});
+
+test('prepaid quarter and year reuse the exact account-scoped purchase key after response loss and retirement',async()=>{
+  for(const interval of ['quarter','year'] as const){
+    const storage=memoryStorage(),quote={...prepaid,interval},writes:{price_id:string;provider:string;key:string}[]=[];
+    let retired=false,fulfilled=false;
+    const request=(async(path:string,_method?:string,body?:{price_id:string;provider:string},headers?:Record<string,string>)=>{
+      if(path.startsWith('/v1/billing/status'))return {...billing,offers:retired?[year]:[year,quote]};
+      if(path==='/v1/me')return {user:{id:'buyer'}};
+      writes.push({...body!,key:headers!['Idempotency-Key']});
+      if(!fulfilled)throw new TypeError('Response lost');
+      return {provider:'creem',checkout_url:null,fulfilled:true};
+    }) as typeof api;
+    await assert.rejects(directCheckout(quote.id,request,storage));
+    retired=true;await assert.rejects(directCheckout(quote.id,request,storage));
+    fulfilled=true;assert.deepEqual(await directCheckout(quote.id,request,storage),{fulfilled:true});
+    assert.equal(writes.length,3);assert.ok(writes[0].key);
+    assert.ok(writes.every(write=>write.key===writes[0].key&&write.price_id===quote.id&&write.provider==='creem'));
+    assert.equal(readPurchaseIntent(storage,'buyer',quote.id),null);
+  }
+});
+
+test('a later subscription can recover fulfilled prepaid intent but server rejection retains any pending intent',async()=>{
+  const storage=memoryStorage(),writes:{body:unknown;headers:unknown}[]=[];
+  let fulfilled=false;
+  const request=(async(path:string,_method?:string,body?:unknown,headers?:Record<string,string>)=>{
+    if(path.startsWith('/v1/billing/status'))return {...billing,offers:[prepaid],subscription:{status:'active'}};
+    if(path==='/v1/me')return {user:{id:'buyer'}};
+    writes.push({body,headers});
+    if(!fulfilled)throw new ApiError('subscription active',409,'BILLING_SUBSCRIPTION_EXISTS');
+    return {provider:'creem',fulfilled:true,checkout_url:null};
+  }) as typeof api;
+  await assert.rejects(directCheckout(prepaid.id,request,storage),/CHECKOUT_UNAVAILABLE/);
+  assert.equal(writes.length,0);assert.equal(readPurchaseIntent(storage,'buyer',prepaid.id),null);
+  purchaseIntent(storage,'different-buyer',prepaid.id,'creem');
+  await assert.rejects(directCheckout(prepaid.id,request,storage),/CHECKOUT_UNAVAILABLE/);
+  assert.equal(writes.length,0);
+  const original=purchaseIntent(storage,'buyer',prepaid.id,'creem');
+  await assert.rejects(directCheckout(prepaid.id,request,storage),error=>error instanceof ApiError&&error.code==='BILLING_SUBSCRIPTION_EXISTS');
+  assert.equal(readPurchaseIntent(storage,'buyer',prepaid.id)?.key,original.key);
+  assert.equal(writes.length,1);
+  fulfilled=true;
+  assert.deepEqual(await directCheckout(prepaid.id,request,storage),{fulfilled:true});
+  assert.deepEqual(writes,[0,1].map(()=>({body:{price_id:prepaid.id,provider:'creem'},headers:{'Idempotency-Key':original.key}})));
+  assert.equal(readPurchaseIntent(storage,'buyer',prepaid.id),null);
 });
 
 test('a different subscription quote creates its own checkout instead of redirecting to the old price',async()=>{
@@ -336,7 +395,7 @@ function button(copy:CheckoutCopy,checkout:()=>Promise<unknown>,signedIn=true,op
 test('all 17 languages provide distinct checkout verification and conflict guidance',()=>{
   for(const locale of locales){
     const copy=checkoutStatusCopy(locale);
-    assert.deepEqual(Object.keys(copy).sort(),['conflict','uncertain']);
+    assert.deepEqual(Object.keys(copy).sort(),['conflict','pending','uncertain']);
     assert.match(copy.uncertain,/comics@nodelane\.net/,locale);
     for(const value of Object.values(copy)){
       assert.ok(value.trim(),locale);assert.notEqual(value,dictionaries[locale].account?.['操作暂未完成，请重试或重新登录。'],locale);
@@ -346,7 +405,7 @@ test('all 17 languages provide distinct checkout verification and conflict guida
   }
 });
 
-for(const [code,key] of [['CREEM_CHECKOUT_UNCERTAIN','uncertain'],['BILLING_CHECKOUT_UNCERTAIN','uncertain'],['BILLING_CHECKOUT_PRICE_CONFLICT','conflict']] as const){
+for(const [code,key] of [['CREEM_CHECKOUT_UNCERTAIN','uncertain'],['BILLING_CHECKOUT_UNCERTAIN','uncertain'],['BILLING_CHECKOUT_PRICE_CONFLICT','conflict'],['BILLING_CHECKOUT_PENDING','pending']] as const){
   test(`${code} displays localized guidance by code without retrying or changing the quote`,async()=>{
     for(const locale of locales){
       const copy={...base,...checkoutStatusCopy(locale)};
@@ -424,6 +483,6 @@ test('returning during session preflight prevents the stale button action from s
 test('pricing passes the same localized error copy to subscription and quota checkout buttons',()=>{
   const pricing=readFileSync(new URL('../src/components/BillingOffers.tsx',import.meta.url),'utf8');
   assert.match(pricing,/buttonCopy=\{\.\.\.checkoutCopy,\.\.\.checkoutStatusCopy\(locale\)\}/);
-  assert.match(pricing,/<CheckoutButton[^>]*copy=\{buttonCopy\}/);
+  assert.match(pricing,/<CheckoutButton[^>]*copy=\{oneTime\?prepaidButtonCopy:buttonCopy\}/);
   assert.match(pricing,/<QuotaOffers[^>]*checkoutCopy=\{buttonCopy\}/);
 });

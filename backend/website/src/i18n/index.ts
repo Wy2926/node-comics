@@ -18,6 +18,7 @@ import ar from './ar';
 import type { Locale, Dictionary } from './types';
 import { mobileCopy, mobileGuides } from './mobile';
 import {quotaPurchase,quotaPurchasePolicy} from './quota-purchase';
+import {prepaidMembershipCopy} from './prepaid-membership';
 import { findMangaGuide } from './guides/find-manga';
 import { localImportSteps } from './guides/local-import';
 export { locales, prefixes, languageNames, localeFromPath, basePath, localPath } from './locales';
@@ -25,17 +26,21 @@ export type { Locale } from './types';
 const baseDictionaries: Record<Locale,Dictionary> = {'zh-CN':zhCN, 'zh-TW':zhTW, 'en':en, 'ja':ja, 'ko':ko, 'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id, 'ar':ar};
 export const dictionaries = Object.fromEntries(Object.entries(baseDictionaries).map(([language, dictionary]) => {
   const locale = language as Locale;
+  const prepaid=prepaidMembershipCopy(locale);
+  const prepaidPolicy={title:prepaid.status,paragraphs:[prepaid.notice,prepaid.quotaRule]};
   const localized:Dictionary={
     ...dictionary,
     ui: { ...dictionary.ui, downloadDescription: mobileCopy[locale].availability },
     documents: {
       ...dictionary.documents,
-      policies:{...dictionary.documents.policies,refund:{...dictionary.documents.policies.refund,sections:[...dictionary.documents.policies.refund.sections,{title:quotaPurchase[locale].title,paragraphs:[quotaPurchasePolicy[locale],quotaPurchase[locale].once,quotaPurchase[locale].subscription]}]}},
+      policies:{...dictionary.documents.policies,
+        terms:{...dictionary.documents.policies.terms,sections:[prepaidPolicy,...dictionary.documents.policies.terms.sections]},
+        refund:{...dictionary.documents.policies.refund,sections:[prepaidPolicy,...dictionary.documents.policies.refund.sections,{title:quotaPurchase[locale].title,paragraphs:[quotaPurchasePolicy[locale],quotaPurchase[locale].once,quotaPurchase[locale].subscription]}]}},
       guides: [...dictionary.documents.guides.map(guide => guide.slug === 'local-comics'
         ? { ...guide, updated: '2026-10-10', sections: guide.sections.map((section, index) => index === 0 ? { ...section, steps: localImportSteps[locale] } : section) }
         : guide), findMangaGuide(locale, dictionary.ui.guides), ...mobileGuides(locale, dictionary.ui)],
       faqs: dictionary.documents.faqs.map(faq => faq.id === 'browsers'
-        ? { ...faq, answer: `${mobileCopy[locale].availability} ${mobileCopy[locale].notices[1]}` } : faq),
+        ? { ...faq, answer: `${mobileCopy[locale].availability} ${mobileCopy[locale].notices[1]}` } : faq.id==='cancel-subscription'?{...faq,answer:`${prepaid.notice} ${faq.answer}`}:faq),
     },
   };
   return [locale,localized];

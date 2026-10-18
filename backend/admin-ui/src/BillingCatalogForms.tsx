@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {authError, errorText, request} from './api';
-import {benefitsSummary, billingEndpoint, environmentName, intervalName, minorAmount, pageAllowance, money, priceAmount, providerName, type BillingChannel, type BillingEnvironment, type BillingPrice, type BillingProduct, type BillingProvider} from './billing';
+import {benefitsSummary, billingEndpoint, billingTypeName, environmentName, intervalName, minorAmount, pageAllowance, money, priceAmount, providerName, type BillingChannel, type BillingEnvironment, type BillingPrice, type BillingProduct, type BillingProvider, type BillingType} from './billing';
 import {BillingDialog} from './BillingShared';
 
 export type CatalogEditor = {kind: 'product'} | {kind: 'benefits'; product: BillingProduct} | {kind: 'price'; product: BillingProduct; copy?: BillingPrice} | {kind: 'binding'; price: BillingPrice};
@@ -12,7 +12,7 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
   const [productId, setProductId] = useState('');
   const [isPack, setIsPack] = useState((latest?.quota_pages ?? 0) > 0);
   const [benefits, setBenefits] = useState({name: latest?.name ?? '', monthly_classic_pages: latest ? latest.monthly_classic_pages : null as number | null, trial_days: latest?.trial_days ?? 7, trial_classic_pages: latest ? latest.trial_classic_pages : 30 as number | null, hourly_image_limit: latest?.hourly_image_limit ?? null as number | null, service_plan_id: latest?.service_plan_id ?? null as string | null, quota_pages: latest?.quota_pages ?? 0, quota_validity_days: latest?.quota_validity_days ?? null as number | null});
-  const [price, setPrice] = useState({plan_revision_id: copied?.plan_revision_id ?? latest?.id ?? '', currency: copied?.currency ?? 'usd', amount: copied ? priceAmount(copied.unit_amount, copied.currency) : '', interval: copied?.interval ?? ((latest?.quota_pages ?? 0) > 0 ? 'once' : 'month'), environment: copied?.environment ?? channels.find(channel => channel.enabled)?.environment ?? 'test'});
+  const [price, setPrice] = useState({plan_revision_id: copied?.plan_revision_id ?? latest?.id ?? '', currency: copied?.currency ?? 'usd', amount: copied ? priceAmount(copied.unit_amount, copied.currency) : '', interval: copied?.interval ?? (isPack ? 'once' : 'month'), billing_type: copied?.billing_type ?? (isPack ? 'onetime' : 'recurring') as BillingType, environment: copied?.environment ?? channels.find(channel => channel.enabled)?.environment ?? 'test'});
   const servicePlans = products.filter(value => value.revisions.some(revision => !revision.quota_pages));
   const priceIsPack = (product?.revisions.find(value => value.id === price.plan_revision_id)?.quota_pages ?? 0) > 0;
   const [binding, setBinding] = useState({provider: (channels.find(channel => channel.enabled)?.provider ?? 'creem') as BillingProvider, product_id: '', provider_price_id: '', trial_product_id: ''});
@@ -27,7 +27,7 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
       let path: string, body: unknown;
       if (editor.kind === 'product') {path = '/products'; body = {...benefits, id: productId, revision_id: recordId};}
       else if (editor.kind === 'benefits') {path = `/products/${encodeURIComponent(editor.product.id)}/revisions`; body = {...benefits, id: recordId};}
-      else if (editor.kind === 'price') {path = '/prices'; body = {id: recordId, plan_revision_id: price.plan_revision_id, currency: price.currency, unit_amount: minorAmount(price.amount, price.currency), interval: price.interval, environment: price.environment};}
+      else if (editor.kind === 'price') {path = '/prices'; body = {id: recordId, plan_revision_id: price.plan_revision_id, currency: price.currency, unit_amount: minorAmount(price.amount, price.currency), interval: price.interval, billing_type: price.billing_type, environment: price.environment};}
       else {path = `/prices/${encodeURIComponent(editor.price.id)}/bindings`; body = {id: recordId, provider: binding.provider, environment: editor.price.environment, product_id: binding.product_id.trim(), provider_price_id: binding.provider === 'stripe' ? binding.provider_price_id.trim() : null, trial_product_id: binding.provider === 'creem' && editor.price.trial_days > 0 ? binding.trial_product_id.trim() : null};}
       await request(billingEndpoint + path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
       await onSaved(editor.kind === 'product' ? productId : product?.id);
@@ -43,7 +43,7 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
           setIsPack(pack);
           setBenefits({...benefits, service_plan_id: null, quota_pages: 0, quota_validity_days: null,
             monthly_classic_pages: pack ? 0 : null, trial_days: 0, trial_classic_pages: 0, hourly_image_limit: null});
-        }}><option value="subscription">按月／按年订阅</option><option value="once">一次性常规额度包</option></select></label>
+        }}><option value="subscription">会员（订阅或季卡／年卡）</option><option value="once">一次性常规额度包</option></select></label>
         {editor.kind === 'product' && <label>产品编号<input required autoFocus pattern="[a-z][a-z0-9_-]*" maxLength={64} value={productId} placeholder="例如 plus" onChange={event => setProductId(event.target.value)}/><small>小写字母开头，可包含数字、短横线和下划线。</small></label>}
         <label>产品名称<input required maxLength={100} value={benefits.name} placeholder="例如 PLUS" onChange={event => setBenefits({...benefits, name: event.target.value})}/></label>
         {isPack ? <>
@@ -58,22 +58,26 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
         {!isPack && <><label>首次试用天数<input required type="number" min={0} max={30} step={1} value={benefits.trial_days} onChange={event => setBenefits({...benefits, trial_days: Number(event.target.value), trial_classic_pages: event.target.value === '' ? null : Number(event.target.value) === 0 ? 0 : benefits.trial_classic_pages})}/></label>
         <label>试用翻译页数<input type="number" min={0} max={1000000} step={1} disabled={!benefits.trial_days} placeholder="留空表示不限量" value={benefits.trial_classic_pages ?? ''} onChange={event => setBenefits({...benefits, trial_classic_pages: pageAllowance(event.target.value)})}/></label></>}
       </div>{editor.kind === 'benefits' && <p className="provider-warning">保存后请添加采用新权益的价格。现有价格、订阅和已购额度继续保留原权益。</p>}</>}
-      {editor.kind === 'price' && <><p className="muted">价格先保存为草稿，关联并验证支付渠道后发布。发布同一产品、环境、币种和周期的新价格，会自动停售原价格。</p><div className="billing-form-grid">
-        <label>付款周期<select value={price.interval} onChange={event => setPrice({...price, interval: event.target.value as BillingPrice['interval']})}>{priceIsPack ? <option value="once">一次性购买（不自动续费）</option> : <><option value="month">月付</option><option value="quarter">季付（每三个月）</option><option value="year">年付</option></>}</select></label>
+      {editor.kind === 'price' && <><p className="muted">价格先保存为草稿，关联并验证支付渠道后发布。发布同一产品、环境、币种、周期和续订方式的新价格，会自动停售原价格；会员卡与自动续订可同时在售。</p><div className="billing-form-grid">
+        {!priceIsPack && <label>续订方式<select value={price.billing_type} onChange={event => {
+          const billing_type = event.target.value as BillingType;
+          setPrice({...price, billing_type, interval: billing_type === 'onetime' && price.interval === 'month' ? 'quarter' : price.interval});
+        }}><option value="recurring">自动续订</option><option value="onetime">一次付清的季卡／年卡</option></select><small>会员卡复用此产品权益，逐月发放额度，不含试用。</small></label>}
+        <label>{price.billing_type === 'onetime' && !priceIsPack ? '会员期限' : '付款周期'}<select value={price.interval} onChange={event => setPrice({...price, interval: event.target.value as BillingPrice['interval']})}>{priceIsPack ? <option value="once">一次性购买（不自动续费）</option> : <>{price.billing_type === 'recurring' && <option value="month">月付</option>}<option value="quarter">{price.billing_type === 'onetime' ? '季卡（三个月）' : '季付（每三个月）'}</option><option value="year">{price.billing_type === 'onetime' ? '年卡（一年）' : '年付'}</option></>}</select></label>
         <label>币种<input required pattern="[a-zA-Z]{3}" maxLength={3} value={price.currency} onChange={event => setPrice({...price, currency: event.target.value.toLowerCase()})}/></label>
         <label>价格金额（{price.currency.toUpperCase()}）<input required inputMode="decimal" pattern="[0-9]+(\.[0-9]+)?" value={price.amount} onChange={event => setPrice({...price, amount: event.target.value})}/><small>填写实际金额，例如 9.99。</small></label>
         <label>支付环境<select value={price.environment} onChange={event => setPrice({...price, environment: event.target.value as BillingEnvironment})}><option value="test">测试环境</option><option value="live">正式环境</option></select></label>
         <label className="billing-form-wide">采用的产品权益<select required value={price.plan_revision_id} onChange={event => {
           const selected = editor.product.revisions.find(value => value.id === event.target.value);
-          setPrice({...price, plan_revision_id: event.target.value, interval: selected?.quota_pages ? 'once' : price.interval === 'once' ? 'month' : price.interval});
+          setPrice({...price, plan_revision_id: event.target.value, interval: selected?.quota_pages ? 'once' : price.interval === 'once' ? 'quarter' : price.interval, billing_type: selected?.quota_pages ? 'onetime' : price.billing_type});
         }}>{editor.product.revisions.map(revision => <option key={revision.id} value={revision.id}>{revision.name} · {benefitsSummary(revision)}{revision.hourly_image_limit != null && ` · 每滚动小时最多 ${revision.hourly_image_limit} 页`}{revision.id === latest?.id ? '（当前权益）' : '（历史权益）'}</option>)}</select></label>
       </div></>}
-      {editor.kind === 'binding' && <><div className="billing-form-context"><strong>{editor.price.name} · {intervalName(editor.price.interval)} · {money(editor.price.unit_amount, editor.price.currency)}</strong><small>{environmentName(editor.price.environment)} · 首次试用 {editor.price.trial_days} 天</small></div><div className="billing-form-grid">
+      {editor.kind === 'binding' && <><div className="billing-form-context"><strong>{editor.price.name} · {intervalName(editor.price.interval, editor.price.billing_type)} · {money(editor.price.unit_amount, editor.price.currency)}</strong><small>{environmentName(editor.price.environment)} · {billingTypeName(editor.price.billing_type)} · 首次试用 {editor.price.trial_days} 天</small></div><div className="billing-form-grid">
         <label className="billing-form-wide">支付渠道<select value={binding.provider} onChange={event => setBinding({...binding, provider: event.target.value as BillingProvider, product_id: '', provider_price_id: '', trial_product_id: ''})}>{channels.map(value => <option key={value.provider} value={value.provider}>{providerName(value.provider)}</option>)}</select></label>
-        <label className="billing-form-wide">{binding.provider === 'creem' ? 'Creem 常规产品 ID（无试用）' : 'Stripe 产品 ID'}<input required autoComplete="off" maxLength={255} value={binding.product_id} onChange={event => setBinding({...binding, product_id: event.target.value})} placeholder={binding.provider === 'creem' ? 'prod_…' : 'prod_…'}/></label>
+        <label className="billing-form-wide">{binding.provider === 'creem' ? 'Creem 常规产品 ID（无试用）' : 'Stripe 产品 ID'}<input required autoComplete="off" maxLength={255} value={binding.product_id} onChange={event => setBinding({...binding, product_id: event.target.value})} placeholder="prod_…"/></label>
         {binding.provider === 'stripe' && <label className="billing-form-wide">Stripe 价格 ID<input required autoComplete="off" maxLength={255} value={binding.provider_price_id} onChange={event => setBinding({...binding, provider_price_id: event.target.value})} placeholder="price_…"/></label>}
         {binding.provider === 'creem' && editor.price.trial_days > 0 && <label className="billing-form-wide">Creem 首次试用产品 ID<input required autoComplete="off" maxLength={255} value={binding.trial_product_id} onChange={event => setBinding({...binding, trial_product_id: event.target.value})} placeholder="prod_…"/><small>在 Creem 创建同价、同币种、同周期且带 {editor.price.trial_days} 天试用的产品。已试用用户使用常规产品，避免重复试用。</small></label>}
-      </div><p className="muted">平台产品的金额、币种和周期须与此价格一致。保存关联后，点击“验证并启用”检查平台配置。</p>{channel && (!channel.credential_configured || channel.environment !== editor.price.environment) && <p className="provider-warning">{!channel.credential_configured ? '渠道 API 密钥尚未配置。' : '渠道当前环境与此价格不一致。'}可先保存草稿，服务端配置完成后再验证启用。</p>}</>}
+      </div><p className="muted">{editor.price.billing_type === 'onetime' ? '平台使用一次性商品：Creem 选择 onetime / once，Stripe 选择 one_time；会员期限由本站价格决定。' : '平台产品的金额、币种和周期须与此价格一致。'}保存关联后，点击“验证并启用”检查平台配置。</p>{channel && (!channel.credential_configured || channel.environment !== editor.price.environment) && <p className="provider-warning">{!channel.credential_configured ? '渠道 API 密钥尚未配置。' : '渠道当前环境与此价格不一致。'}可先保存草稿，服务端配置完成后再验证启用。</p>}</>}
     </fieldset>
     {error && <div className="error" role="alert">{error} 结果不确定时先关闭并刷新列表核实；保留此表单重试不会重复创建。</div>}
     <div className="provider-save-bar"><small>已有订阅和购买额度保留原价格与权益。</small><div className="provider-actions"><button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</button><button className="primary" disabled={busy}>{busy ? '正在保存…' : editor.kind === 'price' || editor.kind === 'binding' ? '保存草稿' : '保存产品'}</button></div></div>

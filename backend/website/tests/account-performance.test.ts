@@ -9,6 +9,7 @@ import {ApiError,type AuthIdentity} from '../src/lib/auth';
 import * as authConfig from '../src/lib/auth-config';
 import * as billingModule from '../src/lib/billing';
 import * as quotaCopy from '../src/i18n/quota-purchase';
+import * as prepaidCopy from '../src/i18n/prepaid-membership';
 
 type Props={children?:ReactNode;className?:string;href?:string;disabled?:boolean;onClick?:()=>void;'aria-busy'?:boolean;role?:string};
 type Element=ReactElement<Props>;
@@ -52,7 +53,7 @@ function mount(){
   };
   const modules:Record<string,unknown>={
     react:{useState:state,useRef:<T,>(value:T)=>state({current:value})[0],useEffect:(effect:()=>void|(()=>void))=>{const index=cursor++;if(index===cells.length){cells.push(true);effects.push(effect);}}},
-    'react/jsx-runtime':jsx,'../lib/auth-config':authConfig,'../lib/billing':billingModule,'../i18n/subscription-quota':subscriptionQuota,'../i18n/quota-purchase':quotaCopy,
+    'react/jsx-runtime':jsx,'../lib/auth-config':authConfig,'../lib/billing':billingModule,'../i18n/subscription-quota':subscriptionQuota,'../i18n/quota-purchase':quotaCopy,'../i18n/prepaid-membership':prepaidCopy,
     '../lib/auth':{ApiError,sessionIdentity:async()=>currentIdentity,subscribeAuth:(next:()=>void)=>{listener=next;return()=>{listener=()=>{};};},
       signOut:async()=>{currentIdentity=null;listener();},api:(path:string,method='GET',_body?:unknown,_headers?:unknown,boundIdentity?:unknown)=>{
         const pending=deferred();calls.push({path,method,identity:boundIdentity,pending});return pending.promise;
@@ -106,6 +107,18 @@ test('account navigation stays on the plain pricing page with or without a pendi
     const link=elements(view.byClass('account-purchase-link')).find(node=>node.type==='a');
     assert.equal(link?.props.href,'/pricing/');assert.ok(view.byClass('account-summary'));
   }
+});
+
+test('prepaid account shows the exact term and purchased-through date without subscription controls',async()=>{
+  const view=mount();await view.flush();view.response('/v1/me').resolve(account());
+  view.response('/v1/billing/status').resolve({...billing,subscription:null,provider:null,
+    prepaid_membership:{price:{...price,interval:'quarter',billing_type:'onetime'},starts_at:'2098-10-01T00:00:00Z',ends_at:'2099-01-01T00:00:00Z',paid_through:'2099-04-01T00:00:00Z'}});
+  await view.flush();
+  const text=content(view.byClass('prepaid-membership'));
+  assert.match(text,/2098/);assert.match(text,/2099/);assert.match(text,/不自动续订/);assert.match(text,/手动续购/);
+  assert.ok(view.byClass('account-purchase-link'));
+  assert.ok(!view.all().some(node=>node.type==='button'&&/Creem|Stripe|取消自动续费/.test(content(node))));
+  assert.equal(view.calls.filter(call=>call.method==='POST').length,0);
 });
 
 test('refresh keeps account visible, ignores repeated clicks, and locks billing actions but not logout',async()=>{

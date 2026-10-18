@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from . import stripe_client as stripe, creem_client as creem
 from .billing_providers import BillingError, require, provider_enabled, provider_environment, provider_config_json, resource_key, remote_id, stripe_quote
-from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding, BillingOrder
+from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding, BillingOrder, BillingTerm
 from .entitlement_models import QuotaPeriod
 from .billing_access import ongoing_subscription, access_dates
 from .billing_catalog import offers, price_json, default_provider
@@ -24,10 +24,11 @@ def pending_checkout_condition():
     subscription = select(BillingSubscription.id).where(
         BillingSubscription.checkout_id == BillingCheckout.id).exists()
     purchase = select(BillingOrder.id).join(BillingPrice, BillingPrice.id == BillingOrder.price_id).where(
-        BillingOrder.checkout_id == BillingCheckout.id, BillingPrice.interval == 'once',
+        BillingOrder.checkout_id == BillingCheckout.id, BillingPrice.billing_type == 'onetime',
         (BillingOrder.status.in_(['refunded', 'disputed'])) | (
-            BillingOrder.status.in_(['paid', 'partially_refunded']) & select(QuotaPeriod.id).where(
-                QuotaPeriod.billing_order_id == BillingOrder.id).exists())).exists()
+            BillingOrder.status.in_(['paid', 'partially_refunded']) & (
+                select(QuotaPeriod.id).where(QuotaPeriod.billing_order_id == BillingOrder.id).exists() |
+                select(BillingTerm.id).where(BillingTerm.billing_order_id == BillingOrder.id).exists()))).exists()
     return BillingCheckout.status.in_(PENDING) | ((BillingCheckout.status == 'completed') & ~subscription & ~purchase)
 
 
@@ -64,7 +65,7 @@ def current_subscription(db, owner_id, provider=None):
 def subscription_checkout(db, owner_id, price_id=None):
     query = select(BillingCheckout, BillingPrice).join(
         BillingPrice, BillingPrice.id == BillingCheckout.price_id).where(
-            BillingCheckout.owner_id == owner_id, BillingPrice.interval != 'once', pending_checkout_condition())
+            BillingCheckout.owner_id == owner_id, BillingPrice.billing_type == 'recurring', pending_checkout_condition())
     if price_id is not None:
         query = query.where(BillingCheckout.price_id == price_id)
     return db.execute(query.order_by(BillingCheckout.created_at, BillingCheckout.id).limit(1)).first()
@@ -85,12 +86,21 @@ def billing_status(db, user, price_id=None):
         pending = {'id': row.id, 'provider': row.provider, 'price': quote,
             'idempotency_key': row.idempotency_key, 'error': row.error_code}
     providers = [provider_config_json(p) for p in ('stripe', 'creem') if provider_enabled(p)]
+    prepaid_terms = select(BillingTerm).where(BillingTerm.owner_id == user.id,
+        BillingTerm.billing_order_id.is_not(None), BillingTerm.revoked_at.is_(None), BillingTerm.ends_at > now())
+    prepaid = db.scalar(prepaid_terms.order_by(BillingTerm.starts_at, BillingTerm.id).limit(1))
+    prepaid_json = None
+    if prepaid:
+        paid_through = db.scalar(prepaid_terms.with_only_columns(func.max(BillingTerm.ends_at)))
+        prepaid_json = {'price': price_json(db, db.get(BillingPrice, prepaid.price_id)),
+            'starts_at': iso(prepaid.starts_at), 'ends_at': iso(prepaid.ends_at), 'paid_through': iso(paid_through)}
     return {'enabled': bool(providers), 'providers': providers,
         'provider': sub.provider if sub else None,
         'environment': providers[0]['environment'] if providers else 'test',
         'offers': offers(db), 'quota_offers': offers(db, interval='once'),
         'subscription_checkout': pending,
         'trial_eligible': not account or account.trial_used_at is None,
+        'prepaid_membership': prepaid_json,
         'gift': gift_json(user),
         'subscription': None if not sub else {'provider': sub.provider, 'status': sub.status, **renewal_json(sub),
             'price': price_json(db, db.get(BillingPrice, sub.price_id)), 'next_billed_at': iso(sub.next_billed_at),
@@ -122,7 +132,7 @@ def bind_session(checkout_id, session):
         if row.provider == 'stripe':
             stripe.environment(session)
             price = db.get(BillingPrice, row.price_id)
-            require(session.get('mode') == ('payment' if price.interval == 'once' else 'subscription') and stripe.intent_id(session) == row.id
+            require(session.get('mode') == ('payment' if price.billing_type == 'onetime' else 'subscription') and stripe.intent_id(session) == row.id
                 and session.get('client_reference_id') == row.id)
             status = {'open': 'open', 'expired': 'expired', 'complete': 'completed'}.get(session.get('status'), 'unknown')
             customer = session.get('customer')
@@ -200,12 +210,12 @@ def recover_checkout(checkout_id):
             session = creem.call('POST', '/checkouts', body=params)
             created_session = session
         else:
-            params = {'mode': 'payment' if price.interval == 'once' else 'subscription', 'client_reference_id': row.id, 'metadata': metadata,
+            params = {'mode': 'payment' if price.billing_type == 'onetime' else 'subscription', 'client_reference_id': row.id, 'metadata': metadata,
                 'line_items': [{'price': binding.provider_price_id, 'quantity': 1}], 'payment_method_types': ['card'],
                 'currency': price.currency, 'adaptive_pricing': {'enabled': False},
                 'success_url': urljoin(row.return_url, '/payment/success/'), 'cancel_url': row.return_url,
                 'expires_at': int(row.expires_at.replace(tzinfo=timezone.utc).timestamp())}
-            if price.interval == 'once':
+            if price.billing_type == 'onetime':
                 params['payment_intent_data'] = {'metadata': metadata, 'capture_method': 'automatic'}
                 if not row.customer_id:
                     params['customer_creation'] = 'always'
@@ -230,7 +240,7 @@ def recover_checkout(checkout_id):
                     # A competing preflight can have ended this untouched intent.
                     # Never dispatch it after another caller was allowed to restart.
                     require(current.status not in ('failed', 'expired'),
-                        'BILLING_PURCHASE_RETRY_ALLOWED' if price.interval == 'once' else 'BILLING_CHECKOUT_EXPIRED')
+                        'BILLING_PURCHASE_RETRY_ALLOWED' if price.billing_type == 'onetime' else 'BILLING_CHECKOUT_EXPIRED')
                     if current.session_id is None:
                         current.status, current.last_checked_at = 'unknown', now()
                     db.commit()
@@ -282,15 +292,15 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
         require(price is not None, 'BILLING_PLAN_UNAVAILABLE')
         require(idempotency_key is None or 1 <= len(idempotency_key) <= 128 and idempotency_key.isascii(),
             'BILLING_IDEMPOTENCY_KEY_INVALID')
-        require(price.interval != 'once' or idempotency_key, 'BILLING_IDEMPOTENCY_KEY_REQUIRED')
+        require(price.billing_type != 'onetime' or idempotency_key, 'BILLING_IDEMPOTENCY_KEY_REQUIRED')
         replay = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == owner_id,
             BillingCheckout.idempotency_key == idempotency_key)) if idempotency_key else None
         if replay:
             require(replay.price_id == price_id and replay.provider == provider, 'BILLING_CHECKOUT_PRICE_CONFLICT')
             if not db.scalar(select(BillingCheckout.id).where(BillingCheckout.id == replay.id, pending_checkout_condition())):
-                if replay.status == 'completed' and price.interval == 'once':
+                if replay.status == 'completed' and price.billing_type == 'onetime':
                     return fulfilled_checkout(replay)
-                if price.interval == 'once' and replay.status in ('expired', 'failed'):
+                if price.billing_type == 'onetime' and replay.status in ('expired', 'failed'):
                     raise BillingError('BILLING_PURCHASE_RETRY_ALLOWED')
                 raise BillingError('BILLING_CHECKOUT_COMPLETED' if replay.status == 'completed' else 'BILLING_CHECKOUT_EXPIRED')
         require(provider_enabled(provider), 'BILLING_DISABLED')
@@ -299,15 +309,27 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             account = BillingAccount(owner_id=owner_id)
             db.add(account)
         customer = customer_for(db, owner_id, provider)
-        selected = subscription_checkout(db, owner_id, price_id) if price.interval != 'once' else None
-        row = replay if price.interval == 'once' else selected[0] if selected else None
+        selected = subscription_checkout(db, owner_id, price_id) if price.billing_type == 'recurring' else None
+        row = replay if price.billing_type == 'onetime' else selected[0] if selected else None
         require(not replay or row and replay.id == row.id, 'BILLING_CHECKOUT_PRICE_CONFLICT')
         if price.interval != 'once':
             active = db.scalar(select(BillingSubscription.id).where(BillingSubscription.owner_id == owner_id,
                 ongoing_subscription()).limit(1))
             require(active is None, 'BILLING_SUBSCRIPTION_EXISTS')
+            if price.billing_type == 'recurring':
+                prepaid = db.scalar(select(BillingTerm.id).where(BillingTerm.owner_id == owner_id,
+                    BillingTerm.billing_order_id.is_not(None), BillingTerm.revoked_at.is_(None),
+                    BillingTerm.ends_at > now()).limit(1))
+                require(prepaid is None, 'BILLING_PREPAID_ACTIVE')
         if row is None:
             if price.interval != 'once':
+                # Do not leave both renewable and prepaid membership links
+                # payable at once. Quota packs and same-type renewals stay independent.
+                other_mode = db.scalar(select(BillingCheckout.id).join(
+                    BillingPrice, BillingPrice.id == BillingCheckout.price_id).where(
+                        BillingCheckout.owner_id == owner_id, BillingPrice.interval != 'once',
+                        BillingPrice.billing_type != price.billing_type, pending_checkout_condition()).limit(1))
+                require(other_mode is None, 'BILLING_CHECKOUT_PENDING')
                 gift = gift_json(user)
                 require(not gift or gift['state'] == 'expired', 'BILLING_GIFT_ACTIVE')
             require(provider == default_provider(db), 'BILLING_CHANNEL_UNAVAILABLE')
@@ -320,7 +342,10 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             if price.interval == 'once':
                 require(revision.quota_pages > 0 and revision.service_plan_id and not revision.trial_days
                     and revision.trial_classic_pages == 0 and revision.monthly_classic_pages == 0, 'BILLING_PLAN_UNAVAILABLE')
-            trial = price.interval != 'once' and account.trial_used_at is None and revision.trial_days > 0
+            elif price.billing_type == 'onetime':
+                require(price.interval in ('quarter', 'year') and revision.quota_pages == 0
+                    and not revision.trial_days and revision.trial_classic_pages == 0, 'BILLING_PLAN_UNAVAILABLE')
+            trial = price.billing_type == 'recurring' and account.trial_used_at is None and revision.trial_days > 0
             if trial:
                 trial = not db.scalar(select(BillingCheckout.id).where(BillingCheckout.owner_id == owner_id,
                     BillingCheckout.trial.is_(True), pending_checkout_condition()).limit(1))
@@ -342,7 +367,7 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
         sync_session(session['id'], provider=provider)
         with session_factory()() as db:
             row = db.get(BillingCheckout, checkout_id)
-            if db.get(BillingPrice, row.price_id).interval == 'once':
+            if db.get(BillingPrice, row.price_id).billing_type == 'onetime':
                 require(not db.scalar(select(BillingCheckout.id).where(BillingCheckout.id == row.id,
                     pending_checkout_condition())), 'BILLING_PURCHASE_PROCESSING')
                 return fulfilled_checkout(row)
@@ -350,7 +375,7 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
     require(session['status'] != 'processing', 'BILLING_PURCHASE_PROCESSING')
     if session['status'] == 'expired':
         with session_factory()() as db:
-            if db.get(BillingPrice, price_id).interval == 'once':
+            if db.get(BillingPrice, price_id).billing_type == 'onetime':
                 raise BillingError('BILLING_PURCHASE_RETRY_ALLOWED')
     require(session['status'] in ('open', 'pending'), 'BILLING_CHECKOUT_EXPIRED')
     url = stripe.hosted_url(session['url']) if provider == 'stripe' else creem.hosted_url(session['checkout_url'])
@@ -371,7 +396,7 @@ def sync_owner(owner_id):
             sub.synced_at = now()
         threshold = now() - timedelta(seconds=10)
         pending = []
-        for category, limit in ((BillingPrice.interval != 'once', 1), (BillingPrice.interval == 'once', 2)):
+        for category, limit in ((BillingPrice.billing_type == 'recurring', 1), (BillingPrice.billing_type == 'onetime', 2)):
             pending.extend(db.scalars(select(BillingCheckout).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
                 .where(BillingCheckout.owner_id == owner_id, category, pending_checkout_condition(),
                     BillingCheckout.provider.in_(enabled),
@@ -379,7 +404,7 @@ def sync_owner(owner_id):
                 .order_by(func.coalesce(BillingCheckout.last_checked_at, BillingCheckout.created_at),
                     BillingCheckout.created_at, BillingCheckout.id).limit(limit)))
         purchase = db.scalar(select(BillingCheckout).join(BillingPrice, BillingPrice.id == BillingCheckout.price_id)
-            .where(BillingCheckout.owner_id == owner_id, BillingPrice.interval == 'once',
+            .where(BillingCheckout.owner_id == owner_id, BillingPrice.billing_type == 'onetime',
                 BillingCheckout.provider.in_(enabled),
                 BillingCheckout.status == 'completed', ~pending_checkout_condition())
             .order_by(BillingCheckout.created_at.desc()).limit(1))

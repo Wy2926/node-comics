@@ -6,7 +6,7 @@ const plusMonth:BillingOffer={id:'old-plus-month',name:'PLUS 示例',plan_id:'pl
 const plusAnnual:BillingOffer={...plusMonth,id:'old-plus-year',unit_amount:9999,interval:'year'};
 const month:BillingOffer={...plusMonth,id:'fixture-month',name:'Lite',plan_id:'lite',plan_revision_id:'lite-v1',unit_amount:599,monthly_classic_pages:null,hourly_image_limit:1200,trial_classic_pages:null,channels:plusMonth.channels.map(channel=>({...channel,trial_classic_pages:null}))};
 const annual:BillingOffer={...month,id:'fixture-year',unit_amount:5999,interval:'year'};
-const pack:BillingOffer={...month,id:'fixture-pack',name:'Lite 100 页',plan_id:'pages',service_plan_id:'lite',interval:'once',quota_pages:100,quota_validity_days:null,monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,channels:month.channels.map(channel=>({...channel,trial_days:0,trial_classic_pages:0}))};
+const pack:BillingOffer={...month,id:'fixture-pack',name:'Lite 100 页',plan_id:'pages',service_plan_id:'lite',interval:'once',billing_type:'onetime',quota_pages:100,quota_validity_days:null,monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,channels:month.channels.map(channel=>({...channel,trial_days:0,trial_classic_pages:0}))};
 const entitlements={plan:'free',plus_expires_at:null,image_rate_limit:{limit:10},modes:{classic:{unlimited:false,allowed:true,quota:{available:30,granted:30,reserved:0}}}};
 const parameters=new URLSearchParams(location.search);
 const scenario=parameters.get('scenario');
@@ -14,8 +14,15 @@ const pending=parameters.has('pending')||scenario==='subscription-pending';
 const subscriptionProvider='creem';
 const billing:Billing={enabled:true,providers:[{id:'stripe',label:'Stripe',environment:'test'},{id:'creem',label:'Creem',environment:'test'}],provider:null,environment:'test',trial_eligible:true,gift:null,entitlement_expires_at:null,
   subscription_checkout:pending?{id:'fixture-subscription-checkout',provider:subscriptionProvider,price:{...annual,channels:annual.channels.filter(channel=>channel.provider===subscriptionProvider)},idempotency_key:null,error:null}:null,
-  offers:publishedSubscriptions.map(offer=>({...offer,id:`fixture-${offer.plan_id}-${offer.interval}`,
-    channels:[{provider:'creem',binding_id:'creem-fixture',trial_days:0,trial_classic_pages:0}]})),subscription:null};
+  offers:publishedSubscriptions.flatMap(offer=>(['recurring','onetime'] as const).map(billing_type=>({...offer,billing_type,id:`fixture-${offer.plan_id}-${offer.interval}${billing_type==='onetime'?'-prepaid':''}`,
+    channels:[{provider:'creem' as const,binding_id:'creem-fixture',trial_days:0,trial_classic_pages:0}]}))),subscription:null};
+if(scenario==='prepaid-unavailable')billing.offers=billing.offers.filter(offer=>offer.billing_type!=='onetime');
+if(scenario==='prepaid-active'||scenario==='prepaid-queued'){
+  const price=billing.offers.find(offer=>offer.id==='fixture-plus-quarter-prepaid')!;
+  billing.prepaid_membership={price,starts_at:'2026-01-01T00:00:00Z',ends_at:'2099-01-01T00:00:00Z',paid_through:scenario==='prepaid-queued'?'2099-04-01T00:00:00Z':'2099-01-01T00:00:00Z'};
+  billing.entitlement_expires_at=billing.prepaid_membership.paid_through!;
+  Object.assign(entitlements,{plan:'plus',plus_expires_at:billing.entitlement_expires_at,subscription_quota:{available:2400,granted:2500,used:100,reserved:0,unlimited:false,next_expiry_at:null}});
+}
 const performanceCheck=parameters.has('perf');
 const fixtureStarted=performance.now();
 const observations:{accountVisibleMs:number|null;requests:{path:string;startedMs:number;finishedMs?:number}[]}={accountVisibleMs:null,requests:[]};
@@ -71,7 +78,7 @@ if(scenario?.startsWith('gift-')){
   if(scenario==='gift-resuming'&&billing.subscription)billing.subscription.renewal_state='resuming';
 }
 billing.provider=billing.subscription?.provider??null;
-let loggedIn=scenario!=='signed-out'&&scenario!=='quota-signed-out';
+let loggedIn=scenario!=='signed-out'&&scenario!=='quota-signed-out'&&scenario!=='prepaid-signed-out';
 let accountVersion=1;
 const authChanges=new EventTarget();
 export const session=async()=>loggedIn?{}:null;
@@ -102,7 +109,7 @@ export async function api<T>(path:string,_method?:string,body?:unknown,headers?:
   if(path==='/v1/billing/checkouts'){
     const message=`已验证报价：${(body as {price_id:string}).price_id} · ${(body as {provider:string}).provider}${headers?.['Idempotency-Key']?' · '+headers['Idempotency-Key']:''}`;
     const output=document.getElementById('checkout-observation');if(output)output.textContent=message+'（模拟响应丢失，不创建真实订单）';
-    if(scenario==='quota-expired'){
+    if(scenario==='quota-expired'||scenario==='prepaid-expired'){
       const key=headers?.['Idempotency-Key'];
       endedKey??=key;
       if(endedKey===key)throw new ApiError('未付款会话已结束',409,'BILLING_PURCHASE_RETRY_ALLOWED');

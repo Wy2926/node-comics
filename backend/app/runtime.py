@@ -5,7 +5,7 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'comic_title_length_0019'})
+SUPPORTED_SCHEMAS = frozenset({'prepaid_membership_0020'})
 
 
 def check_schema(connection):

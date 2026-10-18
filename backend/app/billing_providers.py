@@ -44,12 +44,13 @@ def remote_id(value):
 def stripe_quote(binding, price):
     return SimpleNamespace(environment=binding.environment, stripe_product_id=binding.product_id,
         stripe_price_id=binding.provider_price_id, currency=price.currency,
-        unit_amount=price.unit_amount, interval=price.interval)
+        unit_amount=price.unit_amount, interval=price.interval, billing_type=price.billing_type)
 
 
 def approved_binding(binding, price, revision):
     require(provider_enabled(binding.provider), 'BILLING_DISABLED')
     require(binding.environment == provider_environment(binding.provider) == price.environment, 'BILLING_ENVIRONMENT_MISMATCH')
+    require(price.billing_type != 'onetime' or not revision.trial_days, 'BILLING_PRICE_TRIAL_INVALID')
     if binding.provider == 'stripe':
         from . import stripe_client as stripe
         require(binding.provider_price_id and not binding.trial_product_id, 'STRIPE_PRICE_UNBOUND')

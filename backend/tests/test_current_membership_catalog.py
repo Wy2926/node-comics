@@ -22,6 +22,8 @@ def test_current_catalog_is_finite_no_trial_and_packs_never_expire(client):
         assert {(p.id, p.unit_amount) for p in db.scalars(select(BillingPrice))} == {
             ('plus-quarter-v1', 666), ('plus-year-v1', 2399),
             ('pro-quarter-v1', 999), ('pro-year-v1', 3599),
+            ('plus-quarter-prepaid-v1', 666), ('plus-year-prepaid-v1', 2399),
+            ('pro-quarter-prepaid-v1', 999), ('pro-year-prepaid-v1', 3599),
             ('pages-3500-once-v1', 599), ('pages-7000-once-v1', 999)}
         for plan, pages in [('plus', 2500), ('pro', 4000)]:
             revision = db.get(BillingPlanRevision, plan + '-v1')
@@ -30,7 +32,9 @@ def test_current_catalog_is_finite_no_trial_and_packs_never_expire(client):
         for pages in (3500, 7000):
             revision = db.get(BillingPlanRevision, f'pages-{pages}-v1')
             assert (revision.quota_pages, revision.quota_validity_days, revision.service_plan_id) == (pages, None, 'plus')
-        assert all(p.status == 'draft' for p in db.scalars(select(BillingPrice)))
+        for price in db.scalars(select(BillingPrice)):
+            assert price.status == 'draft'
+            assert price.billing_type == ('onetime' if price.interval == 'once' or '-prepaid-' in price.id else 'recurring')
 
 
 @pytest.mark.parametrize('plan,pages', [('plus', 2500), ('pro', 4000)])
@@ -147,7 +151,7 @@ def test_stripe_quarter_rejects_wrong_month_count(client, monkeypatch, count):
     from app.config import settings
     monkeypatch.setenv('STRIPE_ENVIRONMENT', 'test')
     settings.cache_clear()
-    quote = SimpleNamespace(interval='quarter', environment='test', stripe_price_id='price_fixture',
+    quote = SimpleNamespace(interval='quarter', billing_type='recurring', environment='test', stripe_price_id='price_fixture',
         stripe_product_id='prod_fixture', currency='usd', unit_amount=666)
     with pytest.raises(BillingError):
         approved_price({'livemode': False, 'id': 'price_fixture', 'product': 'prod_fixture',

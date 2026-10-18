@@ -34,6 +34,8 @@ from app.billing_models import BillingPlan, BillingPlanRevision, BillingPrice, B
 from app.entitlement_models import QuotaPeriod
 from app.billing_catalog import initialize_catalog
 from app.billing_providers import BillingError
+from app.billing_grants import grant_term
+from app.entitlements import month_boundary
 from app.db import session_factory
 from app.migrate import migrate
 from app.models import User, now
@@ -50,8 +52,10 @@ def synthetic_stripe(resource, action, *args, **kwargs):
         price = db.get(BillingPrice, binding.price_id)
         return {'id': binding.provider_price_id, 'product': binding.product_id, 'livemode': False,
             'active': True, 'unit_amount': price.unit_amount, 'currency': price.currency,
-            'type': 'one_time' if price.interval == 'once' else 'recurring',
-            'recurring': None if price.interval == 'once' else {'interval': price.interval, 'interval_count': 1, 'usage_type': 'licensed'}}
+            'type': 'one_time' if price.billing_type == 'onetime' else 'recurring',
+            'recurring': None if price.billing_type == 'onetime' else {
+                'interval': 'month' if price.interval == 'quarter' else price.interval,
+                'interval_count': 3 if price.interval == 'quarter' else 1, 'usage_type': 'licensed'}}
 
 
 def synthetic_creem(method, path, **kwargs):
@@ -65,8 +69,9 @@ def synthetic_creem(method, path, **kwargs):
             raise BillingError('FIXTURE_PRODUCT_UNAVAILABLE')
         price = db.get(BillingPrice, binding.price_id)
         return {'id': product_id, 'mode': 'test', 'status': 'active', 'price': price.unit_amount,
-            'currency': price.currency, 'billing_type': 'onetime' if price.interval == 'once' else 'recurring',
-            'billing_period': {'month': 'every-month', 'year': 'every-year', 'once': 'once'}[price.interval],
+            'currency': price.currency, 'billing_type': price.billing_type,
+            'billing_period': 'once' if price.billing_type == 'onetime' else {
+                'month': 'every-month', 'quarter': 'every-three-months', 'year': 'every-year'}[price.interval],
             'trial_period_days': 7 if product_id == binding.trial_product_id else 0}
 
 
@@ -107,8 +112,14 @@ with session_factory()() as db:
         for provider in ('stripe', 'creem'):
             db.add(BillingPriceBinding(id=f'fixture-{provider}-{interval}', price_id=price.id,
                 provider=provider, environment='test', product_id=f'prod_{provider}_{interval}',
-                trial_product_id=f'prod_creem_{interval}_trial' if provider == 'creem' else None,
+                trial_product_id=None,
                 provider_price_id=f'price_{interval}' if provider == 'stripe' else None, status='active'))
+        prepaid = db.get(BillingPrice, f'plus-{interval}-prepaid-v1')
+        prepaid.status = 'active'
+        for provider in ('stripe', 'creem'):
+            db.add(BillingPriceBinding(id=f'fixture-{provider}-{interval}-prepaid', price_id=prepaid.id,
+                provider=provider, environment='test', product_id=f'prod_{provider}_{interval}_prepaid',
+                provider_price_id=f'price_{interval}_prepaid' if provider == 'stripe' else None, status='active'))
     db.flush()
     at = now()
     states = ['paid', 'trialing', 'pending', 'failed', 'refunded', 'unknown', 'canceled', 'expired']
@@ -180,6 +191,13 @@ with session_factory()() as db:
         billing_order_id='fixture-purchase-order', kind='classic_purchase', mode='classic',
         source='purchase', source_key='purchase:fixture-purchase-order:classic', starts_at=at,
         ends_at=None, granted=500, used=17, reserved=2))
+    db.add(BillingOrder(id='fixture-prepaid-order', owner_id='billing-demo-user', provider='creem',
+        environment='test', price_id='plus-quarter-prepaid-v1', binding_id='fixture-creem-quarter-prepaid',
+        external_id='ord_fixture_prepaid', kind='initial', status='partially_refunded', currency='usd',
+        subtotal=666, total=666, refunded_total=66, paid_at=at, created_at=at))
+    db.flush()
+    grant_term(db, db.get(User, 'billing-demo-user'), None, db.get(BillingPrice, 'plus-quarter-prepaid-v1'),
+        'paid', at, month_boundary(at, 3, 'UTC'), billing_order_id='fixture-prepaid-order')
     db.commit()
 
 port = int(os.environ.get('BILLING_FIXTURE_PORT', '18091'))

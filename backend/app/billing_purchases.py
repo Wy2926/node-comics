@@ -1,16 +1,16 @@
-"""One-off page purchases. Payment receipts, quota and audit commit together."""
+"""One-off quota or membership purchases; payment, grants and audit commit together."""
 from datetime import timedelta
-from sqlalchemy import literal_column, select
+from sqlalchemy import func, literal_column, select
 from . import stripe_client as stripe, creem_client as creem
-from .billing_models import BillingCheckout, BillingEvent, BillingOrder, BillingPlanRevision, BillingPrice, BillingPriceBinding
+from .billing_models import BillingCheckout, BillingEvent, BillingOrder, BillingPlanRevision, BillingPrice, BillingPriceBinding, BillingTerm
 from .billing_orders import checkout_order, transition
 from .billing_providers import require, provider_environment, stripe_quote
-from .billing_grants import timestamp
+from .billing_grants import grant_term, timestamp
 from .billing_checkout import bind_checkout_customer
 from .db import session_factory
 from .entitlement_models import QuotaPeriod
-from .entitlements import locked_user
-from .models import Ledger, now
+from .entitlements import locked_user, month_boundary
+from .models import Ledger, User, now
 from .providers import digest
 
 REVERSED = ('refunded', 'disputed')
@@ -18,8 +18,14 @@ REVERSED = ('refunded', 'disputed')
 
 def revoke_purchase(db, order):
     # Preserve the original amount, reservations and dates for in-flight settlement.
+    at = now()
+    term = db.scalar(select(BillingTerm).where(BillingTerm.billing_order_id == order.id))
+    if term:
+        term.revoked_at = term.revoked_at or at
+    # Subscription-style monthly buckets are revoked through their term, exactly
+    # like recurring memberships; their historical usage and reservations remain.
     for bucket in db.scalars(select(QuotaPeriod).where(QuotaPeriod.billing_order_id == order.id)):
-        bucket.revoked_at = bucket.revoked_at or now()
+        bucket.revoked_at = bucket.revoked_at or at
 
 
 def purchase_order(db, row, external_id, total, state, paid_at, event_id=None):
@@ -48,14 +54,34 @@ def purchase_order(db, row, external_id, total, state, paid_at, event_id=None):
 def grant_purchase(db, row, order, paid_at):
     price = db.get(BillingPrice, row.price_id)
     revision = db.get(BillingPlanRevision, price.plan_revision_id)
-    require(price.interval == 'once' and not row.trial and revision.quota_pages > 0
-        and revision.service_plan_id and not revision.trial_days and not revision.trial_classic_pages
-        and revision.monthly_classic_pages == 0, 'BILLING_PURCHASE_INVALID')
-    key = 'purchase:' + order.id + ':classic'
-    bucket = db.get(QuotaPeriod, digest([row.owner_id, key]))
+    require(price.billing_type == 'onetime' and not row.trial
+        and not revision.trial_days and not revision.trial_classic_pages, 'BILLING_PURCHASE_INVALID')
     if order.status in REVERSED:
         revoke_purchase(db, order)
         return
+    if price.interval != 'once':
+        require(price.interval in ('quarter', 'year') and revision.quota_pages == 0, 'BILLING_PURCHASE_INVALID')
+        term = db.scalar(select(BillingTerm).where(BillingTerm.billing_order_id == order.id))
+        if term:
+            require(term.owner_id == row.owner_id and term.price_id == price.id, 'BILLING_PURCHASE_CONFLICT')
+            return
+        require(order.status in ('paid', 'partially_refunded'), 'BILLING_PURCHASE_UNPAID')
+        require(paid_at is not None, 'BILLING_PAYMENT_TIME_PENDING')
+        user = db.get(User, row.owner_id)
+        # The owning account is locked by the payment verifier. Independent
+        # purchases extend already granted time instead of overlapping it.
+        end = db.scalar(select(func.max(BillingTerm.ends_at)).where(BillingTerm.owner_id == row.owner_id,
+            BillingTerm.revoked_at.is_(None), BillingTerm.ends_at > paid_at))
+        start = max(paid_at, end or paid_at)
+        if user.plus_expires_at and not user.plus_pending:
+            start = max(start, user.plus_expires_at)
+        grant_term(db, user, None, price, 'paid', start,
+            month_boundary(start, 3 if price.interval == 'quarter' else 12, 'UTC'), billing_order_id=order.id)
+        return
+    require(revision.quota_pages > 0 and revision.service_plan_id
+        and revision.monthly_classic_pages == 0, 'BILLING_PURCHASE_INVALID')
+    key = 'purchase:' + order.id + ':classic'
+    bucket = db.get(QuotaPeriod, digest([row.owner_id, key]))
     if bucket:
         require(bucket.billing_order_id == order.id and bucket.owner_id == row.owner_id,
             'BILLING_PURCHASE_CONFLICT')
@@ -80,7 +106,7 @@ def sync_stripe_purchase(checkout_id):
         locked_user(db, row.owner_id)
         db.refresh(row)
         price, binding = db.get(BillingPrice, row.price_id), db.get(BillingPriceBinding, row.binding_id)
-        require(price.interval == 'once' and row.environment == provider_environment('stripe'))
+        require(price.billing_type == 'onetime' and row.environment == provider_environment('stripe'))
         session = stripe.call('checkout.sessions', 'retrieve', row.session_id)
         stripe.environment(session)
         require(session.get('id') == row.session_id and session.get('mode') == 'payment'
@@ -156,7 +182,6 @@ def apply_creem_reversals(db, order):
         if event.event_type == 'dispute.created':
             transition(db, order, 'disputed', 'purchase_reversal', event.id)
     db.flush()
-    from sqlalchemy import func
     from .billing_models import BillingRefund
     total = db.scalar(select(func.coalesce(func.sum(BillingRefund.amount), 0)).where(
         BillingRefund.order_id == order.id, BillingRefund.status == 'succeeded', BillingRefund.currency == order.currency))
@@ -172,7 +197,7 @@ def sync_creem_purchase(checkout_id):
         locked_user(db, row.owner_id)
         db.refresh(row)
         price, binding = db.get(BillingPrice, row.price_id), db.get(BillingPriceBinding, row.binding_id)
-        require(price.interval == 'once' and row.environment == provider_environment('creem'))
+        require(price.billing_type == 'onetime' and row.environment == provider_environment('creem'))
         session = creem.call('GET', '/checkouts', params={'checkout_id': row.session_id})
         creem.environment(session)
         require(session.get('id') == row.session_id and creem.intent_id(session) == row.id
@@ -208,7 +233,7 @@ def sync_creem_purchase(checkout_id):
             BillingEvent.environment == row.environment, BillingEvent.resource_id == row.session_id,
             BillingEvent.event_type == 'checkout.completed').order_by(BillingEvent.occurred_at).limit(1))
         revision = db.get(BillingPlanRevision, price.plan_revision_id)
-        waiting = paid_at is None and revision.quota_validity_days is not None
+        waiting = paid_at is None and (price.interval != 'once' or revision.quota_validity_days is not None)
         order = purchase_order(db, row, transaction_id, total, 'processing' if waiting and state == 'paid' else state, paid_at)
         refunded = value.get('refunded_amount')
         require(refunded is None or type(refunded) is int and 0 <= refunded <= total, 'CREEM_TRANSACTION_INVALID')

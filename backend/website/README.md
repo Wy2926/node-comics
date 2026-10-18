@@ -8,7 +8,7 @@ Astro + React + TypeScript。公开页面输出静态 HTML，翻译工作台和�
 
 翻译页不拦截输入框中的文字粘贴。“清理图片缓存”确认后一次性移除当前图片历史列表的原图、送译副本、译图和记录，不影响其他账户、登录或整份文件任务；图片导入、翻译同步和下载期间禁用。格式、额度和保存方式折叠展示；公共工作台文案覆盖 17 语，整份文件详细状态沿用简中／繁中及显式英文回退，保留页面 RTL 布局。语言菜单支持内部 Tab 导航，焦点离开、点击外部或 Esc 时收起。首页顶部下载按钮不可见、不可聚焦，但保留与内页相同的布局空间，切页时导航不移位；窄桌面精简品牌与账户区，1280px 及以下使用折叠菜单。
 
-订阅与一次性额度包都只在定价页购买，插件和账户页只保留权益、订阅管理与定价入口。`tests/checkout-fixture.html` 使用账户隔离夹具（Vite 配置 `tests/account-fixture.config.ts`，端口 5193）检查购买、原请求恢复与模拟登录，不创建真实订单。额度规则见[会员与额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)，独立额度订单、订阅结账与恢复规则统一维护在[支付规范](../../docs/STRIPE_BILLING.md)。
+期限会员、自动续订与一次性额度包都只在定价页购买，插件和账户页只保留权益、订阅管理与定价入口。简体中文默认显示季卡／年卡的一次性支付报价；精确报价链接和登录返回保留原付款方式。`tests/checkout-fixture.html` 使用账户隔离夹具（Vite 配置 `tests/account-fixture.config.ts`，端口 5193）检查购买、原请求恢复与模拟登录，不创建真实订单；`scenario=prepaid-active`／`prepaid-queued`／`prepaid-unavailable`／`prepaid-signed-out`／`prepaid-expired` 覆盖期限会员、续购、缺价与失败重购。额度规则见[会员与额度](../../docs/MEMBERSHIP_AND_QUOTAS.md)，独立购买订单、订阅结账与恢复规则统一维护在[支付规范](../../docs/STRIPE_BILLING.md)。
 
 需要 Node.js 22.12+，在本目录执行：
 

@@ -6,7 +6,7 @@ from .billing_models import BillingInvoice, BillingPlanRevision, BillingPrice, B
 from .entitlement_models import QuotaPeriod
 from .entitlements import MONTHLY, month_boundary
 from .providers import digest
-from .billing_providers import resource_key, remote_id
+from .billing_providers import require, resource_key, remote_id
 from .billing_orders import payment_order
 
 
@@ -20,34 +20,38 @@ def timestamp(value):
         raise stripe.BillingError('STRIPE_INVALID_TIMESTAMP') from None
 
 
-def grant_term(db, user, sub, price, kind, start, end, invoice_id=None):
-    stripe.require(start and end and start < end, 'STRIPE_PERIOD_MISSING')
-    term_id = digest([sub.id, kind, start.isoformat()])
+def grant_term(db, user, sub, price, kind, start, end, invoice_id=None, *, billing_order_id=None):
+    require(start and end and start < end, 'BILLING_PERIOD_MISSING')
+    require((sub is not None) != (billing_order_id is not None), 'BILLING_TERM_SOURCE_INVALID')
+    term_id = digest(['purchase-term', billing_order_id] if billing_order_id else [sub.id, kind, start.isoformat()])
     existing = db.get(BillingTerm, term_id)
     if existing:
-        stripe.require(existing.owner_id == user.id and existing.price_id == price.id
-            and existing.ends_at == end, 'STRIPE_TERM_CONFLICT')
-        return
+        require(existing.owner_id == user.id and existing.price_id == price.id
+            and existing.starts_at == start and existing.ends_at == end
+            and existing.billing_order_id == billing_order_id, 'BILLING_TERM_CONFLICT')
+        return existing
     revision = db.get(BillingPlanRevision, price.plan_revision_id)
-    db.add(BillingTerm(id=term_id, owner_id=user.id, subscription_id=sub.id, price_id=price.id,
-        invoice_id=invoice_id, kind=kind, starts_at=start, ends_at=end))
+    term = BillingTerm(id=term_id, owner_id=user.id, subscription_id=sub.id if sub else None, price_id=price.id,
+        billing_order_id=billing_order_id, invoice_id=invoice_id, kind=kind, starts_at=start, ends_at=end)
+    db.add(term)
     db.flush()
     count = {'month': 1, 'quarter': 3, 'year': 12}[price.interval] if kind == 'paid' else 1
     pages = revision.trial_classic_pages if kind == 'trial' else revision.monthly_classic_pages
     if pages is None or pages == 0:
-        return  # Unlimited access and zero-page terms do not need a quota bucket.
+        return term  # Unlimited access and zero-page terms do not need a quota bucket.
     # Compute every boundary from the original anchor: Jan 31 -> Feb 28 -> Mar 31.
     # Future buckets exist durably but cannot be spent before their starts_at.
     for index in range(count):
         period_start = month_boundary(start, index, 'UTC')
         period_end = end if index == count-1 else month_boundary(start, index+1, 'UTC')
-        stripe.require(period_start < period_end <= end, 'STRIPE_PERIOD_MISSING')
+        require(period_start < period_end <= end, 'BILLING_PERIOD_MISSING')
         key = f'term:{term_id}:classic:{index}'
         db.add(QuotaPeriod(id=digest([user.id, key]), owner_id=user.id, billing_term_id=term_id,
             kind=MONTHLY, mode='classic', source='subscription', source_key=key,
             starts_at=period_start, ends_at=period_end, granted=pages, used=0, reserved=0,
             grants_access=False, note=f'{revision.name} · ' + ('试用' if kind == 'trial' else f'月额度 {index+1}/{count}')))
     db.flush()
+    return term
 
 
 def invoice_subscription(invoice):

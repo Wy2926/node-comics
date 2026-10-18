@@ -31,8 +31,8 @@ class ReconcileRequest(RequestBody):
 
 def order_json(order, owner, price, revision):
     return {**{key: getattr(order, key) for key in ORDER_FIELDS},
-        'owner_name': owner.name, 'product_name': revision.name, 'interval': price.interval,
-        'quota_review_required': price.interval == 'once' and order.status == 'partially_refunded'}
+        'owner_name': owner.name, 'product_name': revision.name, 'interval': price.interval, 'billing_type': price.billing_type,
+        'quota_review_required': price.billing_type == 'onetime' and order.status == 'partially_refunded'}
 
 
 def order_query():
@@ -116,7 +116,9 @@ def order_detail(order_id: str, db: Session = Depends(get_db)):
     complete = (all(item.amount is not None and item.currency == order.currency and item.status != 'unknown' for item in refunds)
         and order.refunded_total is not None and order.refunded_total == known_total)
     purchase_quota = db.scalar(select(QuotaPeriod).where(QuotaPeriod.billing_order_id == order.id))
+    membership_term = db.scalar(select(BillingTerm).where(BillingTerm.billing_order_id == order.id))
     return {'order': order_json(order, owner, price, revision), 'price': price_json(db, price),
+        'membership_term': fields(membership_term, ('id', 'kind', 'starts_at', 'ends_at', 'revoked_at')) if membership_term else None,
         'purchase_quota': fields(purchase_quota, ('id', 'kind', 'starts_at', 'ends_at', 'granted', 'used',
             'reserved', 'revoked_at')) if purchase_quota else None,
         'checkout': {key: getattr(checkout, key) for key in ('id', 'status', 'session_id', 'trial',
@@ -184,7 +186,7 @@ def reconcile_order(order_id: str, body: ReconcileRequest, db: Session = Depends
         db.refresh(order)
         if order.provider == 'stripe' and order.external_id:
             from .stripe_refunds import sync_invoice_reversals, sync_purchase_reversals
-            if db.get(BillingPrice, order.price_id).interval == 'once':
+            if db.get(BillingPrice, order.price_id).billing_type == 'onetime':
                 sync_purchase_reversals(order.external_id)
             else:
                 sync_invoice_reversals(order.external_id)

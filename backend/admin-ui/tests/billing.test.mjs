@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/billing.ts', import.meta.url), 'utf8');
 const {outputText} = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022}});
-const {minorAmount, priceAmount, money, billingStatus, billingDate, benefitsSummary, quotaValidity, intervalName, orderKind, pageAllowance} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const {minorAmount, priceAmount, money, billingStatus, billingDate, benefitsSummary, quotaValidity, intervalName, billingTypeName, orderKind, pageAllowance} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
 
 test('blank monthly or trial allowance means unlimited, while explicit zero grants no pages', () => {
   assert.equal(pageAllowance(''), null);
@@ -56,4 +56,17 @@ test('purchased pages never display unlimited membership, monthly quotas or rene
   assert.equal(intervalName('once'), '一次性购买');
   assert.equal(orderKind('initial', 'once'), '额度购买');
   assert.match(benefitsSummary({monthly_classic_pages: 300}), /300/);
+});
+
+test('prepaid membership keeps monthly benefits and clearly distinguishes renewal', () => {
+  assert.equal(intervalName('quarter', 'onetime'), '季卡');
+  assert.equal(intervalName('year', 'onetime'), '年卡');
+  assert.equal(intervalName('quarter', 'recurring'), '季付');
+  assert.equal(intervalName('year', 'recurring'), '年付');
+  assert.equal(intervalName('once', 'onetime'), '一次性购买');
+  assert.equal(orderKind('initial', 'quarter', 'onetime'), '会员卡购买');
+  assert.equal(orderKind('initial', 'once', 'onetime'), '额度购买');
+  assert.equal(billingTypeName('onetime'), '一次付清，不自动续订');
+  assert.equal(billingTypeName('recurring'), '自动续订');
+  assert.equal(benefitsSummary({monthly_classic_pages: 2500, quota_pages: 0}), '每月 2500 页常规翻译');
 });

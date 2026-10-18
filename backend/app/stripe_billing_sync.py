@@ -43,6 +43,7 @@ def sync_subscription(subscription_id, invoice_id=None):
         item = items['data'][0]
         stripe.require(item.get('quantity') == 1, 'STRIPE_PLAN_MISMATCH')
         price = db.get(BillingPrice, row.price_id)
+        stripe.require(price.billing_type == 'recurring', 'STRIPE_PLAN_MISMATCH')
         binding = db.get(BillingPriceBinding, row.binding_id)
         stripe.approved_price(item.get('price') or {}, stripe_quote(binding, price))
         revision = db.get(BillingPlanRevision, price.plan_revision_id)

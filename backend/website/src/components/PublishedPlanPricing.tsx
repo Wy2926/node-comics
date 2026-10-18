@@ -1,5 +1,6 @@
 import {publishedSubscriptions} from '../data/published-plans';
-import {amountParts,annualSavings,billingCopy,billingBenefitCopy,renewalCopy,type BillingOffer} from '../lib/billing';
+import {amountParts,annualSavings,billingCopy,billingBenefitCopy,renewalCopy,type BillingOffer,type BillingType} from '../lib/billing';
+import {prepaidMembershipCopy} from '../i18n/prepaid-membership';
 import type {BillingInterval} from '../lib/billing-cycle';
 import {pricingCopy,publishedPricingCopy} from '../lib/pricing';
 import {quarterlyCopy} from '../i18n/billing-cadence';
@@ -45,11 +46,11 @@ export default function PublishedPlanPricing({locale,interval='quarter'}:{locale
   return <PlanPrice locale={locale} interval={interval}/>;
 }
 
-export function PublishedPurchaseAvailability({locale,state,name='PLUS',interval='quarter'}:{locale:string;state:PurchaseAvailability;name?:string;interval?:BillingInterval}){
-  const published=publishedPricingCopy(locale);
+export function PublishedPurchaseAvailability({locale,state,name='PLUS',interval='quarter',billingType='recurring'}:{locale:string;state:PurchaseAvailability;name?:string;interval?:BillingInterval;billingType?:BillingType}){
+  const published=publishedPricingCopy(locale),oneTime=billingType==='onetime';
   return <div className="billing-availability" data-state={state}>
-    <button className="button" type="button" disabled>{billingBenefitCopy(locale).subscribe(name)}</button>
+    <button className="button" type="button" disabled>{oneTime?prepaidMembershipCopy(locale).buy.replace('{0}',name):billingBenefitCopy(locale).subscribe(name)}</button>
     <p className="billing-status" role={state==='error'?'alert':'status'}>{published[state]}</p>
-    <p className="trial-note">{renewalCopy({interval},locale)} {pricingCopy(locale).cancel} {published.tax}</p>
+    <p className="trial-note">{renewalCopy({interval,billing_type:billingType},locale)} {!oneTime&&pricingCopy(locale).cancel} {published.tax}</p>
   </div>;
 }

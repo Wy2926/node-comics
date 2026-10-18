@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, finishLogin, sessionIdentity, signIn, signOut, loginReturnPath, subscribeAuth, type AuthIdentity } from '../lib/auth';
 import { checkoutUrl } from '../lib/auth-config';
-import {billingCopy,billingBenefitCopy,offerLabel,offerBenefits,providerLabel,manageLabel,hasManagedSubscription,subscriptionStatusLabel,type Billing,type BillingProvider,type MembershipGift,type PurchaseQuota} from '../lib/billing';
+import {billingCopy,billingBenefitCopy,offerLabel,offerBenefits,providerLabel,manageLabel,hasManagedSubscription,hasPrepaidMembership,subscriptionStatusLabel,type Billing,type BillingProvider,type MembershipGift,type PurchaseQuota} from '../lib/billing';
 import {quotaPurchaseCopy} from '../i18n/quota-purchase';
 import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
+import {prepaidMembershipCopy} from '../i18n/prepaid-membership';
 interface Entitlements {plan:string;free_quota?:PurchaseQuota;subscription_quota?:PurchaseQuota&{unlimited:boolean};service_plan?:string;purchase_quota?:PurchaseQuota|null;plus_expires_at:string|null;gift?:MembershipGift|null;hourly_image_rate_limit?:{window_seconds:number;limit:number}|null}
 interface Me { user: { id: string; name: string }; entitlements: Entitlements }
 interface SyncedAccount {billing:Billing;entitlements:Entitlements}
@@ -22,6 +23,8 @@ export default function Account({ callback = false, locale = 'zh-CN', copy = {},
   const [confirmCancel,setConfirmCancel]=useState(false);
   const gift=billing?billing.gift:me?.entitlements.gift;
   const subscription=billing?.subscription;
+  const prepaid=billing&&hasPrepaidMembership(billing)?billing.prepaid_membership:null;
+  const prepaidCopy=prepaidMembershipCopy(locale);
   const benefitText=billingBenefitCopy(locale);
   const quotaText=quotaPurchaseCopy(locale),quotaCopy=subscriptionQuotaCopy(locale);
   const epoch = useRef(0);
@@ -119,7 +122,7 @@ export default function Account({ callback = false, locale = 'zh-CN', copy = {},
         {me.entitlements.plan!=='free'&&me.entitlements.plus_expires_at&&<p className="account-expiry">{t("会员有效期至")}{date(me.entitlements.plus_expires_at,locale)}{t("（北京时间）")}</p>}
         {me.entitlements.hourly_image_rate_limit&&<p className="account-rate-limit">{benefitText.hourly(me.entitlements.hourly_image_rate_limit.limit)}</p>}
         {me.entitlements.service_plan&&<p>{quotaText.currentService.replace('{0}',me.entitlements.service_plan==='free'?t('普通账户'):me.entitlements.service_plan)}</p>}
-        {([['free_quota',quotaCopy.free],['subscription_quota',quotaCopy.subscription]] as const).map(([key,title])=>{const balance=me.entitlements[key];return balance&&<div className="account-gift" key={key}><strong>{title}</strong><p>{'unlimited' in balance&&balance.unlimited?billingCopy(locale).classic:quotaText.pages.replace('{0}',balance.available.toLocaleString(locale))}</p></div>;})}
+        {([['free_quota',quotaCopy.free],['subscription_quota',prepaid?prepaidCopy.allowance:quotaCopy.subscription]] as const).map(([key,title])=>{const balance=me.entitlements[key];return balance&&<div className="account-gift" key={key}><strong>{title}</strong><p>{'unlimited' in balance&&balance.unlimited?billingCopy(locale).classic:quotaText.pages.replace('{0}',balance.available.toLocaleString(locale))}</p></div>;})}
         <p className="muted">{quotaCopy.rule}</p>
         {me.entitlements.purchase_quota&&<div className="account-gift"><strong>{quotaText.title}</strong><p>{quotaText.remaining.replace('{0}',me.entitlements.purchase_quota.available.toLocaleString(locale)).replace('{1}',me.entitlements.purchase_quota.reserved.toLocaleString(locale))}</p>{me.entitlements.purchase_quota.next_expiry_at?<p>{quotaText.nextExpiry.replace('{0}',date(me.entitlements.purchase_quota.next_expiry_at,locale))}{t('（北京时间）')}</p>:me.entitlements.purchase_quota.available>0&&<p>{quotaText.noExpiry}</p>}<p>{quotaText.subscription}</p></div>}
         {gift&&gift.state!=='expired'&&<div className="account-gift"><strong>{t('赠送 PLUS {0} 天').replace('{0}',String(gift.days))}</strong>{gift.state==='pending'?<p role="status">{t('赠送安排处理中，请刷新查看。')}</p>:<>{gift.starts_at&&<p>{t('赠送生效：{0}').replace('{0}',date(gift.starts_at,locale))}{t('（北京时间）')}</p>}{gift.ends_at&&<p>{t('赠送结束：{0}').replace('{0}',date(gift.ends_at,locale))}{t('（北京时间）')}</p>}</>}</div>}
@@ -128,7 +131,14 @@ export default function Account({ callback = false, locale = 'zh-CN', copy = {},
       <section className="account-subscription" aria-busy={billingLoading}><div className="account-section-heading"><h3>{t("会员订阅")}</h3><button className="account-refresh" disabled={busy||loading||billingLoading||!billing?.enabled} onClick={()=>void refreshBilling()}>{t("刷新")}</button></div>
         {billingLoading&&<p role="status">{t('订阅状态')}…</p>}
         {billingError&&<div className="status-panel error" role="alert">{billingError} <button className="button compact secondary" disabled={busy||billingLoading} onClick={()=>{const identity=accountIdentity.current;if(identity)void read(identity,epoch.current,true);}}>{t('重试连接')}</button></div>}
-        {!billing ? !billingLoading&&!billingError&&<p>{t("暂时无法读取订阅状态，请刷新重试。")}</p> : !billing.enabled ? <p>{t("订阅服务当前不可用。已有权益不受此提示影响，如需帮助请联系 comics@nodelane.net。")}</p> : billing.subscription && hasManagedSubscription(billing.subscription.status,billing.entitlement_expires_at) ? <>
+        {!billing ? !billingLoading&&!billingError&&<p>{t("暂时无法读取订阅状态，请刷新重试。")}</p> : prepaid ? <div className="prepaid-membership">
+        <p className="subscription-price">{offerLabel(prepaid.price,locale)}</p>
+        <p>{offerBenefits(prepaid.price,locale)}</p>
+        <p>{prepaidCopy.status}</p>
+        <p>{prepaidCopy.period.replace('{0}',date(prepaid.starts_at,locale)).replace('{1}',date(prepaid.ends_at,locale))}{t('（北京时间）')}</p>
+        {prepaid.paid_through&&prepaid.paid_through!==prepaid.ends_at&&<p>{t('会员有效期至')}{date(prepaid.paid_through,locale)}{t('（北京时间）')}</p>}
+        <p>{prepaidCopy.notice}</p>
+        </div> : !billing.enabled ? <p>{t("订阅服务当前不可用。已有权益不受此提示影响，如需帮助请联系 comics@nodelane.net。")}</p> : billing.subscription && hasManagedSubscription(billing.subscription.status,billing.entitlement_expires_at) ? <>
         <p className="subscription-price">{offerLabel(billing.subscription.price,locale)}</p>
         <p>{offerBenefits(billing.subscription.price,locale)}</p>
         <dl className="subscription-facts"><div><dt>{t("订阅状态")}</dt><dd>{subscriptionStatusLabel(billing.subscription.status,locale)}</dd></div></dl>

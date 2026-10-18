@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { checkoutIntentKey, rememberCheckout, takeCheckout,PurchaseRetryAllowed } from '../lib/checkout-intent';
 import { ApiError } from '../lib/auth-session';
 
-export interface CheckoutCopy { busy: string; error: string; before: string; refund: string; renewal: string;retry?:string;retryHint?:string;resume?:string;uncertain?:string;conflict?:string }
+export interface CheckoutCopy { busy: string; error: string; before: string; refund: string; renewal: string;retry?:string;retryHint?:string;resume?:string;uncertain?:string;conflict?:string;pending?:string }
 export default function CheckoutButton({ priceId, accountHref, label, copy,disabled=false,showDisclosure=true,continueAfterLogin=true }: {
   priceId: string; accountHref: string; label: string; copy: CheckoutCopy;disabled?:boolean;showDisclosure?:boolean;continueAfterLogin?:boolean;
 }) {
@@ -38,6 +38,7 @@ export default function CheckoutButton({ priceId, accountHref, label, copy,disab
       if(error instanceof PurchaseRetryAllowed){setRestartPurchase(()=>error.restart);setError(copy.retryHint??copy.error);}
       else if(error instanceof ApiError&&(error.code==='CREEM_CHECKOUT_UNCERTAIN'||error.code==='BILLING_CHECKOUT_UNCERTAIN'))setError(copy.uncertain??copy.error);
       else if(error instanceof ApiError&&error.code==='BILLING_CHECKOUT_PRICE_CONFLICT')setError(copy.conflict??copy.error);
+      else if(error instanceof ApiError&&error.code==='BILLING_CHECKOUT_PENDING')setError(copy.pending??copy.error);
       else setError(copy.error);
       inFlight.current = false;
       setBusy(false);

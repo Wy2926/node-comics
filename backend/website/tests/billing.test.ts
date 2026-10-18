@@ -1,10 +1,11 @@
 import {subscriptionQuotaCopy} from '../src/i18n/subscription-quota';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {annualSavings,annualSavingsForAmounts,amount,billingCopy,billingBenefitCopy,selectedChannel,hasManagedSubscription,offerBenefits,offerLabel,renewalCopy,trialCopy,type BillingOffer} from '../src/lib/billing';
+import {annualSavings,annualSavingsForAmounts,amount,billingCopy,billingBenefitCopy,findCheckoutOffer,selectedChannel,hasManagedSubscription,offerBenefits,offerLabel,renewalCopy,trialCopy,type Billing,type BillingOffer} from '../src/lib/billing';
 import {quotaPurchase} from '../src/i18n/quota-purchase';
-import {selectedInterval} from '../src/components/BillingCycle';
-import {offerForInterval} from '../src/lib/billing-cycle';
+import {membershipBillingType,membershipPricing,offerForInterval} from '../src/lib/billing-cycle';
+import {publishedSubscriptions} from '../src/data/published-plans';
+import {prepaidMembershipCopy} from '../src/i18n/prepaid-membership';
 import {comparisonCopy} from '../src/lib/pricing-comparison';
 import {locales} from '../src/i18n/locales';
 
@@ -17,15 +18,6 @@ test('all pricing locales distinguish ordinary and subscription translation mode
     for(const model of ['GPT 6 Luna','Claude Haiku 5.5','DeepSeekv4 Pro','DeepSeek V4.1 Flash','Gemini 3.8 Flash'])assert.ok(copy.model.lite.includes(model),locale);
     assert.doesNotMatch(copy.model.free,/Gemini|DeepSeek/,locale);
   }
-});
-
-test('billing cycles use available quotes and preserve the chosen cadence',()=>{
-  const month={interval:'month'} as BillingOffer,year={interval:'year'} as BillingOffer;
-  assert.equal(selectedInterval([month,year],'year'),'year');
-  assert.equal(selectedInterval([year],'month'),'year');
-  assert.equal(selectedInterval([month],'year'),'month');
-  assert.equal(selectedInterval([],'year'),'year');
-  assert.equal(selectedInterval([{interval:'once'} as BillingOffer],'year'),'year');
 });
 
 test('all purchase locales preserve placeholders and do not describe a page pack as a subscription',()=>{
@@ -52,6 +44,50 @@ test('channel selection never changes a pending checkout provider',()=>{
   assert.equal(selectedChannel({...offer,channels:[offer.channels[0]]},'creem'),undefined);
   assert.equal(selectedChannel({...offer,channels:[]},'creem'),undefined);
   assert.equal(selectedChannel(offer)?.provider,'stripe');
+});
+
+test('checkout quote lookup preserves pending priority and includes prepaid and quota offers',()=>{
+  const published=publishedSubscriptions[0];
+  const current={...published,id:'same-price',channels:[{provider:'creem' as const,binding_id:'current',trial_days:0,trial_classic_pages:0}]};
+  const pending={...current,channels:[{...current.channels[0],provider:'stripe' as const,binding_id:'original'}]};
+  const prepaid={...current,id:'prepaid',billing_type:'onetime' as const};
+  const pack={...current,id:'pack',interval:'once' as const};
+  const billing={subscription_checkout:{price:pending},offers:[current,prepaid],quota_offers:[pack]} as Billing;
+  assert.equal(findCheckoutOffer(billing,current.id),pending);
+  assert.equal(findCheckoutOffer({...billing,subscription_checkout:null},current.id),current);
+  assert.equal(findCheckoutOffer(billing,prepaid.id),prepaid);
+  assert.equal(findCheckoutOffer(billing,pack.id),pack);
+  assert.equal(findCheckoutOffer(billing,'retired'),undefined);
+  assert.equal(findCheckoutOffer({...billing,quota_offers:undefined},pack.id),undefined);
+});
+
+test('membership pricing derives exact-mode quotes and display-only fallback without mutating the catalog',()=>{
+  const published=structuredClone(publishedSubscriptions),before=structuredClone(published);
+  const base=published.find(offer=>offer.plan_id==='plus'&&offer.interval==='quarter')!;
+  const recurring={...base,id:'live-quarter',channels:[{provider:'creem' as const,binding_id:'live',trial_days:0,trial_classic_pages:0}]};
+  const prepaid={...recurring,id:'prepaid-quarter',billing_type:'onetime' as const};
+  const alternate={...prepaid,id:'prepaid-exact'};
+  const pro={...prepaid,id:'prepaid-pro',plan_id:'pro'};
+  const year={...prepaid,id:'prepaid-year',interval:'year' as const};
+  const quotes=[recurring,prepaid,alternate,pro,year],original=structuredClone(quotes);
+  const selected=membershipPricing(quotes,published,'quarter','onetime',alternate.id);
+  assert.deepEqual(selected.available,[prepaid,alternate,pro,year]);
+  assert.deepEqual(selected.plans,[alternate,pro]);
+  assert.equal(selected.display,selected.available);
+  assert.equal(selected.cycleOffers,selected.available);
+  assert.deepEqual(membershipPricing(quotes,published,'quarter','recurring').plans,[recurring]);
+
+  for(const available of [[],[recurring],[year]]){
+    const missing=membershipPricing(available,published,'quarter','onetime');
+    assert.ok(missing.plans.length>0);
+    assert.ok(missing.plans.every(offer=>offer.interval==='quarter'&&offer.billing_type==='onetime'&&offer.channels.length===0));
+    assert.ok(missing.display.every(offer=>offer.interval!=='month'));
+    assert.notEqual(missing.display,missing.available);
+    if(available[0]===year)assert.deepEqual(missing.cycleOffers,[year]);
+    else assert.equal(missing.cycleOffers,missing.display);
+  }
+  assert.deepEqual(quotes,original);
+  assert.deepEqual(published,before);
 });
 
 test('public pricing never substitutes another cadence or retains a mismatched price ID',()=>{
@@ -93,6 +129,25 @@ test('quarterly current plans renew without trial and compare four quarters with
     assert.deepEqual(annualSavings(annual,[{...base,unit_amount:quarter},annual]),{regular:quarter*4,saved:quarter*4-year,percent:9.9});
   }
   assert.equal(renewalCopy(base,'zh-CN'),'每三个月自动续费。');
+});
+
+test('prepaid membership keeps the existing monthly allowance and has localized nonrenewing terms',()=>{
+  const quarter:BillingOffer={id:'quarter-prepaid',plan_id:'plus',plan_revision_id:'plus-v1',name:'PLUS',currency:'usd',unit_amount:666,interval:'quarter',billing_type:'onetime',monthly_classic_pages:2500,trial_days:0,trial_classic_pages:0,channels:[]};
+  const year={...quarter,id:'year-prepaid',interval:'year' as const,unit_amount:2399};
+  for(const locale of locales){
+    const copy=prepaidMembershipCopy(locale);
+    assert.equal(membershipBillingType(locale),locale==='zh-CN'?'onetime':'recurring',locale);
+    assert.equal(membershipBillingType(locale,quarter),'onetime',locale);
+    assert.equal(membershipBillingType(locale,{...quarter,billing_type:'recurring'}),'recurring',locale);
+    assert.equal(renewalCopy(quarter,locale),copy.notice,locale);
+    assert.equal(offerBenefits(quarter,locale),subscriptionQuotaCopy(locale).monthly.replace('{0}',(2500).toLocaleString(locale)),locale);
+    for(const [key,value] of Object.entries(copy)){
+      assert.ok(value.trim(),locale+key);
+      assert.deepEqual(value.match(/\{\d+\}/g)?.sort()??[],prepaidMembershipCopy('en')[key as keyof typeof copy].match(/\{\d+\}/g)?.sort()??[],locale+key);
+    }
+  }
+  assert.equal(annualSavings(year,[{...quarter,billing_type:'recurring'}]),null);
+  assert.deepEqual(annualSavings(year,[quarter]),{regular:2664,saved:265,percent:9.9});
 });
 
 test('annual savings compare the same published benefits and currency',()=>{

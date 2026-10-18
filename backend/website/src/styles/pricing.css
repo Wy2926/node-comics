@@ -51,7 +51,7 @@
 .pricing-comparison tbody th { color: var(--muted); }
 .pricing-comparison tbody strong { font-weight: 500; }
 .pricing-comparison tr[data-feature='classic'] strong { color: var(--accent); font-size: 1rem; }
-.pricing-comparison .model-access { display: inline-flex; align-items: center; }
+.pricing-comparison .model-access { position: relative; display: inline-flex; align-items: center; }
 .pricing-comparison td[data-advantage='true'] { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 .pricing-comparison td[data-advantage='true'] > strong { display: inline-block; padding: 5px 10px; border-radius: var(--comic-badge-radius); background: var(--accent-soft); color: var(--accent); }
 .pricing-comparison td[data-advantage='true'] .model-access { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%; background: var(--accent-soft); }

@@ -7,6 +7,7 @@ export const publishedOffers:BillingOffer[]=catalog.products.flatMap(product=>
     id:`published-${product.id}-${interval}`,name:product.name,plan_id:product.id,
     plan_revision_id:`${product.id}-v1`,currency:catalog.currency,unit_amount:unit_amount!,
     interval:interval as BillingOffer['interval'],monthly_classic_pages:product.monthly_classic_pages,
+    billing_type:interval==='once'?'onetime' as const:'recurring' as const,
     service_plan_id:product.service_plan_id,quota_pages:product.quota_pages,quota_validity_days:null,
     hourly_image_limit:null,trial_days:0,trial_classic_pages:0,channels:[],
   })));

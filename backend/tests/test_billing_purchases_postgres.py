@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from test_postgres_concurrency import pg_scope, pytestmark
+from test_creem_checkout_failures import test_quota_pack_http_failure_preserves_original_intent_without_reposting
 from test_billing_purchases import (
     purchase, buy,
     test_one_time_purchase_grants_once_and_replays_same_intent,

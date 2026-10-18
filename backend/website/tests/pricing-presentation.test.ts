@@ -22,6 +22,8 @@ import {pricingHighlightsCopy} from '../src/i18n/pricing-highlights';
 import PlanComparison from '../src/components/PlanComparison';
 import PlanModels from '../src/components/PlanModels';
 import {locales,localPath} from '../src/i18n/locales';
+import {membershipBillingType} from '../src/lib/billing-cycle';
+import {prepaidMembershipCopy} from '../src/i18n/prepaid-membership';
 
 test('published subscription prices remain readable without fabricating a purchasable offer',()=>{
   for(const locale of locales)for(const interval of ['quarter','year'] as const){
@@ -170,6 +172,7 @@ test('pricing presentation rules stay scoped and do not duplicate the former glo
   assert.doesNotMatch(global,/\.pricing-comparison|\.plan-comparison|\.pricing-actions/);
   assert.match(css,/table-layout:\s*fixed/);
   assert.match(css,/\.pricing-comparison\s+\.feature-column\s*\{/);
+  assert.match(css,/\.pricing-comparison\s+\.model-access\s*\{[^}]*position:\s*relative/,'Offscreen absolute screen-reader labels stay inside the scrolling table, not the root viewport');
 });
 
 const pack:BillingOffer={id:'synthetic-pack',name:'Lite',plan_id:'pages',plan_revision_id:'pack-v1',currency:'usd',unit_amount:700,interval:'once',monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,service_plan_id:'lite',quota_pages:100,quota_validity_days:null,hourly_image_limit:1200,channels:[{provider:'creem',binding_id:'synthetic',trial_days:0,trial_classic_pages:0}]};
@@ -182,9 +185,9 @@ const emptyBilling:Billing={enabled:true,providers:[],provider:null,environment:
 const pricingFile=new URL('../src/components/BillingOffers.tsx',import.meta.url);
 const pricingRequire=createRequire(pricingFile);
 const pricingCompiled=ts.transpileModule(readFileSync(pricingFile,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-function pricingSnapshot(billing:Billing|null,locale='en',selectedPrice=''){
+function pricingSnapshot(billing:Billing|null,locale='en',selectedPrice='',interval='month'){
   // Seed only BillingOffers' loaded snapshot. Child controls use real React SSR.
-  const states:unknown[]=[billing?.offers??[subscription],false,billing?.quota_offers??[pack],billing,'month',selectedPrice];
+  const states:unknown[]=[billing?.offers??[subscription],false,billing?.quota_offers??[pack],billing,interval,selectedPrice,membershipBillingType(locale)];
   const exports={} as typeof import('../src/components/BillingOffers');
   new Function('require','exports',pricingCompiled)((name:string)=>name==='react'?{...react,useEffect:()=>{},useState:()=>[states.shift(),()=>{}]}:name.endsWith('.css')?{}:pricingRequire(name),exports);
   return load(renderToStaticMarkup(createElement(exports.default,{locale,accountHref:localPath('/account/',locale as typeof locales[number]),downloadHref:'/download/',checkoutCopy,
@@ -270,7 +273,7 @@ test('subscription recovery does not hide or disable any quota purchase action',
 test('every locale keeps other subscription prices and cycles available beside pending checkout',()=>{
   const sub={...subscription,id:'retired-year',interval:'year' as const};
   for(const locale of locales){
-    const $=pricingSnapshot({...emptyBilling,subscription_checkout:original(sub)},locale,pack.id);
+    const $=pricingSnapshot({...emptyBilling,subscription_checkout:original(sub)},locale,subscription.id);
     const subscriptionButton=$('.subscription-card.paid [data-purchase-link]'),quotaButton=$('.quota-offer [data-purchase-link]');
     assert.equal(subscriptionButton.attr('href'),localPath('/pricing/?price=subscription-month',locale));
     assert.equal(quotaButton.attr('href'),localPath('/pricing/?price=synthetic-pack',locale));
@@ -281,6 +284,54 @@ test('every locale keeps other subscription prices and cycles available beside p
     assert.equal(recovered('.subscription-card.paid [data-purchase-link]').attr('href'),localPath('/pricing/?price=retired-year',locale));
     assert.ok(recovered('.subscription-card.paid [data-purchase-link]').text().includes('resume original'));
   }
+});
+
+test('simplified Chinese defaults to prepaid quarter/year without silently substituting a recurring quote',()=>{
+  const recurring={...subscription,id:'quarter',interval:'quarter' as const,billing_type:'recurring' as const,trial_days:0};
+  const prepaid={...recurring,id:'quarter-prepaid',billing_type:'onetime' as const};
+  const annual={...prepaid,id:'year-prepaid',interval:'year' as const};
+  const snapshot={...emptyBilling,offers:[recurring,prepaid,annual]};
+  for(const locale of locales){
+    const $=pricingSnapshot(snapshot,locale,'','quarter'),oneTime=locale==='zh-CN';
+    const selected=$('.subscription-card.paid [data-purchase-link]');
+    assert.equal(selected.attr('href'),localPath(`/pricing/?price=${oneTime?prepaid.id:recurring.id}`,locale));
+    assert.equal($('.subscription-card.paid').attr('data-billing-type'),oneTime?'onetime':'recurring');
+    if(oneTime){
+      assert.ok($('.billing-cycle').text().includes('季卡'));assert.ok($('.billing-cycle').text().includes('年卡'));
+      assert.ok($('.subscription-card.paid').text().includes(prepaidMembershipCopy(locale).notice));
+      assert.doesNotMatch($('.subscription-card.paid').text(),/subscription renewal|下次续费前取消|每三个月自动续费/);
+    }
+    for(const offer of [prepaid,recurring,annual]){
+      const exact=pricingSnapshot(snapshot,locale,offer.id,'quarter');
+      assert.equal(exact('.subscription-card.paid [data-purchase-link]').attr('href'),localPath(`/pricing/?price=${offer.id}`,locale));
+      assert.equal(exact('.subscription-card.paid').attr('data-billing-type'),offer.billing_type);
+    }
+  }
+  const unavailable=pricingSnapshot({...snapshot,offers:[recurring]},'zh-CN','','quarter');
+  assert.equal(unavailable('.subscription-card.paid [data-purchase-link]').length,0);
+  assert.equal(unavailable('.subscription-card.paid button[disabled]').length,2);
+  assert.doesNotMatch(unavailable('.subscription-card.paid').text(),/每三个月自动续费|下次续费前取消/);
+});
+
+test('prepaid membership keeps manual purchases available and blocks new recurring checkout',()=>{
+  const prepaid={...subscription,id:'quarter-prepaid',interval:'quarter' as const,billing_type:'onetime' as const};
+  const status={...emptyBilling,offers:[prepaid,subscription],prepaid_membership:{price:prepaid,starts_at:'2026-01-01T00:00:00Z',ends_at:'2099-01-01T00:00:00Z'}};
+  const renewable=pricingSnapshot(status,'zh-CN',prepaid.id,'quarter');
+  assert.equal(renewable('.subscription-card.paid [data-purchase-link]').attr('href'),'/pricing/?price=quarter-prepaid');
+  const recurring=pricingSnapshot(status,'en',subscription.id);
+  assert.equal(recurring('.subscription-card.paid [data-purchase-link]').length,0);
+  assert.equal(recurring('.subscription-card.paid a.button').attr('href'),'/en/account/');
+});
+
+test('an explicit prepaid price retains manual original-result verification after a subscription becomes active',()=>{
+  const prepaid={...subscription,id:'quarter-prepaid',interval:'quarter' as const,billing_type:'onetime' as const};
+  const status={...emptyBilling,offers:[prepaid,subscription],subscription:{status:'active'} as Billing['subscription']};
+  const selected=pricingSnapshot(status,'zh-CN',prepaid.id,'quarter');
+  assert.equal(selected('.subscription-card.paid [data-purchase-link]').length,0);
+  assert.equal(selected('.billing-recovery [data-purchase-link]').attr('href'),'/pricing/?price=quarter-prepaid');
+  assert.ok(selected('.billing-recovery').text().includes(checkoutCopy.resume!));
+  assert.equal(pricingSnapshot(status,'zh-CN','','quarter')('.billing-recovery').length,0);
+  assert.equal(pricingSnapshot(status,'en',subscription.id)('.billing-recovery').length,0);
 });
 
 test('a retired selected quote gets one manual recovery action only for a signed-in pricing snapshot',()=>{

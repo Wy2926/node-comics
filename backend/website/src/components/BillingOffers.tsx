@@ -1,12 +1,12 @@
 import {useEffect,useState} from 'react';
-import {amount,annualSavings,billingCopy,billingBenefitCopy,offerBenefits,renewalCopy,trialCopy,hasManagedSubscription,manageLabel,type BillingOffer,type Billing} from '../lib/billing';
+import {amount,annualSavings,billingCopy,billingBenefitCopy,offerBenefits,renewalCopy,trialCopy,findCheckoutOffer,isOneTimePrice,membershipCheckoutBlocked,manageLabel,type BillingOffer,type Billing,type BillingType} from '../lib/billing';
 import {pricingCopy,publishedPricingCopy} from '../lib/pricing';
 import {comparisonCopy,comparisonRows,extraPagesCopy,paidComparisonValue} from '../lib/pricing-comparison';
 import {pricingHighlightsCopy} from '../i18n/pricing-highlights';
 import {checkoutStatusCopy} from '../i18n/commerce';
 import {publishedSubscriptions,publishedPacks} from '../data/published-plans';
 import BillingCycle,{type BillingInterval} from './BillingCycle';
-import {offerForInterval} from '../lib/billing-cycle';
+import {membershipBillingType,membershipPricing,offerForInterval} from '../lib/billing-cycle';
 import {PlanPrice,PublishedPurchaseAvailability,publishedAmountParts,publishedAnnualDiscount} from './PublishedPlanPricing';
 import PriceAmount from './PriceAmount';
 import CheckoutButton, { type CheckoutCopy } from './CheckoutButton';
@@ -15,6 +15,7 @@ import PlanModels from './PlanModels';
 import PlanComparison from './PlanComparison';
 import {quotaPurchaseCopy} from '../i18n/quota-purchase';
 import {subscriptionQuotaCopy} from '../i18n/subscription-quota';
+import {prepaidMembershipCopy} from '../i18n/prepaid-membership';
 import '../styles/pricing.css';
 import '../styles/quota-offers.css';
 
@@ -32,10 +33,13 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
   const [billing,setBilling]=useState<Billing|null>();
   const [preferred,setPreferred]=useState<BillingInterval>('quarter');
   const [selectedPrice,setSelectedPrice]=useState('');
+  const [preferredType,setPreferredType]=useState<BillingType>(membershipBillingType(locale));
   const copy=billingCopy(locale),benefits=billingBenefitCopy(locale),text=pricingCopy(locale),comparison=comparisonCopy(locale);
   const quota=subscriptionQuotaCopy(locale);
+  const prepaid=prepaidMembershipCopy(locale);
   const highlights=pricingHighlightsCopy(locale);
   const buttonCopy={...checkoutCopy,...checkoutStatusCopy(locale)};
+  const prepaidButtonCopy={...buttonCopy,renewal:'',retry:quotaPurchaseCopy(locale).retry,retryHint:quotaPurchaseCopy(locale).retryHint};
   useEffect(()=>{
     setSelectedPrice(new URLSearchParams(location.search).get('price')??'');
     const controller=new AbortController();
@@ -65,21 +69,21 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
     return()=>{disposed=true;unsubscribe?.();clearTimeout(timeout);controller.abort();};
   },[]);
   const pending=billing?.subscription_checkout?.price;
-  const available=(billing?.offers??(error?[]:offers??[])).filter(offer=>offer.interval!=='once'&&offer.id!==pending?.id);
-  if(pending)available.push(pending);
-  const requested=available.find(offer=>offer.id===selectedPrice);
+  const quotes=(billing?.offers??(error?[]:offers??[])).filter(offer=>offer.interval!=='once'&&offer.id!==pending?.id);
+  if(pending)quotes.push(pending);
+  const requested=quotes.find(offer=>offer.id===selectedPrice);
+  const billingType=requested?membershipBillingType(locale,requested):preferredType;
+  const oneTime=billingType==='onetime';
   const interval=requested?.interval==='month'||requested?.interval==='quarter'||requested?.interval==='year'?requested.interval:preferred;
-  const managed=!!billing&&(hasManagedSubscription(billing.subscription?.status,billing.entitlement_expires_at)||!!billing.gift&&billing.gift.state!=='expired');
-  const display=available.some(offer=>offer.interval===interval)?available:publishedSubscriptions;
-  const plans=[...new Set(display.map(offer=>offer.plan_id))].map(plan=>
-    offerForInterval(display.filter(offer=>offer.plan_id===plan),interval,selectedPrice)).filter((offer):offer is BillingOffer=>!!offer);
+  const {available,display,plans,cycleOffers}=membershipPricing(quotes,publishedSubscriptions,interval,billingType,selectedPrice);
   const recoverSelected=!!billing&&/^[\w-]{1,36}$/.test(selectedPrice)&&
-    ![pending,...billing.offers,...billing.quota_offers??[]].some(quote=>quote?.id===selectedPrice);
+    (!findCheckoutOffer(billing,selectedPrice)||
+      !!requested&&isOneTimePrice(requested)&&membershipCheckoutBlocked(billing,requested));
   const rows=comparisonRows(locale,0).filter(row=>row.key==='rate'||row.key==='priority');
   const annual=offerForInterval(available,'year',selectedPrice);
   const discount=annual?annualSavings(annual,available)?.percent??0:available.length?0:publishedAnnualDiscount;
   return <div className="pricing-comparison">
-    <BillingCycle offers={available.length?available:publishedSubscriptions} value={interval} onChange={value=>{setPreferred(value);setSelectedPrice('');}} locale={locale} preview annualDiscount={discount}/>
+    <BillingCycle offers={cycleOffers} value={interval} onChange={value=>{setPreferred(value);setPreferredType(billingType);setSelectedPrice('');}} locale={locale} billingType={billingType} preview annualDiscount={discount}/>
     <div className="subscription-grid">
       <article className="subscription-card free">
         <header><p className="membership-heading">{highlights.free}</p><h2>{free.name}</h2></header>
@@ -89,17 +93,20 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
         <PlanModels locale={locale} paid={false}/>
         <ul className="subscription-features">{rows.map(row=><li key={row.key} data-feature={row.key}><span>{row.label}</span><strong>{row.free}</strong></li>)}</ul>
       </article>
-      {plans.map(offer=>{const extra=extraPagesCopy(offer,plans,locale);return <article className="subscription-card paid" data-plan={offer.plan_id} data-more-pages={!!extra} key={offer.id}>
+      {plans.map(offer=>{
+        const extra=extraPagesCopy(offer,plans,locale),managed=!!billing&&membershipCheckoutBlocked(billing,offer);
+        const yearlyAmount=amount(cycleOffers.find(p=>p.plan_id===offer.plan_id&&p.interval==='year')??offer,locale);
+        return <article className="subscription-card paid" data-plan={offer.plan_id} data-billing-type={billingType} data-more-pages={!!extra} key={offer.id}>
         <header><p className="membership-heading">{extra?highlights.pro:highlights.plus}</p><h2>{offer.name}</h2></header>
         <div aria-live="polite"><PlanPrice locale={locale} interval={interval} offer={offer} offers={display}/>
-          <noscript><p className="billing-total">{publishedPricingCopy(locale).yearly}: {text.billed(amount((available.length?available:publishedSubscriptions).find(p=>p.plan_id===offer.plan_id&&p.interval==='year')??offer,locale))}</p></noscript>
+          <noscript><p className="billing-total">{oneTime?prepaid.year:publishedPricingCopy(locale).yearly}: {oneTime?yearlyAmount:text.billed(yearlyAmount)}</p></noscript>
         </div>
-        <div className="plan-allowance"><span>{quota.subscription}</span><strong className="subscription-allowance">{offerBenefits(offer,locale)}</strong>{extra&&<p className="plan-difference">{extra}</p>}</div>
+        <div className="plan-allowance"><span>{oneTime?prepaid.allowance:quota.subscription}</span><strong className="subscription-allowance">{offerBenefits(offer,locale)}</strong>{extra&&<p className="plan-difference">{extra}</p>}</div>
         <div className="subscription-purchase">
         {offer.channels.length>0?<>
-        {managed?<a className="button" href={accountHref}>{manageLabel(locale)} ↗</a>:<CheckoutButton priceId={offer.id} accountHref={accountHref} label={pending?.id===offer.id?checkoutCopy.resume??benefits.subscribe(offer.name):benefits.subscribe(offer.name)} copy={buttonCopy} disabled={billing===undefined}/>}
-        <p className="trial-note">{offer.trial_days>0&&`${trialCopy(offer.trial_days,locale)} · ${offer.trial_classic_pages===null?copy.classic:quotaPurchaseCopy(locale).pages.replace('{0}',offer.trial_classic_pages.toLocaleString(locale))}`} {renewalCopy(offer,locale)} {text.cancel} {publishedPricingCopy(locale).tax}</p>
-        </>:<PublishedPurchaseAvailability locale={locale} name={offer.name} interval={interval} state={error?'error':offers?'unavailable':'loading'}/>}
+        {managed?<a className="button" href={accountHref}>{manageLabel(locale)} ↗</a>:<CheckoutButton priceId={offer.id} accountHref={accountHref} label={oneTime?prepaid.buy.replace('{0}',offer.name):pending?.id===offer.id?checkoutCopy.resume??benefits.subscribe(offer.name):benefits.subscribe(offer.name)} copy={oneTime?prepaidButtonCopy:buttonCopy} disabled={billing===undefined}/>}
+        <p className="trial-note">{!oneTime&&offer.trial_days>0&&`${trialCopy(offer.trial_days,locale)} · ${offer.trial_classic_pages===null?copy.classic:quotaPurchaseCopy(locale).pages.replace('{0}',offer.trial_classic_pages.toLocaleString(locale))}`} {renewalCopy(offer,locale)} {!oneTime&&text.cancel} {publishedPricingCopy(locale).tax}</p>
+        </>:<PublishedPurchaseAvailability locale={locale} name={offer.name} interval={interval} billingType={billingType} state={error?'error':offers?'unavailable':'loading'}/>}
         </div>
         <PlanModels locale={locale} paid/>
         <ul className="subscription-features">{rows.map(row=><li key={row.key} data-feature={row.key}><span>{row.label}</span><strong>{paidComparisonValue(row,offer,locale)}</strong></li>)}</ul>
@@ -107,9 +114,9 @@ export default function BillingOffers({locale,accountHref,downloadHref,free,chec
     </div>
     <PlanComparison locale={locale} plans={plans} freeName={free.name}/>
     <p className="comparison-note">{quota.rule}</p>
-    <p className="comparison-note">{quota.renewal}</p>
+    <p className="comparison-note">{oneTime?prepaid.quotaRule:quota.renewal}</p>
     <p className="comparison-note">{comparison.note}</p>
-    {recoverSelected&&<div className="billing-recovery"><CheckoutButton priceId={selectedPrice} accountHref={accountHref} label={checkoutCopy.resume??benefits.subscribe('PLUS')} copy={buttonCopy} showDisclosure={false} continueAfterLogin={false}/></div>}
+    {recoverSelected&&<div className="billing-recovery"><CheckoutButton priceId={selectedPrice} accountHref={accountHref} label={checkoutCopy.resume??benefits.subscribe('PLUS')} copy={prepaidButtonCopy} showDisclosure={false} continueAfterLogin={false}/></div>}
     <QuotaOffers preview locale={locale} offers={(billing?.quota_offers??quotaOffers).length?(billing?.quota_offers??quotaOffers):publishedPacks} blocked={billing===undefined} accountHref={accountHref} checkoutCopy={buttonCopy}/>
   </div>;
 }

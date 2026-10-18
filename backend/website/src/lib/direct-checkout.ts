@@ -1,7 +1,9 @@
 import { api, ApiError, sessionIdentity } from "./auth";
 import { checkoutUrl } from "./auth-config";
 import {
-  hasManagedSubscription,
+  findCheckoutOffer,
+  isOneTimePrice,
+  membershipCheckoutBlocked,
   selectedChannel,
   type Billing,
   type BillingProvider,
@@ -19,29 +21,12 @@ export async function checkoutStatus() {
     : null;
 }
 
-function checkoutOffer(billing: Billing, priceId: string) {
-  return [
-    billing.subscription_checkout?.price,
-    ...billing.offers,
-    ...(billing.quota_offers ?? []),
-  ].find((item) => item?.id === priceId);
-}
-
 export function checkoutSelection(billing: Billing, priceId: string) {
   if (!billing.enabled) throw Error("CHECKOUT_UNAVAILABLE");
-  const offer = checkoutOffer(billing, priceId);
+  const offer = findCheckoutOffer(billing, priceId);
   if (!offer) throw Error("CHECKOUT_UNAVAILABLE");
-  const pending =
-    offer.interval === "once" ? null : billing.subscription_checkout;
-  if (
-    offer.interval !== "once" &&
-    (hasManagedSubscription(
-      billing.subscription?.status,
-      billing.entitlement_expires_at,
-    ) ||
-      (billing.gift && billing.gift.state !== "expired"))
-  )
-    return null;
+  const pending = isOneTimePrice(offer) ? null : billing.subscription_checkout;
+  if (membershipCheckoutBlocked(billing,offer)) return null;
   const channel = selectedChannel(offer, pending?.price.id === priceId ? pending.provider : undefined);
   if (!channel) throw Error("CHECKOUT_UNAVAILABLE");
   return { price_id: offer.id, provider: channel.provider };
@@ -61,10 +46,10 @@ export async function directCheckout(
     undefined,
     identity ?? undefined,
   );
-  const offer = checkoutOffer(billing, priceId);
+  const offer = findCheckoutOffer(billing, priceId);
   let intent: ReturnType<typeof readPurchaseIntent> = null;
   let selection: { price_id: string; provider: BillingProvider } | null;
-  if (!offer || offer.interval === "once") {
+  if (!offer || isOneTimePrice(offer)) {
     const local = storage ?? localStorage;
     const scope = (
       await request<{ user: { id: string } }>(
@@ -82,7 +67,8 @@ export async function directCheckout(
       intent = purchaseIntent(local, scope, priceId, selection.provider);
     }
     // An unconfirmed request can outlive its published quote or channel. Only
-    // its exact original key/provider is replayed; the server validates it.
+    // its exact original key/provider is replayed; the server validates it and
+    // may return fulfillment without permitting another pending payment.
     selection = { price_id: priceId, provider: intent.provider };
   } else selection = checkoutSelection(billing, priceId);
   if (!selection) return null;
