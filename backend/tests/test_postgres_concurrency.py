@@ -111,17 +111,16 @@ def pg_scope(tmp_path, monkeypatch):
 
 @pytest.fixture
 def pg(pg_scope):
-    from app.db import initialize, session_factory
-    from app.providers import initialize_providers
+    from app.db import session_factory
+    from app.migrate import migrate
     from app.assets import create_asset
     from app.models import User, uid, now
-    initialize()
+    migrate()
     image = BytesIO()
     Image.new("RGB", (320, 480), (231, 225, 248)).save(image, "PNG")
     raw = image.getvalue()
     with session_factory()() as db:
         configure_text_provider(db)
-        initialize_providers(db)
         at = now()
         user = User(id=uid(), subject="postgres-test:" + uid(), name="PG isolated test", membership_id=uid(), plus_started_at=at,
                     plus_expires_at=at + timedelta(days=360), plus_monthly_pages=300)
@@ -356,7 +355,7 @@ def test_postgres_initial_migrations_wait_on_advisory_lock_across_processes(pg_s
             assert "migration-complete" in stdout
         with engine().connect() as connection:
             revisions = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-            assert revisions == ['quota_purchases_0014']
+            assert revisions == ['prepaid_membership_0020']
             assert connection.scalar(text("SELECT count(*) FROM translation_providers")) == 0
             assert connection.scalar(text("SELECT count(*) FROM translation_provider_revisions")) == 0
             assert connection.scalar(text("SELECT count(*) FROM users")) == 0

@@ -5,7 +5,7 @@ from threading import Barrier
 from fastapi import HTTPException
 from sqlalchemy import select
 from test_postgres_concurrency import pg, pg_scope, pytestmark
-from conftest import png_variant
+from conftest import configure_system_limits, png_variant
 from app.db import session_factory
 from app.models import Asset, Job, Ledger, User, now
 from app.entitlement_models import QuotaPeriod
@@ -22,7 +22,7 @@ from app.quota_grants import GrantRequest, grant_pages
 def test_postgres_final_daily_and_gift_pages_are_reserved_exactly_once(pg):
     from app.config import settings
     from app.assets import create_asset
-    settings().free_daily_pages = 1
+    configure_system_limits(free_daily_pages=1)
     settings().translation_request_concurrency = 8  # Exercise quota contention, independently of admission throttling.
     with session_factory()() as db:
         db.get(User, pg['owner_id']).plus_expires_at = now() - timedelta(seconds=1)
