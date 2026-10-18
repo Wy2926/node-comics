@@ -20,7 +20,10 @@ class ScriptRouter:
 
     def choose(self, predictions):
         native = self.native
-        accepted = {lang: [row] if row['text'].strip() and row['conf'] >= .5 else []
+        # Routing needs script evidence, not publication-quality transcription.
+        # Reuse upstream's weak-evidence floor without adding its retry pass;
+        # formal Paddle recognition (including reused lines) still applies .5.
+        accepted = {lang: [row] if row['text'].strip() and row['conf'] >= native.RETRY_FLOOR else []
                     for lang, row in predictions.items()}
         # Reject absent script evidence before the upstream first-candidate tie
         # default. Classification weights and character categories stay upstream.

@@ -13,7 +13,8 @@ from classic_node.timing import collect
 
 def router():
     result = ScriptRouter.__new__(ScriptRouter)
-    native = SimpleNamespace(_WEIGHTS={lang: {'latin': 1} for lang in ('en', 'ch', 'japan', 'korean')},
+    native = SimpleNamespace(RETRY_FLOOR=.3,
+                             _WEIGHTS={lang: {'latin': 1} for lang in ('en', 'ch', 'japan', 'korean')},
                              _script=lambda c: 'latin' if c.isalpha() else 'other')
     calls = []
     def detect(image):
@@ -25,19 +26,22 @@ def router():
     return result, calls
 
 
-@pytest.mark.parametrize('text,score', [('', .99), ('!!', .99), ('hello', .49), (' ', .99)])
+@pytest.mark.parametrize('text,score', [('', .99), ('!!', .99), ('123', .99), ('hello', .299), (' ', .99)])
 def test_no_evidence_does_not_default_to_english(text, score):
     instance, calls = router()
     assert instance.choose({lang: {'text': text, 'conf': score} for lang in instance.native._WEIGHTS}) is None
     assert calls == []
 
 
-def test_floor_then_delegate_scoring_and_release_private_text():
+@pytest.mark.parametrize('language', ['en', 'ch', 'japan', 'korean'])
+@pytest.mark.parametrize('floor', [.3, .4])
+def test_upstream_evidence_floor_then_delegate_scoring_and_release_private_text(language, floor):
     instance, calls = router()
-    values = {lang: {'text': 'word', 'conf': .1} for lang in instance.native._WEIGHTS}
-    values['korean']['conf'] = .5
+    instance.native.RETRY_FLOOR = floor
+    values = {lang: {'text': 'word', 'conf': floor - .001} for lang in instance.native._WEIGHTS}
+    values[language]['conf'] = floor
     assert instance.choose(values) == 'korean'
-    assert calls == [{'en': [], 'ch': [], 'japan': [], 'korean': [values['korean']]}]
+    assert calls == [{lang: [row] if lang == language else [] for lang, row in values.items()}]
     assert instance.native._ocr_lines is None
 
 

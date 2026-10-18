@@ -172,7 +172,7 @@ def test_unknown_language_does_not_call_recognizers_or_erase(analysis):
     assert calls == []
 
 
-@pytest.mark.parametrize('score,text', [(.9, 'cached'), (.49, ''), (.5, 'cached')])
+@pytest.mark.parametrize('score,text', [(.9, 'cached'), (.3, ''), (.49, ''), (.5, 'cached')])
 def test_representative_reuse_skips_only_that_line_and_keeps_order(analysis, score, text):
     engine, source, quads, _ = analysis
     engine.router = SimpleNamespace(classify=lambda *args: (['en'], [(1, {'text': 'cached', 'conf': score})]))
@@ -200,6 +200,17 @@ def test_single_line_reuse_never_calls_formal_model_and_is_page_local(analysis, 
         assert regions[0].texts == [text]
     engine.router = SimpleNamespace(classify=lambda *args: ([None], [None]))
     assert engine.analyze(source) == ([], None, None, None)
+
+
+@pytest.mark.parametrize('score', [.3, .49])
+def test_weak_reused_script_evidence_alone_does_not_authorize_erasure(analysis, monkeypatch, score):
+    engine, source, quads, calls = analysis
+    block = SimpleNamespace(lines=[quads[0]], font_size=12, angle=0, src_is_vertical=False)
+    monkeypatch.setitem(sys.modules, 'ballontranslator.utils.textblock', SimpleNamespace(group_output=lambda *args: [block]))
+    engine.router = SimpleNamespace(classify=lambda *args: (['en'], [(0, {'text': 'uncertain', 'conf': score})]))
+    engine.recognizers['en'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Representative read twice'))
+    assert engine.analyze(source) == ([], None, None, None)
+    assert calls == []
 
 
 def test_close_does_not_unload_shared_probe_recognizers_twice(analysis):

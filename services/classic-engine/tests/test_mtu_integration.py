@@ -34,6 +34,29 @@ def deny_network(*args, **kwargs):
     raise AssertionError('Prepared image stages must work offline')
 
 
+@pytest.mark.parametrize('language,text', [('en', 'HELLO'), ('japan', 'こんにちは'),
+                                         ('ch', '你好世界'), ('korean', '안녕하세요')])
+def test_native_script_scoring_keeps_weak_evidence_for_every_expert(assets, offline, language, text):
+    from mtu_engine.routing import ScriptRouter
+    router = ScriptRouter(assets[0], {})
+    predictions = {lang: {'text': '', 'conf': 0.} for lang in router.native.DETECT_CANDIDATES}
+    predictions['en'] = {'text': 'I', 'conf': .6}
+    predictions[language] = {'text': text, 'conf': .4}
+    if language in ('ch', 'japan'):
+        predictions['ch'] = predictions['japan'] = predictions[language]
+    assert router.choose(predictions) == language
+    assert router.native._ocr_lines is None
+
+
+def test_native_script_scoring_keeps_clear_latin_over_weak_other_scripts(assets, offline):
+    from mtu_engine.routing import ScriptRouter
+    router = ScriptRouter(assets[0], {})
+    weak = {'text': 'あ', 'conf': .31}
+    assert router.choose({'en': {'text': 'HELLO WORLD', 'conf': .95},
+                          'ch': weak, 'japan': weak,
+                          'korean': {'text': '가', 'conf': .31}}) == 'en'
+
+
 def test_font_search_prepares_plain_text_once_and_preserves_native_sizes(assets, monkeypatch):
     import inspect
     from mtu_engine.assets import LOCK
