@@ -1,7 +1,45 @@
 """Bounded bubble recovery using MTU's geometry, line breaking and font search."""
 from copy import copy
+import unicodedata
 
 import numpy as np
+
+
+def _can_stack_text(text):
+    """MTU stacks code points; do not split graphemes or lose bidi shaping."""
+    from PyQt6.QtCore import QTextBoundaryFinder
+
+    boundaries = QTextBoundaryFinder(QTextBoundaryFinder.BoundaryType.Grapheme, text)
+    position = 0
+    for char in text:
+        if unicodedata.bidirectional(char) in ('R', 'AL', 'AN', 'NSM') or unicodedata.category(char) == 'Cf':
+            return False
+        position += 2 if ord(char) > 0xffff else 1  # Qt positions use UTF-16.
+        boundaries.setPosition(position)
+        if not boundaries.isAtBoundary():
+            return False
+    return True
+
+
+def _wrap_words(text, font_size, width, letter_spacing):
+    """Let Qt break at word boundaries, without Manga2Eng's short-word groups."""
+    from PyQt6.QtGui import QTextLayout, QTextOption
+    from manga_translator.rendering.text_render._fonts import _layout_font
+
+    layout = QTextLayout(text, _layout_font(font_size, letter_spacing))
+    option = QTextOption()
+    option.setWrapMode(QTextOption.WrapMode.WordWrap)
+    layout.setTextOption(option)
+    encoded, lines = text.encode('utf-16-le'), []
+    layout.beginLayout()
+    try:
+        while (line := layout.createLine()).isValid():
+            line.setLineWidth(width)
+            start, length = line.textStart() * 2, line.textLength() * 2
+            lines.append(encoded[start:start+length].decode('utf-16-le').strip())
+    finally:
+        layout.endLayout()
+    return '[BR]'.join(lines)
 
 
 def associate_bubbles(blocks, mask):
@@ -14,8 +52,8 @@ def associate_bubbles(blocks, mask):
                 _region_lines_fully_inside_mask(block, mask))
 
 
-def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=()):
-    """Keep the native layout; bound recovery to one alternative per paragraph.
+def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(), *, language):
+    """Keep native layout; reuse one safe rectangle for bounded recovery.
 
     Source lines/checkpoints are immutable. Only a layout copy's native anchor
     and wrap budget change; Qt still measures, breaks, sizes and paints the text.
@@ -25,10 +63,25 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
     from manga_translator.utils import build_region_reference_mask
     from manga_translator.utils.bubble import reference_mask_bounds
 
+    def cap_source_font(block, polygon):
+        # Do this before reserving pending layouts: balloon-fill can otherwise
+        # double a short paragraph's size and starve its neighbour of space.
+        maximum = native._apply_final_font_constraints(block.original_font_size, config)
+        if block.font_size <= maximum:
+            return polygon
+        block.font_size = maximum
+        config._current_region = block
+        native.text_render.set_font(block.font_family)
+        return native._calc_region_dst_points_for_font(
+            region=block, font_size=maximum, render_horizontally=block.horizontal,
+            line_spacing_multiplier=block.line_spacing,
+            letter_spacing_multiplier=block.letter_spacing, config=config, anchor_mode='center')
+
     if mask is None or labels is None:
         raise ValueError('No safe bubble layout')
     points = native.resize_regions_to_font_size(image, blocks, config, original,
         bubble_mask=mask, skip_text_replacements=True)
+    points = [cap_source_font(block, polygon) for block, polygon in zip(blocks, points)]
     height, width = image.shape[:2]
     boxes = np.array([np.concatenate((np.asarray(p).reshape(-1, 2).min(axis=0),
                                      np.asarray(p).reshape(-1, 2).max(axis=0)))
@@ -70,26 +123,34 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
         all_points = [*points, *occupied]
         obstacles = [(all_points[i], None) for i in nearby if i != index]
         collision = native._layout_regions_conflict(points[index], reference, obstacles)
-        # Whole-word layout can be safe yet unreadably small in a tall caption.
-        # Try native hyphenation after width-limited shrink, with a dictionary;
-        # normal bubbles, single rich words and explicit breaks stay unchanged.
-        hyphenate = (config.render.balloon_fill_mask_layout and block.horizontal and
-            h > 2 * w and 2 * block.font_size < block.original_font_size and
+        # A wide shared bubble can still contain a narrow vertical paragraph.
+        # Recover unused height before accepting severe width-limited shrink;
+        # ordinary layouts and explicit breaks retain the native fast path.
+        source_width, source_height = block.unrotated_size
+        recover = (config.render.balloon_fill_mask_layout and block.horizontal and
+            (h > w or source_height > source_width) and
+            block.font_size < .75 * block.original_font_size and
             2 * (boxes[index, 3] - boxes[index, 1]) < h and
-            not block.translation_rich and not native._has_explicit_line_breaks(texts[index]))
+            not native._has_explicit_line_breaks(texts[index]))
+        vertical = recover and _can_stack_text(texts[index])
+        # Native hyphenation can also fall back to code-point splits. Reuse
+        # the same grapheme/bidi guard; complex text keeps Qt word wrapping.
+        hyphenate = vertical and not block.translation_rich
         if hyphenate:
-            from manga_translator.rendering.text_render_eng import _resolve_english_layout_language
-            layout_language = _resolve_english_layout_language(block.target_lang)
-            hyphenate = native.text_render.select_hyphenator(layout_language) is not None
+            # The upstream selector accepts BCP-47 tags, not MTU's internal
+            # three-letter targets. Reuse the request's existing language tag.
+            hyphenate = native.text_render.select_hyphenator(language) is not None
         if (safe(points[index], reference) and not collision and
-                native._polygon_fully_inside_mask(block.min_rect[0], reference) and not hyphenate):
+                native._polygon_fully_inside_mask(block.min_rect[0], reference) and not recover):
             continue
         chosen = copy(block)
         chosen_points = avoid(chosen, points[index], reference, obstacles)
 
         # Work on this component's ROI, not another full-page mask. The native
         # maximal-rectangle search keeps holes; pending/placed boxes are holes
-        # too. A single alternative bounds CPU work even on difficult pages.
+        # too. Reuse this one ROI for horizontal recovery, then the existing
+        # vertical layout and (only if still undersized) native column fitting.
+        # No extra mask/rectangle search; keep a better single-column result.
         available = reference[y:y+h, x:x+w].copy()
         if w and h:
             if x == 0:
@@ -104,34 +165,67 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
                 cv2.fillPoly(available, [np.rint(np.asarray(polygon).reshape(-1, 2) - (x, y)).astype(np.int32)], 0)
             rx, ry, rw, rh = native.find_largest_inscribed_rect(available)
             if rw > 2 and rh > 2:
-                candidate = copy(block)
-                candidate.center = np.array([x + rx + rw / 2, y + ry + rh / 2])
-                candidate.unrotated_size = (rw - 2, rh - 2)
-                rich = block.translation_rich
-                candidate.translation = texts[index]
-                candidate.translation_rich = rich
-                candidate.font_size = block.original_font_size
-                native.text_render.set_font(candidate.font_family)
-                config._current_region = candidate
-                if hyphenate:
-                    from manga_translator.rendering.auto_linebreak import _layout_horizontal_eng
-                    lines, _ = _layout_horizontal_eng(round(candidate.font_size), texts[index], rw - 2,
-                        language=layout_language, hyphenate=True, letter_spacing=candidate.letter_spacing)
-                    candidate.translation = '[BR]'.join(lines)
-                else:
-                    native._apply_default_english_line_break_method(candidate, round(candidate.font_size), None, config)
-                # The spare rectangle is the wrap budget. Mask-layout would
-                # replace it with the whole shared bubble's rectangle again.
-                mask_layout = config.render.balloon_fill_mask_layout
-                config.render.balloon_fill_mask_layout = False
-                try:
-                    polygon = native.resize_regions_to_font_size(image, [candidate], config, original,
-                        bubble_mask=mask, skip_text_replacements=True)[0]
-                finally:
-                    config.render.balloon_fill_mask_layout = mask_layout
-                polygon = avoid(candidate, polygon, reference, obstacles)
-                if polygon is not None and (chosen_points is None or candidate.font_size > chosen.font_size):
-                    chosen, chosen_points = candidate, polygon
+                for mode in (('horizontal', 'vertical', 'columns') if vertical else ('horizontal',)):
+                    stack = mode != 'horizontal'
+                    if stack and chosen_points is not None and chosen.font_size >= .75 * block.original_font_size:
+                        break
+                    candidate = copy(block)
+                    candidate.center = np.array([x + rx + rw / 2, y + ry + rh / 2])
+                    candidate.unrotated_size = (rw - 2, rh - 2)
+                    rich = block.translation_rich
+                    candidate.translation = texts[index]
+                    candidate.translation_rich = rich
+                    candidate.font_size = block.original_font_size
+                    native.text_render.set_font(candidate.font_family)
+                    config._current_region = candidate
+                    # The spare rectangle is the wrap budget. Do not replace
+                    # it with the whole bubble or force a vertical copy back
+                    # to English horizontal layout during native fitting.
+                    mask_layout = config.render.balloon_fill_mask_layout
+                    english_layout = config.render.bubble_layout_english
+                    config.render.balloon_fill_mask_layout = False
+                    if stack:
+                        candidate._direction = 'v'
+                        config.render.bubble_layout_english = False
+                    try:
+                        if mode == 'columns':
+                            from manga_translator.rendering.auto_linebreak import solve_no_br_layout
+                            # The new rectangle is a layout budget, not a single
+                            # OCR column. Keep source lines intact while asking
+                            # MTU to choose columns and a bounded fitting size.
+                            config._current_region = None
+                            try:
+                                wrapped = solve_no_br_layout(text=texts[index], horizontal=False,
+                                    seed_segments=0, seed_font_size=round(block.original_font_size),
+                                    bubble_width=rw-2, bubble_height=rh-2, min_font_size=1,
+                                    max_font_size=round(block.original_font_size),
+                                    line_spacing_multiplier=candidate.line_spacing,
+                                    letter_spacing_multiplier=candidate.letter_spacing,
+                                    target_lang=candidate.target_lang, config=config)
+                                candidate.translation = wrapped.text_with_br
+                            finally:
+                                config._current_region = candidate
+                            if candidate.translation == texts[index]:
+                                continue
+                        elif not stack and hyphenate:
+                            from manga_translator.rendering.auto_linebreak import _layout_horizontal_eng
+                            lines, _ = _layout_horizontal_eng(round(candidate.font_size), texts[index], rw - 2,
+                                language=language, hyphenate=True, letter_spacing=candidate.letter_spacing)
+                            candidate.translation = '[BR]'.join(lines)
+                        elif not stack and recover and not rich:
+                            candidate.translation = _wrap_words(texts[index], round(candidate.font_size),
+                                rw - 2, candidate.letter_spacing)
+                        else:
+                            native._apply_default_english_line_break_method(candidate, round(candidate.font_size), None, config)
+                        polygon = native.resize_regions_to_font_size(image, [candidate], config, original,
+                            bubble_mask=mask, skip_text_replacements=True)[0]
+                    finally:
+                        config.render.balloon_fill_mask_layout = mask_layout
+                        config.render.bubble_layout_english = english_layout
+                    polygon = cap_source_font(candidate, polygon)
+                    polygon = avoid(candidate, polygon, reference, obstacles)
+                    if polygon is not None and (chosen_points is None or candidate.font_size > chosen.font_size):
+                        chosen, chosen_points = candidate, polygon
         if chosen_points is None:
             # Existing page-failure handling preserves the original. Never
             # publish a cleaned page with missing or clipped translated text.

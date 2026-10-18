@@ -70,8 +70,10 @@ class Renderer:
         from hyphen import dictools
         dictools.DEFAULT_DICT_PATH = str(root / 'hyphenation')
         registry = json.loads((root / 'hyphenation/dictionaries.json').read_text(encoding='utf-8'))
-        dictools.LANGUAGES[:] = list(registry)
         from manga_translator.rendering import text_render
+        # Upstream rewrites aliases at import. The prepared offline registry is
+        # authoritative; install it after that import, before any dictionary use.
+        dictools.LANGUAGES[:] = list(registry)
         from PyQt6.QtGui import QRawFont
         self.fonts = tuple(fonts)
         self.font_by_name = {Path(path).name: path for path in self.fonts}
@@ -229,7 +231,8 @@ class Renderer:
                         _apply_default_english_line_break_method(
                             block, round(block.font_size), None, config)
                 enclosed, points = fit_bubbles(rendered, original, enclosed, enclosed_texts, config,
-                                               bubble_mask, labels, [block.dst_points for block in free])
+                                               bubble_mask, labels, [block.dst_points for block in free],
+                                               language=language)
                 # Layout and final scale are already resolved. Native painting
                 # uses those exact sizes/anchors without a second fit or scale.
                 rendered = asyncio.run(dispatch(rendered, enclosed, config, original,
