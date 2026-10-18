@@ -1951,3 +1951,220 @@ def test_complex_text_recovery_uses_qt_words_not_codepoint_hyphenation(
     assert native._polygon_fully_inside_mask(block.dst_points[0], inset)
     painted = np.any(output != image, axis=2)
     assert painted.any() and not np.any(painted & (inset == 0))
+
+
+def _shared_reflow_page(source_sizes=(28, 19)):
+    """A generic L-shaped bubble, not a private page or translated checkpoint."""
+    from manga_translator.utils import TextBlock
+    image = np.full((320, 280, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[25:250, 75:230] = 255
+    mask[170:250, 25:220] = 255
+    lines = [
+        [[[130, 80], [215, 80], [215, 230], [130, 230]]],
+        [[[40, 180], [59, 180], [59, 240], [40, 240]]],
+    ]
+    regions = [serialize_region(TextBlock(value, ['source'], font_size=size, direction='v'))
+               for value, size in zip(lines, source_sizes)]
+    texts = ['The library is open from nine until six.',
+             'Ask the receptionist about the updated timetable.']
+    return image, mask, regions, texts
+
+
+def _assert_shared_reflow_pixels(image, output, mask, regions, texts, observed, native):
+    from manga_translator.utils import erode_bubble_mask
+    from mtu_engine.engine import configuration
+    by_source = {tuple(np.asarray(block.lines).ravel()): block for block in observed}
+    assert len(by_source) == len(regions)
+    blocks = [by_source[tuple(np.asarray(region['lines']).ravel())] for region in regions]
+    inset = erode_bubble_mask(mask, .02)
+    for i, (block, region, text) in enumerate(zip(blocks, regions, texts)):
+        assert block.original_font_size == region['font_size']
+        assert 0 < block.font_size <= native._apply_final_font_constraints(
+            region['font_size'], configuration())
+        restored = re.sub(r'-\[BR\]', '', block.translation).replace('[BR]', '')
+        assert ''.join(restored.split()) == ''.join(text.replace('[BR]', '').split())
+        np.testing.assert_array_equal(block.lines, np.asarray(region['lines']))
+        vertices = block.dst_points.reshape(-1, 2)
+        assert np.isfinite(vertices).all() and (vertices >= (1, 1)).all()
+        assert (vertices <= (image.shape[1]-1, image.shape[0]-1)).all()
+        assert native._polygon_fully_inside_mask(vertices, inset)
+        assert all(not native._polygons_overlap(block.dst_points, other.dst_points)
+                   for other in blocks[i+1:])
+    painted = np.any(output != image, axis=2)
+    assert painted.any() and not np.any(painted & (inset == 0))
+    return blocks
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize(('language', 'texts', 'source_sizes'), [
+    ('en', None, (28, 19)),
+    ('en', None, (26, 20)),
+    ('fr', ['La bibliothe\u0300que ouvre chaque jour a\u0300 neuf heures.',
+            'Le calendrier de\u0301taille les horaires de chaque atelier.'], (28, 19)),
+    ('ar', ['تفتح المكتبة في التاسعة كل صباح.',
+            'يرجى مراجعة الجدول لمعرفة مواعيد الأنشطة خلال الأسبوع القادم.'], (28, 19)),
+])
+def test_shared_bubble_reflow_balances_source_sizes_without_splitting_shaped_words(
+        bubble_layout, monkeypatch, reverse, language, texts, source_sizes):
+    from mtu_engine.engine import configuration
+    renderer, observed, native = bubble_layout
+    image, mask, regions, defaults = _shared_reflow_page(source_sizes)
+    texts = defaults if texts is None else texts
+    if reverse:
+        regions, texts = regions[::-1], texts[::-1]
+    snapshot = json.loads(json.dumps(regions))
+    rectangles, candidates = [], []
+    rectangle, resize = native.find_largest_inscribed_rect, native.resize_regions_to_font_size
+
+    def counted_rectangle(value):
+        if value.shape != image.shape[:2]:
+            rectangles.append(value.shape)
+        return rectangle(value)
+
+    def counted_resize(*args, **kwargs):
+        result = resize(*args, **kwargs)
+        if not args[2].render.balloon_fill_mask_layout:
+            candidates.extend(args[1])
+        return result
+
+    monkeypatch.setattr(native, 'find_largest_inscribed_rect', counted_rectangle)
+    monkeypatch.setattr(native, 'resize_regions_to_font_size', counted_resize)
+    outputs = []
+    for cache_bytes in (0, None):
+        observed.clear()
+        rectangles.clear()
+        candidates.clear()
+        output = renderer.render(image, image, regions, texts, language, mask,
+                                 mask_cache_bytes=cache_bytes)
+        blocks = _assert_shared_reflow_pixels(image, output, mask, regions, texts, observed, native)
+        # Compare final rendered sizes with the same final-scale constraint;
+        # the native integer rounding is not a raw 75% source-size promise.
+        assert all(block.font_size >= native._apply_final_font_constraints(
+            .75 * region['font_size'], configuration()) for block, region in zip(blocks, regions))
+        assert all(block.horizontal for block in blocks)
+        # Either shared-cell axis is valid, but its source order must survive.
+        ordered_axes = []
+        for axis in (0, 1):
+            source_order = sorted(blocks, key=lambda block:
+                np.asarray(block.lines)[..., axis].mean())
+            if (source_order[0].dst_points[..., axis].max() <
+                    source_order[1].dst_points[..., axis].min()):
+                ordered_axes.append(axis)
+        assert ordered_axes
+        assert len(rectangles) <= 6  # Two ordinary ROIs + at most two two-cell plans.
+        assert len(candidates) <= 22  # Six ordinary fits + four shared cells with at most four modes.
+        if language == 'en':
+            # Independent fitting leaves this caption below the threshold.
+            # This positive reflow fixture must also exceed the raw threshold.
+            assert min(block.font_size / region['font_size']
+                       for block, region in zip(blocks, regions)) >= .75
+            assert 1 in ordered_axes  # Retain explicit top-to-bottom coverage.
+            assert len(rectangles) >= 2  # Exercise actual joint allocation, not a fast-path case.
+        else:
+            assert all(block.horizontal for block in candidates)
+            for block, text in zip(blocks, texts):
+                assert block.translation.replace('[BR]', ' ').split() == text.split()
+        assert regions == snapshot
+        outputs.append(output)
+    np.testing.assert_array_equal(outputs[0], outputs[1])
+
+
+@pytest.mark.parametrize('boundary', ['hole', 'edge', 'occupied'])
+def test_shared_bubble_reflow_respects_holes_page_edges_and_external_paragraphs(
+        bubble_layout, boundary):
+    from manga_translator.utils import TextBlock
+    renderer, observed, native = bubble_layout
+    image, mask, regions, texts = _shared_reflow_page()
+    if boundary == 'hole':
+        mask[110:130, 90:108] = 0
+    elif boundary == 'edge':
+        mask[:, :-25] = mask[:, 25:]
+        mask[:, -25:] = 0
+        for region in regions:
+            points = np.asarray(region['lines'])
+            points[..., 0] -= 25
+            region['lines'] = points.tolist()
+    else:
+        free = serialize_region(TextBlock([[[190, 190], [205, 190], [205, 205], [190, 205]]],
+            ['outside the pair'], font_size=12, direction='h'))
+        free['bubble_enclosed'] = False
+        regions.append(free)
+        texts.append('!')
+    snapshot = json.loads(json.dumps(regions))
+    output = renderer.render(image, image, regions, texts, 'en', mask)
+    _assert_shared_reflow_pixels(image, output, mask, regions, texts, observed, native)
+    assert regions == snapshot
+
+
+@pytest.mark.parametrize('explicit', [False, True])
+def test_shared_bubble_reflow_preserves_normal_pairs_and_explicit_breaks(
+        bubble_layout, monkeypatch, explicit):
+    from manga_translator.utils import TextBlock
+    renderer, observed, native = bubble_layout
+    image = np.full((320, 380, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[20:300, 20:360] = 255
+    lines = [[[[40, 50], [160, 50], [160, 130], [40, 130]]],
+             [[[190, 170], [330, 170], [330, 260], [190, 260]]]]
+    regions = [serialize_region(TextBlock(value, ['source'], font_size=size, direction='h'))
+               for value, size in zip(lines, (28, 19))]
+    texts = (['This is a deliberately long explicit first line[BR]Follow the existing break.',
+              'Keep this existing[BR]paragraph as written.'] if explicit else
+             ['Hello there!', 'See you soon.'])
+    candidates, resize = [], native.resize_regions_to_font_size
+
+    def record(*args, **kwargs):
+        result = resize(*args, **kwargs)
+        if not args[2].render.balloon_fill_mask_layout:
+            candidates.extend(args[1])
+        return result
+
+    monkeypatch.setattr(native, 'resize_regions_to_font_size', record)
+    output = renderer.render(image, image, regions, texts, 'en', mask)
+    blocks = _assert_shared_reflow_pixels(image, output, mask, regions, texts, observed, native)
+    # The ordinary pass may resolve initially overlapping native boxes. Neither
+    # case needs extra shared-cell fitting beyond one horizontal fit per block.
+    assert len(candidates) <= len(regions)
+    if explicit:
+        assert min(block.font_size / region['font_size']
+                   for block, region in zip(blocks, regions)) < .75
+        assert [block.translation for block in blocks] == texts
+    else:
+        assert all(block.font_size >= .75 * region['font_size']
+                   for block, region in zip(blocks, regions))
+
+
+def test_shared_bubble_reflow_rolls_back_both_paragraphs_without_a_joint_gain(
+        bubble_layout, monkeypatch):
+    renderer, observed, native = bubble_layout
+    image, mask, regions, texts = _shared_reflow_page()
+    snapshot = json.loads(json.dumps(regions))
+    rectangle = native.find_largest_inscribed_rect
+    # Keep the native initial layouts but make every optional recovery budget
+    # empty. This gives the fallback pixels without another layout implementation.
+    with monkeypatch.context() as unavailable:
+        unavailable.setattr(native, 'find_largest_inscribed_rect', lambda value:
+            rectangle(value) if value.shape == image.shape[:2] else (0, 0, 0, 0))
+        expected = renderer.render(image, image, regions, texts, 'en', mask)
+    baseline = [(block.font_size, block.translation, block.dst_points.copy()) for block in observed]
+    observed.clear()
+    candidates, resize = [], native.resize_regions_to_font_size
+
+    def undersized_caption(*args, **kwargs):
+        result = resize(*args, **kwargs)
+        if not args[2].render.balloon_fill_mask_layout:
+            for block in args[1]:
+                candidates.append(block.original_font_size)
+                if block.original_font_size == regions[1]['font_size']:
+                    block.font_size = 1  # Main-paragraph changes alone cannot commit a pair.
+        return result
+
+    monkeypatch.setattr(native, 'resize_regions_to_font_size', undersized_caption)
+    actual = renderer.render(image, image, regions, texts, 'en', mask)
+    assert set(candidates) == {region['font_size'] for region in regions}
+    np.testing.assert_array_equal(actual, expected)
+    for block, (size, text, polygon) in zip(observed, baseline):
+        assert (block.font_size, block.translation) == (size, text)
+        np.testing.assert_array_equal(block.dst_points, polygon)
+    assert regions == snapshot

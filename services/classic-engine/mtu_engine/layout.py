@@ -112,6 +112,105 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
                 block.font_size = size
         return polygon if safe(polygon, reference) else None
 
+    def available_space(reference, obstacles):
+        x, y, w, h = reference_mask_bounds(reference) or cv2.boundingRect(reference)
+        available = reference[y:y+h, x:x+w].copy()
+        if w and h:
+            if x == 0:
+                available[:, 0] = 0
+            if y == 0:
+                available[0, :] = 0
+            if x + w == width:
+                available[:, -1] = 0
+            if y + h == height:
+                available[-1, :] = 0
+            for polygon, _ in obstacles:
+                cv2.fillPoly(available, [np.rint(np.asarray(polygon).reshape(-1, 2) - (x, y)).astype(np.int32)], 0)
+        return x, y, available
+
+    def fit_rectangle(block, text, rect, reference, obstacles, *, recover, best, cell=None):
+        chosen, chosen_points = best
+        rx, ry, rw, rh = rect
+        if rw <= 2 or rh <= 2:
+            return best
+        vertical = recover and _can_stack_text(text)
+        # Native hyphenation can fall back to code-point splits too; complex
+        # graphemes and bidi text must keep Qt's shaping and word wrapping.
+        hyphenate = (vertical and not block.translation_rich and
+                     native.text_render.select_hyphenator(language) is not None)
+        modes = ('horizontal', 'vertical', 'columns') if vertical else ('horizontal',)
+        # Shared cells can trade width for height. Compare Qt word wrapping
+        # with the existing dictionary breaks, rather than forcing hyphenation.
+        if cell is not None and hyphenate:
+            modes = ('words', *modes)
+        for mode in modes:
+            stack = mode in ('vertical', 'columns')
+            if stack and chosen_points is not None and chosen.font_size >= .75 * block.original_font_size:
+                break
+            candidate = copy(block)
+            candidate.center = np.array([rx + rw / 2, ry + rh / 2])
+            candidate.unrotated_size = (rw - 2, rh - 2)
+            rich = block.translation_rich
+            candidate.translation = text
+            candidate.translation_rich = rich
+            candidate.font_size = block.original_font_size
+            # In a shared cell, reuse a healthy paragraph's already fitted
+            # size for wrapping, rather than freezing breaks at its larger OCR size.
+            seed = round(block.font_size if cell is not None and
+                block.font_size >= .75 * block.original_font_size else block.original_font_size)
+            native.text_render.set_font(candidate.font_family)
+            config._current_region = candidate
+            mask_layout = config.render.balloon_fill_mask_layout
+            english_layout = config.render.bubble_layout_english
+            config.render.balloon_fill_mask_layout = False
+            if stack:
+                candidate._direction = 'v'
+                config.render.bubble_layout_english = False
+            try:
+                if mode == 'columns':
+                    from manga_translator.rendering.auto_linebreak import solve_no_br_layout
+                    # The rectangle is a layout budget, not a single OCR column.
+                    config._current_region = None
+                    try:
+                        wrapped = solve_no_br_layout(text=text, horizontal=False,
+                            seed_segments=0, seed_font_size=round(block.original_font_size),
+                            bubble_width=rw-2, bubble_height=rh-2, min_font_size=1,
+                            max_font_size=round(block.original_font_size),
+                            line_spacing_multiplier=candidate.line_spacing,
+                            letter_spacing_multiplier=candidate.letter_spacing,
+                            target_lang=candidate.target_lang, config=config)
+                        candidate.translation = wrapped.text_with_br
+                    finally:
+                        config._current_region = candidate
+                    if candidate.translation == text:
+                        continue
+                elif mode == 'horizontal' and hyphenate:
+                    from manga_translator.rendering.auto_linebreak import _layout_horizontal_eng
+                    lines, _ = _layout_horizontal_eng(seed, text, rw - 2,
+                        language=language, hyphenate=True, letter_spacing=candidate.letter_spacing)
+                    candidate.translation = '[BR]'.join(lines)
+                elif not stack and recover and not rich:
+                    candidate.translation = _wrap_words(text, seed,
+                        rw - 2, candidate.letter_spacing)
+                else:
+                    native._apply_default_english_line_break_method(candidate, round(candidate.font_size), None, config)
+                polygon = native.resize_regions_to_font_size(image, [candidate], config, original,
+                    bubble_mask=mask, skip_text_replacements=True)[0]
+            finally:
+                config.render.balloon_fill_mask_layout = mask_layout
+                config.render.bubble_layout_english = english_layout
+            polygon = avoid(candidate, cap_source_font(candidate, polygon), reference, obstacles)
+            if polygon is not None and cell is not None:
+                origin, budget = cell
+                vertices = np.asarray(polygon).reshape(-1, 2) - origin
+                if not ((vertices >= 0).all() and
+                        (vertices <= (budget.shape[1]-1, budget.shape[0]-1)).all() and
+                        native._polygon_fully_inside_mask(vertices, budget)):
+                    polygon = None
+            if polygon is not None and (chosen_points is None or candidate.font_size > chosen.font_size):
+                chosen, chosen_points = candidate, polygon
+        return chosen, chosen_points
+
     for index, block in enumerate(blocks):
         reference = build_region_reference_mask(block, mask, labels)
         x, y, w, h = reference_mask_bounds(reference) or cv2.boundingRect(reference)
@@ -132,14 +231,6 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
             block.font_size < .75 * block.original_font_size and
             2 * (boxes[index, 3] - boxes[index, 1]) < h and
             not native._has_explicit_line_breaks(texts[index]))
-        vertical = recover and _can_stack_text(texts[index])
-        # Native hyphenation can also fall back to code-point splits. Reuse
-        # the same grapheme/bidi guard; complex text keeps Qt word wrapping.
-        hyphenate = vertical and not block.translation_rich
-        if hyphenate:
-            # The upstream selector accepts BCP-47 tags, not MTU's internal
-            # three-letter targets. Reuse the request's existing language tag.
-            hyphenate = native.text_render.select_hyphenator(language) is not None
         if (safe(points[index], reference) and not collision and
                 native._polygon_fully_inside_mask(block.min_rect[0], reference) and not recover):
             continue
@@ -151,81 +242,11 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
         # too. Reuse this one ROI for horizontal recovery, then the existing
         # vertical layout and (only if still undersized) native column fitting.
         # No extra mask/rectangle search; keep a better single-column result.
-        available = reference[y:y+h, x:x+w].copy()
+        x, y, available = available_space(reference, obstacles)
         if w and h:
-            if x == 0:
-                available[:, 0] = 0
-            if y == 0:
-                available[0, :] = 0
-            if x + w == width:
-                available[:, -1] = 0
-            if y + h == height:
-                available[-1, :] = 0
-            for polygon, _ in obstacles:
-                cv2.fillPoly(available, [np.rint(np.asarray(polygon).reshape(-1, 2) - (x, y)).astype(np.int32)], 0)
             rx, ry, rw, rh = native.find_largest_inscribed_rect(available)
-            if rw > 2 and rh > 2:
-                for mode in (('horizontal', 'vertical', 'columns') if vertical else ('horizontal',)):
-                    stack = mode != 'horizontal'
-                    if stack and chosen_points is not None and chosen.font_size >= .75 * block.original_font_size:
-                        break
-                    candidate = copy(block)
-                    candidate.center = np.array([x + rx + rw / 2, y + ry + rh / 2])
-                    candidate.unrotated_size = (rw - 2, rh - 2)
-                    rich = block.translation_rich
-                    candidate.translation = texts[index]
-                    candidate.translation_rich = rich
-                    candidate.font_size = block.original_font_size
-                    native.text_render.set_font(candidate.font_family)
-                    config._current_region = candidate
-                    # The spare rectangle is the wrap budget. Do not replace
-                    # it with the whole bubble or force a vertical copy back
-                    # to English horizontal layout during native fitting.
-                    mask_layout = config.render.balloon_fill_mask_layout
-                    english_layout = config.render.bubble_layout_english
-                    config.render.balloon_fill_mask_layout = False
-                    if stack:
-                        candidate._direction = 'v'
-                        config.render.bubble_layout_english = False
-                    try:
-                        if mode == 'columns':
-                            from manga_translator.rendering.auto_linebreak import solve_no_br_layout
-                            # The new rectangle is a layout budget, not a single
-                            # OCR column. Keep source lines intact while asking
-                            # MTU to choose columns and a bounded fitting size.
-                            config._current_region = None
-                            try:
-                                wrapped = solve_no_br_layout(text=texts[index], horizontal=False,
-                                    seed_segments=0, seed_font_size=round(block.original_font_size),
-                                    bubble_width=rw-2, bubble_height=rh-2, min_font_size=1,
-                                    max_font_size=round(block.original_font_size),
-                                    line_spacing_multiplier=candidate.line_spacing,
-                                    letter_spacing_multiplier=candidate.letter_spacing,
-                                    target_lang=candidate.target_lang, config=config)
-                                candidate.translation = wrapped.text_with_br
-                            finally:
-                                config._current_region = candidate
-                            if candidate.translation == texts[index]:
-                                continue
-                        elif not stack and hyphenate:
-                            from manga_translator.rendering.auto_linebreak import _layout_horizontal_eng
-                            lines, _ = _layout_horizontal_eng(round(candidate.font_size), texts[index], rw - 2,
-                                language=language, hyphenate=True, letter_spacing=candidate.letter_spacing)
-                            candidate.translation = '[BR]'.join(lines)
-                        elif not stack and recover and not rich:
-                            candidate.translation = _wrap_words(texts[index], round(candidate.font_size),
-                                rw - 2, candidate.letter_spacing)
-                        else:
-                            native._apply_default_english_line_break_method(candidate, round(candidate.font_size), None, config)
-                        polygon = native.resize_regions_to_font_size(image, [candidate], config, original,
-                            bubble_mask=mask, skip_text_replacements=True)[0]
-                    finally:
-                        config.render.balloon_fill_mask_layout = mask_layout
-                        config.render.bubble_layout_english = english_layout
-                    polygon = cap_source_font(candidate, polygon)
-                    polygon = avoid(candidate, polygon, reference, obstacles)
-                    if polygon is not None and (chosen_points is None or candidate.font_size > chosen.font_size):
-                        chosen, chosen_points = candidate, polygon
+            chosen, chosen_points = fit_rectangle(block, texts[index], (x+rx, y+ry, rw, rh),
+                reference, obstacles, recover=recover, best=(chosen, chosen_points))
         if chosen_points is None:
             # Existing page-failure handling preserves the original. Never
             # publish a cleaned page with missing or clipped translated text.
@@ -233,4 +254,80 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
         blocks[index], points[index] = chosen, chosen_points
         vertices = np.asarray(chosen_points).reshape(-1, 2)
         boxes[index] = np.concatenate((vertices.min(axis=0), vertices.max(axis=0)))
+
+    # A safe large paragraph can leave its neighbour only a narrow strip.
+    # Retry shared pairs as a unit, using the same native fitting in two cells.
+    # Source geometry orders the cells; paragraph IDs and source data never move.
+    if config.render.balloon_fill_mask_layout and any(
+            block.font_size < .75 * block.original_font_size for block in blocks):
+        from manga_translator.utils.bubble import _region_labels
+        groups = {}
+        for index, block in enumerate(blocks):
+            key = _region_labels(block, mask, labels)
+            if len(key) == 1:
+                groups.setdefault(key, []).append(index)
+        for indices in groups.values():
+            if len(indices) != 2 or any(not blocks[i].horizontal or blocks[i].translation_rich or
+                    native._has_explicit_line_breaks(texts[i]) for i in indices):
+                continue
+            ratios = [blocks[i].font_size / blocks[i].original_font_size for i in indices]
+            score = min(ratios)
+            if score >= .75:
+                continue
+            reference = build_region_reference_mask(blocks[indices[0]], mask, labels)
+            obstacles = [(p, None) for i, p in enumerate([*points, *occupied]) if i not in indices]
+            x, y, available = available_space(reference, obstacles)
+            origin = np.array([x, y])
+            centers = {}
+            for i in indices:
+                source = np.asarray(blocks[i].lines).reshape(-1, 2)
+                centers[i] = (source.min(axis=0) + source.max(axis=0)) / 2
+
+            def fit_pair(axis, split):
+                order = sorted(indices, key=lambda i: centers[i][axis])
+                if not 0 < split < available.shape[1-axis]:
+                    return None
+                pair = []
+                for side, i in enumerate(order):
+                    budget = available.copy()
+                    excluded = [slice(None), slice(None)]
+                    excluded[1-axis] = slice(split, None) if side == 0 else slice(None, split)
+                    budget[tuple(excluded)] = 0
+                    # Feed the cell boundary to the existing collision fitter,
+                    # so an outline crossing it slightly is shrunk, not lost.
+                    low, high = origin.copy(), origin + available.shape[::-1]
+                    if side == 0:
+                        low[axis] += split - 1
+                    else:
+                        high[axis] = origin[axis] + split
+                    wall = np.array([low, (high[0], low[1]), high, (low[0], high[1])])
+                    rx, ry, rw, rh = native.find_largest_inscribed_rect(budget)
+                    candidate, polygon = fit_rectangle(blocks[i], texts[i], (x+rx, y+ry, rw, rh),
+                        reference, [*obstacles, (wall, None)], recover=True,
+                        best=(copy(blocks[i]), None), cell=(origin, budget))
+                    if polygon is None:
+                        return None
+                    pair.append((i, candidate, polygon))
+                if native._polygons_overlap(pair[0][2], pair[1][2]):
+                    return None
+                return pair
+
+            best_pair = None
+            for axis in (0, 1):
+                if centers[indices[0]][axis] == centers[indices[1]][axis]:
+                    continue
+                split = round(sum(centers[i][axis] for i in indices) / 2 - origin[axis])
+                pair = fit_pair(axis, split)
+                if pair is None:
+                    continue
+                candidate_score = min(b.font_size / b.original_font_size for _, b, _ in pair)
+                # Compare output sizes with output constraints, including the
+                # existing final scale and integer rounding, just like the cap.
+                if (candidate_score > score and all(b.font_size >= min(blocks[i].font_size,
+                        native._apply_final_font_constraints(.75 * b.original_font_size, config))
+                        for i, b, _ in pair)):
+                    score, best_pair = candidate_score, pair
+            if best_pair is not None:
+                for i, block, polygon in best_pair:
+                    blocks[i], points[i] = block, polygon
     return blocks, points
