@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from . import stripe_client as stripe, creem_client as creem
 from .billing_providers import BillingError, require, provider_enabled, provider_environment, provider_config_json, resource_key, remote_id, stripe_quote
-from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding, BillingOrder, BillingTerm
+from .billing_models import BillingAccount, BillingCustomer, BillingCheckout, BillingCheckoutAlias, BillingSubscription, BillingPrice, BillingPlanRevision, BillingPriceBinding, BillingOrder, BillingTerm
 from .entitlement_models import QuotaPeriod
 from .billing_access import ongoing_subscription, access_dates
 from .billing_catalog import offers, price_json, default_provider
@@ -62,29 +62,44 @@ def current_subscription(db, owner_id, provider=None):
     return db.scalar(query.order_by(ongoing_subscription().desc(), BillingCheckout.created_at.desc()).limit(1))
 
 
-def subscription_checkout(db, owner_id, price_id=None):
+def pending_checkout(db, owner_id, price_id=None, *, subscription_only=False):
     query = select(BillingCheckout, BillingPrice).join(
         BillingPrice, BillingPrice.id == BillingCheckout.price_id).where(
-            BillingCheckout.owner_id == owner_id, BillingPrice.billing_type == 'recurring', pending_checkout_condition())
+            BillingCheckout.owner_id == owner_id, pending_checkout_condition())
     if price_id is not None:
         query = query.where(BillingCheckout.price_id == price_id)
+    else:
+        query = query.where(BillingPrice.interval != 'once')
+    if subscription_only:
+        query = query.where(BillingPrice.billing_type == 'recurring')
     return db.execute(query.order_by(BillingCheckout.created_at, BillingCheckout.id).limit(1)).first()
+
+
+def subscription_checkout(db, owner_id, price_id=None):
+    return pending_checkout(db, owner_id, price_id, subscription_only=True)
+
+
+def checkout_summary(db, selected):
+    if selected is None:
+        return None
+    row, price = selected
+    quote = price_json(db, price)
+    revision = db.get(BillingPlanRevision, price.plan_revision_id)
+    quote['channels'] = [{'provider': row.provider, 'binding_id': row.binding_id,
+        'trial_days': revision.trial_days, 'trial_classic_pages': revision.trial_classic_pages}]
+    return {'id': row.id, 'provider': row.provider, 'price': quote,
+        'idempotency_key': row.idempotency_key, 'error': row.error_code}
 
 
 def billing_status(db, user, price_id=None):
     from .billing_renewal import renewal_json
     account = db.get(BillingAccount, user.id)
     sub = current_subscription(db, user.id)
-    pending = None
-    selected = subscription_checkout(db, user.id, price_id)
-    if selected:
-        row, price = selected
-        quote = price_json(db, price)
-        revision = db.get(BillingPlanRevision, price.plan_revision_id)
-        quote['channels'] = [{'provider': row.provider, 'binding_id': row.binding_id,
-            'trial_days': revision.trial_days, 'trial_classic_pages': revision.trial_classic_pages}]
-        pending = {'id': row.id, 'provider': row.provider, 'price': quote,
-            'idempotency_key': row.idempotency_key, 'error': row.error_code}
+    selected = pending_checkout(db, user.id, price_id)
+    pending = checkout_summary(db, selected)
+    subscription_pending = pending
+    if selected and selected[1].billing_type != 'recurring':
+        subscription_pending = checkout_summary(db, subscription_checkout(db, user.id)) if price_id is None else None
     providers = [provider_config_json(p) for p in ('stripe', 'creem') if provider_enabled(p)]
     prepaid_terms = select(BillingTerm).where(BillingTerm.owner_id == user.id,
         BillingTerm.billing_order_id.is_not(None), BillingTerm.revoked_at.is_(None), BillingTerm.ends_at > now())
@@ -98,7 +113,7 @@ def billing_status(db, user, price_id=None):
         'provider': sub.provider if sub else None,
         'environment': providers[0]['environment'] if providers else 'test',
         'offers': offers(db), 'quota_offers': offers(db, interval='once'),
-        'subscription_checkout': pending,
+        'pending_checkout': pending, 'subscription_checkout': subscription_pending,
         'trial_eligible': not account or account.trial_used_at is None,
         'prepaid_membership': prepaid_json,
         'gift': gift_json(user),
@@ -295,6 +310,11 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
         require(price.billing_type != 'onetime' or idempotency_key, 'BILLING_IDEMPOTENCY_KEY_REQUIRED')
         replay = db.scalar(select(BillingCheckout).where(BillingCheckout.owner_id == owner_id,
             BillingCheckout.idempotency_key == idempotency_key)) if idempotency_key else None
+        if replay is None and idempotency_key:
+            alias = db.get(BillingCheckoutAlias, (owner_id, idempotency_key))
+            if alias:
+                replay = db.get(BillingCheckout, alias.checkout_id)
+                require(replay is not None and replay.owner_id == owner_id, 'BILLING_ACCOUNT_UNBOUND')
         if replay:
             require(replay.price_id == price_id and replay.provider == provider, 'BILLING_CHECKOUT_PRICE_CONFLICT')
             if not db.scalar(select(BillingCheckout.id).where(BillingCheckout.id == replay.id, pending_checkout_condition())):
@@ -309,9 +329,8 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             account = BillingAccount(owner_id=owner_id)
             db.add(account)
         customer = customer_for(db, owner_id, provider)
-        selected = subscription_checkout(db, owner_id, price_id) if price.billing_type == 'recurring' else None
-        row = replay if price.billing_type == 'onetime' else selected[0] if selected else None
-        require(not replay or row and replay.id == row.id, 'BILLING_CHECKOUT_PRICE_CONFLICT')
+        selected = pending_checkout(db, owner_id, price_id) if replay is None else None
+        row = replay or (selected[0] if selected else None)
         if price.interval != 'once':
             active = db.scalar(select(BillingSubscription.id).where(BillingSubscription.owner_id == owner_id,
                 ongoing_subscription()).limit(1))
@@ -359,6 +378,11 @@ def start_checkout(owner_id, price_id, provider, idempotency_key=None):
             checkout_order(db, row)
         else:
             require(row.price_id == price_id and row.provider == provider, 'BILLING_CHECKOUT_PRICE_CONFLICT')
+        if idempotency_key and replay is None and row.idempotency_key != idempotency_key:
+            # A returned checkout URL can be lost before the caller sees it.
+            # Retain this key before recovery so a later paid replay stays on
+            # the same intent instead of becoming another purchase.
+            db.add(BillingCheckoutAlias(owner_id=owner_id, idempotency_key=idempotency_key, checkout_id=row.id))
         checkout_id, trial = row.id, row.trial
         db.commit()
     session = recover_checkout(checkout_id)

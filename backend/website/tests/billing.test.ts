@@ -59,6 +59,11 @@ test('checkout quote lookup preserves pending priority and includes prepaid and 
   assert.equal(findCheckoutOffer(billing,pack.id),pack);
   assert.equal(findCheckoutOffer(billing,'retired'),undefined);
   assert.equal(findCheckoutOffer({...billing,quota_offers:undefined},pack.id),undefined);
+  const original={...prepaid,channels:pending.channels};
+  const withPurchase={...billing,pending_checkout:{price:original}} as Billing;
+  assert.equal(findCheckoutOffer(withPurchase,prepaid.id),original);
+  assert.equal(findCheckoutOffer(withPurchase,current.id),pending);
+  assert.equal(findCheckoutOffer({...billing,pending_checkout:{price:pack}} as Billing,pack.id),pack);
 });
 
 test('membership pricing derives exact-mode quotes and display-only fallback without mutating the catalog',()=>{
@@ -139,6 +144,11 @@ test('prepaid membership keeps the existing monthly allowance and has localized 
     assert.equal(membershipBillingType(locale),locale==='zh-CN'?'onetime':'recurring',locale);
     assert.equal(membershipBillingType(locale,quarter),'onetime',locale);
     assert.equal(membershipBillingType(locale,{...quarter,billing_type:'recurring'}),'recurring',locale);
+    assert.equal(membershipBillingType(locale,undefined,quarter),'onetime',locale);
+    assert.equal(membershipBillingType(locale,undefined,{...quarter,billing_type:'recurring'}),'recurring',locale);
+    assert.equal(membershipBillingType(locale,{...quarter,billing_type:'recurring'},quarter),'recurring',locale);
+    assert.equal(membershipBillingType(locale,quarter,{...quarter,billing_type:'recurring'}),'onetime',locale);
+    assert.equal(membershipBillingType(locale,undefined,{...quarter,interval:'once'}),locale==='zh-CN'?'onetime':'recurring',locale);
     assert.equal(renewalCopy(quarter,locale),copy.notice,locale);
     assert.equal(offerBenefits(quarter,locale),subscriptionQuotaCopy(locale).monthly.replace('{0}',(2500).toLocaleString(locale)),locale);
     for(const [key,value] of Object.entries(copy)){

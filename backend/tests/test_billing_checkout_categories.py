@@ -1,4 +1,4 @@
-"""Independent quota orders retain exact intent/payment identity without a purchase lock."""
+"""Reuse pending quotes while preserving independently issued historical payments."""
 import copy
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -7,7 +7,7 @@ from datetime import timedelta, timezone
 import pytest
 from sqlalchemy import func, select
 from conftest import login
-from test_billing_purchases import purchase, paid, notify, records, reverse
+from test_billing_purchases import purchase, paid, notify, records, reverse, historical_checkout
 
 
 @pytest.fixture
@@ -128,6 +128,7 @@ def test_subscription_pending_does_not_lock_same_or_other_quota_prices(category_
     assert checkout(state, 'subscription').status_code == 200
     snapshot = status(state)
     pending = snapshot['subscription_checkout']
+    assert snapshot['pending_checkout'] == pending
     assert set(pending) == {'id', 'provider', 'price', 'idempotency_key', 'error'}
     assert pending['idempotency_key'] is None and pending['price']['interval'] == 'month'
     assert not {'pending_checkouts', 'checkout_pending', 'checkout_price', 'quota_checkout_price',
@@ -140,17 +141,32 @@ def test_subscription_pending_does_not_lock_same_or_other_quota_prices(category_
     assert status(state)['provider'] is None
     assert checkout(state, key='small-one', price_id='large-price').json()['error']['code'] == 'BILLING_CHECKOUT_PRICE_CONFLICT'
     assert checkout(state, 'subscription').json()['checkout_id'] == pending['id']
-    assert len(rows(state)) == len(state['sessions']) == len(state['posts']) == 4
+    assert len(rows(state)) == len(state['sessions']) == len(state['posts']) == 3
 
 
-def test_distinct_key_concurrency_keeps_independent_checkouts(category_buyer):
+def test_distinct_key_concurrency_reuses_one_checkout_per_price(category_buyer):
     from app.billing_checkout import start_checkout
+    from app.billing_models import BillingCheckoutAlias
+    from app.billing_providers import BillingError
+    from app.db import session_factory
     state = category_buyer
+
+    def start(index):
+        try:
+            return start_checkout(state['owner'], 'large-price' if index % 2 else 'purchase-price',
+                state['provider'], 'key-' + str(index))
+        except BillingError as exc:
+            assert state['provider'] == 'creem' and exc.code == 'CREEM_CHECKOUT_UNCERTAIN'
+            return None
+
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(lambda index: start_checkout(state['owner'],
-            'large-price' if index % 2 else 'purchase-price', state['provider'], 'key-' + str(index)), range(6)))
-    assert len({result['checkout_id'] for result in results}) == len(rows(state)) == len(state['sessions']) == 6
+        list(pool.map(start, range(6)))
+    results = [start(index) for index in range(6)]
+    assert all(results)
+    assert len({result['checkout_id'] for result in results}) == len(rows(state)) == len(state['sessions']) == 2
     assert all(row.customer_id is None for row in rows(state))
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(BillingCheckoutAlias)) == 4
 
 
 @pytest.mark.parametrize('order', ['forward', 'reverse', 'concurrent'])
@@ -161,7 +177,7 @@ def test_customerless_purchases_settle_with_distinct_customers(category_buyer, o
     state = category_buyer
     sessions = []
     for index in range(2):
-        assert checkout(state, key='purchase-' + str(index)).status_code == 200
+        historical_checkout(state, 'purchase-' + str(index))
         session = paid(state, sync=False)
         change_payment_customer(state, session, 'cust_order' + str(index))
         sessions.append(session)
@@ -255,7 +271,7 @@ def test_many_pending_status_is_fixed_and_remote_free(category_buyer):
     state = category_buyer
     baseline = status(state)
     for index in range(12):
-        assert checkout(state, key='pending-' + str(index)).status_code == 200
+        historical_checkout(state, 'pending-' + str(index))
     state['requests'].clear()
     current = status(state)
     assert current == baseline and len(json.dumps(current)) == len(json.dumps(baseline))
@@ -264,15 +280,18 @@ def test_many_pending_status_is_fixed_and_remote_free(category_buyer):
 
 
 @pytest.mark.parametrize('purchase', ['creem'], indirect=True)
-def test_unknown_intent_blocks_only_its_own_post_replay(category_buyer):
+def test_unknown_same_price_reuses_original_intent_without_blocking_other_quotes(category_buyer):
     state = category_buyer
     state['lost'] = True
     assert checkout(state, key='lost-one').status_code == 503
-    assert checkout(state, key='another-one').status_code == 200
+    reused = checkout(state, key='another-one')
+    assert reused.status_code == 409 and reused.json()['error']['code'] == 'CREEM_CHECKOUT_UNCERTAIN'
+    assert len(state['posts']) == 1
+    assert checkout(state, key='large-one', price_id='large-price').status_code == 200
     assert checkout(state, 'subscription').status_code == 200
     count = len(state['posts'])
-    for _ in range(2):
-        response = checkout(state, key='lost-one')
+    for key in ('lost-one', 'another-one'):
+        response = checkout(state, key=key)
         assert response.status_code == 409 and response.json()['error']['code'] == 'CREEM_CHECKOUT_UNCERTAIN'
     assert len(state['posts']) == count == 3
 
@@ -283,7 +302,7 @@ def test_expired_purchase_does_not_close_other_intents(category_buyer):
     pending = status(state)['subscription_checkout']
     assert checkout(state, key='kept-quota').status_code == 200
     kept = rows(state)[-1].id
-    assert checkout(state, key='expired-quota').status_code == 200
+    historical_checkout(state, 'expired-quota')
     list(state['sessions'].values())[-1]['status'] = 'expired'
     assert checkout(state, key='expired-quota').json()['error']['code'] == 'BILLING_PURCHASE_RETRY_ALLOWED'
     assert checkout(state, key='kept-quota').json()['checkout_id'] == kept
@@ -304,9 +323,13 @@ def test_failed_pending_rotation_does_not_starve_subscription_or_later_quota(cat
     failed = set()
     for index in range(4):
         state['lost'] = failure == 'unknown'
-        assert checkout(state, key='failed-' + str(index)).status_code == (503 if failure == 'unknown' else 200)
+        if failure == 'unknown':
+            with pytest.raises(BillingError, match='CREEM_UNAVAILABLE'):
+                historical_checkout(state, 'failed-' + str(index))
+        else:
+            historical_checkout(state, 'failed-' + str(index))
         failed.add(list(state['sessions'])[-1])
-    assert checkout(state, key='later-paid').status_code == 200
+    historical_checkout(state, 'later-paid')
     paid(state, sync=False)
     original = creem_client.call
 
@@ -334,7 +357,7 @@ def test_unfulfilled_completed_purchase_stays_inside_two_quota_limit(category_bu
     from app.db import session_factory
     state = category_buyer
     for index in range(3):
-        assert checkout(state, key='unpaid-' + str(index)).status_code == 200
+        historical_checkout(state, 'unpaid-' + str(index))
     latest = paid(state, sync=False)
     with session_factory()() as db:
         db.get(BillingPlanRevision, 'pages100-v1').quota_validity_days = 30
@@ -368,7 +391,7 @@ def test_disabled_provider_unsent_intents_do_not_starve_enabled_purchases(catego
                 return_url='https://comics.example/account/', trial=False, status='creating',
                 created_at=state['at'] - timedelta(hours=1), expires_at=state['at'] + timedelta(hours=1)))
         db.commit()
-    assert checkout(state).status_code == 200
+    historical_checkout(state, 'quota-intent')
     paid(state, sync=False)
     # Only the dispatched checkout is due; the old rows retain their null sentinels.
     with session_factory()() as db:
@@ -385,11 +408,13 @@ def test_disabled_provider_unsent_intents_do_not_starve_enabled_purchases(catego
 @pytest.mark.parametrize('purchase', ['creem'], indirect=True)
 def test_maintenance_bounded_batch_eventually_reaches_other_owner(category_buyer, monkeypatch):
     from app import billing_checkout, billing_renewal
+    from app.billing_providers import BillingError
     from app.billing_sync import reconcile_once
     state = category_buyer
     for index in range(13):
         state['lost'] = True
-        assert checkout(state, key='busy-' + str(index)).status_code == 503
+        with pytest.raises(BillingError, match='CREEM_UNAVAILABLE'):
+            historical_checkout(state, 'busy-' + str(index))
     due(state)
     other_auth = login(state['client'], 'later-buyer')
     other_owner = state['client'].get('/v1/me', headers=other_auth).json()['user']['id']

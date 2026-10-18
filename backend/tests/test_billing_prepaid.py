@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from conftest import login
-from test_billing_purchases import purchase, buy, notify, paid, reverse
+from test_billing_purchases import purchase, buy, notify, paid, reverse, historical_checkout
 
 
 @pytest.fixture
@@ -229,6 +229,8 @@ def test_prepaid_stable_intent_and_status_do_not_create_subscription(prepaid):
     assert not membership_records()[1]
     status = state['client'].get('/v1/billing/status', headers=state['auth']).json()
     assert status['subscription_checkout'] is None and status['prepaid_membership'] is None
+    assert status['pending_checkout']['id'] == first.json()['checkout_id']
+    assert status['pending_checkout']['price']['billing_type'] == 'onetime'
     session = paid(state)
     sync_session(session['id'], provider=state['provider'])
     replay = buy(state)
@@ -239,6 +241,7 @@ def test_prepaid_stable_intent_and_status_do_not_create_subscription(prepaid):
     status = state['client'].get('/v1/billing/status', headers=state['auth']).json()
     assert status['subscription'] is None and status['provider'] is None
     assert status['subscription_checkout'] is None
+    assert status['pending_checkout'] is None
     assert status['prepaid_membership']['price']['id'] == 'purchase-price'
     assert status['prepaid_membership']['starts_at'] == terms[0].starts_at.isoformat() + 'Z'
     assert status['prepaid_membership']['ends_at'] == terms[0].ends_at.isoformat() + 'Z'
@@ -251,30 +254,39 @@ def test_prepaid_stable_intent_and_status_do_not_create_subscription(prepaid):
         assert 'subscription_data' not in state['posts'][0]
 
 
-def test_prepaid_concurrent_same_intent_and_notification_replay_grant_once(prepaid):
+@pytest.mark.parametrize('prepaid', ['quarter', 'year'], indirect=True)
+@pytest.mark.parametrize('distinct_keys', [False, True], ids=['same-key', 'different-tabs'])
+def test_prepaid_concurrent_same_intent_and_notification_replay_grant_once(prepaid, distinct_keys):
     from app.billing_checkout import start_checkout
+    from app.billing_models import BillingCheckoutAlias
     from app.billing_providers import BillingError
     from app.billing_sync import sync_session
+    from app.db import session_factory
     state = prepaid
+    keys = ['concurrent-prepaid-' + str(index if distinct_keys else 0) for index in range(8)]
 
-    def start(_):
+    def start(key):
         try:
-            return start_checkout(state['owner'], 'purchase-price', state['provider'], 'concurrent-prepaid')
+            return start_checkout(state['owner'], 'purchase-price', state['provider'], key)
         except BillingError as exc:
             return exc.code
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(start, range(8)))
+        results = list(pool.map(start, keys))
     assert any(isinstance(result, dict) for result in results)
     assert all(isinstance(result, dict) or state['provider'] == 'creem' and result == 'CREEM_CHECKOUT_UNCERTAIN'
         for result in results)
     assert len(state['sessions']) == len(membership_records()[0]) == 1
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(BillingCheckoutAlias)) == (7 if distinct_keys else 0)
     session = paid(state)
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda _: sync_session(session['id'], provider=state['provider']), range(8)))
     orders, terms, buckets = membership_records()
-    assert len(orders) == len(terms) == 1 and len(buckets) == 3
+    assert len(orders) == len(terms) == 1 and len(buckets) == (3 if state['interval'] == 'quarter' else 12)
     assert all(bucket.used == bucket.reserved == 0 for bucket in buckets)
+    assert all(buy(state, key).json()['fulfilled'] is True for key in keys)
+    assert len(state['sessions']) == 1
 
 
 def test_prepaid_concurrent_independent_payments_serialize_membership_terms(prepaid, monkeypatch):
@@ -283,7 +295,8 @@ def test_prepaid_concurrent_independent_payments_serialize_membership_terms(prep
     state = prepaid
     assert buy(state, 'parallel-prepaid-1').status_code == 200
     first = paid(state, sync=False)
-    assert buy(state, 'parallel-prepaid-2').status_code == 200
+    # Old independently issued links must still grant independently.
+    historical_checkout(state, 'parallel-prepaid-2')
     second = paid(state, sync=False)
     # The durable signed receipts exist before either worker starts. This keeps
     # Creem's trusted payment time while exercising concurrent first grants.

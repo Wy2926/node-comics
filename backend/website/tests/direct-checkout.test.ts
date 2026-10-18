@@ -210,7 +210,7 @@ test('a retired subscription quote and an unconfirmed retired quota retain their
     {body:{price_id:subscription.price.id,provider:'stripe'},headers:undefined},
     {body:{price_id:'retired-pack',provider:'creem'},headers:{'Idempotency-Key':quota.key}},
   ]);
-  assert.equal(readPurchaseIntent(storage,'buyer','retired-pack'),null);
+  assert.equal(readPurchaseIntent(storage,'buyer','retired-pack')?.key,quota.key);
   assert.ok(readPurchaseIntent(storage,'buyer','different-pack'));
 });
 
@@ -275,19 +275,69 @@ test('A to B to A response-loss retries remain independent and keep each origina
   assert.deepEqual(writes.map(write=>write.provider),['creem','creem','creem']);
 });
 
-test('a validated quota checkout URL ends only its request, so explicit same-price and different-price purchases get new keys',async()=>{
+test('validated unpaid URLs keep each quote key across returns, reloads and shared tabs',async()=>{
   const storage=memoryStorage(),other={...pack,id:'other-pack'},writes:{price_id:string;key:string}[]=[];
   const request=(async(path:string,_method?:string,body?:{price_id:string},headers?:Record<string,string>)=>{
-    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack,other]};
+    if(path.startsWith('/v1/billing/status'))return {...billing,offers:[prepaid],quota_offers:[pack,other]};
     if(path==='/v1/me')return {user:{id:'buyer'}};
     writes.push({price_id:body!.price_id,key:headers!['Idempotency-Key']});
     return {provider:'creem',checkout_url:'https://creem.io/test/checkout/independent'};
   }) as typeof api;
-  for(const quote of [pack,other,pack]){
-    await directCheckout(quote.id,request,storage);assert.equal(readPurchaseIntent(storage,'buyer',quote.id),null);
+  for(const quote of [pack,other,pack,prepaid,prepaid]){
+    await directCheckout(quote.id,request,storage);assert.ok(readPurchaseIntent(storage,'buyer',quote.id));
   }
   assert.equal(new Set(writes.map(write=>write.key)).size,3);
-  assert.deepEqual(writes.map(write=>write.price_id),[pack.id,other.id,pack.id]);
+  assert.equal(writes[0].key,writes[2].key);assert.equal(writes[3].key,writes[4].key);
+  await Promise.all([directCheckout(prepaid.id,request,storage),directCheckout(prepaid.id,request,storage)]);
+  assert.ok(writes.slice(3).every(write=>write.key===writes[3].key));
+});
+
+test('a missing local key adopts the exact server pending purchase even after its quote or provider retires',async()=>{
+  for(const quote of [pack,prepaid]){
+    const storage=memoryStorage(),original=pendingCheckout(quote,'creem','server-original');
+    const writes:{body:unknown;headers:unknown}[]=[];
+    const request=(async(path:string,_method?:string,body?:unknown,headers?:Record<string,string>)=>{
+      if(path.startsWith('/v1/billing/status'))return {...billing,offers:[],quota_offers:[],pending_checkout:original};
+      if(path==='/v1/me')return {user:{id:'buyer'}};
+      writes.push({body,headers});return {provider:'creem',checkout_url:'https://creem.io/test/checkout/original'};
+    }) as typeof api;
+    assert.equal(await directCheckout(quote.id,request,storage),'https://creem.io/test/checkout/original');
+    assert.deepEqual(writes,[{body:{price_id:quote.id,provider:'creem'},headers:{'Idempotency-Key':'server-original'}}]);
+    assert.equal(readPurchaseIntent(storage,'buyer',quote.id)?.key,'server-original');
+  }
+});
+
+test('local aliases in different tabs are never replaced by another pending key or rotated after unknown outcomes',async()=>{
+  const first=memoryStorage(),second=memoryStorage();
+  const keys=[purchaseIntent(first,'buyer',prepaid.id,'creem').key,purchaseIntent(second,'buyer',prepaid.id,'creem').key];
+  assert.notEqual(keys[0],keys[1]);
+  const writes:string[]=[];let unknown=true;
+  const request=(async(path:string,_method?:string,_body?:unknown,headers?:Record<string,string>)=>{
+    if(path.startsWith('/v1/billing/status'))return {...billing,offers:[prepaid],pending_checkout:pendingCheckout(prepaid,'creem',keys[0])};
+    if(path==='/v1/me')return {user:{id:'buyer'}};
+    writes.push(headers!['Idempotency-Key']);
+    if(unknown)throw new ApiError('Unverified original',409,'CREEM_CHECKOUT_UNCERTAIN');
+    return {provider:'creem',checkout_url:'https://creem.io/test/checkout/original'};
+  }) as typeof api;
+  await Promise.all([assert.rejects(directCheckout(prepaid.id,request,first)),assert.rejects(directCheckout(prepaid.id,request,second))]);
+  unknown=false;
+  await Promise.all([directCheckout(prepaid.id,request,first),directCheckout(prepaid.id,request,second)]);
+  assert.deepEqual(writes,[...keys,...keys]);
+  assert.equal(readPurchaseIntent(first,'buyer',prepaid.id)?.key,keys[0]);
+  assert.equal(readPurchaseIntent(second,'buyer',prepaid.id)?.key,keys[1]);
+});
+
+test('a pending purchase for another quote never supplies its key and a missing original key fails closed',async()=>{
+  const writes:string[]=[];let original=pendingCheckout(prepaid,'creem','prepaid-key');
+  const request=(async(path:string,_method?:string,_body?:unknown,headers?:Record<string,string>)=>{
+    if(path.startsWith('/v1/billing/status'))return {...billing,quota_offers:[pack],pending_checkout:original};
+    if(path==='/v1/me')return {user:{id:'buyer'}};
+    writes.push(headers!['Idempotency-Key']);return {provider:'creem',checkout_url:'https://creem.io/test/checkout/pack'};
+  }) as typeof api;
+  await directCheckout(pack.id,request,memoryStorage());assert.notEqual(writes[0],'prepaid-key');
+  original=pendingCheckout(pack,'creem',null);
+  await assert.rejects(directCheckout(pack.id,request,memoryStorage()),/CHECKOUT_UNAVAILABLE/);
+  assert.equal(writes.length,1);
 });
 
 test('wrong-provider, missing and unsafe URLs never clear the original quota intent',async()=>{
@@ -304,7 +354,7 @@ test('wrong-provider, missing and unsafe URLs never clear the original quota int
   }
   result={provider:'creem',checkout_url:'https://creem.io/test/checkout/verified'};
   await directCheckout(pack.id,request,storage);assert.equal(new Set(keys).size,1);
-  assert.equal(readPurchaseIntent(storage,'buyer',pack.id),null);
+  assert.equal(readPurchaseIntent(storage,'buyer',pack.id)?.key,keys[0]);
 });
 
 test('a verified unpaid terminal response offers, but never automatically starts, a new purchase',async()=>{
@@ -456,11 +506,35 @@ test('pricing URLs never auto-purchase without a fresh login intent, and retired
   login.returnFromCheckout();await login.flush();assert.equal(login.requests.length,1);
 });
 
-test('one button blocks duplicate clicks, but returning from hosted checkout permits another explicit purchase',async()=>{
+test('one button blocks duplicate clicks, but returning from hosted checkout permits explicit original-purchase recovery',async()=>{
   const view=button(base,async()=>'/checkout');
   view.click();view.click();await view.flush();assert.deepEqual(view.requests,['original-quote']);assert.equal(view.busy(),true);
   view.returnFromCheckout();await view.flush();assert.equal(view.busy(),undefined);assert.equal(view.requests.length,1);
   view.click();await view.flush();assert.deepEqual(view.requests,['original-quote','original-quote']);
+});
+
+test('returning reuses the unpaid key and fulfilled recovery requires a separate click before another purchase',async()=>{
+  const storage=memoryStorage(),quote={...prepaid,id:'original-quote'},keys:string[]=[];
+  let paid=false;
+  const request=(async(path:string,_method?:string,_body?:unknown,headers?:Record<string,string>)=>{
+    if(path.startsWith('/v1/billing/status'))return {...billing,offers:[quote]};
+    if(path==='/v1/me')return {user:{id:'buyer'}};
+    keys.push(headers!['Idempotency-Key']);
+    return paid&&headers!['Idempotency-Key']===keys[0]
+      ?{provider:'creem',fulfilled:true,checkout_url:null}
+      :{provider:'creem',checkout_url:'https://creem.io/test/checkout/original'};
+  }) as typeof api;
+  const view=button(base,()=>directCheckout(quote.id,request,storage));
+  view.click();await view.flush();assert.equal(keys.length,1);
+  view.returnFromCheckout();await view.flush();assert.equal(keys.length,1,'return never submits by itself');
+  view.click();await view.flush();assert.equal(keys[1],keys[0]);
+  paid=true;view.returnFromCheckout();view.click();await view.flush();
+  assert.equal(keys.length,3);assert.equal(keys[2],keys[0]);
+  assert.equal(readPurchaseIntent(storage,'buyer',quote.id),null);
+  assert.equal(view.redirects.at(-1),'/account/');
+  await view.flush();assert.equal(keys.length,3,'fulfillment never automatically creates another purchase');
+  view.returnFromCheckout();view.click();await view.flush();
+  assert.equal(keys.length,4);assert.notEqual(keys[3],keys[0]);
 });
 
 test('a bfcache return invalidates an old response without automatically starting or clearing a retry',async()=>{

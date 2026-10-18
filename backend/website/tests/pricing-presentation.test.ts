@@ -22,7 +22,6 @@ import {pricingHighlightsCopy} from '../src/i18n/pricing-highlights';
 import PlanComparison from '../src/components/PlanComparison';
 import PlanModels from '../src/components/PlanModels';
 import {locales,localPath} from '../src/i18n/locales';
-import {membershipBillingType} from '../src/lib/billing-cycle';
 import {prepaidMembershipCopy} from '../src/i18n/prepaid-membership';
 
 test('published subscription prices remain readable without fabricating a purchasable offer',()=>{
@@ -178,16 +177,16 @@ test('pricing presentation rules stay scoped and do not duplicate the former glo
 const pack:BillingOffer={id:'synthetic-pack',name:'Lite',plan_id:'pages',plan_revision_id:'pack-v1',currency:'usd',unit_amount:700,interval:'once',monthly_classic_pages:0,trial_days:0,trial_classic_pages:0,service_plan_id:'lite',quota_pages:100,quota_validity_days:null,hourly_image_limit:1200,channels:[{provider:'creem',binding_id:'synthetic',trial_days:0,trial_classic_pages:0}]};
 const checkoutCopy:CheckoutCopy={busy:'busy',error:'error',before:'before',refund:'refund',renewal:'subscription renewal',resume:'resume original'};
 const subscription={...pack,id:'subscription-month',name:'Lite',plan_id:'lite',quota_pages:0,monthly_classic_pages:500,trial_days:7,trial_classic_pages:30,interval:'month' as const};
-const original=(price:BillingOffer):PendingCheckout=>({id:'checkout-'+price.id,provider:'creem',price,idempotency_key:price.interval==='once'?'quota-key':null,error:null});
+const original=(price:BillingOffer):PendingCheckout=>({id:'checkout-'+price.id,provider:'creem',price,idempotency_key:price.interval==='once'||price.billing_type==='onetime'?'purchase-key':null,error:null});
 const emptyBilling:Billing={enabled:true,providers:[],provider:null,environment:'test',trial_eligible:true,
   subscription_checkout:null,offers:[subscription],quota_offers:[pack,{...pack,id:'second-pack'}],
   entitlement_expires_at:null,gift:null,subscription:null};
 const pricingFile=new URL('../src/components/BillingOffers.tsx',import.meta.url);
 const pricingRequire=createRequire(pricingFile);
 const pricingCompiled=ts.transpileModule(readFileSync(pricingFile,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-function pricingSnapshot(billing:Billing|null,locale='en',selectedPrice='',interval='month'){
+function pricingSnapshot(billing:Billing|null,locale='en',selectedPrice='',interval:string|null='month',preferredType?:'recurring'|'onetime'){
   // Seed only BillingOffers' loaded snapshot. Child controls use real React SSR.
-  const states:unknown[]=[billing?.offers??[subscription],false,billing?.quota_offers??[pack],billing,interval,selectedPrice,membershipBillingType(locale)];
+  const states:unknown[]=[billing?.offers??[subscription],false,billing?.quota_offers??[pack],billing,interval??undefined,selectedPrice,preferredType];
   const exports={} as typeof import('../src/components/BillingOffers');
   new Function('require','exports',pricingCompiled)((name:string)=>name==='react'?{...react,useEffect:()=>{},useState:()=>[states.shift(),()=>{}]}:name.endsWith('.css')?{}:pricingRequire(name),exports);
   return load(renderToStaticMarkup(createElement(exports.default,{locale,accountHref:localPath('/account/',locale as typeof locales[number]),downloadHref:'/download/',checkoutCopy,
@@ -311,6 +310,55 @@ test('simplified Chinese defaults to prepaid quarter/year without silently subst
   assert.equal(unavailable('.subscription-card.paid [data-purchase-link]').length,0);
   assert.equal(unavailable('.subscription-card.paid button[disabled]').length,2);
   assert.doesNotMatch(unavailable('.subscription-card.paid').text(),/每三个月自动续费|下次续费前取消/);
+});
+
+test('all locales continue the pending membership mode and exact original price without blocking same-mode cycles or packs',()=>{
+  const quarter={...subscription,id:'recurring-quarter',interval:'quarter' as const,billing_type:'recurring' as const,trial_days:0};
+  const prepaid={...quarter,id:'prepaid-quarter',billing_type:'onetime' as const};
+  for(const locale of locales)for(const quote of [quarter,prepaid]){
+    const pending={...quote,id:'retired-'+quote.billing_type,interval:'year' as const};
+    const status={...emptyBilling,offers:[quarter,prepaid],pending_checkout:original(pending)};
+    const $=pricingSnapshot(status,locale,'',null);
+    assert.equal($('.subscription-card.paid').attr('data-billing-type'),quote.billing_type,locale);
+    assert.equal($('input:checked').attr('value'),'year',locale);
+    assert.equal($('.subscription-card.paid [data-purchase-link]').attr('href'),localPath(`/pricing/?price=${pending.id}`,locale));
+    assert.ok($('.subscription-card.paid [data-purchase-link]').text().includes('resume original'));
+    assert.equal($('.billing-recovery').length,0,'the visible original card is already the recovery action');
+    const changed=pricingSnapshot(status,locale,'','quarter',quote.billing_type);
+    assert.equal(changed('.subscription-card.paid [data-purchase-link]').attr('href'),localPath(`/pricing/?price=${quote.id}`,locale));
+    assert.equal(changed('.subscription-card.paid [data-purchase-link]').attr('aria-disabled'),undefined);
+    assert.equal(changed('.billing-recovery [data-purchase-link]').attr('href'),localPath(`/pricing/?price=${pending.id}`,locale));
+    assert.equal(changed('.quota-offer [data-purchase-link]').first().attr('aria-disabled'),undefined);
+    const loadingChoice=pricingSnapshot(status,locale,'','quarter',quote.billing_type==='onetime'?'recurring':'onetime');
+    assert.equal(loadingChoice('.subscription-card.paid').attr('data-billing-type'),quote.billing_type,'a cadence picked before status loaded cannot override the original payment type');
+  }
+});
+
+test('explicit opposite-mode quotes stay exact and explain the pending guard with a manual original-checkout action',()=>{
+  const recurring={...subscription,id:'recurring-quarter',interval:'quarter' as const,billing_type:'recurring' as const,trial_days:0};
+  const prepaid={...recurring,id:'prepaid-quarter',billing_type:'onetime' as const};
+  for(const locale of locales)for(const [pending,requested] of [[recurring,prepaid],[prepaid,recurring]]){
+    const status={...emptyBilling,offers:[recurring,prepaid],pending_checkout:original(pending)};
+    const $=pricingSnapshot(status,locale,requested.id,'quarter');
+    assert.equal($('.subscription-card.paid').attr('data-billing-type'),requested.billing_type,locale);
+    const purchase=$('.subscription-card.paid [data-purchase-link]');
+    assert.equal(purchase.attr('href'),localPath(`/pricing/?price=${requested.id}`,locale));
+    assert.equal(purchase.attr('aria-disabled'),'true');
+    assert.ok($('.billing-recovery [role="status"]').text().trim(),locale);
+    assert.equal($('.billing-recovery [data-purchase-link]').attr('href'),localPath(`/pricing/?price=${pending.id}`,locale));
+    assert.ok($('.billing-recovery [data-purchase-link]').text().includes('resume original'));
+    assert.equal($('.quota-offer [data-purchase-link]').first().attr('aria-disabled'),undefined);
+  }
+});
+
+test('quota pending snapshots do not change membership locale defaults',()=>{
+  const recurring={...subscription,id:'recurring-quarter',interval:'quarter' as const,billing_type:'recurring' as const};
+  const prepaid={...recurring,id:'prepaid-quarter',billing_type:'onetime' as const};
+  for(const locale of locales){
+    const $=pricingSnapshot({...emptyBilling,offers:[recurring,prepaid],pending_checkout:original(pack)},locale,'','quarter');
+    assert.equal($('.subscription-card.paid').attr('data-billing-type'),locale==='zh-CN'?'onetime':'recurring');
+    assert.equal($('.billing-recovery').length,0);
+  }
 });
 
 test('prepaid membership keeps manual purchases available and blocks new recurring checkout',()=>{

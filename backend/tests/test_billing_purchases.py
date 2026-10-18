@@ -126,6 +126,32 @@ def buy(state, key='purchase-intent-1'):
         json={'provider': state['provider'], 'price_id': 'purchase-price'})
 
 
+def historical_checkout(state, key, price_id='purchase-price'):
+    """Seed a previously issued intent; only the isolated provider fixture is used.
+
+    Old links must still reconcile independently even though new same-price
+    requests now reuse one pending checkout.
+    """
+    from app.billing_checkout import recover_checkout
+    from app.billing_models import BillingCheckout, BillingPriceBinding
+    from app.billing_orders import checkout_order
+    from app.db import session_factory
+    from app.models import now, uid
+    with session_factory()() as db:
+        binding = db.scalar(select(BillingPriceBinding).where(BillingPriceBinding.price_id == price_id,
+            BillingPriceBinding.provider == state['provider'], BillingPriceBinding.environment == 'test'))
+        assert binding is not None and state['provider'] in ('stripe', 'creem')
+        row = BillingCheckout(id=uid(), owner_id=state['owner'], idempotency_key=key,
+            provider=state['provider'], environment='test', price_id=price_id, binding_id=binding.id,
+            return_url='https://comics.example/account/', trial=False, status='creating',
+            created_at=now(), expires_at=state['at'] + timedelta(hours=23))
+        db.add(row)
+        db.flush()
+        checkout_order(db, row)
+        db.commit()
+    return recover_checkout(row.id)
+
+
 def notify(state, kind, obj, event_id='evt_purchase1'):
     created = int(state['at'].replace(tzinfo=timezone.utc).timestamp())
     if state['provider'] == 'stripe':
@@ -218,15 +244,16 @@ def test_one_time_purchase_grants_once_and_replays_same_intent(purchase):
     assert len(state['sessions']) == 2
 
 
-def test_purchase_requires_stable_intent_and_allows_independent_inflight(purchase):
+def test_purchase_requires_stable_intent_and_reuses_same_price_inflight(purchase):
     state = purchase
     response = state['client'].post('/v1/billing/checkouts', headers=state['auth'],
         json={'provider': state['provider'], 'price_id': 'purchase-price'})
     assert response.status_code == 409 and response.json()['error']['code'] == 'BILLING_IDEMPOTENCY_KEY_REQUIRED'
     assert not state['posts']
-    assert buy(state).status_code == 200
-    assert buy(state, 'different-intent').status_code == 200
-    assert len(state['posts']) == 2
+    original = buy(state)
+    assert original.status_code == 200
+    assert buy(state, 'different-intent').json() == original.json()
+    assert len(state['posts']) == len(records()[0]) == 1
 
 
 def test_concurrent_purchase_notifications_grant_and_log_once(purchase):
@@ -291,17 +318,28 @@ def test_finite_purchase_uses_original_payment_time_not_reconciliation_time(purc
 
 
 def test_unknown_creation_recovers_original_order_without_new_charge(purchase):
+    from app.billing_models import BillingCheckoutAlias
+    from app.db import session_factory
     state = purchase
     state['lost'] = True
     assert buy(state).status_code == 503
     if state['provider'] == 'creem':
         assert buy(state).status_code == 409
+        assert buy(state, 'lost-response-alias').status_code == 409
         assert len(state['posts']) == 1
     else:
         assert buy(state).status_code == 200
+        assert buy(state, 'lost-response-alias').status_code == 200
         assert len(state['sessions']) == 1
+    with session_factory()() as db:
+        alias = db.get(BillingCheckoutAlias, (state['owner'], 'lost-response-alias'))
+        assert alias is not None
+        checkout_id = alias.checkout_id
     paid(state)
-    assert buy(state).json()['fulfilled'] is True
+    for key in ('purchase-intent-1', 'lost-response-alias'):
+        replay = buy(state, key).json()
+        assert replay['fulfilled'] is True and replay['checkout_id'] == checkout_id
+    assert len(state['sessions']) == 1
     assert len(records()[0]) == len(records()[1]) == len(records()[2]) == 1
 
 
@@ -793,7 +831,7 @@ def test_transaction_event_lookup_uses_exact_expression_index(purchase):
         assert len(list(db.scalars(statement))) == 1
 
 
-def test_creem_processing_checkout_reuses_only_its_intent_without_granting(purchase):
+def test_creem_processing_checkout_reuses_every_same_price_intent_without_granting(purchase):
     if purchase['provider'] != 'creem':
         pytest.skip('Creem has a distinct processing state')
     state = purchase
@@ -801,11 +839,12 @@ def test_creem_processing_checkout_reuses_only_its_intent_without_granting(purch
     next(iter(state['sessions'].values()))['status'] = 'processing'
     response = buy(state)
     assert response.status_code == 409 and response.json()['error']['code'] == 'BILLING_PURCHASE_PROCESSING'
-    assert buy(state, 'another-during-processing').status_code == 200
-    assert len(state['posts']) == 2 and not records()[1] and not records()[2]
+    another = buy(state, 'another-during-processing')
+    assert another.status_code == 409 and another.json()['error']['code'] == 'BILLING_PURCHASE_PROCESSING'
+    assert len(state['posts']) == 1 and not records()[1] and not records()[2]
     replay = buy(state)
     assert replay.status_code == 409 and replay.json()['error']['code'] == 'BILLING_PURCHASE_PROCESSING'
-    assert len(state['posts']) == 2
+    assert len(state['posts']) == 1
 
 
 def test_delayed_payment_confirmation_does_not_extend_expired_purchase(purchase):

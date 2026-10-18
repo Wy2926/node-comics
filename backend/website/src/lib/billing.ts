@@ -15,15 +15,18 @@ export interface Billing {
   enabled:boolean;providers:{id:BillingProvider;label:string;environment:'test'|'live'}[];
   provider:BillingProvider|null;environment:'test'|'live';trial_eligible:boolean;
   subscription_checkout:PendingCheckout|null;
+  pending_checkout?:PendingCheckout|null;
   offers:BillingOffer[];quota_offers?:BillingOffer[];entitlement_expires_at:string|null;gift:MembershipGift|null;
   prepaid_membership?:{price:BillingPrice;starts_at:string;ends_at:string;paid_through?:string}|null;
   subscription:{provider:BillingProvider;price:BillingPrice;status:string;next_billed_at:string|null;cancel_at:string|null;paid_ends_at:string|null;trial_ends_at:string|null;auto_renew:boolean;can_cancel:boolean;renewal_state:'normal'|'deferring'|'deferred'|'resuming'|'canceling'|'canceled'|'attention';resume_at:string|null}|null;
 }
 export const providerLabel=(provider:BillingProvider)=>provider==='creem'?'Creem':'Stripe';
 export const manageLabel=(locale:string)=>commerceCopy(locale)?.manage??({'zh-CN':'管理订阅','zh-TW':'管理訂閱',en:'Manage subscription',ja:'購読を管理',ko:'구독 관리'}[locale]??'Manage subscription');
+export function findPendingCheckout(billing:Billing,priceId:string){
+  return [billing.pending_checkout,billing.subscription_checkout].find(checkout=>checkout?.price.id===priceId)??null;
+}
 export function findCheckoutOffer(billing:Billing,priceId:string){
-  const pending=billing.subscription_checkout?.price;
-  return pending?.id===priceId?pending:billing.offers.find(offer=>offer.id===priceId)
+  return findPendingCheckout(billing,priceId)?.price??billing.offers.find(offer=>offer.id===priceId)
     ??billing.quota_offers?.find(offer=>offer.id===priceId);
 }
 export function selectedChannel(offer:BillingOffer|undefined,provider?:BillingProvider){

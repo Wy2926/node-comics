@@ -16,6 +16,12 @@ const billing:Billing={enabled:true,providers:[{id:'stripe',label:'Stripe',envir
   subscription_checkout:pending?{id:'fixture-subscription-checkout',provider:subscriptionProvider,price:{...annual,channels:annual.channels.filter(channel=>channel.provider===subscriptionProvider)},idempotency_key:null,error:null}:null,
   offers:publishedSubscriptions.flatMap(offer=>(['recurring','onetime'] as const).map(billing_type=>({...offer,billing_type,id:`fixture-${offer.plan_id}-${offer.interval}${billing_type==='onetime'?'-prepaid':''}`,
     channels:[{provider:'creem' as const,binding_id:'creem-fixture',trial_days:0,trial_classic_pages:0}]}))),subscription:null};
+billing.pending_checkout=billing.subscription_checkout;
+if(scenario==='prepaid-pending'||scenario==='prepaid-retired'||scenario==='prepaid-pending-unknown'){
+  const current=billing.offers.find(offer=>offer.id==='fixture-plus-year-prepaid')!;
+  const price=scenario==='prepaid-retired'?{...current,id:'fixture-retired-prepaid'}:current;
+  billing.pending_checkout={id:'fixture-prepaid-checkout',provider:'creem',price,idempotency_key:'fixture-original-prepaid',error:scenario==='prepaid-pending-unknown'?'CREEM_CHECKOUT_UNCERTAIN':null};
+}
 if(scenario==='prepaid-unavailable')billing.offers=billing.offers.filter(offer=>offer.billing_type!=='onetime');
 if(scenario==='prepaid-active'||scenario==='prepaid-queued'){
   const price=billing.offers.find(offer=>offer.id==='fixture-plus-quarter-prepaid')!;
@@ -43,6 +49,7 @@ export function observeAccountFixture(){
 }
 if(scenario?.startsWith('quota')||scenario==='subscription-pending'){
   billing.quota_offers=[pack,{...pack,id:'fixture-pack-expiring',name:'Lite 50 页',quota_pages:50,quota_validity_days:30}];
+  if(scenario==='quota-pending')billing.pending_checkout={id:'fixture-quota-checkout',provider:'creem',price:pack,idempotency_key:'fixture-original-purchase',error:null};
   Object.assign(entitlements,{service_plan:scenario==='quota-depleted'?'free':'lite',purchase_quota:{granted:100,used:scenario==='quota-depleted'?100:10,reserved:0,available:scenario==='quota-depleted'?0:90,next_expiry_at:null}});
   if(scenario==='quota-unknown'||scenario==='quota-retired'){
     const price=scenario==='quota-retired'?'fixture-retired':pack.id;
@@ -104,11 +111,20 @@ export async function api<T>(path:string,_method?:string,body?:unknown,headers?:
     if(path==='/v1/billing/sync'&&parameters.has('syncFail'))throw new ApiError('模拟支付同步超时，已有权益不受影响。',503);
   }
   if(path==='/v1/me')return {user:{id:'synthetic-'+version,name:version===1?'界面验收':'界面验收 '+version},entitlements} as T;
-  if(path.split('?')[0]==='/v1/billing/status'){if(scenario==='error')throw new ApiError('账户服务暂时不可用，请重试。',503);return structuredClone(billing) as T;}
+  if(path.split('?')[0]==='/v1/billing/status'){
+    if(scenario==='error')throw new ApiError('账户服务暂时不可用，请重试。',503);
+    const snapshot=structuredClone(billing),price=new URLSearchParams(path.split('?')[1]).get('price_id');
+    if(price){
+      if(snapshot.pending_checkout?.price.id!==price)snapshot.pending_checkout=null;
+      if(snapshot.subscription_checkout?.price.id!==price)snapshot.subscription_checkout=null;
+    }else if(snapshot.pending_checkout?.price.interval==='once')snapshot.pending_checkout=null;
+    return snapshot as T;
+  }
   if(path==='/v1/billing/sync')return structuredClone({billing,entitlements}) as T;
   if(path==='/v1/billing/checkouts'){
     const message=`已验证报价：${(body as {price_id:string}).price_id} · ${(body as {provider:string}).provider}${headers?.['Idempotency-Key']?' · '+headers['Idempotency-Key']:''}`;
     const output=document.getElementById('checkout-observation');if(output)output.textContent=message+'（模拟响应丢失，不创建真实订单）';
+    if(scenario==='prepaid-pending-unknown')throw new ApiError('原结账待核实',409,'CREEM_CHECKOUT_UNCERTAIN');
     if(scenario==='quota-expired'||scenario==='prepaid-expired'){
       const key=headers?.['Idempotency-Key'];
       endedKey??=key;

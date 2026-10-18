@@ -2,6 +2,7 @@ import { api, ApiError, sessionIdentity } from "./auth";
 import { checkoutUrl } from "./auth-config";
 import {
   findCheckoutOffer,
+  findPendingCheckout,
   isOneTimePrice,
   membershipCheckoutBlocked,
   selectedChannel,
@@ -25,9 +26,9 @@ export function checkoutSelection(billing: Billing, priceId: string) {
   if (!billing.enabled) throw Error("CHECKOUT_UNAVAILABLE");
   const offer = findCheckoutOffer(billing, priceId);
   if (!offer) throw Error("CHECKOUT_UNAVAILABLE");
-  const pending = isOneTimePrice(offer) ? null : billing.subscription_checkout;
+  const pending = findPendingCheckout(billing,priceId);
   if (membershipCheckoutBlocked(billing,offer)) return null;
-  const channel = selectedChannel(offer, pending?.price.id === priceId ? pending.provider : undefined);
+  const channel = selectedChannel(offer, pending?.provider);
   if (!channel) throw Error("CHECKOUT_UNAVAILABLE");
   return { price_id: offer.id, provider: channel.provider };
 }
@@ -64,9 +65,11 @@ export async function directCheckout(
     if (!intent) {
       selection = checkoutSelection(billing, priceId);
       if (!selection) throw Error("CHECKOUT_UNAVAILABLE");
-      intent = purchaseIntent(local, scope, priceId, selection.provider);
+      const pending = findPendingCheckout(billing,priceId);
+      if (pending && !pending.idempotency_key) throw Error("CHECKOUT_UNAVAILABLE");
+      intent = purchaseIntent(local, scope, priceId, selection.provider,pending?.idempotency_key??undefined);
     }
-    // An unconfirmed request can outlive its published quote or channel. Only
+    // An unpaid purchase can outlive its published quote or channel. Only
     // its exact original key/provider is replayed; the server validates it and
     // may return fulfillment without permitting another pending payment.
     selection = { price_id: priceId, provider: intent.provider };
@@ -103,8 +106,7 @@ export async function directCheckout(
   }
   if (!result.checkout_url) throw Error("CHECKOUT_UNAVAILABLE");
   const destination = checkoutUrl(result.checkout_url, selection.provider);
-  // Only this creation request is confirmed, not payment. A later explicit
-  // purchase may create another independent order, even for the same quote.
-  intent?.complete();
+  // A checkout URL confirms creation, not payment. Returning or reloading
+  // continues this purchase until fulfillment or a verified explicit restart.
   return destination;
 }

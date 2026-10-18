@@ -5,7 +5,7 @@ from .config import settings
 from .db import engine
 
 # Review explicitly when a migration changes. Do not accept unknown newer schemas.
-SUPPORTED_SCHEMAS = frozenset({'prepaid_membership_0020'})
+SUPPORTED_SCHEMAS = frozenset({'checkout_aliases_0021'})
 
 
 def check_schema(connection):

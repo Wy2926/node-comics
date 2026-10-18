@@ -150,6 +150,13 @@ class BillingCheckout(Base):
         CheckConstraint("environment IN ('test', 'live')"))
 
 
+class BillingCheckoutAlias(Base):
+    __tablename__ = 'billing_checkout_aliases'
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    checkout_id: Mapped[str] = mapped_column(ForeignKey('billing_checkouts.id'))
+
+
 class BillingSubscription(Base):
     __tablename__ = 'billing_subscriptions'
     id: Mapped[str] = mapped_column(String(320), primary_key=True)

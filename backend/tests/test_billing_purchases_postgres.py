@@ -10,6 +10,7 @@ from test_creem_checkout_failures import test_quota_pack_http_failure_preserves_
 from test_billing_purchases import (
     purchase, buy,
     test_one_time_purchase_grants_once_and_replays_same_intent,
+    test_unknown_creation_recovers_original_order_without_new_charge,
     test_concurrent_same_purchase_intent_never_creates_second_order,
     test_concurrent_purchase_notifications_grant_and_log_once,
     test_payment_order_quota_and_ledger_commit_atomically,
@@ -27,10 +28,18 @@ from test_billing_purchases import (
 from test_billing_checkout_categories import (
     category_buyer,
     test_subscription_pending_does_not_lock_same_or_other_quota_prices,
-    test_distinct_key_concurrency_keeps_independent_checkouts,
+    test_distinct_key_concurrency_reuses_one_checkout_per_price,
+    test_unknown_same_price_reuses_original_intent_without_blocking_other_quotes,
     test_customerless_purchases_settle_with_distinct_customers,
     test_quota_before_customerless_subscription_does_not_claim_canonical,
     test_later_canonical_customer_cannot_block_bound_purchase_refund,
+)
+from test_billing_checkout_reuse import (
+    test_alternate_key_is_durable_without_replacing_original_intent,
+    test_new_key_reuses_oldest_pending_without_merging_historical_checkouts,
+    test_alias_never_resolves_another_accounts_checkout,
+    test_alias_replay_cannot_change_quote_or_provider,
+    test_same_key_is_scoped_to_its_account,
 )
 
 
@@ -62,9 +71,9 @@ def test_purchase_event_correlation_uses_postgres_expression_index(purchase):
         assert len(list(db.scalars(statement))) == 1
 
 
-def test_distinct_purchase_requests_can_all_remain_pending(purchase, monkeypatch):
+def test_distinct_purchase_requests_reuse_one_pending_checkout(purchase, monkeypatch):
     from app import creem_client, stripe_client
-    from app.billing_models import BillingCheckout, BillingOrder
+    from app.billing_models import BillingCheckout, BillingCheckoutAlias, BillingOrder
     from app.db import session_factory
     state = purchase
     provider = creem_client if state['provider'] == 'creem' else stripe_client
@@ -78,18 +87,26 @@ def test_distinct_purchase_requests_can_all_remain_pending(purchase, monkeypatch
             return original(*args, **kwargs)
 
     monkeypatch.setattr(provider, 'call', provider_call)
-    keys = [f'independent-purchase-{index}' for index in range(6)]
+    keys = [f'purchase-tab-{index}' for index in range(6)]
     with ThreadPoolExecutor(max_workers=4) as pool:
         responses = list(pool.map(lambda key: buy(state, key), keys))
-    assert all(response.status_code == 200 for response in responses), [r.text for r in responses]
-    assert len({response.json()['checkout_id'] for response in responses}) == len(keys)
-    assert len(state['posts']) == len(keys)
+    assert all(response.status_code == 200 or state['provider'] == 'creem' and response.status_code == 409
+        and response.json()['error']['code'] == 'CREEM_CHECKOUT_UNCERTAIN' for response in responses), [r.text for r in responses]
+    replays = [buy(state, key) for key in keys]
+    assert all(response.status_code == 200 for response in replays), [r.text for r in replays]
+    assert len({response.json()['checkout_id'] for response in replays}) == len(state['sessions']) == 1
     with session_factory()() as db:
         checkouts = list(db.scalars(select(BillingCheckout).where(BillingCheckout.owner_id == state['owner'])))
         orders = list(db.scalars(select(BillingOrder).where(BillingOrder.owner_id == state['owner'])))
-        assert {row.idempotency_key for row in checkouts} == set(keys)
+        aliases = list(db.scalars(select(BillingCheckoutAlias).where(BillingCheckoutAlias.owner_id == state['owner'])))
+        assert len(checkouts) == 1 and len(aliases) == 5
+        assert {row.idempotency_key for row in checkouts + aliases} == set(keys)
+        assert {alias.checkout_id for alias in aliases} == {checkouts[0].id}
         assert all(row.status == 'open' for row in checkouts)
-        assert len(orders) == len(keys) and all(row.status == 'pending' for row in orders)
-    for key, response in zip(keys, responses):
+        assert len(orders) == 1 and orders[0].status == 'pending'
+    posts = len(state['posts'])
+    for key, response in zip(keys, replays):
         assert buy(state, key).json() == response.json()
-    assert len(state['posts']) == len(keys)
+    assert len(state['posts']) == posts
+    if state['provider'] == 'creem':
+        assert posts == 1

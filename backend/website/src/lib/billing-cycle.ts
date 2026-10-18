@@ -2,9 +2,10 @@ import {isOneTimePrice,type BillingOffer,type BillingType} from './billing';
 
 export type BillingInterval='month'|'quarter'|'year';
 
-// Exact checkout links (including login returns) take precedence over locale defaults.
-export function membershipBillingType(locale:string,requested?:BillingOffer):BillingType{
-  return requested&&requested.interval!=='once'?(isOneTimePrice(requested)?'onetime':'recurring'):locale==='zh-CN'?'onetime':'recurring';
+// Explicit quotes win; changing language must not replace an unpaid membership's payment type.
+export function membershipBillingType(locale:string,requested?:BillingOffer,pending?:BillingOffer):BillingType{
+  const quote=[requested,pending].find(offer=>offer&&offer.interval!=='once');
+  return quote?(isOneTimePrice(quote)?'onetime':'recurring'):locale==='zh-CN'?'onetime':'recurring';
 }
 
 export function offerForInterval(offers:BillingOffer[],interval:BillingInterval,selectedPrice=''){

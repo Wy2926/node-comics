@@ -209,7 +209,9 @@ def test_verified_expired_without_customer_allows_explicit_new_intent(returning_
 
 @pytest.mark.parametrize('purchase', ['creem'], indirect=True)
 @pytest.mark.parametrize('status,customer', [('expired', 'cust_other'), ('expired', ''), ('expired', {}), ('unknown', None)])
-def test_expired_conflicting_or_unknown_missing_customer_cannot_release_intent(returning_creem_buyer, status, customer):
+def test_unverified_closure_cannot_release_original_or_alternate_intent(returning_creem_buyer, status, customer):
+    from app.billing_models import BillingCheckoutAlias
+    from app.db import session_factory
     state = returning_creem_buyer
     assert buy(state, 'expiring-intent').status_code == 200
     remote = list(state['sessions'].values())[-1]
@@ -218,6 +220,14 @@ def test_expired_conflicting_or_unknown_missing_customer_cannot_release_intent(r
     assert response.status_code == 409 and response.json()['error']['code'] == 'BILLING_BINDING_MISMATCH'
     row, order = checkout_row(state['owner'])
     assert row.status == 'open' and order.status == 'pending' and row.customer_id == 'cust_pagebuyer'
-    response = buy(state, 'independent-new-intent')
-    assert response.status_code == 200
-    assert len(state['posts']) == 3 and len(records()[1]) == len(records()[2]) == 1
+    for _ in range(2):
+        response = buy(state, 'alternate-intent')
+        assert response.status_code == 409 and response.json()['error']['code'] == 'BILLING_BINDING_MISMATCH'
+    preserved, preserved_order = checkout_row(state['owner'])
+    assert (preserved.id, preserved.idempotency_key, preserved.session_id, preserved.status, preserved.customer_id) == (
+        row.id, 'expiring-intent', remote['id'], 'open', 'cust_pagebuyer')
+    assert preserved_order.id == order.id and preserved_order.status == 'pending'
+    with session_factory()() as db:
+        assert db.get(BillingCheckoutAlias, (state['owner'], 'alternate-intent')).checkout_id == row.id
+    assert len(state['posts']) == len(state['sessions']) == len(records()[0]) == 2
+    assert len(records()[1]) == len(records()[2]) == 1

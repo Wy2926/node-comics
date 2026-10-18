@@ -14,6 +14,11 @@ from test_billing_prepaid import (
     test_prepaid_payment_and_monthly_grants_commit_atomically,
     test_prepaid_reversal_before_payment_notification_never_grants,
 )
+from test_billing_checkout_reuse import (
+    test_prepaid_reused_response_can_be_lost_without_rebuying_after_payment,
+    test_prepaid_unknown_new_key_stays_on_original_checkout_through_payment,
+    test_prepaid_pending_summary_keeps_original_quote_and_old_field_meaning,
+)
 
 
 @pytest.fixture
