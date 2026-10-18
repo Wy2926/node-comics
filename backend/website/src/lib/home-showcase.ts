@@ -1,5 +1,5 @@
-interface Picture { src: string; srcset: string; width: number; height: number }
-interface Sample { original: Picture; language: string; translations: Record<string, Picture> }
+interface Picture { src: string; srcset: string; width: number; height: number; full: string }
+interface Sample { original: Picture; language: string; sourceLocale: string; translations: Record<string, Picture> }
 interface ShowcaseAssets {
   samples: Record<string, Sample>;
   inline: Record<string, Picture>;
@@ -64,13 +64,24 @@ export function setupHomeShowcase() {
   const translated = root.querySelector<HTMLImageElement>('[data-comparison=translated] img')!;
   const inline = root.querySelector<HTMLImageElement>('[data-inline-image]')!;
   const pair = root.querySelector<HTMLElement>('.home-image-pair')!;
+  const languageSelect = root.querySelector<HTMLSelectElement>('[data-language-select]')!;
   const status = root.querySelector<HTMLElement>('[data-image-status]')!;
+  const retry = root.querySelector<HTMLButtonElement>('[data-image-retry]')!;
   const inlineStatus = root.querySelector<HTMLElement>('[data-inline-status]')!;
   const scrubber = root.querySelector<HTMLElement>('[data-inline-comparison]')!;
   let sample = 'mono';
   let language = root.dataset.language!;
+  let preferredLanguage = root.dataset.locale!;
   let pairLoading = false;
   let inlineLoad: Promise<void> | undefined;
+  let failedSelection: [string, string] | undefined;
+
+  const healthy = (image: HTMLImageElement) => image.complete && image.naturalWidth > 0;
+  function fail(nextSample = sample, requestedLanguage = preferredLanguage) {
+    failedSelection = [nextSample, requestedLanguage];
+    status.textContent = assets.labels.error;
+    retry.hidden = false;
+  }
 
   // Load the hidden original only on interaction. No continuous animation loop.
   function prepareInline() {
@@ -89,11 +100,20 @@ export function setupHomeShowcase() {
   setupScrubber(scrubber, assets.labels, prepareInline);
   scrubber.querySelector('a')!.tabIndex = -1;
   const preparePair = () => {
-    if (!original.complete || !original.naturalWidth || !translated.complete || !translated.naturalWidth) return;
-    void Promise.all([original.decode(), translated.decode()]).then(() => { pair.dataset.inlineReady = 'true'; }).catch(() => {});
+    if (!healthy(original) || !healthy(translated)) return;
+    const sources = [original.src, translated.src];
+    const current = () => sources[0] === original.src && sources[1] === translated.src;
+    void Promise.all([original.decode(), translated.decode()]).then(() => {
+      if (current()) pair.dataset.inlineReady = 'true';
+    }).catch(() => { if (current() && !pairLoading) fail(); });
   };
-  original.addEventListener('load', preparePair);
-  translated.addEventListener('load', preparePair);
+  for (const image of [original, translated]) {
+    image.addEventListener('load', preparePair);
+    image.addEventListener('error', () => {
+      if (!pairLoading) { delete pair.dataset.inlineReady; fail(); }
+    });
+    if (image.complete && !image.naturalWidth) fail();
+  }
   setupScrubber(pair, assets.labels, preparePair, true);
   preparePair();
 
@@ -103,52 +123,75 @@ export function setupHomeShowcase() {
     image.width = picture.width;
     image.height = picture.height;
     if (label) image.alt = label;
-    image.closest('a')!.href = picture.src;
+    image.closest('a')!.href = picture.full;
     if (!reducedMotion.matches) image.animate([{ opacity: .55 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
   }
   function select(selector: string, attribute: string, value: string) {
     root!.querySelectorAll<HTMLButtonElement>(selector).forEach(button => button.setAttribute('aria-pressed', String(button.getAttribute(attribute) === value)));
   }
   function disable(selector: string, disabled: boolean) {
-    root!.querySelectorAll<HTMLButtonElement>(selector).forEach(button => { button.disabled = disabled; });
+    root!.querySelectorAll<HTMLButtonElement | HTMLSelectElement>(selector).forEach(control => { control.disabled = disabled; });
   }
-  async function changeSample(nextSample: string, nextLanguage: string) {
-    if (pairLoading || (nextSample === sample && nextLanguage === language)) return;
+  async function changeSample(nextSample: string, requestedLanguage: string) {
+    if (pairLoading) return;
     const next = assets.samples[nextSample];
-    if (!next.translations[nextLanguage]) nextLanguage = 'en';
+    const nextLanguage = next.translations[requestedLanguage] ? requestedLanguage : 'en';
+    if (nextSample === sample && nextLanguage === language && !failedSelection && healthy(original) && healthy(translated)) { preferredLanguage = requestedLanguage; return; }
+    const reloadOriginal = nextSample !== sample || !healthy(original) || !pair.dataset.inlineReady;
     pairLoading = true;
-    disable('[data-sample], [data-language-choice]', true);
+    retry.hidden = true;
+    disable('button[data-sample], [data-language-choice], [data-language-select]', true);
     status.textContent = assets.labels.loading;
     pair.setAttribute('aria-busy', 'true');
     try {
       await Promise.all([
-        nextSample !== sample ? preload(next.original, original.sizes) : Promise.resolve(),
+        reloadOriginal ? preload(next.original, original.sizes) : Promise.resolve(),
         preload(next.translations[nextLanguage], translated.sizes),
       ]);
-      if (nextSample !== sample) show(original, next.original, `${assets.labels.original} · ${next.language}`);
+      if (reloadOriginal) show(original, next.original, `${assets.labels.original} · ${next.language}`);
       show(translated, next.translations[nextLanguage], `${assets.labels.translated} · ${assets.languageNames[nextLanguage]}`);
       sample = nextSample;
       language = nextLanguage;
+      preferredLanguage = requestedLanguage;
+      root!.dataset.sample = sample;
+      root!.dataset.language = language;
       root!.querySelector('[data-original-language]')!.textContent = next.language;
       root!.querySelector('[data-translated-language]')!.textContent = assets.languageNames[language];
+      root!.querySelector('[data-original-language]')!.setAttribute('lang', next.sourceLocale);
+      root!.querySelector('[data-translated-language]')!.setAttribute('lang', language);
+      root!.querySelector<HTMLAnchorElement>('[data-open-original]')!.href = next.original.full;
+      root!.querySelector<HTMLAnchorElement>('[data-open-translated]')!.href = next.translations[language].full;
       root!.querySelectorAll<HTMLButtonElement>('[data-language-choice]').forEach(button => {
         button.hidden = !next.translations[button.dataset.languageChoice!];
       });
-      select('[data-sample]', 'data-sample', sample);
+      Array.from(languageSelect.options).forEach(option => { option.hidden = option.disabled = !next.translations[option.value]; });
+      languageSelect.value = language;
+      select('button[data-sample]', 'data-sample', sample);
       select('[data-language-choice]', 'data-language-choice', language);
+      failedSelection = undefined;
       status.textContent = '';
+      preparePair();
     } catch {
-      status.textContent = assets.labels.error;
+      fail(nextSample, requestedLanguage);
     } finally {
       pairLoading = false;
-      disable('[data-sample], [data-language-choice]', false);
+      disable('button[data-sample], [data-language-choice], [data-language-select]', false);
       pair.setAttribute('aria-busy', 'false');
     }
   }
+  languageSelect.addEventListener('change', () => {
+    const requestedLanguage = languageSelect.value;
+    languageSelect.value = language;
+    void changeSample(sample, requestedLanguage);
+  });
+  retry.addEventListener('click', () => {
+    const [nextSample, requestedLanguage] = failedSelection ?? [sample, preferredLanguage];
+    void changeSample(nextSample, requestedLanguage);
+  });
   root.addEventListener('click', async event => {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button') : null;
     if (!button) return;
-    if (button.dataset.sample) void changeSample(button.dataset.sample, language);
+    if (button.dataset.sample) void changeSample(button.dataset.sample, preferredLanguage);
     if (button.dataset.languageChoice) void changeSample(sample, button.dataset.languageChoice);
   });
   root.dataset.enhanced = 'true';

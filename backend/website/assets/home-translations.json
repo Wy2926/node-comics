@@ -1,0 +1,367 @@
+{
+  "schema": "website-home-translations/1",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "prompt_version": "comic-json-v14",
+  "prompt_sha256": "3b748fa338afb23cd283d49b1eb30b85ce35fbbcf655f1db44b19b3d529751a7",
+  "image_pipeline": "Current pinned Classic Engine image algorithms on CPU",
+  "renderer": "Current Classic Engine / MTU / Qt; default target-language fonts",
+  "torch": "2.9.1+cpu",
+  "limits": [
+    "Automatic OCR, inpainting and layout outputs; no manual text or mask correction.",
+    "Very narrow text and small mixed-language lettering can be misrecognized or remain untranslated.",
+    "Narrow text boxes can fall back to character-per-line layout or very small type.",
+    "Undetected decorative titles, sound effects and watermarks remain in their original form."
+  ],
+  "samples": {
+    "mono": {
+      "source": "mono-original.png",
+      "source_language": "ja",
+      "source_languages": [
+        "ja"
+      ],
+      "source_sha256": "575a5436b203fd2d9d8acd6d0492d2a86c7b2364e894640ac59db7151e71b2c5",
+      "width": 836,
+      "height": 1189,
+      "engine_code_sha256": "6053e57de1037dc471a35719a03c4a07c2a56baa8c88dc9bacf459cb1cae714d",
+      "assets_manifest_sha256": "55cfa3193f2be07d2dcae66400bc59d39f3cbe92ee7e845ee0fe663c3f4aa1b6",
+      "targets": {
+        "zh-CN": {
+          "file": "mono-zh-CN.webp",
+          "language": "zh-Hans",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "b47d26625bb30ff1763edd5779c501427dade655303265f157b6edee52ee1524",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 218422
+        },
+        "zh-TW": {
+          "file": "mono-zh-TW.webp",
+          "language": "zh-Hant",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "8255dc59e73f734a5a4ca60173ba5052127e74b5356a84cb19839557c6e9f1ba",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 221338
+        },
+        "en": {
+          "file": "mono-en.webp",
+          "language": "en",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "e3320a733a2f5ce5a7cecd340ddbb07c05f8045afa830ac928840de92b52cbbe",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 225750
+        },
+        "ko": {
+          "file": "mono-ko.webp",
+          "language": "ko",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "b7d561947b9eeaf909994cd87428005630496a846e2b53bc3c27377dc22abe12",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 214318
+        },
+        "fr": {
+          "file": "mono-fr.webp",
+          "language": "fr",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "787ba86c6c83e31ae1ff5ef3be8ba2cd1f5b64a93b2043d68c241a523458e4f2",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 227788
+        },
+        "es": {
+          "file": "mono-es.webp",
+          "language": "es",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "ef4ee4e3569da49fa652d7fd6205ecf1fb1d185d29f01eb0dd128f0cc1e3b64d",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 222336
+        },
+        "pt-BR": {
+          "file": "mono-pt-BR.webp",
+          "language": "pt-BR",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "3568257e715b06da8adf844ad2090aad29b8e19ddd0b8077aabd61f261402ce1",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 225078
+        },
+        "de": {
+          "file": "mono-de.webp",
+          "language": "de",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "4ebcdc60ee761388f4b8e52a211a4d85a7e18e7a6f9e385c60446d03bbaa80c1",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 225376
+        },
+        "it": {
+          "file": "mono-it.webp",
+          "language": "it",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "d3558d112debd288b157fb38c3f92801ae96c2131e2d6b3588d31e026e38eba2",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 224244
+        },
+        "ru": {
+          "file": "mono-ru.webp",
+          "language": "ru",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "c3aef059bd28542bd27c889be860ec3f0207c24beafae662951ed1a25d3f4241",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 224726
+        },
+        "pl": {
+          "file": "mono-pl.webp",
+          "language": "pl",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "15d5c62d6cf9c5954e2af4f3e27837a7a5f67bb6b150f187c8132d998e321bc6",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 223036
+        },
+        "uk": {
+          "file": "mono-uk.webp",
+          "language": "uk",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "4795c067d16121e29f1560c9d31e1d7396b009b09f370726061b62b359d66f2e",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 222320
+        },
+        "tr": {
+          "file": "mono-tr.webp",
+          "language": "tr",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "a1cc8e6f643d18f79d3d7d7a2c8afa0aea4651b3c49c6c80329b5c6c0a2d120e",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 222292
+        },
+        "vi": {
+          "file": "mono-vi.webp",
+          "language": "vi",
+          "font_id": "pangolin",
+          "font_sha256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+          "sha256": "042197a872673a5783b69ee188ddc557d63db69fde471532334c273109b2120a",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 229412
+        },
+        "id": {
+          "file": "mono-id.webp",
+          "language": "id",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "212a5299928f23182fe333ca9109068ac7fc59324b9566adbd2c17a40f60a4ba",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 221432
+        },
+        "ar": {
+          "file": "mono-ar.webp",
+          "language": "ar",
+          "font_id": "noto-sans-arabic",
+          "font_sha256": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+          "sha256": "9e21cda1a4861bf9e205b16a29023939af8a70aaa73bed00f201c55f545accb9",
+          "width": 836,
+          "height": 1189,
+          "byte_size": 214934
+        }
+      }
+    },
+    "color": {
+      "source": "color-original.jpg",
+      "source_language": "zh-TW",
+      "source_languages": [
+        "zh-TW",
+        "ja",
+        "en"
+      ],
+      "source_sha256": "08f6c46135f6f91cf1c92ca67dcc92f1154d7c1e3125a63762630bcbc2532ae3",
+      "width": 1129,
+      "height": 1602,
+      "engine_code_sha256": "6053e57de1037dc471a35719a03c4a07c2a56baa8c88dc9bacf459cb1cae714d",
+      "assets_manifest_sha256": "55cfa3193f2be07d2dcae66400bc59d39f3cbe92ee7e845ee0fe663c3f4aa1b6",
+      "targets": {
+        "zh-CN": {
+          "file": "color-zh-CN.webp",
+          "language": "zh-Hans",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "f6d6933600d3c495a09759f215d14eaf1cc9a2f41fc09aadce655016a668b67e",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 546842
+        },
+        "en": {
+          "file": "color-en.webp",
+          "language": "en",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "96ff251a8f17eefe2ce9dfa9eda8e9f7642f21c618e04b6a526ded7edb70dda2",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 560382
+        },
+        "ja": {
+          "file": "color-ja.webp",
+          "language": "ja",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "42fa64b8f8be8da2e037085900f6bd21684dd7c6764bb95dc65ef237793fc339",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 564572
+        },
+        "ko": {
+          "file": "color-ko.webp",
+          "language": "ko",
+          "font_id": "noto-sans-cjk",
+          "font_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+          "sha256": "5138d929d9e4a5af5b35f9a8adf5233319386d42959c4a0156da349a56626464",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 545040
+        },
+        "fr": {
+          "file": "color-fr.webp",
+          "language": "fr",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "618496b9b103c68ffa86550a9d25ec18887b712e687a352fc2636a7f3f0beb86",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 572308
+        },
+        "es": {
+          "file": "color-es.webp",
+          "language": "es",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "fed04af65d8ebe5367e0c839e1e5270a49dc88e4b44d1d326b4fcf0ee00a7f23",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 565570
+        },
+        "pt-BR": {
+          "file": "color-pt-BR.webp",
+          "language": "pt-BR",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "b963579c395e2f5f0bbbb2cfb0a2ce3f90dc346cec77553b70997443b8ca4949",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 564718
+        },
+        "de": {
+          "file": "color-de.webp",
+          "language": "de",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "ebcb3503d3cd064d6b1be83a5202acc55da41a78b66b2b02e0b9dc17f2e8d9f4",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 568902
+        },
+        "it": {
+          "file": "color-it.webp",
+          "language": "it",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "82c0e68b8458786eb82ec8bd4e0fd0cf7c319fd1d143fe5c01153196beef44b7",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 563284
+        },
+        "ru": {
+          "file": "color-ru.webp",
+          "language": "ru",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "fc34c5816d5f2d1fd4e56e878d135ff222f1892e2643608771ba96a6ec3e8346",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 557704
+        },
+        "pl": {
+          "file": "color-pl.webp",
+          "language": "pl",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "776d6968f75d266ffcec1b1505280a9d3c9c6239ce058b51105ceb235adac165",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 563192
+        },
+        "uk": {
+          "file": "color-uk.webp",
+          "language": "uk",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "696862592a330b09c24f23cf394043687fb43a3919133f29f1a59b6d04d49118",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 559074
+        },
+        "tr": {
+          "file": "color-tr.webp",
+          "language": "tr",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "640088dda7c42852202e1ccdbfc386d05599a41ad838bf2a222c9018afb68854",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 565234
+        },
+        "vi": {
+          "file": "color-vi.webp",
+          "language": "vi",
+          "font_id": "pangolin",
+          "font_sha256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+          "sha256": "3f2b6afbd33d7de250198b6e2c41de6b193a0ba7ec108267480f93277a6ffbef",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 582626
+        },
+        "id": {
+          "file": "color-id.webp",
+          "language": "id",
+          "font_id": "comic-relief",
+          "font_sha256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+          "sha256": "39e9ac127d13814a0c4f11a49a3b7c23bb0ddd2d3f05b3346218d62d249e8d10",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 575650
+        },
+        "ar": {
+          "file": "color-ar.webp",
+          "language": "ar",
+          "font_id": "noto-sans-arabic",
+          "font_sha256": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+          "sha256": "b64263d282cad30066cebaea008c239ca84375af1a61ace52c090cc7fac57f77",
+          "width": 1129,
+          "height": 1602,
+          "byte_size": 547324
+        }
+      }
+    }
+  }
+}

@@ -2,7 +2,9 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { load } from 'cheerio';
 import { gzipSync } from 'node:zlib';
+import sharp from 'sharp';
 import { browserStores, site } from '../src/data/site';
+import { homeSamples, homeSampleLanguage, homeSampleLanguages, type HomeSampleKind } from '../src/data/home-samples';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
 import { homeCopy } from '../src/i18n/home';
@@ -18,6 +20,30 @@ const titles = new Set<string>();
 const descriptions = new Set<string>();
 const indexedRoutes = new Set<string>();
 const pages = new Map<string, ReturnType<typeof load>>();
+type HomePicture = { src: string; srcset: string; full: string; width: number; height: number };
+const homeImageMetadata = new Map<string, ReturnType<ReturnType<typeof sharp>['metadata']>>();
+async function checkHomePicture(picture: HomePicture, label: string, widths: number[]) {
+  if (!picture?.src || !picture.srcset || !picture.full || !picture.width || !picture.height) {
+    errors.push(`${label}: missing responsive or full-size artwork`);
+    return;
+  }
+  const candidates = picture.srcset.split(',').map(candidate => candidate.trim().split(/\s+/));
+  if (candidates.map(([, width]) => width).join(',') !== widths.map(width => `${width}w`).join(',')) errors.push(`${label}: incorrect width-described responsive images`);
+  for (const [url, width] of [...candidates, [picture.full, `${picture.width}w`]]) {
+    if (!url.startsWith('/_astro/')) { errors.push(`${label}: artwork must use a local build asset`); continue; }
+    let metadata = homeImageMetadata.get(url);
+    if (!metadata) {
+      metadata = sharp(join(root, url)).metadata();
+      homeImageMetadata.set(url, metadata);
+    }
+    try {
+      const image = await metadata;
+      if (image.width !== Number.parseInt(width) || !image.height || Math.abs(image.height - Number.parseInt(width) * picture.height / picture.width) > 1)
+        errors.push(`${label}: wrong built dimensions ${url}`);
+    } catch { errors.push(`${label}: missing or undecodable artwork ${url}`); }
+  }
+  if (!candidates.some(([url]) => url === picture.src)) errors.push(`${label}: default artwork must be one of its responsive variants`);
+}
 const htmlFiles = (await files(root)).filter(path => path.endsWith('.html'));
 for (const file of htmlFiles) pages.set(file, load(await readFile(file, 'utf8')));
 for (const file of htmlFiles) {
@@ -174,7 +200,45 @@ for (const file of htmlFiles) {
     if (!showcaseScript || gzipSync(showcaseScript).byteLength > 4 * 1024) errors.push(`${label}: homepage interaction script exceeds its 4 KiB gzip budget`);
     if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-search img[loading="lazy"]').length !== 1) errors.push(`${label}: comparison and search must be lazy-loaded static content`);
     if ($('.home-image-pair input[type=range][hidden]').length !== 1 || $('[data-view-choice]').length) errors.push(`${label}: mobile comparison must use a slider rather than original/translated buttons`);
-    if ($('[data-sample]').length !== 2 || $('[data-language-choice]:not([hidden])').length !== 4) errors.push(`${label}: expected both samples and their available output languages`);
+    if ($('button[data-sample]').length !== 2 || $('[data-language-choice]').length !== locales.length || $('[data-language-choice]:not([hidden])').length !== 16)
+      errors.push(`${label}: expected two samples and all 16 available translation languages`);
+    if ($('[data-home-showcase]').attr('data-language') !== homeSampleLanguage('mono', locale) || $('[data-home-showcase]').attr('data-sample') !== 'mono')
+      errors.push(`${label}: initial comparison must match the page language except the source-language fallback`);
+    const languageSelect = $('select[data-language-select]');
+    if (languageSelect.length !== 1 || languageSelect.find('option').length !== locales.length || languageSelect.find('option:not([hidden]):not([disabled])').length !== 16)
+      errors.push(`${label}: mobile language picker must expose every supported target`);
+    for (const language of locales) {
+      const button = $(`[data-language-choice="${language}"]`), option = languageSelect.find(`option[value="${language}"]`);
+      if (button.length !== 1 || option.length !== 1 || !button.text().trim() || !option.text().trim() || button.attr('lang') !== language)
+        errors.push(`${label}: missing accessible native language name ${language}`);
+      if (button.is('[hidden]') !== (language === 'ja') || option.is('[hidden][disabled]') !== (language === 'ja'))
+        errors.push(`${label}: only the original language should be unavailable ${language}`);
+    }
+    const fallback = load($('noscript').toArray().map(node => $(node).html()).join(''), { scriptingEnabled: false });
+    if (fallback('[data-gallery-link]').length !== 32 || fallback('[data-gallery-original]').length !== 2)
+      errors.push(`${label}: no-script gallery must link to both originals and all 32 translations`);
+    try {
+      const assets = JSON.parse($('[data-home-assets]').text());
+      if (Object.keys(assets.languageNames).sort().join(',') !== [...locales].sort().join(',')) errors.push(`${label}: missing native names in the gallery manifest`);
+      for (const kind of Object.keys(homeSamples) as HomeSampleKind[]) {
+        const sample = assets.samples[kind], targets = homeSampleLanguages(kind);
+        if (!sample || Object.keys(sample.translations).sort().join(',') !== [...targets].sort().join(',')) {
+          errors.push(`${label}: ${kind} must contain all 16 targets and exclude its source language`);
+          continue;
+        }
+        await checkHomePicture(sample.original, `${label}/${kind}/original`, homeSamples[kind].widths);
+        for (const language of targets) {
+          const picture = sample.translations[language];
+          if (picture.width !== sample.original.width || picture.height !== sample.original.height) errors.push(`${label}: ${kind}/${language} changed the artwork dimensions`);
+          await checkHomePicture(picture, `${label}/${kind}/${language}`, homeSamples[kind].widths);
+          const link = fallback(`[data-gallery-link][data-sample-key="${kind}"][lang="${language}"]`);
+          if (link.length !== 1 || link.attr('href') !== picture.full || !link.text().trim()) errors.push(`${label}: missing full-size static translation link ${kind}/${language}`);
+        }
+      }
+      const selected = assets.samples.mono.translations[homeSampleLanguage('mono', locale)];
+      if ($('[data-comparison=translated] img').attr('src') !== selected.src || $('[data-comparison=translated] a').attr('href') !== selected.full)
+        errors.push(`${label}: static comparison image and full-size link must use the selected page language`);
+    } catch { errors.push(`${label}: invalid homepage gallery manifest`); }
     const directory = pages.get(join(root, localPath('/sites/', locale), 'index.html'));
     const entries = directory?.('.supported-site').toArray().map(node => ({ anchor: directory(node).attr('id'), name: directory(node).find('h3').text(), price: directory(node).find('[data-pricing]').text() })) ?? [];
     const minis = $('.sites-group:not(.sites-clone) a.site-mini');

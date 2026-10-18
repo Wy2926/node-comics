@@ -1,5 +1,33 @@
 import type { Locale } from '../types';
 
+interface GalleryCopy {
+  description: string;
+  languages: string;
+  browseAll: string;
+  viewImage: string;
+  hint: string;
+}
+
+export const galleryCopy: Record<Locale, GalleryCopy> = {
+  'zh-CN': { description: '两幅原图，各有 16 种语言的译文。选一种语言，细看每一句对白。', languages: '译文语言', browseAll: '浏览所有译图', viewImage: '查看大图', hint: '拖动分界线，对照原图与译文。' },
+  'zh-TW': { description: '兩幅原圖，各有 16 種語言的譯文。選一種語言，細看每一句對白。', languages: '譯文語言', browseAll: '瀏覽所有譯圖', viewImage: '查看大圖', hint: '拖動分界線，對照原圖與譯文。' },
+  en: { description: 'Two original pages, each translated into 16 languages. Choose a language and explore every line.', languages: 'Translation language', browseAll: 'Browse all translations', viewImage: 'View full size', hint: 'Drag the divider to compare the original and translation.' },
+  ja: { description: '2枚の原画像を、それぞれ16言語に翻訳。言語を選んで、一つひとつのセリフを見比べてください。', languages: '翻訳先の言語', browseAll: 'すべての翻訳画像を見る', viewImage: '大きな画像で見る', hint: '境界線を動かして、原画像と翻訳画像を見比べられます。' },
+  ko: { description: '두 원본 페이지를 각각 16개 언어로 번역했어요. 언어를 골라 대사 하나하나를 살펴보세요.', languages: '번역 언어', browseAll: '모든 번역본 보기', viewImage: '크게 보기', hint: '경계선을 드래그해 원본과 번역본을 비교하세요.' },
+  fr: { description: 'Deux pages originales, chacune traduite en 16 langues. Choisissez une langue et explorez chaque réplique.', languages: 'Langue de traduction', browseAll: 'Voir toutes les traductions', viewImage: 'Voir en grand', hint: 'Faites glisser la séparation pour comparer l’original et la traduction.' },
+  es: { description: 'Dos páginas originales, cada una traducida a 16 idiomas. Elige un idioma y descubre cada diálogo.', languages: 'Idioma de traducción', browseAll: 'Ver todas las traducciones', viewImage: 'Ver a tamaño completo', hint: 'Arrastra el divisor para comparar el original y la traducción.' },
+  'pt-BR': { description: 'Duas páginas originais, cada uma traduzida para 16 idiomas. Escolha um idioma e explore cada fala.', languages: 'Idioma da tradução', browseAll: 'Ver todas as traduções', viewImage: 'Ver em tamanho real', hint: 'Arraste a divisória para comparar o original e a tradução.' },
+  de: { description: 'Zwei Originalseiten, jeweils in 16 Sprachen übersetzt. Wähle eine Sprache und entdecke jede Sprechblase.', languages: 'Übersetzungssprache', browseAll: 'Alle Übersetzungen ansehen', viewImage: 'In voller Größe ansehen', hint: 'Verschiebe die Trennlinie, um Original und Übersetzung zu vergleichen.' },
+  it: { description: 'Due pagine originali, ciascuna tradotta in 16 lingue. Scegli una lingua e scopri ogni battuta.', languages: 'Lingua della traduzione', browseAll: 'Vedi tutte le traduzioni', viewImage: 'Vedi a grandezza naturale', hint: 'Trascina il divisore per confrontare originale e traduzione.' },
+  ru: { description: 'Две оригинальные страницы, каждая переведена на 16 языков. Выберите язык и рассмотрите каждую реплику.', languages: 'Язык перевода', browseAll: 'Посмотреть все переводы', viewImage: 'Открыть в полном размере', hint: 'Перетаскивайте разделитель, чтобы сравнить оригинал и перевод.' },
+  pl: { description: 'Dwie oryginalne strony, każda przetłumaczona na 16 języków. Wybierz język i przyjrzyj się każdej kwestii.', languages: 'Język tłumaczenia', browseAll: 'Zobacz wszystkie tłumaczenia', viewImage: 'Zobacz w pełnym rozmiarze', hint: 'Przesuń linię podziału, aby porównać oryginał i tłumaczenie.' },
+  uk: { description: 'Дві оригінальні сторінки, кожна перекладена 16 мовами. Виберіть мову й роздивіться кожну репліку.', languages: 'Мова перекладу', browseAll: 'Переглянути всі переклади', viewImage: 'Відкрити в повному розмірі', hint: 'Перетягуйте роздільник, щоб порівняти оригінал і переклад.' },
+  tr: { description: 'İki orijinal sayfa, her biri 16 dile çevrildi. Bir dil seçin ve her repliği keşfedin.', languages: 'Çeviri dili', browseAll: 'Tüm çevirilere göz at', viewImage: 'Tam boyutta görüntüle', hint: 'Orijinali ve çeviriyi karşılaştırmak için ayırıcıyı sürükleyin.' },
+  vi: { description: 'Hai trang gốc, mỗi trang được dịch sang 16 ngôn ngữ. Chọn một ngôn ngữ và khám phá từng lời thoại.', languages: 'Ngôn ngữ bản dịch', browseAll: 'Xem tất cả bản dịch', viewImage: 'Xem ảnh kích thước đầy đủ', hint: 'Kéo đường phân cách để so sánh ảnh gốc và bản dịch.' },
+  id: { description: 'Dua halaman asli, masing-masing diterjemahkan ke 16 bahasa. Pilih bahasa dan telusuri setiap dialog.', languages: 'Bahasa terjemahan', browseAll: 'Lihat semua terjemahan', viewImage: 'Lihat ukuran penuh', hint: 'Geser pembatas untuk membandingkan gambar asli dan terjemahan.' },
+  ar: { description: 'صفحتان أصليتان، تُرجمت كل منهما إلى 16 لغة. اختر لغة واستكشف كل حوار.', languages: 'لغة الترجمة', browseAll: 'تصفّح جميع الترجمات', viewImage: 'عرض بالحجم الكامل', hint: 'اسحب الفاصل للمقارنة بين الأصل والترجمة.' },
+};
+
 interface ShowcaseCopy {
   title: [string, string];
   description: string;

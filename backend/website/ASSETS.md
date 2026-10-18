@@ -12,11 +12,11 @@
 | Logo / favicon | 复用插件品牌资源，深色布局使用插件原始 `logo-horizontal-en-dark.webp` / `logo-horizontal-zh-dark.webp` 的本地副本；命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
 | [GitHubMark.astro](src/components/GitHubMark.astro) | GitHub 官方 [Octicons mark-github-16](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/mark-github-16.svg)，固定版本 `90af1f14984832de34e94b2d530043fbcf85eb7f`；保留原始轮廓，仅使用 `currentColor` 和 20px 显示尺寸。上游 SVG SHA-256：`7421820090b50ac79d7c2bf7c951a433d7098a8a9c474809207bdd45f62d9d46`；[MIT 许可](public/licenses/octicons.txt)随静态产物分发 |
 
-首页截图和对照图按屏幕尺寸生成 WebP，保持画面比例，点击可打开大图；不重画 UI 或修改截图文字。网页翻译截图是 MangaPill 同页、同位置的英文原图与繁体中文译图；搜索截图是加载完成后的 Atsumaru／MangaPill 两个结果。各语言首页共用这些真实界面，不冒充对应语言的操作实测。黑白对照原图是日文，提供简中／繁中／英文／韩文译图；彩色原图是繁中，提供简中／英文／日文／韩文译图。生成的设计稿不作为产品素材使用。漫画与站点 UI 归各自权利人，用户提供素材不意味着重新授予许可；生成插画不重新授予第三方开源许可。
+首页截图和对照图按屏幕尺寸生成 WebP，保持画面比例，点击可打开大图；不重画 UI 或修改截图文字。网页翻译截图是 MangaPill 同页、同位置的英文原图与繁体中文译图；搜索截图是加载完成后的 Atsumaru／MangaPill 两个结果。各语言首页共用这些真实界面，不冒充对应语言的操作实测。黑白对照原图是日文，彩色原图以繁中为主；两张原图均保留原始文件，各提供当前 17 种支持语言中除原文语言外的 16 份重新翻译结果。生成的设计稿不作为产品素材使用。漫画与站点 UI 归各自权利人，用户提供素材不意味着重新授予许可；生成插画不重新授予第三方开源许可。
 
 ### 首页素材摘要
 
-`inline-*` 与 `search.png` 来自本机真实浏览器、插件界面；`mono-*` 与 `color-*` 来自用户提供的“对比图”目录，按语言重命名保留内容。以下摘要对应构建前文件：
+`inline-*` 与 `search.png` 来自本机真实浏览器、插件界面；`mono-original.png` 与 `color-original.jpg` 来自用户提供的“对比图”目录，字节及原始尺寸保持不变。以下摘要对应构建前文件：
 
 | 文件 | SHA-256 |
 | --- | --- |
@@ -24,15 +24,11 @@
 | `inline-translated.png` | `2ab2e975515e87e6c794f974dbf195e63f5e307d2de793bbda8ef249acf44acc` |
 | `search.png` | `f79aab5a9045ad4b42fd728f020fee7ac5896ac4d749a93cb51d720ae54721a3` |
 | `mono-original.png` | `575a5436b203fd2d9d8acd6d0492d2a86c7b2364e894640ac59db7151e71b2c5` |
-| `mono-zh-CN.webp` | `5cd0eab0d2cacf63b68196d54278e62eacb10a6bbe3fffff4cc3cb049ce6682f` |
-| `mono-zh-TW.webp` | `5b7ee470d577f15586f61e1a599701bb2a33953bd62636445cb685abf55feb5e` |
-| `mono-en.webp` | `4c4b1bf040788c5cda48bb5b6d182db43e8d32f6cc81626085738f729b3e7641` |
-| `mono-ko.webp` | `e1a163389cf936ae119409e3a5bd9bed9393901101b44e4dd383bf6148fec085` |
 | `color-original.jpg` | `08f6c46135f6f91cf1c92ca67dcc92f1154d7c1e3125a63762630bcbc2532ae3` |
-| `color-zh-CN.webp` | `b907938d582308c2841e0e53dd73816ef891ca005acc9390f5ebdbb40308b4b9` |
-| `color-en.webp` | `e2b8d9aa509a75bf59eecd2df11089857434ec922be108d7dc310784775fb966` |
-| `color-ja.webp` | `51c1b165a1621e053bcb37c7f45fb87a246061cc0b04dcbe3984cf2e3207f085` |
-| `color-ko.webp` | `90dc8175806bbe187ff632ddca496753fe8e686975800b749aeec7d367f29e0d` |
+
+32 份 `mono-<语言>.webp`／`color-<语言>.webp` 使用项目 Classic Engine 的检测、OCR、LaMa 修复及字体排版流程重新生成，文本翻译实际使用 DeepSeek V4.1 Flash 与 `comic-json-v14` 提示词。每张原图只进行一次检测及修复，各语言复用同一结果；输出保留原生尺寸（黑白 836 × 1189、彩色 1129 × 1602），以质量 95 的 WebP 保存。每份输出的语言、字体、文件摘要，以及提示词、引擎和模型资源版本摘要集中维护在 [home-translations.json](assets/home-translations.json)，不随页面加载。
+
+这些是自动处理样张，未人工改写 OCR 或重绘蒙版，也不代表逐句人工校译：黑白页右上细字存在误识，彩色页的艺术书名未被检出，部分英文与作者小字存在截断或误识，局部修复仍可能留下痕迹。狭长区域可能出现过小字号或逐字列排，黑白土语样张的部分叙述框也触发了引擎现有的竖排回退。未识别区域保留原文，不应理解为整页所有文字都已正确翻译。首页按需加载当前选择的原图与译图，完整尺寸链接保留真实输出供查看；语言覆盖和图片完整性检查不等同于所有语言的语义与排版质量验收。
 
 保留的教程素材同样来自上述真实产品截图，不冒充视频截帧；视频链接统一维护在 `src/data/site.ts`。官网不嵌入播放器或加载远程视频缩略图，首页不再展开教程卡片。
 
