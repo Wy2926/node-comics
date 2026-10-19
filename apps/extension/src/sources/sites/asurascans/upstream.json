@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/keiyoushi/extensions-source",
+  "commit": "780153a29642a57364e894bc0850c4e76619c7de",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "distributionPath": "apps/extension/public/licenses/keiyoushi-extensions-source.txt",
+    "noticeFile": null
+  },
+  "usage": "Protocol cross-check only after implementing the site's observed SSR markup. No Kotlin/APK code is executed or bundled. AsuraScans extends KeiSource directly, not a shared multisrc engine.",
+  "scope": "Cross-check Astro SSR tuples, public_url versus stable seriesSlug, eight-character rotating URL suffix, chapter numbers, page arrays and locked/tiled variants. Node Comics uses the observed comic-only SSR name search instead of upstream API search. Account tokens, premium API access, recommendations, preference migrations and tile decoding are not implemented; nonempty tile mappings fail explicitly.",
+  "files": [
+    {
+      "path": "src/en/asurascans/src/eu/kanade/tachiyomi/extension/en/asurascans/AsuraScans.kt",
+      "sha256": "69fe232de85d99bb74da05a65c7524aee2adf9dbd9409ae968022f62b18d1ea6",
+      "purpose": "Confirms independent KeiSource inheritance, Astro properties, stable slug/random suffix separation and the boundary of unsupported premium and tiled readers."
+    },
+    {
+      "path": "src/en/asurascans/src/eu/kanade/tachiyomi/extension/en/asurascans/Dto.kt",
+      "sha256": "aed70708ccfbc56d4a7f95396ce8c52145ebcaf02576668a17e24138c6d61cd8",
+      "purpose": "Cross-check public and stable work URLs, chapter number/title fields, membership markers and tile_cols/tile_rows metadata."
+    },
+    {
+      "path": "src/en/asurascans/build.gradle.kts",
+      "sha256": "07a4f36ef5836a37618632f6392476198f4658d38a7f78d79c3af61bffe53987",
+      "purpose": "Confirms English Asura Scans at asurascans.com, comics deep links and upstream versionCode 69."
+    }
+  ]
+}
