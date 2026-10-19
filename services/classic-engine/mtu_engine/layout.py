@@ -100,14 +100,22 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
     def avoid(block, polygon, reference, obstacles):
         if polygon is None:
             return None
+        config._current_region = block
+        native.text_render.set_font(block.font_family)
+        options = dict(region=block, min_font_size=1, render_horizontally=block.horizontal,
+            line_spacing_multiplier=block.line_spacing, letter_spacing_multiplier=block.letter_spacing,
+            config=config, anchor_mode='center', bubble_mask=reference)
+        if not safe(polygon, reference):
+            # Collision fitting alone does not check bubble containment. Reuse
+            # MTU's bounded mask search before avoiding neighbouring paragraphs.
+            size, polygon = native._binary_search_font_for_bubble_mask(
+                start_font_size=block.font_size, **options)
+            if size is None:
+                return None
+            block.font_size = size
         if native._layout_regions_conflict(polygon, reference, obstacles):
-            config._current_region = block
-            native.text_render.set_font(block.font_family)
             size, polygon = native._shrink_font_for_layout_collisions(
-                region=block, start_font_size=block.font_size, min_font_size=1,
-                render_horizontally=block.horizontal, line_spacing_multiplier=block.line_spacing,
-                letter_spacing_multiplier=block.letter_spacing, config=config, anchor_mode='center',
-                bubble_mask=reference, placed_regions=obstacles)
+                start_font_size=block.font_size, placed_regions=obstacles, **options)
             if size is not None:
                 block.font_size = size
         return polygon if safe(polygon, reference) else None

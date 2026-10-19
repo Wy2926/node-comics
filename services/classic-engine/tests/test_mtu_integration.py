@@ -1448,6 +1448,47 @@ def test_bubble_layout_checks_unclipped_page_edges(bubble_layout, edge, box, ang
     assert np.array_equal(output[:, [0, -1]], image[:, [0, -1]])
 
 
+@pytest.mark.parametrize('cache_bytes', [0, None])
+def test_short_wide_bubble_shrinks_overflow_without_a_collision(bubble_layout, monkeypatch, cache_bytes):
+    from manga_translator.utils import TextBlock
+    renderer, observed, native = bubble_layout
+    image = np.full((200, 1433, 3), 255, np.uint8)
+    inset = np.zeros(image.shape[:2], np.uint8)
+    inset[45:127, 420:1071] = 255
+    region = {**serialize_region(TextBlock(
+        [[[458, 60], [1056, 60], [1056, 110], [458, 110]]],
+        ['source'], font_size=50, direction='h')), 'bubble_enclosed': True}
+    snapshot = json.loads(json.dumps(region))
+    text = 'AN EXTRAORDINARY ADVENTURE'
+    resize = native.resize_regions_to_font_size
+
+    def oversized(*args, **kwargs):
+        points = resize(*args, **kwargs)
+        # Reproduce a final native font that exceeds a short bubble after
+        # wrapping, independently of platform-specific Qt font measurements.
+        for index, block in enumerate(args[1]):
+            block.font_size = 48
+            args[2]._current_region = block
+            native.text_render.set_font(block.font_family)
+            points[index] = native._calc_region_dst_points_for_font(
+                region=block, font_size=48, render_horizontally=True,
+                line_spacing_multiplier=block.line_spacing,
+                letter_spacing_multiplier=block.letter_spacing, config=args[2], anchor_mode='center')
+        return points
+
+    monkeypatch.setattr(native, 'resize_regions_to_font_size', oversized)
+    output = renderer.render(image, image, [region], [text], 'en', inset,
+        bubble_prepared=True, mask_cache_bytes=cache_bytes, font_id='comic-relief')
+    assert region == snapshot and len(observed) == 1
+    block = observed[0]
+    assert 1 < block.font_size < 47
+    assert block.translation.replace('[BR]', ' ').split() == text.split()
+    assert native._polygon_fully_inside_mask(block.dst_points.reshape(-1, 2), inset)
+    painted = np.any(output != image, axis=2)
+    assert painted.any() and not np.any(painted & (inset == 0))
+    np.testing.assert_array_equal(block.lines, region['lines'])
+
+
 def test_safe_bubble_layout_does_not_search_alternate_rectangles(bubble_layout, monkeypatch):
     from manga_translator.utils import TextBlock
     renderer, observed, native = bubble_layout
@@ -1469,6 +1510,32 @@ def test_safe_bubble_layout_does_not_search_alternate_rectangles(bubble_layout, 
     result = renderer.render(image, image, [serialize_region(block)], ['正常气泡保持原有排版'], 'zh-Hans', mask)
     assert np.any(result != image) and len(observed) == 1
     assert layouts == [1]  # Paint the validated geometry without repeating Qt layout.
+
+
+def test_bubble_layout_keeps_native_subpixel_mask_tolerance(bubble_layout, monkeypatch):
+    import cv2
+    from mtu_engine.engine import configuration
+    from mtu_engine.layout import fit_bubbles
+    from manga_translator.utils import TextBlock
+    _, _, native = bubble_layout
+    image = np.full((180, 240, 3), 255, np.uint8)
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[20:120, 20:180] = 255
+    _, labels = cv2.connectedComponents(mask)
+    block = TextBlock([[[50, 50], [150, 50], [150, 90], [50, 90]]],
+                      ['source'], font_size=26, direction='h')
+    block.original_font_size = block.font_size
+    block.font_size = 20
+    points = np.array([[[40., 40.], [179.4, 40.], [179.4, 119.4], [40., 119.4]]])
+    monkeypatch.setattr(native, 'resize_regions_to_font_size', lambda *a, **k: [points])
+    monkeypatch.setattr(native, '_binary_search_font_for_bubble_mask',
+                        lambda **k: pytest.fail('Native pixel rounding must not trigger shrinking'))
+    monkeypatch.setattr(native, 'find_largest_inscribed_rect',
+                        lambda *_: pytest.fail('A tolerated layout needs no alternate rectangle'))
+    blocks, actual = fit_bubbles(image, image, [block], ['SOURCE'], configuration(),
+                                mask, labels, language='en')
+    assert blocks[0].font_size == 20
+    np.testing.assert_array_equal(actual[0], points)
 
 
 def test_missing_safe_bubble_fails_without_publishing_erased_page(bubble_layout):
@@ -1873,6 +1940,11 @@ def test_narrow_long_translation_uses_height_without_losing_larger_single_column
         # multi-column alternative must not replace it with a smaller size.
         assert before.vertical and before.font_size >= .5 * region['font_size']
         assert after.font_size >= before.font_size
+    elif language == 'ar':
+        # Mask shrinking also rescues the disabled-word-wrap control. Its
+        # different breaks are no longer a smaller-font baseline; measure
+        # the shaped, whole-word layout against its actual safe font budget.
+        assert_maximum_scaled_font(after, erode_bubble_mask(mask, .02))
     else:
         assert after.font_size > before.font_size
     if language == 'ko' and not edge:
