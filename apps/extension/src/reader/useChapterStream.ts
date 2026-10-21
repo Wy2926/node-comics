@@ -11,7 +11,7 @@ export const completeManifest=completePageList;
 type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];motion?:RefObject<boolean>;update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
 /** Three metadata chapters, with viewport position independent of mounted page DOM. */
 export function useChapterStream({copy,sequence,layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
- const initialIndex=Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId));
+ const initialIndex=useMemo(()=>Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId)),[copy.pages,copy.pageId]);
  const [active,setActive]=useState({entryId:copy.id,index:initialIndex});
  const index=active.entryId===copy.id?Math.min(active.index,Math.max(0,copy.pages.length-1)):initialIndex;
  const stream=useMemo(()=>layout==='continuous'?chapterWindow(sequence,copy):[copy],[layout,sequence,copy]);
@@ -20,6 +20,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  const copyRef=useRef(copy),indexRef=useRef(index);copyRef.current=copy;indexRef.current=index;
  const anchor=useRef<{entryId:string;pageId:string;relativeOffset:number;edgeOffset?:number}>({entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset});
  const restoredGeometry=useRef(''),restorePending=useRef(true);
+ const restoredPages=useRef<Pick<ChapterWindow,'copy'|'offsets'>|undefined>(undefined);
  const suppressScroll=useRef(false),lastScrollTop=useRef(0),saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),restoreFrame=useRef<number|undefined>(undefined);
  const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
  const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
@@ -32,14 +33,14 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  const [foreground,setForeground]=useState(()=>!document.hidden);
  const resourceChapters=useMemo(()=>foreground?chapterResources(stream,copy,index,next,layout):[copy],[foreground,stream,copy,index,next,layout]);
  const elementTop=(element:HTMLElement)=>{const v=viewport.current!;return element.getBoundingClientRect().top-v.getBoundingClientRect().top+v.scrollTop-v.clientTop;};
- function position(chapter:ReadingEntry,n:number){
+ function position(chapter:ReadingEntry,n:number):{top:number;height:number;stackTop?:number}|undefined{
   if(!viewport.current||n<0||n>=chapter.pages.length)return;
   if(layout!=='continuous'){
    const cell=cells.current.get(pageKey(chapter,chapter.pages[n].id));
    return cell?{top:elementTop(cell),height:cell.getBoundingClientRect().height}:undefined;
   }
   const metrics=geometry.current.get(chapter.id),stack=stacks.current.get(chapter.id);
-  if(metrics&&stack)return {top:elementTop(stack)+metrics.offsets[n],height:metrics.offsets[n+1]-metrics.offsets[n]};
+  if(metrics&&stack){const stackTop=elementTop(stack);return {top:stackTop+metrics.offsets[n],height:metrics.offsets[n+1]-metrics.offsets[n],stackTop};}
  }
  function preserve(){
   const chapter=copyRef.current,n=indexRef.current,page=chapter.pages[n],p=position(chapter,n),v=viewport.current;
@@ -128,14 +129,21 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  useLayoutEffect(()=>{
   if(anchor.current.entryId!==copy.id){anchor.current={entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset};setActive({entryId:copy.id,index:initialIndex});}
   if(!anchor.current.pageId&&copy.pages.length){anchor.current.pageId=copy.pages[0].id;setActive({entryId:copy.id,index:0});}
-  const v=viewport.current,n=copy.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(copy,n);
+  const v=viewport.current,n=copy.pages[indexRef.current]?.id===anchor.current.pageId?indexRef.current:copy.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(copy,n);
   if(!v||!p)return;
   // A canceled entrance also restores the current DOM to x=0. Reconcile only after
   // that commit, so an external jump cannot credit the page it has just discarded.
   if(!motion?.current&&deferredShown.current)settleMotion();
-  const signature=JSON.stringify([copy.id,anchor.current.pageId,layout,p.top,p.height,v.clientHeight,v.scrollHeight]);
+  const metrics=layout==='continuous'?geometry.current.get(copy.id):undefined,previous=restoredPages.current;
+  const pageGeometryChanged=!!metrics&&(!previous||previous.copy.id!==copy.id||previous.copy.pages[n]?.id!==copy.pages[n]?.id
+   ||previous.offsets[n]!==metrics.offsets[n]||previous.offsets[n+1]!==metrics.offsets[n+1]);
+  // A new reading page is not a layout change. Compare its offsets against the
+  // last committed geometry so a status commit cannot replay the previous
+  // scroll event's anchor while the next native scroll is still pending.
+  const signature=JSON.stringify([copy.id,layout,metrics?p.stackTop:[anchor.current.pageId,p.top,p.height],v.clientHeight,v.scrollHeight]);
   // Status/image updates must not replay a stale anchor while a native scroll event is pending.
-  if(restorePending.current||restoredGeometry.current!==signature){restore();markVisibleEnd(copy);}
+  if(restorePending.current||pageGeometryChanged||restoredGeometry.current!==signature){restore();markVisibleEnd(copy);}
+  restoredPages.current=metrics;
   restoredGeometry.current=signature;restorePending.current=false;
   updateReadingProgress();
  });

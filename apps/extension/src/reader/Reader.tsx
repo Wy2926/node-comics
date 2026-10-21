@@ -14,9 +14,8 @@ import {activeProcessingProfile} from '../image-processing/settings';
 import {processingInput} from '../comics/application/image-access';
 import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
-import {pageWindow,nextImagePages} from './virtual-window';
+import {chapterGeometry,pageWindow,nextImagePages} from './virtual-window';
 import {pageSpreads,spreadAt,spreadFrames} from './pagination';
-import {DECODED_PAGE_WINDOW} from '../image-resources';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
 import {FeedbackForm} from '../ui/Feedback';
@@ -81,7 +80,6 @@ async function retryCurrentPage(){
 }
 const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:moving||analyticsBlocked||searchOpen||!!panel||!!feedback,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
 useEffect(()=>{if(!moving&&shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowledgeCatalogUpdates(copy.comicId,copy.catalogUpdateRevision).catch(()=>{});},[moving,!!shown,copy.comicId,copy.catalogUpdateRevision]);
-const streamPages=useMemo(()=>stream.filter(chapter=>resources.ready(chapter)).flatMap(c=>c.pages.map(p=>({page:p,key:pageKey(c,p.id),entryId:c.id}))),[stream,resourceVersion]);
 useEffect(()=>{setFeedback(undefined);},[copy.id]);
 useEffect(()=>{setActual({});setLoads({});setFeedback(undefined);},[scopeBase]);
 useEffect(()=>{
@@ -106,16 +104,26 @@ const spread=spreadAt(spreads,index);
 const spreadPages=useMemo(()=>spread?copy.pages.slice(spread.start,spread.end):[],[copy.pages,spread]);
 const frames=useMemo(()=>new Map(spreadFrames(spreadPages,viewportSize,compare).map((frame,n)=>[spreadPages[n].id,frame])),[spreadPages,viewportSize,compare]);
 const frame=(p:Page)=>frames.get(p.id)??pageFrame(p,viewportSize,fit,zoom,compare);
+const continuousGeometry=useMemo(()=>settings.layout==='continuous'
+ ?chapterGeometry(stream,p=>pageFrame(p,viewportSize,fit,zoom,compare)):[],
+ [stream,viewportSize,fit,zoom,compare,settings.layout]);
 const windows=useMemo(()=>settings.layout==='continuous'
- ?pageWindow(stream,copy.id,index,p=>frame(p).height,DECODED_PAGE_WINDOW)
+ ?pageWindow(continuousGeometry,copy.id,index)
  :[{copy,start:spread?.start??index,end:spread?.end??Math.min(index+1,copy.pages.length),offsets:[],before:0,after:0}],
- [stream,copy,index,viewportSize,fit,zoom,compare,settings.layout,spread]);
+ [continuousGeometry,copy,index,settings.layout,spread]);
+const windowPages=useMemo(()=>windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end)),[windows,resourceVersion]);
 const decodedSet=useMemo(()=>new Set(windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).map(p=>pageKey(chapter,p.id)))),[windows,resourceVersion]);
 const processingSettings=useProcessingSettings(),processingProfile=activeProcessingProfile(processingSettings),enhancementVisible=useEnhancementVisible();
 const readingTargets=useMemo(()=>{
- const start=streamPages.findIndex(item=>item.key===pageKey(copy,copy.pages[spread?.start??index]?.id??''));
- return start<0?[]:streamPages.slice(start,start+readingAhead).map(item=>({...item,mode}));
-},[streamPages,copy.id,spread,index,readingAhead,mode]);
+ const start=stream.findIndex(chapter=>chapter.id===copy.id),targets:(ReadingTarget&{key:string})[]=[];
+ if(start<0||!resources.ready(stream[start])||!stream[start].pages[spread?.start??index])return targets;
+ for(let n=start;n<stream.length&&targets.length<readingAhead;n++){
+  const chapter=stream[n];if(!resources.ready(chapter))continue;
+  const from=n===start?spread?.start??index:0;
+  for(const page of chapter.pages.slice(from,from+readingAhead-targets.length))targets.push({page,key:pageKey(chapter,page.id),entryId:chapter.id,mode});
+ }
+ return targets;
+},[stream,resourceVersion,copy.id,spread,index,readingAhead,mode]);
 const processingTargets=useMemo(()=>readingTargets.map(({key,entryId,page})=>{
  const translated=preference!=='original',image=readingImage(page,mode,translated,settings.language,translationScope);
  return {id:key,sourceKey:page.blobKey,input:image.key&&(!translated||image.job||image.originalResult)?processingInput(image.key,entryId,page.blobKey):undefined};
@@ -124,7 +132,7 @@ const enhancedImages=useProcessingWindow(processingTargets,enhancementVisible?pr
 geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=spread?spreadPages.reduce((width,page)=>width+frame(page).width,0)
  :settings.layout==='single'?(page?frame(page).width:0)
- :stream.reduce((width,chapter)=>chapter.pages.reduce((width,page)=>Math.max(width,frame(page).width),width),0);
+ :continuousGeometry.reduce((width,chapter)=>Math.max(width,chapter.width),0);
 const swipeBlocked=!!searchOpen||!!feedback||!!analyticsBlocked||!!panel;
 const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layout==='double'&&!!page,blocked:swipeBlocked||moving,
  resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,spreadPages.map(p=>[p.width,p.height])]),
@@ -179,8 +187,8 @@ useShortcuts({
  'reader.find':()=>{if(!onFind)return false;findComic();},
 },{enabled:!searchOpen&&!feedback&&!analyticsBlocked});
 useEffect(()=>{
- onReadingWindow(preference==='original'?[]:readingTargets,streamPages.filter(p=>decodedSet.has(p.key)).map(p=>p.page),navigationReason.current==='direct');
-},[readingTargets,streamPages,decodedSet,preference,onReadingWindow]);
+ onReadingWindow(preference==='original'?[]:readingTargets,windowPages,navigationReason.current==='direct');
+},[readingTargets,windowPages,preference,onReadingWindow]);
 useEffect(()=>()=>onReadingWindow([],[]),[onReadingWindow]);
 function navigate(offset:-1|1){if(!page)return false;if(spreadZoom.zoomed){if(swipeBlocked||!canTurn(offset))return false;swipe.cancel();spreadZoom.reset();movePage(offset);return;}return swipe.turn(offset);}
 function jump(n:number){swipe.cancel();spreadZoom.reset();jumpImmediately(n);}

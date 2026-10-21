@@ -4,7 +4,7 @@ import type {ReadingEntry} from '../src/types';
 import type {ReadingView} from '../src/reader/view';
 
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
-const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true}));
+const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
 const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn(),clickCapture:vi.fn()}));
 vi.mock('../src/reader/useSpreadZoom',()=>({useSpreadZoom:()=>spreadZoom}));
@@ -23,8 +23,8 @@ vi.mock('../src/analytics',()=>({track:actions.track}));
 vi.mock('../src/reader/useChapterStream',()=>({
  pageKey:(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`,completeManifest:()=>true,
  useChapterStream:({copy}:{copy:ReadingEntry})=>({
-  index:2,indexRef:{current:2},readingAhead:4,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
-  stream:[copy],next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
+  index:2,indexRef:{current:2},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
+  stream:hooks.stream??[copy],next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
  }),
 }));
 import {Reader} from '../src/reader/Reader';
@@ -62,7 +62,7 @@ function click(tree:ReactElement,match:(node:ReactElement<Record<string,unknown>
  const node=nodes(tree).find(match);expect(node).toBeDefined();(node!.props.onClick as ()=>void)();
 }
 beforeEach(()=>{
- hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;
+ hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;hooks.stream=undefined;hooks.readingAhead=4;
  for(const action of Object.values(actions))action.mockClear();
  spreadZoom.change.mockClear();spreadZoom.reset.mockClear();
  installDictionary('zh-CN',{});
@@ -187,6 +187,24 @@ describe('reader shortcut action integration',()=>{
   expect(targets.map(target=>target.page.id)).toEqual(['page-1','page-2','page-3','page-4']);
   expect(visible.map(page=>page.id)).toEqual(['page-1','page-2']);
  });
+ it('does not translate the next ready chapter while the current ready chapter is empty',()=>{
+  const empty={...copy,pages:[]},next={...copy,id:'next-chapter',pages:copy.pages.map(page=>({...page,id:`next-${page.id}`}))};
+  hooks.stream=[empty,next];
+  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',fit:'width',zoom:100}),setItem:vi.fn()});
+  const props=fixture({copy:empty,sequence:hooks.stream});render(props);flushEffects();
+  expect(view().preference).toBe('translation');
+  expect(vi.mocked(props.onReadingWindow).mock.calls.at(-1)![0]).toEqual([]);
+ });
+ it.each([4,5])('keeps a %i-page translation window bounded when continuing into the next ready chapter',readingAhead=>{
+  const next={...copy,id:'next-chapter',pages:Array.from({length:20},(_,index)=>({...copy.pages[0],id:`next-${index}`}))};
+  hooks.stream=[copy,next];hooks.readingAhead=readingAhead;
+  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',fit:'width',zoom:100}),setItem:vi.fn()});
+  const props=fixture({sequence:hooks.stream});render(props);flushEffects();
+  const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
+  expect(targets.map(target=>target.page.id)).toEqual(['page-2','page-3','page-4',...next.pages.slice(0,readingAhead-3).map(page=>page.id)]);
+  expect(targets.slice(3).every(target=>target.entryId===next.id)).toBe(true);
+  expect(visible).toHaveLength(11);
+ });
  it.each(['single','double'] as const)('does not render footer content in %s mode and disables next when its last spread is shown',layout=>{
   const props=fixture({settings:{...defaults,layout},copy:{...copy,pages:copy.pages.slice(0,3)}}),tree=render(props);
   const end=nodes(tree).find(node=>node.props['data-paged']===true)!;
@@ -215,14 +233,17 @@ describe('reader shortcut action integration',()=>{
   hooks.states=[];vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:100,fit:'width'}),setItem:vi.fn()});
   const restored=render(props);expect(view()).toEqual({mode:'classic',preference:'translation',zoom:100,fit:'width'});expect(pageWidth(restored).width).toBe(900);
  });
- it('applies a first long-image preset once and preserves the saved view across reopening and ordinary chapters',()=>{
+ it('restores the saved phone long-image view when reopening an ordinary chapter',()=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const stored=new Map<string,string>(),setItem=vi.fn((key:string,value:string)=>stored.set(key,value));
   vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem});
   const long=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
-  const tree=render(long);expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
-  expect((nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(450);
+  const tree=render(long);expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:100});
+  expect((nodes(tree).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(900);
   flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual(view());
-  hooks.states=[];render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:50});
+  const ordinary=fixture({copy:{...copy,id:'ordinary-chapter'}});
+  hooks.states=[];render(ordinary);expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:100});
+  hooks.states=[];render({...ordinary,viewKey:'unsaved-ordinary'});expect(view()).toEqual({mode:'classic',preference:'original',fit:'window',zoom:100});
   expect(long.setSettings).not.toHaveBeenCalled();
  });
  it('applies desktop sizing before placeholder dimensions resolve without a later sizing jump',()=>{
@@ -257,9 +278,14 @@ describe('reader shortcut action integration',()=>{
   render(props);flushEffects();expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
  });
  it.each(['fit','zoomIn'] as const)('preserves a manual %s change made before the actual long-image dimensions arrive',command=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});
-  render(props);flushEffects();hooks.handlers[`reader.${command}`]();
+  render(props);flushEffects();
+  // Keep the selected view distinct from the pending long-image width/100 preset.
+  if(command==='fit'){hooks.handlers['reader.fit']();render(props);}
+  hooks.handlers[`reader.${command}`]();
   const selected={...view()};
+  expect(selected).toEqual({mode:'classic',preference:'original',fit:'window',zoom:command==='fit'?100:110});
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
   render(props);flushEffects();expect(view()).toEqual(selected);
   expect(props.setSettings).not.toHaveBeenCalled();
@@ -268,7 +294,9 @@ describe('reader shortcut action integration',()=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,imageSha256:undefined}))}});render(props);
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,height:6000,imageSha256:`real-${page.id}`}))};
-  render(props);hooks.handlers['reader.fit']();const selected={...view()};flushEffects();expect(view()).toEqual(selected);
+  render(props);hooks.handlers['reader.zoomIn']();const selected={...view()};
+  expect(selected).toEqual({mode:'classic',preference:'original',fit:'window',zoom:110});
+  flushEffects();expect(view()).toEqual(selected);
  });
  it('keeps an existing legacy view and its zoom when opening a long-image comic',()=>{
   vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:140}),setItem:vi.fn()});

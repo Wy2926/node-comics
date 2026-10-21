@@ -21,7 +21,15 @@ import '../src/ui/theme/surfaces.css';
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
 const api=new Api(location.origin+'/fixture-disabled');
 const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
-const width=highResolution?4000:800,height=highResolution?6000:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:120;
+const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
+const fractionalDimensions=performanceFixture&&query.get('fractional')==='1';
+const width=highResolution?4000:fractionalDimensions?817:800,height=highResolution?6000:fractionalDimensions?1203:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:performanceFixture?3:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:performanceFixture&&query.get('pages')==='1000'?1000:120;
+// Opt-in geometry-read counts belong to this fixture, not the production reader.
+let dimensionReads=0;
+if(performanceFixture)Object.assign(window,{__readerFixturePerformance:{
+ reset:()=>{dimensionReads=0;},
+ snapshot:()=>({dimensionReads}),
+}});
 const failedIndex=pagination?(query.get('failure')==='1'?5:-1):7;
 const originalKey=(chapter:number,index:number)=>pagination?`inline-original:pagination-fixture-${chapter}-${index}`:highResolution?`inline-original:window-fixture-high-${chapter}-${index}`:'inline-original:window-fixture';
 const resultKey=(pageId:string)=>pagination?`inline-original:pagination-fixture-result-${pageId}`:highResolution?`inline-original:window-fixture-high-result-${pageId}`:'inline-original:window-fixture-result';
@@ -35,6 +43,9 @@ context.fillStyle='#fff';context.fillText('TRANSLATED RESULT',115,420);
 const translatedBlob=await canvas.convertToBlob({type:'image/png'});
 if(!highResolution&&!pagination){await sourcePageCache.put(originalKey(0,0),originalBlob);await sourcePageCache.put(resultKey(''),translatedBlob);}
 const samples:ReadingEntry[]=Array.from({length:chapterCount},(_,chapter)=>({id:`window-fixture-${chapter}`,title:`第 ${chapter+1} 章 · 窗口验收`,source:'fixture',sourceKey:`window-fixture-${chapter}`,generation:1,retention:'offline',createdAt:0,updatedAt:0,discoveryComplete:true,pageId:`window-page-${chapter}-0`,relativeOffset:0,pages:Array.from({length:pageCount},(_,index)=>({id:`window-page-${chapter}-${index}`,name:`第 ${index+1} 页`,...dimensions(index),blobKey:index===failedIndex?undefined:originalKey(chapter,index),fetchError:index===failedIndex?'隔离样本：本页读取失败，可重试。':undefined,jobs:[],outputBlobs:{}}))}));
+if(performanceFixture)for(const chapter of samples)for(const page of chapter.pages)for(const dimension of ['width','height'] as const){
+ const value=page[dimension];Object.defineProperty(page,dimension,{enumerable:true,configurable:true,get:()=>{dimensionReads++;return value;}});
+}
 // Reuse two encoded PNGs; independent keys expose per-page reads and resource retention.
 if(highResolution)for(const chapter of samples)for(const page of chapter.pages){if(page.blobKey)await sourcePageCache.put(page.blobKey,originalBlob);await sourcePageCache.put(resultKey(page.id),translatedBlob);}
 // Distinctly labelled pages: cover, portrait pair, landscape, then portrait pairs.

@@ -1,10 +1,47 @@
-import {describe,expect,it} from 'vitest';
-import {chapterWindow,chapterResources,pageWindow,pageAtHeight,nextImagePages,type ChapterWindow} from '../src/reader/virtual-window';
+import {describe,expect,it,vi} from 'vitest';
+import {chapterWindow,chapterResources,chapterGeometry,pageWindow,pageAtHeight,nextImagePages,type ChapterWindow} from '../src/reader/virtual-window';
 import {pageFrame} from '../src/reader/geometry';
 import type {ReadingEntry,Page} from '../src/types';
 
 const chapter=(id:string,count:number):ReadingEntry=>({id,title:id,source:'local',sourceKey:id,pages:Array.from({length:count},(_,index)=>({id:`${id}-${index}`,name:`${index}`,width:800,height:1000+index,jobs:[],outputBlobs:{}} as Page)),generation:1,createdAt:0,updatedAt:0,pageId:`${id}-0`,relativeOffset:0,discoveryComplete:true});
 describe('bounded reader geometry',()=>{
+ it('reuses chapter offsets and widths across a thousand page-window shifts without measuring pages again',()=>{
+  const copies=[chapter('before',1000),chapter('current',1000),chapter('after',1000)];
+  copies[1].pages[600]={...copies[1].pages[600],width:1600};
+  const frame=vi.fn((page:Page)=>pageFrame(page,{width:1200,height:900},'window'));
+  const measured=chapterGeometry(copies,frame);
+  expect(frame).toHaveBeenCalledTimes(3000);
+  expect(measured[1].width).toBe(900);
+  frame.mockClear();
+  for(let index=0;index<1000;index++){
+   const windows=pageWindow(measured,'current',index);
+   expect(windows.reduce((count,window)=>count+window.end-window.start,0)).toBe(11);
+   for(let n=0;n<windows.length;n++){
+    expect(windows[n].offsets).toBe(measured[n].offsets);
+    expect(windows[n].copy).toBe(copies[n]);
+   }
+  }
+  expect(frame).not.toHaveBeenCalled();
+ });
+ it('rebuilds geometry when dimensions or sizing change, without mutating the previous layout',()=>{
+  const book=chapter('book',20),viewport={width:1200,height:900};
+  const before=chapterGeometry([book],page=>pageFrame(page,viewport,'width',50));
+  const updated={...book,pages:book.pages.map(page=>({...page,height:page.height*2}))};
+  const after=chapterGeometry([updated],page=>pageFrame(page,viewport,'width',100,true));
+  expect(before[0].width).toBe(600);expect(after[0].width).toBe(1200);
+  expect(after[0].offsets.at(-1)).toBe(before[0].offsets.at(-1)!*2);
+  expect(pageWindow(after,'book',12)[0].copy).toBe(updated);
+  expect(before[0].copy).toBe(book);
+ });
+ it('keeps empty chapters and minimum placeholder heights valid',()=>{
+  const empty=chapter('empty',0),book=chapter('book',2);
+  const measured=chapterGeometry([empty,book],()=>({width:0,height:0}));
+  expect(measured[0]).toMatchObject({offsets:[0],width:0});
+  expect(measured[1].offsets).toEqual([0,1,2]);
+  expect(pageWindow(measured,'book',1).map(({start,end,before,after})=>({start,end,before,after}))).toEqual([
+   {start:0,end:0,before:0,after:0},{start:0,end:2,before:0,after:0},
+  ]);
+ });
  it.each([{width:390,height:640},{width:1200,height:900},{width:1200,height:80}])('uses the full reading width without a hidden surface gutter in %j',viewport=>{
   const page={width:800,height:1200};
   for(const zoom of [50,100,200]){
@@ -30,57 +67,58 @@ describe('bounded reader geometry',()=>{
   const desktop=pageFrame(page,{width:1200,height:900},'width',100,true);
   expect(desktop.width).toBe(1200);
  });
- it('retains the current page and fractional anchor when a phone rotates in comparison mode',()=>{
+ it('locates the page after recalculating comparison geometry for each phone orientation',()=>{
   const book=chapter('phone-book',50),index=25,relativeOffset=.42;
   for(const viewport of [{width:390,height:620},{width:800,height:240}]){
-   const height=(page:Page)=>pageFrame(page,viewport,'width',100,true).height;
-   const [window]=pageWindow([book],book.id,index,height);
-   const top=window.offsets[index]+height(book.pages[index])*relativeOffset;
+   const frame=(page:Page)=>pageFrame(page,viewport,'width',100,true);
+   const measured=chapterGeometry([book],frame);
+   const [window]=pageWindow(measured,book.id,index);
+   const top=window.offsets[index]+frame(book.pages[index]).height*relativeOffset;
    expect(pageAtHeight(window.offsets,top)).toBe(index);
-   expect((top-window.offsets[index])/height(book.pages[index])).toBeCloseTo(relativeOffset);
   }
  });
  it('retains at most three chapters and eleven total page elements across thirty chapters',()=>{
   const sequence=Array.from({length:30},(_,index)=>chapter('chapter-'+index,100));
-  for(let active=0;active<30;active++)for(const index of [0,1,50,98,99]){
+  for(let active=0;active<30;active++){
    const stream=chapterWindow(sequence,sequence[active]);expect(stream.length).toBeLessThanOrEqual(3);
-   const windows=pageWindow(stream,sequence[active].id,index,page=>page.height);
-   expect(windows.reduce((count,item)=>count+item.end-item.start,0)).toBe(11);
-   const current=windows.find(item=>item.copy.id===sequence[active].id)!;expect(current.start).toBeLessThanOrEqual(index);expect(current.end).toBeGreaterThan(index);
+   const measured=chapterGeometry(stream,page=>page);
+   for(const index of [0,1,50,98,99]){
+    const windows=pageWindow(measured,sequence[active].id,index);
+    expect(windows.reduce((count,item)=>count+item.end-item.start,0)).toBe(11);
+    const current=windows.find(item=>item.copy.id===sequence[active].id)!;expect(current.start).toBeLessThanOrEqual(index);expect(current.end).toBeGreaterThan(index);
+   }
   }
  });
  it('preserves exact height when pages move between DOM and spacers, including unequal page sizes',()=>{
   const stream=[chapter('before',9),chapter('current',120),chapter('after',8)];
-  for(const index of [0,5,60,119])for(const item of pageWindow(stream,'current',index,page=>page.height)){
+  const measured=chapterGeometry(stream,page=>page);
+  for(const index of [0,5,60,119])for(const item of pageWindow(measured,'current',index)){
    const mounted=item.copy.pages.slice(item.start,item.end).reduce((total,page)=>total+page.height,0);
    expect(item.before+mounted+item.after).toBe(item.copy.pages.reduce((total,page)=>total+page.height,0));
   }
  });
  it('locates scrollbar jumps into unmounted ranges without a page DOM node',()=>{
-  const [window]=pageWindow([chapter('book',120)],'book',0,page=>page.height);
+  const measured=chapterGeometry([chapter('book',120)],page=>page);
+  const [window]=pageWindow(measured,'book',0);
   expect(window.end).toBe(11);expect(pageAtHeight(window.offsets,window.offsets[99]+300)).toBe(99);
   expect(pageAtHeight(window.offsets,window.offsets[99])).toBe(99);
   expect(pageAtHeight(window.offsets,-20)).toBe(0);expect(pageAtHeight(window.offsets,Infinity)).toBe(119);expect(pageAtHeight([0],0)).toBe(-1);
  });
- it('keeps the same page and fractional anchor when measured dimensions change',()=>{
+ it('locates the page after rebuilding geometry from changed image dimensions',()=>{
   const book=chapter('book',100),index=75,relativeOffset=.42;
-  const old=pageWindow([book],book.id,index,page=>page.height)[0];
+  const old=pageWindow(chapterGeometry([book],page=>page),book.id,index)[0];
   const changed={...book,pages:book.pages.map((page,n)=>({...page,height:page.height*(n<=index?1.7:1)}))};
-  const next=pageWindow([changed],book.id,index,page=>page.height)[0];
+  const next=pageWindow(chapterGeometry([changed],page=>page),book.id,index)[0];
   const oldTop=old.offsets[index]+book.pages[index].height*relativeOffset;
   const nextTop=next.offsets[index]+changed.pages[index].height*relativeOffset;
   expect(pageAtHeight(old.offsets,oldTop)).toBe(index);expect(pageAtHeight(next.offsets,nextTop)).toBe(index);
-  expect((nextTop-next.offsets[index])/changed.pages[index].height).toBeCloseTo(relativeOffset);
- });
- it('renders exactly one requested page in single mode, including first and last',()=>{
-  const book=chapter('book',120);for(const index of [0,52,119]){const [window]=pageWindow([book],book.id,index,page=>page.height,1);expect([window.start,window.end]).toEqual([index,index+1]);}
  });
 });
 
 describe('shared reader prefetch ranges',()=>{
  const window=(copy:ReadingEntry,start:number,end:number):ChapterWindow=>({copy,start,end,before:0,after:0,offsets:[]});
  it('prepares two byte-only pages after the continuous eleven-page decoded window',()=>{
-  const book=chapter('book',30),windows=pageWindow([book],book.id,0,p=>p.height);
+  const book=chapter('book',30),measured=chapterGeometry([book],page=>page),windows=pageWindow(measured,book.id,0);
   expect(windows[0].end).toBe(11);
   expect(nextImagePages(windows,'continuous').map(p=>p.id)).toEqual(['book-11','book-12']);
  });

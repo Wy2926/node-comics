@@ -11,6 +11,8 @@ const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],c
 page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
 await page.addInitScript(()=>{
+ // Fixed sizing is the premise of this 100% -> 40% -> 100% decode-window test.
+ localStorage.setItem('isolated-window-fixture',JSON.stringify({mode:'classic',preference:'original',fit:'window',zoom:100}));
  const live=new Map(),reads=[],decodes=[],decodeFailures=[],keys=new WeakMap();let created=0,peakUrls=0,activeDecodes=0,peakDecodes=0;
  const get=IDBObjectStore.prototype.get;
  IDBObjectStore.prototype.get=function(key){
@@ -35,6 +37,7 @@ const input=page.getByLabel('跳转页码',{exact:true});
 const cell=index=>page.locator(`[data-copy-id="window-fixture-0"] [data-page-index="${index}"]`);
 const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 const position=()=>viewport.evaluate(node=>node.scrollTop);
+async function jump(number){await input.fill(String(number));await input.press('Enter');await settle();}
 async function decoded(indices,panes=1){
  await page.waitForFunction(({indices,panes})=>indices.every(index=>{
   const images=document.querySelectorAll(`[data-copy-id="window-fixture-0"] [data-page-index="${index}"] .nc-page-image`);
@@ -43,8 +46,12 @@ async function decoded(indices,panes=1){
  await settle();
 }
 async function sample(label,panes=1){
- // Wait for old windows and replacement URLs to be released before measuring retention.
- await page.waitForFunction(()=>window.readerPreloadMetrics().activeDecodes===0);
+ // Outgoing swipe snapshots intentionally retain their URLs until the animation
+ // finishes. Measure the steady-state window only after those layers are released.
+ await page.waitForFunction(()=>{
+  const viewport=document.querySelector('.nc-reading-viewport');
+  return window.readerPreloadMetrics().activeDecodes===0&&!viewport?.hasAttribute('data-swipe-phase')&&!viewport?.querySelector('[data-swipe-snapshot]');
+ });
  await settle();
  const value=await page.evaluate(label=>{
   const v=document.querySelector('.nc-reading-viewport'),m=window.readerPreloadMetrics();
@@ -59,12 +66,16 @@ async function sample(label,panes=1){
 async function settings(action){await page.getByRole('button',{name:'阅读设置',exact:true}).click();await action();await page.getByRole('button',{name:'关闭面板',exact:true}).click();await settle();}
 try{
  const start=performance.now();await page.goto(origin+'/tests/reader-window-fixture.html?highres=1');
- await decoded([0,1]);
+ const openingPages=Array.from({length:11},(_,index)=>index).filter(index=>index!==7);
+ await decoded(openingPages);
  const initial=await sample('initial');
- assert.equal(initial.currentPage,1);assert.equal(initial.selectedPages,11);assert.equal(initial.distinctReadKeys,10);
+ // Byte-only lookahead may read two more pages after the window settles; it must
+ // not create extra displayed images or URLs, regardless of native decode speed.
+ assert.equal(initial.currentPage,1);assert.equal(initial.selectedPages,11);
+ assert.equal(initial.displayedImages,openingPages.length);assert.equal(initial.liveUrls,openingPages.length);
  const firstReadyMilliseconds=performance.now()-start;
  checks.push('Actual 4000 x 6000 PNGs preload the eleven-page window without excluding high-resolution neighbors');
- await input.fill('4');await decoded([2,3,4]);
+ await jump(4);await decoded([2,3,4]);
  const middle=await sample('middle');assert.equal(middle.selectedPages,11);
  checks.push('Navigating into the chapter preloads both previous and next high-resolution pages');
  const middleTop=await position();
@@ -75,7 +86,7 @@ try{
  assert.equal(await input.inputValue(),'4');
  assert(await cell(5).evaluate(node=>{const a=node.getBoundingClientRect(),v=node.closest('.nc-reading-viewport').getBoundingClientRect();return a.bottom>v.top&&a.top<v.bottom;}));
  const visible=await sample('zoom40-visible-extra');assert.equal(visible.selectedPages,11);
- await viewport.evaluate(node=>{node.scrollTop+=20;node.dispatchEvent(new Event('scroll',{bubbles:true}));});await settle();
+ await viewport.evaluate(node=>{node.scrollTop+=20;});await settle();
  await decoded([2,3,4,5]);assert.equal(await input.inputValue(),'4');await sample('scroll-visible-extra');
  await page.screenshot({path:path.join(out,'visible-neighbor.png')});
  checks.push('At 40% zoom a further visible page loads before and during scrolling while page 4 remains current');
@@ -98,20 +109,23 @@ try{
  await page.getByRole('button',{name:'上一页',exact:true}).click();await decoded([3]);await sample('single-previous');
  checks.push('Single-page mode loads one image and supports forward/back navigation');
  await settings(()=>page.getByRole('button',{name:'连续',exact:true}).click());
- await input.fill('8');await cell(7).locator('.nc-image-failure').waitFor();await decoded([6,8]);
+ await jump(8);await cell(7).locator('.nc-image-failure').waitFor();await decoded([6,8]);
  const failedTop=await position();await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();assert(Math.abs(await position()-failedTop)<1);
- await cell(7).getByRole('button',{name:'重试',exact:true}).click();await cell(7).locator('.nc-image-failure').waitFor();await sample('failed-page');
+ await cell(7).getByRole('button',{name:'加载失败 · 重试',exact:true}).click();await cell(7).locator('.nc-image-failure').waitFor();await sample('failed-page');
  await page.screenshot({path:path.join(out,'failed-page.png')});
  checks.push('A failed original and retry do not prevent surrounding high-resolution pages from loading');
- await input.fill('12');await decoded([10,11,12]);
- await viewport.evaluate(node=>{node.scrollTop+=180;node.dispatchEvent(new Event('scroll',{bubbles:true}));});
- await settle();await page.waitForTimeout(400);const saved=await position(),savedPage=await input.inputValue();
+ await jump(12);await decoded([10,11,12]);
+ const previousSaved=await page.getByLabel('保存位置',{exact:true}).textContent();
+ await viewport.evaluate(node=>{node.scrollTop+=180;});
+ await settle();
+ await page.waitForFunction(previous=>document.querySelector('[aria-label="保存位置"]').textContent!==previous,previousSaved);
+ const saved=await position(),savedPage=await input.inputValue();
  await page.getByRole('button',{name:'关闭并保存位置',exact:true}).click();
  await page.waitForFunction(()=>window.readerPreloadMetrics().liveUrls===0);checks.push('Closing the reader releases all Blob URLs');
  await page.getByRole('button',{name:'重开阅读器',exact:true}).click();await decoded([10,11,12]);
  assert.equal(await input.inputValue(),savedPage);assert(Math.abs(await position()-saved)<1);await sample('reopened');
  checks.push('Reopening restores the same in-page position with a bounded eleven-page image window');
- for(const number of [18,3,21,5,15]){await input.fill(String(number));await decoded([number-2,number-1,number]);await sample(`jump-${number}`);}
+ for(const number of [18,3,21,5,15]){await jump(number);await decoded([number-2,number-1,number]);await sample(`jump-${number}`);}
  checks.push('Repeated far jumps release old images while keeping the DOM and held URLs bounded');
  await page.screenshot({path:path.join(out,'reopened.png')});
  const metrics=await page.evaluate(()=>window.readerPreloadMetrics());

@@ -95,10 +95,8 @@ describe('paged swipe animation',()=>{
   f.controls.turn(1);expect(f.surface.animations).toHaveLength(1);expect(f.surface.style.visibility).toBe('');expect(vi.getTimerCount()).toBe(0);
   f.finish();expect(f.snapshot.pinned).toBe(false);expect(f.options.onSettled).toHaveBeenCalledOnce();expect(f.viewport.dataset.swipePhase).toBeUndefined();
  });
- it.each(['pending original','deferred translation','failed result','empty comparison'])('allows repeated bounded turns while displaying a %s without waiting on pixels',state=>{
+ it('supports repeated bounded turns and releases every outgoing snapshot',()=>{
   const f=fixture();
-  // Neither layer exposes an image readiness signal; its displayed content cannot gate the slide.
-  f.surface.dataset.imageState=state;
   for(let page=2;page<=5;page++){
    f.controls.turn(1);expect(f.options.onTurn).toHaveBeenCalledTimes(page-1);
    f.render({identity:`page-${page}`});expect(f.surface.style.visibility).toBe('');

@@ -12,6 +12,24 @@ export interface ChapterWindow {
   before: number;
   after: number;
 }
+export interface ChapterGeometry {
+  copy: ReadingEntry;
+  offsets: number[];
+  width: number;
+}
+/** Measure the bounded metadata stream once per layout, not once per scroll/page window. */
+export function chapterGeometry(copies: readonly ReadingEntry[], frame: (page: Page) => {width: number; height: number}): ChapterGeometry[] {
+  return copies.map(copy => {
+    const offsets = [0];
+    let width = 0;
+    for (const page of copy.pages) {
+      const size = frame(page);
+      offsets.push(offsets.at(-1)! + Math.max(1, size.height));
+      width = Math.max(width, size.width);
+    }
+    return {copy, offsets, width};
+  });
+}
 export function chapterWindow(sequence: ReadingEntry[], current: ReadingEntry): ReadingEntry[] {
   const at = sequence.findIndex(copy => copy.id === current.id);
   if (at < 0) return [current];
@@ -22,19 +40,16 @@ export function chapterResources(stream:ReadingEntry[],current:ReadingEntry,inde
   if(layout==='continuous')return stream;
   return next&&completePageList(current)&&index>=current.pages.length-3?[current,next]:[current];
 }
-export function pageWindow(copies: ReadingEntry[], entryId: string, index: number, height: (page: Page) => number, limit = DECODED_PAGE_WINDOW): ChapterWindow[] {
+export function pageWindow(chapters: readonly ChapterGeometry[], entryId: string, index: number): ChapterWindow[] {
   let active = 0, count = 0;
-  for (const copy of copies) {
+  for (const {copy} of chapters) {
     if (copy.id === entryId) active = count + Math.max(0, Math.min(index, copy.pages.length - 1));
     count += copy.pages.length;
   }
-  const size = Math.max(1, Math.trunc(limit));
-  const start = Math.max(0, Math.min(active - Math.floor(size / 2), count - size));
-  const end = Math.min(count, start + size);
+  const start = Math.max(0, Math.min(active - Math.floor(DECODED_PAGE_WINDOW / 2), count - DECODED_PAGE_WINDOW));
+  const end = Math.min(count, start + DECODED_PAGE_WINDOW);
   let cursor = 0;
-  return copies.map(copy => {
-    const offsets = [0];
-    for (const page of copy.pages) offsets.push(offsets.at(-1)! + Math.max(1, height(page)));
+  return chapters.map(({copy, offsets}) => {
     const from = Math.max(0, Math.min(copy.pages.length, start - cursor));
     const to = Math.max(from, Math.min(copy.pages.length, end - cursor));
     cursor += copy.pages.length;

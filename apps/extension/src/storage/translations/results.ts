@@ -82,6 +82,9 @@ async function loadCachedResult(request:ResultRequest&{load?:()=>Promise<Blob>},
     const read=async()=>{
       assertCurrent(isCurrent);
       const token=await translationCache.token(scope.key,key).catch(cacheUnavailable);
+      // A fresh fence permits byte reuse; retainCurrent still checks for a concurrent deletion.
+      const memory=token?resultInMemory(key,token):undefined;
+      if(memory)return retainCurrent(request,key,memory,token);
       const cached=await translationCache.get(key).catch(cacheUnavailable);
       const retained=cached??resultInMemory(key,token)??(!job.result!.recoverable?await readResultFromContexts(key,token):undefined);
       if(retained)return retainCurrent(request,key,retained,token);

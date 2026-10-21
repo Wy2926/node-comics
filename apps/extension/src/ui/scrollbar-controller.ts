@@ -163,6 +163,10 @@ export function installScrollbars(scope: HTMLElement) {
     if (root.style.getPropertyValue('--nc-header-height') !== padding) root.style.setProperty('--nc-header-height', padding);
     for (const entry of entries.values()) {
       const {target, layer, rails} = entry;
+      if (target.dataset.ncScrollbarMode === 'hidden') {
+        if (layer.matches(':popover-open')) layer.hidePopover();
+        continue;
+      }
       const page = target === root, style = getComputedStyle(target);
       const parent = page ? scope : target.closest<HTMLElement>('dialog,[popover]:not(.nc-scrollbar-layer)') ?? scope;
       if (layer.parentElement !== parent) parent.append(layer);

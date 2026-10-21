@@ -6,6 +6,7 @@ import { loadResultBlob, saveResultBlob, resultBlobKey, resultInMemory } from '.
 import { translationCache, setTranslationCacheLimitMb } from '../src/storage/translations';
 import { sourcePageCache } from '../src/storage/source-pages';
 import { SourceDatabaseSchemaError } from '../src/storage/database';
+import { IMAGE_MEMORY_ENTRIES } from '../src/image-resources';
 
 /** Message delivery model; native extension-page Blob handoff is covered by the browser harness. */
 class ResultChannel {
@@ -58,6 +59,59 @@ it('coalesces concurrent readers and retains bytes after the display is released
   expect(await blobs[0].text()).toBe('translated');
   await loadResultBlob(input);
   expect(input.download).toHaveBeenCalledTimes(1);
+});
+
+it.each([false,true])('reuses a token-matched memory result without rereading disk, downloading or decoding, recoverable=%s',async recoverable=>{
+  const input=request();input.job={...input.job,result:{key:crypto.randomUUID(),recoverable}};
+  const blob=new Blob(['warm result']);await saveResultBlob({...input,blob});
+  const get=vi.spyOn(translationCache,'get');vi.mocked(createImageBitmap).mockClear();
+  expect(await loadResultBlob(input)).toBe(blob);
+  expect(get).not.toHaveBeenCalled();expect(input.download).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
+
+it.each(['clear','owner','key'] as const)('does not reuse memory after %s races with its second token check',async removal=>{
+  const input=request();await loadResultBlob(input);
+  const key=resultBlobKey(input.scope,input.job),token=translationCache.token.bind(translationCache);
+  let checks=0;
+  vi.spyOn(translationCache,'token').mockImplementation(async(owner,objectKey)=>{
+    if(++checks===2){
+      if(removal==='clear')await translationCache.clear();
+      else if(removal==='owner')await translationCache.deleteOwner(input.scope.key);
+      else await translationCache.delete(key);
+    }
+    return token(owner,objectKey);
+  });
+  const get=vi.spyOn(translationCache,'get');
+  await expect(loadResultBlob(input)).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
+  expect(checks).toBe(2);expect(get).not.toHaveBeenCalled();expect(input.download).toHaveBeenCalledOnce();
+  await expect(loadResultBlob({...input,download:undefined})).rejects.toMatchObject({code:'RESULT_NOT_CACHED'});
+});
+
+it('keeps disk-first fallback when memory cannot be checked against a fresh token',async()=>{
+  const input=request();await loadResultBlob(input);
+  vi.spyOn(translationCache,'token').mockRejectedValue(Error('temporarily unavailable'));
+  const get=vi.spyOn(translationCache,'get');
+  expect(await(await loadResultBlob(input)).text()).toBe('translated');expect(get).toHaveBeenCalledOnce();
+  get.mockRejectedValueOnce(new SourceDatabaseSchemaError('translations','缺少 objects'));
+  await expect(loadResultBlob(input)).rejects.toBeInstanceOf(SourceDatabaseSchemaError);
+  expect(input.download).toHaveBeenCalledOnce();
+});
+
+it('still rejects token schema errors with a warm memory result',async()=>{
+  const input=request();await loadResultBlob(input);
+  const error=new SourceDatabaseSchemaError('translations','缺少 state');
+  vi.spyOn(translationCache,'token').mockRejectedValueOnce(error);
+  const get=vi.spyOn(translationCache,'get');
+  await expect(loadResultBlob(input)).rejects.toBe(error);expect(get).not.toHaveBeenCalled();expect(input.download).toHaveBeenCalledOnce();
+});
+
+it('refreshes memory recency on a cache hit without increasing its retention window',async()=>{
+  const inputs=Array.from({length:IMAGE_MEMORY_ENTRIES+1},request);
+  for(const input of inputs.slice(0,-1))await loadResultBlob(input);
+  await loadResultBlob(inputs[0]);await loadResultBlob(inputs.at(-1)!);
+  expect(resultInMemory(resultBlobKey(inputs[0].scope,inputs[0].job))).toBeDefined();
+  expect(resultInMemory(resultBlobKey(inputs[1].scope,inputs[1].job))).toBeUndefined();
+  expect(resultInMemory(resultBlobKey(inputs.at(-1)!.scope,inputs.at(-1)!.job))).toBeDefined();
 });
 
 it('uses the same persistent cache and lock after the module/context restarts', async () => {

@@ -143,24 +143,32 @@ try{
   checks.push('Closing during decode clears onShown, releases every Blob URL and ignores a late completion');await sample('closed');
 
   await page.getByTestId('enhancement-cache').click();const cacheStart=await metrics();
-  await page.getByTestId('mount').click();await settle();assert.equal(await shown(),null);await liveCount(0);
-  assert.equal((await metrics()).reads.length,cacheStart.reads.length);assert.equal((await metrics()).decodes.length,cacheStart.decodes.length);
-  await page.getByTestId('enhancement-ready').click();await displayed('translated');await liveCount(1);
-  assert.equal((await metrics()).reads.length,cacheStart.reads.length);assert.equal((await metrics()).decodes.length,cacheStart.decodes.length+1);
-  checks.push('An enhancement cache lookup waits without parent reads, then a warm result decodes only the enhanced image');await sample('enhancement-warm-cache');
+  await page.getByTestId('mount').click();await displayed('translated');await liveCount(1);
+  const cacheParent=await actualImage(),cacheIdentity=await shown(),cachePending=await metrics();
+  assert.equal(cachePending.reads.length,cacheStart.reads.length+1);assert.equal(cachePending.decodes.length,cacheStart.decodes.length+1);
+  assert.equal(cachePending.decodes.at(-1).key,key('translated'));await sample('enhancement-cache-parent');
+  await page.getByTestId('enhancement-ready').click();
+  await page.waitForFunction(url=>{const image=document.querySelector('.nc-page-image');return image&&image.src!==url;},cacheParent.url);
+  await displayed('translated');await liveCount(1);assert.deepEqual(await shown(),cacheIdentity);
+  assert(!(await metrics()).live.some(item=>item.url===cacheParent.url));
+  assert.equal((await metrics()).reads.length,cachePending.reads.length);assert.equal((await metrics()).decodes.length,cachePending.decodes.length+1);
+  checks.push('An enhancement cache lookup displays the parent immediately; the ready enhancement replaces it and releases its URL');await sample('enhancement-cache-replaced');
 
-  for(const label of ['first','reopened']){
-    await page.getByTestId('mount').click();await liveCount(0);await page.getByTestId('enhancement-queued').click();const queuedStart=await metrics();
-    await page.getByTestId('mount').click();await displayed('translated');await liveCount(1);
-    const queuedImage=await actualImage(),queuedIdentity=await shown(),queuedReady=await metrics();
-    assert.equal(queuedReady.reads.length,queuedStart.reads.length+1);assert.equal(queuedReady.decodes.length,queuedStart.decodes.length+1);
-    assert.equal(queuedReady.decodes.at(-1).key,key('translated'));
-    for(const phase of ['running','error']){await page.getByTestId(`enhancement-${phase}`).click();await page.locator(`[data-enhancement-state="${phase}"]`).waitFor();await settle();await unchanged(queuedIdentity,queuedImage.url);}
-    assert.equal(await page.locator('.nc-image-failure').count(),0);assert.equal(await page.locator('.nc-image-placeholder').count(),0);
-    await page.getByRole('button',{name:'重试增强',exact:true}).click();await page.locator('[data-enhancement-state="queued"]').waitFor();await settle();
-    assert.equal((await metrics()).reads.length,queuedReady.reads.length);assert.equal((await metrics()).decodes.length,queuedReady.decodes.length);
-    checks.push(`A ${label} queued enhancement displays the translation; running, failure and enhancement retry never reread or decode it`);await sample(`enhancement-${label}`);
-  }
+  await page.getByTestId('mount').click();await liveCount(0);const warmStart=await metrics();
+  await page.getByTestId('mount').click();await displayed('translated');await liveCount(1);
+  assert.equal((await metrics()).reads.length,warmStart.reads.length);assert.equal((await metrics()).decodes.length,warmStart.decodes.length+1);
+  checks.push('An enhancement Blob available at mount decodes only the enhanced image without reading the parent');await sample('enhancement-warm-mount');
+
+  await page.getByTestId('mount').click();await liveCount(0);await page.getByTestId('enhancement-queued').click();const queuedStart=await metrics();
+  await page.getByTestId('mount').click();await displayed('translated');await liveCount(1);
+  const queuedImage=await actualImage(),queuedIdentity=await shown(),queuedReady=await metrics();
+  assert.equal(queuedReady.reads.length,queuedStart.reads.length+1);assert.equal(queuedReady.decodes.length,queuedStart.decodes.length+1);
+  assert.equal(queuedReady.decodes.at(-1).key,key('translated'));
+  for(const phase of ['running','error']){await page.getByTestId(`enhancement-${phase}`).click();await page.locator(`[data-enhancement-state="${phase}"]`).waitFor();await settle();await unchanged(queuedIdentity,queuedImage.url);}
+  assert.equal(await page.locator('.nc-image-failure').count(),0);assert.equal(await page.locator('.nc-image-placeholder').count(),0);
+  await page.getByRole('button',{name:'重试增强',exact:true}).click();await page.locator('[data-enhancement-state="queued"]').waitFor();await settle();
+  assert.equal((await metrics()).reads.length,queuedReady.reads.length);assert.equal((await metrics()).decodes.length,queuedReady.decodes.length);
+  checks.push('A queued enhancement displays the translation; running, failure and enhancement retry never reread or decode it');await sample('enhancement-queued');
   await page.screenshot({path:path.join(out,'queued-enhancement-shows-translation.png')});
 
   await page.getByTestId('mount').click();await liveCount(0);await page.evaluate(()=>window.readerImageTest.armDecode('deferred'));

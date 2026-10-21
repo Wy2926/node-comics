@@ -35,3 +35,4 @@ private-test-data/
 /output/chrome-web-store-*.zip
 /output/imagegen/blue-manga-store/
 /output/imagegen/blue-manga-store-kit.zip
+/output/playwright/reader-performance/

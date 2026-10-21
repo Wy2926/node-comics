@@ -26,7 +26,7 @@ async function seek(chapter,selector,offset){
  const target=await page.evaluate(({chapter,selector,offset})=>{
   const v=document.querySelector('.nc-reading-viewport'),node=document.querySelector(`[data-copy-id="window-fixture-${chapter}"] ${selector}`);
   const top=node.getBoundingClientRect().top-v.getBoundingClientRect().top+v.scrollTop+offset;
-  v.scrollTop=top;v.dispatchEvent(new Event('scroll',{bubbles:true}));return v.scrollTop;
+  v.scrollTop=top;return v.scrollTop;
  },{chapter,selector,offset});
  await settle();return target;
 }
@@ -69,19 +69,24 @@ try{
  assert(Math.abs(await headingTop()-40)<1,'chapter eviction lost the heading offset');await refresh();
  assert(Math.abs(await headingTop()-40)<1);checks.push('three-chapter window eviction preserves visual position');
  // Wheel scrolling during repeated status updates must remain monotonic in both directions.
- await viewport.hover();
  for(const direction of [1,-1]){
   let previous=await position();
   for(let i=0;i<8;i++){
-   await page.mouse.wheel(0,direction*12);await page.waitForTimeout(40);await refresh();
-   const current=await position();assert(direction*(current-previous)>=-1,'wheel motion reversed during status update');previous=current;
+   // The fixture status button moves the pointer outside the reader after each click.
+   await viewport.hover();
+   await page.mouse.wheel(0,direction*12);
+   await page.waitForFunction(({previous,direction})=>direction*(document.querySelector('.nc-reading-viewport').scrollTop-previous)>0,{previous,direction});
+   await refresh();
+   const current=await position();assert(direction*(current-previous)>0,'wheel motion stopped or reversed during status update');previous=current;
   }
  }
  checks.push('wheel scrolling stays monotonic through translation updates');
  await jump(8);await page.locator('.nc-image-failure').first().waitFor();
  const failed=await position();await refresh();assert(Math.abs(await position()-failed)<1);checks.push('image failure leaves the reading position stable');
- await jump(60);await seek(2,'.nc-page-stack',59*await page.locator('.nc-page-picture').first().evaluate(node=>node.getBoundingClientRect().height)+200);
- const saved=await position(),savedPageTop=await pageTop(2,59);await page.waitForTimeout(400);
+ await jump(60);const previousSaved=await page.getByLabel('保存位置',{exact:true}).textContent();
+ await seek(2,'.nc-page-stack',59*await page.locator('.nc-page-picture').first().evaluate(node=>node.getBoundingClientRect().height)+200);
+ const saved=await position(),savedPageTop=await pageTop(2,59);
+ await page.waitForFunction(previous=>document.querySelector('[aria-label="保存位置"]').textContent!==previous,previousSaved);
  await page.getByRole('button',{name:'关闭并保存位置',exact:true}).click();await page.getByRole('button',{name:'重开阅读器',exact:true}).click();await settle();
  assert(Math.abs(await position()-saved)<1,`reopened position changed from ${saved} to ${await position()}`);
  assert(Math.abs(await pageTop(2,59)-savedPageTop)<1,`reopened page top changed from ${savedPageTop} to ${await pageTop(2,59)}`);

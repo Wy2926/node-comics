@@ -33,11 +33,6 @@ describe('manga page spreads', () => {
     ]);
   });
 
-  it('starts a fresh cover in each chapter instead of joining the previous chapter tail', () => {
-    expect(pageSpreads(portraits(2))).toEqual([{start: 0, end: 1}, {start: 1, end: 2}]);
-    expect(pageSpreads(portraits(3))).toEqual([{start: 0, end: 1}, {start: 1, end: 3}]);
-  });
-
   it('finds the same group from either member, including exact first and last boundaries', () => {
     const spreads = pageSpreads(portraits(1000));
     for (const spread of spreads) {

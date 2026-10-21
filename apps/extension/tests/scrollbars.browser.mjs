@@ -182,6 +182,24 @@ test('hidden mode removes rails and gutters while preserving scrolling and the s
   assert.equal(await page.locator('#hidden-scroll').evaluate(element=>getComputedStyle(element).paddingRight),'0px');
   const box=await page.locator('#hidden-scroll').boundingBox();await page.mouse.move(box.x+50,box.y+50);await page.mouse.wheel(0,200);
   await page.waitForFunction(() => document.getElementById('hidden-scroll').scrollTop > 0);
+  const hiddenScroll = await page.locator('#hidden-scroll').evaluate(async element => {
+    const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await frame();
+    const measure = element.getBoundingClientRect;
+    let measurements = 0;
+    element.getBoundingClientRect = function () {measurements++;return measure.call(this);};
+    try {
+      const before = element.scrollTop;
+      const scrolled = new Promise(resolve => element.addEventListener('scroll', resolve, {once: true}));
+      element.scrollTop = before + 40;
+      await scrolled;await frame();
+      return {measurements, before, after: element.scrollTop};
+    } finally {
+      delete element.getBoundingClientRect;
+    }
+  });
+  assert(hiddenScroll.after > hiddenScroll.before);
+  assert.equal(hiddenScroll.measurements, 0, 'Hidden rails do not measure their viewport on scroll');
   const offset=await page.locator('#hidden-scroll').evaluate(element=>element.scrollTop);
   await page.locator('#hidden-scroll').evaluate(element=>element.dataset.scrollbarMode='reserved');await rail('hidden-scroll').waitFor();
   assert.equal(await page.locator('#hidden-scroll').evaluate(element=>element.scrollTop),offset);
