@@ -1,6 +1,7 @@
 {
   "protocol_version": 3,
   "control_url": "https://control.example.com",
+  "proxy_url": null,
   "node_id": "REPLACE_WITH_ADMIN_NODE_ID",
   "node_token": "REPLACE_WITH_NODE_CREDENTIAL_OR_SET_NODE_TOKEN",
   "resource_id": "machine:cuda:0",

@@ -42,6 +42,14 @@ def load(path):
     if value.get('allow_http', False):
         raise ValueError('Production nodes require HTTPS')
     value['control_url'] = origin(value['control_url'])
+    if value.get('proxy_url') is not None:
+        import httpx
+        try:
+            if not httpx.Proxy(value['proxy_url']).url.host:
+                raise ValueError
+        except (TypeError, ValueError, httpx.InvalidURL):
+            # Native validation errors can contain proxy credentials.
+            raise ValueError('proxy_url must be an HTTP(S) or SOCKS5 proxy URL, or null') from None
     if value.get('control_ca'):
         value['control_ca'] = str((path.parent / value['control_ca']).resolve())
         if not Path(value['control_ca']).is_file():

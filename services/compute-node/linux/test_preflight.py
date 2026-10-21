@@ -6,7 +6,7 @@ import sys
 import tempfile
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 spec = importlib.util.spec_from_file_location('node_preflight', Path(__file__).with_name('preflight.py'))
 preflight = importlib.util.module_from_spec(spec)
@@ -25,11 +25,16 @@ class PreflightTests(unittest.TestCase):
         self.state = self.root / 'state'
         config = ModuleType('classic_node.config')
         config.load = Mock(return_value={'state_dir': str(self.state), 'document_spool_bytes': 6 * 1024 ** 3,
-            'engine': {'gpu': 0}, 'control_url': 'https://example.invalid'})
+            'engine': {'gpu': 0}, 'control_url': 'https://example.invalid',
+            'proxy_url': 'http://user:private-password@proxy.invalid:8080', 'control_ca': 'private-ca.pem'})
+        self.config = config.load.return_value
+        transport = ModuleType('classic_node.transport')
+        self.control_client = transport.control_client = MagicMock()
+        self.client = self.control_client.return_value.__enter__.return_value
         documents = ModuleType('comic_document_files')
         self.probe = documents.check_parser_sandbox = Mock(return_value=True)
         self.stack.enter_context(patch.dict(sys.modules, {
-            'classic_node.config': config, 'comic_document_files': documents}))
+            'classic_node.config': config, 'classic_node.transport': transport, 'comic_document_files': documents}))
         self.stack.enter_context(patch.object(preflight.os, 'geteuid', return_value=10001, create=True))
         self.stack.enter_context(patch.object(preflight.shutil, 'disk_usage',
             return_value=SimpleNamespace(free=16 * 1024 ** 3)))
@@ -64,6 +69,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(security['document_protocol'], 2)
         self.assertTrue(security['denial_probe'])
         self.assertEqual(security['parser'], 'landlock-seccomp')
+        self.control_client.assert_not_called()
 
     def test_lost_sandbox_with_existing_file_work_still_blocks_start(self):
         (self.state / 'documents/job/1').mkdir(parents=True)
@@ -75,10 +81,20 @@ class PreflightTests(unittest.TestCase):
 
     def test_image_only_node_still_requires_control_tls(self):
         self.probe.side_effect = RuntimeError('sandbox unavailable')
-        with patch.object(preflight.socket, 'create_connection', side_effect=OSError('unreachable')):
-            result = preflight.check(self.path)
+        self.client.head.side_effect = OSError('private-password unreachable')
+        result = preflight.check(self.path)
         self.assertFalse(result['ready'])
         self.assertEqual(result['code'], 'NODE_CONTROL_TLS_UNREACHABLE')
+        self.assertNotIn('private-password', str(result))
+
+    def test_control_probe_uses_shared_proxy_and_ca_policy_without_identity(self):
+        self.client.head.return_value.status_code = 404
+        result = preflight.check(self.path)
+        self.assertTrue(result['ready'])
+        self.assertTrue(result['checks']['control_tls'])
+        self.control_client.assert_called_once_with(self.config, timeout=15)
+        self.client.head.assert_called_once_with('/')
+        self.assertNotIn('private-password', str(result))
 
 
 if __name__ == '__main__':

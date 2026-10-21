@@ -9,6 +9,27 @@ def configuration():
             'node_id': 'fixture', 'node_token': 'fixture', 'resource_id': 'fixture:cuda:0'}
 
 
+@pytest.mark.parametrize('proxy', [None, 'http://user:p%40ss@localhost:7890', 'https://localhost:7890',
+                                 'socks5://localhost:1080', 'socks5h://localhost:1080'])
+def test_native_proxy_configuration(tmp_path, proxy):
+    from classic_node.transport import control_client
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(configuration() | {'proxy_url': proxy}))
+    resolved = load(path)
+    assert resolved['proxy_url'] == proxy
+    with control_client(resolved):  # Includes the optional SOCKS dependency; no network request.
+        pass
+
+
+@pytest.mark.parametrize('proxy', [42, 'http://', 'ftp://user:secret@host', 'http://user:secret@host:bad'])
+def test_invalid_proxy_configuration_is_redacted(tmp_path, proxy):
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(configuration() | {'proxy_url': proxy}))
+    with pytest.raises(ValueError, match='proxy_url') as error:
+        load(path)
+    assert 'secret' not in str(error.value) and error.value.__suppress_context__
+
+
 @pytest.fixture
 def cpu_capacity(monkeypatch):
     value = {'logical_cpus': 16, 'affinity_cpus': 16, 'cpuset_cpus': 16, 'quota_cpus': 11.5,

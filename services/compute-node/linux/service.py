@@ -11,15 +11,19 @@ from threading import Event
 import time
 
 
-def environment(home):
-    # Do not inherit Vast CONTAINER_API_KEY, account-level tokens, proxy URLs,
-    # NODE_TOKEN or Python injection settings from Supervisor's environment.
-    return {'PATH': '/usr/bin:/bin', 'HOME': str(home), 'PYTHONPATH': '/opt/node/engine',
+def environment(home, *, inherit_proxy=False):
+    # Only the running service inherits proxy settings. Offline bootstrap checks
+    # use this environment in argv and must not expose proxy credentials there.
+    env = {'PATH': '/usr/bin:/bin', 'HOME': str(home), 'PYTHONPATH': '/opt/node/engine',
             'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONUNBUFFERED': '1', 'PYTHONUTF8': '1',
             'QT_QPA_PLATFORM': 'offscreen', 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1',
             'XDG_CACHE_HOME': str(home / 'cache'), 'XDG_CONFIG_HOME': str(home / 'config'),
             'YOLO_CONFIG_DIR': str(home / 'cache/ultralytics'),
             'CUDA_CACHE_PATH': str(home / 'cache/cuda')}
+    if inherit_proxy:
+        env.update({key: value for key, value in os.environ.items()
+                    if key.lower() in {'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy'}})
+    return env
 
 
 def main():
@@ -27,8 +31,9 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     args = parser.parse_args()
     os.umask(0o077)
+    env = environment(args.config.parent, inherit_proxy=True)
     os.environ.clear()
-    os.environ.update(environment(args.config.parent))
+    os.environ.update(env)
     from preflight import check
     from classic_node.config import load
     state = Path(load(args.config)['state_dir'])

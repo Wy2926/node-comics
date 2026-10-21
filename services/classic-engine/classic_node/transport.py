@@ -9,13 +9,18 @@ from .protocol import ControlFailure, MAX_RESULT_BYTES, NodeFailure
 PREFIX = '/internal/compute/v3'
 
 
+def control_client(config, *, headers=None, transport=None, timeout=30):
+    """Shared TLS/proxy policy; preflight uses this without node credentials."""
+    verify = ssl.create_default_context(cafile=config['control_ca']) if config.get('control_ca') else True
+    return httpx.Client(base_url=config['control_url'], trust_env=True, proxy=config.get('proxy_url'),
+        follow_redirects=False, timeout=timeout, verify=verify, transport=transport, headers=headers)
+
+
 class Transport:
     def __init__(self, config, *, control_transport=None):
         self.node_id = config['node_id']
-        verify = ssl.create_default_context(cafile=config['control_ca']) if config.get('control_ca') else True
-        self.control = httpx.Client(base_url=config['control_url'], trust_env=False, follow_redirects=False,
-            timeout=30, verify=verify, transport=control_transport, headers={'Authorization': 'Bearer ' + config['node_token'],
-                                                           'X-Node-Id': self.node_id})
+        self.control = control_client(config, transport=control_transport,
+            headers={'Authorization': 'Bearer ' + config['node_token'], 'X-Node-Id': self.node_id})
 
     def close(self):
         self.control.close()

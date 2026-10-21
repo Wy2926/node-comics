@@ -18,6 +18,31 @@ def config():
             'control_url': 'https://control.example.test'}
 
 
+@pytest.mark.parametrize('proxy', [None, 'http://user:secret@localhost:7890'])
+def test_control_document_and_preflight_clients_use_native_proxy_options(monkeypatch, tmp_path, proxy):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from classic_node.document_runner import DocumentRunner
+    from classic_node.transport import control_client
+    constructor = Mock()
+    monkeypatch.setattr(httpx, 'Client', constructor)
+    local = config() | {'proxy_url': proxy, 'state_dir': str(tmp_path)}
+    node = Transport(local)
+    documents = DocumentRunner(SimpleNamespace(local=local))
+    try:
+        control_client(local, timeout=15).close()
+        center, objects, probe = [call.kwargs for call in constructor.call_args_list]
+        for options in (center, objects, probe):
+            assert options['trust_env'] is True and options['proxy'] == proxy
+            assert options['follow_redirects'] is False and options.get('verify', True) is True
+        assert center['headers']['Authorization'] == 'Bearer control-only-token'
+        assert not objects.get('headers') and not probe['headers'] and probe['timeout'] == 15
+    finally:
+        node.close()
+        documents.objects.close()
+        documents.control.shutdown(wait=True)
+
+
 def test_document_control_uses_v2_and_keeps_authorization_on_center():
     body = {'lease_token': 'lease-secret', 'workspace_generation': 2, 'error': 'LEASE_STOPPED'}
     def center(request):

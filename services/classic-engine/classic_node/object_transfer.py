@@ -11,8 +11,9 @@ from .protocol import ControlFailure, NodeFailure
 
 
 class ObjectTransfer:
-    def __init__(self, *, transport=None):
-        self.client = httpx.Client(trust_env=False, follow_redirects=False, timeout=30, transport=transport)
+    def __init__(self, config=None, *, transport=None):
+        self.client = httpx.Client(trust_env=True, proxy=(config or {}).get('proxy_url'),
+                                  follow_redirects=False, timeout=30, transport=transport)
 
     def close(self):
         self.client.close()

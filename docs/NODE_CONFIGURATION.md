@@ -28,6 +28,20 @@
 
 复制 [node.example.json](../services/classic-engine/node.example.json) 为私有文件。必填 `protocol_version:3`、中心 HTTPS `control_url`、`node_id`、`node_token` 和 `resource_id`；不配置对象存储 origin 或凭据。可用 `control_ca` 指定私有中心 CA，仍验证服务器证书和主机名；节点凭据只发送到配置中的中心。
 
+### 代理
+
+未配置 `proxy_url` 或设为 `null` 时，使用 HTTPX 原生环境代理（支持大小写 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`）。节点请求均为 HTTPS，应设置 `HTTPS_PROXY` 或 `ALL_PROXY`。也可在私有 JSON 顶层指定：
+
+```json
+"proxy_url": "http://127.0.0.1:7890"
+```
+
+支持 `http://`、`https://`、`socks5://`、`socks5h://`；认证使用 `http://username:password@host:port`，特殊字符需 URL 编码。HTTPS 请求通常仍使用 `http://` 代理地址，通过 CONNECT 隧道传输。显式配置覆盖环境代理及 `NO_PROXY`；需要绕过列表时使用环境变量。行为沿用 [HTTPX](https://www.python-httpx.org/advanced/proxies/)，TLS 校验、凭据隔离和原有失败重试保持不变，不自动回退直连。
+
+配置统一作用于中心请求、图片／文件传输及 Linux 联网预检，排空重启后生效。Windows 使用 `data/node.json`（或 `--home` 指定目录）；服务账户／Supervisor 未必继承终端环境，长期运行建议使用私有 JSON。Linux 只额外保留代理环境变量，不继承平台令牌；离线安装检查不将代理凭据放入命令行。含密码的 URL 不提交仓库、不写入日志。
+
+### 执行资源
+
 中心不修改本地模型、线程或缓存：
 
 | 字段 | 默认值与用途 |

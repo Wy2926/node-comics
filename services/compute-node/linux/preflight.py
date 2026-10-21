@@ -5,11 +5,8 @@ import json
 import os
 from pathlib import Path
 import shutil
-import socket
-import ssl
 import subprocess
 import sys
-from urllib.parse import urlsplit
 
 
 def host_security():
@@ -68,11 +65,11 @@ def check(config_path, *, local_only=False):
                                                denial_probe=True)
         if not local_only:
             code = 'NODE_CONTROL_TLS_UNREACHABLE'
-            url = urlsplit(config['control_url'])
-            context = ssl.create_default_context(cafile=config.get('control_ca'))
-            with socket.create_connection((url.hostname, url.port or 443), timeout=15) as connection:
-                with context.wrap_socket(connection, server_hostname=url.hostname):
-                    pass
+            from classic_node.transport import control_client
+            with control_client(config, timeout=15) as client:
+                # Any HTTP status proves TLS connectivity; do not require a
+                # public health route, follow redirects or send node identity.
+                client.head('/')
             result['checks']['control_tls'] = True
         result['ready'] = True
     except Exception:

@@ -104,9 +104,11 @@ def test_attach_and_image_stage_never_sample_or_write_diagnostics(tmp_path, monk
 
 def test_execution_settings_allowlist_excludes_identity_paths_and_credentials():
     settings = execution_settings({'node_token': 'secret-token', 'control_url': 'private-origin',
+        'proxy_url': 'http://proxy-user:proxy-password@proxy-private:8080',
         'engine': {'models': 'private-model-path', 'font': ['private-font-path'], 'ocr_batch_size': 2}})
     assert settings['engine']['ocr_batch_size'] == 2
     assert not any(value in json.dumps(settings) for value in ('secret-token', 'private-origin', 'private-model-path', 'private-font-path'))
+    assert 'proxy' not in json.dumps(settings)
 
 
 def test_process_survives_registration_outage_then_registers(tmp_path):

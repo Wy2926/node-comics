@@ -47,9 +47,12 @@ class ContainerTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('node_service', ROOT / 'service.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        with patch.dict('os.environ', {'NODE_TOKEN': 'secret', 'CONTAINER_API_KEY': 'secret', 'LLM_KEY': 'secret'}):
+        with patch.dict('os.environ', {'NODE_TOKEN': 'secret', 'CONTAINER_API_KEY': 'secret', 'LLM_KEY': 'secret',
+                                      'PYTHONPATH': 'secret', 'HTTPS_PROXY': 'http://user:secret@proxy.test:8080'}, clear=True):
             env = module.environment(Path('/data'))
-        self.assertNotIn('secret', json.dumps(env))
+            running = module.environment(Path('/data'), inherit_proxy=True)
+        self.assertEqual(running.pop('HTTPS_PROXY'), 'http://user:secret@proxy.test:8080')
+        self.assertNotIn('secret', json.dumps(env) + json.dumps(running))
         self.assertEqual(env['HF_HUB_OFFLINE'], '1')
 
     def test_asset_build_refuses_existing_bundle(self):

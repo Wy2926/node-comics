@@ -44,7 +44,7 @@ class DocumentRunner:
             LOCAL_DEFAULTS['document_control_workers']), thread_name_prefix='document-control')
         self.claim_future = self.heartbeat_future = self.sync_future = None
         self.next_claim = self.next_heartbeat = self.next_sync = 0
-        self.objects = ObjectTransfer()
+        self.objects = ObjectTransfer(agent.local)
         self.state_dir = Path(agent.local.get('state_dir') or agent.journal.root)
         self._protocol = False  # Probed once at registration, not on the hot path.
 
