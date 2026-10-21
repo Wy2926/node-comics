@@ -146,11 +146,18 @@ func (a app) worker(command string) *exec.Cmd {
 var localPaths = map[string]string{"TEMP": "tmp", "TMP": "tmp", "XDG_CACHE_HOME": "cache",
 	"HF_HOME": "cache/huggingface", "TORCH_HOME": "cache/torch", "MPLCONFIGDIR": "cache/matplotlib",
 	"YOLO_CONFIG_DIR": "cache/ultralytics", "CUDA_CACHE_PATH": "cache/cuda",
-	"APPDATA": "profile/roaming", "LOCALAPPDATA": "profile/local"}
+	"MIOPEN_USER_DB_PATH": "cache/miopen/db", "MIOPEN_CUSTOM_CACHE_DIR": "cache/miopen/kernels",
+	"ROCFFT_RTC_CACHE_PATH": "cache/rocfft/kernels.db",
+	"APPDATA":               "profile/roaming", "LOCALAPPDATA": "profile/local"}
 
 func localDirectories(directory string) error {
-	for _, relative := range localPaths {
-		if err := os.MkdirAll(filepath.Join(directory, relative), 0700); err != nil {
+	for key, relative := range localPaths {
+		path := filepath.Join(directory, filepath.FromSlash(relative))
+		// rocFFT takes a database filename; only the library creates/updates it.
+		if key == "ROCFFT_RTC_CACHE_PATH" {
+			path = filepath.Dir(path)
+		}
+		if err := os.MkdirAll(path, 0700); err != nil {
 			return err
 		}
 	}

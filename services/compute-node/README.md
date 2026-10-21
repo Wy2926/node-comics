@@ -49,6 +49,8 @@ ZIP 仅包含原生启动器、源码、许可证和锁定清单，不包含大�
 
 所有命令可用 `--home <路径>` 指定私有数据目录；双击入口使用默认 `data/`。应用可控的临时／缓存路径通过子进程环境限定在上述目录，不修改用户或机器环境变量；Windows 和显卡驱动自身的缓存不承诺零写入。新配置默认单页／单渲染并发、2 个算子线程，这不是 CPU、内存或显存硬限额。
 
+AMD 的 [MIOpen 调优数据库与内核缓存](https://rocm.docs.amd.com/projects/MIOpen/en/latest/conceptual/tuningdb.html)分别保存在 `data/cache/miopen/db/`、`data/cache/miopen/kernels/`；[rocFFT 编译缓存](https://rocm.docs.amd.com/projects/rocFFT/en/latest/how-to/runtime-compilation.html)保存在 `data/cache/rocfft/kernels.db`。启动器只为子进程设置对应路径，不改 `HOME`／`USERPROFILE`，不搬移或删除已有用户缓存。停止和覆盖更新均保留这些缓存。AMD 在接单前预热 LaMa 从 64 到配置上限的各档方形输入，首次建立缓存会增加启动耗时；NVIDIA 预热不变，不增加空闲时的后台保活。
+
 仅下载准备、不接入中心可执行 `node.exe prepare --backend cuda` 或 `node.exe prepare --backend amd`；命令行启动为 `node.exe start`，首次也可附加 `--backend cuda|amd --from <私有配置>`。`node.exe doctor` 在节点停止时检查 GPU、模型和字体，不接单。节点身份不能与其他部署同时运行；新电脑使用新身份。彻底移除前先处理完待交付任务、关闭自启并停止，再删除该专用目录；不要删除其他部署的环境或数据。
 
 Windows 便携包处理普通 v3 单图任务，不声明需要 Linux 解析沙箱的 `document_protocol:2` 文件能力。节点不配置 R2／LLM 凭据。状态、日志与恢复规则见[节点运维](../classic-engine/docs/NODE_OPERATIONS.md)，文件任务能力与调度见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)及[文件调度规则](../../docs/DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。

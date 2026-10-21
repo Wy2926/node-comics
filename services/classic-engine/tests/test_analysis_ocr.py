@@ -1,4 +1,4 @@
-"""Mocked analysis-stage policy tests; no neural model or CUDA execution."""
+"""Mocked model-stage policy tests; no neural model or CUDA execution."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import sys
@@ -56,6 +56,48 @@ def analysis(monkeypatch):
     engine.colors = SimpleNamespace(apply=colors)
     engine.bubbles = SimpleNamespace(detect=lambda *args, **kwargs: calls.append(('bubbles', None)))
     return engine, source, quads, calls
+
+
+@pytest.mark.parametrize('backend,limit,fail_at,expected', [
+    ('cuda', 512, None, [512]),
+    ('cuda', 1024, None, [512]),
+    ('amd', 512, None, [512, 64, 128, 192, 256, 320, 384, 448]),
+    ('amd', 768, None, [512, 64, 128, 192, 256, 320, 384, 448, 576, 640, 704, 768]),
+    ('amd', 1024, None, [512, 64, 128, 192, 256, 320, 384, 448, 576, 640, 704, 768, 832, 896, 960, 1024]),
+    ('amd', 512, 192, [512, 64, 128, 192]),
+])
+def test_warmup_covers_amd_block_shapes_without_changing_cuda(analysis, backend, limit, fail_at, expected):
+    engine, _, _, calls = analysis
+    engine.backend = backend
+    engine.config.inpainter = SimpleNamespace(inpainting_size=limit)
+    shapes = []
+
+    def record(name):
+        async def run(*args):
+            calls.append((name, None))
+        return run
+
+    async def inpaint(image, mask, config, size):
+        side = image.shape[0]
+        assert image.shape == (side, side, 3) and mask.shape == (side, side)
+        assert image.dtype == mask.dtype == np.uint8
+        assert np.any(mask) and np.any(mask == 0)
+        assert config is engine.config.inpainter and size == limit
+        shapes.append(side)
+        if side == fail_at:
+            raise RuntimeError('fixture inpaint failed')
+
+    engine.detector.detect = record('detect')
+    engine.probes = {name: SimpleNamespace(recognize=record(name)) for name in ('en', 'ch', 'korean')}
+    engine.router.choose = lambda *args: calls.append(('route', None))
+    engine.colors.apply = lambda *args: calls.append(('colors', None))
+    engine.inpainter = SimpleNamespace(inpaint=inpaint)
+    with pytest.raises(RuntimeError, match='fixture inpaint failed') if fail_at else nullcontext():
+        engine.warmup()
+    assert shapes == expected
+    assert [name for name, _ in calls] == ['detect', 'en', 'ch', 'korean', 'route', 'colors'] + (
+        [] if fail_at else ['bubbles'])
+    assert not engine._detector_lock.locked() and not engine._bubble_lock.locked()
 
 
 @pytest.mark.parametrize('texts', [

@@ -95,7 +95,11 @@ func TestChildEnvironmentIsPrivateAndDoesNotMutateParent(t *testing.T) {
 	t.Setenv("PYTHONPATH", "foreign-python")
 	t.Setenv("NODE_TOKEN", "foreign-token")
 	t.Setenv("TEMP", "foreign-temp")
-	directory := t.TempDir()
+	for _, key := range []string{"MIOPEN_USER_DB_PATH", "MIOPEN_CUSTOM_CACHE_DIR", "ROCFFT_RTC_CACHE_PATH"} {
+		t.Setenv(key, "foreign-cache")
+	}
+	parentHome, parentProfile := os.Getenv("HOME"), os.Getenv("USERPROFILE")
+	directory := filepath.Join(t.TempDir(), "节点 cache")
 	if err := localDirectories(directory); err != nil {
 		t.Fatal(err)
 	}
@@ -108,16 +112,67 @@ func TestChildEnvironmentIsPrivateAndDoesNotMutateParent(t *testing.T) {
 	if values["NODE_TOKEN"] != "" || values["PYTHONPATH"] != "" {
 		t.Fatal("inherited private configuration")
 	}
-	for key := range localPaths {
-		if !strings.HasPrefix(values[key], directory+string(filepath.Separator)) {
+	for key, relative := range localPaths {
+		if values[key] != filepath.Join(directory, filepath.FromSlash(relative)) {
 			t.Fatal(key, values[key])
 		}
-		if info, err := os.Stat(values[key]); err != nil || !info.IsDir() {
+		path := values[key]
+		if key == "ROCFFT_RTC_CACHE_PATH" {
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatal("rocFFT must create its own database file", err)
+			}
+			path = filepath.Dir(path)
+		}
+		if info, err := os.Stat(path); err != nil || !info.IsDir() {
 			t.Fatal("cache directory must exist before a library checks writability", key, err)
+		}
+	}
+	if values["HOME"] != parentHome || values["USERPROFILE"] != parentProfile ||
+		os.Getenv("HOME") != parentHome || os.Getenv("USERPROFILE") != parentProfile {
+		t.Fatal("changed user home/profile")
+	}
+	for _, key := range []string{"MIOPEN_USER_DB_PATH", "MIOPEN_CUSTOM_CACHE_DIR", "ROCFFT_RTC_CACHE_PATH"} {
+		if os.Getenv(key) != "foreign-cache" {
+			t.Fatal("changed parent GPU cache environment", key)
 		}
 	}
 	if os.Getenv("TEMP") != "foreign-temp" || os.Getenv("PYTHONPATH") != "foreign-python" {
 		t.Fatal("changed parent environment")
+	}
+}
+
+func TestGPUCachesSurviveRepeatedLaunchSetup(t *testing.T) {
+	directory, other := t.TempDir(), t.TempDir()
+	if err := localDirectories(directory); err != nil {
+		t.Fatal(err)
+	}
+	for key, filename := range map[string]string{"MIOPEN_USER_DB_PATH": "shape.ufdb.txt",
+		"MIOPEN_CUSTOM_CACHE_DIR": "kernels.ukdb", "ROCFFT_RTC_CACHE_PATH": ""} {
+		path := filepath.Join(directory, filepath.FromSlash(localPaths[key]), filename)
+		if err := os.WriteFile(path, []byte("compiled cache"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := localDirectories(directory); err != nil {
+			t.Fatal(err)
+		}
+		if err := localDirectories(other); err != nil {
+			t.Fatal(err)
+		}
+		after, err := os.Stat(path)
+		if err != nil || !before.ModTime().Equal(after.ModTime()) {
+			t.Fatal("launch setup rewrote an existing GPU cache", key, err)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != "compiled cache" {
+			t.Fatal("launch setup changed cache contents", key, err)
+		}
+		if _, err := os.Stat(filepath.Join(other, filepath.FromSlash(localPaths[key]), filename)); !os.IsNotExist(err) {
+			t.Fatal("shared GPU cache across node data directories", key, err)
+		}
 	}
 }
 

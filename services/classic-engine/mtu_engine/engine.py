@@ -252,6 +252,7 @@ class Engine:
         validate_backend(backend, gpu)
         self.models = Path(models)
         self.gpu = gpu
+        self.backend = backend
         self.keep_lang = keep_lang
         self.renderer = Renderer(models, font)
         self.config = configuration(detect_size, inpainting_size)
@@ -335,6 +336,18 @@ class Engine:
                 lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=[text], language=language)
                 for text, language in [('warmup', 'en'), ('', 'unknown')]])
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
+            if self.backend == 'amd':
+                # Native per-block LaMa inputs are square and padded to 64.
+                # Warm their HIP kernels before accepting pages, not on first use.
+                for side in range(64, c.inpainter.inpainting_size + 1, 64):
+                    if side == 512:
+                        continue  # Already exercised above; keep CUDA unchanged.
+                    sample = np.full((side, side, 3), 255, dtype=np.uint8)
+                    sample_mask = np.zeros((side, side), dtype=np.uint8)
+                    center = side // 2
+                    sample_mask[center - 15:center + 15, center - 15:center + 15] = 255
+                    await self.inpainter.inpaint(sample, sample_mask, c.inpainter,
+                                                c.inpainter.inpainting_size)
         with self._detector_lock, self._bubble_lock, torch.cuda.device(self.gpu):
             asyncio.run(run())
             self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
