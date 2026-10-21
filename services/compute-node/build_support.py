@@ -74,7 +74,8 @@ def safe_extract_zip(archive, destination):
 
 
 def copy_sources(source, target):
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.egg-info', '.env*', '*.log', '*.sqlite*'))
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.egg-info',
+                    '.env*', '*.log', '*.sqlite*', '.venv', '.pytest_cache', 'node_modules', 'build'))
     # Git autocrlf must not change engine identity.
     for path in Path(target).rglob('*'):
         if path.is_file() and path.suffix in ('.py', '.go', '.json', '.toml', '.md', '.txt', '.lock'):
@@ -90,6 +91,15 @@ def build_environment(work, go_root=None):
                GOPATH=str(work / 'go-path'), CGO_ENABLED='0', GOWORK='off', GOENV='off')
     if go_root:
         env['GOROOT'] = str(go_root)
+    # Process-local only. Neither installation nor source-package builds write
+    # into the operator's global Python, temporary directory or library caches.
+    for key, relative in {'TEMP': 'tmp', 'TMP': 'tmp', 'XDG_CACHE_HOME': 'cache',
+                          'HF_HOME': 'cache/huggingface', 'TORCH_HOME': 'cache/torch',
+                          'MPLCONFIGDIR': 'cache/matplotlib', 'YOLO_CONFIG_DIR': 'cache/ultralytics',
+                          'CUDA_CACHE_PATH': 'cache/cuda'}.items():
+        path = Path(work) / relative
+        path.mkdir(parents=True, exist_ok=True)
+        env[key] = str(path)
     return env
 
 
@@ -118,22 +128,22 @@ def remove_unused_launchers(site):
             csv.writer(stream, lineterminator='\n').writerows(sorted(retained))
 
 
-def archive_release(destination):
+def archive_release(destination, manifest_name='release.json'):
     destination = Path(destination).resolve()
-    manifest = json.loads((destination / 'release.json').read_text(encoding='utf-8'))
+    manifest = json.loads((destination / manifest_name).read_text(encoding='utf-8'))
     archive = destination.parent / (destination.name + '.zip')
     temporary = archive.with_suffix('.zip.partial')
     if archive.exists() or temporary.exists():
         raise ValueError('Archive already exists')
     with temporary.open('xb') as raw:
         with zipfile.ZipFile(raw, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=1) as package:
-            for name in sorted([*manifest['files'], 'release.json']):
+            for name in sorted([*manifest['files'], manifest_name]):
                 relative = PurePosixPath(name)
                 source = (destination / name).resolve()
-                if (relative.is_absolute() or '..' in relative.parts or relative.parts[0].lower() == 'data'
+                if (relative.is_absolute() or '..' in relative.parts or relative.parts[0].lower() in ('data', '.setup', 'payload')
                         or not source.is_relative_to(destination)):
                     raise ValueError('Invalid distribution entry')
-                if name != 'release.json' and sha256(source) != manifest['files'][name]:
+                if name != manifest_name and sha256(source) != manifest['files'][name]:
                     raise ValueError('Release changed since manifest creation')
                 info = zipfile.ZipInfo(destination.name + '/' + name, (2024, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_DEFLATED

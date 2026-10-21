@@ -20,6 +20,7 @@ class Builder:
     def __init__(self, args):
         self.output, self.work, self.session = args.output.resolve(), args.work.resolve(), args.run.resolve()
         self.version, self.uv = args.version, args.uv.resolve()
+        self.backend = getattr(args, 'backend', 'cuda')
         self.lock = json.loads((ROOT / 'toolchain.lock.json').read_text(encoding='utf-8'))
         if sys.platform != 'win32' or sys.maxsize <= 2**32 or sys.version.split()[0] != self.lock['python']['version']:
             raise RuntimeError('Use build.ps1 with its pinned Windows x64 Python runtime')
@@ -34,12 +35,14 @@ class Builder:
 
     def requirements(self, project, target):
         run([self.uv, 'export', '--project', project, '--frozen', '--no-dev', '--no-emit-project',
+             '--no-emit-package', 'node-comics-classic-engine',
              '--no-emit-package', 'comic-document-files',
              '--no-editable', '--no-header', '--no-annotate', '--output-file', target], cwd=ROOT, env=self.env, capture=True)
         content = target.read_text(encoding='utf-8')
         # uv export omits index URLs. Keep CUDA artifacts tied directly
         # to its locked Windows wheel, without changing global index priority.
         lock = tomllib.loads((project / 'uv.lock').read_text(encoding='utf-8'))
+        amd_pins = json.loads((ROOT / 'portable-amd-artifacts.json').read_text(encoding='utf-8'))
         for package in lock['package']:
             name = package['name']
             if name in ('torch', 'torchvision') and re.search(r'^' + name + '==', content, re.MULTILINE):
@@ -47,6 +50,14 @@ class Builder:
                 if len(wheels) != 1:
                     raise ValueError('Expected one locked CPython 3.12 Windows CUDA wheel: ' + name)
                 requirement = name + ' @ ' + wheels[0]['url'] + ' --hash=' + wheels[0]['hash']
+                content = re.sub(r'^' + name + r'==[^\n]*(?:\n[ \t]+[^\n]*)*',
+                                 lambda match: requirement, content, flags=re.MULTILINE)
+            if name in amd_pins and re.search(r'^' + name + '==', content, re.MULTILINE):
+                artifact = amd_pins[name]
+                sources = package.get('wheels', []) + ([package['sdist']] if 'sdist' in package else [])
+                if package['version'] != artifact['version'] or artifact['url'] not in [item['url'] for item in sources]:
+                    raise ValueError('AMD artifact pin differs from environment lock: ' + name)
+                requirement = name + ' @ ' + artifact['url'] + ' --hash=sha256:' + artifact['sha256']
                 content = re.sub(r'^' + name + r'==[^\n]*(?:\n[ \t]+[^\n]*)*',
                                  lambda match: requirement, content, flags=re.MULTILINE)
         target.write_text(content, encoding='utf-8', newline='\n')
@@ -92,28 +103,22 @@ class Builder:
         copy_sources(base / 'DLLs', runtime / 'DLLs')
         shutil.copytree(base / 'Lib', runtime / 'Lib', ignore=shutil.ignore_patterns(
             'site-packages', '__pycache__', '*.pyc', 'test', 'tests', 'idlelib', 'tkinter', 'turtledemo', 'ensurepip'))
-        (runtime / 'python312._pth').write_text('.\nDLLs\nLib\nLib/site-packages\n../engine\nimport site\n', encoding='ascii')
+        (runtime / 'python312._pth').write_text('.\nDLLs\nLib\nLib/site-packages\nimport site\n', encoding='ascii')
         requirements = self.output / 'runtime-requirements.txt'
-        self.requirements(ENGINE, requirements)
+        self.requirements(ENGINE / 'environments/amd' if self.backend == 'amd' else ENGINE, requirements)
         packaging_python = self.environment('packaging')
         # Source-only antlr4 builds using locked setuptools/wheel, without PEP 517 downloads.
         run([self.uv, 'pip', 'install', '--python', packaging_python, '--target', runtime / 'Lib/site-packages',
              '--require-hashes', '--no-build-isolation', '-r', requirements], cwd=ROOT, env=self.env)
         remove_unused_launchers(runtime / 'Lib/site-packages')
-        for package in ('classic_node', 'mtu_engine'):
-            copy_sources(ENGINE / package, self.output / 'engine' / package)
-        # Local first-party source is copied with the engine, not fed to pip's
-        # hash-required third-party requirements. PDFium stays lockfile-pinned.
-        copy_sources(ENGINE.parent.parent / 'backend/document_files/comic_document_files',
-                     self.output / 'engine/comic_document_files')
-        for name in ('LICENSE', 'THIRD_PARTY.md', 'uv.lock', 'pyproject.toml'):
-            shutil.copy2(ENGINE / name, self.output / 'engine' / name)
         for directory in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation'):
             shutil.copytree(self.assets / directory, self.output / directory)
         shutil.copy2(self.assets / 'mtu-assets.json', self.output / 'mtu-assets.json')
-        code = ('import json; from mtu_engine.assets import verify; '
-                'print(json.dumps(verify(__import__("sys").argv[1])["files"]))')
-        verified = json.loads(run([runtime / 'python.exe', '-B', '-c', code, self.output / 'models'],
+        # Application code belongs to the small update package, not the cached
+        # environment. Asset verification only needs the bootstrap standard library.
+        code = ('import json, sys; sys.path.insert(0, sys.argv[1]); from mtu_engine.assets import verify; '
+                'print(json.dumps(verify(sys.argv[2])["files"]))')
+        verified = json.loads(run([sys.executable, '-I', '-B', '-c', code, ENGINE, self.output / 'models'],
                                   cwd=self.output, env=self.env, capture=True))
         self.model_hashes = {name: value for name, value in verified.items() if name.startswith('models/')}
         event('models_verified', files=len(verified))
@@ -128,7 +133,7 @@ class Builder:
         copy_sources(ENGINE.parent.parent / 'backend/document_files', self.output / 'backend/document_files')
         host = source / 'compute-node'
         host.mkdir(parents=True)
-        for pattern in ('*.go', '*.py', '*.ps1', '*.json', 'go.mod', 'go.sum', 'README.md', 'LICENSE'):
+        for pattern in ('*.go', '*.py', '*.ps1', '*.cmd', '*.json', 'go.mod', 'go.sum', 'README.md', 'LICENSE'):
             for path in ROOT.glob(pattern):
                 shutil.copy2(path, host / path.name)
         copy_sources(ROOT / 'build-deps', host / 'build-deps')
@@ -136,8 +141,13 @@ class Builder:
         engine = source / 'classic-engine'
         for directory in ('classic_node', 'mtu_engine', 'tools', 'docs'):
             copy_sources(ENGINE / directory, engine / directory)
+        amd = engine / 'environments/amd'
+        amd.mkdir(parents=True)
+        for name in ('pyproject.toml', 'uv.lock'):
+            shutil.copy2(ENGINE / 'environments/amd' / name, amd / name)
         for name in ('LICENSE', 'THIRD_PARTY.md', 'uv.lock', 'pyproject.toml', 'README.md', 'ENGINE.md'):
             shutil.copy2(ENGINE / name, engine / name)
+        (self.output / 'licenses').mkdir(exist_ok=True)
         for name in ('sys', 'term'):
             module = json.loads(run([self.go, 'list', '-m', '-json', 'golang.org/x/' + name], cwd=ROOT, env=self.env, capture=True))
             shutil.copy2(Path(module['Dir']) / 'LICENSE', self.output / 'licenses' / f'go-x-{name}-LICENSE')
@@ -146,30 +156,41 @@ class Builder:
         readme = (ROOT / 'README.md').read_text(encoding='utf-8').replace(
             '../classic-engine/docs/NODE_OPERATIONS.md', 'source/classic-engine/docs/NODE_OPERATIONS.md')
         (self.output / 'README.md').write_text(readme, encoding='utf-8', newline='\n')
-        notices = self.output / 'engine/THIRD_PARTY.md'
-        notices.write_text(notices.read_text(encoding='utf-8').replace('../compute-node/README.md', '../README.md')
-                          .replace('../compute-node/assets.json', '../licenses/font-sources.json'), encoding='utf-8', newline='\n')
-
     def build(self):
         if self.output.exists():
             raise ValueError('Output must be a new directory; never overwrite a configured node')
         self.output.mkdir(parents=True)
         self.prepare_go()
-        self.prepare_models()
-        self.package_runtime()
-        self.package_fonts()
+        self.environment('packaging')
         event('native_host')
         run([self.go, 'build', '-trimpath', '-buildvcs=false', '-ldflags', f'-s -w -X main.version={self.version}',
              '-o', self.output / 'node.exe', '.'], cwd=ROOT, env=self.env)
-        run([self.go, 'test', './...'], cwd=ROOT, env=self.env)
-        run([self.go, 'vet', './...'], cwd=ROOT, env=self.env)
-        run([self.tool_envs['packaging'], '-B', '-m', 'pytest', ROOT / 'test_build_release.py', '-q'], cwd=ROOT, env=self.env)
+        run([self.go, 'test', '.'], cwd=ROOT, env=self.env)
+        run([self.go, 'vet', '.'], cwd=ROOT, env=self.env)
+        run([self.tool_envs['packaging'], '-B', '-m', 'pytest', ROOT / 'test_build_release.py',
+             ROOT / 'test_portable.py', ROOT / 'test_run_node.py', '-q'], cwd=ROOT, env=self.env)
         self.package_sources()
+        for name in ('Start.cmd', 'Stop.cmd', 'Status.cmd', 'Enable-Autostart.cmd', 'Disable-Autostart.cmd'):
+            shutil.copy2(ROOT / name, self.output / name)
+        self.write_manifest('portable.json')
+
+    def write_manifest(self, filename='release.json'):
+        portable = filename == 'portable.json'
         manifest = {'version': self.version, 'platform': 'windows-amd64', 'python': self.lock['python']['version'],
-                    'toolchain': self.lock, 'models': self.model_hashes, 'fonts': self.fonts,
+                    'toolchain': self.lock, 'models': {} if portable else self.model_hashes,
+                    'fonts': [] if portable else self.fonts,
                     'files': {p.relative_to(self.output).as_posix(): sha256(p)
                               for p in sorted(self.output.rglob('*')) if p.is_file()}}
-        (self.output / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
+        if portable:
+            manifest['format'] = 'gpu-portable-v1'
+            manifest['requirements_sha256'] = {}
+            for backend, project in (('cuda', ENGINE), ('amd', ENGINE / 'environments/amd')):
+                target = self.session / (backend + '-requirements.txt')
+                self.requirements(project, target)
+                manifest['requirements_sha256'][backend] = sha256(target)
+        else:
+            manifest['backend'] = self.backend
+        (self.output / filename).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
         event('release_complete', release=str(self.output), files=len(manifest['files']))
 
 
@@ -185,7 +206,7 @@ def main():
     builder = Builder(args)
     builder.build()
     if args.zip:
-        archive_release(builder.output)
+        archive_release(builder.output, manifest_name='portable.json')
 
 
 if __name__ == '__main__':

@@ -29,7 +29,7 @@ uv run --project environments/amd --locked python -m tools.prepare_mtu --output 
 uv run --project environments/amd --locked python -m classic_node check --config D:/amd-node/node.local.json
 ```
 
-资产仍用 `tools.prepare_mtu`，为 AMD 指定独立输出目录，并将私有配置的 `engine.models`、`engine.font` 指向该目录；设置 `engine.backend: "amd"`、`engine.gpu: 0` 和独立 `state_dir`。不要复用正在接单的节点身份、状态或资产准备目录。`check` 只做本地校验和预热；只有明确授权接入中心后才运行 `run`。现有 Windows 发布包和 Linux NVIDIA 构建仍使用根 CUDA 锁文件，不包含此 AMD 环境。
+资产仍用 `tools.prepare_mtu`，为 AMD 指定独立输出目录，并将私有配置的 `engine.models`、`engine.font` 指向该目录；设置 `engine.backend: "amd"`、`engine.gpu: 0` 和独立 `state_dir`。不要复用正在接单的节点身份、状态或资产准备目录。`check` 只做本地校验和预热；只有明确授权接入中心后才运行 `run`。Linux NVIDIA 构建仍使用根 CUDA 锁文件；Windows 部署统一使用[轻量便携包](../compute-node/README.md#轻量便携包)，首次可选择 AMD 并自动准备此独立环境，纯代码更新停止后直接覆盖、复用依赖和模型。
 
 AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`；真实模型测试另外设置 `MTU_TEST_BACKEND=amd`。2 万／5 万像素图应先单页测量再增加并发；不能因使用相同并发参数便推断与 RTX 5060 容量或性能相同。
 
@@ -63,7 +63,7 @@ AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`�
 
 ## 部署与协议
 
-- [Windows 独立节点包](../compute-node/README.md)、[Linux NVIDIA](../compute-node/linux/README.md)
+- [Windows 便携节点包](../compute-node/README.md)、[Linux NVIDIA](../compute-node/linux/README.md)
 - [节点配置](../../docs/NODE_CONFIGURATION.md)、[运行与恢复](docs/NODE_OPERATIONS.md)
 - [v3 计算协议](../../docs/COMPUTE_PROTOCOL.md)、[第三方来源](THIRD_PARTY.md)
 

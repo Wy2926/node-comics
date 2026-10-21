@@ -1,6 +1,5 @@
 """Distribution boundary: initialized node data must never enter a release ZIP."""
 import json
-from pathlib import Path
 import zipfile
 
 import pytest
@@ -35,28 +34,30 @@ wheels = [
     assert 'torch @ https://download.pytorch.org/torch-cp312-cp312-win_amd64.whl' in result
 
 
-def test_archive_preserves_version_name_and_excludes_private_data(tmp_path):
-    release = tmp_path / 'NodeComicsNode-0.1.0-windows-x64'
+def test_archive_keeps_stable_name_and_excludes_private_and_generated_data(tmp_path):
+    release = tmp_path / 'NodeComicsNode'
     release.mkdir()
     (release / 'node.exe').write_bytes(b'release fixture')
-    (release / 'data').mkdir()
-    (release / 'data/node.json').write_text('private fixture credential')
-    (release / 'release.json').write_text(json.dumps({'files': {'node.exe': sha256(release / 'node.exe')}}))
-    archive_release(release)
+    for name in ('data/node.json', 'payload/runtime/python.exe', '.setup/downloads/large.bin'):
+        path = release / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('must not distribute')
+    (release / 'portable.json').write_text(json.dumps({'files': {'node.exe': sha256(release / 'node.exe')}}))
+    archive_release(release, manifest_name='portable.json')
     archive = tmp_path / (release.name + '.zip')
     with zipfile.ZipFile(archive) as package:
-        assert package.namelist() == [release.name + '/node.exe', release.name + '/release.json']
+        assert package.namelist() == ['NodeComicsNode/node.exe', 'NodeComicsNode/portable.json']
         assert package.testzip() is None
     assert archive.with_suffix('.zip.sha256').read_text() == sha256(archive) + '  ' + archive.name + '\n'
     with pytest.raises(ValueError, match='already exists'):
-        archive_release(release)
+        archive_release(release, manifest_name='portable.json')
 
 
 def test_archive_rejects_modified_release(tmp_path):
     (tmp_path / 'node.exe').write_bytes(b'changed')
-    (tmp_path / 'release.json').write_text(json.dumps({'files': {'node.exe': '0' * 64}}))
+    (tmp_path / 'portable.json').write_text(json.dumps({'files': {'node.exe': '0' * 64}}))
     with pytest.raises(ValueError, match='changed since manifest'):
-        archive_release(tmp_path)
+        archive_release(tmp_path, manifest_name='portable.json')
     assert not tmp_path.with_name(tmp_path.name + '.zip').exists()
 
 
@@ -125,3 +126,54 @@ def test_unused_absolute_launchers_are_removed_from_runtime(tmp_path):
     remove_unused_launchers(tmp_path)
     assert not (tmp_path / 'bin').exists()
     assert (metadata / 'RECORD').read_text() == 'package.dist-info/METADATA,hash,14\n'
+
+
+def test_first_install_runtime_has_no_copied_application_code(tmp_path, monkeypatch):
+    import build_release
+    builder = Builder.__new__(Builder)
+    builder.output, builder.session, builder.assets = (tmp_path / name for name in ('payload', 'session', 'assets'))
+    builder.output.mkdir()
+    base = builder.session / 'python'
+    (base / 'DLLs').mkdir(parents=True)
+    (base / 'Lib').mkdir()
+    (base / 'Lib/stdlib.py').write_text('stdlib fixture')
+    for name in ('python.exe', 'pythonw.exe', 'LICENSE.txt'):
+        (base / name).write_text(name)
+    for directory in ('upstream', 'models', 'fonts', 'licenses', 'hyphenation'):
+        (builder.assets / directory).mkdir(parents=True)
+    (builder.assets / 'mtu-assets.json').write_text('{}')
+    builder.backend, builder.uv, builder.env = 'amd', 'uv', {}
+    builder.environment = lambda _: 'packaging-python'
+    builder.requirements = lambda _, target: target.write_text('gpu==amd\n', newline='\n')
+    def run(args, **kwargs):
+        if '-c' in args:
+            assert args[:3] == [build_release.sys.executable, '-I', '-B']
+            assert args[-2:] == [build_release.ENGINE, builder.output / 'models']
+            return json.dumps({'models/fixture': 'model-hash'})
+        assert args[:3] == ['uv', 'pip', 'install']
+    monkeypatch.setattr(build_release, 'run', run)
+    builder.package_runtime()
+    assert not (builder.output / 'engine').exists()
+    assert '../engine' not in (builder.output / 'runtime/python312._pth').read_text()
+    assert builder.model_hashes == {'models/fixture': 'model-hash'}
+
+
+def test_build_only_emits_portable_package(tmp_path, monkeypatch):
+    import build_release
+    builder = Builder.__new__(Builder)
+    builder.output, builder.version, builder.go = tmp_path / 'NodeComicsNode', '0.3.0', 'go'
+    builder.env, builder.tool_envs = {}, {'packaging': 'pytest-python'}
+    builder.prepare_go = lambda: None
+    builder.environment = lambda name: None
+    builder.package_sources = lambda: None
+    for name in ('prepare_models', 'package_runtime', 'package_fonts'):
+        monkeypatch.setattr(builder, name, lambda: pytest.fail('small-package build prepared a GPU environment'))
+    manifests = []
+    builder.write_manifest = manifests.append
+    monkeypatch.setattr(build_release, 'run', lambda *args, **kwargs: None)
+    builder.build()
+    assert manifests == ['portable.json']
+    assert (builder.output / 'Start.cmd').is_file()
+    assert not (builder.output / 'payload').exists()
+    with pytest.raises(ValueError, match='never overwrite a configured node'):
+        builder.build()

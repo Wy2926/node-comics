@@ -1,14 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -16,44 +13,14 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
-func machineID() (string, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE|registry.WOW64_64KEY)
-	if err != nil {
-		return "", err
-	}
-	defer key.Close()
-	value, _, err := key.GetStringValue("MachineGuid")
-	if err != nil {
-		return "", err
-	}
-	hash := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(hash[:]), nil
-}
-
-func protectDirectory(path string, service bool) error {
-	rights := ""
-	if service {
-		rights = "0x1301bf" // Modify, excluding permission/ownership changes.
-	}
-	return setDirectoryPermissions(path, rights)
-}
-
-func setDirectoryPermissions(path, serviceRights string) error {
+func protectDirectory(path string) error {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return err
 	}
 	sddl := "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + user.User.Sid.String() + ")"
-	if serviceRights != "" {
-		sid, _, _, err := windows.LookupSID("", `NT SERVICE\`+serviceName)
-		if err != nil {
-			return err
-		}
-		sddl += "(A;OICI;" + serviceRights + ";;;" + sid.String() + ")"
-	}
 	descriptor, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {
 		return err
@@ -130,15 +97,12 @@ func (a app) status() map[string]any {
 	return map[string]any{"supervisor_alive": alive, "connected": connected, "supervisor": host, "worker": worker, "home": a.home}
 }
 
-func (a app) start() error {
+func (a app) startBackground(waitForHeartbeat bool) error {
 	if _, alive := a.liveHost(); alive {
-		if a.status()["connected"] == true {
+		if !waitForHeartbeat || a.status()["connected"] == true {
 			return printJSON(a.status())
 		}
 		return errors.New("supervisor is already running but has no fresh successful heartbeat; inspect node status and logs")
-	}
-	if err := a.checkBinding(); err != nil {
-		return err
 	}
 	cmd := exec.Command(filepath.Join(a.root, "node.exe"), "_host", "--home", a.home)
 	cmd.Dir = a.root
@@ -147,14 +111,17 @@ func (a app) start() error {
 		return err
 	}
 	defer cmd.Process.Release()
-	deadline := time.Now().Add(90 * time.Second)
+	if !waitForHeartbeat {
+		return nil // Spawn requested, not proof of a connected node; use status.
+	}
+	deadline := time.Now().Add(600 * time.Second)
 	for time.Now().Before(deadline) {
 		if a.status()["connected"] == true {
 			return printJSON(a.status())
 		}
 		time.Sleep(time.Second)
 	}
-	return errors.New("no successful heartbeat within 90 seconds; inspect node status and logs (supervisor continues recovery)")
+	return errors.New("startup heartbeat timed out; inspect node status and logs")
 }
 
 func (a app) requestStop() error {
@@ -162,37 +129,88 @@ func (a app) requestStop() error {
 }
 
 func (a app) stop() error {
+	setup := filepath.Join(a.root, ".setup")
+	if err := os.MkdirAll(setup, 0700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(setup, "stop"), []byte("operator stop\n"), 0600); err != nil {
+		return err
+	}
+	job, err := openJob(a.jobName("prepare"))
+	if err != nil {
+		return err
+	}
+	if job != 0 {
+		defer windows.CloseHandle(job)
+	}
+	lock, err := a.cancelLaunch()
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	// A detached host might still be starting and not yet have published its
+	// PID. This persistent gate prevents it from starting a late GPU worker.
+	if err := os.WriteFile(filepath.Join(setup, "stop"), []byte("operator stop\n"), 0600); err != nil {
+		return err
+	}
+	if job == 0 {
+		job, err = openJob(a.jobName("prepare"))
+		if err != nil {
+			return err
+		}
+		if job != 0 {
+			defer windows.CloseHandle(job)
+		}
+	}
+	if err := finishJob(job); err != nil {
+		return err
+	}
+	return a.stopHost()
+}
+
+func (a app) stopHost() error {
+	job, err := openJob(a.jobName("worker"))
+	if err != nil {
+		return err
+	}
+	if job != 0 {
+		defer windows.CloseHandle(job)
+	}
+	state, alive := a.liveHost()
+	if !alive {
+		return finishJob(job)
+	}
 	if err := a.requestStop(); err != nil {
 		return err
 	}
 	deadline := time.Now().Add(85 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, alive := a.liveHost(); !alive {
-			return nil
+			return finishJob(job)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	return errors.New("supervisor did not stop; inspect its PID and logs")
+	// A stuck native host must not leave its GPU worker running indefinitely.
+	return errors.Join(terminateOwnedProcess(state), finishJob(job))
 }
 
 // The kernel kills the worker if the native host is terminated. No orphaned
 // Python process can retain GPU memory or race a replacement host.
-func childJob(process *os.Process) (windows.Handle, error) {
-	job, err := windows.CreateJobObject(nil, nil)
+func childJob(name string) (windows.Handle, error) {
+	value, err := windows.UTF16PtrFromString(name)
 	if err != nil {
+		return 0, err
+	}
+	job, err := windows.CreateJobObject(nil, value)
+	if err != nil {
+		if job != 0 {
+			windows.CloseHandle(job)
+		}
 		return 0, err
 	}
 	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
 	info.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)))
-	if err == nil {
-		var handle windows.Handle
-		handle, err = windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(process.Pid))
-		if err == nil {
-			err = windows.AssignProcessToJobObject(job, handle)
-			windows.CloseHandle(handle)
-		}
-	}
 	if err != nil {
 		windows.CloseHandle(job)
 		return 0, err
@@ -220,15 +238,18 @@ func (r rotatingLog) Write(data []byte) (int, error) {
 	return file.Write(data)
 }
 
-func (a app) supervise(console bool, stopRequests ...<-chan struct{}) error {
-	if err := a.checkBinding(); err != nil {
-		return err
+func (a app) supervise() error {
+	if _, err := os.Stat(filepath.Join(a.root, ".setup", "stop")); err == nil {
+		return nil
 	}
 	lock, err := acquireLock(filepath.Join(a.home, "host.lock"))
 	if err != nil {
 		return errors.New("another supervisor owns this node")
 	}
 	defer lock.Close()
+	if err := localDirectories(a.home); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Join(a.home, "logs"), 0700); err != nil {
 		return err
 	}
@@ -252,62 +273,43 @@ func (a app) supervise(console bool, stopRequests ...<-chan struct{}) error {
 	if err := publish(); err != nil {
 		return err
 	}
-	if len(stopRequests) > 0 {
-		finished := make(chan struct{})
-		defer close(finished)
-		go func() {
-			select {
-			case <-stopRequests[0]:
-				_ = a.requestStop()
-			case <-finished:
-			}
-		}()
-	}
-	if err := a.verifyBundle(); err != nil {
+	if err := a.checkConfiguredBackend(); err != nil {
 		logger.Printf("event=invalid_release")
 		return err
 	}
-	interrupt := make(chan os.Signal, 1)
-	if console {
-		signal.Notify(interrupt, os.Interrupt)
-		defer signal.Stop(interrupt)
-	}
 	backoff := time.Second
 	for {
+		if _, err := os.Stat(filepath.Join(a.root, ".setup", "stop")); err == nil {
+			return nil
+		}
 		if _, err := os.Stat(filepath.Join(a.home, "host.stop")); err == nil {
 			return nil
 		}
 		cmd := a.worker("run")
 		cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW, HideWindow: true}
-		if err := cmd.Start(); err != nil {
-			logger.Print("event=worker_start_failed")
-			return errors.New("cannot start bundled runtime")
-		}
-		job, err := childJob(cmd.Process)
+		child, job, err := startContained(cmd, a.jobName("worker"))
 		if err != nil {
-			_ = cmd.Process.Kill()
-			_ = cmd.Wait()
 			return fmt.Errorf("cannot contain worker: %w", err)
 		}
-		state.WorkerPID = cmd.Process.Pid
+		state.WorkerPID = child.pid
 		state.Phase = "running"
 		logger.Printf("event=worker_started pid=%d", state.WorkerPID)
 		started := time.Now()
 		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
+		go func() { done <- child.wait() }()
 		stopping := time.Time{}
 		finished := false
 		for !finished {
 			if err := publish(); err != nil {
+				_ = finishJob(job)
 				windows.CloseHandle(job)
 				<-done
+				windows.CloseHandle(child.handle)
 				return err
 			}
 			select {
 			case <-done:
 				finished = true
-			case <-interrupt:
-				_ = a.requestStop()
 			case <-time.After(time.Second):
 			}
 			if _, err := os.Stat(filepath.Join(a.home, "host.stop")); err == nil && stopping.IsZero() {
@@ -324,8 +326,13 @@ func (a app) supervise(console bool, stopRequests ...<-chan struct{}) error {
 				_ = windows.TerminateJobObject(job, 1)
 			}
 		}
+		cleanupErr := finishJob(job)
 		windows.CloseHandle(job)
-		logger.Printf("event=worker_exit code=%d", cmd.ProcessState.ExitCode())
+		windows.CloseHandle(child.handle)
+		if cleanupErr != nil {
+			return cleanupErr
+		}
+		logger.Printf("event=worker_exit code=%d", child.exitCode)
 		state.WorkerPID = 0
 		if !stopping.IsZero() {
 			return nil
@@ -344,11 +351,7 @@ func (a app) supervise(console bool, stopRequests ...<-chan struct{}) error {
 			if _, err := os.Stat(filepath.Join(a.home, "host.stop")); err == nil {
 				return nil
 			}
-			select {
-			case <-interrupt:
-				_ = a.requestStop()
-			case <-time.After(time.Second):
-			}
+			time.Sleep(time.Second)
 		}
 		backoff = min(time.Minute, backoff*2)
 	}

@@ -215,4 +215,4 @@ R2 使用独立无默认授权的 HTTPS 客户端，不跟随重定向、不继�
 
 文件的 SQL 领取／双代次／阶段屏障见 [test_document_compute.py](../backend/tests/test_document_compute.py)，共享资源、签名隔离和节点恢复见 [test_document_node.py](../services/classic-engine/tests/test_document_node.py)，持久目录、完整 ZIP 与清理见 [test_document_workspace.py](../services/classic-engine/tests/test_document_workspace.py)。全文唯一调用与 DB 断点见 [test_document_workflow.py](../backend/tests/test_document_workflow.py)。这些夹具不调用真实 R2、供应商或 GPU，不代表真实图像效果与生产吞吐已验收。
 
-模拟文本和隔离中心验证协议、并发、丢回执、终态清理及恢复；真实 GPU 的检测/抹字/覆盖像素、真实文本服务、公网吞吐与目标机 Windows 服务另行验收。通过本地单一样图不能推断所有页面的压缩率或翻译效果。
+模拟文本和隔离中心验证协议、并发、丢回执、终态清理及恢复；真实 GPU 的检测/抹字/覆盖像素、真实文本服务、公网吞吐与目标机 Windows 登录自启另行验收。通过本地单一样图不能推断所有页面的压缩率或翻译效果。

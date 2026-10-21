@@ -39,6 +39,8 @@ def verify(release, work):
         serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     outage = threading.Event()
     requests = {'registrations': 0, 'heartbeats': 0}
+    payload = release / 'payload'
+    backend = json.loads((payload / 'release.json').read_text(encoding='utf-8')).get('backend', 'cuda')
     class Controller(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass
@@ -73,17 +75,42 @@ def verify(release, work):
     server.socket = tls.wrap_socket(server.socket, server_side=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     config = {'protocol_version': 3, 'node_id': 'isolated-release-node', 'node_token': 'isolated-fixture-token',
-              'resource_id': 'isolated-cuda:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
-              'control_ca': 'ca.pem'}
+              'resource_id': f'isolated-{backend}:0', 'control_url': f'https://127.0.0.1:{server.server_port}',
+              'control_ca': 'ca.pem', 'max_leases': 1, 'local_pages': 1, 'render_workers': 1,
+              'engine': {'backend': backend, 'threads': 2}}
     source = work / 'fixture.json'
     source.write_text(json.dumps(config), encoding='utf-8')
     executable = release / 'node.exe'
     env = dict(os.environ, PYTHONHOME='Z:/missing-python', PYTHONPATH='Z:/wrong-imports', NODE_TOKEN='wrong-parent-token')
     def command(*args, timeout=180):
         return subprocess.run([str(executable), *args, '--home', str(home)], cwd=os.environ['TEMP'],
-                              env=env, capture_output=True, text=True, encoding='utf-8', timeout=timeout, check=True)
+                              env=env, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                              timeout=timeout, check=True)
     def status():
         return json.loads(command('status').stdout)
+    def gpu_memory(pid):
+        # WDDM per-process counters work for both AMD and NVIDIA; never require
+        # the whole GPU to be empty (the desktop/other nodes may still use it).
+        script = (f"@(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory "
+                  f"-ErrorAction Stop | Where-Object Name -like 'pid_{pid}_*' | "
+                  "Select-Object DedicatedUsage,SharedUsage) | ConvertTo-Json -Compress")
+        output = subprocess.check_output(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script],
+                                         text=True, encoding='utf-8', timeout=30)
+        records = json.loads(output) if output.strip() else []
+        if isinstance(records, dict):
+            records = [records]
+        return sum(int(row['DedicatedUsage']) + int(row['SharedUsage']) for row in records)
+    def process_exists(pid):
+        import ctypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        handle = kernel.OpenProcess(0x1000, False, pid)
+        if not handle:
+            if ctypes.get_last_error() == 87:  # ERROR_INVALID_PARAMETER: no such process.
+                return False
+            raise OSError(ctypes.get_last_error(), 'cannot verify process exit')
+        kernel.CloseHandle(ctypes.c_void_p(handle))
+        return True
     def wait(label, check, timeout=180):
         until = time.monotonic() + timeout
         while time.monotonic() < until:
@@ -93,45 +120,72 @@ def verify(release, work):
                 return value
             time.sleep(1)
         raise AssertionError('Timed out: ' + label)
-    host = None
+    background = False
     try:
         command('init', '--from', str(source))
         doctor_started = time.monotonic()
-        # The CUDA/Qt distribution verifies every wheel file before GPU startup.
+        # Full environment hashing is explicit diagnostics, not normal startup.
         doctor = command('doctor', timeout=600)
         print(json.dumps({'passed': 'relocated_gpu_doctor', 'seconds': time.monotonic() - doctor_started,
                           'result': json.loads(doctor.stdout.strip())}), flush=True)
-        host = subprocess.Popen([str(executable), 'run', '--home', str(home)], cwd=os.environ['TEMP'], env=env,
-                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                creationflags=subprocess.CREATE_NO_WINDOW)
+        background = True
+        command('start', timeout=600)
         connected = wait('initial_registration_recovers', lambda value: value['connected'], timeout=600)
         assert requests['registrations'] >= 3
         pid = connected['supervisor']['worker_pid']
+        before_stop_bytes = gpu_memory(pid)
+        assert before_stop_bytes > 0, 'no per-process GPU memory observed; GPU release not verified'
         outage.set()
         wait('outage_reported_offline', lambda value: not value['connected'], timeout=80)
         assert status()['supervisor']['worker_pid'] == pid, 'network outage restarted GPU worker'
         outage.clear()
         wait('same_worker_reconnects', lambda value: value['connected'], timeout=30)
         assert status()['supervisor']['worker_pid'] == pid
-        assert connected['supervisor']['pid'] == host.pid, 'wrong supervisor identity'
+        host_pid = connected['supervisor']['pid']
+        assert process_exists(host_pid)
         os.kill(pid, signal.SIGTERM)
         recovered = wait('gpu_worker_crash_recovers', lambda value: value['connected'] and value['supervisor']['worker_pid'] != pid)
         assert recovered['supervisor']['restarts'] == 1
+        final_pid = recovered['supervisor']['worker_pid']
+        assert gpu_memory(final_pid) > 0
         command('stop', timeout=90)
-        assert host.wait(timeout=10) == 0
+        assert not process_exists(host_pid), 'supervisor remains after stop'
         assert not status()['connected']
+        assert not process_exists(pid) and not process_exists(final_pid), 'compute worker remains after stop'
+        until = time.monotonic() + 30
+        after_stop_bytes = gpu_memory(final_pid)
+        while after_stop_bytes and time.monotonic() < until:
+            time.sleep(1)
+            after_stop_bytes = gpu_memory(final_pid)
+        assert after_stop_bytes == 0, 'WDDM still reports GPU memory for the stopped worker'
+        command('stop', timeout=90)
+        # Exercise the actual Start.cmd entry path after Stop's persistent gate,
+        # including an idempotent second click, without another download.
+        background = True
+        command('start', timeout=600)
+        restarted = status()
+        assert restarted['connected']
+        background_pid = restarted['supervisor']['worker_pid']
+        assert gpu_memory(background_pid) > 0
+        command('start', timeout=30)
+        assert status()['supervisor']['worker_pid'] == background_pid
+        command('stop', timeout=90)
+        assert not process_exists(background_pid)
+        until = time.monotonic() + 30
+        while gpu_memory(background_pid) and time.monotonic() < until:
+            time.sleep(1)
+        assert gpu_memory(background_pid) == 0
+        background = False
         result = {'passed': 'release_lifecycle', 'requests': requests, 'restarts': recovered['supervisor']['restarts'],
-                  'engine': json.loads(doctor.stdout.strip()), 'scope': 'desktop GPU and isolated HTTPS; not SCM or production'}
+                  'engine': json.loads(doctor.stdout.strip()), 'backend': backend,
+                  'gpu_memory_before_stop': before_stop_bytes, 'gpu_memory_after_stop': after_stop_bytes,
+                  'workers_exited': [pid, final_pid, background_pid], 'background_start_stop': True,
+                  'scope': 'desktop GPU and isolated HTTPS; not production or real image tasks'}
         (work / 'result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
         print(json.dumps(result), flush=True)
     finally:
-        if host and host.poll() is None:
-            try:
-                command('stop', timeout=90)
-            finally:
-                if host.poll() is None:
-                    host.kill()
-                host.wait(timeout=10)
+        if background:
+            command('stop', timeout=90)
         server.shutdown()
         server.server_close()
 

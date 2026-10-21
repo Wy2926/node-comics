@@ -1,0 +1,32 @@
+{
+  "amd-torch-device-gfx1030": {
+    "version": "2.13.0+rocm10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/pytorch/whl-next/amd-torch-device-gfx1030/amd_torch_device_gfx1030-2.13.0%2Brocm10.1.0-cp312-cp312-win_amd64.whl",
+    "sha256": "61b3872f39571b3376a1218e6c46272a6c5cd32725cbe465b9b22f11bfd2874e"
+  },
+  "amd-torchvision-device-gfx1030": {
+    "version": "0.28.0+rocm10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/pytorch/whl-next/amd-torchvision-device-gfx1030/amd_torchvision_device_gfx1030-0.28.0%2Brocm10.1.0-cp312-cp312-win_amd64.whl",
+    "sha256": "52d12b82303401b91f09d24243b55f67f022e3fb49ce1f22be79678b3c17419e"
+  },
+  "rocm": {
+    "version": "10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/core/whl-next/rocm/rocm-10.1.0.tar.gz",
+    "sha256": "e6616e62ebd1324031681e6e59349d46ee4f143a8d8f4f901a91c35c993041fc"
+  },
+  "rocm-sdk-core": {
+    "version": "10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/core/whl-next/rocm-sdk-core/rocm_sdk_core-10.1.0-py3-none-win_amd64.whl",
+    "sha256": "b12f1c4cde14ed1cd8864006d17586c6b1e6a4e4695b9597cfe04ed7715e952f"
+  },
+  "rocm-sdk-device-gfx1030": {
+    "version": "10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/core/whl-next/rocm-sdk-device-gfx1030/rocm_sdk_device_gfx1030-10.1.0-py3-none-win_amd64.whl",
+    "sha256": "f7c850ae8f17de48d9df65ada67eba09cfa75c78a602e81b518398b7b1f0ff0c"
+  },
+  "rocm-sdk-libraries": {
+    "version": "10.1.0",
+    "url": "https://stable.repo.amd.com/rocm/core/whl-next/rocm-sdk-libraries/rocm_sdk_libraries-10.1.0-py3-none-win_amd64.whl",
+    "sha256": "0c34bafbb4aa626cc710d8b130bb314f591194c3d79eeb5892b755ea0be06159"
+  }
+}

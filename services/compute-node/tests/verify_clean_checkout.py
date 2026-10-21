@@ -25,7 +25,7 @@ def verify(directory, version):
     def git(root, *args):
         return subprocess.check_output(['git', '-C', str(root), *args], env=env, encoding='utf-8').strip()
     paths = git(REPOSITORY, '-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard',
-                '--', 'services/classic-engine', 'services/compute-node').splitlines()
+                '--', 'services/classic-engine', 'services/compute-node', 'backend/document_files').splitlines()
     hashes = {}
     for relative in sorted(set(paths)):
         source = REPOSITORY / relative
@@ -47,7 +47,7 @@ def verify(directory, version):
     for relative in ('services/classic-engine/models', 'services/classic-engine/.venv-lama', 'services/compute-node/.build'):
         assert not (checkout / relative).exists(), relative
     assert not work.exists()
-    output = directory / 'release' / f'NodeComicsNode-{version}-windows-x64'
+    output = directory / 'release' / 'NodeComicsNode'
     result = {'snapshot': git(checkout, 'rev-parse', 'HEAD'), 'source_files': hashes,
               'initially_clean': True, 'initial_work_directory_empty': True, 'reused_existing_models_or_venv': False}
     (directory / 'inputs.json').write_text(json.dumps(result, indent=2), encoding='utf-8')

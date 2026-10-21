@@ -31,28 +31,28 @@ func entry(args []string) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
 		fmt.Println(`Node Comics Node (Windows x64)
   node init [--from node.json]     Initialize this computer; credential input is hidden
+  node start [--backend cuda|amd]  Prepare, initialize once and start (Start.cmd)
+  node prepare --backend cuda|amd Download/verify the selected private environment only
   node doctor                    Verify release files, GPU, models and fonts offline
-  node run                       Run the supervised node in this console
-  node start | stop | status      Manage a background node in the current session
-  node service install           Install a native automatic Windows service (Administrator)
-  node service start|stop|status|remove
-  node adopt                     Bind a moved, stopped, empty node to this computer
+  node stop | status              Stop the node or inspect its connection
+  node autostart enable|disable|status  Portable package: current-user logon startup
   node version
 
 All commands accept --home PATH (default: data beside node.exe).
 Copy the entire release folder; a new computer needs its own node credentials.
-Stop/remove the old service before moving an existing node; then use adopt.
-Background start is session-only. Install the service for unattended boot startup.`)
+Stop before overwriting package files. Keep data, payload and .setup directories.
+Logic-only updates reuse the installed environment and models.
+Autostart is opt-in and runs after user sign-in, not before login.`)
 		return nil
 	}
 	command := args[0]
 	args = args[1:]
-	serviceAction := ""
-	if command == "service" {
+	action := ""
+	if command == "autostart" {
 		if len(args) == 0 {
-			return errors.New("specify service install, start, stop, status or remove")
+			return fmt.Errorf("specify a %s action; use node help", command)
 		}
-		serviceAction, args = args[0], args[1:]
+		action, args = args[0], args[1:]
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -62,6 +62,7 @@ Background start is session-only. Install the service for unattended boot startu
 	flags := flag.NewFlagSet("node "+command, flag.ContinueOnError)
 	home := flags.String("home", filepath.Join(root, "data"), "private node data directory")
 	from := flags.String("from", "", "import an existing private node configuration")
+	backend := flags.String("backend", "", "portable backend: cuda or amd (chosen once)")
 	if err = flags.Parse(args); err != nil {
 		return err
 	}
@@ -82,10 +83,19 @@ Background start is session-only. Install the service for unattended boot startu
 		return nil
 	case "init":
 		return a.initialize(*from)
-	case "adopt":
-		return a.adopt()
+	case "start", "prepare":
+		return a.launch(*from, *backend, command == "prepare", false)
+	case "_autostart":
+		return a.launchAtLogon()
+	case "autostart":
+		return a.autostart(action)
 	case "doctor":
-		if err := a.checkBinding(); err != nil {
+		finish, err := a.beginLaunch("checking")
+		if err != nil {
+			return err
+		}
+		defer finish()
+		if err := a.checkConfiguredBackend(); err != nil {
 			return err
 		}
 		lock, err := acquireLock(filepath.Join(a.home, "host.lock"))
@@ -98,22 +108,23 @@ Background start is session-only. Install the service for unattended boot startu
 		}
 		cmd := a.worker("check")
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		if err := cmd.Run(); err != nil {
+		if err := runContained(cmd, a.jobName("prepare")); err != nil {
 			return errors.New("engine check failed; inspect data/startup-logs/node.log and model/font configuration")
 		}
 		return nil
-	case "run", "_host":
-		return a.supervise(command == "run")
-	case "start":
-		return a.start()
+	case "_host":
+		return a.supervise()
 	case "stop":
 		return a.stop()
 	case "status":
-		return printJSON(a.status())
-	case "service":
-		return a.service(serviceAction)
-	case "_service":
-		return a.serve()
+		status := a.status()
+		startup, err := a.autostartStatus()
+		if err != nil {
+			status["autostart"] = map[string]string{"error": err.Error()}
+		} else {
+			status["autostart"] = startup
+		}
+		return printJSON(status)
 	default:
 		return errors.New("unknown command; use node help")
 	}
@@ -122,17 +133,43 @@ Background start is session-only. Install the service for unattended boot startu
 func (a app) configPath() string { return filepath.Join(a.home, "node.json") }
 func (a app) statePath() string  { return filepath.Join(a.home, "state") }
 func (a app) worker(command string) *exec.Cmd {
-	cmd := exec.Command(filepath.Join(a.root, "runtime", "python.exe"), "-B", "-m", "classic_node", command, "--config", a.configPath(), "--bundle-root", a.root)
-	cmd.Dir = filepath.Join(a.root, "engine")
+	root := a.bundleRoot()
+	cmd := exec.Command(filepath.Join(root, "runtime", "python.exe"), "-B", filepath.Join(a.root, "source/compute-node/run_node.py"), command, "--config", a.configPath(), "--bundle-root", root)
+	cmd.Dir = a.root
 	// The release _pth isolates imports; NODE_TOKEN must never override this
 	// installation's private credential through a parent shell's environment.
-	for _, item := range os.Environ() {
-		key := strings.ToUpper(strings.SplitN(item, "=", 2)[0])
-		if key != "NODE_TOKEN" && key != "PYTHONPATH" && key != "PYTHONHOME" {
-			cmd.Env = append(cmd.Env, item)
+	cmd.Env = localEnvironment(a.home)
+	cmd.Err = localDirectories(a.home)
+	return cmd
+}
+
+var localPaths = map[string]string{"TEMP": "tmp", "TMP": "tmp", "XDG_CACHE_HOME": "cache",
+	"HF_HOME": "cache/huggingface", "TORCH_HOME": "cache/torch", "MPLCONFIGDIR": "cache/matplotlib",
+	"YOLO_CONFIG_DIR": "cache/ultralytics", "CUDA_CACHE_PATH": "cache/cuda",
+	"APPDATA": "profile/roaming", "LOCALAPPDATA": "profile/local"}
+
+func localDirectories(directory string) error {
+	for _, relative := range localPaths {
+		if err := os.MkdirAll(filepath.Join(directory, relative), 0700); err != nil {
+			return err
 		}
 	}
-	return cmd
+	return nil
+}
+
+func localEnvironment(directory string) []string {
+	environment := []string{}
+	for _, item := range os.Environ() {
+		key := strings.ToUpper(strings.SplitN(item, "=", 2)[0])
+		_, overridden := localPaths[key]
+		if !overridden && key != "NODE_TOKEN" && key != "VIRTUAL_ENV" && !strings.HasPrefix(key, "PYTHON") && !strings.HasPrefix(key, "UV_") && !strings.HasPrefix(key, "PIP_") {
+			environment = append(environment, item)
+		}
+	}
+	for key, relative := range localPaths {
+		environment = append(environment, key+"="+filepath.Join(directory, filepath.FromSlash(relative)))
+	}
+	return append(environment, "PYTHONUTF8=1", "PYTHONDONTWRITEBYTECODE=1")
 }
 
 func printJSON(value any) error {
