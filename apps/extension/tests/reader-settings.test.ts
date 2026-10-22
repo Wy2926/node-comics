@@ -92,6 +92,22 @@ it('remembers a manual selection for both extension pages and background transla
   expect((await readReaderSettings()).language).toBe('ko');
   expect(stored.preferences).toMatchObject({language:'ko'});
 });
+it.each([true,false])('remembers immersive mode through local and extension restoration: %s',async readerImmersive=>{
+  const previous={...defaults,language:'ja',layout:'single' as const,direction:'rtl' as const,readerBackground:'night' as const};
+  await saveSettings({...previous,readerImmersive});
+  expect(settings()).toEqual({...previous,readerImmersive});
+  local.clear();
+  await connectReaderSettings(settings());
+  expect(settings()).toEqual({...previous,readerImmersive});
+  expect((await readReaderSettings()).readerImmersive).toBe(readerImmersive);
+  expect(translationLanguageChanged(previous,settings())).toBe(false);
+});
+it.each([undefined,null,'false',0,{}])('defaults only a missing or invalid immersive preference without resetting other choices: %j',readerImmersive=>{
+  const previous={language:'ja',layout:'double',direction:'rtl',readerBackground:'night',readerImmersive};
+  local.set('nc-settings',JSON.stringify(previous));
+  expect(settings()).toMatchObject({...previous,readerImmersive:true});
+  expect(JSON.parse(local.get('nc-settings')!)).toEqual(JSON.parse(JSON.stringify(previous)));
+});
 it('reads saved translation settings with one storage request and no write lock',async()=>{
   stored[settingsKey]={...defaults,language:'ja'};
   expect((await readReaderSettings()).language).toBe('ja');

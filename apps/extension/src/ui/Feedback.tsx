@@ -1,27 +1,10 @@
 import {msg,getLocale} from '../i18n/runtime';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {Api} from '../api';
-import {ApiError} from '../api';
-import {Modal} from './components';
 import {Icon} from '../icons';
-import {languageLabel,modeLabels,type FeedbackIssue,type FeedbackRecord,type Job,type Paginated} from '../types';
+import type {FeedbackIssue,FeedbackRecord,Paginated} from '../types';
 export const issueLabels:Record<FeedbackIssue,string>={get missing_text(){return msg("漏译或未识别");},get meaning(){return msg("意思不准确");},get typesetting(){return msg("文字排版问题");},get art_changed(){return msg("画面被改动");},get other(){return msg("其他问题");}};
 const feedbackLabels={get received(){return msg("已收到");},get reviewing(){return msg("查看中");},get resolved(){return msg("已处理");}};
-type Draft={key:string;issues:FeedbackIssue[];comment:string;submitted?:boolean;locked?:boolean};
-export function FeedbackForm({api,job,pageNumber,onClose}:{api:Api;job:Job;pageNumber:number;onClose:()=>void}){
-  const storageKey=`nc-feedback:${api.base}:${job.id}`;
-  const [draft,setDraft]=useState<Draft>(()=>{try{return JSON.parse(localStorage.getItem(storageKey)??'null')??{key:crypto.randomUUID(),issues:[],comment:''};}catch{return {key:crypto.randomUUID(),issues:[],comment:''};}});
-  const [sending,setSending]=useState(false);const lock=useRef(false);const [error,setError]=useState('');
-  useEffect(()=>{localStorage.setItem(storageKey,JSON.stringify(draft));},[storageKey,draft]);
-  async function submit(){if(lock.current)return;lock.current=true;setSending(true);setError('');const payload={...draft,locked:true};setDraft(payload);
-    try{await api.feedback(job.id,{issues:payload.issues,comment:payload.comment},payload.key);if(api.isCurrent())setDraft({...payload,submitted:true});}
-    catch(e){if(!api.isCurrent())return;const known=e instanceof ApiError&&e.status>=400&&e.status<500;setDraft({...payload,locked:!known});setError((e as Error).message+(known?'':msg(" 可重试确认，同一份反馈不会重复保存。")));}
-    finally{lock.current=false;setSending(false);}
-  }
-  return <Modal title={draft.submitted?msg("反馈已收到"):msg("这页译图哪里需要改进？")} subtitle={msg("第 {0} 页 · {1} · {2}", {"0": pageNumber, "1": modeLabels[job.mode], "2": languageLabel(job.target_language)})} onClose={onClose}>
-    {draft.submitted?<div className="nc-feedback-success"><Icon name="check" size={32}/><p>{msg("感谢你帮助改善翻译。反馈已绑定刚才看到的译图。")}</p><span className="nc-muted">{msg("提交反馈免费，也不会自动重新翻译。")}</span></div>:<><div className="nc-issue-options">{(Object.keys(issueLabels) as FeedbackIssue[]).map(issue=><label key={issue} className={draft.issues.includes(issue)?'selected':''}><input type="checkbox" checked={draft.issues.includes(issue)} disabled={sending||draft.locked} onChange={()=>setDraft(d=>({...d,issues:d.issues.includes(issue)?d.issues.filter(i=>i!==issue):[...d.issues,issue]}))}/>{issueLabels[issue]}</label>)}</div><label className="field">{msg("补充说明（选填）")}<textarea rows={4} maxLength={500} placeholder={msg("例如：右下角的对白漏译了。")} value={draft.comment} disabled={sending||draft.locked} onChange={e=>setDraft(d=>({...d,comment:e.target.value}))}/></label><p className="nc-muted">{msg("选择问题类型或填写说明即可。反馈免费，原图不会被修改。")}</p>{error&&<p className="inline-error" role="alert">{error}</p>}<button className="button primary full" disabled={sending||(!draft.issues.length&&!draft.comment.trim())} onClick={()=>void submit()}>{sending?msg("正在提交…"):draft.locked?msg("重试确认反馈"):msg("提交反馈")}</button></>}
-  </Modal>;
-}
 export function FeedbackInbox({api}:{api:Api}){
   const [data,setData]=useState<Paginated<FeedbackRecord>>();const [offset,setOffset]=useState(0);const [error,setError]=useState('');const [refresh,setRefresh]=useState(0);
   useEffect(()=>{let active=true;setError('');setData(undefined);void api.feedbackList(offset).then(d=>{if(active&&api.isCurrent())setData(d);}).catch(e=>{if(active&&api.isCurrent())setError(e.message);});return()=>{active=false};},[api,offset,refresh]);

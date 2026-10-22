@@ -31,8 +31,10 @@ vi.mock('react', async original => ({
 }));
 import {useReaderControls} from '../src/reader/useReaderControls';
 import {ReaderShell, dismissReaderKeyboard} from '../src/reader/ReaderChrome';
+import {defaults, type Settings} from '../src/types';
 
 let blocked: boolean, focusVisible: boolean, active: boolean, hovered: boolean, finePointer: boolean, compact: boolean;
+let settings: Settings;
 const focus = vi.fn();
 const querySelector = vi.fn((selector: string) => selector === '.nc-reader-controls :focus-visible, .nc-reader-controls :active'
   ? focusVisible || active ? {focus} : null : selector === '.nc-reader-controls:hover'
@@ -42,7 +44,10 @@ function render() {
   do {
     hooks.state = hooks.ref = hooks.effect = 0;
     hooks.dirty = false;
-    controls = useReaderControls({blocked, notify: vi.fn()});
+    controls = useReaderControls({blocked, notify: vi.fn(), settings, setSettings: value => {
+      settings = typeof value === 'function' ? value(settings) : value;
+      hooks.dirty = true;
+    }});
     controls.root.current = {querySelector} as unknown as HTMLDivElement;
     while (hooks.pending.length) hooks.pending.shift()!();
   } while (hooks.dirty);
@@ -58,6 +63,7 @@ const target = (inControls: boolean) => ({closest: vi.fn(() => inControls ? {} :
 
 beforeEach(() => {
   hooks.states = []; hooks.refs = []; hooks.effects = []; hooks.pending = [];
+  settings = {...defaults};
   blocked = focusVisible = active = hovered = finePointer = compact = false;
   focus.mockClear(); querySelector.mockClear();
   vi.useFakeTimers();
@@ -98,6 +104,26 @@ describe('immersive reader controls', () => {
     expect(controls.immersive).toBe(true);
     expect(controls.hidden).toBe(false);
     expect(shell().className).toContain('is-immersive');
+    advance(); expect(controls.hidden).toBe(true);
+  });
+
+  it('retains the disabled preference when image or EPUB controls remount', () => {
+    controls.setImmersive(false); render();
+    expect(settings).toEqual({...defaults, readerImmersive: false});
+    cleanup(); hooks.states = []; hooks.refs = []; hooks.effects = []; hooks.pending = [];
+    render(); advance(5000);
+    expect(controls.immersive).toBe(false);
+    expect(controls.hidden).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('uses the latest shared preference and cancels hiding when another reader disables immersion', () => {
+    advance(1000);
+    settings = {...settings, readerImmersive: false}; render(); advance(5000);
+    expect(controls.hidden).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    controls.setImmersive(previous => !previous); render();
+    expect(settings.readerImmersive).toBe(true);
     advance(); expect(controls.hidden).toBe(true);
   });
 

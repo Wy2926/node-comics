@@ -32,7 +32,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, fontS
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
       <SettingRow title={msg("默认阅读布局")} description={msg("未单独设置布局的漫画使用此默认值。")}>
-        <Select aria-label={msg("默认阅读布局")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout,...(layout==='double'&&s.layout!=='double'?{direction:'rtl' as const}:{})}));}}>
+        <Select aria-label={msg("默认阅读布局")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout}));}}>
           <option value="continuous">{msg("连续")}</option>
           <option value="single">{msg("单页")}</option>
           <option value="double">{msg("双页")}</option>

@@ -27,7 +27,7 @@ export function ReaderScale({label, value, min, max, disabled, onChange}: {
   </div></div>;
 }
 
-export function ReaderDisplaySettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, children, allowDouble = false}: {
+export function ReaderDisplaySettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, allowDouble = false}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   layout?: Settings['layout'];
@@ -35,19 +35,17 @@ export function ReaderDisplaySettings({settings, setSettings, layout, direction,
   onLayout(layout: Settings['layout'] | undefined): void;
   onDirection(direction: Settings['direction']): void;
   sizing: ReactNode;
-  children?: ReactNode;
   allowDouble?: boolean;
 }) {
   return <>
+    {sizing && <div className="nc-reader-sizing">{sizing}</div>}
     <ReaderChoice<Settings['layout'] | 'default'> variant="cards" label={msg('阅读布局')} value={!allowDouble && layout === 'double' ? 'single' : layout ?? 'default'}
       options={[{id: 'default', label: msg('默认'), icon: <Icon name="settings"/>}, {id: 'continuous', label: msg('连续'), icon: <Icon name="list"/>}, {id: 'single', label: msg('单页'), icon: <Icon name="page-unread"/>},
         ...(allowDouble ? [{id: 'double' as const, label: msg('双页'), icon: <Icon name="book"/>}]: [])]} onChange={value => onLayout(value === 'default' ? undefined : value)}/>
     <p className="nc-muted">{msg('仅对此漫画生效；选择默认时跟随全局阅读布局。')}</p>
     <ReaderChoice label={msg('阅读方向')} value={direction}
       options={[{id: 'rtl', label: msg('从右向左'), icon: <Icon name="arrow" size={16} style={{transform: 'rotate(180deg)'}}/>}, {id: 'ltr', label: msg('从左向右'), icon: <Icon name="arrow" size={16}/>}]} onChange={onDirection}/>
-    {sizing}
     <ReaderChoice label={msg('阅读背景')} value={settings.readerBackground}
       options={[{id: 'gray', label: msg('浅灰')}, {id: 'paper', label: msg('纸白')}, {id: 'night', label: msg('夜色')}]} onChange={readerBackground => setSettings(value => ({...value, readerBackground}))}/>
-    {children}
   </>;
 }

@@ -1,15 +1,21 @@
 import {useEffect, useRef, useState} from 'react';
 import {msg} from '../i18n/runtime';
 import {hasShortcutOverlay} from '../shortcuts/runtime';
+import type {Settings} from '../types';
 
 /** Reader chrome owns interaction state, never image windows or document locations. */
-export function useReaderControls<Panel extends string>({blocked, notify}: {
+export function useReaderControls<Panel extends string>({blocked, notify, settings, setSettings}: {
   blocked: boolean;
   notify(message: string): void;
+  settings: Settings;
+  setSettings(value: Settings | ((previous: Settings) => Settings)): void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<Panel>();
-  const [immersive, setImmersive] = useState(true);
+  const immersive = settings.readerImmersive;
+  function setImmersive(value: boolean | ((previous: boolean) => boolean)) {
+    setSettings(previous => ({...previous, readerImmersive: typeof value === 'function' ? value(previous.readerImmersive) : value}));
+  }
   const [hidden, setHidden] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 

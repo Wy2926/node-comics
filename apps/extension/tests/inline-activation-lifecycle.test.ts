@@ -71,7 +71,7 @@ beforeEach(async()=>{
     const channel:ChannelConnection={key:'test-channel',scope:{key:'test-scope'},label:'Fixture',
       capabilities:{modes:[{id:'classic',label:'Classic',enabled:true,languages:['zh-Hans']}],languages:[{id:'zh-Hans',label:'Chinese'}],
         limits:{max_bytes:40000000,max_pixels:60000000,max_dimension:20000,max_translation_ids:32},entitlements:null},
-      available:true,requiresInternet:true,allowsFeedback:false,isCurrent:()=>!disposed&&current(),validateResult:vi.fn(async()=>{}),
+      available:true,requiresInternet:true,isCurrent:()=>!disposed&&current(),validateResult:vi.fn(async()=>{}),
       createRuntime:vi.fn((value:RuntimeOptions)=>{options.push(value);return core;}),readResult:vi.fn(),dispose:vi.fn(()=>{disposed=true;})};
     cores.push(core);channels.push(channel);return channel;
   });

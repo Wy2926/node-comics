@@ -74,8 +74,13 @@ async function shown(number, visible, imageCount = visible.length, chapter = 0) 
 }
 
 async function openSettings() {
+  await page.keyboard.press('Escape');
   await page.getByRole('button', {name: '阅读设置', exact: true}).click();
   await settings().waitFor();
+}
+async function openMore(dialog = settings()) {
+  const more = dialog.locator('details.nc-reader-more');
+  if (await more.getAttribute('open') === null) await more.locator(':scope > summary').click();
 }
 async function closeSettings() {
   await settings().getByRole('button', {name: '关闭面板', exact: true}).click();
@@ -85,6 +90,11 @@ async function closeSettings() {
 async function layout(value) {
   await openSettings();
   await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: value, exact: true}).click();
+  await closeSettings();
+}
+async function direction(value) {
+  await openSettings();
+  await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: value, exact: true}).click();
   await closeSettings();
 }
 const comicView = comic => page.evaluate(key => JSON.parse(localStorage.getItem(key) || '{}'), `isolated-layout-comic-${comic}`);
@@ -97,13 +107,15 @@ async function expectLayoutChoice(value) {
   assert.equal(await settings().getByRole('group', {name: '阅读布局', exact: true}).getByRole('button', {name: value, exact: true}).getAttribute('aria-pressed'), 'true');
   await closeSettings();
 }
-async function globalLayout(value) {
+async function globalPreference(name, value) {
   await page.getByRole('button', {name: '全局阅读偏好', exact: true}).click();
-  await page.getByRole('combobox', {name: '默认阅读布局', exact: true}).click();
+  await page.getByRole('combobox', {name, exact: true}).click();
   await page.getByRole('option', {name: value, exact: true}).click();
   await page.getByRole('button', {name: '返回阅读器', exact: true}).click();
   await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
 }
+const globalLayout = value => globalPreference('默认阅读布局', value);
+const globalDirection = value => globalPreference('翻页方向', value);
 async function switchComic(comic) {
   await page.getByRole('button', {name: `漫画 ${comic}`, exact: true}).click();
   await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
@@ -167,8 +179,8 @@ test('single-page window fit removes footer space at the first, middle, landscap
   await page.screenshot({path: resolve(artifacts, 'single-last-page.png')});
 });
 
-test('double pages default to manga RTL, separate the cover and landscape, and navigate by a whole spread', async () => {
-  await reader(); await layout('双页'); await shown(1, [1]);
+test('explicit RTL double pages separate the cover and landscape and navigate by a whole spread', async () => {
+  await reader(); await direction('从右向左'); await layout('双页'); await shown(1, [1]);
   assert.equal(await viewport().getAttribute('data-layout'), 'double');
   assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
   await page.keyboard.press('ArrowLeft'); await shown(2, [2, 3]);
@@ -187,7 +199,7 @@ test('double pages default to manga RTL, separate the cover and landscape, and n
 });
 
 test('LTR reverses visual and arrow navigation without changing the selected page', async () => {
-  await reader(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
+  await reader(); await direction('从右向左'); await layout('双页'); await jump(3); await shown(3, [2, 3]);
   await openSettings();
   await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从左向右', exact: true}).click();
   await closeSettings(); await shown(3, [2, 3]);
@@ -414,7 +426,7 @@ test('continuous modified clicks leave controls untouched while plain center tap
 });
 
 test('double touch pan suppresses its synthetic tap and minimum zoom restores swipe', async () => {
-  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]); await wheelAt(-300);
+  await reader(); await direction('从右向左'); await layout('双页'); await jump(2); await shown(2, [2, 3]); await wheelAt(-300);
   const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true});
   const box = await viewport().boundingBox(), x = Math.round(box.x + box.width / 2), y = Math.round(box.y + box.height / 2), before = await zoomMetrics();
   await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y, id: 1}]});
@@ -440,7 +452,7 @@ test('both spread pages are translation targets and four comparison images still
   assert.deepEqual(window.visible, [pageId(2), pageId(3)]);
   assert.equal(window.immediate, true);
   assert.equal(await viewport().locator('img.nc-page-image:not([data-result-job="original"])').count(), 2);
-  await openSettings(); await settings().getByRole('switch', {name: '并排对照', exact: true}).click(); await closeSettings();
+  await openSettings(); await openMore(); await settings().getByRole('switch', {name: '并排对照', exact: true}).click(); await closeSettings();
   await shown(3, [2, 3], 4); await assertFits('double comparison desktop');
   await page.setViewportSize({width: 360, height: 740}); await shown(3, [2, 3], 4); await assertFits('double comparison narrow');
   await page.screenshot({path: resolve(artifacts, 'double-comparison-narrow.png')});
@@ -568,25 +580,82 @@ test('an explicit comic layout equal to the global default survives global chang
   await switchComic('B'); await expectLayout('single'); await expectLayoutChoice('默认');
 });
 
-test('comic direction and layout persist across chapters without changing global defaults or the other comic', async () => {
-  await reader({layoutSettings: true, chapters: true}); await layout('双页'); await shown(1, [1]);
-  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
-  assert.equal((await snapshot('global-reading-settings')).direction, 'ltr');
-  assert.deepEqual([(await comicView('A')).layout, (await comicView('A')).direction], ['double', 'rtl']);
-  await openSettings();
-  await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从左向右', exact: true}).click();
-  await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: '从右向左', exact: true}).click();
-  await closeSettings();
+test('global and comic layout changes preserve inherited direction without creating a comic direction override', async () => {
+  await reader({layoutSettings: true});
+  for (const [label, value] of [['从左向右', 'ltr'], ['从右向左 · 日漫习惯', 'rtl']]) {
+    await globalDirection(label);
+    for (const name of ['双页', '单页', '连续']) {
+      await globalLayout(name);
+      assert.equal((await snapshot('global-reading-settings')).direction, value, 'Global layout does not rewrite the selected direction');
+      assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
+      assert.equal((await comicView('A')).direction, undefined, 'Inherited direction is not pinned by saving a layout');
+    }
+    for (const name of ['双页', '单页', '双页', '默认']) {
+      await layout(name);
+      assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
+      assert.equal((await comicView('A')).direction, undefined);
+    }
+    assert.equal((await comicView('A')).layout, undefined, 'Default clears only the layout override');
+  }
+});
+
+for (const [label, value, inheritedLabel, inherited] of [
+  ['从左向右', 'ltr', '从右向左 · 日漫习惯', 'rtl'],
+  ['从右向左', 'rtl', '从左向右', 'ltr'],
+]) test(`explicit ${value} survives repeated layout changes, reopening and chapters without changing global defaults or another comic`, async () => {
+  await reader({layoutSettings: true, chapters: true}); await globalDirection(inheritedLabel); await direction(label);
+  await jump(3); await shown(3, [3]);
+  for (const [name, visible] of [['双页', [2, 3]], ['单页', [3]], ['双页', [2, 3]]]) {
+    await layout(name); await shown(3, visible);
+    assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
+    assert.equal((await comicView('A')).direction, value);
+  }
+  await layout('默认'); await shown(3, [3]);
+  assert.equal((await comicView('A')).layout, undefined);
+  assert.equal((await comicView('A')).direction, value, 'Restoring default layout preserves the independent direction override');
+  await layout('双页'); await shown(3, [2, 3]);
+  assert.equal((await snapshot('global-reading-settings')).direction, inherited);
+  assert.deepEqual([(await comicView('A')).layout, (await comicView('A')).direction], ['double', value]);
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [2, 3]);
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
   await page.getByRole('button', {name: '切下一章', exact: true}).click(); await shown(1, [1], 1, 1);
   await expectLayout('double');
-  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
   assert.equal((await snapshot('global-reading-settings')).viewKey, 'isolated-layout-comic-A');
-  assert.equal((await snapshot('global-reading-settings')).direction, 'ltr');
+  assert.equal((await snapshot('global-reading-settings')).direction, inherited);
   await switchComic('B'); await expectLayout('single');
-  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'ltr');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), inherited);
   assert.equal((await comicView('B')).direction, undefined);
   await switchComic('A'); await expectLayout('double');
-  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), 'rtl');
+  assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
+});
+
+test('the immersive preference survives reopening and comic changes without saving temporary toolbar visibility', async () => {
+  await reader({layoutSettings: true}); await openSettings();
+  const immersive = () => settings().getByRole('switch', {name: '沉浸阅读', exact: true});
+  assert.equal(await immersive().getAttribute('aria-checked'), 'true');
+  await immersive().click(); await closeSettings(); await jump(3); await shown(3, [3]);
+  const pinned = async () => {
+    assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('is-immersive')), false);
+    await page.waitForTimeout(1400);
+    assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false, 'Disabled immersive controls stay visible beyond the idle timeout');
+  };
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [3]); await pinned();
+  await switchComic('B'); await pinned();
+  await switchComic('A'); await shown(3, [3]); await pinned();
+  await openSettings(); assert.equal(await immersive().getAttribute('aria-checked'), 'false');
+  await immersive().click(); await closeSettings();
+  const box = await viewport().boundingBox(); await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [3]);
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('is-immersive')), true);
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false, 'Each new reader starts with its tools visible, not the previous temporary hidden state');
+  await openSettings(); assert.equal(await immersive().getAttribute('aria-checked'), 'true');
+  assert.equal((await comicView('A')).readerImmersive, undefined, 'Immersive is a global preference, not a comic view override');
+  // This fixture keeps global Settings in React state; real settings-store/App tests cover full page reloads.
 });
 
 async function readerLocale(locale, scale = 1) {
@@ -602,7 +671,7 @@ async function readerLocale(locale, scale = 1) {
   return labels;
 }
 
-async function assertCardGrid(group, label, count = 4) {
+async function assertCardGrid(group, label, count = 4, columns = 2) {
   const bounds = await group.evaluate(element => {
     const box = element.getBoundingClientRect();
     return {width: innerWidth, left: box.left, right: box.right, client: element.clientWidth, scroll: element.scrollWidth,
@@ -619,7 +688,7 @@ async function assertCardGrid(group, label, count = 4) {
       })};
   });
   assert.equal(bounds.buttons.length, count, `${label}: all available choices are rendered`);
-  assert.equal(bounds.columns, 2, `${label}: two equal-width columns`);
+  assert.equal(bounds.columns, columns, `${label}: ${columns} equal-width columns`);
   assert(bounds.left >= 0 && bounds.right <= bounds.width + 1, `${label}: grid stays in the screen`);
   assert(bounds.scroll <= bounds.client + 1, `${label}: no horizontal grid overflow`);
   for (const button of bounds.buttons) {
@@ -645,16 +714,18 @@ for (const width of [320, 390, 1280]) test(`layout and action cards fit all 16 l
   for (const scale of [1, 1.25]) for (const locale of locales) {
     const [title, layoutLabel, defaultLabel, continuousLabel, singleLabel, doubleLabel, sourceLabel] = await readerLocale(locale, scale);
     const dialog = page.getByRole('dialog', {name: title, exact: true});
-    const choices = dialog.getByRole('group', {name: layoutLabel, exact: true}), actions = dialog.locator('.nc-reader-actions');
+    const choices = dialog.getByRole('group', {name: layoutLabel, exact: true}), actions = dialog.locator('.nc-reader-more .nc-reader-actions');
     assert.deepEqual(await choices.getByRole('button').allTextContents(), [defaultLabel, continuousLabel, singleLabel, doubleLabel]);
     assert.equal(await choices.getByRole('button', {name: defaultLabel, exact: true}).getAttribute('aria-pressed'), 'true');
     await choices.scrollIntoViewIfNeeded();
     await settle();
     await assertCardGrid(choices, `${locale}/${scale} layouts`);
     if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) await page.screenshot({path: resolve(artifacts, `settings-layout-${locale}-${scale}.png`)});
-    await actions.scrollIntoViewIfNeeded();
+    await dialog.locator('.nc-reader-primary-actions').scrollIntoViewIfNeeded();
+    await assertCardGrid(dialog.locator('.nc-reader-primary-actions'), `${locale}/${scale} fullscreen`, 1, 1);
+    await openMore(dialog); await actions.scrollIntoViewIfNeeded();
     await settle();
-    await assertCardGrid(actions, `${locale}/${scale} actions`);
+    await assertCardGrid(actions, `${locale}/${scale} actions`, 3);
     assert.equal(await dialog.getByRole('link', {name: sourceLabel, exact: true}).count(), 0);
     assert(await dialog.locator('.nc-drawer-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${locale}/${scale}: entire settings panel has no horizontal overflow`);
     if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) {
@@ -670,12 +741,19 @@ for (const width of [320, 390, 1280]) test(`layout and action cards fit all 16 l
 
 test('reader action cards keep reload and find callbacks and the shortcut panel', async () => {
   await reader({layoutSettings: true}); await openSettings();
-  assert.deepEqual(await settings().locator('.nc-reader-actions button').allTextContents(), ['寻找其他语言', '全屏阅读', '重新载入', '键盘快捷键']);
+  assert.equal(await settings().locator('details.nc-reader-more').getAttribute('open'), null);
+  assert.deepEqual(await settings().locator('.nc-reader-primary-actions button').allTextContents(), ['全屏阅读']);
+  assert.equal(await settings().getByRole('button', {name: '重新载入', exact: true}).count(), 0, 'Secondary actions start outside the accessible control list');
+  assert.equal(await settings().getByRole('switch', {name: '并排对照', exact: true}).count(), 0);
+  await settings().locator('details.nc-reader-more > summary').focus();
+  await page.keyboard.press('Enter');
+  assert.notEqual(await settings().locator('details.nc-reader-more').getAttribute('open'), null, 'Native disclosure is keyboard operable');
+  assert.deepEqual(await settings().locator('.nc-reader-more .nc-reader-actions button').allTextContents(), ['寻找其他语言', '重新载入', '键盘快捷键']);
   await settings().getByRole('button', {name: '重新载入', exact: true}).click();
   await page.getByText('已触发重新载入', {exact: true}).waitFor();
   await settings().getByRole('button', {name: '键盘快捷键', exact: true}).click();
   await page.getByRole('dialog', {name: '键盘快捷键', exact: true}).waitFor();
-  await page.keyboard.press('Escape'); await openSettings();
+  await page.keyboard.press('Escape'); await openSettings(); await openMore();
   await settings().getByRole('button', {name: '寻找其他语言', exact: true}).click();
   await page.getByText('已触发寻找其他语言', {exact: true}).waitFor();
   assert.equal(await settings().count(), 0); await shown(1, [1]);

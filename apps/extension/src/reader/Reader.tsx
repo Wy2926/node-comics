@@ -5,8 +5,7 @@ import {translationNotice} from '../translation/notice';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Icon} from '../icons';
 import {useShortcuts} from '../shortcuts/react';
-import type {Api} from '../api';
-import {languageLabel,modeLabels,supportsLanguage,type Capabilities,type ReadingEntry,type Job,type Mode,type Page,type Settings} from '../types';
+import {languageLabel,modeLabels,supportsLanguage,type Capabilities,type ReadingEntry,type Mode,type Page,type Settings} from '../types';
 
 import {BlobPicture,type ShownImage} from './Images';
 import {useProcessingSettings, useEnhancementVisible, useProcessingWindow} from '../image-processing/react';
@@ -18,7 +17,6 @@ import {chapterGeometry,pageWindow,nextImagePages} from './virtual-window';
 import {pageSpreads,spreadAt,spreadFrames} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
-import {FeedbackForm} from '../ui/Feedback';
 import {useChapterStream,pageKey,completeManifest} from './useChapterStream';
 import {ThumbnailDirectory} from './ThumbnailDirectory';
 import {ComicDirectory,contentLanguageLabel} from './ComicDirectory';
@@ -39,9 +37,9 @@ import {ignoreReaderClick} from './reader-input';
 import {useReaderPrefetch} from './useReaderPrefetch';
 import type {ChapterLoadOptions} from './chapter-resources';
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
-type Props={progressStatus?:ReadingProgressStatus;backLabel?:string;backText?:string;onFind?:()=>void;searchOpen?:boolean;onOpenShortcuts:()=>void;onSourceLanguageChange?:(language:string|undefined)=>void;viewKey:string;directory?:ReadingDirectory;catalogLoading?:boolean;onContinueCatalog?:()=>void;onReload?:(entryId:string)=>void;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingEntry[];onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;sourceStatus?:string;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;copy:ReadingEntry;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingEntry)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,entryId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(entryId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[],immediate?:boolean)=>void;caps?:Capabilities;modelSelection?:import('../translation/channels/contracts').ModelSelection;fontSelection?:import('../translation/channels/contracts').FontSelection;translationScope?:string;allowsFeedback?:boolean;channelLabel?:string;api:Api;busy:boolean;};
+type Props={progressStatus?:ReadingProgressStatus;backLabel?:string;backText?:string;onFind?:()=>void;searchOpen?:boolean;onOpenShortcuts:()=>void;onSourceLanguageChange?:(language:string|undefined)=>void;viewKey:string;directory?:ReadingDirectory;catalogLoading?:boolean;onContinueCatalog?:()=>void;onReload?:(entryId:string)=>void;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingEntry[];onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;sourceStatus?:string;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;copy:ReadingEntry;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingEntry)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,entryId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(entryId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[],immediate?:boolean)=>void;caps?:Capabilities;modelSelection?:import('../translation/channels/contracts').ModelSelection;fontSelection?:import('../translation/channels/contracts').FontSelection;translationScope?:string;channelLabel?:string;busy:boolean;};
 type Panel='directory'|'translation'|'settings';
-export function Reader({progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings:globalSettings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,fontSelection,translationScope,allowsFeedback=false,channelLabel,api,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
+export function Reader({progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings:globalSettings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,fontSelection,translationScope,channelLabel,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
 const motion=useRef(false),surface=useRef<HTMLDivElement>(null),spreadStack=useRef<HTMLDivElement>(null);
 const [moving,setMoving]=useState(false);
 const [compactAtOpen]=useState(isCompactReaderDevice);
@@ -57,16 +55,16 @@ const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRe
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
 const [compare,setCompare]=useState(false);
-const [feedback,setFeedback]=useState<{job:Job;number:number}>();const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
+const [actual,setActual]=useState<Record<string,ShownImage|undefined>>({});
 const [loads,setLoads]=useState<Record<string,ImageLoadState|undefined>>({});
-const {root,panel,setPanel,togglePanel,closePanel,immersive,setImmersive,hidden,reveal,toggleControls,fullscreen}=useReaderControls<Panel>({blocked:!!feedback||analyticsBlocked||searchOpen,notify});
+const {root,panel,setPanel,togglePanel,closePanel,immersive,setImmersive,hidden,reveal,toggleControls,fullscreen}=useReaderControls<Panel>({blocked:analyticsBlocked||searchOpen,notify,settings:globalSettings,setSettings});
 const [viewportSize,setViewportSize]=useState({width:900,height:700});
 const preservePosition=useRef(preserve);preservePosition.current=preserve;
 const previousSearch=useRef(searchOpen);
 useEffect(()=>{if(previousSearch.current&&!searchOpen)root.current?.querySelector<HTMLButtonElement>('[data-reader-settings-trigger]')?.focus();previousSearch.current=searchOpen;},[searchOpen]);
 const {mode,preference,zoom,fit}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
 const scopeBase=`${translationScope??''}:${settings.language}`;const scope=(p:Page,c=copy)=>JSON.stringify([scopeBase,c.id,c.contentId,c.generation,p.id]);
-const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;const shownJob=shown?.job;
+const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;
 function imageLoad(chapter:ReadingEntry,p:Page,key?:string){const load=loads[pageKey(chapter,p.id)];return load?.scope===scope(p,chapter)&&load.key===key?load:undefined;}
 function recordLoad(key:string,state:ImageLoadState|undefined){setLoads(prev=>{if(prev[key]===state)return prev;const next={...prev};if(state)next[key]=state;else delete next[key];return next;});}
 const currentImage=page&&readingImage(page,mode,preference!=='original',settings.language,translationScope);
@@ -78,10 +76,9 @@ async function retryCurrentPage(){
   selectView(mode);
   try{await onRetry(page,mode,copy.id);}catch(error){notify(translationNotice({kind:'error',message:error instanceof Error?error.message:msg('重试失败')}).label);}
 }
-const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:moving||analyticsBlocked||searchOpen||!!panel||!!feedback,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
+const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:moving||analyticsBlocked||searchOpen||!!panel,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
 useEffect(()=>{if(!moving&&shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowledgeCatalogUpdates(copy.comicId,copy.catalogUpdateRevision).catch(()=>{});},[moving,!!shown,copy.comicId,copy.catalogUpdateRevision]);
-useEffect(()=>{setFeedback(undefined);},[copy.id]);
-useEffect(()=>{setActual({});setLoads({});setFeedback(undefined);},[scopeBase]);
+useEffect(()=>{setActual({});setLoads({});},[scopeBase]);
 useEffect(()=>{
  if(savedView)return;
  // Compact defaults wait for real image dimensions, not descriptor placeholders.
@@ -133,7 +130,7 @@ geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=spread?spreadPages.reduce((width,page)=>width+frame(page).width,0)
  :settings.layout==='single'?(page?frame(page).width:0)
  :continuousGeometry.reduce((width,chapter)=>Math.max(width,chapter.width),0);
-const swipeBlocked=!!searchOpen||!!feedback||!!analyticsBlocked||!!panel;
+const swipeBlocked=!!searchOpen||!!analyticsBlocked||!!panel;
 const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layout==='double'&&!!page,blocked:swipeBlocked||moving,
  resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,spreadPages.map(p=>[p.width,p.height])]),
 });
@@ -185,7 +182,7 @@ useShortcuts({
  'reader.fullscreen':()=>{void fullscreen();},
  'reader.back':leaveReader,
  'reader.find':()=>{if(!onFind)return false;findComic();},
-},{enabled:!searchOpen&&!feedback&&!analyticsBlocked});
+},{enabled:!searchOpen&&!analyticsBlocked});
 useEffect(()=>{
  onReadingWindow(preference==='original'?[]:readingTargets,windowPages,navigationReason.current==='direct');
 },[readingTargets,windowPages,preference,onReadingWindow]);
@@ -201,7 +198,7 @@ function reloadContent(chapter:ReadingEntry){if(busy||!onReload)return;swipe.can
 function leaveReader(){swipe.cancel();preserve();persist();onBack();}
 function openShortcuts(){setPanel(undefined);reveal();onOpenShortcuts();}
 function findComic(){swipe.cancel();preserve();persist();setPanel(undefined);onFind?.();}
-function changeLayout(layout:Settings['layout']|undefined){swipe.cancel();preserve();updateView(view=>({...view,layout,...(layout==='double'&&settings.layout!=='double'?{direction:'rtl' as const}:{})}));}
+function changeLayout(layout:Settings['layout']|undefined){swipe.cancel();preserve();updateView(view=>({...view,layout}));}
 function changeDirection(direction:Settings['direction']){swipe.cancel();preserve();updateView(view=>({...view,direction}));}
 function updateView(change:(view:ReadingView)=>ReadingView){setView(previous=>change(previous??view));}
 function changeFit(fit:Settings['fit']){if(settings.layout==='double')return false;preserve();updateView(view=>({...view,fit}));}
@@ -254,7 +251,7 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} notice={sourceStatus} onBack={leaveReader} progressStatus={progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}>
 <div className="nc-reader-navigation"><button aria-label={msg("上一页")} title={msg("上一页")} disabled={(spread?.start??index)===0} onClick={()=>navigate(-1)}><Icon name="chevron" style={{transform:'rotate(-90deg)'}}/></button><label><ReaderNumberInput label={msg("跳转页码")} value={index+1} max={copy.pages.length} onCommit={value=>jump(value-1)}/><span>/ {copy.pages.length}</span></label><input className="nc-reader-progress" type="range" aria-label={msg("阅读进度")} aria-valuetext={msg("第 {0} 页，共 {1} 页", {"0": index+1, "1": copy.pages.length})} min={1} max={copy.pages.length} step={1} value={index+1} disabled={copy.pages.length===1} onChange={e=>jump(Number(e.target.value)-1)}/><button aria-label={msg("下一页")} title={msg("下一页")} disabled={(spread?.end??index+1)>=copy.pages.length&&!next} onClick={()=>navigate(1)}><Icon name="chevron" style={{transform:'rotate(90deg)'}}/></button></div>
 </ReaderNavigation>
-<PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} allowsFeedback={allowsFeedback} selectedView={preference==='original'?'original':mode} shownJob={allowsFeedback?shownJob:undefined} onView={selectView} onFeedback={()=>shownJob&&setFeedback({job:{...shownJob},number:index+1})} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
+<PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} selectedView={preference==='original'?'original':mode} onView={selectView} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
 {sourceStatus&&panel!=='directory'&&<div className="nc-source-status nc-source-action nc-reader-controls" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}
 <div className="nc-reading-viewport" data-layout={settings.layout} data-swipe-enabled={settings.layout!=='continuous'&&!swipeBlocked&&!spreadZoom.zoomed&&contentWidth<=viewportSize.width+1} data-scrollbar-mode="hidden" ref={viewport} onScroll={scroll} data-decoded-pages={decodedSet.size} data-page-count={copy.pages.length} onPointerDown={pagedNavigation.onPointerDown} onPointerMove={pagedNavigation.onPointerMove} onPointerLeave={pagedNavigation.onPointerLeave} onClickCapture={e=>{swipe.clickCapture(e);spreadZoom.clickCapture(e);}} onClick={e=>{if(ignoreReaderClick(e)||pagedNavigation.click(e))return;toggleControls();}}>
 <div className="nc-reading-clip" style={{minWidth:contentWidth}}><div className="nc-reading-surface" ref={surface} style={{minWidth:contentWidth}}>{windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" data-direction={settings.direction} ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);if(chapter.id===copy.id)spreadStack.current=node;}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
@@ -272,7 +269,6 @@ onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellK
 </div></div>;})}</div></div></div>
 {readerPanel}
 
-{allowsFeedback&&feedback&&<FeedbackForm key={feedback.job.id} api={api} job={feedback.job} pageNumber={feedback.number} onClose={()=>setFeedback(undefined)}/>}
 
 </ReaderShell>;
 }

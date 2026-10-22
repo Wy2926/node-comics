@@ -54,16 +54,22 @@ export function ReaderSettings({settings, setSettings, layout, direction, onLayo
   allowDouble?: boolean;
 }) {
   return <>
-    <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing} allowDouble={allowDouble}>{children}</ReaderDisplaySettings>
-    <EnhancementToggle configure/>
+    <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing} allowDouble={allowDouble}/>
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>
     </div>
-    <div className="nc-reader-actions">
-      {extraActions}
+    <div className="nc-reader-actions nc-reader-primary-actions">
       <button className="button secondary" onClick={onFullscreen}><Icon name="expand"/><span>{msg('全屏阅读')}</span></button>
-      {onReload && <button className="button secondary" disabled={busy} onClick={onReload}><Icon name="refresh"/><span>{msg('重新载入')}</span></button>}
-      <button className="button secondary" onClick={onShortcuts}><Icon name="keyboard"/><span>{msg('键盘快捷键')}</span></button>
     </div>
+    <details className="nc-detail-more nc-reader-more">
+      <summary data-shortcuts-ignore>{msg('更多操作 · {0}', {'0': msg('阅读器')})}</summary>
+      {children}
+      <EnhancementToggle configure/>
+      <div className="nc-reader-actions">
+        {extraActions}
+        {onReload && <button className="button secondary" disabled={busy} onClick={onReload}><Icon name="refresh"/><span>{msg('重新载入')}</span></button>}
+        <button className="button secondary" onClick={onShortcuts}><Icon name="keyboard"/><span>{msg('键盘快捷键')}</span></button>
+      </div>
+    </details>
   </>;
 }

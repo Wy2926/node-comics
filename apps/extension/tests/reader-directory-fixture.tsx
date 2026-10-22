@@ -3,7 +3,6 @@ import {Scrollbars} from '../src/ui/Scrollbars';
 import {useCallback,useMemo,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Reader} from '../src/reader/Reader';
-import {Api} from '../src/api';
 import {defaults,type ReadingEntry,type Settings} from '../src/types';
 import type {ReadingDirectory} from '../src/comics/application/library-service';
 import {sourcePageCache} from '../src/storage/source-pages';
@@ -14,7 +13,6 @@ import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
-const api=new Api(location.origin+'/fixture-disabled');
 const canvas=new OffscreenCanvas(800,1200),ctx=canvas.getContext('2d')!;
 ctx.fillStyle='#e8e4ff';ctx.fillRect(0,0,800,1200);ctx.fillStyle='#695aaa';ctx.font='48px sans-serif';ctx.fillText('Directory fixture',120,180);
 await sourcePageCache.put('inline-original:directory-fixture',await canvas.convertToBlob());
@@ -40,7 +38,7 @@ function Fixture(){
    <label>章节<input aria-label="验收章节" type="number" min={1} max={620} value={Number(id.slice(8))} onChange={e=>navigate('chapter-'+e.target.value)}/></label>
    <output aria-label="保存位置">{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>
   </div>
-  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={{...copy,sourceUrl:'https://fixture.invalid/comic',...(empty?{pages:[]}:{})}} sequence={copies} sourceStatus={sourceError} onReload={reload} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={noop} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} api={api} busy={reloading}/>}
+  {mounted&&<Reader viewKey="isolated-directory-fixture" directory={directory} copy={{...copy,sourceUrl:'https://fixture.invalid/comic',...(empty?{pages:[]}:{})}} sequence={copies} sourceStatus={sourceError} onReload={reload} settings={config} setSettings={setConfig} update={update} onActiveEntry={navigate} onLoadEntry={noop} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={noop} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={noop} onReadingWindow={noop} busy={reloading}/>}
  </div>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

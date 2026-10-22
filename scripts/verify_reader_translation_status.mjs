@@ -125,8 +125,9 @@ try{
     content:rail.querySelector('button').getBoundingClientRect().right,
   })));
   for(const rail of edgeBars)assert(rail.edge>=rail.content,'A toolbar scrollbar covers the button label');
-  await page.locator('[data-reader-feedback-trigger]').scrollIntoViewIfNeeded();
-  const feedbackBounds=await page.locator('[data-reader-feedback-trigger]').boundingBox();assert(feedbackBounds.y>=0&&feedbackBounds.y+feedbackBounds.height<=420);
+  assert.equal(await page.locator('[data-reader-feedback-trigger]').count(),0);
+  await page.locator('[data-reader-settings-trigger]').scrollIntoViewIfNeeded();
+  const settingsBounds=await page.locator('[data-reader-settings-trigger]').boundingBox();assert(settingsBounds.y>=0&&settingsBounds.y+settingsBounds.height<=420);
   await page.screenshot({path:path.join(out,'rails-short-window.png')});
   await page.setViewportSize({width:390,height:844});
   await page.locator('.nc-reader-rail').evaluateAll(rails=>rails.forEach(rail=>rail.scrollTop=0));await settle();

@@ -52,7 +52,8 @@ async function readerSettings(target=page){
   if(await target.locator('.nc-reader').evaluate(element=>element.classList.contains('controls-hidden')))await target.keyboard.press('Escape');
   await target.getByRole('button',{name:'阅读设置',exact:true}).click();
 }
-async function toggle(target=page){await readerSettings(target);await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await readerSettings(target);}
+async function openMore(target=page){const more=target.getByRole('dialog',{name:'阅读设置',exact:true}).locator('details.nc-reader-more');if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();}
+async function toggle(target=page){await readerSettings(target);await openMore(target);await target.getByRole('switch',{name:'清晰度优化',exact:true}).click();await readerSettings(target);}
 async function waitWidth(width,target=page,index=0){await first(target,index).locator('img.nc-page-image').last().waitFor();await target.waitForFunction(({width,index})=>document.querySelector(`.nc-manga-page[data-page-index="${index}"] .nc-comparison-pane:last-child img.nc-page-image`)?.naturalWidth===width,{width,index});}
 try {
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -68,6 +69,7 @@ try {
   await page.evaluate(()=>{location.hash='library';});
   await page.getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await openMore();
   assert.equal(await page.getByRole('switch',{name:'清晰度优化',exact:true}).isDisabled(),true);
   await page.getByRole('link',{name:'添加增强渠道',exact:true}).click();
   await card.waitFor();
@@ -126,6 +128,7 @@ try {
   assert.equal(await first().locator('img.nc-page-image').last().getAttribute('src'),shownUrl);
   assert.equal((await read()).enhancement.length,5);
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await openMore();
   await page.getByText('当前渠道 · 已重命名 nunif',{exact:true}).waitFor();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   check('renaming a profile or changing cache budget keeps the displayed enhancement and active channel visible');
@@ -190,7 +193,7 @@ try {
   value=await read();assert.equal(value.enhancement.length,7);assert.equal(value.translation,5);
   assert.deepEqual(await geometry(),before);
   check('cache clear never reprocesses automatically; failure retains translation; manual retry changes enhancement only');
-  await readerSettings();
+  await readerSettings(); await openMore();
   await page.getByRole('switch',{name:'并排对照',exact:true}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('.nc-manga-page[data-page-index="0"] img.nc-page-image').length===2);
@@ -199,6 +202,7 @@ try {
   assert.equal((await read()).enhancement.length,7);
   await page.screenshot({path:path.join(out,'comparison.png')});
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await openMore();
   await page.getByRole('switch',{name:'并排对照',exact:true}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   check('comparison keeps the left original untouched and the enhanced translation on the right');

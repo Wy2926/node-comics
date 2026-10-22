@@ -112,7 +112,7 @@ export function EpubReader({
   const [fixedLayout, setFixedLayout] = useState(false);
   const fontSize = Math.max(70, view.zoom);
   const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
-  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify});
+  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify, settings: globalSettings, setSettings});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
   const latest = useRef({ copy, update, settings, layout, fontSize, images, toggleControls });
   latest.current = { copy, update, settings, layout, fontSize, images, toggleControls };
@@ -450,7 +450,7 @@ export function EpubReader({
       </div>
     </ReaderNavigation>
     <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
-      modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)} allowsFeedback={false} onFeedback={() => {}}
+      modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
     <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
       <div ref={viewport} className="nc-epub-viewport" aria-busy={loading}/>

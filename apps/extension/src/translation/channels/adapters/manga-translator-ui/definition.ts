@@ -42,7 +42,7 @@ export const definition: ChannelDefinition = {
     return {
       key: scope.key, scope, label: profile.name, capabilities: capabilities(), available: !!token,
       unavailable: token ? undefined : {kind: 'error', message: msg('请在渠道设置中连接翻译服务。'), retryable: false},
-      requiresInternet: false, allowsFeedback: false, analyticsCategory:'local', isCurrent: current,
+      requiresInternet: false, analyticsCategory:'local', isCurrent: current,
       async validateResult(){assertCurrent(current);if(!token)throw Error(msg('请在渠道设置中连接翻译服务。'));},
       createRuntime: options => new DirectImageRuntime(scope, {...options, isCurrent: () => current() && options.isCurrent()}, {
         start: (id, blob, mode, language) => {

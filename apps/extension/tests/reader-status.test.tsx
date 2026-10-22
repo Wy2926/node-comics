@@ -13,16 +13,16 @@ import {needsTranslation,type TranslationState} from '../src/translation/automat
 const origin='https://fixture.example';
 const noop=()=>{};
 it('offers originals and translation, respecting disabled channel capabilities',()=>{
- const controls=(modes?:'classic'[])=>renderToStaticMarkup(<PageTranslationBar selectedView="original" modes={modes} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const controls=(modes?:'classic'[])=>renderToStaticMarkup(<PageTranslationBar selectedView="original" modes={modes} onView={noop} translationLabel="Translate" onPanel={noop}/>);
  const available=controls();expect(available).toContain('aria-label="原图"');expect(available).toContain('aria-label="翻译"');expect(available).toContain('title="查看译图"');expect(available).toContain('<span>翻译</span>');
  const disabled=controls([]);expect(disabled).toContain('aria-label="原图"');expect(disabled).not.toContain('aria-label="翻译"');
 });
 it('keeps development diagnostics out of the reading toolbar',()=>{
- const html=renderToStaticMarkup(<PageTranslationBar selectedView="classic" allowsFeedback={false} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const html=renderToStaticMarkup(<PageTranslationBar selectedView="classic" onView={noop} translationLabel="Translate" onPanel={noop}/>);
  expect(html).not.toContain('aria-label="翻译状态"');expect(html).not.toContain('aria-label="译图有问题"');
 });
 it('offers an explicit rerun only when it can run',()=>{
- const controls=(canRetry:boolean)=>renderToStaticMarkup(<PageTranslationBar selectedView="classic" allowsFeedback={false} onRetry={async()=>{}} canRetry={canRetry} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
+ const controls=(canRetry:boolean)=>renderToStaticMarkup(<PageTranslationBar selectedView="classic" onRetry={async()=>{}} canRetry={canRetry} onView={noop} translationLabel="Translate" onPanel={noop}/>);
  const available=controls(true),disabled=controls(false);
  expect(available).toContain('data-reader-retry-trigger="true"');expect(available).toContain('aria-label="重新翻译此页"');
  expect(available).not.toContain('disabled');expect(available).not.toContain('aria-label="译图有问题"');
@@ -40,13 +40,12 @@ function fixture(status:Job['status']):Page{
  const delivered:Job={id:'delivered',result:{key:'output',recoverable:true},mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'done',version:1,created_at:'2026-09-18T00:00:00Z',quota_pages:1,cache_hit:false};
  return {...emptyPage('page',800,1200),translationScope:JSON.stringify([origin,'reader','overlay-v1']),blobKey:'original',outputBlobs:{delivered:'translated'},jobs:[delivered,{...delivered,id:'retry',result:undefined,version:2,status,created_at:'2026-09-19T00:00:00Z'}]};
 }
-it('hides the actual model without reserving toolbar space or removing feedback',()=>{
- const job={...fixture('succeeded').jobs[0],model:{id:'model-fixture',name:'Claude Haiku 5.5'}};
- const controls=(shownJob:Job)=>renderToStaticMarkup(<PageTranslationBar selectedView="classic" shownJob={shownJob} onView={noop} onFeedback={noop} translationLabel="Translate" onPanel={noop}/>);
- const html=controls(job);
- expect(html).not.toContain('Claude Haiku 5.5');expect(html).not.toContain('nc-reader-model');
- expect(html).toContain('aria-label="译图有问题"');expect(html).toContain('nc-translation-trigger');
- expect(html).toBe(controls({...job,model:undefined}));
+it.each(['original','classic'] as const)('removes feedback and its reserved slot while preserving %s controls',selectedView=>{
+ const html=renderToStaticMarkup(<PageTranslationBar selectedView={selectedView} onRetry={async()=>{}} canRetry onView={noop} translationLabel="Translate" onPanel={noop}/>);
+ expect(html).not.toContain('data-reader-feedback-trigger');expect(html).not.toContain('译图有问题');expect(html).not.toContain('nc-reader-model');
+ expect(html).toContain('--reader-tools-above:3;--reader-tools-below:2');
+ expect(html).toContain('data-reader-retry-trigger');expect(html).toContain('nc-translation-trigger');expect(html).toContain('data-reader-settings-trigger');
+ expect(html).toContain('aria-label="原图"');expect(html).toContain('aria-label="翻译"');
 });
 describe('explicit page rerun eligibility',()=>{
  const eligible=(page:Page,state?:TranslationState,scope=page.translationScope)=>canRetryPage(pageTranslation(page,'classic','zh-Hans',scope),state);

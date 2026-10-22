@@ -163,6 +163,7 @@ test('real reader shortcuts remain active with a scrollbar popover and pause onl
   await page.locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('60%', {exact: true}).waitFor();
   await waitPage(3);
   const before = await readingPosition();
+  await page.locator('.nc-reader-drawer details.nc-reader-more > summary').click();
   await page.getByRole('button', {name: '键盘快捷键', exact: true}).click();
   await panel().waitFor(); await activeScope('reader');
   assert.equal(await page.locator('.nc-reader-drawer').count(), 0, 'The existing reader shortcut entry closes its drawer before opening the panel');

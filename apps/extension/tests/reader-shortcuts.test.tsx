@@ -43,7 +43,7 @@ function fixture(extra:Partial<Props>={}){
  const props:Props={
   viewKey:'fixture',copy,sequence:[copy],settings:{...defaults},setSettings:vi.fn(),update:vi.fn(),onBack:vi.fn(),onOpenShortcuts:vi.fn(),onRetry:vi.fn(),onFind:vi.fn(),
   onUpgrade:vi.fn(),onLogin:vi.fn(),onImport:vi.fn(),notify:vi.fn(),onMarkRead:vi.fn(async()=>{}),onNavigate:vi.fn(),onActiveEntry:vi.fn(),onLoadEntry:vi.fn(),
-  onReadingWindow:vi.fn(),translationState:vi.fn(),api:{} as Props['api'],busy:false,...extra,
+  onReadingWindow:vi.fn(),translationState:vi.fn(),busy:false,...extra,
  };
  props.setSettings=vi.fn(next=>{props.settings=typeof next==='function'?next(props.settings):next;});
  return props;
@@ -113,9 +113,9 @@ describe('reader shortcut action integration',()=>{
   const props=fixture();render(props);hooks.handlers['reader.layout']();hooks.handlers['reader.fit']();
   expect(props.settings).toEqual(defaults);expect(view()).toMatchObject({layout:'single',fit:'window'});
   expect(actions.preserve).toHaveBeenCalledTimes(2);
-  render(props);hooks.handlers['reader.layout']();expect(view()).toMatchObject({layout:'double',direction:'rtl'});
+  render(props);hooks.handlers['reader.layout']();expect(view().layout).toBe('double');expect(view().direction).toBeUndefined();
   render(props);expect(hooks.handlers['reader.fit']()).toBe(false);expect(view().fit).toBe('window');
-  hooks.handlers['reader.layout']();expect(view()).toMatchObject({layout:'continuous',direction:'rtl'});
+  hooks.handlers['reader.layout']();expect(view().layout).toBe('continuous');expect(view().direction).toBeUndefined();
   render(props);hooks.handlers['reader.fit']();expect(view().fit).toBe('width');
   expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings).toEqual(defaults);
  });
@@ -130,7 +130,7 @@ describe('reader shortcut action integration',()=>{
  it('remembers each comic across chapters and reopening without changing the global defaults',()=>{
   const stored=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
   const a=fixture({viewKey:'comic-a'});render(a);hooks.handlers['reader.layout']();render(a);hooks.handlers['reader.layout']();render(a);flushEffects();
-  const chosen={...view()};expect(chosen).toMatchObject({layout:'double',direction:'rtl'});
+  const chosen={...view()};expect(chosen.layout).toBe('double');expect(chosen.direction).toBeUndefined();
   a.copy={...a.copy,id:'chapter-two'};render(a);expect(view()).toEqual(chosen);
   hooks.states=[];const b=fixture({viewKey:'comic-b',settings:{...defaults,layout:'single'}});render(b);flushEffects();
   expect(view().layout).toBeUndefined();expect(view().direction).toBeUndefined();
@@ -148,6 +148,23 @@ describe('reader shortcut action integration',()=>{
   options().onLayout(undefined);expect(view().layout).toBeUndefined();expect(view().direction).toBe('rtl');
   expect(nodes(render(props)).find(node=>node.props.className==='nc-reading-viewport')?.props['data-layout']).toBe('single');
   expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it.each(['ltr','rtl'] as const)('never changes the explicit comic direction when selecting or cycling layouts (%s)',direction=>{
+  const props=fixture();render(props);hooks.handlers['reader.settings']();
+  const options=()=>nodes(render(props)).find(node=>node.type===ReaderSettings)!.props as unknown as Parameters<typeof ReaderSettings>[0];
+  options().onDirection(direction);
+  for(const layout of ['double','single','continuous','double',undefined] as const){
+   options().onLayout(layout);expect(view().layout).toBe(layout);expect(view().direction).toBe(direction);
+  }
+  for(let i=0;i<3;i++){render(props);hooks.handlers['reader.layout']();expect(view().direction).toBe(direction);}
+  expect(props.setSettings).not.toHaveBeenCalled();expect(props.settings).toEqual(defaults);
+ });
+ it('persists the immersive shortcut in shared preferences without changing the comic view',()=>{
+  const props=fixture();render(props);const before={...view()};
+  hooks.handlers['reader.immersive']();expect(props.settings.readerImmersive).toBe(false);
+  const tree=render(props);expect(tree.props.immersive).toBe(false);expect(view()).toEqual(before);
+  hooks.states=[];expect(render(props).props.immersive).toBe(false);
+  hooks.handlers['reader.immersive']();expect(props.settings).toEqual(defaults);
  });
  it('keeps a comic layout selected before phone dimensions arrive',()=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});

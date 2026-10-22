@@ -22,6 +22,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  const restoredGeometry=useRef(''),restorePending=useRef(true);
  const restoredPages=useRef<Pick<ChapterWindow,'copy'|'offsets'>|undefined>(undefined);
  const suppressScroll=useRef(false),lastScrollTop=useRef(0),saveTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),restoreFrame=useRef<number|undefined>(undefined);
+ const flushPending=useRef(()=>{});
  const [resources]=useState(()=>new ChapterResourceWindow(copy)),[resourceVersion,setResourceVersion]=useState(0);
  const read=useRef(new Set<string>()),shown=useRef(new Set<string>());
  const deferredShown=useRef<{window:string;pages:Set<string>}|undefined>(undefined);
@@ -53,10 +54,13 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
   setAhead(previous=>previous.key===key&&previous.count===count?previous:{key,count});
  }
  function persist(){
-  clearTimeout(saveTimer.current);const chapter=copyRef.current;
+  clearTimeout(saveTimer.current);saveTimer.current=undefined;const chapter=copyRef.current;
   if(anchor.current.entryId!==chapter.id||!chapter.pages.some(page=>page.id===anchor.current.pageId))return;
   const {pageId,relativeOffset}=anchor.current;update({...chapter,pageId,relativeOffset,lastReadAt:Date.now(),updatedAt:Date.now()});
  }
+ // Only flush an observed scroll, using the cached anchor even after the DOM detaches.
+ // The ref also keeps deferred saves on the latest update callback.
+ flushPending.current=()=>{if(saveTimer.current!==undefined)persist();};
  function restore(){
   const chapter=copyRef.current,v=viewport.current,n=chapter.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(chapter,n);
   if(!v||!p||anchor.current.entryId!==chapter.id)return;
@@ -110,7 +114,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
    for(const chapter of stream){const stack=stacks.current.get(chapter.id),metrics=geometry.current.get(chapter.id);if(!stack||!metrics||!chapter.pages.length)continue;const top=elementTop(stack);if(top<=line||!selected)selected={chapter,index:pageAtHeight(metrics.offsets,line-top)};}
    if(selected)activate(selected.chapter,selected.index);
   }
-  preserve();updateReadingProgress();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(persist,350);
+  preserve();updateReadingProgress();clearTimeout(saveTimer.current);saveTimer.current=setTimeout(()=>flushPending.current(),350);
   if(forward){
    for(const chapter of stream){const end=ends.current.get(chapter.id);if(!end)continue;const top=elementTop(end),crossed=top>previous&&top+end.offsetHeight<=v.scrollTop+v.clientHeight+1;if(crossed&&atEnd(chapter))markRead(chapter);}
   }
@@ -148,9 +152,11 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
   updateReadingProgress();
  });
  useEffect(()=>{
-  const visibility=()=>setForeground(!document.hidden);
+  const flush=()=>flushPending.current();
+  const visibility=()=>{if(document.hidden)flush();setForeground(!document.hidden);};
   document.addEventListener('visibilitychange',visibility);
-  return()=>document.removeEventListener('visibilitychange',visibility);
+  window.addEventListener('pagehide',flush);
+  return()=>{flush();document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',flush);};
  },[]);
  useEffect(()=>{
   resources.prepare(resourceChapters,onLoadEntry,()=>setResourceVersion(value=>value+1),resourceChapters.filter(chapter=>chapter.id!==copy.id).map(chapter=>chapter.id));

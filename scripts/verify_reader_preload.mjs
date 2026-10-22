@@ -64,6 +64,7 @@ async function sample(label,panes=1){
  samples.push(value);return value;
 }
 async function settings(action){await page.getByRole('button',{name:'阅读设置',exact:true}).click();await action();await page.getByRole('button',{name:'关闭面板',exact:true}).click();await settle();}
+async function openMore(){const more=page.getByRole('dialog',{name:'阅读设置',exact:true}).locator('details.nc-reader-more');if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();}
 try{
  const start=performance.now();await page.goto(origin+'/tests/reader-window-fixture.html?highres=1');
  const openingPages=Array.from({length:11},(_,index)=>index).filter(index=>index!==7);
@@ -95,13 +96,13 @@ try{
  await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport').dataset.decodedPages==='11');
  await page.getByRole('button',{name:'完成模拟翻译',exact:true}).click();
  await page.getByRole('button',{name:'翻译',exact:true}).click();
- await settings(()=>page.getByRole('switch',{name:'并排对照',exact:true}).click());
+ await settings(async()=>{await openMore();await page.getByRole('switch',{name:'并排对照',exact:true}).click();});
  await decoded([2,3,4],2);
  await page.waitForFunction(()=>[...document.querySelectorAll('[data-page-index="3"] .nc-page-image')].some(image=>image.dataset.resultJob!=='original'));
  const compared=await sample('comparison',2);assert.equal(compared.liveUrls,20);
  await page.screenshot({path:path.join(out,'comparison.png')});
  checks.push('Comparison retains full-resolution originals and translations within eleven pages; the bad page stays isolated');
- await settings(async()=>{await page.getByRole('switch',{name:'并排对照',exact:true}).click();await page.getByRole('button',{name:'单页',exact:true}).click();});
+ await settings(async()=>{await openMore();await page.getByRole('switch',{name:'并排对照',exact:true}).click();await page.getByRole('button',{name:'单页',exact:true}).click();});
  await decoded([3]);
  await page.waitForFunction(()=>document.querySelectorAll('.nc-reading-viewport .nc-manga-page').length===1&&window.readerPreloadMetrics().liveUrls===1);
  const single=await sample('single');assert.equal(single.selectedPages,1);

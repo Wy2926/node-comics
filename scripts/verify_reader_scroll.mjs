@@ -22,6 +22,7 @@ async function jump(number){
  assert.equal(Number(await page.getByLabel('阅读进度',{exact:true}).inputValue()),Number(number),'page input commits before scrolling');
 }
 async function refresh(){await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();}
+async function openMore(){const more=page.getByRole('dialog',{name:'阅读设置',exact:true}).locator('details.nc-reader-more');if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();}
 async function seek(chapter,selector,offset){
  const target=await page.evaluate(({chapter,selector,offset})=>{
   const v=document.querySelector('.nc-reading-viewport'),node=document.querySelector(`[data-copy-id="window-fixture-${chapter}"] ${selector}`);
@@ -92,6 +93,7 @@ try{
  assert(Math.abs(await pageTop(2,59)-savedPageTop)<1,`reopened page top changed from ${savedPageTop} to ${await pageTop(2,59)}`);
  checks.push('in-page saved scroll and visual page position restore after reopening');
  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+ await openMore();
  const anchorBefore=await input.inputValue();await page.getByRole('switch',{name:'并排对照',exact:true}).click();await settle();
  assert.equal(await input.inputValue(),anchorBefore);await page.getByRole('button',{name:'关闭面板',exact:true}).click();
  const comparisonPosition=await position();await jump('060');

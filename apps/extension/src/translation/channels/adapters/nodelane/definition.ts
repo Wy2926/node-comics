@@ -94,7 +94,7 @@ export const definition:ChannelDefinition={
       }};},
       get capabilities(){return caps;},available:!!session,
       unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
-      requiresInternet:true,allowsFeedback:true,analyticsCategory:'official',isCurrent:live,
+      requiresInternet:true,analyticsCategory:'official',isCurrent:live,
       async validateResult(){
         assertCurrent(live);if(!session)throw Error(msg('请先登录'));
         await authorization!.current();assertCurrent(live);

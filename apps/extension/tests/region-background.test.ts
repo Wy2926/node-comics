@@ -67,7 +67,7 @@ beforeEach(async()=>{
   mocks.prepare.mockResolvedValue({image:{sha256:sha,byte_size:source.size,content_type:source.type,normalization_version:1},sourceSha256:sha,width:100,height:80});
   core={init:vi.fn(async()=>{}),restore:vi.fn(async()=>{}),submit:vi.fn(async()=>{}),manual:vi.fn(async()=>{}),wait:vi.fn(async()=>false),hasPending:false,
     waitingIds:[],retryDelay:0,stateFor:vi.fn(()=>undefined),refresh:vi.fn(async()=>{}),dispose:vi.fn()};
-  channel={key:'channel-session-1',scope:{key:'account-1'},label:'Fixture',available:true,requiresInternet:true,allowsFeedback:true,isCurrent:()=>true,
+  channel={key:'channel-session-1',scope:{key:'account-1'},label:'Fixture',available:true,requiresInternet:true,isCurrent:()=>true,
     capabilities:{modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'zh-Hans',label:'Chinese'}],
       limits:{max_bytes:128*1024*1024,max_dimension:100000,max_pixels:100000**2,max_translation_ids:32},entitlements:null},
     createRuntime:vi.fn((_options:RuntimeOptions)=>core),validateResult:vi.fn(async()=>{}),readResult:vi.fn(async()=>source),dispose:vi.fn()};

@@ -80,7 +80,7 @@ window.fetch = async (input, init = {}) => {
 function mockChannel(account: string, changed: () => void): ChannelConnection {
   const scope = {key: (failFirst ? 'epub-fixture-failure:' : 'epub-fixture:') + account};
   return {
-    key: scope.key, scope, label: '本地模拟图片翻译 · 无外部请求', available: true, requiresInternet: false, allowsFeedback: false, isCurrent: () => true,
+    key: scope.key, scope, label: '本地模拟图片翻译 · 无外部请求', available: true, requiresInternet: false, isCurrent: () => true,
     capabilities: {modes: [{id: 'classic', label: 'Classic', enabled: true}], languages: [{id: 'zh-Hans', label: '简体中文'}, {id: 'en', label: 'English'}], limits: {max_bytes: 20_000_000, max_pixels: 20_000_000, max_dimension: 10_000, max_translation_ids: 20}, entitlements: null},
     createRuntime(options) {
       const attempted = new Set<string>();

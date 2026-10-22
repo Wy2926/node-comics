@@ -9,7 +9,6 @@ import {ShortcutPanel} from '../src/ui/shortcuts/ShortcutPanel';
 import {Preferences} from '../src/ui/Preferences';
 import {useUiLocale} from '../src/i18n/react';
 import {useShortcuts} from '../src/shortcuts/react';
-import {Api} from '../src/api';
 import {defaults,type Page,type ReadingEntry,type Settings} from '../src/types';
 import type {ReadingTarget} from '../src/translation/automatic';
 import {sourcePageCache} from '../src/storage/source-pages';
@@ -19,7 +18,6 @@ import '../src/library.css';
 import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
-const api=new Api(location.origin+'/fixture-disabled');
 const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
 const fractionalDimensions=performanceFixture&&query.get('fractional')==='1';
@@ -144,7 +142,7 @@ function Fixture(){
   </div>}
   <output hidden data-testid="reading-window">{readingWindow}</output><output hidden data-testid="marked-read">{JSON.stringify(markedRead)}</output>
   {lazyChapters&&<output hidden data-testid="chapter-state">{JSON.stringify({active:id,chapters:copies.map(chapter=>({id:chapter.id,pages:chapter.pages.length,complete:chapter.discoveryComplete,pageId:chapter.pageId}))})}</output>}
-  {layoutSettings&&preferencesOpen?<div style={{overflow:'auto',minHeight:0}}><Preferences settings={config} setSettings={setConfig}/></div>:mounted&&<Reader key={viewKey} viewKey={viewKey} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} onFind={layoutSettings?()=>setStatus('已触发寻找其他语言'):undefined} onReload={layoutSettings?()=>setStatus('已触发重新载入'):undefined} notify={setStatus} onReadingWindow={observeWindow} api={api} busy={false}/>}
+  {layoutSettings&&preferencesOpen?<div style={{overflow:'auto',minHeight:0}}><Preferences settings={config} setSettings={setConfig}/></div>:mounted&&<Reader key={viewKey} viewKey={viewKey} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} onFind={layoutSettings?()=>setStatus('已触发寻找其他语言'):undefined} onReload={layoutSettings?()=>setStatus('已触发重新载入'):undefined} notify={setStatus} onReadingWindow={observeWindow} busy={false}/>}
   {shortcutsOpen&&<ShortcutPanel initialScope="reader" onClose={()=>setShortcutsOpen(false)}/>}
  </div>;
 }

@@ -109,7 +109,6 @@
   .nc-app .nc-reader .nc-page-versions button { width: 48px; height: var(--reader-tool-size); }
   .nc-app .nc-reader .nc-reader-rail.right button { gap: 1px; padding: 2px; }
   .nc-app .nc-reader .nc-reader-rail.right .nc-reader-tool-group > button > span { display: none; }
-  .nc-app .nc-reader .nc-reader-rail.right .nc-reader-tool-group > button[data-reader-feedback-trigger] > span { display: -webkit-box; }
   .nc-app .nc-reader .nc-reader-rail.right > .nc-rail-divider { height: 36px; width: 1px; margin: 0; }
 
   .nc-app .nc-reader .nc-page-versions {

@@ -12,7 +12,7 @@ export function settings(): Settings {
     const value=JSON.parse(saved); const merged=known(value);
     const enums={appearance:['system','light','dark'],accentTheme:['sky','rose','mint','iris','amber','slate'],readerBackground:['gray','paper','night'],direction:['ltr','rtl'],layout:['continuous','single','double'],fit:['width','window']} as const;
     for(const key of Object.keys(enums) as (keyof typeof enums)[]) if(!(enums[key] as readonly string[]).includes(merged[key]))Object.assign(merged,{[key]:defaults[key]});
-    return {...merged,uiLanguage:validUiLanguage(merged.uiLanguage)?merged.uiLanguage:'auto',autoTranslateTabs:merged.autoTranslateTabs===true,discoveryTextTranslation:typeof merged.discoveryTextTranslation==='boolean'?merged.discoveryTextTranslation:defaults.discoveryTextTranslation,cacheLimitMb:[0,128,512,1024,10240,-1].includes(merged.cacheLimitMb)?merged.cacheLimitMb:defaults.cacheLimitMb,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
+    return {...merged,uiLanguage:validUiLanguage(merged.uiLanguage)?merged.uiLanguage:'auto',autoTranslateTabs:merged.autoTranslateTabs===true,discoveryTextTranslation:typeof merged.discoveryTextTranslation==='boolean'?merged.discoveryTextTranslation:defaults.discoveryTextTranslation,readerImmersive:typeof merged.readerImmersive==='boolean'?merged.readerImmersive:defaults.readerImmersive,cacheLimitMb:[0,128,512,1024,10240,-1].includes(merged.cacheLimitMb)?merged.cacheLimitMb:defaults.cacheLimitMb,textScale:[1,1.125,1.25].includes(value.textScale)?value.textScale:1};
   } catch { return {...defaults}; }
 }
 export async function saveSettings(value: Settings) {

@@ -4,8 +4,8 @@
 .nc-app .nc-search { border: var(--comic-input-border); border-radius: var(--comic-control-radius); background: var(--surface); padding: 0 12px; }
 .nc-app .nc-search:focus-within { border-color: var(--accent); }
 .nc-app .nc-search input, .nc-app .nc-search input:focus { border: 0; min-width: 0; box-shadow: none; outline: none; }
-.nc-app :is(.nc-filter-chips>button, .nc-theme-options button, .nc-issue-options label, .nc-choice-card, .nc-version-filter, .nc-catalog-group-tabs>button) { border-width: 2px; border-radius: var(--comic-control-radius); }
-.nc-app :is(.nc-filter-chips>button[aria-pressed=true], .nc-theme-options button.selected, .nc-issue-options label.selected, .nc-choice-card[aria-pressed=true], .nc-version-filter[aria-pressed=true], .nc-catalog-group-tabs>button[aria-pressed=true]) { border-color: var(--ink); box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--ink); }
+.nc-app :is(.nc-filter-chips>button, .nc-theme-options button, .nc-choice-card, .nc-version-filter, .nc-catalog-group-tabs>button) { border-width: 2px; border-radius: var(--comic-control-radius); }
+.nc-app :is(.nc-filter-chips>button[aria-pressed=true], .nc-theme-options button.selected, .nc-choice-card[aria-pressed=true], .nc-version-filter[aria-pressed=true], .nc-catalog-group-tabs>button[aria-pressed=true]) { border-color: var(--ink); box-shadow: var(--comic-shadow-small); background: var(--accent-soft); color: var(--ink); }
 .nc-app .nc-catalog-check { border: var(--comic-border); border-radius: var(--comic-control-radius); }
 .nc-app .switch { border: var(--comic-border); border-radius: var(--comic-control-radius); height: 28px; }
 .nc-app .switch i { border-radius: 2px; top: 3px; left: 3px; }

@@ -7,3 +7,12 @@
 .nc-app .nc-drawer-title, .nc-app .nc-comic-directory-heading { background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); border-bottom: var(--comic-perforation); }
 .nc-app .nc-translation-popover .nc-drawer-title { margin-bottom: 14px; }
 .nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }
+.nc-reader-sizing { margin-bottom: 20px; }
+.nc-reader-sizing > .nc-reader-option:last-child { padding-top: 0; padding-bottom: 14px; }
+.nc-app .nc-reader-choice-cards button { flex-direction: row; justify-content: flex-start; min-height: 44px; padding: 8px; text-align: start; }
+.nc-reader-choice-cards button > .nc-icon { flex: none; }
+.nc-reader-primary-actions { grid-template-columns: minmax(0, 1fr); }
+.nc-app .nc-reader-primary-actions > .button { min-height: 44px; }
+.nc-app .nc-detail-more.nc-reader-more { margin-top: 20px; padding-top: 8px; }
+.nc-app .nc-reader-more > summary { min-height: 44px; overflow-wrap: anywhere; }
+.nc-app .nc-reader-more > summary::before { flex: none; }

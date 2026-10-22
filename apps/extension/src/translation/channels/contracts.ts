@@ -66,7 +66,6 @@ export interface ChannelConnection {
   available: boolean;
   unavailable?: TranslationState;
   requiresInternet: boolean;
-  allowsFeedback: boolean;
   isCurrent: ()=>boolean;
   createRuntime(options:RuntimeOptions):ChannelRuntime;
   /** Current local authorization only, without downloading or composing result pixels. */

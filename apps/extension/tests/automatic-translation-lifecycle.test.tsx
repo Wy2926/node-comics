@@ -71,7 +71,7 @@ function images(node:ReactNode):ReactElement<ImgHTMLAttributes<HTMLImageElement>
 function channelFixture(scope:TranslationScope={key:crypto.randomUUID()}){
   const session={current:true},download=vi.fn(async():Promise<Blob>=>{throw Error('Unexpected result download');}),translate=vi.fn();
   const runtimes:{options:RuntimeOptions;dispose:ReturnType<typeof vi.fn>;manual:ReturnType<typeof vi.fn>}[]=[];
-  const channel:ChannelConnection={key:crypto.randomUUID(),scope,label:'Fixture',available:true,requiresInternet:false,allowsFeedback:false,isCurrent:()=>session.current,
+  const channel:ChannelConnection={key:crypto.randomUUID(),scope,label:'Fixture',available:true,requiresInternet:false,isCurrent:()=>session.current,
     capabilities:{modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'en',label:'English'},{id:'ja',label:'Japanese'}],limits:{max_bytes:1000,max_pixels:1000,max_dimension:1000,max_translation_ids:20},entitlements:null},
     validateResult:vi.fn(async()=>{}),readResult:vi.fn((value:Job)=>loadResultBlob({scope,job:value,isCurrent:()=>session.current,download})),dispose(){},
     createRuntime(options){
