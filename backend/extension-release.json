@@ -1,6 +1,36 @@
 {
-  "current": "0.11.3",
+  "current": "1.0.0",
   "releases": [
+    {
+      "version": "1.0.0",
+      "browser": "chrome",
+      "filename": "node-comics-1.0.0-chrome.crx",
+      "bytes": 9647331,
+      "sha256": "d5b92b40be997f1ec2cf81ce2a95fac2730992201dc1d0448f82224b3d1a6a59",
+      "content_type": "application/x-chrome-extension",
+      "path": "/downloads/node-comics-1.0.0-chrome.crx",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/1.0.0/d5b92b40be997f1ec2cf81ce2a95fac2730992201dc1d0448f82224b3d1a6a59/node-comics-1.0.0-chrome.crx"
+    },
+    {
+      "version": "1.0.0",
+      "browser": "edge",
+      "filename": "node-comics-1.0.0-edge.crx",
+      "bytes": 9614604,
+      "sha256": "1fe342b26c9074090ea2ef4a324f61181da8d48f07e2f40a70d8724b5e846a6c",
+      "content_type": "application/x-chrome-extension",
+      "path": "/downloads/node-comics-1.0.0-edge.crx",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/1.0.0/1fe342b26c9074090ea2ef4a324f61181da8d48f07e2f40a70d8724b5e846a6c/node-comics-1.0.0-edge.crx"
+    },
+    {
+      "version": "1.0.0",
+      "browser": "firefox",
+      "filename": "node-comics-1.0.0-firefox.xpi",
+      "bytes": 9714008,
+      "sha256": "72c10c564d81b1780093e0e9c9f6cff7770b703948369686d80528170d02a58a",
+      "content_type": "application/x-xpinstall",
+      "path": "/downloads/node-comics-1.0.0-firefox.xpi",
+      "download_url": "https://comics-oss.nodelane.net/releases/extensions/1.0.0/72c10c564d81b1780093e0e9c9f6cff7770b703948369686d80528170d02a58a/node-comics-1.0.0-firefox.xpi"
+    },
     {
       "version": "0.11.3",
       "browser": "chrome",
@@ -309,8 +339,8 @@
     }
   ],
   "current_by_browser": {
-    "chrome": "0.11.3",
-    "edge": "0.10.2",
-    "firefox": "0.11.3"
+    "chrome": "1.0.0",
+    "edge": "1.0.0",
+    "firefox": "1.0.0"
   }
 }
