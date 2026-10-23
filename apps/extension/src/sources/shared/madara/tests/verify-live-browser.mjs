@@ -6,13 +6,14 @@ import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 
-const args = process.argv.slice(2), usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-live-browser.mjs <siteId> <work-or-chapter-url> [second-chapter-url] [--max-pages=40]';
+const args = process.argv.slice(2), usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-live-browser.mjs <siteId> <work-or-chapter-url> [second-chapter-url] [--max-pages=40] [--source-entry]';
 if (args.includes('--help')) {console.log(usage); process.exit(0);}
 const positional = args.filter(value => !value.startsWith('--')), [siteId, inputUrl, secondUrl] = positional;
 const flags = args.filter(value => value.startsWith('--'));
 assert(positional.length >= 2 && positional.length <= 3 && /^[a-z0-9-]+$/.test(siteId), usage);
-assert(flags.length <= 1 && flags.every(value => /^--max-pages=\d+$/.test(value)), usage);
-const maxPages = Number(flags[0]?.split('=')[1] ?? 40);
+assert(flags.length <= 2 && flags.every(value => /^(?:--max-pages=\d+|--source-entry)$/.test(value)) &&
+  new Set(flags.map(value => value.split('=')[0])).size === flags.length, usage);
+const maxPages = Number(flags.find(value => value.startsWith('--max-pages='))?.split('=')[1] ?? 40);
 assert(Number.isInteger(maxPages) && maxPages >= 1 && maxPages <= 100, '--max-pages must be between 1 and 100');
 for (const input of [inputUrl, secondUrl].filter(Boolean)) {
   const url = new URL(input);
@@ -27,8 +28,9 @@ const sourceUrl = value => {try {const url = new URL(value); return url.origin +
 const redact = value => String(value).replace(/https?:\/\/[^\s"'<>]+/g, sourceUrl).slice(0, 1500);
 const checks = [], selected = [], pageErrors = [], httpFailures = [];
 const pendingSizes = new Set();
-const network = {requests: 0, imageResponses: 0, completedBodyBytes: 0, blockedServiceRequests: 0, origins: {}};
-const limits = {chapters: secondUrl ? 2 : 1, maxChapterPages: maxPages, imageResponses: 24, requests: 180, bytes: 64 * 1024 * 1024, timeoutMs: 240000};
+const network = {requests: 0, imageResponses: 0, sourcePageImageResponses: 0, completedBodyBytes: 0, blockedServiceRequests: 0, origins: {}};
+const limits = {chapters: secondUrl ? 2 : 1, maxChapterPages: maxPages, imageResponses: 24,
+  sourcePageImageResponses: flags.includes('--source-entry') ? 16 : 0, requests: 180, bytes: 64 * 1024 * 1024, timeoutMs: 240000};
 let browser, reader, watchdog, stage = 'prepare', fatal, serviceOrigin, manifest, home, activeEntry, catalogUrl, identity;
 const stop = message => {if (!fatal) {fatal = new Error(message); void browser?.close().catch(() => {});}};
 const inspect = () => reader.evaluate(async () => (await import(chrome.runtime.getURL('madara-inspect.js'))).snapshot());
@@ -151,7 +153,14 @@ export async function position(entryId:string,number:number) {const entry=await 
   browser.on('response', response => {
     const url = new URL(response.url()); if (!['http:', 'https:'].includes(url.protocol) || url.origin === serviceOrigin) return;
     const image = /^image\//i.test(response.headers()['content-type'] ?? '');
-    if (image && ++network.imageResponses > limits.imageResponses) stop('Image response budget exceeded');
+    if (image) {
+      // Native-page icons/ads are not reader pages. Keep the original 24-image reader budget,
+      // and separately bound the optional source-entry visit instead of hiding its extra traffic.
+      let nativePage = false;
+      try {nativePage = /^https?:/.test(response.request().frame().url());} catch { /* service-worker request */ }
+      const counter = nativePage ? 'sourcePageImageResponses' : 'imageResponses';
+      if (++network[counter] > limits[counter]) stop(`${counter} budget exceeded`);
+    }
     const length = Number(response.headers()['content-length'] ?? 0);
     if (length > limits.bytes) stop('A response exceeds the public-download byte budget');
     if (response.status() >= 400 && httpFailures.length < 20) httpFailures.push({origin: url.origin, status: response.status(), image});
@@ -194,7 +203,19 @@ export async function position(entryId:string,number:number) {const entry=await 
     await route.abort('blockedbyclient');
   });
   stage = 'initial product import';
-  const first = await importLink(inputUrl);
+  let first;
+  if (flags.includes('--source-entry')) {
+    const sourcePage = await browser.newPage();
+    await sourcePage.goto(inputUrl, {waitUntil: 'domcontentloaded'});
+    const button = sourcePage.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true});
+    await button.waitFor({timeout: 60000}); await sourcePage.screenshot({path: path.join(out, 'source-entry.png')});
+    const opened = browser.waitForEvent('page'); await button.click();
+    const setupPage = reader; reader = await opened;
+    await reader.waitForURL('**/reader.html?catalog=*');
+    await sourcePage.close(); await setupPage.close();
+    first = await currentEntry();
+    checks.push('Actual source-page floating import opens the product reader; later reading needs no source tab');
+  } else first = await importLink(inputUrl);
   if (identity.location.kind === 'reader') assert.equal(first.entry.sourceEntryId, identity.location.pageKey);
   await jump(1); await jump(first.entry.pageCount);
   const firstPage = Math.min(3, first.entry.pageCount), firstSize = await jump(firstPage);

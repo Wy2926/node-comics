@@ -27,6 +27,8 @@ export interface SourceSite {
   /** Confirmed main content types; independent of pricing, language and reading conditions. */
   contentTags: readonly SourceSiteContentTag[];
   search?: true;
+  /** Verified source page size when it exceeds the default search result budget; hard capped by the runtime. */
+  searchPageSize?: number;
 }
 /** Pure metadata: safe in build tools, UI and the service worker. */
 export interface SourceDefinition {

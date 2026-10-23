@@ -146,5 +146,9 @@ export function createMadaraParsers(site: MadaraSite) {
     text(textContent(work.body));
     return text(textContent(rows[2].body));
   }
-  return {prepareCatalog, parseCatalog, parsePages, ...madaraSearch(site, helpers)};
+  // Custom Madara detail/reader layouts can reuse the same strict, complete AJAX list parser.
+  function parseChapterList(html: string, slug: string, title: string, artwork: {url: string}, mangaId: string) {
+    return parseChapters(inertHtml(html), slug, title, artwork, mangaId);
+  }
+  return {prepareCatalog, parseCatalog, parseChapterList, parsePages, ...madaraSearch(site, helpers)};
 }

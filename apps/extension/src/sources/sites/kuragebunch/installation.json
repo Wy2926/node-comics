@@ -1,0 +1,7 @@
+{
+  "autoContentMatches": [],
+  "optionalContentMatches": [
+    "https://kuragebunch.com/episode/*",
+    "https://kuragebunch.com/series/*/first_episode"
+  ]
+}

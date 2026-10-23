@@ -1,0 +1,35 @@
+{
+  "repository": "https://github.com/keiyoushi/extensions-source",
+  "commit": "780153a29642a57364e894bc0850c4e76619c7de",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "distributionPath": "apps/extension/public/licenses/keiyoushi-extensions-source.txt",
+    "noticeFile": null
+  },
+  "usage": "Protocol reference only. The serial adapter extracts and reuses the existing Node Comics Comic DAYS TypeScript parser and GigaViewer decoder. No upstream Kotlin/APK or downloaded site script is executed or bundled.",
+  "scope": "Verified Comic DAYS, Shonen Jump+, Tonari no Young Jump, Kurage Bunch, Comic Gardo, Comic Action and Zenon episode catalogs, purchase_info.can_read, episode-json and source-owned series-thumbnail identities. Search uses verified public legacy/SSR HTML, not upstream GraphQL or Next.js hydration scripts. No volumes, magazines, full-site lists, purchases, rental/ticket consumption, login actions or view counters.",
+  "files": [
+    {
+      "path": "lib-multisrc/gigaviewer/src/eu/kanade/tachiyomi/multisrc/gigaviewer/GigaViewer.kt",
+      "sha256": "0d2baa896224a972f96245de78636dec5b1d0276a51cadbc7f58384991448288",
+      "purpose": "Reference for episode pagination, series identity in dedicated thumbnail URLs, public pageStructure extraction and the boundary between unavailable and readable chapters. Catalog completeness and result validation follow the existing Node Comics contract."
+    },
+    {
+      "path": "src/ja/comicgardo/build.gradle.kts",
+      "sha256": "9f78d6cd5ac5a0aef10cc177b431403f29bd4d01e00a68624f5d4e8f49ccdbe7",
+      "purpose": "Candidate site origin and engine identity; current search, catalog, public viewer and metadata independently verified against the source."
+    },
+    {
+      "path": "src/ja/comicaction/build.gradle.kts",
+      "sha256": "34cce45f09e7a74357151de45e5f99b3955c9cfef9f2016f908c2ed4d571e9c7",
+      "purpose": "Candidate site origin and engine identity; current search, catalog, public viewer and metadata independently verified against the source."
+    },
+    {
+      "path": "src/ja/zenon/build.gradle.kts",
+      "sha256": "80c9bc5079b68db8a32340367f166ddc929dac6b24ded0a1d167074db2f49ebc",
+      "purpose": "Candidate site origin and engine identity; current search, catalog, public viewer and metadata independently verified against the source."
+    }
+  ]
+}

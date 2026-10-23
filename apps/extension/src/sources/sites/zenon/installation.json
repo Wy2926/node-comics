@@ -1,0 +1,7 @@
+{
+  "autoContentMatches": [],
+  "optionalContentMatches": [
+    "https://comic-zenon.com/episode/*",
+    "https://comic-zenon.com/series/*/first_episode"
+  ]
+}

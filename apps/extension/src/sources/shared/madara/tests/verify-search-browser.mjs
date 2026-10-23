@@ -6,15 +6,19 @@ import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 
-const usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs <siteId> <query-with-2-or-more-pages> <no-result-query> [--max-pages=3] [--html-search] [--page-size=10]';
+const usage = 'Usage: node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs <siteId> <query-with-2-or-more-pages> <no-result-query> [--max-pages=3] [--html-search] [--page-size=10] [--query-param=s] [--page-param=pg]';
 const args = process.argv.slice(2);
 if (args.includes('--help')) {console.log(usage); process.exit(0);}
 const positional = args.filter(value => !value.startsWith('--')), flags = args.filter(value => value.startsWith('--'));
 const [siteId, query, emptyQuery] = positional;
 assert(positional.length === 3 && /^[a-z0-9-]+$/.test(siteId), usage);
-assert(flags.length <= 3 && flags.every(value => /^(?:--max-pages=\d+|--html-search|--page-size=\d+)$/.test(value)) &&
+assert(flags.length <= 5 && flags.every(value => /^(?:--max-pages=\d+|--html-search|--page-size=\d+|--(?:query|page)-param=[a-z][a-z0-9_]{0,30})$/.test(value)) &&
   new Set(flags.map(value => value.split('=')[0])).size === flags.length, usage);
 const htmlSearch = flags.includes('--html-search');
+const queryParam = flags.find(value => value.startsWith('--query-param='))?.split('=')[1] ?? 's';
+const pageParam = flags.find(value => value.startsWith('--page-param='))?.split('=')[1];
+assert(htmlSearch || queryParam === 's' && !pageParam, 'Query parameter overrides require HTML search');
+assert(queryParam !== pageParam, 'Query and page parameters must differ');
 const maxPages = Number(flags.find(value => value.startsWith('--max-pages='))?.split('=')[1] ?? 3);
 const pageItems = Number(flags.find(value => value.startsWith('--page-size='))?.split('=')[1] ?? 12);
 assert(Number.isInteger(pageItems) && pageItems >= 1 && pageItems <= 100, '--page-size must be 1..100; default Madara AJAX uses 12 items');
@@ -90,8 +94,10 @@ async function operation(label, action, pageIndex = 0, searchQuery = query) {
     assert.equal(requests[0].method, 'GET', 'HTML search must use a single read-only GET');
     assert.equal(requests[0].bodyBytes, 0, 'HTML search must not submit a request body');
     assert.equal(requests[0].form, undefined);
-    const expected = origin + (pageIndex === 0 ? '/' : `/page/${pageIndex + 1}/`) + '?' + new URLSearchParams({s: searchQuery});
-    assert.equal(textTargets[start], expected, 'HTML search must preserve the exact same-origin path, page and name query');
+    const expected = new URL(origin + (pageIndex === 0 || pageParam ? '/' : `/page/${pageIndex + 1}/`));
+    expected.searchParams.set(queryParam, searchQuery);
+    if (pageIndex > 0 && pageParam) expected.searchParams.set(pageParam, String(pageIndex + 1));
+    assert.equal(textTargets[start], expected.href, 'HTML search must preserve the exact same-origin path, page and name query');
   } else {
     assert.equal(requests[0].method, 'POST', 'Verified AJAX pagination must not add a preliminary GET');
     assert.match(requests[0].contentType, /^application\/x-www-form-urlencoded(?:;|$)/i);
@@ -225,9 +231,11 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
   // Collapsed sites are unmounted but remain selected; expose the full scope before changing it.
   await reader.waitForFunction(count => document.querySelectorAll('.nc-search-page .nc-search-site-option').length === count, searchableSiteCount);
-  for (const option of await panel.locator('.nc-search-site-option').all()) {
-    await option.locator('input').setChecked(await option.locator('b').innerText() === target.name);
-  }
+  // Use the real bulk controls; toggling every site individually wastes the bounded live-test time.
+  const all = panel.getByRole('button', {name: '全选', exact: true});
+  if (await all.isEnabled()) await all.click();
+  await panel.getByRole('button', {name: '反选', exact: true}).click();
+  await panel.getByText(target.name, {exact: true}).locator('..').getByRole('checkbox').check();
   await selectedSite(); assert.equal(network.requests, 0, 'Opening and configuring search must not query any source');
   assertNoLibraryWrites(await inspect());
   const input = panel.getByLabel('搜索名称', {exact: true}); await input.fill(query);

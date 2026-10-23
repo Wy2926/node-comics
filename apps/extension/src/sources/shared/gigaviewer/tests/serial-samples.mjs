@@ -1,0 +1,17 @@
+// Fixed public, read-only samples. No accounts or translation providers.
+export const samples = [
+  {id: 'shonenjumpplus', name: '少年ジャンプ＋', origin: 'https://shonenjumpplus.com',
+    cdn: 'https://cdn-ak-img.shonenjumpplus.com', query: 'SPY', episode: '10834108156648240735', series: '10834108156648240732'},
+  {id: 'tonarinoyj', name: 'となりのヤングジャンプ', origin: 'https://tonarinoyj.jp',
+    cdn: 'https://cdn-img.tonarinoyj.jp', query: 'ワンパンマン', episode: '13932016480028985383', series: '13932016480028984490'},
+  {id: 'kuragebunch', name: 'くらげバンチ', origin: 'https://kuragebunch.com',
+    cdn: 'https://cdn-img.kuragebunch.com', query: '極主夫道', episode: '10834108156629370790', series: '10834108156629370787'},
+  {id: 'comicdays', name: 'Comic DAYS', origin: 'https://comic-days.com',
+    cdn: 'https://cdn-img.comic-days.com', query: '宇宙兄弟', episode: '10834108156628505403', series: '10834108156628504270'},
+  {id: 'comicgardo', name: 'コミックガルド', origin: 'https://comic-gardo.com',
+    cdn: 'https://cdn-img.comic-gardo.com', query: 'とんでもスキル', paginationQuery: 'の', episode: '3269754496561202479', series: '3269754496561189266'},
+  {id: 'comicaction', name: 'webアクション', origin: 'https://comic-action.com',
+    cdn: 'https://cdn-img.comic-action.com', query: 'ダンジョンの中のひと', paginationQuery: 'の', episode: '13933686331665056851', series: '13933686331663374228'},
+  {id: 'zenon', name: 'ゼノンプラス', origin: 'https://comic-zenon.com',
+    cdn: 'https://cdn-img.comic-zenon.com', query: 'ワカコ酒', episode: '10834108156688950516', series: '10834108156688944838'},
+];

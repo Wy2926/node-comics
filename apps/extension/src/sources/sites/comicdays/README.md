@@ -26,7 +26,7 @@ npm --prefix apps/extension run check
 npm --prefix apps/extension test
 npm --prefix apps/extension run build
 node apps/extension/src/sources/sites/comicdays/tests/verify-http.mjs
-node apps/extension/src/sources/sites/comicdays/tests/verify-browser.mjs
+node apps/extension/src/sources/shared/gigaviewer/tests/verify-serial-browser.mjs comicdays
 $env:INLINE_SITE_ONLY = 'comicdays'
 $env:RUN_LIVE_COMICDAYS = '1'
 node scripts/verify_inline_translation.mjs
@@ -34,6 +34,6 @@ Remove-Item Env:INLINE_SITE_ONLY
 Remove-Item Env:RUN_LIVE_COMICDAYS
 ```
 
-单测覆盖 URL／伪造主机／作品归属、能力与安装元数据、完整目录与分页变化／重复／缺失、取消、锁定章节、搜索游标、空 404、页槽及解码。真实 HTTP 脚本检查分页目录、搜索、正文与专属封面；真实浏览器脚本在隔离的 MV3 插件中检查网站列表、搜索、网页导入、原图还原、页码恢复、重复导入与刷新，另外用模拟 HTTP 失败检查旧目录和进度保留。`COMICDAYS_READER_URL`、`COMICDAYS_SEARCH_QUERY` 可指定公开样本。
+单测覆盖 URL／伪造主机／作品归属、能力与安装元数据、完整目录与分页变化／重复／缺失、取消、锁定章节、搜索游标、空 404、页槽及解码。真实 HTTP 脚本检查分页目录、搜索、正文与专属封面；共享浏览器脚本在隔离的 MV3 插件中检查网站列表、搜索、网页导入、原图还原、页码恢复、重复导入与刷新，另外用模拟 HTTP 失败检查旧目录和进度保留。`GIGAVIEWER_READER_URL`、`GIGAVIEWER_SEARCH_QUERY` 可指定浏览器公开样本。目录、搜索和身份解析显式复用共享 GigaViewer 分话模块；保留既有作品及章节身份，不包含单行本／杂志。
 
-原位脚本默认使用污染画布、合成图片和本地模拟翻译服务，检查 HTTP 原图还原、失败页隔离、懒加载、原图恢复、几何位置及导航失效；`RUN_LIVE_COMICDAYS=1` 另外检查真实公开章节的画布识别、翻页、译图对齐和原图恢复。翻译服务始终模拟，不代表真实模型效果。HTTP／浏览器产物写入忽略的 `artifacts/comicdays/`，原位产物写入 `artifacts/inline-validation/`；不记录签名 CDN 查询参数。
+原位脚本默认使用污染画布、合成图片和本地模拟翻译服务，检查 HTTP 原图还原、失败页隔离、懒加载、原图恢复、几何位置及导航失效；`RUN_LIVE_COMICDAYS=1` 另外检查真实公开章节的画布识别、翻页、译图对齐和原图恢复。翻译服务始终模拟，不代表真实模型效果。本站 HTTP 产物写入忽略的 `artifacts/comicdays/`，共享浏览器产物写入 `artifacts/gigaviewer/`，原位产物写入 `artifacts/inline-validation/`；不记录签名 CDN 查询参数。

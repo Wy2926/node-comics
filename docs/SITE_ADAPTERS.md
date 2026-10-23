@@ -31,6 +31,8 @@
 
 搜索在具体 `SourceSite` 上声明 `search: true`，并提供 `network.search`，共用现有静态注册。搜索只按名称查询，不依据 `primaryLanguages` 或候选语言过滤；网站实际提供的语言作为可选结果字段返回，缺失时不推断。查询返回轻量候选页而非目录，游标、权限与交互遵循[跨语言搜索](COMIC_SEARCH_DESIGN.md)。网页起点与可被搜索是两个独立能力；`describeWork` 不返回章节标题，也不为查名字抓完整目录。
 
+单页搜索默认上限50项。源站固定页大小超过默认值且已真实核验时，在该 `SourceSite` 声明 `searchPageSize`（硬上限100）；不截断结果、不重复读取同页来凑默认大小，其他站点预算不变。
+
 网站入口由适配器声明首次适配日期 `adaptedOn`（`YYYY-MM-DD`），后续修复不改写；镜像入口按各自首次支持日期填写。已适配网站目录显示日期并按日期从新到旧排列，同日保留声明顺序。日期与标签均来自随包元数据，打开列表不额外请求源站。
 
 每个入口必须声明 `pricing`、`contentTags` 和 `isRaw`。收费分为 `free`（漫画免费阅读）、`freemium`（免费与付费内容并存，包括关联 App 的付费阅读）和 `unknown`（证据不足以判断，不等于免费）；不把捐赠、去广告或账户增值功能当成漫画收费。优先依据源站收费／会员说明；没有明确声明时，结合首页、帮助、目录及章节的公开阅读行为判断，不仅因缺少声明就保留未知，也不凭单个免费试读章或站名认定全站免费。各站 README 保留依据链接，并区分源站声明、内容推断和无法实时复核的边界；发现付费章节、会员专享阅读或提前看时应归为 `freemium`。标签是对已核验内容的分类，不承诺源站永久免费。
@@ -114,6 +116,7 @@ npm run build
 | [Comix](../apps/extension/src/sources/sites/comix/README.md) | 网页会话目录与章节清单、图片还原、12 小时目录同步；已加载正文图片／还原画布的原位翻译，在详情页与章节页嵌入导入／管理入口 |
 | [动漫屋 DM5](../apps/extension/src/sources/sites/dm5/README.md) | HTTP 完整目录／章节图片、12 小时更新；嵌入导入／管理按钮，章节 Referer；网页正文图片原位翻译 |
 | [NAVER Webtoon](../apps/extension/src/sources/sites/naver/README.md) | Webtoon／Best Challenge／Challenge 的 HTTP 目录与图片、12 小时更新；嵌入导入／管理入口；网页正文切片原位翻译 |
+| [GoodToon](../apps/extension/src/sources/sites/goodtoon/README.md) | 韩文生肉名称分页搜索、HTTP 完整 AJAX 目录／正文／封面和 12 小时同步；作品／章节及已核验首话别名导入、网页浮动入口与通用原位识图 |
 | [WEBTOON 国际站](../apps/extension/src/sources/sites/webtoons/README.md) | 七语言 Originals／Canvas 搜索、HTTP 完整公开目录／正文／封面与 12 小时更新；网页导入及已加载正文原位翻译 |
 | [WebtoonScan](../apps/extension/src/sources/sites/webtoonscan/README.md) | 复用 Madara 静态 HTML 解析的名称分页搜索、网页会话完整目录／图片、专门封面与 12 小时更新；作品／章节浮动导入，标签页识别沿用通用规则 |
 | [LHTranslation](../apps/extension/src/sources/sites/lhtranslation/README.md) | Madara 共享 AJAX 名称分页搜索与完整目录、列表正文／封面和 12 小时更新；作品／章节浮动导入与通用原位识图 |
@@ -159,6 +162,12 @@ npm run build
 | [RawKuro / Raw1001](../apps/extension/src/sources/sites/rawkuro/README.md) | 双域同站身份、HTTP 分页名称搜索、完整静态目录／封面与索引排序正文、12 小时更新；作品／章节浮动导入，标签页识图复用通用规则 |
 | [Sunday Webry](../apps/extension/src/sources/sites/sundaywebry/README.md) | 名称搜索、HTTP 完整分页目录／正文／封面、GigaViewer 图片还原、12 小时更新；裸章节归属、网页导入和已加载正文原位翻译 |
 | [Comic DAYS](../apps/extension/src/sources/sites/comicdays/README.md) | HTTP 名称搜索、完整公开目录／正文／封面与 12 小时同步；作品／章节导入与网页浮动入口，阅读器及当前标签页原位翻译复用共享 GigaViewer 引擎 |
+| [少年ジャンプ＋](../apps/extension/src/sources/sites/shonenjumpplus/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不购买或解锁付费内容 |
+| [となりのヤングジャンプ](../apps/extension/src/sources/sites/tonarinoyj/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原 |
+| [くらげバンチ](../apps/extension/src/sources/sites/kuragebunch/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不购买或解锁付费内容 |
+| [コミックガルド](../apps/extension/src/sources/sites/comicgardo/README.md) | 日语生肉 SSR 名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不消耗点数或阅读券 |
+| [webアクション](../apps/extension/src/sources/sites/comicaction/README.md) | 日语生肉 SSR 名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不购买或解锁付费内容 |
+| [ゼノンプラス](../apps/extension/src/sources/sites/zenon/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不购买或解锁付费内容 |
 | [ComicWalker / カドコミ](../apps/extension/src/sources/sites/comicwalker/README.md) | HTTP 名称搜索、完整公开目录／正文／封面、图片还原与 12 小时同步；作品／章节导入、浮动入口及有限 canvas 下一页预翻 |
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 名称搜索、HTTP 完整分页目录／封面、公开免费正文还原与 12 小时同步；作品／章节浮动导入，标签页识图复用通用规则，不自动消耗体力、硬币或阅读券 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |

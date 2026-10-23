@@ -125,6 +125,16 @@
       "path": "src/en/s2manga/src/eu/kanade/tachiyomi/extension/en/s2manga/S2Manga.kt",
       "sha256": "76e81ea0b8d5d496a28f628bcd22a5f4d4aca3fcabc4f2e17da4a4c38960bcdb",
       "purpose": "Confirms the default static catalog and trimmed image addresses. Live server-populated AJAX reader navigation and content-search pagination are verified independently."
+    },
+    {
+      "path": "src/ko/goodtoon/build.gradle.kts",
+      "sha256": "1860e4a07836a3d11629261d53fb9fb9b7dc6568849d890c39de24641c933536",
+      "purpose": "Reference for the Korean source and Madara declaration. The current www.goodtoon008.com origin was verified live; the old configured domain is not automatically registered as a mirror."
+    },
+    {
+      "path": "src/ko/goodtoon/src/eu/kanade/tachiyomi/extension/ko/goodtoon/GoodToon.kt",
+      "sha256": "11ec2e60aa4e88cbc2a1df6594293a5f4dc6b7d0b10e0e7744d1f068725c525b",
+      "purpose": "Reference for MangaAjax chapter lists, q/pg HTML search, custom work fields and direct reader images. Node Comics reuses only the complete chapter-list parser; site-owned search/reader identities, contiguous slots, final-ad exclusion and public 1권 alias were verified independently."
     }
   ]
 }

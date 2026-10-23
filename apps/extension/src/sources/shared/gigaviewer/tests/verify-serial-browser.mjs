@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {cp, mkdir, mkdtemp, writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {samples} from './serial-samples.mjs';
 
-const root = process.cwd(), base = path.join(root, 'artifacts/comicdays/browser');
+const sample = samples.find(s => s.id === (process.argv[2] || 'comicdays'));
+assert(sample && process.argv.length <= 3, 'Usage: node verify-serial-browser.mjs [site-id]');
+
+const root = process.cwd(), base = path.join(root, 'artifacts/gigaviewer/browser', sample.id);
 await mkdir(base, {recursive: true});
 const out = await mkdtemp(path.join(base, 'run-')), extension = path.join(out, 'extension');
 await cp(path.join(root, 'apps/extension/.output/chrome-mv3'), extension, {recursive: true});
@@ -13,7 +17,7 @@ await writeFile(probe, `export {catalog} from '${source}/comics/repositories/ind
 export {readWebsiteCatalog} from '${source}/comics/application/website-catalog.ts';
 export {applyCatalogRefresh} from '${source}/comics/application/catalog-service.ts';
 export {listSearchSites, searchSource, readSearchCover, releaseSourceSearchSession, sourceLocation, sourceImage} from '${source}/sources/index.ts';
-export {network} from '${source}/sources/sites/comicdays/network.ts';`);
+export {network} from '${source}/sources/sites/${sample.id}/network.ts';`);
 const {build} = createRequire(path.join(root, 'apps/extension/package.json'))('vite');
 await build({configFile: false, root: path.join(root, 'apps/extension'), logLevel: 'error', build: {
   outDir: extension, emptyOutDir: false, lib: {entry: probe, formats: ['es'], fileName: () => 'verify-source.mjs'},
@@ -24,10 +28,12 @@ const context = await chromium.launchPersistentContext(path.join(out, 'profile')
   viewport: {width: 1440, height: 1000}, reducedMotion: 'reduce',
   args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension]});
 context.setDefaultTimeout(30000);
+await context.addInitScript(() => {if (location.protocol === 'chrome-extension:')
+  localStorage.setItem('nc-release-notes-version', chrome.runtime.getManifest().version);});
 const checks = [], errors = [], sourceFailures = [];
-const safeError = value => String(value).replace(/https:\/\/cdn-img\.comic-days\.com\/\S+/g, '[Comic DAYS CDN resource]');
+const safeError = value => String(value).replace(/https?:\/\/[^\s"']+/g, '[source URL]');
 const resourceName = value => {const url = new URL(value); return url.origin + url.pathname;};
-const isSourceRequest = value => ['comic-days.com', 'cdn-img.comic-days.com'].includes(new URL(value).hostname);
+const isSourceRequest = value => [sample.origin, sample.cdn].includes(new URL(value).origin);
 context.on('page', page => page.on('pageerror', error => {
   if (page.url().startsWith('chrome-extension:')) errors.push(safeError(error.message));
 }));
@@ -52,6 +58,7 @@ const waitImage = page => reader.waitForFunction(({id, index}) => {
 }, {id: details.entryId, index: page - 1}, {timeout: 60000});
 async function jump(page) {
   await reader.getByLabel('跳转页码', {exact: true}).fill(String(page), {force: true});
+  await reader.getByLabel('跳转页码', {exact: true}).press('Enter');
   await waitImage(page);
   await reader.waitForFunction(async ({id, index}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.mjs')), entry = await catalog.get('entries', id);
@@ -72,32 +79,42 @@ try {
   });
   await setup.reload();
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
-  await setup.getByRole('heading', {name: 'Comic DAYS', exact: true}).waitFor();
+  const siteHeading = setup.getByRole('heading', {name: sample.name, exact: true});
+  await siteHeading.waitFor(); await siteHeading.scrollIntoViewIfNeeded();
   await setup.screenshot({path: path.join(out, 'site-directory.png')});
-  const query = process.env.COMICDAYS_SEARCH_QUERY || 'ハコヅメ';
-  const found = await setup.evaluate(async query => {
-    const p = await import(chrome.runtime.getURL('verify-source.mjs')), sessionId = 'comicdays-browser-search';
+  const query = process.env.GIGAVIEWER_SEARCH_QUERY || sample.query;
+  const found = await setup.evaluate(async ({query, sourceId}) => {
+    const p = await import(chrome.runtime.getURL('verify-source.mjs')), sessionId = sourceId + '-browser-search';
     try {
-      const results = await p.searchSource('comicdays', {siteId: 'comicdays', query}, {sessionId});
+      const results = await p.searchSource(sourceId, {siteId: sourceId, query}, {sessionId});
       const hit = results.items.find(hit => hit.cover);
       if (!hit) throw Error('Live search has no artwork');
       const cover = await p.readSearchCover(hit);
-      return {registered: p.listSearchSites().some(site => site.key === 'comicdays:comicdays'), hits: results.items.length,
-        owned: results.items.every(hit => hit.sourceId === 'comicdays' && hit.siteId === 'comicdays'),
+      return {registered: p.listSearchSites().some(site => site.key === sourceId + ':' + sourceId), hits: results.items.length,
+        owned: results.items.every(hit => hit.sourceId === sourceId && hit.siteId === sourceId),
         coverBytes: cover.size, comics: (await p.catalog.list('comics')).length};
     } finally {p.releaseSourceSearchSession(sessionId);}
-  }, query);
+  }, {query, sourceId: sample.id});
   assert(found.registered && found.hits > 0 && found.owned && found.coverBytes > 1000 && found.comics === 0);
   await setup.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = setup.locator('.nc-search-page');
-  for (const option of await search.locator('.nc-search-site-option').all())
-    await option.locator('input').setChecked((await option.innerText()).includes('Comic DAYS'));
+  const expand = search.locator('.nc-search-scope-expand');
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
+  const all = search.getByRole('button', {name: '全选', exact: true});
+  if (await all.isEnabled()) await all.click();
+  await search.getByRole('button', {name: '反选', exact: true}).click();
+  await search.locator('.nc-search-site-option').filter({hasText: sample.name}).locator('input').check();
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'true') await expand.click();
   const input = search.getByPlaceholder('输入漫画名称或别名');
   await input.fill(query); await input.press('Enter');
   await search.locator('.nc-search-result').first().waitFor({timeout: 60000});
+  const searchCover = search.locator('.nc-search-result-cover img').first();
+  await searchCover.waitFor({timeout: 30000});
+  await searchCover.evaluate(image => image.decode());
+  assert(await searchCover.evaluate(image => image.naturalWidth > 0 && image.naturalHeight > 0));
   await setup.screenshot({path: path.join(out, 'search.png')});
-  checks.push('Website list and live name search return Comic DAYS candidates and artwork without creating shelf records');
-  const chapter = process.env.COMICDAYS_READER_URL || 'https://comic-days.com/episode/12207421984001216436';
+  checks.push('Website list and live name search return source candidates and artwork without creating shelf records');
+  const chapter = process.env.GIGAVIEWER_READER_URL || `${sample.origin}/episode/${sample.episode}`;
   const site = await context.newPage();
   await site.goto(chapter, {waitUntil: 'domcontentloaded'});
   const button = site.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true});
@@ -107,16 +124,16 @@ try {
   await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
   await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
-  details = await reader.evaluate(async chapter => {
+  details = await reader.evaluate(async ({chapter, sourceId}) => {
     const {catalog, sourceLocation} = await import(chrome.runtime.getURL('verify-source.mjs'));
-    const comic = (await catalog.list('comics')).find(comic => comic.source.connectionId === 'website:comicdays');
-    if (!comic) throw Error('Comic DAYS import did not create a work');
+    const comic = (await catalog.list('comics')).find(comic => comic.source.connectionId === 'website:' + sourceId);
+    if (!comic) throw Error('Source import did not create a work');
     const entries = await catalog.listEntries(comic.id, {limit: 10000});
     const entry = entries.find(entry => entry.sourceEntryId === sourceLocation(chapter)?.pageKey);
     if (!entry) throw Error('Imported work does not own the source episode');
     return {comicId: comic.id, entryId: entry.id, title: comic.title, catalogUrl: comic.sourceUrl,
       chapters: entries.length, total: entry.pageCount};
-  }, chapter);
+  }, {chapter, sourceId: sample.id});
   assert(details.chapters > 0 && details.total > 0);
   await waitImage(1);
   details.decoding = await reader.evaluate(async ({chapter, id}) => {
@@ -148,7 +165,7 @@ try {
     return result;
   }, {chapter, id: details.entryId});
   assert(details.decoding.exact, 'Displayed page pixels differ from the independent source-image reconstruction');
-  const pages = [...new Set([1, Math.min(3, details.total), details.total])];
+  const pages = [...new Set([1, Math.ceil(details.total / 2), details.total])];
   for (const page of pages) await jump(page);
   const restorePage = Math.min(3, details.total);
   await jump(restorePage);
@@ -189,12 +206,12 @@ try {
     const {sourceLocation} = await import(chrome.runtime.getURL('verify-source.mjs'));
     const series = sourceLocation(catalogUrl)?.catalog?.key?.split(':').at(-1);
     if (!series) throw Error('Catalog failure probe has no work identity');
-    globalThis.comicdaysFailureFetch = globalThis.fetch;
+    globalThis.gigaFailureFetch = globalThis.fetch;
     globalThis.fetch = (input, options) => {
       const url = new URL(typeof input === 'string' ? input : input.url ?? input, location.href);
-      return url.hostname === 'comic-days.com' && url.pathname === '/api/viewer/readable_product_pagination_information' &&
+      return url.origin === new URL(catalogUrl).origin && url.pathname === '/api/viewer/readable_product_pagination_information' &&
         url.searchParams.get('aggregate_id') === series ? Promise.resolve(new Response('Unavailable', {status: 503}))
-        : globalThis.comicdaysFailureFetch(input, options);
+        : globalThis.gigaFailureFetch(input, options);
     };
   }, details.catalogUrl);
   const beforeFailure = await state();
@@ -206,7 +223,7 @@ try {
   }, details.comicId);
   assert(failed, 'Injected catalog HTTP failure should reject refresh');
   assert.deepEqual(await state(), beforeFailure);
-  await reader.evaluate(() => {globalThis.fetch = globalThis.comicdaysFailureFetch; delete globalThis.comicdaysFailureFetch;});
+  await reader.evaluate(() => {globalThis.fetch = globalThis.gigaFailureFetch; delete globalThis.gigaFailureFetch;});
   checks.push('Simulated catalog HTTP failure preserves the complete catalog and saved reading position');
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill(chapter);

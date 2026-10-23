@@ -1,0 +1,7 @@
+{
+  "autoContentMatches": [],
+  "optionalContentMatches": [
+    "https://comic-action.com/episode/*",
+    "https://comic-action.com/series/*/first_episode"
+  ]
+}

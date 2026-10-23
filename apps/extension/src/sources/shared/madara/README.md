@@ -2,13 +2,14 @@
 
 在浏览器前端执行的 TypeScript HTML 解析器与只读请求编排。实现复用项目已有代码，并参考 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 的 Madara 协议；不运行、加载或打包 Kotlin／APK，也不是上游全部 Madara 功能的移植。
 
-当前显式接入 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga、Monopoly Scan、GakaMangas、Hunlight Comics、Anisa Scans 和 S2Manga / S2READ 十个站点。固定上游版本中的 249 个 Madara 源模块是参考范围，不代表其余网站已经注册、适配或验证可用。
+当前显式接入 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga、Monopoly Scan、GakaMangas、Hunlight Comics、Anisa Scans 和 S2Manga / S2READ；[GoodToon](../../sites/goodtoon/README.md)仅复用惯用 HTML 工具和完整 AJAX 章节列表解析。固定上游版本中的 249 个 Madara 源模块是参考范围，不代表其余网站已经注册、适配或验证可用。
 
 ## 接入与职责
 
 站点提供 [MadaraSite](config.ts) 所需的来源身份、地址识别与构造、阅读方向和图片地址校验器。域名、稳定 ID、图片策略、普通 HTTP／网页会话选择、安装入口和原位识图仍归站点及公共运行时；引擎不声明具体主机、不注册站点、不认领未知网页。
 
 - [createMadaraParsers](index.ts) 是纯解析入口：接收原始 HTTP 响应，返回搜索、目录和正文结果，不请求网络。不能用执行源站脚本后的 DOM 快照代替原始响应，脚本可能删除或改写身份字段。
+- `parseChapterList` 供 GoodToon 在独立校验详情页身份、名称和封面后复用完整 AJAX 列表约束；不放宽现有站点的详情／正文规则。GoodToon 的卡片搜索、独立阅读导航和无 `page-break` 图片属于站点实现，不向共享引擎增加站点分支。
 - [createMadaraNetwork](network.ts) 复用同一解析器，仅通过调用方的 `context.request` 执行声明的 GET／只读表单 POST，并在请求前后检查取消。没有直接 `fetch`、浏览器 API、隐藏请求通道、缓存或失败后自动切换。
 - [madaraImageUrl](image.ts) 提供共享地址语法检查；实际图片权限、Referer、字节读取和解码沿用公共图片管线。
 - [createMadaraWork](work.ts) 供 Manga Eclipse、Bun Manga、LHTranslation、GakaMangas、Hunlight Comics、Anisa Scans 和 S2READ 的页面元数据入口显式调用：核对当前作品／章节 canonical，再从面包屑中精确指向所属作品的链接读取名称；重复导航须名称一致。只读取当前 DOM，不使用章节标题、通用文档标题或 OG 标题，不抓取目录；原位识图仍由通用识图处理。
@@ -27,6 +28,7 @@
 | [Hunlight Comics](../../sites/hunlightcomics/README.md) | `catalog: 'ajax'`，作品路径 `/m/` | `reader: 'ajax-select'` | `search: 'ajax'`，12 项分页 |
 | [Anisa Scans](../../sites/anisascans/README.md) | `catalog: 'ajax'` | `reader: 'ajax-breadcrumb'`，已绑定作品的面包屑章节名 | `search: 'ajax'`，12 项分页 |
 | [S2Manga / S2READ](../../sites/s2manga/README.md) | 静态列表 | `reader: 'ajax-select'`，预填充选择框 | `search: 'ajax'`，12 项分页 |
+| [GoodToon](../../sites/goodtoon/README.md) | 站点详情 + `parseChapterList` | 站点独立解析，不调用共享正文解析器 | 站点 HTML `q`／`pg`，63 项分页 |
 
 ## 已实现的协议边界
 
@@ -63,6 +65,8 @@ node apps/extension/src/sources/shared/madara/tests/verify-live-browser.mjs <sit
 
 脚本使用隔离 profile 和正式产品链接导入入口，不改写源站响应、不注入目录／图片／阅读位置；校验最多两章的首页、末页及选定页实际解码、封面、小窗口阅读、关闭重开位置及两次目录刷新幂等。任何被检查的图片失败都会中止，不能跳过坏页后宣称该样本通过。随后请求本站明确不存在的测试作品路径，核对真实错误提示、已有目录／位置不变，以及有效链接恢复阅读；该请求可能产生预期的 HTTP 404，单独记录在报告中。默认每章最多 40 页，限制总请求、图片响应、流量和运行时长，超过预算即失败；仅阻断产品账号／模型服务。报告和截图存入忽略的 `artifacts/madara-live-browser/`。这是桌面浏览器验收，不代表整章所有图片、实机移动端、撤权恢复、原位翻译或真实模型效果。
 
+`--source-entry` 可将第一次导入改为真实源站浮动按钮，随后关闭源站标签页；源站原生页面图标／广告单独限16张并计入总字节／请求预算，阅读器图片仍限24张，分别记录。`--max-pages=80` 可显式选择较长样本，硬上限100页且不提高阅读器图片请求预算。不存在的测试路径也可能在来源识别阶段被拒绝，应区分本地错误与真实 HTTP 失败。
+
 AJAX 搜索同样使用隔离 profile 和正式产品界面，需先构建并配置上述浏览器环境变量：
 
 ```powershell
@@ -74,5 +78,7 @@ node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs mo
 ```
 
 每次只勾选指定站点，实际提交名称；出现「加载更多」才逐页点击直至末页，单页结果直接核验终点，不强制小站点凑出第二页。报告区分是否实际执行分页。然后重新搜索不存在名称；检查每页唯一 POST、查询和零基页码、来源归属、跨页不重复、顺序保留、终点按钮消失和真实封面解码，并断言没有读取候选详情或写入书架／目录。页数是验收上限而非固定源站结果，超限即失败，不自动扩展扫描；默认最多 3 页，显式配置最多 10 页，另限 90 请求、18 张封面响应、32 MiB 和 180 秒。只阻断产品账号／模型服务，不替换源站响应、不改 UA 或导入用户 Cookie。报告和截图写入忽略的 `artifacts/madara-search-browser/`；这是实际桌面无头扩展 UI 与真实服务验证，不是用户现有浏览器、移动端或模型验收。
+
+公开 GET 搜索用 `--html-search` 并声明 `--page-size`；默认核对 `s` 与 `/page/n/`，`--query-param=q --page-param=pg` 可核对 GoodToon 的查询参数分页。每页仍严格要求一次实际请求、正确查询和页码，不绕过产品搜索运行时。
 
 在仓库根执行 `node apps/extension/src/sources/shared/madara/tests/verify-performance.mjs <基准提交>`，对比基准与当前 WebtoonScan 路径的 1000 章目录、100 页正文和 20 条搜索结果。脚本核对输出及单次请求数量，记录解析耗时和独立网络入口打包体积，产物保存在忽略的 `artifacts/madara-performance/`。这是自制 HTML 的离线对比，不代表 AJAX 网络时延、浏览器渲染、整包体积、图片解码或模型效果。

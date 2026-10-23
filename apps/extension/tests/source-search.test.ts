@@ -84,6 +84,24 @@ describe('name-only search and candidate authority', () => {
     site().search = undefined;
     expect(() => validateSearchCapability(fixture.definitions[0], site())).toThrow();
   });
+  it('accepts an explicitly verified page size without changing the default or hard limit', async () => {
+    const rows = Array.from({length: 63}, (_, index) => {
+      const name = 'work' + String.fromCharCode(97 + Math.floor(index / 26), 97 + index % 26);
+      return hit({catalogId: 'fixture:' + name, catalogUrl: 'https://fixture.test/book/' + name});
+    });
+    expect(() => validate(rows)).toThrow('SOURCE_SEARCH_INVALID');
+    site().searchPageSize = 63;
+    fixture.networks.fixture.search = async () => ({items: rows});
+    expect((await searchSource('fixture', query(), {sessionId: 'session'})).items).toHaveLength(63);
+    expect(() => validate([...rows, hit()])).toThrow('SOURCE_SEARCH_INVALID');
+    for (const size of [0, -1, 1.5, 101, NaN, Infinity]) {
+      site().searchPageSize = size;
+      expect(() => validateSearchCapability(fixture.definitions[0], site())).toThrow('SOURCE_SEARCH_INVALID');
+    }
+    site().searchPageSize = undefined;
+    expect(validate(rows.slice(0, 50)).items).toHaveLength(50);
+    expect(() => validate(rows.slice(0, 51))).toThrow('SOURCE_SEARCH_INVALID');
+  });
 });
 
 describe('single-site search runtime', () => {

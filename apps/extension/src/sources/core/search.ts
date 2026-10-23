@@ -4,7 +4,7 @@ import {SourceSearchError,
 import {resolveSource} from './resolve';
 import {safeImageUrl} from '../shared/urls';
 
-export const sourceSearchLimits = {queryCharacters: 256, pageItems: 50, cursorCharacters: 4096, pageTimeoutMs: 15_000} as const;
+export const sourceSearchLimits = {queryCharacters: 256, pageItems: 50, maxPageItems: 100, cursorCharacters: 4096, pageTimeoutMs: 15_000} as const;
 const invalid = (): never => {throw new SourceSearchError('SOURCE_SEARCH_INVALID');};
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && !!value.trim() &&
   [...value].length <= max && !/[\u0000-\u001f\u007f]/u.test(value);
@@ -22,6 +22,8 @@ export function normalizeSourceSearchRequest(input: SourceSearchRequest): Source
 
 export function validateSearchCapability(definition: SourceDefinition, site: SourceSite): true {
   if (site.search !== true || !definition.capabilities.importable || !definition.capabilities.catalog) return invalid();
+  if (site.searchPageSize !== undefined && (!Number.isSafeInteger(site.searchPageSize) ||
+      site.searchPageSize < 1 || site.searchPageSize > sourceSearchLimits.maxPageItems)) return invalid();
   return true;
 }
 function stringList(value: unknown, maxItems: number, maxLength: number): string[] | undefined {
@@ -34,7 +36,7 @@ export function validateSearchPage(input: unknown, definition: SourceDefinition,
   registry: readonly SourceDefinition[]): {items: SourceSearchResult[]; nextCursor?: string} {
   validateSearchCapability(definition, site);
   const page = input as SourceSearchPage;
-  if (!page || !Array.isArray(page.items) || page.items.length > sourceSearchLimits.pageItems ||
+  if (!page || !Array.isArray(page.items) || page.items.length > (site.searchPageSize ?? sourceSearchLimits.pageItems) ||
     page.nextCursor !== undefined && !text(page.nextCursor, sourceSearchLimits.cursorCharacters)) return invalid();
   const items = new Map<string, SourceSearchResult>();
   for (const raw of page.items) {
