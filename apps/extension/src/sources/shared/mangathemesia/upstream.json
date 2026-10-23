@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. Node Comics implements inert TypeScript HTML/JSON parsing through its existing source contracts and caller transport; upstream Kotlin/APK code is not executed or bundled.",
-  "scope": "Explicitly registered Lagoon Scans, UnderTranslations and Arena Scans: public WordPress name search, complete static chapterlist, dedicated work cover, canonical and allc chapter ownership, unprotected full-mode ts_reader.run JSON with one selected image source. No source scripts, view-count POSTs, account actions, protected-page unlocks, novels, alternate randomized slugs, DOM-only or base64/obfuscated reader variants are implemented.",
+  "scope": "Explicitly registered Lagoon Scans, UnderTranslations, Arena Scans, Akaza Scans, Aster Scans and King of Shojo: public WordPress name search, complete static chapterlist, dedicated work cover, consistent canonical and allc chapter ownership, full-mode ts_reader.run JSON with one image source. Akaza Scans and Aster Scans explicitly use the verified legacy document-ready wrapper without modern access fields, requiring exact agreement between public HTML images and JSON slots despite the stale default-source label. King of Shojo explicitly uses modern access flags with contentmode minimal and exact public HTML/JSON agreement. No source scripts, view-count POSTs, account actions, protected-page unlocks, novels, alternate randomized slugs, DOM-only or base64/obfuscated reader variants are implemented.",
   "files": [
     {
       "path": "lib-multisrc/mangathemesia/src/eu/kanade/tachiyomi/multisrc/mangathemesia/MangaThemesia.kt",
@@ -55,6 +55,36 @@
       "path": "src/en/arenascans/build.gradle.kts",
       "sha256": "5a09d344ce9f526cce31e104cbaa95d68c5968a48cef66cfbf4f12008dd8eabd",
       "purpose": "Reference for the source name, English language, origin and theme declaration."
+    },
+    {
+      "path": "src/en/akazascans/src/eu/kanade/tachiyomi/extension/en/akazascans/AkazaScans.kt",
+      "sha256": "d6e52fa3866a80a4be622d9a07ee71ddc8581eab9781fa21596aaf2e268a9e27",
+      "purpose": "Confirms Akaza Scans uses MangaThemesia without overrides; the legacy wrapper and matching public HTML/JSON lists were verified independently against the site."
+    },
+    {
+      "path": "src/en/akazascans/build.gradle.kts",
+      "sha256": "6ea7ff379ff6487335c344eecb477207ac4c74c894bfa5701259d44242a9539f",
+      "purpose": "Reference for the source name, English language, origin and theme declaration."
+    },
+    {
+      "path": "src/en/asterscans/src/eu/kanade/tachiyomi/extension/en/asterscans/AsterScans.kt",
+      "sha256": "0a88cb5a84b48a9f82d715458aa2ba9355c41efcc56e8b0de6943d73d3b2748d",
+      "purpose": "Confirms Aster Scans uses MangaThemesia without overrides; the legacy wrapper and matching public HTML/JSON lists were verified independently against the site."
+    },
+    {
+      "path": "src/en/asterscans/build.gradle.kts",
+      "sha256": "ce2b60bcb31211613de68615cc6340de4df8279aebd9589f46189cf4bcd187c0",
+      "purpose": "Reference for the source name, English language, origin and theme declaration."
+    },
+    {
+      "path": "src/en/kingofshojo/build.gradle.kts",
+      "sha256": "08c9f66131a22c003bf404274545dba4b170eec24dd0bdf7a6f697f1c51c16ea",
+      "purpose": "Reference for source name, origin, English language and theme declaration."
+    },
+    {
+      "path": "src/en/kingofshojo/src/eu/kanade/tachiyomi/extension/en/kingofshojo/KingofShojo.kt",
+      "sha256": "6c89070ee7b00ba734f1798479397f124c0b39f2ac62e6ed6105cef37854bae4",
+      "purpose": "Confirms the standard MangaThemesia base; the full minimal reader and matching public HTML/JSON lists were verified independently against raw live responses."
     }
   ]
 }

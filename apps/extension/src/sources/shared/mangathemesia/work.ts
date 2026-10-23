@@ -13,9 +13,10 @@ export function mangaThemesiaWork(site: WorkSite): DescribeSourceWork {
       const current = site.location(new URL(context.location.url)), doc = context.document;
       if (!current) return unavailable;
       const canonicals = doc.querySelectorAll('link[rel="canonical"]');
-      if (canonicals.length !== 1) return unavailable;
-      const href = canonicals[0].getAttribute('href');
-      const canonical = href ? site.location(new URL(href, context.location.url)) : null;
+      const hrefs = [...canonicals].map(element => element.getAttribute('href'));
+      if (!hrefs.length || !hrefs[0] || hrefs.some(href => href !== hrefs[0])) return unavailable;
+      const href = hrefs[0];
+      const canonical = site.location(new URL(href, context.location.url));
       if (!canonical || canonical.chapterSlug !== current.chapterSlug ||
         !current.chapterSlug && canonical.catalogSlug !== current.catalogSlug) return unavailable;
 

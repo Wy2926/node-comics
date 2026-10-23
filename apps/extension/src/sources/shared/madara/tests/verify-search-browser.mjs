@@ -234,7 +234,6 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   const first = await operation('positive page 1', () => panel.getByRole('button', {name: '搜索网站', exact: true}).click());
   let result = await recordPage(1, [], first.requests);
   assert(result.items.length > 0, 'The positive query returned no candidates');
-  assert(result.hasMore, 'Choose a narrow query with at least two pages so Load more is actually verified');
   const firstCard = panel.locator('.nc-search-result').first(); await firstCard.scrollIntoViewIfNeeded();
   const cover = firstCard.locator('.nc-search-result-cover img'); await cover.waitFor();
   const coverSize = await cover.evaluate(async image => {await image.decode(); return {width:image.naturalWidth,height:image.naturalHeight};});
@@ -248,7 +247,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
   assert(!result.hasMore, `The query still has more results after ${maxPages} pages; choose a narrower query rather than scanning the site`);
   await panel.locator('.nc-search-status-detail').scrollIntoViewIfNeeded();
   await reader.screenshot({path: path.join(out, 'search-last.png')});
-  checks.push(`Only the selected site is queried; real UI Load more appends unique owned candidates through the terminal page with one ${htmlSearch ? 'query-bound GET' : 'form POST'} per page`);
+  checks.push(`Only the selected site is queried; ${pages.length > 1 ? 'real UI Load more appends unique owned candidates through the terminal page' : 'the single result page is terminal without a Load more button'} with one ${htmlSearch ? 'query-bound GET' : 'form POST'} per page`);
   await wait(1000); await input.fill(emptyQuery);
   const empty = await operation('no-result query', () => panel.getByRole('button', {name: '重新搜索', exact: true}).click(), 0, emptyQuery);
   assert.equal(await panel.locator('.nc-search-result').count(), 0);

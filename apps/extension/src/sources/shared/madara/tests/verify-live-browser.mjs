@@ -81,7 +81,10 @@ async function navigate(section) {
   // Use the actual reader Back button first, then the normal product navigation.
   const back = reader.locator('button[data-reader-back-trigger="true"]');
   if (await back.count()) {
-    if (await reader.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden'))) await reader.keyboard.press('Escape');
+    // Resizing/decoding can outlive the idle timer between the visibility check and click.
+    // Reveal unconditionally and keep real keyboard focus on the control until it is clicked.
+    await reader.keyboard.press('Escape');
+    await back.focus();
     await back.click();
     await reader.locator('.nc-reader').waitFor({state: 'detached'});
   }
@@ -240,6 +243,25 @@ export async function position(entryId:string,number:number) {const entry=await 
     await decoded(selected.at(-1).testedPage);
   }
   checks.push('Two ordinary catalog-link reimports refresh without duplicate comics/chapters, false updates or lost reading positions');
+  stage = 'unavailable work and recovery';
+  const beforeFailure = await inspect();
+  const missing = new URL(catalogUrl);
+  missing.pathname = missing.pathname.replace(/[^/]+\/$/, 'nodelane-validation-missing-comic-7f92d1/');
+  missing.search = ''; missing.hash = '';
+  assert.notEqual(missing.href, catalogUrl, 'The negative probe must not reuse the imported work');
+  await navigate('sites');
+  await reader.getByLabel('通过链接添加漫画', {exact: true}).fill(missing.href);
+  await reader.getByRole('button', {name: '添加到书架', exact: true}).click();
+  await reader.locator('.nc-site-link-import [role="alert"]').waitFor({timeout: 45000});
+  const failed = await inspect(); assertState(failed);
+  assert.deepEqual(failed.entries, beforeFailure.entries);
+  assert.deepEqual(stablePositions(failed), stablePositions(beforeFailure));
+  await reader.screenshot({path: path.join(out, 'unavailable-source.png')});
+  const recovered = await importLink(catalogUrl);
+  assert.equal(recovered.entry.id, selected.at(-1).entryId);
+  assert.deepEqual(stablePositions(recovered.state), stablePositions(beforeFailure));
+  await decoded(selected.at(-1).testedPage);
+  checks.push('An unavailable source work surfaces a real import error without altering existing entries/positions; a valid link recovers reading');
   await Promise.all([...pendingSizes]);
   assert.equal(fatal, undefined); assert.deepEqual(pageErrors, []);
   assert(network.requests > 0 && network.imageResponses > 0, 'Real public HTML/image HTTP must have been observed');

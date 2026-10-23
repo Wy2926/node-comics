@@ -18,7 +18,7 @@ await build({configFile: false, root: extension, logLevel: 'error',
     load(id) {
       if (id !== virtual) return;
       return `export {createMangaThemesiaNetwork} from ${JSON.stringify(source + '/network.ts')};
-        export {fixtureSite,catalogHtml,readerHtml,searchHtml,work,chapter,pageUrl} from ${JSON.stringify(source + '/tests/fixtures.ts')};`;
+        export {fixtureSite,catalogHtml,readerHtml,legacyReaderHtml,minimalReaderHtml,searchHtml,work,chapter,pageUrl} from ${JSON.stringify(source + '/tests/fixtures.ts')};`;
     },
   }],
   build: {outDir: out, emptyOutDir: false, reportCompressedSize: false,
@@ -26,6 +26,8 @@ await build({configFile: false, root: extension, logLevel: 'error',
 });
 const fixture = await import(pathToFileURL(path.join(out, 'fixtures.mjs')).href);
 const site = fixture.fixtureSite('performance'), engine = fixture.createMangaThemesiaNetwork(site);
+const legacy = fixture.createMangaThemesiaNetwork({...site, reader: 'legacy-ready'});
+const minimal = fixture.createMangaThemesiaNetwork({...site, reader: 'minimal'});
 const catalogUrl = site.catalogUrl(fixture.work), readerUrl = site.chapterUrl(fixture.chapter, fixture.work);
 const input = {siteId: site.id, query: 'performance'};
 const cases = [
@@ -33,14 +35,21 @@ const cases = [
     target: catalogUrl, expected: 1000, iterations: 50, parse: engine.parseCatalog, count: value => value.entries.length},
   {operation: 'pages', html: fixture.readerHtml(site, Array.from({length: 100}, (_, i) => fixture.pageUrl(site, i))),
     target: readerUrl, expected: 100, iterations: 200, parse: engine.parsePages, count: value => value.items.length},
+  {operation: 'pages-legacy', method: 'pages', adapter: legacy,
+    html: fixture.legacyReaderHtml(site, Array.from({length: 100}, (_, i) => fixture.pageUrl(site, i))),
+    target: readerUrl, expected: 100, iterations: 200, parse: legacy.parsePages, count: value => value.items.length},
+  {operation: 'pages-minimal', method: 'pages', adapter: minimal,
+    html: fixture.minimalReaderHtml(site, Array.from({length: 100}, (_, i) => fixture.pageUrl(site, i))),
+    target: readerUrl, expected: 100, iterations: 200, parse: minimal.parsePages, count: value => value.items.length},
   {operation: 'search', html: fixture.searchHtml(site, 20, 1, false, input.query),
     target: input, expected: 20, iterations: 200, parse: engine.parseSearch, count: value => value.items.length},
 ];
 const requests = {};
 for (const item of cases) {
-  const calls = [], expectedUrl = item.operation === 'pages' ? site.chapterUrl(fixture.chapter)
+  const method = item.method ?? item.operation;
+  const calls = [], expectedUrl = method === 'pages' ? site.chapterUrl(fixture.chapter)
     : item.operation === 'search' ? site.searchUrl(input.query, 1) : catalogUrl;
-  const result = await engine.network[item.operation](item.target, {request: async (url, options) => {
+  const result = await (item.adapter ?? engine).network[method](item.target, {request: async (url, options) => {
     calls.push({url, options});
     assert.equal(url, expectedUrl, 'A fixture must use only its declared endpoint');
     assert.equal(options?.form, undefined, 'No view counters, mutations or speculative POSTs');
@@ -76,8 +85,8 @@ for (const item of cases) {
     medianMs: [...samplesMs].sort((a, b) => a - b)[Math.floor(rounds / 2)], samplesMs});
 }
 const report = {node: process.version,
-  method: 'Original synthetic HTML: 1000 chapters, 100 JSON page slots and 20 search cards. Synchronous parser timings with warmup; medians are observations, not pass/fail thresholds. Mocked transport verifies exactly one read-only request per operation.',
-  boundary: 'New engine; no before/after comparison is claimed. Does not measure real-source latency, browser rendering, permissions, image decoding, extension-wide bundle size or translation models.',
+  method: 'Original synthetic HTML: 1000 chapters, 100 modern/legacy/minimal JSON page slots and 20 search cards. Synchronous parser timings with warmup; medians are observations, not pass/fail thresholds. Mocked transport verifies exactly one read-only request per operation.',
+  boundary: 'Modern JSON and legacy HTML/JSON agreement are different inputs, not a before/after speed claim. Does not measure real-source latency, browser rendering, permissions, image decoding, extension-wide bundle size or translation models.',
   requests, timings};
 await writeFile(path.join(out, 'results.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify({out, ...report}, null, 2));

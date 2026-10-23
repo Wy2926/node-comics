@@ -85,7 +85,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 [ComiciViewer](../apps/extension/src/sources/shared/comici/README.md) 复用既有 Comici 搜索、编号目录、canvas 与图块还原，由经过独立验收的站点按相同共享边界显式接入。公开章节 API 负责归属及访问校验，站点保留各自图片主机策略；支持名单、上游来源、已实现协议与未支持变体以引擎目录为准，不声明上游所有站点可用。
 
-[MangaThemesia](../apps/extension/src/sources/shared/mangathemesia/README.md) 接入 Lagoon Scans、UnderTranslations 和 Arena Scans，共享网页名称分页搜索、完整静态目录、章节作品绑定及公开 `ts_reader` JSON 图片清单。站点保留主机、路径、身份与图片策略；不执行源站脚本、不发送浏览量统计或解锁请求，不自动认领上游其他站点。支持结构、限制及上游摘要以引擎目录为准。
+[MangaThemesia](../apps/extension/src/sources/shared/mangathemesia/README.md) 接入 Lagoon Scans、UnderTranslations、Arena Scans、Akaza Scans 和 Aster Scans，共享网页名称分页搜索、完整静态目录、章节作品绑定及公开 `ts_reader` JSON 图片清单；旧版正文由已验证站点显式选择。站点保留主机、路径、身份与图片策略；不执行源站脚本、不发送浏览量统计或解锁请求，不自动认领上游其他站点。支持结构、限制及上游摘要以引擎目录为准。
 
 ## 验收与交付
 
@@ -124,6 +124,11 @@ npm run build
 | [Lagoon Scans](../apps/extension/src/sources/sites/lagoonscans/README.md) | 英语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
 | [UnderTranslations](../apps/extension/src/sources/sites/undertranslations/README.md) | 西语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
 | [Arena Scans](../apps/extension/src/sources/sites/arenascans/README.md) | 英语 MangaThemesia 名称分页搜索、HTTP 完整静态目录／公开正文／封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
+| [Akaza Scans](../apps/extension/src/sources/sites/akazascans/README.md) | 英语 MangaThemesia 名称分页搜索、完整静态目录、旧版 HTML／JSON 一致性核对的公开正文、封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
+| [King of Shojo](../apps/extension/src/sources/sites/kingofshojo/README.md) | 英语 MangaThemesia 名称分页搜索、完整静态目录、minimal HTML／JSON 一致性正文、封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
+| [Hunlight Comics](../apps/extension/src/sources/sites/hunlightcomics/README.md) | 英语 Madara 名称搜索、完整 AJAX 目录、公开正文／封面及 12 小时更新；`/m/` 作品／章节导入、浮动入口和通用原位识图 |
+| [GakaMangas](../apps/extension/src/sources/sites/gakamangas/README.md) | 英语同人漫画名称搜索、完整 AJAX 目录、公开正文／封面及 12 小时更新；作品／章节导入、浮动入口和通用原位识图，不含 Patreon 提前看 |
+| [Aster Scans](../apps/extension/src/sources/sites/asterscans/README.md) | 英语 MangaThemesia 名称分页搜索、完整静态目录、旧版 HTML／JSON 一致性核对的公开正文、封面与 12 小时更新；裸章节归属、浮动导入与通用原位识图 |
 | [WeLoMa](../apps/extension/src/sources/sites/weloma/README.md) | HTTP 分页名称搜索、完整静态目录／正文／封面与 12 小时同步；作品／裸章节浮动导入、章节归属校验，标签页识图复用通用规则 |
 | [瓜子漫画](../apps/extension/src/sources/sites/guazimanhua/README.md) | HTTP 完整目录／正文／封面、12 小时更新；嵌入作品与章节导入入口，HTTP 校验章节所属作品 |
 | [包子漫画](../apps/extension/src/sources/sites/baozimh/README.md) | 简体站名称搜索、隐藏完整目录、跨页章节／整卷、封面与 12 小时更新；章节／续页导入、网页入口和 AMP 正文原位翻译 |

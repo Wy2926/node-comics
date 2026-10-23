@@ -33,12 +33,21 @@ describe('MangaThemesia current-page work metadata', () => {
     expect(read(context)).toMatchObject({status: 'ready', value: {title: 'Updated work'}});
   });
 
-  it.each(['missing-canonical', 'duplicate-canonical', 'foreign-canonical', 'other-chapter', 'missing-owner', 'duplicate-owner',
+  it('accepts identical duplicate canonicals emitted by the theme and WordPress', () => {
+    const site = sites[0];
+    for (const url of [site.catalogUrl(work), site.chapterUrl(chapter)]) {
+      const fixture = documentFixture(url, 'Sample & Book', url.includes('/manga/') ? undefined : site.catalogUrl(work));
+      fixture.nodes['link[rel="canonical"]'].push(element('', url));
+      expect(mangaThemesiaWork(site)(contextFor(site, fixture.document, url)).status).toBe('ready');
+    }
+  });
+
+  it.each(['missing-canonical', 'conflicting-canonical', 'foreign-canonical', 'other-chapter', 'missing-owner', 'duplicate-owner',
     'foreign-owner', 'chapter-owner', 'empty-title', 'oversize-title', 'control-title'] as const)('rejects %s without using a chapter or document title', kind => {
     const [site, foreign] = sites, url = site.chapterUrl(chapter), fixture = documentFixture(url, 'Sample & Book', site.catalogUrl(work));
     const canonical = fixture.nodes['link[rel="canonical"]'], owner = fixture.nodes['.chapterbody .allc a[href]'];
     if (kind === 'missing-canonical') canonical.length = 0;
-    if (kind === 'duplicate-canonical') canonical.push(canonical[0]);
+    if (kind === 'conflicting-canonical') canonical.push(element('', site.chapterUrl('other-chapter-1')));
     if (kind === 'foreign-canonical') canonical[0] = element('', foreign.chapterUrl(chapter));
     if (kind === 'other-chapter') canonical[0] = element('', site.chapterUrl('other-chapter-1'));
     if (kind === 'missing-owner') owner.length = 0;

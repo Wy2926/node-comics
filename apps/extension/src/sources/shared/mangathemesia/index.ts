@@ -3,9 +3,11 @@ import {attributes, hasClass, inertHtml, tags, textContent} from '../html';
 import type {MangaThemesiaSite} from './config';
 import {mangaThemesiaHtml} from './html';
 import {mangaThemesiaSearch} from './search';
+import {legacyReaderData} from './legacy-reader';
 
 /** The verified static catalog and public ts_reader JSON protocol; no source scripts execute. */
 export function createMangaThemesiaParsers(site: MangaThemesiaSite) {
+  const legacy = site.reader === 'legacy-ready', mirrored = legacy || site.reader === 'minimal';
   const helpers = mangaThemesiaHtml(site);
   const {one, text, location, regions, byClass, byId, canonical, image} = helpers;
   function document(html: string, section = 'postbody') {
@@ -64,6 +66,10 @@ export function createMangaThemesiaParsers(site: MangaThemesiaSite) {
       if (/(?:^|\s)src(?:\s|=|$)/i.test(script[1]) ||
         /(?:^|\s)type(?:\s|=|$)/i.test(script[1]) && !['text/javascript', 'application/javascript'].includes(attrs.type)) return [];
       const body = script[2].trim();
+      if (legacy) {
+        const value = legacyReaderData(body);
+        return value === undefined ? [] : [value];
+      }
       if (!/^ts_reader\s*\.\s*run\s*\(/.test(body)) return [];
       const match = /^ts_reader\s*\.\s*run\s*\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/.exec(body);
       if (!match) throw Error(`${site.name} 正文不是受支持的静态 JSON。`);
@@ -76,19 +82,31 @@ export function createMangaThemesiaParsers(site: MangaThemesiaSite) {
   function parsePages(html: string, url: string): SourceSnapshot {
     const info = readerInfo(html, url), data = readerData(html);
     // These flags describe access; an images field alone is not authorization to read a protected release.
-    if (data.protected !== false || data.is_novel !== false || data.unlock_token !== null || data.mode !== 'full' ||
-      data.contentmode !== 'advanced' || !Number.isSafeInteger(data.post_id) || (data.post_id as number) <= 0)
+    const accessValid = legacy
+      ? ['protected', 'is_novel', 'unlock_token', 'post_id'].every(key => !Object.hasOwn(data, key))
+      : data.protected === false && data.is_novel === false && data.unlock_token === null &&
+        Number.isSafeInteger(data.post_id) && (data.post_id as number) > 0;
+    if (!accessValid || data.mode !== 'full' || data.contentmode !== (site.reader === 'minimal' ? 'minimal' : 'advanced'))
       throw Error(`${site.name} 正文受保护、尚不可用或读取协议已变化。`);
     const viewer = byId(info.main, 'div', 'readerarea').replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, '');
-    if (/<(?:img|iframe|canvas|video)\b/i.test(viewer)) throw Error(`${site.name} 正文包含未支持的混合读取通道。`);
+    if (/<(?:iframe|canvas|video)\b/i.test(viewer) || !mirrored && /<img\b/i.test(viewer))
+      throw Error(`${site.name} 正文包含未支持的混合读取通道。`);
     if (!Array.isArray(data.sources) || data.sources.length !== 1) throw Error(`${site.name} 正文图片源缺失或存在未支持的多源变体。`);
     const source = data.sources[0];
     if (!source || typeof source !== 'object' || typeof source.source !== 'string' || !source.source ||
-      source.source !== data.defaultSource || !Array.isArray(source.images) || !source.images.length || source.images.length > 1500)
+      (legacy ? typeof data.defaultSource !== 'string' || !data.defaultSource : source.source !== data.defaultSource) ||
+      !Array.isArray(source.images) || !source.images.length || source.images.length > 1500)
       throw Error(`${site.name} 未提供完整正文图片清单。`);
     // Repeated URLs are distinct ordered page slots; never filter a missing or invalid page.
     const items = source.images.map((value: unknown, order: number) => ({id: 'page-' + order, order, width: 0, height: 0,
       resource: {kind: 'http' as const, url: site.imageUrl(text(value, 8192))}}));
+    if (mirrored) {
+      // The verified theme variants supply the same complete public list twice. Require agreement;
+      // a missing/truncated/changed DOM list is not a fallback and must not silently lose pages.
+      const mirrors = tags(viewer, 'img');
+      if (mirrors.length !== items.length || mirrors.some((attrs, i) => site.imageUrl(text(attrs.src, 8192)) !== items[i].resource.url))
+        throw Error(`${site.name} 正文 HTML 与 JSON 图片清单不一致。`);
+    }
     return {url, adapter: site.id, title: info.title, direction: site.direction, note: '', discoveryComplete: true,
       knownTotal: items.length, items};
   }

@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. The front-end TypeScript parsers and caller-transport request orchestration reuse Node Comics code; upstream Kotlin/APK code is not executed or bundled.",
-  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi, Manga Eclipse, Bun Manga and Monopoly Scan, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select (including the repeated breadcrumb picker and fully server-populated holders) and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
+  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi, Manga Eclipse, Bun Manga, Monopoly Scan, GakaMangas and Hunlight Comics, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select (including the repeated breadcrumb picker and fully server-populated holders) and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
   "files": [
     {
       "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/MadaraBase.kt",
@@ -85,6 +85,26 @@
       "path": "src/es/monopolyscan/build.gradle.kts",
       "sha256": "3ace5c8510cc3650a876096410e9c5ca3240f4c25f8f489806122f04da9005ef",
       "purpose": "Reference for the Monopoly Scan source domain, Spanish language and Madara theme declaration."
+    },
+    {
+      "path": "src/en/gakamangas/build.gradle.kts",
+      "sha256": "98c7769dcace2cfca85d7ed1843ae52d8709f40146afb9d0db5a49098b0b4ad8",
+      "purpose": "Reference for source name, origin, English language and theme declaration."
+    },
+    {
+      "path": "src/en/gakamangas/src/eu/kanade/tachiyomi/extension/en/gakamangas/GakaMangas.kt",
+      "sha256": "ba82a481957671ba606601aa37b8890e575467255d8a790230069b594cd5af7c",
+      "purpose": "Confirms MangaAjax catalog mode. Public fan-manga reading and content-search pagination use the verified shared Madara protocol."
+    },
+    {
+      "path": "src/en/hunlightcomics/build.gradle.kts",
+      "sha256": "f050e614a7180b77b76615780d9974b28b8017455f91f06190e878cf58b6a6e9",
+      "purpose": "Reference for source name, origin, English language and theme declaration."
+    },
+    {
+      "path": "src/en/hunlightcomics/src/eu/kanade/tachiyomi/extension/en/hunlightcomics/HunlightComics.kt",
+      "sha256": "f2810419660c116a097513e1b3fce05b5039472056d3e39b7f4295138f06fc46",
+      "purpose": "Confirms MangaAjax catalog mode. The live /m/ URL prefix and chapter-canonical AJAX reader are verified independently; no speculative /manga/ alias is added."
     }
   ]
 }

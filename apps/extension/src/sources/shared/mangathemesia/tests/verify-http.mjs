@@ -15,10 +15,17 @@ const samples = [
     chapterSlug: 'scarlet-capitulo-478', query: 'última', paginationQuery: 'el', minimumEntries: 49, pages: 25},
   {id: 'arenascans', origin: 'https://arenascan.com', catalogSlug: '100-year-old-top-chef',
     chapterSlug: '100-year-old-top-chef-70', query: '100-Year-Old', paginationQuery: 'chef', minimumEntries: 70, pages: 59},
+  {id: 'akazascans', origin: 'https://akazascans.org', catalogSlug: 'the-investment-method-of-a-wall-street-genius-on-borrowed-time',
+    chapterSlug: 'the-investment-method-of-a-wall-street-genius-on-borrowed-time-chapter-1', query: 'Investment', paginationQuery: 'a', minimumEntries: 9, pages: 14,
+    lockedChapterSlug: 'emperors-domination-chapter-122'},
+  {id: 'asterscans', origin: 'https://asterscans.com', catalogSlug: 'i-think-i-poked-the-sleeping-lion',
+    chapterSlug: 'i-think-i-poked-the-sleeping-lion-chapter-1', query: 'Sleeping', paginationQuery: 'e', minimumEntries: 11, pages: 16},
+  {id: 'kingofshojo', origin: 'https://kingofshojo.com', catalogSlug: 'the-evil-grand-duchess-has-a-secret-life',
+    chapterSlug: 'the-evil-grand-duchess-has-a-secret-life-chapter-0', query: 'Secret Life', paginationQuery: 'duchess', minimumEntries: 100, pages: 37},
 ];
 const selectedId = process.argv[2];
 assert(process.argv.length <= 3 && (!selectedId || samples.some(sample => sample.id === selectedId)),
-  'Usage: node verify-http.mjs [lagoonscans|undertranslations|arenascans]');
+  'Usage: node verify-http.mjs [' + samples.map(sample => sample.id).join('|') + ']');
 const selected = selectedId ? samples.filter(sample => sample.id === selectedId) : samples;
 const limits = {timeoutMs: 20000, maxRequestsPerSite: 18, maxHtmlBytes: 2 * 1024 * 1024,
   imagePrefixBytes: 512, maxImageReadBytes: 64 * 1024, maxSiteBytes: 8 * 1024 * 1024, maxRedirects: 3};
@@ -166,6 +173,14 @@ async function verifySite(sample) {
     assert.throws(() => parsePages(readerHtml, wrongBinding.href), /归属/, 'Parser accepted a wrong work binding');
     result.chapter = {pages: pages.items.length, complete: pages.discoveryComplete, resolvedCatalog: true, rejectsWrongBinding: true};
     readerHtml = undefined;
+
+    if (sample.lockedChapterSlug) {
+      operation = 'locked-reader';
+      const lockedUrl = `${sample.origin}/${sample.lockedChapterSlug}/`, lockedHtml = await readHttp(lockedUrl);
+      assert(/This chapter is locked\. Please purchase it/i.test(lockedHtml), 'Locked sample changed; review access classification');
+      assert.throws(() => parsePages(lockedHtml, lockedUrl), 'Locked public response must not become a page manifest');
+      result.chapter.rejectsLockedResponse = true;
+    }
 
     result.images = [];
     for (const [label, url, referer] of [['cover', catalog.cover.url, catalog.url],

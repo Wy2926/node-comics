@@ -5,6 +5,8 @@ export interface MangaThemesiaSite {
   name: string;
   origin: string;
   direction: 'ltr' | 'rtl';
+  /** Explicit verified variants; both require matching public HTML/JSON page lists. */
+  reader?: 'legacy-ready' | 'minimal';
   location(url: URL): MangaThemesiaLocation | null;
   catalogKey(slug: string): string;
   catalogUrl(slug: string): string;

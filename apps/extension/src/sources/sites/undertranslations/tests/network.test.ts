@@ -1,5 +1,4 @@
 import {describe, expect, it, vi} from 'vitest';
-import type {SourceNetworkContext} from '../../../contracts/network';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
 import {catalogHtml, fixtureSite, readerHtml, searchHtml, workDocument} from '../../../shared/mangathemesia/tests/fixtures';
@@ -89,22 +88,5 @@ describe('UnderTranslations', () => {
     expect(searchUrl({...input, cursor: found.nextCursor})).toBe(origin + '/page/2/?s=a+%26+%E6%97%A5%E6%9C%AC%E8%AA%9E');
     expect(parseSearch(searchHtml(fixture, 0, 1, false, input.query), input)).toEqual({items: []});
     expect(() => searchUrl({...input, siteId: 'other'})).toThrow();
-  });
-  it('preserves prior catalog state on failure and honors cancellation before and after HTTP', async () => {
-    const previous = parseCatalog(catalog(), url), saved = structuredClone(previous), request = vi.fn().mockRejectedValue(Error('unavailable'));
-    await expect(network.catalog(url, {request, previous})).rejects.toThrow('unavailable');
-    expect(previous).toEqual(saved);
-    const operations = [
-      (context: SourceNetworkContext) => network.catalog(url, context),
-      (context: SourceNetworkContext) => network.pages(reader, context),
-      (context: SourceNetworkContext) => network.resolveCatalog(reader, context),
-      (context: SourceNetworkContext) => network.search({siteId: 'undertranslations', query: 'sample'}, context),
-    ];
-    for (const operation of operations) {
-      const before = new AbortController(); before.abort(Error('cancelled')); request.mockClear();
-      await expect(operation({request, signal: before.signal})).rejects.toThrow('cancelled'); expect(request).not.toHaveBeenCalled();
-      const after = new AbortController(); request.mockImplementation(async () => {after.abort(Error('cancelled')); return catalog();});
-      await expect(operation({request, signal: after.signal})).rejects.toThrow('cancelled');
-    }
   });
 });

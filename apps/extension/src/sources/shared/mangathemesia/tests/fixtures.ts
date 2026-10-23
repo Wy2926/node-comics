@@ -82,6 +82,27 @@ export function readerHtml(site: FixtureSite, images?: string[]) {
   return envelope(`<div class="chapterbody"><h1 class="entry-title">Sample Chapter 1</h1><div class="allc"><a href="${site.catalogUrl(work)}">All chapters</a></div><div id="readerarea"></div><script>ts_reader.run(${JSON.stringify(readerData(site, images))});</script></div>`, canonical(site.chapterUrl(chapter)));
 }
 
+export function legacyReaderHtml(site: FixtureSite, images = [pageUrl(site), pageUrl(site)]) {
+  const data = {mode: 'full', contentmode: 'advanced', defaultSource: 'Server 1', sources: [{source: 'Server 2', images}]};
+  // Synthetic theme-shaped wrapper, including inert history/view-count code which must never run.
+  const script = `jQuery(document).ready(function ($) {
+    Hooks.add_filter('image.attributes', function (value) {return value + \`alt="fixture"\`;}, 1);
+    ts_reader.run(${JSON.stringify(data)});
+    var post_id = 42; var chapter_id = 43;
+    loadChList();
+    jQuery.ajax({url: ajaxurl, type: 'post', data: {action: 'dynamic_view_ajax', post_id: chapter_id}});
+    HISTORY.push(43, {manga_ID: '42'});
+  });`;
+  return readerHtml(site, images)
+    .replace(`<script>ts_reader.run(${JSON.stringify(readerData(site, images))});</script>`, `<script>${script}</script>`)
+    .replace('<div id="readerarea"></div>', `<div id="readerarea"><p>${images.map(src => `<img loading="lazy" src="${escape(src)}">`).join('')}</p></div>`);
+}
+
+export function minimalReaderHtml(site: FixtureSite, images = [pageUrl(site), pageUrl(site)]) {
+  return readerHtml(site, images).replace('"contentmode":"advanced"', '"contentmode":"minimal"')
+    .replace('<div id="readerarea"></div>', `<div id="readerarea"><p>${images.map(src => `<img src="${escape(src)}">`).join('')}</p></div>`);
+}
+
 export function searchCard(site: FixtureSite, slug = 'sample-0') {
   return `<div class="bs"><div class="bsx"><a href="${site.catalogUrl(slug)}" title="Sample &amp; ${slug}"><img src="${coverUrl(site)}"><div class="tt">Sample &amp; ${slug}</div></a></div></div>`;
 }

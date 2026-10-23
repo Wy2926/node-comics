@@ -29,16 +29,19 @@ function add(id, kind, url, body, expected = title, head = '') {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${chapterTitle}</title><link rel="icon" href="data:,">${head}</head><body>${body}</body></html>`;
   fixtures.set(url, html); cases.push({id, kind, url, expected});
 }
-for (const host of ['mangaeclipse.com', 'bunmanga.com', 'lhtranslation.net']) {
-  const work = `https://${host}/manga/fixture-work/`, chapter = work + 'chapter-12/', name = host + ' · ' + title;
+for (const [host, directory] of [['mangaeclipse.com', 'manga'], ['bunmanga.com', 'manga'], ['lhtranslation.net', 'manga'],
+  ['gakamangas.com', 'manga'], ['hunlightcomics.com', 'm']]) {
+  const work = `https://${host}/${directory}/fixture-work/`, chapter = work + 'chapter-12/', name = host + ' · ' + title;
   const body = `<div class="c-breadcrumb"><ol class="breadcrumb"><li>${link(work, name)}</li></ol></div><h1>${chapterTitle}</h1>`;
   add(host, 'catalog', work, body, name, `<link rel="canonical" href="${work}">`);
   add(host, 'reader', chapter, body, name, `<link rel="canonical" href="${host === 'mangaeclipse.com' ? work : chapter}">`);
 }
-for (const [host, suffix] of [['lagoonscans.com', 'chapter-12'], ['arenascan.com', '12'], ['undertranslations.com', 'capitulo-12']]) {
+for (const [host, suffix] of [['lagoonscans.com', 'chapter-12'], ['arenascan.com', '12'], ['undertranslations.com', 'capitulo-12'],
+  ['akazascans.org', 'chapter-12'], ['asterscans.com', 'chapter-12'], ['kingofshojo.com', 'chapter-12']]) {
   const work = `https://${host}/manga/fixture-work/`, chapter = `https://${host}/different-reader-${suffix}/`, name = host + ' · ' + title;
-  add(host, 'catalog', work, `<div class="postbody"><h1 class="entry-title">${escape(name)}</h1></div>`, name, `<link rel="canonical" href="${work}">`);
-  add(host, 'reader', chapter, `<div class="chapterbody"><h1>${chapterTitle}</h1><div class="allc">${link(work, name)}</div></div>`, name, `<link rel="canonical" href="${chapter}">`);
+  const canonical = url => `<link rel="canonical" href="${url}">`.repeat(['akazascans.org', 'asterscans.com'].includes(host) ? 2 : 1);
+  add(host, 'catalog', work, `<div class="postbody"><h1 class="entry-title">${escape(name)}</h1></div>`, name, canonical(work));
+  add(host, 'reader', chapter, `<div class="chapterbody"><h1>${chapterTitle}</h1><div class="allc">${link(work, name)}</div></div>`, name, canonical(chapter));
 }
 const welomaWork = 'https://weloma.net/m/Work1', welomaReader = 'https://weloma.net/c/Chap1';
 const welomaName = 'WeLoMa · ' + title, encoded = Buffer.from(welomaName).toString('base64');
@@ -63,7 +66,13 @@ await context.route(/^https?:/, route => {
 });
 let source, latest;
 try {
-  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  const isExtension = worker => worker.url().startsWith('chrome-extension:');
+  const worker = context.serviceWorkers().find(isExtension) || await context.waitForEvent('serviceworker', {predicate: isExtension});
+  const workerReady = Date.now() + 15000;
+  while (!(await worker.evaluate(() => !!globalThis.chrome?.storage?.local))) {
+    assert(Date.now() < workerReady, 'Extension worker APIs were not initialized');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   // Route interception does not cover all extension service-worker fetches; block those at the fixture transport too.
   await worker.evaluate(async () => {
     globalThis.__sourceWorkRequests = []; const original = fetch;

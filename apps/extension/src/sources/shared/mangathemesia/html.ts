@@ -37,7 +37,9 @@ export function mangaThemesiaHtml(site: MangaThemesiaSite) {
   const byClass = (html: string, tag: string, name: string) => one(regions(html, tag, a => !!hasClass(a, name)), name).body;
   const byId = (html: string, tag: string, id: string) => one(regions(html, tag, a => a.id === id), id).body;
   function canonical(html: string, expected: MangaThemesiaLocation) {
-    const actual = location(one(tags(html, 'link').filter(a => a.rel === 'canonical'), '规范地址').href);
+    // WordPress and the theme can emit the same canonical twice; conflicts still fail closed.
+    const hrefs = tags(html, 'link').filter(a => a.rel === 'canonical').map(a => text(a.href));
+    const actual = location(one([...new Set(hrefs)], '规范地址'));
     if (expected.chapterSlug ? actual.chapterSlug !== expected.chapterSlug :
       actual.chapterSlug || actual.catalogSlug !== expected.catalogSlug) throw Error(`${site.name} 页面归属错误。`);
   }
