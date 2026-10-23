@@ -1,6 +1,6 @@
 # MangaThemesia
 
-供 [Lagoon Scans](../../sites/lagoonscans/README.md)、[UnderTranslations](../../sites/undertranslations/README.md)、[Arena Scans](../../sites/arenascans/README.md)、[Akaza Scans](../../sites/akazascans/README.md)、[Aster Scans](../../sites/asterscans/README.md) 和 [King of Shojo](../../sites/kingofshojo/README.md) 显式调用的共享协议引擎。站点拥有主机、URL 形态、身份、图片策略、语言与安装元数据；引擎不自动认领未知网站，不依赖浏览器全局，不直接请求网络或执行下载的脚本。HTTP 解析不依赖 DOM，网页作品元数据只读取调用方传入的文档。
+供 [Lagoon Scans](../../sites/lagoonscans/README.md)、[UnderTranslations](../../sites/undertranslations/README.md)、[Arena Scans](../../sites/arenascans/README.md)、[Akaza Scans](../../sites/akazascans/README.md)、[Aster Scans](../../sites/asterscans/README.md)、[King of Shojo](../../sites/kingofshojo/README.md) 和 [NekoScans / Neko Manga](../../sites/nekoscans/README.md) 显式调用的共享协议引擎。站点拥有主机、URL 形态、身份、图片策略、语言与安装元数据；引擎不自动认领未知网站，不依赖浏览器全局，不直接请求网络或执行下载的脚本。HTTP 解析不依赖 DOM，网页作品元数据只读取调用方传入的文档。
 
 ## 支持范围
 
@@ -25,7 +25,7 @@
 在插件目录执行：
 
 ```powershell
-npm test -- src/sources/shared/mangathemesia src/sources/sites/lagoonscans src/sources/sites/undertranslations src/sources/sites/arenascans src/sources/sites/akazascans src/sources/sites/asterscans src/sources/sites/kingofshojo --maxWorkers=2
+npm test -- src/sources/shared/mangathemesia src/sources/sites/lagoonscans src/sources/sites/undertranslations src/sources/sites/arenascans src/sources/sites/akazascans src/sources/sites/asterscans src/sources/sites/kingofshojo src/sources/sites/nekoscans --maxWorkers=2
 npm run check
 npm run build
 ```
@@ -38,6 +38,6 @@ node apps/extension/src/sources/shared/mangathemesia/tests/verify-http.mjs
 node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs lagoonscans return nodelanevalidationzzqv --html-search --page-size=10 --max-pages=3
 ```
 
-站点单元测试只保留自身身份和协议接线；取消、失败保留和通用非法输入集中在共享测试，不在每站重复整套用例。测试使用自造 HTML／JSON，覆盖身份隔离、归属、页序、完整性、取消、未支持协议及请求数。性能入口测量 1000 章、普通／旧版／minimal 各 100 页与 20 搜索项的解析时间及单次请求数；不同正文结构分别记录，不宣称相对旧实现提速。HTTP 入口可按站点 ID 单独执行，或串行检查六个公开站点的名称搜索、分页、空结果、目录、裸章节归属、正文及有限图片响应；不下载整章、不保留源站 HTML／漫画图片。
+站点单元测试只保留自身身份和协议接线；取消、失败保留和通用非法输入集中在共享测试，不在每站重复整套用例。测试使用自造 HTML／JSON，覆盖身份隔离、归属、页序、完整性、取消、未支持协议及请求数。性能入口测量 1000 章、普通／旧版／minimal 各 100 页与 20 搜索项的解析时间及单次请求数；不同正文结构分别记录，不宣称相对旧实现提速。HTTP 入口可按站点 ID 单独执行，或串行检查该脚本所列公开样本的名称搜索、分页、空结果、目录、裸章节归属、正文及有限图片响应；不下载整章、不保留源站 HTML／漫画图片。
 
 真实 MV3 浏览器导入、图片解码、失败恢复与重开位置复用现有 [阅读验收入口](../madara/README.md#验证入口)的 `tests/verify-live-browser.mjs <siteId> <作品或章节URL> [第二章节URL]`，其站点参数由统一注册表解析。搜索界面使用同目录的 `verify-search-browser.mjs`。这些入口使用隔离 profile 和真实公开 HTTP，需先构建插件并配置现有 Playwright／Chromium 路径；不调用翻译模型。样本、统计及截图写入忽略的 `artifacts/`。普通 HTTP、自造夹具、真实浏览器与模型效果分别验收。

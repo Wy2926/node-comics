@@ -306,6 +306,41 @@ describe('Madara explicitly selected reader navigation', () => {
   });
 });
 
+describe('Madara explicit AJAX breadcrumb titles', () => {
+  const site = fixtureSite({catalog: 'ajax', reader: 'ajax-breadcrumb'}), engine = createMadaraNetwork(site);
+  const breadcrumb = `<div class="c-breadcrumb"><ol class="breadcrumb"><li><a href="${site.origin}/">Home</a></li>
+    <li><a href="${workUrl}">Sample Book</a></li><li class="active">Chapter 1 &amp; Start</li></ol></div>`;
+  const html = reader(ajaxSite).replace(/<h1[^>]*>.*?<\/h1>/, breadcrumb);
+  it('uses an owned breadcrumb without relaxing AJAX navigation or adding a request', async () => {
+    const request = vi.fn<SourceNetworkContext['request']>().mockResolvedValue(html);
+    expect(await engine.network.pages(pageUrl, {request})).toMatchObject({title: 'Chapter 1 & Start', knownTotal: 2, discoveryComplete: true});
+    expect(request.mock.calls).toEqual([[pageUrl + '?style=list']]);
+    expect(() => createMadaraParsers(ajaxSite).parsePages(html, pageUrl)).toThrow();
+    expect(() => engine.parsePages(reader(ajaxSite), pageUrl)).toThrow();
+  });
+  const invalid: Mutation[] = [
+    ['missing wrapper', html => html.replace('class="c-breadcrumb"', 'class="other"')],
+    ['duplicate breadcrumb', html => html + breadcrumb],
+    ['extra item', html => html.replace('</ol>', '<li>Other</li></ol>')],
+    ['nested item', html => html.replace('Sample Book</a>', 'Sample Book</a><li>Other</li>')],
+    ['foreign homepage', html => html.replace(`href="${site.origin}/"`, 'href="https://foreign.test/"')],
+    ['homepage query', html => html.replace(`href="${site.origin}/"`, `href="${site.origin}/?x=1"`)],
+    ['foreign work', html => html.replace(`<a href="${workUrl}">`, '<a href="/manga/other/">')],
+    ['chapter as work', html => html.replace(`<a href="${workUrl}">`, `<a href="${pageUrl}">`)],
+    ['empty work name', html => html.replace('Sample Book', ' ')],
+    ['unmarked current item', html => html.replace('class="active"', '')],
+    ['extra active item', html => html.replace('<li>', '<li class="active">')],
+    ['empty chapter', html => html.replace('Chapter 1 &amp; Start', ' ')],
+    ['linked chapter', html => html.replace('Chapter 1 &amp; Start', `<a href="${pageUrl}">Chapter 1</a>`)],
+    ['foreign navigation', html => html.replace('data-manga="42"', 'data-manga="99"')],
+    ['foreign page slot owner', html => html.replace(current, current.replace('chapter-1', 'chapter-2'))],
+    ['disagreeing prefilled menus', html => html.replaceAll(holder, holder.replace('</div>', menu.replace('Chapter 1 &amp; Start', 'Other') + '</div>'))],
+  ];
+  it.each(invalid)('rejects %s instead of falling back to a document title', (_label, mutate) => {
+    expect(() => engine.parsePages(mutate(html), pageUrl)).toThrow();
+  });
+});
+
 describe('Madara optional search and shared image syntax', () => {
   it('does not expose unverified search on the network capability object', () => {
     const engine = createMadaraNetwork(ajaxSite), input = {siteId: ajaxSite.id, query: 'sample'};

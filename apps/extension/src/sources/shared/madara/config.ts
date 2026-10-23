@@ -12,7 +12,7 @@ export interface MadaraSite {
   /** Only the verified, complete manga-scoped AJAX chapter endpoint is supported. */
   catalog?: 'ajax';
   /** Default: chapter canonical, heading and static chapter select. */
-  reader?: 'ajax-select' | 'catalog-select';
+  reader?: 'ajax-select' | 'ajax-breadcrumb' | 'catalog-select';
   location(url: URL): MadaraLocation | null;
   catalogKey(slug: string): string;
   catalogUrl(slug: string): string;

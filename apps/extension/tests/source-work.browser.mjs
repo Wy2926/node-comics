@@ -30,14 +30,14 @@ function add(id, kind, url, body, expected = title, head = '') {
   fixtures.set(url, html); cases.push({id, kind, url, expected});
 }
 for (const [host, directory] of [['mangaeclipse.com', 'manga'], ['bunmanga.com', 'manga'], ['lhtranslation.net', 'manga'],
-  ['gakamangas.com', 'manga'], ['hunlightcomics.com', 'm']]) {
+  ['gakamangas.com', 'manga'], ['hunlightcomics.com', 'm'], ['anisascans.in', 'manga'], ['s2read.com', 'manga']]) {
   const work = `https://${host}/${directory}/fixture-work/`, chapter = work + 'chapter-12/', name = host + ' · ' + title;
   const body = `<div class="c-breadcrumb"><ol class="breadcrumb"><li>${link(work, name)}</li></ol></div><h1>${chapterTitle}</h1>`;
   add(host, 'catalog', work, body, name, `<link rel="canonical" href="${work}">`);
   add(host, 'reader', chapter, body, name, `<link rel="canonical" href="${host === 'mangaeclipse.com' ? work : chapter}">`);
 }
 for (const [host, suffix] of [['lagoonscans.com', 'chapter-12'], ['arenascan.com', '12'], ['undertranslations.com', 'capitulo-12'],
-  ['akazascans.org', 'chapter-12'], ['asterscans.com', 'chapter-12'], ['kingofshojo.com', 'chapter-12']]) {
+  ['akazascans.org', 'chapter-12'], ['asterscans.com', 'chapter-12'], ['kingofshojo.com', 'chapter-12'], ['nekoproject.org', 'capitulo-12']]) {
   const work = `https://${host}/manga/fixture-work/`, chapter = `https://${host}/different-reader-${suffix}/`, name = host + ' · ' + title;
   const canonical = url => `<link rel="canonical" href="${url}">`.repeat(['akazascans.org', 'asterscans.com'].includes(host) ? 2 : 1);
   add(host, 'catalog', work, `<div class="postbody"><h1 class="entry-title">${escape(name)}</h1></div>`, name, canonical(work));

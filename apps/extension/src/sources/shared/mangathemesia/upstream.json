@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. Node Comics implements inert TypeScript HTML/JSON parsing through its existing source contracts and caller transport; upstream Kotlin/APK code is not executed or bundled.",
-  "scope": "Explicitly registered Lagoon Scans, UnderTranslations, Arena Scans, Akaza Scans, Aster Scans and King of Shojo: public WordPress name search, complete static chapterlist, dedicated work cover, consistent canonical and allc chapter ownership, full-mode ts_reader.run JSON with one image source. Akaza Scans and Aster Scans explicitly use the verified legacy document-ready wrapper without modern access fields, requiring exact agreement between public HTML images and JSON slots despite the stale default-source label. King of Shojo explicitly uses modern access flags with contentmode minimal and exact public HTML/JSON agreement. No source scripts, view-count POSTs, account actions, protected-page unlocks, novels, alternate randomized slugs, DOM-only or base64/obfuscated reader variants are implemented.",
+  "scope": "Explicitly registered Lagoon Scans, UnderTranslations, Arena Scans, Akaza Scans, Aster Scans, King of Shojo and NekoScans / Neko Manga: public WordPress name search, complete static chapterlist, dedicated work cover, consistent canonical and allc chapter ownership, full-mode ts_reader.run JSON with one image source. Akaza Scans and Aster Scans explicitly use the verified legacy document-ready wrapper without modern access fields, requiring exact agreement between public HTML images and JSON slots despite the stale default-source label. King of Shojo explicitly uses modern access flags with contentmode minimal and exact public HTML/JSON agreement. No source scripts, view-count POSTs, account actions, protected-page unlocks, novels, alternate randomized slugs, DOM-only or base64/obfuscated reader variants are implemented.",
   "files": [
     {
       "path": "lib-multisrc/mangathemesia/src/eu/kanade/tachiyomi/multisrc/mangathemesia/MangaThemesia.kt",
@@ -85,6 +85,16 @@
       "path": "src/en/kingofshojo/src/eu/kanade/tachiyomi/extension/en/kingofshojo/KingofShojo.kt",
       "sha256": "6c89070ee7b00ba734f1798479397f124c0b39f2ac62e6ed6105cef37854bae4",
       "purpose": "Confirms the standard MangaThemesia base; the full minimal reader and matching public HTML/JSON lists were verified independently against raw live responses."
+    },
+    {
+      "path": "src/es/nekoscans/build.gradle.kts",
+      "sha256": "8f50da3a6cd8a3c7495bdfcd26a8543d3ae27263a45a7ea52c858ac0d81c2a2f",
+      "purpose": "Reference for the NekoScans source name, nekoproject.org origin, Spanish language and MangaThemesia declaration."
+    },
+    {
+      "path": "src/es/nekoscans/src/eu/kanade/tachiyomi/extension/es/nekoscans/NekoScans.kt",
+      "sha256": "d48ef1b6030c3dfa6a4503280fcc3f4efbe4fc38c5ca37fbece1a68af195e803",
+      "purpose": "Confirms the standard MangaThemesia base; Spanish search, capitulo URLs and public advanced JSON reader were verified against raw live responses."
     }
   ]
 }

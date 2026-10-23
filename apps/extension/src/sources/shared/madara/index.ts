@@ -92,7 +92,7 @@ export function createMadaraParsers(site: MadaraSite) {
     const navigation = safe.includes('chapters_selectbox_holder') ? tags(safe, 'div') : [];
     const holders = navigation.filter(a => hasClass(a, 'chapters_selectbox_holder'));
     let selectedTitle: string | undefined;
-    if (site.reader === 'ajax-select') {
+    if (site.reader === 'ajax-select' || site.reader === 'ajax-breadcrumb') {
       const mangaId = postId(safe);
       const nav = one(navigation.filter(a => a.id === 'manga-reading-nav-head'), '章节导航');
       // Some Madara layouts repeat the same chapter picker in the top breadcrumb as well as head/foot.
@@ -115,8 +115,10 @@ export function createMadaraParsers(site: MadaraSite) {
         throw Error(`${site.name} 当前章节归属错误。`);
       selectedTitle = label;
     }
-    const title = site.reader === 'catalog-select' ? text(selectedTitle) :
+    const title = site.reader === 'catalog-select' ? text(selectedTitle) : site.reader === 'ajax-breadcrumb' ? breadcrumbTitle(safe, loc.slug) :
       text(textContent(one(regions(safe, 'h1', a => a.id === 'chapter-heading'), '章节标题').body));
+    if (site.reader === 'ajax-breadcrumb' && selectedTitle !== undefined && selectedTitle !== title)
+      throw Error(`${site.name} 章节标题与选择框不一致。`);
     const viewer = byClass(safe, 'div', 'reading-content');
     const current = one(tags(viewer, 'input').filter(a => a.id === 'wp-manga-current-chap'), '正文标识');
     const rows = regions(viewer, 'div', a => !!hasClass(a, 'page-break'));
@@ -129,6 +131,20 @@ export function createMadaraParsers(site: MadaraSite) {
       return {id: image.id, order, width: 0, height: 0, resource: {kind: 'http' as const, url: site.imageUrl(image['data-src'] || image.src)}};
     });
     return {url, adapter: site.id, title, direction: site.direction, note: '', discoveryComplete: true, knownTotal: items.length, items};
+  }
+  function breadcrumbTitle(safe: string, slug: string) {
+    // Verified heading-less AJAX layout: home / the exact owning work / current chapter label.
+    const breadcrumb = byClass(byClass(safe, 'div', 'c-breadcrumb'), 'ol', 'breadcrumb');
+    const rows = regions(breadcrumb, 'li', () => true);
+    if (rows.length !== 3 || tags(breadcrumb, 'li').length !== 3 || tags(breadcrumb, 'a').length !== 2 ||
+        rows.slice(0, 2).some(row => hasClass(row.attrs, 'active')) || !hasClass(rows[2].attrs, 'active') || /<[^>]+>/.test(rows[2].body))
+      throw Error(`${site.name} 章节面包屑结构无效。`);
+    const home = one(tags(rows[0].body, 'a'), '首页导航');
+    if (new URL(text(home.href), site.origin).href !== site.origin + '/') throw Error(`${site.name} 首页导航归属错误。`);
+    const work = one(regions(rows[1].body, 'a', () => true), '作品导航'), owner = location(work.attrs.href);
+    if (owner.chapter || owner.slug !== slug) throw Error(`${site.name} 作品导航归属错误。`);
+    text(textContent(work.body));
+    return text(textContent(rows[2].body));
   }
   return {prepareCatalog, parseCatalog, parsePages, ...madaraSearch(site, helpers)};
 }

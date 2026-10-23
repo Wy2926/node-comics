@@ -22,6 +22,8 @@ const samples = [
     chapterSlug: 'i-think-i-poked-the-sleeping-lion-chapter-1', query: 'Sleeping', paginationQuery: 'e', minimumEntries: 11, pages: 16},
   {id: 'kingofshojo', origin: 'https://kingofshojo.com', catalogSlug: 'the-evil-grand-duchess-has-a-secret-life',
     chapterSlug: 'the-evil-grand-duchess-has-a-secret-life-chapter-0', query: 'Secret Life', paginationQuery: 'duchess', minimumEntries: 100, pages: 37},
+  {id: 'nekoscans', origin: 'https://nekoproject.org', catalogSlug: 'kemono-joushi-ni-jitsu-wa-mitomerarete-ita-hanashi',
+    chapterSlug: 'kemono-joushi-ni-jitsu-wa-mitomerarete-ita-hanashi-capitulo-32', query: 'Kemono Joushi', paginationQuery: 'amor', minimumEntries: 61, pages: 19},
 ];
 const selectedId = process.argv[2];
 assert(process.argv.length <= 3 && (!selectedId || samples.some(sample => sample.id === selectedId)),

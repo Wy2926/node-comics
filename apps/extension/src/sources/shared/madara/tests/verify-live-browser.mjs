@@ -196,14 +196,16 @@ export async function position(entryId:string,number:number) {const entry=await 
   stage = 'initial product import';
   const first = await importLink(inputUrl);
   if (identity.location.kind === 'reader') assert.equal(first.entry.sourceEntryId, identity.location.pageKey);
+  await jump(1); await jump(first.entry.pageCount);
   const firstPage = Math.min(3, first.entry.pageCount), firstSize = await jump(firstPage);
   selected.push({sourceEntryId: first.entry.sourceEntryId, entryId: first.entry.id, pages: first.entry.pageCount, testedPage: firstPage, decoded: firstSize});
   await reader.screenshot({path: path.join(out, 'reader-first.png')});
-  checks.push('Registered product link import, complete owned catalog and actual source-image decoding');
+  checks.push('Registered product link import, complete owned catalog and actual first/last/selected source-image decoding');
   if (secondUrl) {
     stage = 'second explicit chapter'; await wait(750);
     const second = await importLink(secondUrl); assert.equal(second.entry.sourceEntryId, setup.identities[1].location.pageKey);
     assert.notEqual(second.entry.id, first.entry.id, 'Choose a different second chapter');
+    await jump(1); await jump(second.entry.pageCount);
     const number = Math.min(2, second.entry.pageCount), size = await jump(number);
     selected.push({sourceEntryId: second.entry.sourceEntryId, entryId: second.entry.id, pages: second.entry.pageCount, testedPage: number, decoded: size});
     checks.push('A second explicit chapter belongs to the same comic and keeps its own saved page');

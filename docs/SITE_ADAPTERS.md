@@ -81,11 +81,11 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 新增或修复站点时，可先核对 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 等上游实现，复用已确认的协议知识；不直接加载其 Android／Kotlin 扩展，也不根据上游站点数量批量声明支持。参考或移植的来源、精确版本、文件 SHA-256、用途及许可留在对应共享引擎或站点目录，必要的第三方许可随插件分发；区分协议参考、实际移植和未实现的上游能力。
 
-[Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由 WebtoonScan、LHTranslation、Mangasushi、Manga Eclipse、Bun Manga 和 Monopoly Scan 显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
+[Madara](../apps/extension/src/sources/shared/madara/README.md) 复用现有 TypeScript 解析器及经过站点验证的静态／只读 AJAX 协议，由已验证站点显式接入；可接受结构、能力组合和未支持变体以引擎 README 为唯一说明。新增同引擎站点仍须声明自己的身份、资源策略和传输方式，并完成本站验证；不能为尚未确认的 AJAX、分组或自定义模板增加假设配置。
 
 [ComiciViewer](../apps/extension/src/sources/shared/comici/README.md) 复用既有 Comici 搜索、编号目录、canvas 与图块还原，由经过独立验收的站点按相同共享边界显式接入。公开章节 API 负责归属及访问校验，站点保留各自图片主机策略；支持名单、上游来源、已实现协议与未支持变体以引擎目录为准，不声明上游所有站点可用。
 
-[MangaThemesia](../apps/extension/src/sources/shared/mangathemesia/README.md) 接入 Lagoon Scans、UnderTranslations、Arena Scans、Akaza Scans 和 Aster Scans，共享网页名称分页搜索、完整静态目录、章节作品绑定及公开 `ts_reader` JSON 图片清单；旧版正文由已验证站点显式选择。站点保留主机、路径、身份与图片策略；不执行源站脚本、不发送浏览量统计或解锁请求，不自动认领上游其他站点。支持结构、限制及上游摘要以引擎目录为准。
+[MangaThemesia](../apps/extension/src/sources/shared/mangathemesia/README.md) 由已验证站点显式接入，共享网页名称分页搜索、完整静态目录、章节作品绑定及公开 `ts_reader` JSON 图片清单；旧版正文由已验证站点显式选择。站点保留主机、路径、身份与图片策略；不执行源站脚本、不发送浏览量统计或解锁请求，不自动认领上游其他站点。支持结构、限制及上游摘要以引擎目录为准。
 
 ## 验收与交付
 
@@ -165,4 +165,7 @@ npm run build
 | [nHentai.com](../apps/extension/src/sources/sites/nhentaicom/README.md) | 整本画廊目录、完整原图／封面、网页会话读取与 12 小时同步；详情／分页链接浮动导入，标签页识图沿用通用规则；暂不支持分章作品和名称搜索 |
 | [COMIC FUZ](../apps/extension/src/sources/sites/comicfuz/README.md) | 名称搜索、HTTP 完整连载目录／分卷／封面、免费正文图片还原与 12 小时更新；作品／章节浮动导入，内嵌阅读器和标签页翻译复用通用识别，不自动扣点或消耗阅读券 |
 | [Zebrack / ゼブラック](../apps/extension/src/sources/sites/zebrack/README.md) | 名称搜索、HTTP 完整分话目录／分卷／封面、公开免费正文图片还原与 12 小时更新；作品／章节浮动导入，标签页 Blob 识图复用通用逻辑，不自动购买或消耗点数及阅读券 |
+| [Anisa Scans](../apps/extension/src/sources/sites/anisascans/README.md) | 英语 Madara 名称搜索、完整 AJAX 目录、面包屑章节名绑定的公开正文／封面及 12 小时同步；作品／章节浮动导入和通用原位识图 |
+| [S2Manga / S2READ](../apps/extension/src/sources/sites/s2manga/README.md) | 英语 Madara 名称分页搜索、完整静态目录、公开正文／封面及 12 小时同步；精确认领 s2read.com，作品／章节浮动导入和通用原位识图 |
+| [NekoScans / Neko Manga](../apps/extension/src/sources/sites/nekoscans/README.md) | 西语 MangaThemesia 名称分页搜索、完整静态目录、公开正文／封面及 12 小时同步；裸章节作品绑定、浮动导入和通用原位识图，不支持小说或空目录 |
 | `generic` | 已加载图片的原位翻译；不提供漫画导入或整章完整性承诺 |

@@ -9,7 +9,7 @@
     "noticeFile": null
   },
   "usage": "Protocol reference only. The front-end TypeScript parsers and caller-transport request orchestration reuse Node Comics code; upstream Kotlin/APK code is not executed or bundled.",
-  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi, Manga Eclipse, Bun Manga, Monopoly Scan, GakaMangas and Hunlight Comics, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select (including the repeated breadcrumb picker and fully server-populated holders) and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
+  "scope": "Public HTML name search for WebtoonScan; read-only madara_load_more content-search POST pagination for LHTranslation, Mangasushi, Manga Eclipse, Bun Manga, Monopoly Scan, GakaMangas, Hunlight Comics, Anisa Scans and S2Manga / S2READ, verified against their live endpoints; static ungrouped and manga-scoped AJAX chapter lists; verified chapter-canonical/static-select, chapter-canonical/AJAX-select (including the repeated breadcrumb picker and fully server-populated holders), explicit AJAX navigation with owned breadcrumb chapter titles, and catalog-canonical/static-select reader identities; contiguous image-N page slots. Other upstream Madara modules are not registered or claimed compatible.",
   "files": [
     {
       "path": "lib-multisrc/madara/src/eu/kanade/tachiyomi/multisrc/madara/MadaraBase.kt",
@@ -105,6 +105,26 @@
       "path": "src/en/hunlightcomics/src/eu/kanade/tachiyomi/extension/en/hunlightcomics/HunlightComics.kt",
       "sha256": "f2810419660c116a097513e1b3fce05b5039472056d3e39b7f4295138f06fc46",
       "purpose": "Confirms MangaAjax catalog mode. The live /m/ URL prefix and chapter-canonical AJAX reader are verified independently; no speculative /manga/ alias is added."
+    },
+    {
+      "path": "src/en/anisascans/build.gradle.kts",
+      "sha256": "afe21cbc2d18040aa2b2c649ae87ccfc7ba22ac95ff1eff9a4558d049e445f35",
+      "purpose": "Reference for source name, English language, origin and Madara declaration."
+    },
+    {
+      "path": "src/en/anisascans/src/eu/kanade/tachiyomi/extension/en/anisascans/AnisaScans.kt",
+      "sha256": "b729ab0c437642f84013289205462a7328a5d736a6edb5c18bf9ccaabbaab120",
+      "purpose": "Confirms MangaAjax catalog mode. Heading-less AJAX navigation and the owned chapter breadcrumb were verified independently against live raw responses; source scripts are not executed."
+    },
+    {
+      "path": "src/en/s2manga/build.gradle.kts",
+      "sha256": "d774ab9fa4d474858028f8da755aafa2cbc246bdbb0c7fb7c861e7ea8a0a1a39",
+      "purpose": "Reference for the S2Manga source name, current s2read.com origin, English language and Madara declaration."
+    },
+    {
+      "path": "src/en/s2manga/src/eu/kanade/tachiyomi/extension/en/s2manga/S2Manga.kt",
+      "sha256": "76e81ea0b8d5d496a28f628bcd22a5f4d4aca3fcabc4f2e17da4a4c38960bcdb",
+      "purpose": "Confirms the default static catalog and trimmed image addresses. Live server-populated AJAX reader navigation and content-search pagination are verified independently."
     }
   ]
 }
