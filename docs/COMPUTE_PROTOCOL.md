@@ -173,7 +173,7 @@ multipart 请求体接收受 `upload_body_timeout_seconds` 总时限约束，持
 
 ## 文件页协议
 
-[文件翻译](DOCUMENT_TRANSLATION.md)把 PDF／ZIP 预检、规范化、逐页 OCR／渲染和完整 ZIP 放在同一个持久计算宿主，中央 document-worker 只执行一次整本文本调用。节点必须具备共享解析包，并实际通过 Linux Landlock ABI ≥3 与 libseccomp 禁网沙箱探测，才能在既有 v3 注册中报告 `document_protocol:2`，取得 `doc_prepare`、`doc_ocr`、`doc_render`、`doc_zip` 能力。沙箱不依赖用户命名空间或特权容器；Windows 或未通过探测的 Linux 宿主不得声明 v2，可继续单图服务，不提供关闭沙箱的兼容路径。文件前缀为 `/internal/documents/compute/v2`，使用原节点身份与令牌，不新建 GPU 节点或资源池。
+[文件翻译](DOCUMENT_TRANSLATION.md)把 PDF／ZIP 预检、规范化、逐页 OCR／渲染和完整 ZIP 放在同一个持久计算宿主，中央 document-worker 只执行一次整本文本调用。节点必须具备共享解析包，并通过本地[文件解析策略](NODE_CONFIGURATION.md#文件解析策略)的启动检查，才能在既有 v3 注册中报告 `document_protocol:2`，取得 `doc_prepare`、`doc_ocr`、`doc_render`、`doc_zip` 能力。默认要求 Linux Landlock ABI ≥3 与 libseccomp 禁网沙箱，不依赖用户命名空间或特权容器；Windows 可显式关闭沙箱并通过 PDF／ZIP 解析自检，不自动降级。检查失败不声明 v2，可继续单图服务。文件前缀为 `/internal/documents/compute/v2`，使用原节点身份与令牌，不新建 GPU 节点或资源池。
 
 | 操作 | 内容 |
 | --- | --- |

@@ -14,6 +14,7 @@
   "delivery_workers": 4,
   "claim_batch_size": 4,
   "document_control_workers": 2,
+  "document_require_sandbox": true,
   "resident_bytes": 1073741824,
   "engine": {
     "models": ".assets/models",

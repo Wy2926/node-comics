@@ -29,7 +29,7 @@
 
 API 只接收有界 JSON、做授权、R2 分片元数据操作和 SQL 状态变更；不代理文件字节、不解压、不执行 PDFium，也不下载中间文件。OCR 原文及逐页译文以内联 JSON 经节点控制协议传递。客户端不能提交对象 key、实际页数、额度桶、供应商参数或支付权限；外部文件 IO 不持有调度锁。
 
-首次领取 `doc_prepare` 在数据库中固定 `owner_node_id`。该宿主从 R2 流式读取并校验源文件，随后在关闭网络的受限子进程内预检与规范化：验证内容、页数、摘要、像素、维度、解压体积及磁盘预算，拒绝加密文件、路径穿越、链接、嵌套压缩容器与压缩炸弹。PDF 按顺序光栅化；ZIP 支持 PNG、JPEG、WebP、静态 GIF，自然排序后规范化为 PNG。仅忽略明确的文本元数据、隐藏文件及 `__MACOSX`；未知图片格式／扩展名整本拒绝，不默默漏页。
+首次领取 `doc_prepare` 在数据库中固定 `owner_node_id`。该宿主从 R2 流式读取并校验源文件，随后在独立子进程内预检与规范化；默认使用禁网解析沙箱，Windows 可按[文件解析策略](NODE_CONFIGURATION.md#文件解析策略)显式关闭沙箱。两种模式均验证内容、页数、摘要、像素、维度、解压体积及磁盘预算，拒绝加密文件、路径穿越、链接、嵌套压缩容器与压缩炸弹。PDF 按顺序光栅化；ZIP 支持 PNG、JPEG、WebP、静态 GIF，自然排序后规范化为 PNG。仅忽略明确的文本元数据、隐藏文件及 `__MACOSX`；未知图片格式／扩展名整本拒绝，不默默漏页。
 
 源文件、规范化原图、完整 analysis／掩膜、译图和待上传 ZIP 均保存在该宿主任务私有的 `state_dir/documents/{job_id}/{workspace_generation}/`，不上传中间 R2 对象。正常无重试路径只有一次源 GET、一次最终 ZIP PUT；逐页 OCR／渲染完成只提交有界文本或描述符，不逐页签名、PUT 或 HEAD。ZIP 在本地按完整页清单校验、打包，只有全部页面可交付才上传。
 
@@ -133,7 +133,7 @@ Python 提供本地静态页面时，启用文件通道会仅在翻译页的 CSP
 
 原始上传默认 1 小时内完成，封存后未预占任务默认保留 24 小时，过期明确失败。预占后的在途任务和 `outcome_unknown` 不按上传期限删输入。终态 R2 输入／失败输出默认延迟 1 小时清理，覆盖短期签名及迟到上传窗口；成功 ZIP 默认保留 7 天，过期不可下载。回收按 job 精确前缀、批量有界进行，保留旧终态 `work/` 一次清理能力；清理不能破坏仍有效的租约。R2 应配置只清理未完成 multipart 的生命周期兜底，不对活跃输入设置固定天数删除规则。
 
-中央文本 worker 使用 [Dockerfile.document](../backend/Dockerfile.document) 和 [独立 Compose](../deploy/compose.document.yaml)，通过与 API 相同的 `INFRA_NETWORK` 加入已有基础设施网络，连接同一 PostgreSQL、Redis 数据库编号与 `REDIS_NAMESPACE`；不创建数据库、Redis、网络或 API 结果卷，不执行 PDFium、不需要图片 spool 或 GPU，也不代理源文件与 ZIP。`DOCUMENT_ENABLED=true` 时，集群健康检查额外要求健康的文本 worker 与已注册文件协议 v2、配置已生效且文档槽位未关闭的在线节点；API 自身就绪检查仍不依赖后台容量。宿主节点使用共享解析包、PDFium、Linux Landlock（ABI ≥3）和 libseccomp，启动时真实验证解析子进程的文件与网络边界，不依赖用户命名空间；不支持的平台不得声明 `document_protocol:2`。限制只作用于处理不可信文件的子进程，节点主进程正常联网。统一安装与预检见 [Linux 节点部署](../services/compute-node/linux/README.md)，不使用 privileged、SYS_ADMIN 或 unconfined。
+中央文本 worker 使用 [Dockerfile.document](../backend/Dockerfile.document) 和 [独立 Compose](../deploy/compose.document.yaml)，通过与 API 相同的 `INFRA_NETWORK` 加入已有基础设施网络，连接同一 PostgreSQL、Redis 数据库编号与 `REDIS_NAMESPACE`；不创建数据库、Redis、网络或 API 结果卷，不执行 PDFium、不需要图片 spool 或 GPU，也不代理源文件与 ZIP。`DOCUMENT_ENABLED=true` 时，集群健康检查额外要求健康的文本 worker 与已注册文件协议 v2、配置已生效且文档槽位未关闭的在线节点；API 自身就绪检查仍不依赖后台容量。宿主节点使用共享解析包和 PDFium；默认通过 Linux Landlock（ABI ≥3）与 libseccomp 真实验证解析子进程的文件与网络边界，不依赖用户命名空间。Windows 非沙箱模式与启动检查见[文件解析策略](NODE_CONFIGURATION.md#文件解析策略)。未通过所配置检查的节点不得声明 `document_protocol:2`。节点主进程正常联网；Linux 统一安装与预检见 [Linux 节点部署](../services/compute-node/linux/README.md)，不使用 privileged、SYS_ADMIN 或 unconfined。
 
 运维另行创建私有 `deploy/.env.document`（数据库、统一 Redis、身份及 DOCUMENT 配置）；用不可变镜像启动。宿主的 `state_dir` 使用持久磁盘及硬配额，`document_spool_bytes` 默认 6 GiB，和中心下发的文件预算取较小值；不以 tmpfs 承载整本文件。必须在目标宿主核实沙箱、磁盘预算、共享单图资源与重启恢复，再开启入口和供应商 `document.enabled`。未知目录交由运维核实，不粗暴清空 state_dir。
 
@@ -156,7 +156,7 @@ npm.cmd --prefix backend/website run dev:documents
 
 浏览器入口 `http://127.0.0.1:5195/`，API 仅监听 `127.0.0.1:4324`。启动器只读取指定根文件的 `R2_*` 字段，在既有前缀下创建本轮独立子前缀。浏览器仍直连 R2，须保留原规则并允许精确本地 origin 的 GET/HEAD/PUT；启动器不自动修改桶。原生开发登录只在专用 Vite 入口适配，正式 OIDC 规则不放宽；两个测试账户 `document-local-paid`、`document-local-other` 各预置 2000 页购买额度，不进行支付，重启不补回已消费额度。
 
-完整处理还需同一数据库／Redis／R2 前缀的 `document-worker` 处理全文，以及以独立身份连接本地 HTTPS 控制面的 Linux GPU 宿主。解析沙箱随宿主节点探测：Windows 或缺少所需 Landlock 能力的平台不能声明文件 v2 能力；禁止用户命名空间本身不再是阻碍。只测文件任务无需单图 `app.workers`，但仍保留 maintenance；缺少合格文件宿主时停在预检排队，缺少文本 worker 时停在全文阶段，不伪造成功。GPU 只拿节点令牌和短期对象签名，不下发 R2／LLM 密钥。测试网络、磁盘硬配额和解析边界须分别注明验证范围，不把本机功能联调称为生产部署验收。
+完整处理还需同一数据库／Redis／R2 前缀的 `document-worker` 处理全文，以及以独立身份连接本地 HTTPS 控制面的 GPU 宿主。默认要求 Linux 解析沙箱探测通过；Windows 可显式采用非沙箱策略并通过解析自检。只测文件任务无需单图 `app.workers`，但仍保留 maintenance；缺少合格文件宿主时停在预检排队，缺少文本 worker 时停在全文阶段，不伪造成功。GPU 只拿节点令牌和短期对象签名，不下发 R2／LLM 密钥。测试网络、磁盘硬配额和解析边界须分别注明验证范围，不把本机功能联调称为生产部署验收。
 
 停止前先停止接收新任务并排空已发送 LLM／有效租约，再停止相应进程与 Compose；`docker compose ... down` 保留数据卷，不使用 `down -v` 清除仍有任务的数据库。私有运行文件、节点身份和 R2 子前缀必须与数据库一起保留，避免失去恢复能力。
 

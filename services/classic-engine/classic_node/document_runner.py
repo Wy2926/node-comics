@@ -51,13 +51,19 @@ class DocumentRunner:
     def protocol(self):
         if self._protocol is False:
             try:
-                from comic_document_files import check_parser_sandbox
-                check_parser_sandbox(self.state_dir, require_sandbox=True)
+                from comic_document_files import check_parser_runtime
+                check_parser_runtime(self.state_dir, require_sandbox=self.require_sandbox)
                 self._protocol = 2
+                LOG.info('event=document_capability_enabled protocol=2 parser_sandbox=%s', self.require_sandbox)
             except Exception:
                 self._protocol = None
-                LOG.warning('event=document_capability_disabled code=DOCUMENT_PARSER_SANDBOX_UNAVAILABLE')
+                code = 'DOCUMENT_PARSER_SANDBOX_UNAVAILABLE' if self.require_sandbox else 'DOCUMENT_PARSER_UNAVAILABLE'
+                LOG.warning('event=document_capability_disabled code=%s', code)
         return self._protocol
+
+    @property
+    def require_sandbox(self):
+        return self.agent.local.get('document_require_sandbox', True)
 
     def post(self, path, body):
         return self.agent.transport.document_post(path, body)
@@ -80,7 +86,7 @@ class DocumentRunner:
             page.document_workspace = DocumentWorkspace(
                 self.state_dir, page.lease['job_id'], page.lease['workspace_generation'],
                 owner_id=self.agent.local['node_id'], limits=FileLimits(**limits),
-                require_sandbox=True, create=page.lease['action'] == 'doc_prepare')
+                require_sandbox=self.require_sandbox, create=page.lease['action'] == 'doc_prepare')
         return page.document_workspace
 
     def measured(self, page, name, operation):

@@ -166,12 +166,54 @@ def test_package_refuses_missing_or_corrupted_pages_and_keeps_existing_files(tmp
     assert target.read_bytes() == b'owned-by-user'
 
 
-def test_subprocess_scan_and_normalize_without_production_sandbox(tmp_path):
-    source = archive(tmp_path / 'source.zip', [('page.png', png())])
+@pytest.mark.parametrize('name', ['page.png', '日本語-é-🎨.png'])
+def test_subprocess_scan_and_normalize_without_production_sandbox(tmp_path, name):
+    source = archive(tmp_path / 'source.zip', [(name, png())])
     manifest = run_file_operation('scan', source, 'zip', require_sandbox=False)
     pages = run_file_operation('normalize', source, 'zip', tmp_path / 'pages', manifest,
                                require_sandbox=False)
     assert len(pages) == 1 and pages[0]['path'].is_file()
+    assert pages[0]['source_name'] == name
+
+
+def test_unsandboxed_runtime_probe_checks_pdf_and_zip_in_current_source(tmp_path, monkeypatch):
+    import comic_document_files as shared
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv('PYTHONPATH', str(tmp_path / 'obsolete-code'))
+    assert shared._parser_command() == [shared.sys.executable, '-I',
+        str(Path(shared.__file__).with_name('__main__.py'))]
+    assert shared.check_parser_runtime(tmp_path, require_sandbox=False)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize('returncode, output', [(1, b''), (0, b'wrong-probe')])
+def test_unsandboxed_runtime_probe_rejects_unusable_parser(tmp_path, monkeypatch, returncode, output):
+    import comic_document_files as shared
+    from types import SimpleNamespace
+    monkeypatch.setattr(shared.subprocess, 'run',
+        lambda *args, **kwargs: SimpleNamespace(returncode=returncode, stdout=output))
+    with pytest.raises(DocumentFileError, match='DOCUMENT_PARSER_UNAVAILABLE'):
+        shared.check_parser_runtime(tmp_path, require_sandbox=False)
+
+
+def test_runtime_probe_requires_sandbox_without_automatic_fallback(tmp_path, monkeypatch):
+    import comic_document_files as shared
+    calls = []
+    def unavailable(path, *, require_sandbox):
+        calls.append(require_sandbox)
+        raise DocumentFileError('DOCUMENT_SANDBOX_UNAVAILABLE')
+    monkeypatch.setattr(shared, 'check_parser_sandbox', unavailable)
+    monkeypatch.setattr(shared.subprocess, 'run', lambda *a, **k: pytest.fail('Unexpected fallback'))
+    with pytest.raises(DocumentFileError, match='DOCUMENT_SANDBOX_UNAVAILABLE'):
+        shared.check_parser_runtime(tmp_path)
+    assert calls == [True]
+
+
+def test_cbz_uses_same_bounded_zip_parser(tmp_path):
+    import comic_document_files as shared
+    source = archive(tmp_path / 'source.cbz', [('2.png', png()), ('1.png', png())])
+    pages = shared.run_file_operation('normalize', source, 'cbz', tmp_path / 'pages', require_sandbox=False)
+    assert [page['source_name'] for page in pages] == ['1.png', '2.png']
 
 
 def test_child_is_not_given_r2_credentials(monkeypatch, tmp_path):

@@ -390,6 +390,30 @@ def _sandbox_command(source, output):
             str(source), str(output)]
 
 
+def _parser_command():
+    # The portable interpreter's _pth can still point at an older installed
+    # package. Launch this exact source version, without inheriting PYTHONPATH.
+    return [sys.executable, '-I', str(Path(__file__).with_name('__main__.py'))]
+
+
+def check_parser_runtime(spool_path=None, *, require_sandbox=True):
+    if require_sandbox:
+        return check_parser_sandbox(spool_path, require_sandbox=True)
+    if spool_path is not None:
+        Path(spool_path).mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='parser-probe-', dir=spool_path) as temporary:
+        try:
+            result = subprocess.run(_parser_command() + ['--probe', temporary],
+                env=_child_environment(temporary), stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=15,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        except (OSError, subprocess.TimeoutExpired):
+            raise DocumentFileError('DOCUMENT_PARSER_UNAVAILABLE') from None
+        if result.returncode or result.stdout.strip() != b'document-parser-ok':
+            raise DocumentFileError('DOCUMENT_PARSER_UNAVAILABLE')
+    return True
+
+
 def check_parser_sandbox(spool_path=None, *, require_sandbox=True):
     """Prove library loading and kernel-enforced denials before advertising v2."""
     if not require_sandbox:
@@ -436,7 +460,7 @@ def run_file_operation(action, source, source_type, directory=None, manifest=Non
         payload = {'action': action, 'source': str(source), 'source_type': source_type,
                    'directory': str(output), 'manifest': manifest, 'limits': asdict(limits)}
         environment = _child_environment(output)
-        command = [sys.executable, '-m', 'comic_document_files']
+        command = _parser_command()
         sandboxed = sys.platform.startswith('linux') and require_sandbox
         if require_sandbox and not sys.platform.startswith('linux'):
             raise DocumentFileError('DOCUMENT_SANDBOX_UNAVAILABLE')
@@ -547,4 +571,6 @@ def _child(payload=None):
         reply = {'error': error.code}
     except Exception:
         reply = {'error': 'DOCUMENT_PARSE_FAILED'}
-    sys.stdout.write(json.dumps(reply, default=str, ensure_ascii=False))
+    # IPC is UTF-8 regardless of the Windows ANSI code page or -I ignoring
+    # PYTHONUTF8. Archive names may contain characters outside that code page.
+    sys.stdout.buffer.write(json.dumps(reply, default=str, ensure_ascii=False).encode('utf-8'))

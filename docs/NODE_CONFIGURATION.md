@@ -22,11 +22,17 @@
 
 节点先预热，使用后台预建的独立凭据注册；注册不能扩容或解除停用。管理员修改配置后，新领取按新版本校验；节点通过长轮询、心跳和领取响应获取配置，迟到旧版本不会覆盖新版本。节点凭据轮换后旧凭据立即失效。全部接口与配套升级要求见 [协议实施](COMPUTE_PROTOCOL.md)。
 
-仅解析沙箱探测通过的 Linux 节点声明 `document_protocol:2`；不支持的宿主仍可执行普通 v3 单图。文件从准备到 ZIP 固定同一节点和工作目录代次，各阶段计入共享执行位、固定线程池和内存预算，不新增 GPU 身份或文档模型进程；新领取与窗口收尾遵循[文件调度规则](DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。整本 LLM 等待不占 GPU 租约或页缓冲，恢复渲染时本地 analysis JSON 计入内存预算，无逐页 R2 传输。传输、失盘与耐久恢复见[文件页协议](COMPUTE_PROTOCOL.md#文件页协议)。
+文件解析启动检查通过的节点声明 `document_protocol:2`；默认要求 Linux 解析沙箱，Windows 可按下文显式使用非沙箱子进程。不满足配置要求的宿主仍可执行普通 v3 单图。文件从准备到 ZIP 固定同一节点和工作目录代次，各阶段计入共享执行位、固定线程池和内存预算，不新增 GPU 身份或文档模型进程；新领取与窗口收尾遵循[文件调度规则](DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。整本 LLM 等待不占 GPU 租约或页缓冲，恢复渲染时本地 analysis JSON 计入内存预算，无逐页 R2 传输。传输、失盘与耐久恢复见[文件页协议](COMPUTE_PROTOCOL.md#文件页协议)。
 
 ## 节点本地配置
 
 复制 [node.example.json](../services/classic-engine/node.example.json) 为私有文件。必填 `protocol_version:3`、中心 HTTPS `control_url`、`node_id`、`node_token` 和 `resource_id`；不配置对象存储 origin 或凭据。可用 `control_ca` 指定私有中心 CA，仍验证服务器证书和主机名；节点凭据只发送到配置中的中心。
+
+### 文件解析策略
+
+`document_require_sandbox` 默认 `true`，要求 Linux Landlock ABI ≥3 与 libseccomp 探测通过；失败时不声明文件能力，不自动降级。Windows 节点可在私有 `data/node.json` 顶层显式设置 `"document_require_sandbox": false`，排空重启后使用普通解析子进程处理 PDF／ZIP／CBZ。启动时在当前版本的解析子进程内实际解析微型 PDF 和 ZIP，通过才声明文件协议 v2；中心仍需启用节点并设置 `document_slots > 0`。
+
+非沙箱模式不隔离当前用户的文件、网络或进程权限。保留源文件／页数／像素／解压体积／磁盘应用预算、超时终止和有界结果；不向解析子进程传入节点或存储凭据，但这不阻止同用户文件访问。Windows 没有 Linux 的 `RLIMIT` 内存／CPU 硬限制，应用预算和超时也不能替代权限隔离或磁盘硬配额。开启前须接受这一边界；默认策略不会因平台或依赖故障自动变更。
 
 ### 代理
 

@@ -53,7 +53,7 @@ AMD 的 [MIOpen 调优数据库与内核缓存](https://rocm.docs.amd.com/projec
 
 仅下载准备、不接入中心可执行 `node.exe prepare --backend cuda` 或 `node.exe prepare --backend amd`；命令行启动为 `node.exe start`，首次也可附加 `--backend cuda|amd --from <私有配置>`。`node.exe doctor` 在节点停止时检查 GPU、模型和字体，不接单。节点身份不能与其他部署同时运行；新电脑使用新身份。彻底移除前先处理完待交付任务、关闭自启并停止，再删除该专用目录；不要删除其他部署的环境或数据。
 
-Windows 便携包处理普通 v3 单图任务，不声明需要 Linux 解析沙箱的 `document_protocol:2` 文件能力。节点不配置 R2／LLM 凭据。状态、日志与恢复规则见[节点运维](../classic-engine/docs/NODE_OPERATIONS.md)，文件任务能力与调度见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)及[文件调度规则](../../docs/DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。
+Windows 便携包默认处理普通 v3 单图任务。需要 PDF／ZIP／CBZ 整本处理时，在私有 `data/node.json` 顶层显式设置 `"document_require_sandbox": false`，排空重启；解析启动检查通过后声明 `document_protocol:2`，中心还须允许文件领取。此模式不使用解析沙箱，权限与资源限制见[文件解析策略](../../docs/NODE_CONFIGURATION.md#文件解析策略)。节点不配置 R2／LLM 凭据。状态、日志与恢复规则见[节点运维](../classic-engine/docs/NODE_OPERATIONS.md)，文件任务能力与调度见[文件页协议](../../docs/COMPUTE_PROTOCOL.md#文件页协议)及[文件调度规则](../../docs/DOCUMENT_TRANSLATION.md#共享调度与闲时借位)。
 
 ## 开发构建与验证
 

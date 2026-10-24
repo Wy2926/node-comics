@@ -12,7 +12,7 @@ ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto', 'bac
     'ocr_arena_extend_strategy': 'kSameAsRequested', 'ocr_arena_shrinkage': True}
 LOCAL_DEFAULTS = {'local_pages': 2, 'render_workers': 'auto', 'max_leases': 8,
     'download_workers': 4, 'delivery_workers': 4, 'claim_batch_size': 4,
-    'document_control_workers': 2,
+    'document_control_workers': 2, 'document_require_sandbox': True,
     'resident_bytes': 1024 ** 3, 'document_spool_bytes': 6 * 1024 ** 3}
 
 
@@ -82,6 +82,8 @@ def load(path):
         raise ValueError('claim_batch_size must be between 1 and the center limit of 4')
     if type(value['document_control_workers']) is not int or not 2 <= value['document_control_workers'] <= 3:
         raise ValueError('document_control_workers must be 2 or 3 (claim, heartbeat, sync)')
+    if type(value['document_require_sandbox']) is not bool:
+        raise ValueError('document_require_sandbox must be a boolean')
     if type(value['resident_bytes']) is not int or value['resident_bytes'] < 512 * 1024 * 1024:
         raise ValueError('Reserve at least 512 MiB for page buffers')
     if type(value['document_spool_bytes']) is not int or not 256 * 1024 ** 2 <= value['document_spool_bytes'] <= 16 * 1024 ** 3:

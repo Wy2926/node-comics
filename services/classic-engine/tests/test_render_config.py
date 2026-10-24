@@ -9,6 +9,25 @@ def configuration():
             'node_id': 'fixture', 'node_token': 'fixture', 'resource_id': 'fixture:cuda:0'}
 
 
+@pytest.mark.parametrize('options, expected', [({}, True), ({'document_require_sandbox': True}, True),
+                                              ({'document_require_sandbox': False}, False)])
+def test_document_parser_policy_is_explicit_and_defaults_to_sandbox(tmp_path, options, expected):
+    from classic_node.config import execution_settings
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(configuration() | options))
+    resolved = load(path)
+    assert resolved['document_require_sandbox'] is expected
+    assert execution_settings(resolved)['document_require_sandbox'] is expected
+
+
+@pytest.mark.parametrize('value', [None, 0, 1, 'false', 'true'])
+def test_document_parser_policy_rejects_non_boolean(tmp_path, value):
+    path = tmp_path / 'node.json'
+    path.write_text(json.dumps(configuration() | {'document_require_sandbox': value}))
+    with pytest.raises(ValueError, match='document_require_sandbox'):
+        load(path)
+
+
 @pytest.mark.parametrize('proxy', [None, 'http://user:p%40ss@localhost:7890', 'https://localhost:7890',
                                  'socks5://localhost:1080', 'socks5h://localhost:1080'])
 def test_native_proxy_configuration(tmp_path, proxy):

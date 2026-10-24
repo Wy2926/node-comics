@@ -1021,12 +1021,35 @@ def test_capability_probe_fails_closed_once_when_sandbox_is_unavailable(agent, m
     def unavailable(path, *, require_sandbox):
         calls.append(require_sandbox)
         raise DocumentFileError('DOCUMENT_SANDBOX_UNAVAILABLE')
-    monkeypatch.setattr('comic_document_files.check_parser_sandbox', unavailable)
+    monkeypatch.setattr('comic_document_files.check_parser_runtime', unavailable)
     with caplog.at_level(logging.WARNING, logger='classic-node'):
         assert agent.documents.protocol() is None
         assert agent.documents.protocol() is None
     assert calls == [True] and agent.documents.capacity() == 0
     assert 'DOCUMENT_PARSER_SANDBOX_UNAVAILABLE' in caplog.text
+
+
+@pytest.mark.parametrize('required', [True, False])
+def test_capability_and_execution_share_parser_policy(agent, monkeypatch, required):
+    agent.local['document_require_sandbox'] = required
+    calls = []
+    monkeypatch.setattr('comic_document_files.check_parser_runtime',
+                        lambda path, *, require_sandbox: calls.append(require_sandbox))
+    assert agent.documents.protocol() == agent.documents.protocol() == 2
+    assert calls == [required]
+    page = add_document(agent, action='doc_prepare')
+    assert agent.documents.workspace(page).require_sandbox is required
+
+
+def test_unsandboxed_parser_probe_failure_disables_documents(agent, monkeypatch, caplog):
+    agent.local['document_require_sandbox'] = False
+    def unavailable(*args, **kwargs):
+        raise DocumentFileError('DOCUMENT_PARSER_UNAVAILABLE')
+    monkeypatch.setattr('comic_document_files.check_parser_runtime', unavailable)
+    with caplog.at_level(logging.WARNING, logger='classic-node'):
+        assert agent.documents.protocol() is None
+    assert agent.documents.capacity() == 0
+    assert 'DOCUMENT_PARSER_UNAVAILABLE' in caplog.text
 
 
 def test_document_decode_uses_existing_normalized_runtime_contract(agent):
