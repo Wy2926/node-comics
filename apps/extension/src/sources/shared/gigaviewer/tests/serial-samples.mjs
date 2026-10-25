@@ -1,5 +1,11 @@
 // Fixed public, read-only samples. No accounts or translation providers.
 export const samples = [
+  {id: 'comicogyaaa', name: 'COMIC OGYAAA!!', origin: 'https://comic-ogyaaa.com',
+    cdn: 'https://cdn-img.comic-ogyaaa.com', query: 'いち駆ける', episode: '2551460910063242542', series: '2551460910063238336'},
+  {id: 'feelweb', name: 'FEEL web', origin: 'https://feelweb.jp',
+    cdn: 'https://cdn-img.feelweb.jp', query: '自然パない', episode: '4856001361355260751', series: '4856001361355251572'},
+  {id: 'comicseasons', name: 'Seasons', origin: 'https://comic-seasons.com',
+    cdn: 'https://cdn-img.comic-seasons.com', query: '死にかけ乙女', episode: '12207421983711088679', series: '12207421983711064345'},
   {id: 'comictrail', name: 'コミックトレイル', origin: 'https://comic-trail.com',
     cdn: 'https://cdn-img.comic-trail.com', query: 'ときめき', episode: '12207421984318727912', series: '12207421984318687209'},
   {id: 'magcomi', name: 'マグコミ', origin: 'https://magcomi.com',

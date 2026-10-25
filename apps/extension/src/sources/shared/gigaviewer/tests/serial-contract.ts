@@ -66,6 +66,35 @@ export function verifySerialSite(definition: SourceDefinition, protocol: GigaVie
       expect(result.entries.map(e => [e.remoteId, e.order, e.readable])).toEqual([['11', 0, true], ['12', 1, false], ['13', 2, true]]);
       expect(ctx.request.mock.calls.some(([u]) => u.includes('first_episode'))).toBe(false);
     });
+    it('follows current source authorization through limited opening, expiry and reopening', async () => {
+      const ctx = context(), read = ctx.request.getMockImplementation()!;
+      let available = true;
+      ctx.request.mockImplementation(async url => {
+        if (url.includes('/episode/')) {
+          const value = data();
+          if (!available) Object.assign(value.readableProduct, {pageStructure: null});
+          return reader(value);
+        }
+        if (url.includes('offset=0')) return JSON.stringify([
+          {...entry('11', available), open_limit: '公開終了まで12日',
+            purchase_info: {can_read: available, is_free: true}}, entry('12', false),
+        ]);
+        return read(url);
+      });
+      const opened = await network.catalog(work, ctx);
+      expect(opened.entries[0].readable).toBe(true);
+      expect((await network.pages(chapter, ctx)).knownTotal).toBe(2);
+      available = false;
+      // A previously readable directory must not grant access to a now closed chapter.
+      await expect(network.pages(chapter, ctx)).rejects.toThrow('当前不可读取');
+      const expired = await network.catalog(work, {...ctx, previous: opened});
+      expect(expired.entries.map(e => e.id)).toEqual(opened.entries.map(e => e.id));
+      expect(expired.entries[0].readable).toBe(false);
+      expect(opened.entries[0].readable).toBe(true);
+      available = true;
+      expect((await network.catalog(work, {...ctx, previous: expired})).entries[0].readable).toBe(true);
+      expect((await network.pages(chapter, ctx)).knownTotal).toBe(2);
+    });
     it.each(['duplicate', 'partial', 'foreign', 'changed', 'binding'])('rejects %s catalog without mutating the previous snapshot', async mode => {
       const ctx = context(), previous = await network.catalog(work, ctx), before = structuredClone(previous);
       const read = ctx.request.getMockImplementation()!; let infoReads = 0;
@@ -90,6 +119,22 @@ export function verifySerialSite(definition: SourceDefinition, protocol: GigaVie
       expect(() => protocol.parseReader(reader() + reader(), chapter)).toThrow();
       const value = data(); value.readableProduct.pageStructure.pages[0].src = image.replace(cdn, origin);
       expect(() => protocol.parsePages(value, chapter)).toThrow();
+    });
+    it('reads source-owned filtered pages without changing their URL, slot or decoder', async () => {
+      const value = data(), filtered = image.replace('/page/2/', '/page/filtered/2/');
+      Object.assign(value.readableProduct.pageStructure.pages[0], {src: filtered, width: 1441, height: 2048});
+      const result = validatePages(await network.pages(chapter, {request: async () => reader(value)}),
+        definition.identify(new URL(chapter))!);
+      expect(result.items[0]).toMatchObject({id: 'page-0', width: 1441, height: 2048,
+        resource: {url: filtered, processing: 'gigaviewer-baku:1441:2048'}});
+      expect(result.items[1]).toMatchObject({id: 'page-2', resource: {url: image}});
+      for (const url of [filtered.replace(cdn, origin), filtered.replace(cdn, cdn + '.evil.test'),
+        filtered.replace('https://', 'https://user@'), filtered.replace('/public/', '/private/'),
+        filtered.replace('/filtered/', '/unknown/'), filtered.replace('/filtered/2/', '/filtered/'),
+        filtered.replace('/filtered/2/', '/filtered/%32/')]) {
+        value.readableProduct.pageStructure.pages[0].src = url;
+        expect(() => protocol.parsePages(value, chapter)).toThrow();
+      }
     });
     it('rejects locked content and cancellation before/after I/O', async () => {
       const locked = data(); Object.assign(locked.readableProduct, {pageStructure: null});

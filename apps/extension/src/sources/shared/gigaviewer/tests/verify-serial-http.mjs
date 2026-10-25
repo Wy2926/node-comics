@@ -7,6 +7,9 @@ import {samples} from './serial-samples.mjs';
 
 const selected = process.argv[2] ? samples.filter(s => s.id === process.argv[2]) : samples;
 assert(selected.length && process.argv.length <= 3, 'Usage: node verify-serial-http.mjs [site-id]');
+const readerOverride = process.env.GIGAVIEWER_READER_URL, queryOverride = process.env.GIGAVIEWER_SEARCH_QUERY;
+assert(!readerOverride && !queryOverride || selected.length === 1 && readerOverride && queryOverride,
+  'Custom checks require one site-id and both GIGAVIEWER_READER_URL and GIGAVIEWER_SEARCH_QUERY');
 const root = process.cwd(), extension = path.join(root, 'apps/extension'), base = path.join(root, 'artifacts/gigaviewer/http');
 await mkdir(base, {recursive: true});
 const out = await mkdtemp(path.join(base, 'run-')), source = path.join(extension, 'src').replaceAll('\\', '/');
@@ -42,14 +45,34 @@ for (const sample of selected) {
     }} finally {await reader.cancel(); reader.releaseLock();}
     return Buffer.concat(chunks);
   }
-  const context = {request: async (url, options) => (await read(url, options)).toString('utf8')};
+  const catalogRows = new Map();
+  const context = {request: async (url, options) => {
+    const raw = (await read(url, options)).toString('utf8');
+    if (new URL(url).pathname === '/api/viewer/pagination_readable_products')
+      for (const row of JSON.parse(raw)) catalogRows.set(row.readable_product_id, row);
+    return raw;
+  }};
   try {
-    const hits = validateSearchPage(await network.search({siteId: sample.id, query: sample.query}, context), definition, definition.sites[0], [definition]);
-    assert(hits.items.some(hit => hit.catalogId === `${sample.id}:series:${sample.series}`));
-    const chapter = `${sample.origin}/episode/${sample.episode}`, catalogUrl = await network.resolveCatalog(chapter, context);
+    const chapter = readerOverride || `${sample.origin}/episode/${sample.episode}`;
+    const location = definition.identify(new URL(chapter));
+    assert(location?.kind === 'reader', 'Sample must be a reader owned by the selected source');
+    const catalogUrl = await network.resolveCatalog(chapter, context);
     const catalog = validateCatalog(await network.catalog(catalogUrl, context), [definition]);
-    assert(catalog.complete && catalog.id === `${sample.id}:series:${sample.series}`);
-    const entry = catalog.entries.find(e => e.remoteId === sample.episode); assert(entry?.readable);
+    assert(catalog.complete);
+    if (!readerOverride) assert.equal(catalog.id, `${sample.id}:series:${sample.series}`);
+    const hits = validateSearchPage(await network.search({siteId: sample.id, query: queryOverride || sample.query}, context), definition, definition.sites[0], [definition]);
+    assert(hits.items.some(hit => hit.catalogId === catalog.id));
+    assert.equal(catalogRows.size, catalog.entries.length, 'Pricing audit must cover the complete sampled catalog');
+    const purchaseStates = [...catalogRows.values()].map(row => row.purchase_info);
+    const pricingFlags = ['is_free', 'unavailable', 'purchasable', 'rentable_via_point', 'rentable_via_ticket', 'subscribable'];
+    const pricing = {declared: definition.sites[0].pricing, entries: purchaseStates.length,
+      ...Object.fromEntries(pricingFlags.map(flag => [flag, purchaseStates.filter(state => {
+        assert.equal(typeof state[flag], 'boolean', 'Unknown pricing flag: ' + flag);
+        return state[flag];
+      }).length]))};
+    if (pricing.declared === 'free') assert(pricingFlags.slice(2).every(flag => pricing[flag] === 0),
+      'Free classification conflicts with source purchase/rental/subscription capabilities; review pricing evidence');
+    const entry = catalog.entries.find(e => e.id === location.pageKey); assert(entry?.readable);
     const pages = validatePages(await network.pages(entry.url, context), definition.identify(new URL(entry.url)));
     assert(pages.discoveryComplete && pages.knownTotal === pages.items.length && pages.items.length > 1);
     const pageBytes = await read(pages.items[0].resource.url, undefined, true);
@@ -68,9 +91,10 @@ for (const sample of selected) {
       assert(second.items.length > 0 && new Set(keys).size === keys.length, 'Search pages must contain distinct source works');
       pagination = {pages: 2, items: keys.length};
     }
-    results.push({siteId: sample.id, status: 'passed', entries: catalog.entries.length,
+    results.push({siteId: sample.id, status: 'passed', episode: entry.remoteId,
+      openLimit: catalogRows.get(entry.remoteId).open_limit ?? null, entries: catalog.entries.length,
       readable: catalog.entries.filter(e => e.readable).length, pages: pages.items.length, requests, bytes,
-      imageBytes: pageBytes.length, coverBytes: coverBytes.length, lockedRefused: !!locked, pagination, elapsedMs: Math.round(performance.now() - start)});
+      imageBytes: pageBytes.length, coverBytes: coverBytes.length, lockedRefused: !!locked, pricing, pagination, elapsedMs: Math.round(performance.now() - start)});
   } catch (error) {results.push({siteId: sample.id, status: 'failed', error: sanitize(error), requests, bytes});}
   console.log(JSON.stringify(results.at(-1)));
 }

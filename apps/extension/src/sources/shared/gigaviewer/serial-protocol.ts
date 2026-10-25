@@ -78,7 +78,7 @@ export function gigaViewerAssetUrls(origin: string) {
     if (url.origin !== origin || url.username || url.password || !pattern.test(url.pathname)) throw changed();
     return url;
   }
-  const pageUrl = (value: unknown) => asset(value, /^\/public\/page\/(?:\d+\/)?[1-9]\d*-[a-f\d]+$/).href;
+  const pageUrl = (value: unknown) => asset(value, /^\/public\/page\/(?:(?:filtered\/)?\d+\/)?[1-9]\d*-[a-f\d]+$/).href;
   function coverUrl(value: unknown, series?: string) {
     let url = new URL(text(value, 8192));
     if (url.origin === 'https://cdn-scissors.gigaviewer.com' && !url.username && !url.password)

@@ -172,6 +172,9 @@ npm run build
 | [ゼノンプラス](../apps/extension/src/sources/sites/zenon/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面与 12 小时同步；裸章节归属、浮动导入与共享 GigaViewer 图片还原，不购买或解锁付费内容 |
 | [コミックトレイル](../apps/extension/src/sources/sites/comictrail/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／公开正文／封面及 12 小时同步；裸章节归属、网页浮动导入与共享 GigaViewer 图片还原 |
 | [マグコミ](../apps/extension/src/sources/sites/magcomi/README.md) | 日语生肉 SSR 名称搜索、HTTP 完整分话目录／公开正文／封面及 12 小时同步；裸章节归属、网页浮动导入与共享 GigaViewer 图片还原，不购买、提前解锁或领取阅读奖励 |
+| [COMIC OGYAAA!!](../apps/extension/src/sources/sites/comicogyaaa/README.md) | 部分收费的日语生肉站；名称搜索、HTTP 完整分话目录／公开及限时开放正文／封面及 12 小时同步；复用 GigaViewer，结束公开的历史话保留但不可读 |
+| [FEEL web](../apps/extension/src/sources/sites/feelweb/README.md) | 日语生肉名称搜索、HTTP 完整分话目录／免费公开正文／封面及 12 小时同步；复用 GigaViewer，不保证已撤下历史章仍可访问 |
+| [Seasons](../apps/extension/src/sources/sites/comicseasons/README.md) | 日语生肉 SSR 名称搜索、HTTP 完整分话目录／免费公开正文／封面及 12 小时同步；复用 GigaViewer，无需登录，不将已下架章节视为付费解锁 |
 | [ComicWalker / カドコミ](../apps/extension/src/sources/sites/comicwalker/README.md) | HTTP 名称搜索、完整公开目录／正文／封面、图片还原与 12 小时同步；作品／章节导入、浮动入口及有限 canvas 下一页预翻 |
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 名称搜索、HTTP 完整分页目录／封面、公开免费正文还原与 12 小时同步；作品／章节浮动导入，标签页识图复用通用规则，不自动消耗体力、硬币或阅读券 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
