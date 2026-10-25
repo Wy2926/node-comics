@@ -54,8 +54,10 @@ beforeEach(async()=>{
   vi.resetModules();vi.clearAllMocks();cores=[];channels=[];options=[];storageListeners=[];updated=()=>{};
   session={'nc-inline:7':{url,navigationId:'nav-7',documentId:'doc-7',automatic:false}};
   mocks.getTab.mockImplementation(async()=>({...tab}));
-  mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string})=>message.type==='NC_REGION_IDENTITY'
-    ?{url,enabled:false}:{url,navigationId:'nav-7',enabled:false});
+  mocks.tabMessage.mockImplementation(async(_id:number,message:{type:string},target:{frameId?:number;documentId?:string})=>{
+    if(target?.frameId!==undefined&&target.documentId)throw Error('Safari forbids frameId with documentId');
+    return message.type==='NC_REGION_IDENTITY'?{url,enabled:false}:{url,navigationId:'nav-7',enabled:false};
+  });
   mocks.localSettings.mockResolvedValue({'nc-reader-settings':{language:'zh-Hans'}});
   mocks.automatic.mockResolvedValue(true);mocks.init.mockResolvedValue(undefined);
   mocks.inlineSize.mockReturnValue(true);
@@ -457,7 +459,7 @@ describe('inline activation lifetime',()=>{
       return channel;
     });
     let settled=false;const done=send(request(1,images)).then(value=>{settled=true;return value;});
-    await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_UPDATE',generation:1,data:expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:'image-7',resultKey:expect.any(String)})])})}),{frameId:0,documentId:'doc-7'}));
+    await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_UPDATE',generation:1,data:expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:'image-7',resultKey:expect.any(String)})])})}),{documentId:'doc-7'}));
     expect(settled).toBe(false);slow.finish();expect(await done).toMatchObject({ok:true});
   });
   it('keeps status waiting independent of a slow neighbouring admission',async()=>{
@@ -575,7 +577,7 @@ describe('inline activation lifetime',()=>{
     await background.activateInline(7);pending.finish();
     expect(await old).toMatchObject({ok:false});expect(mocks.openChannel).not.toHaveBeenCalled();
     expect(await send(request())).toMatchObject({ok:true});expect(cores[0].submit).toHaveBeenCalledOnce();
-    expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_START',automatic:false}),{frameId:0,documentId:'doc-7'});
+    expect(mocks.tabMessage).toHaveBeenCalledWith(7,expect.objectContaining({type:'NC_INLINE_START',automatic:false}),{documentId:'doc-7'});
   });
 
   it('does not start an activation invalidated while its authorization is being saved',async()=>{
@@ -722,7 +724,7 @@ describe('selected image activation',()=>{
     expect(session['nc-inline:7']).toEqual({url,navigationId:'nav-after-stop',documentId:'doc-7',automatic:false,
       image:{id:image.id,url:image.url}});
     expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_INLINE_START',automatic:false,imageId:image.id},
-      {frameId:0,documentId:'doc-7'});
+      {documentId:'doc-7'});
     expect(await send(request())).toMatchObject({ok:false});
     expect(await send({...request(),navigationId:'nav-after-stop'})).toMatchObject({ok:true});
     expect(mocks.readImage).toHaveBeenCalledWith(image.url,url,expect.any(AbortSignal),undefined,true);

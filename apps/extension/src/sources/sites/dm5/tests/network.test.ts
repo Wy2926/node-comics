@@ -36,7 +36,7 @@ describe('DM5 HTTP adapter', () => {
   it('resolves bare chapters through the same validated reader identity without requesting images', async () => {
     const read=vi.fn(async()=>readerHtml);
     expect(await network.resolveCatalog!(reader(false),{request:read})).toBe(url);
-    expect(read).toHaveBeenCalledExactlyOnceWith(reader(false));
+    expect(read).toHaveBeenCalledExactlyOnceWith(reader(false),{desktop:true});
     await expect(network.resolveCatalog!(reader(true).replace('=fixture','=foreign'),{request:read})).rejects.toThrow();
     await expect(network.resolveCatalog!(reader(false),{request:async()=>readerHtml.replace('DM5_CID=1836194','DM5_CID=1')})).rejects.toThrow();
     const controller=new AbortController();read.mockImplementationOnce(async()=>{controller.abort();return readerHtml;});
@@ -226,6 +226,6 @@ describe('DM5 HTTP adapter', () => {
     const previous = parseCatalog(html([1836194]), url), reads = vi.fn(async () => html());
     const next = await network.catalog!(url, {previous, request: reads});
     expect(next.entries).toHaveLength(2);
-    expect(reads).toHaveBeenCalledExactlyOnceWith(url);
+    expect(reads).toHaveBeenCalledExactlyOnceWith(url,{desktop:true});
   });
 });

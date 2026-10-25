@@ -32,6 +32,19 @@ beforeEach(() => {
 });
 afterEach(() => {vi.unstubAllGlobals();});
 
+it('requests desktop HTML only when the adapter selects it in Safari',async()=>{
+  chrome.runtime.getURL=()=> 'safari-web-extension://fixture/';
+  const context=createSourceNetworkContext();
+  await context.request(endpoint,{desktop:true});
+  expect(fetcher.mock.calls[0][1]?.headers).toHaveProperty('User-Agent',expect.stringContaining('Macintosh'));
+  expect(fixture.headers).toHaveBeenLastCalledWith(endpoint,undefined);
+  await context.request(endpoint);
+  expect(fetcher.mock.calls[1][1]?.headers).not.toHaveProperty('User-Agent');
+  chrome.runtime.getURL=()=> 'chrome-extension://fixture/';
+  await context.request(endpoint,{desktop:true});
+  expect(fetcher.mock.calls[2][1]?.headers).not.toHaveProperty('User-Agent');
+});
+
 describe('bounded source binary POST', () => {
   it.each([200, 403, 503])('classifies Cloudflare HTTP %s before parsing text, accepted statuses or binary data', async status => {
     for (const binary of [false, true]) {

@@ -1,4 +1,5 @@
 import type {SourceLocation} from '../contracts/definition';
+import {hostPermissionPattern} from '../../host-permissions';
 
 export interface ImportResponse {url:string; referer?:string; body:string}
 interface Handoff {sourceId:string; pageKey:string; catalogKey:string; expiresAt:number; responses:ImportResponse[]}
@@ -45,7 +46,7 @@ export async function takeImportResponses(location:SourceLocation,signal?:AbortS
   },signal);
   if(!value)return [];
   // Permission revocation must invalidate the handoff just as it invalidates a fresh request.
-  const origins=[...new Set([location.url,...value.responses.map(response=>response.url)].map(url=>new URL(url).origin+'/*'))];
+  const origins=[...new Set([location.url,...value.responses.map(response=>response.url)].map(hostPermissionPattern))];
   const granted=await chrome.permissions.contains({origins}).catch(()=>false);
   signal?.throwIfAborted();
   return granted?value.responses:[];

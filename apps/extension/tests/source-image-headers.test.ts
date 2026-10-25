@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {withImageHeaders} from '../src/sources/runtime/image-headers';
+import {recoverImageHeaders,withImageHeaders} from '../src/sources/runtime/image-headers';
 
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -36,4 +36,28 @@ it.each([false,true])('supports Firefox without runtime enums and cleans up afte
   else await expect(result).resolves.toBe('image bytes');
   expect(read).toHaveBeenCalledOnce();
   expect(rules).toEqual([unrelated]);
+});
+
+it('bounds Safari lock names for long URLs and uses the same lock during recovery',async()=>{
+  const names:string[]=[];
+  let rules:chrome.declarativeNetRequest.Rule[]=[];
+  let live:string|undefined;
+  vi.stubGlobal('navigator',{locks:{request:async(name:string,options:any,callback?:any)=>{
+    expect(name.length).toBeLessThanOrEqual(1024);names.push(name);
+    if(!callback)return options();
+    if(options.ifAvailable)return callback(name===live?null:{});
+    live=name;try{return await callback({});}finally{live=undefined;}
+  }}});
+  vi.stubGlobal('chrome',{runtime:{getURL:()=> 'safari-web-extension://fixture/'},declarativeNetRequest:{
+    getSessionRules:async()=>rules,
+    updateSessionRules:async({addRules=[],removeRuleIds=[]}:any)=>{rules=rules.filter(r=>!removeRuleIds.includes(r.id)).concat(addRules);},
+  }});
+  await withImageHeaders('https://cdn.test/image?ids='+('123456,'.repeat(1000)),{referer:'https://site.test/'},undefined,async()=>{
+    expect(rules).toHaveLength(1);
+    await recoverImageHeaders();
+    expect(rules).toHaveLength(1); // recovery cannot remove the active reader's rule
+  });
+  expect(rules).toHaveLength(0);
+  const imageNames=names.filter(n=>n.startsWith('nc-source-image:'));
+  expect(imageNames).toHaveLength(2);expect(imageNames[0]).toBe(imageNames[1]);
 });

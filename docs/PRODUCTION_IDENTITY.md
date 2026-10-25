@@ -30,17 +30,21 @@ docker compose --env-file .env -f compose.server.yaml run --rm --no-deps migrate
 
 插件有 `identity` API 时使用 `chrome.identity.getRedirectURL('oidc')`；缺少该 API 的 Firefox Android／Firefox 格式移动包根据固定 Gecko ID 生成相同回调，不使用随机的 `moz-extension://<UUID>` 阅读页。普通网页回调仍为实际 origin 与路径；更换扩展 ID 后同步身份平台和 `EXTENSION_IDS`。
 
+Safari 技术验证版使用服务 origin 的 `/auth/callback/`，复用官网已经登记的精确回调；不登记随机的 `safari-web-extension://<UUID>` 地址。当前适配与验证边界见 [Safari 技术验证](SAFARI_PROTOTYPE.md)。
+
 ### Firefox 回调与请求来源
 
 Firefox 的 Gecko ID 固定为 `comics@nodelane.net`，OIDC 回调为 `https://b6537bc59408f22ed5813efab806261a7e62bd16.extensions.allizom.org/oidc`，在 Logto 登记此精确 Redirect URI。插件内部的 `moz-extension://<UUID>` 由浏览器配置决定，不能作为所有安装共用的 Allowed CORS origin。
 
 Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR 规则仅移除本插件发往精确令牌端点的 POST 请求的 Origin；规则按扩展来源、完整 URL 和请求类型限定，通过 Web Locks 串行更新并在请求结束或失败后删除。初始端点的主机权限与 HTTPS 校验、无 Cookie／Referer、PKCE、回调 state 与 API 身份校验继续生效；令牌请求遵循浏览器原生 HTTP 重定向语义，无需登记每个 Firefox UUID。网页和 Chrome／Edge 的 Allowed CORS origins 仍按实际来源配置。
 
+Safari 扩展自身请求的 Origin 不受该 DNR 规则影响，授权码交换和续期改由容器的原生消息处理器执行。令牌分支只接受两种令牌 POST，HTTPS（Debug 构建允许回环 HTTP），使用临时 URLSession，不发送 Cookie、Referer 或 Origin，不跟随重定向、不持久化或记录凭据。请求体最多 64 KiB，响应流最多 128 KiB，网络总期限 20 秒；JavaScript 等待最多 25 秒。网站访问权限、PKCE 和 API 身份校验仍在扩展中完成。网页内容脚本不具有此原生消息能力，令牌回到扩展私有会话库。公开来源 GET 使用独立的消息分支，规则见[公共图片读取](IMAGE_ACCESS.md#safari-公开来源通道)，不能调用令牌 POST 或携带业务凭据。
+
 ## 撤销与并发行为
 
 支持 `identity.launchWebAuthFlow` 的插件保留浏览器原生授权和既有 OIDC 回调；存在窗口 API 时将新开的身份服务弹出窗口调整为 600 × 760，完成后由浏览器关闭。Firefox Android 等缺少 identity 的环境先创建空白标签页、绑定其 tab ID 和监听，再导航到授权站；只读取该标签页主框架的精确回调，保留 PKCE、state、有效期和返回 issuer 校验，拒绝重复或冲突的回调参数。授权、令牌与回调域均须具有已安装的网站访问权限。这个非 blocking 监听不等于原生网络拦截，不能依赖回调域真的返回网页。
 
-标签页授权成功、取消、关闭、导航失败、发起页面卸载或十分钟超时后移除本次监听，仅关闭本次创建的标签页，不按 window ID 关闭浏览器。凭据和 PKCE verifier 留在原扩展上下文，网页内容脚本不参与换码；阅读页不会导航离开。缺少固定扩展 ID 或必要标签页／请求监听 API 时明确拒绝启动。普通网页阅读器仍使用原页面跳转；Orion 的完整授权与令牌请求能力需 iOS 真机单独验收。
+标签页授权成功、取消、关闭、导航失败、发起页面卸载或十分钟超时后移除本次监听，仅关闭本次创建的标签页，不按 window ID 关闭浏览器。凭据和 PKCE verifier 留在原扩展上下文，网页内容脚本不参与换码；阅读页不会导航离开。缺少安全回调地址或必要标签页 API 时明确拒绝启动。`webRequest` 存在时额外观察主框架导航，iOS Safari 使用 `webNavigation.onCommitted` 和 `tabs.onUpdated`，读取本次标签页的主框架原始回调；忽略回调页清除参数后的裸 URL，避免覆盖有效回调。普通网页阅读器仍使用原页面跳转；移动浏览器的完整授权与令牌请求能力需真机单独验收。
 
 官网、插件与网页阅读器使用相同 issuer、public client 和 API resource，通过身份服务的浏览器 SSO 复用已登录身份；各 origin 的本地令牌与会话仍然独立，不通过网页消息、查询参数或插件桥互传。主动登录统一请求 `openid profile offline_access`，默认 `prompt=consent`，不强制重新输入密码，但仍可能显示授权确认。显式本地退出后下一次登录使用 `prompt=login consent`，保留输入其他账户的能力。本地退出不撤销身份服务 SSO，也不退出其他端或其他应用。依据 [Logto 重新认证说明](https://docs.logto.io/end-user-flows/sign-out) 与[刷新令牌配置](https://docs.logto.io/integrate-logto/application-data-structure)。首次授权必须返回有效的 `access_token`、`token_type=Bearer`、`expires_in` 和 `refresh_token`，由产品 API `/v1/me` 验证身份后建立会话。缺少续期权限时明确报错，不建立缺少必要字段的会话。
 
@@ -55,7 +59,7 @@ Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR �
 
 ### 客户端会话与续期
 
-- `src/auth` 统一管理会话：每次登录独立的会话 ID、服务 origin、用户、访问令牌、到期时间、提前刷新时间和 OIDC 续期凭据。Chrome / Edge 在 `chrome.storage.local` 的 `nc-auth` 中保存一份，限制为 `TRUSTED_CONTEXTS`；Firefox 缺少 `setAccessLevel`，使用扩展 origin 的 `node-comics-auth` IndexedDB，网页内容脚本不能读取该库，`storage.local` 的 `nc-auth` 仅保存会话 ID 和随机变更标记，用于通知其他扩展上下文。网页阅读器在自身 origin 的同名 localStorage 记录保存。凭据不在阅读器与后台间镜像。
+- `src/auth` 统一管理会话：每次登录独立的会话 ID、服务 origin、用户、访问令牌、到期时间、提前刷新时间和 OIDC 续期凭据。Chrome / Edge 在 `chrome.storage.local` 的 `nc-auth` 中保存一份，限制为 `TRUSTED_CONTEXTS`；Firefox 和 Safari 缺少 `setAccessLevel`，使用扩展 origin 的 `node-comics-auth` IndexedDB，网页内容脚本不能读取该库，`storage.local` 的 `nc-auth` 仅保存会话 ID 和随机变更标记，用于通知其他扩展上下文。网页阅读器在自身 origin 的同名 localStorage 记录保存。凭据不在阅读器与后台间镜像。
 - 活跃阅读器在令牌到期前最多 60 秒自动续期（短令牌取有效期的 10%）；恢复前台和发起带账户认证的请求时同样检查。关闭页面后不依赖常驻定时器，扩展后台下次工作时按需续期。开发测试会话依照后端 `expires_in=43200` 到期，不能自动重新签发开发身份。
 - 通过同 origin 的 Web Locks 合并多页面／后台的续期。刷新请求携带原 client ID 与 API resource；先持久保存轮换后的凭据，再发送业务请求。独立写锁允许用户在续期期间退出或切换账户，迟到结果按会话 ID 和已使用令牌核对，不恢复旧账户。
 - 产品 API、需认证的原图上传、同源图片下载与状态长轮询统一处理 401：最多续期一次并以原请求体、原幂等键重试一次；仍为 401，或身份服务明确拒绝续期，清除会话和续期凭据，通知所有阅读器及网页翻译上下文停止旧账户请求。页面显示重新登录入口，图内显示登录操作；保留原图、阅读位置和服务端持久任务。

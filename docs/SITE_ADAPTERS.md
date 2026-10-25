@@ -61,6 +61,8 @@ HTTP 页面可提供源站证明的 `contentKey`，用于内容不变而临时�
 
 归属解析期间的成功 HTTP 响应可通过 `storage.session` 一次性交给阅读器复用：按来源、章节、作品绑定，读取时重新检查主机权限，并精确匹配请求 URL 与 Referer。有效期 30 秒，过期后不再复用，存储内容在下一次交接操作时清理；最多 4 组、合计 4 MiB，每组限额统一为 2 MiB／8 个响应，导入失败或目录归属不符时清理对应记录。此机制不保存目录快照，不影响更新请求的新鲜度；交接不可用时照常 HTTP 读取。无站点语义的 HTML 属性、文本和惰性标记清理集中在 `shared/html.ts`，结构及协议校验留在各站目录。
 
+解析器确需桌面 HTML 时，单次 `context.request()` 可声明 `desktop: true`；Safari 使用桌面 User-Agent，避免 iPhone 被重定向到不同结构的移动版，其他浏览器保留原行为。公开请求需要原生 Referer 时，文本 GET 与图片适配器分别显式选择 `safariTransport: 'public-native'`，限额、凭据边界和资源清理统一见[公共图片读取](IMAGE_ACCESS.md#safari-公开来源通道)。这两种选项不用于网页上下文请求，不因一次失败自动切换通道。
+
 HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅读器由受信扩展页面请求，均先检查实际图片域名权限，再根据已校验的来源页生成 Referer。原位入口传递图片属性／meta 中的显式引用策略，缺省为 `strict-origin-when-cross-origin`；仅 HTTP 响应头声明的页面策略未回溯读取。站点 `image.headers` 只覆盖必要差异，不再为普通来源 Referer 增加专用适配。Blob／Data／Canvas 保留页面读取与导航版本校验。
 
 同源 Blob 图片通过 `shared/blob-image.ts` 优先读取原字节；源站加载后撤销 URL、但已加载 `<img>` 仍可读时，按自然尺寸从该元素导出 PNG。读取前后核对元素、URL、尺寸、文档导航及取消状态，临时画布完成即释放；识别阶段不编码，也不保留全尺寸像素缓存。该能力由通用及显式站点的 `renderedImages` 共用，不适用于 HTTP 失败、跨域图片或污染画布，不改变 Blob 的临时资源边界。

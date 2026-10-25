@@ -14,6 +14,12 @@ beforeEach(()=>{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('OIDC with installed host access',()=>{
+  it('uses port-free permission patterns while preserving a loopback provider URL',async()=>{
+    const local={...config,authorization_endpoint:'http://127.0.0.1:4737/authorize',token_endpoint:'http://127.0.0.1:4737/token'};
+    await expect(startOidc(local,'http://127.0.0.1:4737')).rejects.toThrow('登录窗口已关闭');
+    expect(chrome.permissions.contains).toHaveBeenCalledExactlyOnceWith({origins:['http://127.0.0.1/*']});
+    expect(new URL(login.launch.mock.calls[0][0]).origin).toBe('http://127.0.0.1:4737');
+  });
   it('keeps the business login and consent flow without requesting browser host permissions',async()=>{
     await expect(startOidc(config,'https://api.test')).rejects.toThrow('登录窗口已关闭');
     expect(chrome.permissions.contains).toHaveBeenCalledExactlyOnceWith({origins:['https://identity.test/*']});

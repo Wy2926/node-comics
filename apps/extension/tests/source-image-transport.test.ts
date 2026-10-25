@@ -13,6 +13,13 @@ afterEach(()=>vi.unstubAllGlobals());
 const source='https://reader.test/chapter/1?key=test#page-2',image='https://cdn.test/page.png';
 
 describe('common image request context',()=>{
+  it('checks host permission without a port but requests the exact image port',async()=>{
+    const fetch=vi.fn(async()=>new Response('image'));vi.stubGlobal('fetch',fetch);
+    const url='http://127.0.0.1:4737/source.png';
+    await fetchSourceImage(url);
+    expect(chrome.permissions.contains).toHaveBeenCalledExactlyOnceWith({origins:['http://127.0.0.1/*']});
+    expect(fetch).toHaveBeenCalledWith(url,expect.any(Object));
+  });
   it.each([200,403,503])('reports Cloudflare HTTP %s without decoding or retrying a challenge document',async status=>{
     const cancel=vi.fn(),fetch=vi.fn(async()=>new Response(new ReadableStream({cancel}),{status,headers:{'cf-mitigated':'challenge','content-type':'text/html'}}));
     vi.stubGlobal('fetch',fetch);

@@ -79,7 +79,7 @@ async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus
     }
     const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/inline.js']});
     assertCurrent(current);
-    const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    const documentId=injected[0]?.documentId,target=documentId?{documentId}:{frameId:0};
     let transitioned=false;
     try{
     // data: originals stay in the page; only their bytes use the chunked source port.
@@ -122,7 +122,7 @@ async function stopAutomaticInline(tabId:number){
     const key=activationKey(tabId),saved=await chrome.storage.session.get(key),activation=saved[key] as Activation|undefined;
     if(!activation?.automatic)return;
     invalidateTab(tabId);
-    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP_AUTO'},{frameId:0,...(activation.documentId?{documentId:activation.documentId}:{})}).catch(()=>{});
+    await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_STOP_AUTO'},activation.documentId?{documentId:activation.documentId}:{frameId:0}).catch(()=>{});
     await chrome.storage.session.remove(key);
   });
 }
@@ -173,7 +173,7 @@ function publish(ctx:Context){
     // New UUIDs must join the feed immediately, including while another PUT is slow.
     if(ctx.waiting&&ctx.waitIds!==ctx.core?.waitingIds.join(','))ctx.waiting.abort();
     void chrome.tabs.sendMessage(view.sender.tab!.id!,{type:'NC_INLINE_UPDATE',navigationId:view.request.navigationId,generation:view.request.generation,data:response(ctx,view.request)},
-      {frameId:0,...(view.sender.documentId?{documentId:view.sender.documentId}:{})}).catch(()=>{});
+      view.sender.documentId?{documentId:view.sender.documentId}:{frameId:0}).catch(()=>{});
   },0);
 }
 function cancelSources(ctx:Context,keepIds:readonly string[]){
@@ -225,7 +225,7 @@ async function readInlineSource(ctx:Context,request:InlineRequest,image:InlineRe
     const current=()=>!lifetime.aborted&&ctx.active&&ctx.channel.isCurrent();
     assertCurrent(current);let blob:Blob;
     if(image.url==='page-image:'+image.id){
-      const port=chrome.tabs.connect(sender.tab!.id!,{name:INLINE_SOURCE_PORT,frameId:0,...(sender.documentId?{documentId:sender.documentId}:{})});
+      const port=chrome.tabs.connect(sender.tab!.id!,{name:INLINE_SOURCE_PORT,...(sender.documentId?{documentId:sender.documentId}:{frameId:0})});
       blob=await receiveImage(port,{navigationId:request.navigationId,id:image.id},lifetime,current);
     }
     else blob=await readInlineSourceImage(image.url,sender.tab!.url!,lifetime,image.referrerPolicy,ctx.explicitImage);

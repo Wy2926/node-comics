@@ -28,7 +28,7 @@ export async function withPageNetworkContext<T>(url: string, signal: AbortSignal
     signal: page.signal, async request(target, options) {
       const body = await authorizeSourceRequest(target, options, page.signal);
       // Page-context fetch is bound to its document origin, not an adapter host allowlist.
-      if (new URL(target).origin !== origin || options && new URL(options.referer).origin !== origin)
+      if (new URL(target).origin !== origin || options?.referer && new URL(options.referer).origin !== origin || options?.desktop || options?.safariTransport)
         throw new SourceHttpError('request-denied', '网页上下文请求必须与来源页面同源。');
       const result = await page.request(requestInSourcePage, { url: target, referer: options?.referer, body });
       await authorizeSourceRequest(target, undefined, page.signal);

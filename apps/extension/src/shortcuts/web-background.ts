@@ -44,7 +44,7 @@ export function registerWebShortcutsBackground() {
       const tab=await chrome.tabs.get(sender.tab!.id!);
       if(!tab.active||!isWebsite(tab.url)||tab.url!==message.url||new URL(sender.url!).origin!==new URL(tab.url).origin)
         throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));
-      const target={frameId:0,...(sender.documentId?{documentId:sender.documentId}:{})};
+      const target=sender.documentId?{documentId:sender.documentId}:{frameId:0};
       const identity=await chrome.tabs.sendMessage(tab.id!,{type:'NC_SHORTCUTS_IDENTITY'},target);
       if(identity?.url!==tab.url||identity.instanceId!==message.instanceId)
         throw Error(msg('当前网页已变化，请重新打开插件后翻译。'));

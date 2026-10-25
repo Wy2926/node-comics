@@ -83,7 +83,11 @@ try{
     await reader.screenshot({path:path.join(run,'reader-'+action+'.png')});
     checks.push(action+': native identity popup is 600x760, adds no main-window tab and returns to the reader');
   }
-  await reader.getByRole('button',{name:'我的漫画',exact:true}).click();await reader.getByRole('button',{name:'继续阅读',exact:true}).click();
+  phase='resume-navigation';
+  await reader.getByRole('button',{name:'我的漫画',exact:true}).click();
+  phase='resume-card';
+  await reader.getByRole('button',{name:'打开漫画 pages',exact:true}).click();
+  phase='resume-position';
   await reader.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');
   await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
   checks.push('Original comic resumes on page 2 after cancellation, authorization failure and successful login');

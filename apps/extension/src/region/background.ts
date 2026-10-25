@@ -26,7 +26,7 @@ const activatedTabs=new Set<number>();
 const transfers=new Map<number,Set<()=>void>>();
 let configuration=0,lastCapture=0;
 const changed=()=>Error(msg('选区已失效，请重新框选。'));
-const identityTarget=(activation:Activation)=>({frameId:0,...(activation.documentId?{documentId:activation.documentId}:{})});
+const identityTarget=(activation:Activation)=>(activation.documentId?{documentId:activation.documentId}:{frameId:0});
 const epochFor=(tabId:number)=>{let token=epochs.get(tabId);if(!token){token={};epochs.set(tabId,token);}return token;};
 function stopContext(tabId:number) {
   epochs.set(tabId,{});
@@ -48,7 +48,7 @@ export async function activateRegion(tabId:number) {
     await suspendInline(tabId);
     activatedTabs.add(tabId);stopContext(tabId);generations.delete(tabId);await removeRegion(tabId);
     const injected=await chrome.scripting.executeScript({target:{tabId},files:['content-scripts/region.js']});
-    const documentId=injected[0]?.documentId,target={frameId:0,...(documentId?{documentId}:{})};
+    const documentId=injected[0]?.documentId,target=documentId?{documentId}:{frameId:0};
     const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_IDENTITY'},target) as RegionIdentity;
     if(identity?.url!==tab.url)throw changed();
     const activation:Activation={url:tab.url,navigationId:identity.navigationId,documentId,windowId:tab.windowId};

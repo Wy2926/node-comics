@@ -25,4 +25,12 @@ describe('extension login redirect', () => {
     vi.stubGlobal('chrome', {runtime: {getManifest: () => ({})}});
     await expect(loginRedirectUrl()).rejects.toThrow('不支持安全登录');
   });
+
+  it('uses the registered website callback for Safari without exposing its random origin', async () => {
+    vi.stubGlobal('chrome', {runtime: {getURL: () => 'safari-web-extension://private-installation-id/'}});
+    expect(await loginRedirectUrl('https://product.test/api/')).toBe('https://product.test/auth/callback/');
+    expect(await loginRedirectUrl('http://127.0.0.1:5199')).toBe('http://127.0.0.1:5199/auth/callback/');
+    await expect(loginRedirectUrl('http://product.test')).rejects.toThrow('HTTPS');
+    await expect(loginRedirectUrl('https://user:secret@product.test')).rejects.toThrow('HTTPS');
+  });
 });

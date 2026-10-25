@@ -9,7 +9,7 @@ type ImageLoad=(request:unknown,signal:AbortSignal)=>Promise<{blob:Blob;current:
 const mocks=vi.hoisted(()=>({
   openChannel:vi.fn<()=>Promise<ChannelConnection>>(),subscribe:vi.fn(),capture:vi.fn(),prepare:vi.fn<()=>Promise<PreparedInput>>(),
   localSettings:vi.fn<()=>Promise<Record<string,unknown>>>(),sessionGet:vi.fn<(key:string|null)=>Promise<Record<string,unknown>>>(),tabGet:vi.fn(),
-  tabMessage:vi.fn<(tabId:number,message:{type:string},target?:{frameId:number;documentId?:string})=>Promise<unknown>>(),
+  tabMessage:vi.fn<(tabId:number,message:{type:string},target?:{frameId?:number;documentId?:string})=>Promise<unknown>>(),
   serve:vi.fn<(port:unknown,load:ImageLoad,close:()=>void)=>()=>void>(),suspend:vi.fn(async()=>{}),
   read:vi.fn<(id:string)=>Promise<RegionRecord|undefined>>(),forTab:vi.fn<(id:number)=>Promise<RegionRecord|undefined>>(),
   blob:vi.fn<(record:RegionRecord,kind:'source'|'input')=>Promise<Blob|undefined>>(),
@@ -125,7 +125,7 @@ describe('region background capture and admission',()=>{
     expect(await send(message('NC_REGION_CAPTURE'))).toMatchObject({ok:true});
     expect(mocks.sessionGet).toHaveBeenCalledTimes(3);expect(mocks.tabGet).toHaveBeenCalledTimes(3);
     expect(mocks.tabMessage).toHaveBeenCalledTimes(3);
-    for(const call of mocks.tabMessage.mock.calls)expect(call).toEqual([7,{type:'NC_REGION_IDENTITY'},{frameId:0,documentId:'doc-7'}]);
+    for(const call of mocks.tabMessage.mock.calls)expect(call).toEqual([7,{type:'NC_REGION_IDENTITY'},{documentId:'doc-7'}]);
   });
   const stepTypes:RegionRequest['type'][]=['NC_REGION_SUBMIT','NC_REGION_TICK','NC_REGION_WAIT','NC_REGION_RETRY'];
   it.each(stepTypes)('performs exactly one authorization IPC sequence for %s',async type=>{
@@ -133,7 +133,7 @@ describe('region background capture and admission',()=>{
     mocks.sessionGet.mockClear();mocks.tabGet.mockClear();mocks.tabMessage.mockClear();
     expect(await send(message(type))).toMatchObject({ok:true});
     expect(mocks.sessionGet).toHaveBeenCalledExactlyOnceWith('nc-region:7');expect(mocks.tabGet).toHaveBeenCalledExactlyOnceWith(7);
-    expect(mocks.tabMessage).toHaveBeenCalledExactlyOnceWith(7,{type:'NC_REGION_IDENTITY'},{frameId:0,documentId:'doc-7'});
+    expect(mocks.tabMessage).toHaveBeenCalledExactlyOnceWith(7,{type:'NC_REGION_IDENTITY'},{documentId:'doc-7'});
   });
   it('authorizes a queued submit inside its lock and rejects a changed selection before preparing input',async()=>{
     await send(message('NC_REGION_CAPTURE'));const pending=gate();
@@ -261,7 +261,7 @@ describe('region background capture and admission',()=>{
       return {...identity};
     });
     mocks.subscribe.mock.calls[0][0]();
-    await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_REGION_CONFIG_CHANGED'},{frameId:0,documentId:'doc-7'}));
+    await vi.waitFor(()=>expect(mocks.tabMessage).toHaveBeenCalledWith(7,{type:'NC_REGION_CONFIG_CHANGED'},{documentId:'doc-7'}));
     identity={...identity,generation:2,selectionId:'selection-after-settings'};
     expect(await send(message('NC_REGION_CAPTURE'))).toMatchObject({ok:true,data:{selectionId:'selection-after-settings'}});
     pending.finish();await vi.waitFor(()=>expect(mocks.remove).toHaveBeenCalledWith(7,'selection-7'));

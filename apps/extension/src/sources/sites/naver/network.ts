@@ -111,7 +111,7 @@ export const network = {
     context.signal?.throwIfAborted();
     const loc = location(url);
     if (!loc.no) throw Error('NAVER 阅读页地址无效。');
-    const html = await context.request(episodeUrl(loc.titleId, Number(loc.no), loc.section));
+    const html = await context.request(episodeUrl(loc.titleId, Number(loc.no), loc.section),{desktop:true});
     context.signal?.throwIfAborted();
     return parsePages(html, url);
   },

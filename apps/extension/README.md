@@ -2,6 +2,8 @@
 
 WXT + React + TypeScript，提供桌面及手机布局的浏览器阅读器、单来源书架与[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md)。手机适配面向 Firefox Android 与 iOS Orion，界面共用视觉令牌及业务流程；浏览器 API 和真机验收边界见[手机布局](../../docs/POPUP_AND_THEME.md#手机布局与浏览器能力)。
 
+iOS Safari 技术验证版的环境、构建和验证入口见 [Safari 模拟器](../../docs/SAFARI_PROTOTYPE.md)。它尚不属于已发布或已完成真机验收的平台。
+
 ## 运行与构建
 
 需要 Node.js 22.23+、npm 10+，在本目录执行：
@@ -27,6 +29,7 @@ Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页
 | Edge 手动安装包 | `npm run zip:edge` |
 | Chrome／Edge 商店包 | `npm run zip:chrome:store` / `npm run zip:edge:store` |
 | Firefox MV3 审核包／Orion 本地 ZIP | `npm run zip -- --browser firefox --mv3` |
+| Safari 技术验证资源 | `npm run build:safari` |
 | 网页预览构建 | `npm run build:web` |
 
 商店包不含 `manifest.key`；Firefox 公开下载使用 AMO 签名 XPI。包校验、上传与发布见[部署规范](../../docs/DEPLOYMENT.md)。

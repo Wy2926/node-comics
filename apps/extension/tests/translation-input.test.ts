@@ -5,7 +5,7 @@ import {readInput,cacheInput,INPUT_BUDGET_BYTES} from '../src/translation/input/
 import {loadTranslationInput} from '../src/translation/input/load';
 import {ByteCache} from '../src/storage/cache';
 import {setTranslationCacheLimitMb} from '../src/storage/translations';
-import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,translationSize} from '../src/translation/input/limits';
+import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,PNG_INPUT_PROFILE,translationSize} from '../src/translation/input/limits';
 import {hashFile} from '../src/importers/hash';
 import {matchesPage} from '../src/translation/sync';
 import {TranslationCoordinator,translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
@@ -28,6 +28,11 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();await setTranslationCacheLimitMb(1024);});
 const large=()=>{const t=target(1);t.page.width=2400;t.page.height=4800;return t;};
+function pngHeader(width:number,height:number){
+  const bytes=new Uint8Array(24),view=new DataView(bytes.buffer);
+  bytes.set([137,80,78,71,13,10,26,10]);view.setUint32(8,13);bytes.set([73,72,68,82],12);
+  view.setUint32(16,width);view.setUint32(20,height);return new Blob([bytes],{type:'image/png'});
+}
 
 it('shrinks the short edge once, preserves ratio and never upscales',()=>{
   expect(translationSize(2400,12000)).toEqual({width:1800,height:9000});
@@ -97,6 +102,30 @@ it('keeps source identity separate and encodes only once',async()=>{
   expect(await hashFile((await readInput(f.core.scope,record.image.sha256))!)).toBe(await hashFile(encoded));
   expect(matchesPage(t.page,translationJob(record.result!,record))).toBe(true);
   await f.core.submit([t]);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/webp',quality:.9});expect(close).toHaveBeenCalledOnce();
+});
+it('freezes Safari PNG fallback bytes and profile once without creating another request on recovery',async()=>{
+  const output=pngHeader(1800,3600);encode.mockResolvedValue(output);
+  const f=fixture(),t=large();await f.core.submit([t]);
+  const record=(await readOperation(operationId(f.core.scope,'zh-Hans',t)))!;
+  expect(record).toMatchObject({inputProfile:PNG_INPUT_PROFILE,inputSize:{width:1800,height:3600},image:{content_type:'image/png',sha256:await hashFile(output)}});
+  expect(await hashFile((await readInput(f.core.scope,record.image.sha256))!)).toBe(await hashFile(output));
+  const restored=new TranslationCoordinator(f.core.options);await restored.submit([t]);
+  expect(f.submit).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/webp',quality:.9});
+});
+it('restores a frozen PNG input with PNG directly and still rejects different bytes',async()=>{
+  const source=originalBytes(1),output=pngHeader(1800,3600);encode.mockResolvedValue(output);
+  const restored=await restoreTranslationInput(source,1800,3600,await hashFile(source),await hashFile(output),()=>true,PNG_INPUT_PROFILE);
+  expect(restored).toBe(output);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/png'});
+  await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),'0'.repeat(64),()=>true,PNG_INPUT_PROFILE)).rejects.toThrow('原图内容已变化');
+});
+it.each([INPUT_PROFILE,LEGACY_INPUT_PROFILE])('does not change frozen WebP profile %s to PNG during recovery',async profile=>{
+  const source=originalBytes(1);encode.mockResolvedValue(pngHeader(1800,3600));
+  await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),await hashFile(encoded),()=>true,profile)).rejects.toThrow('WebP encoder unavailable');
+  expect(encode).toHaveBeenCalledOnce();
+});
+it.each([new Blob(['invalid'],{type:'image/png'}),pngHeader(1799,3600)])('rejects malformed or resized PNG fallback before submission',async output=>{
+  encode.mockResolvedValue(output);const f=fixture();await f.core.submit([large()]);
+  expect(f.submit).not.toHaveBeenCalled();expect(encode).toHaveBeenCalledOnce();
 });
 it('negotiates long delivery explicitly and retains the same frozen UUID on window updates',async()=>{
   const f=fixture(),t=target(1);t.page.width=64;t.page.height=100000;

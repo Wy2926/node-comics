@@ -1,5 +1,5 @@
 import {hashFile} from './hash';
-import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,TRANSLATION_JPEG_MAX_DIMENSION,TRANSLATION_JPEG_QUALITY,TRANSLATION_MAX_BYTES,TRANSLATION_WEBP_QUALITY,type InputProfile} from './limits';
+import {INPUT_PROFILE,LEGACY_INPUT_PROFILE,PNG_INPUT_PROFILE,TRANSLATION_JPEG_MAX_DIMENSION,TRANSLATION_JPEG_QUALITY,TRANSLATION_MAX_BYTES,TRANSLATION_WEBP_QUALITY,type InputProfile} from './limits';
 import {bitmapPng} from './png';
 import {probeImageMetadata} from './image-metadata';
 export {ImageOutputTooLargeError} from './png';
@@ -50,8 +50,8 @@ export async function canvasJpeg(blob:Blob):Promise<Blob>{
   throw Error('Incomplete JPEG');
 }
 
-/** One WebP or long-image JPEG encode, with optional resize. No repeated quality search. */
-export async function resizeInput(blob:Blob,width:number,height:number,profile:InputProfile=INPUT_PROFILE) {
+/** New inputs may use the browser's PNG fallback; frozen profiles never change encoders. */
+export async function resizeInput(blob:Blob,width:number,height:number,profile?:InputProfile) {
   const long=Math.max(width,height)>16383,legacy=profile===LEGACY_INPUT_PROFILE;
   if(long&&!legacy&&Math.max(width,height)>TRANSLATION_JPEG_MAX_DIMENSION)throw Error('IMAGE_DIMENSIONS_LIMIT');
   const bitmap=await createImageBitmap(blob,{imageOrientation:'from-image',colorSpaceConversion:'default',resizeWidth:width,resizeHeight:height,resizeQuality:'high'});
@@ -59,20 +59,25 @@ export async function resizeInput(blob:Blob,width:number,height:number,profile:I
   try {
     if(long&&legacy){
       const output=await bitmapPng(bitmap,[],TRANSLATION_MAX_BYTES);
-      return {blob:output,sha256:await hashFile(output)};
+      return {blob:output,sha256:await hashFile(output),profile:LEGACY_INPUT_PROFILE};
     }
     canvas=new OffscreenCanvas(width,height);
     const context=canvas.getContext('2d',{colorSpace:'srgb'});
     if(!context)throw Error('Image canvas unavailable');
     if(long){context.fillStyle='#fff';context.fillRect(0,0,width,height);}
     context.drawImage(bitmap,0,0,width,height);
-    const output=long
-      ?await canvasJpeg(await canvas.convertToBlob({type:'image/jpeg',quality:TRANSLATION_JPEG_QUALITY}))
-      :await canvasWebp(await canvas.convertToBlob({type:'image/webp',quality:TRANSLATION_WEBP_QUALITY}));
-    if(long){
+    const png=profile===PNG_INPUT_PROFILE;
+    const encoded=await canvas.convertToBlob(long
+      ?{type:'image/jpeg',quality:TRANSLATION_JPEG_QUALITY}
+      :png?{type:'image/png'}:{type:'image/webp',quality:TRANSLATION_WEBP_QUALITY});
+    // Safari returns PNG when asked for WebP. Reuse those bytes without a second encode.
+    const fallback=!long&&profile===undefined&&encoded.type==='image/png';
+    if(!long&&png&&encoded.type!=='image/png')throw Error('PNG encoder unavailable');
+    const output=long?await canvasJpeg(encoded):png||fallback?encoded:await canvasWebp(encoded);
+    if(long||png||fallback){
       const dimensions=await probeImageMetadata(output);
-      if(dimensions?.width!==width||dimensions.height!==height)throw Error('JPEG encoder changed image dimensions');
+      if(dimensions?.mime!==(long?'image/jpeg':'image/png')||dimensions.width!==width||dimensions.height!==height)throw Error(long?'JPEG encoder changed image dimensions':'PNG encoder changed image dimensions');
     }
-    return {blob:output,sha256:await hashFile(output)};
+    return {blob:output,sha256:await hashFile(output),profile:profile??(fallback?PNG_INPUT_PROFILE:INPUT_PROFILE)};
   } finally {bitmap.close();if(canvas)canvas.width=canvas.height=1;}
 }

@@ -5,7 +5,9 @@ import {safeImageUrl} from '../shared/urls';
 import {imageReferer} from '../shared/referrer';
 import {observeImageRedirect} from './image-redirect';
 import {SourceHttpError,sourceRetryAfter,sourceVerificationError} from './http';
-export interface ImageRequestContext {pageUrl:string;referrerPolicy?:ReferrerPolicy;}
+import {isSafariExtension} from '../../platform';
+import {withSafariPublicResponse} from './safari-public-request';
+export interface ImageRequestContext {pageUrl:string;referrerPolicy?:ReferrerPolicy;safariTransport?:'public-native';}
 /** Source reads are cancellable; translation input limits belong to the translation entry point. */
 export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:Readonly<Record<string,string>>,context?:ImageRequestContext) {
   const lifetime=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(30000)]);
@@ -20,20 +22,25 @@ export async function fetchSourceImage(url:string,signal?:AbortSignal,headers?:R
     if(context){const referer=imageReferer(context.pageUrl,current,context.referrerPolicy);if(referer)requestHeaders.referer=referer;}
     // Site overrides are trusted packaged code, but cannot cross an origin boundary.
     if(new URL(current).origin===initial.origin)for(const [key,value] of Object.entries(headers??{}))requestHeaders[key.toLowerCase()]=value;
-    const result=await withImageHeaders(current,requestHeaders,lifetime,async()=>{
+    const consume=async(response:Response,location?:string)=>{
+      if(response.type==='opaqueredirect'||[301,302,303,307,308].includes(response.status)){
+        const target=location??response.headers.get('location');
+        await response.body?.cancel();
+        const next=target&&safeImageUrl(target,current);
+        if(!next)throw Error(msg('图片重定向无效或次数过多，请刷新来源页面后重试。'));
+        const normalized=new URL(next);normalized.hash='';return {next:normalized.href};
+      }
+      return {image:await readResponse(response,lifetime)};
+    };
+    const result=context?.safariTransport==='public-native'&&isSafariExtension()
+      ?await withSafariPublicResponse(current,requestHeaders,lifetime,consume)
+      :await withImageHeaders(current,requestHeaders,lifetime,async()=>{
       const redirect=observeImageRedirect(current);
       try{
         let response:Response;
         try{response=await fetch(current,{credentials:'include',redirect:'manual',referrerPolicy:'no-referrer',signal:lifetime});}
         catch(error){lifetime.throwIfAborted();throw Error(msg('图片网络请求失败，请检查连接或刷新来源页面后重试。'),{cause:error});}
-        if(response.type==='opaqueredirect'||[301,302,303,307,308].includes(response.status)){
-          const target=redirect.location()??response.headers.get('location');
-          await response.body?.cancel();
-          const next=target&&safeImageUrl(target,current);
-          if(!next)throw Error(msg('图片重定向无效或次数过多，请刷新来源页面后重试。'));
-          const normalized=new URL(next);normalized.hash='';return {next:normalized.href};
-        }
-        return {image:await readResponse(response,lifetime)};
+        return consume(response,redirect.location());
       }finally{redirect.dispose();}
     });
     if(result.image)return result.image;

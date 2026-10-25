@@ -1,3 +1,5 @@
+import {hostPermissionPattern} from '../../host-permissions';
+
 /** Fetch manual redirects conceal Location. Observe only this extension's exact request
  * while it runs; the caller checks permission before following the captured destination. */
 export function observeImageRedirect(url:string){
@@ -12,6 +14,6 @@ export function observeImageRedirect(url:string){
     if(![301,302,303,307,308].includes(details.statusCode))return;
     location=details.responseHeaders?.find(header=>header.name.toLowerCase()==='location')?.value;
   };
-  event.addListener(listener,{urls:[new URL(url).origin+'/*'],types:['xmlhttprequest']},['responseHeaders']);
+  event.addListener(listener,{urls:[hostPermissionPattern(url)],types:['xmlhttprequest']},['responseHeaders']);
   return {location:()=>location,dispose:()=>event.removeListener(listener)};
 }

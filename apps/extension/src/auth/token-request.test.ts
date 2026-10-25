@@ -44,6 +44,28 @@ describe('OIDC token request Origin boundary', () => {
     expect(update.mock.calls[1][0]).toEqual({removeRuleIds: [rule.id]});
   });
 
+  it('uses Safari native transport without an ineffective DNR rule or browser fetch', async () => {
+    const native = vi.fn(async () => ({status: 200, body: '{"access_token":"fixture"}'}));
+    vi.stubGlobal('chrome', {runtime: {getURL: () => 'safari-web-extension://private-safari-id/', sendNativeMessage: native}, declarativeNetRequest: {updateSessionRules: update}});
+    const response = await requestOidcToken(endpoint, new URLSearchParams({grant_type: 'refresh_token'}));
+    expect(native).toHaveBeenCalledWith('net.nodelane.comics.safari.NodeLaneSafari', {type: 'oidc-token', endpoint, body: 'grant_type=refresh_token'});
+    expect(await response.json()).toEqual({access_token: 'fixture'});
+    expect(update).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each([{error: 'sensitive-native-diagnostic'}, {status: 200, body: 'x'.repeat(131073)}, {status: 0, body: ''}])('rejects invalid native replies without exposing diagnostics', async reply => {
+    vi.stubGlobal('chrome', {runtime: {getURL: () => 'safari-web-extension://private-safari-id/', sendNativeMessage: vi.fn(async () => reply)}});
+    await expect(requestOidcToken(endpoint, new URLSearchParams())).rejects.toThrow('未收到登录结果');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('does not send credentials when a protected exchange cannot be installed', async () => {
+    Object.assign(chrome, {declarativeNetRequest: undefined});
+    await expect(requestOidcToken(endpoint, new URLSearchParams())).rejects.toThrow('不支持安全登录');
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it.each([undefined, 'chrome-extension://chrome-public-id/', 'chrome-extension://edge-public-id/'])('uses the browser request unchanged for %s', async root => {
     vi.stubGlobal('chrome', root ? {runtime: {getURL: () => root}} : undefined);
     await requestOidcToken(endpoint, new URLSearchParams({grant_type: 'refresh_token'}));

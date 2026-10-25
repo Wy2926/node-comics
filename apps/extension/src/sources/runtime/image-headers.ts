@@ -1,7 +1,10 @@
 const firstId=800000,lastId=900000;
 const own=(rule:chrome.declarativeNetRequest.Rule)=>rule.id>=firstId&&rule.id<lastId;
 const pattern=(url:string)=>'^'+url.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$';
-const lockName=(expression:string)=>'nc-source-image:'+expression;
+// Safari limits Web Lock names to 1024 characters; signed and batched URLs can
+// be longer. Hash the exact expression so readers and recovery share one lock.
+const lockName=async(expression:string)=>'nc-source-image:'+Array.from(new Uint8Array(
+  await crypto.subtle.digest('SHA-256',new TextEncoder().encode(expression))),byte=>byte.toString(16).padStart(2,'0')).join('');
 const mutate=<T>(run:()=>Promise<T>)=>navigator.locks.request('nc-source-image-rules',run);
 
 async function remove(expression:string) {
@@ -21,7 +24,7 @@ export async function withImageHeaders<T>(url:string,headers:Readonly<Record<str
   }
   const normalized=new URL(url);normalized.hash='';
   const expression=pattern(normalized.href);
-  return navigator.locks.request(lockName(expression),{signal},async()=>{
+  return navigator.locks.request(await lockName(expression),{signal},async()=>{
     signal?.throwIfAborted();
     await remove(expression);
     try {
@@ -49,6 +52,6 @@ export async function recoverImageHeaders() {
   for(const rule of (await chrome.declarativeNetRequest.getSessionRules()).filter(own)) {
     const expression=rule.condition.regexFilter;
     if(!expression)continue;
-    await navigator.locks.request(lockName(expression),{ifAvailable:true},async lock=>{if(lock)await remove(expression);});
+    await navigator.locks.request(await lockName(expression),{ifAvailable:true},async lock=>{if(lock)await remove(expression);});
   }
 }

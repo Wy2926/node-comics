@@ -1,6 +1,8 @@
 import {msg} from '../i18n/runtime';
+import {secureIdentityUrl} from './model';
+import {hostPermissionPattern} from '../host-permissions';
 
-/** Prefer browser-owned OAuth; Android uses a tab bound to this authorization. */
+/** Prefer browser-owned OAuth; browsers without identity use an owned tab. */
 export async function launchLoginWindow(url: string): Promise<string | undefined> {
   if (typeof chrome.identity?.launchWebAuthFlow !== 'function') return launchLoginTab(url);
   const authorization = new URL(url);
@@ -39,11 +41,11 @@ export async function launchLoginWindow(url: string): Promise<string | undefined
 
 async function launchLoginTab(url: string): Promise<string> {
   const authorization = new URL(url);
-  const redirect = new URL(authorization.searchParams.get('redirect_uri')!);
+  const redirect = secureIdentityUrl(authorization.searchParams.get('redirect_uri')!);
   const state = authorization.searchParams.get('state');
-  if (redirect.protocol !== 'https:' || redirect.username || redirect.password || !state ||
+  if (redirect.search || redirect.hash || !state ||
       !chrome.tabs?.getCurrent || !chrome.tabs.create || !chrome.tabs.update || !chrome.tabs.remove ||
-      !chrome.tabs.onUpdated || !chrome.tabs.onRemoved || !chrome.webRequest?.onBeforeRequest) {
+      !chrome.tabs.onUpdated || !chrome.tabs.onRemoved) {
     throw Error(msg('当前浏览器不支持安全登录，请更新浏览器后重试。'));
   }
   const callerTabId = (await chrome.tabs.getCurrent())?.id;
@@ -52,6 +54,10 @@ async function launchLoginTab(url: string): Promise<string> {
   const tab = await chrome.tabs.create({url: 'about:blank', active: true});
   if (tab.id === undefined) throw Error(msg('未收到登录结果，请重新登录。'));
   const tabId = tab.id;
+  // iOS Safari has tabs.onUpdated but no webRequest API. Firefox also observes
+  // requests because its browser-owned callback does not have to serve a page.
+  const requests = chrome.webRequest?.onBeforeRequest;
+  const navigation = chrome.webNavigation?.onCommitted;
   return new Promise((resolve, reject) => {
     let finished = false;
     const finish = (callback?: string, error?: Error) => {
@@ -60,7 +66,8 @@ async function launchLoginTab(url: string): Promise<string> {
       clearTimeout(timeout);
       chrome.tabs.onUpdated.removeListener(updated);
       chrome.tabs.onRemoved.removeListener(removed);
-      chrome.webRequest.onBeforeRequest.removeListener(requested);
+      requests?.removeListener(requested);
+      navigation?.removeListener(committed);
       globalThis.removeEventListener?.('pagehide', unloaded);
       // Never close an Android window: each tab may have a separate windowId.
       void chrome.tabs.remove(tabId).catch(() => {})
@@ -72,17 +79,23 @@ async function launchLoginTab(url: string): Promise<string> {
       let current: URL;
       try { current = new URL(value); } catch { return; }
       if (current.origin !== redirect.origin || current.pathname !== redirect.pathname) return;
+      // The website clears its query immediately. Safari can deliver that tab
+      // update before the committed navigation event carrying the original URL.
+      if (!current.search) return;
       if (current.username || current.password || current.hash ||
           current.searchParams.getAll('state').length !== 1 || current.searchParams.get('state') !== state) {
         finish(undefined, Error(msg('登录状态无效或已过期，请重新登录。')));
       } else if (current.searchParams.has('code') || current.searchParams.has('error')) finish(value);
     };
-    const updated = (id: number, change: chrome.tabs.OnUpdatedInfo) => {
-      if (id === tabId) inspect(change.url);
+    const updated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab?: chrome.tabs.Tab) => {
+      if (id === tabId) inspect(change.url ?? (change.status === 'complete' ? tab?.url : undefined));
     };
     const requested = (request: chrome.webRequest.OnBeforeRequestDetails) => {
       if (request.tabId === tabId && request.frameId === 0 && request.type === 'main_frame') inspect(request.url);
       return undefined;
+    };
+    const committed = (details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
+      if (details.tabId === tabId && details.frameId === 0) inspect(details.url);
     };
     const removed = (id: number) => {
       if (id === tabId) finish(undefined, Error(msg('登录窗口已关闭。')));
@@ -92,7 +105,8 @@ async function launchLoginTab(url: string): Promise<string> {
     try {
       chrome.tabs.onUpdated.addListener(updated);
       chrome.tabs.onRemoved.addListener(removed);
-      chrome.webRequest.onBeforeRequest.addListener(requested, {urls: [redirect.origin + '/*'], types: ['main_frame']});
+      requests?.addListener(requested, {urls: [hostPermissionPattern(redirect.href)], types: ['main_frame']});
+      navigation?.addListener(committed, {url: [{urlPrefix: redirect.origin + redirect.pathname}]});
       globalThis.addEventListener?.('pagehide', unloaded, {once: true});
       void chrome.tabs.update(tabId, {url}).then(value => inspect(value?.url), () => {
         finish(undefined, Error(msg('未收到登录结果，请重新登录。')));

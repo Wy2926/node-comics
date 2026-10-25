@@ -1,8 +1,14 @@
 import type {SourceNetworkContext} from '../contracts/network';
 import {msg} from '../../i18n/runtime';
+import {hostPermissionPattern} from '../../host-permissions';
 import {safeImageUrl} from '../shared/urls';
 import {withImageHeaders} from './image-headers';
 import type {ImportResponse} from './import-responses';
+import {isSafariExtension} from '../../platform';
+import {withSafariPublicResponse} from './safari-public-request';
+// Some packaged parsers consume a site's desktop HTML. iPhone Safari otherwise
+// follows a mobile redirect before those parsers can validate the response.
+const desktopAgent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
 
 export class SourceHttpError extends Error {
   constructor(readonly kind: 'request-denied' | 'permission-required' | 'verification-required' | 'http' | 'invalid-response', message: string,
@@ -43,12 +49,12 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
   signal?.throwIfAborted();
   if (safeImageUrl(url, url) !== url) throw new SourceHttpError('request-denied', '来源请求地址无效。');
   if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-    const origins = [new URL(url).origin + '/*'];
+    const origins = [hostPermissionPattern(url)];
     if (!await chrome.permissions.contains({origins}))
       throw new SourceHttpError('permission-required', msg('网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。'));
     signal?.throwIfAborted();
   }
-  if (options && safeImageUrl(options.referer, options.referer) !== options.referer)
+  if (options?.referer !== undefined && safeImageUrl(options.referer, options.referer) !== options.referer)
     throw new SourceHttpError('request-denied', '来源请求 Referer 地址无效。');
   return options?.form === undefined ? undefined : encodeForm(options.form);
 }
@@ -56,11 +62,7 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
 export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportResponse[] = []): SourceNetworkContext {
   async function read(url: string, options: Parameters<SourceNetworkContext['request']>[1], body?: string | Uint8Array<ArrayBuffer>, binaryResponse = false) {
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
-    return withImageHeaders(url, options ? {referer: options.referer} : undefined, lifetime, async () => {
-      const binary = body instanceof Uint8Array;
-      const response = await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
-        ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
-        ...(body === undefined ? {} : {method: 'POST', body})});
+    const consume=async(response:Response)=>{
       // The explicit challenge header is authoritative, including HTTP 200 and accepted error statuses.
       if (response.headers.get('cf-mitigated') === 'challenge') {
         await response.body?.cancel();
@@ -91,6 +93,18 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       let offset = 0;
       for (const chunk of chunks) {bytes.set(chunk, offset); offset += chunk.length;}
       return bytes;
+    };
+    if(options?.safariTransport==='public-native'&&isSafariExtension()){
+      if(body!==undefined||binaryResponse)throw new SourceHttpError('request-denied','来源请求地址无效。');
+      // Public GET only. A redirect is returned as an HTTP error, never followed natively.
+      return withSafariPublicResponse(url,options.referer?{referer:options.referer}:{},lifetime,consume,'text');
+    }
+    return withImageHeaders(url, options?.referer ? {referer: options.referer} : undefined, lifetime, async () => {
+      const binary = body instanceof Uint8Array;
+      return consume(await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
+        ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),
+        ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
+        ...(body === undefined ? {} : {method: 'POST', body})}));
     });
   }
   return {signal, async request(url, options) {

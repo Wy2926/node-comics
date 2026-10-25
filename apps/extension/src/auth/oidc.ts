@@ -47,7 +47,7 @@ export async function startOidc(config:AuthConfig,apiBase:string):Promise<Sessio
   if(config.mode!=='oidc'||!config.client_id||!config.authorization_endpoint||!config.token_endpoint)throw Error(msg("管理员尚未配置正式登录服务。"));
   const authorization=secureIdentityUrl(config.authorization_endpoint);const token=secureIdentityUrl(config.token_endpoint);
   const extension=typeof chrome!=='undefined'&&Boolean(chrome.runtime?.id);
-  const redirect=extension?await loginRedirectUrl():(location.origin+location.pathname);
+  const redirect=extension?await loginRedirectUrl(apiBase):(location.origin+location.pathname);
   if(extension)await requireHostAccess([...new Set([authorization.origin+'/*',token.origin+'/*',
     ...typeof chrome.identity?.launchWebAuthFlow!=='function'?[secureIdentityUrl(redirect).origin+'/*']:[]])]);
   const verifier=encode(crypto.getRandomValues(new Uint8Array(48)));const state=encode(crypto.getRandomValues(new Uint8Array(24)));

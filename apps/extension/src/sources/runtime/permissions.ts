@@ -1,6 +1,7 @@
 import { msg } from '../../i18n/runtime';
+import {hostPermissionPattern} from '../../host-permissions';
 
-export const imageOrigins = (urls: string[]) => [...new Set(urls.filter(url=>/^https?:/.test(url)).map((url) => new URL(url).origin + '/*'))];
+export const imageOrigins = (urls: string[]) => [...new Set(urls.filter(url=>/^https?:/.test(url)).map(hostPermissionPattern))];
 export class ImagePermissionsRequired extends Error {
   constructor() {
     super(msg('网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。'));

@@ -1,5 +1,7 @@
 /** Image transport/decoding is independent of how a site discovers its directory or pages. */
 export interface SourceImageAdapter {
+  /** Explicitly verified public images only: Safari native GET has no source cookies. */
+  safariTransport?: 'public-native';
   /** Catalog/search artwork only: read bytes in the exact image document's browser session. */
   coverTransport?: 'page';
   /** Extension reader/search image requests only; inline images retain the live page policy. */

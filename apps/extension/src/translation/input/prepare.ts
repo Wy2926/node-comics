@@ -13,7 +13,7 @@ export class InputChangedError extends Error {
   readonly code='SOURCE_CHANGED';
   constructor(){super(msg('原图内容已变化，请重新加载后翻译。'));}
 }
-function resized(blob:Blob,width:number,height:number,profile:InputProfile=INPUT_PROFILE):Promise<{blob:Blob;sha256:string}> {
+function resized(blob:Blob,width:number,height:number,profile?:InputProfile):Promise<{blob:Blob;sha256:string;profile?:InputProfile}> {
   // An extension service worker is already off the UI thread and has no Worker constructor.
   if(typeof Worker==='undefined')return resizeInput(blob,width,height,profile);
   return new Promise((resolve,reject)=>{
@@ -22,10 +22,10 @@ function resized(blob:Blob,width:number,height:number,profile:InputProfile=INPUT
     const fail=()=>{finish();reject(Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('原图')})));};
     const timer=setTimeout(fail,120000);
     worker.onerror=fail;
-    worker.onmessage=(event:MessageEvent<{blob?:Blob;sha256?:string;error?:string}>)=>{
+    worker.onmessage=(event:MessageEvent<{blob?:Blob;sha256?:string;profile?:InputProfile;error?:string}>)=>{
       if(event.data.error==='IMAGE_OUTPUT_TOO_LARGE'){finish();reject(new ImageOutputTooLargeError());return;}
       if(!event.data.blob||!event.data.sha256){fail();return;}
-      finish();resolve({blob:event.data.blob,sha256:event.data.sha256});
+      finish();resolve({blob:event.data.blob,sha256:event.data.sha256,profile:event.data.profile});
     };
     worker.postMessage({blob,width,height,profile});
   });
@@ -94,7 +94,7 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     const prepared=result.blob!==source;
     assertCurrent(current);
     if(result.blob.size>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
-    return {...size,sourceSha256,profile:prepared?INPUT_PROFILE:undefined,blob:prepared?result.blob:undefined,
+    return {...size,sourceSha256,profile:prepared?encoded?.profile??INPUT_PROFILE:undefined,blob:prepared?result.blob:undefined,
       image:{sha256:result.sha256,byte_size:result.blob.size,content_type:result.blob.type,normalization_version:1}};
   });
 }

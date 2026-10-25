@@ -51,7 +51,7 @@ describe('website shortcut protocol',()=>{
     const action='web.shortcuts';
     expect((await send({...command(action),tabId:99})).result).toEqual({ok:true});
     expect(chrome.tabs.get).toHaveBeenCalledWith(7);
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_IDENTITY'},{frameId:0,documentId:'document-7'});
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7,{type:'NC_SHORTCUTS_IDENTITY'},{documentId:'document-7'});
     expect(chrome.tabs.create).toHaveBeenCalledWith({url:'chrome-extension://extension/reader.html#settings/shortcuts'});
     expect(requireHostAccess).not.toHaveBeenCalled();expect(activateInline).not.toHaveBeenCalled();
   });

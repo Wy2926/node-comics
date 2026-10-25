@@ -72,7 +72,7 @@ try{
   for(let attempt=0;attempt<2;attempt++)assert.equal((await read({url:first+'/cached.png'})).hash,hash(png));
   assert.equal(requests.filter(r=>r.path==='/cached.png').length,1);
   check('Default HTTP cache reuses a fresh image without downloading it twice');
-  const denied=await read({url:first+'/ungranted',pageUrl:first+'/chapter/1',deniedOrigin:first.replace('127.0.0.1','localhost')+'/*'});
+  const denied=await read({url:first+'/ungranted',pageUrl:first+'/chapter/1',deniedOrigin:'http://localhost/*'});
   assert.equal(denied.ok,false);assert.match(denied.error,/权限/);assert(!requests.some(r=>r.path==='/never.png'));
   check('Simulated permission denial rejects the redirect destination before any request reaches it');
   const cover=await page.evaluate(async url=>{

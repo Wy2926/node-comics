@@ -24,6 +24,18 @@ function fixture() {
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
 
 describe('mobile login tab', () => {
+  it('captures a committed Safari callback after the page clears its query, ignoring other tabs and subframes', async () => {
+    const f=fixture(), listeners=new Set<(details:any)=>void>();
+    (chrome as any).webRequest=undefined;
+    (chrome as any).webNavigation={onCommitted:{addListener:(listener:any)=>listeners.add(listener),removeListener:(listener:any)=>listeners.delete(listener)}};
+    const result=launchLoginWindow(authorization);
+    await vi.waitFor(()=>expect(f.update).toHaveBeenCalledOnce());
+    f.updated.emit(7,{url:redirect});
+    for(const listener of listeners){listener({tabId:8,frameId:0,url:callback});listener({tabId:7,frameId:1,url:callback});}
+    expect(f.remove).not.toHaveBeenCalled();
+    for(const listener of listeners)listener({tabId:7,frameId:0,url:callback});
+    expect(await result).toBe(callback);expect(listeners.size).toBe(0);f.noListeners();
+  });
   it('binds listeners before navigating and captures a callback before its dummy page loads', async () => {
     const f = fixture();
     f.update.mockImplementation(async (id) => {
@@ -142,11 +154,39 @@ describe('mobile login tab', () => {
     expect(f.remove).toHaveBeenCalledExactlyOnceWith(7); f.noListeners();
   });
 
-  it('does not open a tab without the required observer APIs', async () => {
+  it('captures Safari callbacks using its own tab without webRequest', async () => {
     const f = fixture();
     Object.assign(chrome, {webRequest: undefined});
+    const safariRedirect = 'https://product.test/auth/callback/';
+    const safariAuth = 'https://identity.example/authorize?' + new URLSearchParams({redirect_uri: safariRedirect, state: 'ours'});
+    const result = launchLoginWindow(safariAuth);
+    await vi.waitFor(() => expect(f.update).toHaveBeenCalledOnce());
+    const returned = safariRedirect + '?state=ours&code=fixture-code';
+    f.updated.emit(8, {url: returned});
+    expect(f.remove).not.toHaveBeenCalled();
+    f.updated.emit(7, {status: 'complete'}, {url: returned});
+    expect(await result).toBe(returned);
+    expect(f.requested.addListener).not.toHaveBeenCalled(); f.noListeners();
+  });
+
+  it('does not open a tab without tab navigation events', async () => {
+    const f = fixture();
+    Object.assign(chrome.tabs, {onUpdated: undefined});
     await expect(launchLoginWindow(authorization)).rejects.toThrow('不支持安全登录');
     expect(f.create).not.toHaveBeenCalled(); f.noListeners();
+  });
+
+  it('allows an isolated loopback callback but rejects unencrypted remote callbacks', async () => {
+    const f = fixture();
+    Object.assign(chrome, {webRequest: undefined});
+    const url = (redirect_uri: string) => 'http://127.0.0.1:5199/authorize?' + new URLSearchParams({redirect_uri, state: 'ours'});
+    await expect(launchLoginWindow(url('http://remote.test/callback'))).rejects.toThrow('HTTPS');
+    expect(f.create).not.toHaveBeenCalled();
+    const redirect = 'http://127.0.0.1:5199/auth/callback/';
+    const result = launchLoginWindow(url(redirect));
+    await vi.waitFor(() => expect(f.update).toHaveBeenCalledOnce());
+    f.updated.emit(7, {url: redirect + '?state=ours&code=fixture'});
+    expect(await result).toBe(redirect + '?state=ours&code=fixture'); f.noListeners();
   });
 
   it.each(['api', 'tab'] as const)('does not open a tab without the caller %s', async missing => {

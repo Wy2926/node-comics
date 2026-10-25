@@ -27,7 +27,7 @@ export async function readSourceArtwork(sourceId:string,url:string,pageUrl:strin
   signal?.throwIfAborted();
   const configured = adapter?.coverHeaders ?? adapter?.headers;
   const headers = typeof configured === 'function' ? configured(url) : configured;
-  return (await fetchSourceImage(url, signal, headers, {pageUrl,
+  return (await fetchSourceImage(url, signal, headers, {pageUrl,safariTransport:adapter?.safariTransport,
     ...(adapter?.readerReferrerPolicy ? {referrerPolicy: adapter.readerReferrerPolicy} : {})})).blob;
 }
 
@@ -39,7 +39,7 @@ export async function readInlineSourceImage(url:string,pageUrl:string,signal?:Ab
     throw Error('SOURCE_RESOURCE_EXPIRED');
   const adapter=sourceImages[definition.id];
   const headers=typeof adapter?.headers==='function'?adapter.headers(url):adapter?.headers;
-  const response=await fetchSourceImage(url,signal,headers,{pageUrl,referrerPolicy});
+  const response=await fetchSourceImage(url,signal,headers,{pageUrl,referrerPolicy,safariTransport:adapter?.safariTransport});
   const blob=!explicitImage&&adapter?.decodeInline?await adapter.decodeInline(response.blob,response.headers,url,signal):response.blob;
   signal?.throwIfAborted();
   return blob;
@@ -54,7 +54,7 @@ export async function readSourceImage(reference:SourceImageReference,signal?:Abo
   const adapter=valid.sourceId?sourceImages[valid.sourceId]:undefined;
   if(valid.processing&&!adapter?.decode)throw Error('来源图片处理器不可用。');
   const headers=valid.data?undefined:typeof adapter?.headers==='function'?adapter.headers(valid.url):adapter?.headers;
-  const response=await fetchSourceImage(valid.data??valid.url,signal,headers,valid.data?undefined:{pageUrl:valid.pageUrl,
+  const response=await fetchSourceImage(valid.data??valid.url,signal,headers,valid.data?undefined:{pageUrl:valid.pageUrl,safariTransport:adapter?.safariTransport,
     ...(adapter?.readerReferrerPolicy?{referrerPolicy:adapter.readerReferrerPolicy}:{})});
   signal?.throwIfAborted();
   const blob=adapter?.decode?await adapter.decode(response.blob,response.headers,valid.processing,signal):response.blob;

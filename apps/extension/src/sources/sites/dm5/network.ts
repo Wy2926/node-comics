@@ -22,7 +22,7 @@ export const network: SourceNetwork = {
     const loc=dm5Location(new URL(url));
     if(!loc?.chapterId)throw Error('DM5 章节地址无效。');
     context.signal?.throwIfAborted();
-    const html=await context.request(chapterUrl(loc.chapterId));
+    const html=await context.request(chapterUrl(loc.chapterId),{desktop:true});
     context.signal?.throwIfAborted();
     return catalogUrl(readerIdentity(html,url).slug);
   },
@@ -30,7 +30,7 @@ export const network: SourceNetwork = {
     const loc = dm5Location(new URL(url));
     if (!loc?.slug || loc.chapterId) throw Error('请使用 DM5 漫画详情页链接。');
     context.signal?.throwIfAborted();
-    const html = await context.request(catalogUrl(loc.slug));
+    const html = await context.request(catalogUrl(loc.slug),{desktop:true});
     context.signal?.throwIfAborted();
     return parseCatalog(html, url);
   },
@@ -38,7 +38,7 @@ export const network: SourceNetwork = {
     const loc = dm5Location(new URL(url));
     if (!loc?.chapterId) throw Error('DM5 章节地址无效。');
     context.signal?.throwIfAborted();
-    const canonical = chapterUrl(loc.chapterId), html = await context.request(canonical);
+    const canonical = chapterUrl(loc.chapterId), html = await context.request(canonical,{desktop:true});
     context.signal?.throwIfAborted();
     if (/<div\b[^>]*class=["'][^"']*\bview-pay-form\b/.test(html))
       throw Error('DM5 此章节需要源站登录或购买，暂不能导入。');
@@ -61,7 +61,7 @@ export const network: SourceNetwork = {
       let urls: string[];
       for (;;) {
         context.signal?.throwIfAborted();
-        const response = await context.request(canonical + 'chapterfun.ashx?' + query, {referer: canonical});
+        const response = await context.request(canonical + 'chapterfun.ashx?' + query, {referer: canonical,desktop:true,safariTransport:'public-native'});
         context.signal?.throwIfAborted();
         try { urls = imageUrls(response, loc.chapterId!); break; }
         catch (error) {

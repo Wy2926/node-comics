@@ -7,6 +7,8 @@
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "dev:extension": "wxt",
     "build": "wxt build",
+    "build:safari": "wxt build --browser safari --mv3",
+    "safari:simulator": "node scripts/safari-simulator.mjs",
     "build:web": "vite build",
     "zip": "wxt zip",
     "zip:edge": "wxt zip --browser edge --mv3",
