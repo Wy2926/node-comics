@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {definition, episodeUrl} from '../definition';
-import {network} from '../network';
+import {network, parseEntries} from '../network';
 import {parsePages} from '../pages';
 import {episodeData, parseReader} from '../protocol';
 import {parseSearch} from '../search';
@@ -39,6 +39,14 @@ describe('Sunday Webry identity and catalogs', () => {
     expect(context.request.mock.calls.filter(([url]) => url.includes('offset=0'))).toHaveLength(2);
     expect(catalog.complete).toBe(true); expect(catalog.cover?.url).toContain('series-thumbnail/7-');
   });
+  it('follows current can_read through limited opening, expiry and reopening instead of price or countdown text', () => {
+    const row = {...entry('11'), open_limit: '公開終了まで12日'};
+    Object.assign(row.purchase_info, {is_free: false, purchasable: true});
+    for (const canRead of [true, false, true]) {
+      row.purchase_info.can_read = canRead;
+      expect(parseEntries(JSON.stringify([row]), '7', 0)[0].readable).toBe(canRead);
+    }
+  });
   it.each(['duplicate', 'partial', 'foreign', 'changed'])('rejects %s catalogs without changing the previous snapshot', async mode => {
     const context = fixture(), previous = await network.catalog(workUrl, context), before = structuredClone(previous);
     const original = context.request.getMockImplementation()!; let reads = 0;
@@ -64,11 +72,13 @@ describe('Sunday Webry identity and catalogs', () => {
   });
 });
 describe('Sunday Webry pages and search', () => {
-  it('keeps duplicate image URLs as separate page slots and removes ads without reordering source pages', () => {
+  it.each(['2', 'filtered/2'])('keeps duplicate %s image URLs, page order and the persisted decoder marker', path => {
     const location = definition.identify(new URL(episodeUrl('11')))!;
-    const snapshot = validatePages(parsePages(readerData(), location.url), location);
+    const data = readerData(), url = imageUrl.replace('/page/2/', `/page/${path}/`);
+    for (const page of data.readableProduct.pageStructure.pages) if (page.type === 'main') page.src = url;
+    const snapshot = validatePages(parsePages(data, location.url), location);
     expect(snapshot.items.map(p => [p.id, p.order])).toEqual([['page-0', 0], ['page-2', 1]]);
-    expect(snapshot.knownTotal).toBe(2); expect(snapshot.items[0].resource).toEqual({kind: 'http', url: imageUrl, processing: 'webry-baku:67:99'});
+    expect(snapshot.knownTotal).toBe(2); expect(snapshot.items[0].resource).toEqual({kind: 'http', url, processing: 'webry-baku:67:99'});
   });
   it.each(['host', 'missing', 'protocol', 'dimensions', 'type', 'locked'])('fails closed on %s page data', mode => {
     const data = readerData();

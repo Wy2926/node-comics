@@ -1,7 +1,7 @@
 // Production MV3 in an isolated Chromium profile. RUN_LIVE_WEBRY=1 reads the public website.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
+import {cp, mkdir, mkdtemp, writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 const root = process.cwd(), live = process.env.RUN_LIVE_WEBRY === '1';
@@ -24,6 +24,8 @@ const context = await chromium.launchPersistentContext(path.join(out, 'profile')
   locale: 'zh-CN', viewport: {width: 1440, height: 1000}, reducedMotion: 'reduce',
   args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension]});
 context.setDefaultTimeout(30000);
+await context.addInitScript(() => {if (location.protocol === 'chrome-extension:')
+  localStorage.setItem('nc-release-notes-version', chrome.runtime.getManifest().version);});
 const errors = [], checks = [];
 context.on('page', page => page.on('pageerror', error => {if (page.url().startsWith('chrome-extension:')) errors.push(error.message);}));
 await context.route('https://**.nodelane.net/**', route => route.fulfill({status: 503, body: '{}', contentType: 'application/json'}));
@@ -38,7 +40,8 @@ if (!live) {
     if (url.pathname.startsWith('/episode/')) {
       const data = fixture.readerData(url.pathname.split('/')[2]);
       data.readableProduct.series.title = 'Webry fixture';
-      data.readableProduct.pageStructure.pages = [0, 1, 2].map(() => ({type: 'main', src: fixture.imageUrl, width: 803, height: 1207}));
+      data.readableProduct.pageStructure.pages = [0, 1, 2].map(index => ({type: 'main',
+        src: index === 1 ? fixture.imageUrl : fixture.imageUrl.replace('/page/2/', '/page/filtered/2/'), width: 803, height: 1207}));
       return route.fulfill({contentType: 'text/html', body: '<!doctype html><meta charset="utf-8">' + fixture.readerHtml(data)});
     }
     if (failCatalog) return route.fulfill({status: 503, body: 'Unavailable'});
@@ -57,7 +60,8 @@ async function waitImage(page = 1) {await reader.waitForFunction(({entry, page})
   document.querySelector(`[data-copy-id="${entry}"] [data-page-index="${page - 1}"] img.nc-page-image`)?.naturalWidth > 0,
   {entry: activeEntry, page}, {timeout: 60000});}
 async function jump(page) {
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(page)); await waitImage(page);
+  await reader.getByLabel('跳转页码', {exact: true}).fill(String(page));
+  await reader.getByLabel('跳转页码', {exact: true}).press('Enter'); await waitImage(page);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
     const data = await catalog.get('entries', entry), pages = await catalog.listPages(data.contentId), position = await catalog.get('positions', entry);
     return position?.pageId === pages[page - 1]?.pageId;}, {entry: activeEntry, page});
@@ -86,19 +90,29 @@ try {
     });
     assert(result.exact); imageBytes = Buffer.from(result.data, 'base64'); checks.push('Lossless baku round-trip includes remainder strips');
   }
-  await reader.evaluate(async () => {const settings = {uiLanguage: 'zh-CN', layout: 'single', fit: 'window', autoTranslateTabs: false};
+  // Keep navigation visible: this checks source reading, not immersive idle controls.
+  await reader.evaluate(async () => {const settings = {uiLanguage: 'zh-CN', layout: 'single', fit: 'window', readerImmersive: false, autoTranslateTabs: false};
     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
-  for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('サンデーうぇぶり'));
+  const expand = search.locator('.nc-search-scope-expand');
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
+  const all = search.getByRole('button', {name: '全选', exact: true});
+  if (await all.isEnabled()) await all.click();
+  await search.getByRole('button', {name: '反选', exact: true}).click();
+  await search.locator('.nc-search-site-option').filter({hasText: 'サンデーうぇぶり'}).locator('input').check();
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'true') await expand.click();
   const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? 'フリーレン' : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? '葬送のフリーレン' : 'Webry fixture', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
   await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
   const imported = await state(); assert.equal(imported.comics.length, 1);
+  assert.equal(imported.comics[0].source.connectionId, 'website:sundaywebry');
   const active = imported.entries.find(e => e.indexState === 'ready'); assert(active); activeEntry = active.id;
-  await waitImage(); await jump(3); await reader.screenshot({path: path.join(out, 'reader.png')});
+  await waitImage(); await jump(3);
+  assert.equal(await reader.locator('.nc-reader.is-immersive').count(), 0);
+  await reader.screenshot({path: path.join(out, 'reader.png')});
   assert(imported.entries.length >= (live ? 100 : 3));
   checks.push('Search -> full paginated catalog -> decoded images -> page 3 without a source tab');
   await reader.getByRole('button', {name: '打开目录', exact: true}).click();

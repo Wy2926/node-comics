@@ -1,6 +1,7 @@
 import type {SourceNetworkContext} from '../../contracts/network';
 import {attributes, tags} from '../../shared/html';
 import {gigaViewerProduct} from '../../shared/gigaviewer/pages';
+import {gigaViewerAssetUrls} from '../../shared/gigaviewer/serial-protocol';
 import {webryLocation} from './definition';
 
 export const changed = () => Error('Sunday Webry 目录或阅读协议已变化，请回源确认后重试。');
@@ -53,22 +54,4 @@ export function parseReader(raw: string, url: string) {
   if (canonical.length !== 1 || location(canonical[0].href).episode !== reader.episode) throw changed();
   return reader;
 }
-/** Unwrap only the source's explicit series artwork; never accept arbitrary proxy targets. */
-export function coverUrl(value: unknown, series?: string) {
-  let url = new URL(text(value, 8192));
-  if (url.origin === 'https://cdn-scissors.gigaviewer.com') {
-    const encoded = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
-    url = new URL(decodeURIComponent(encoded));
-  }
-  if (url.origin !== 'https://cdn-img.www.sunday-webry.com' || url.username || url.password ||
-      !/^\/public\/series-thumbnail\/([1-9]\d{0,24})-[a-f\d]+$/.test(url.pathname)) throw changed();
-  const found = /^\/public\/series-thumbnail\/(\d+)-/.exec(url.pathname)![1];
-  if (series && series !== found) throw changed();
-  return {url: url.href, series: found};
-}
-export function pageUrl(value: unknown) {
-  const url = new URL(text(value, 8192));
-  if (url.origin !== 'https://cdn-img.www.sunday-webry.com' || url.username || url.password ||
-      !/^\/public\/page\/(?:\d+\/)?[1-9]\d*-[a-f\d]+$/.test(url.pathname)) throw changed();
-  return url.href;
-}
+export const {pageUrl, coverUrl} = gigaViewerAssetUrls('https://cdn-img.www.sunday-webry.com');
