@@ -28,7 +28,7 @@ export async function acquireImage(key:string,signal?:AbortSignal,priority:'curr
   if(!blob)throw Error('图片缓存已清理，请重新加载。');
   return {blob,release(){}};
 }
-export async function readImage(key:string):Promise<Blob|undefined>{const lease=await acquireImage(key);try{return lease.blob;}finally{lease.release();}}
+export async function readImage(key:string,signal?:AbortSignal):Promise<Blob|undefined>{const lease=await acquireImage(key,signal);try{return lease.blob;}finally{lease.release();}}
 export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob>{
   signal?.throwIfAborted();
   const reference=parsePageReference(key);

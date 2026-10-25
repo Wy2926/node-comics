@@ -16,6 +16,12 @@ try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline&long');
   await page.locator('.nc-release-notes[open] .nc-release-close').click();
+  // Pin the long-page scenario; the product now defaults to 50%, which fits this fixture on one screen.
+  await page.evaluate(async()=>{
+    const {catalog}=await import('/src/comics/repositories/index.ts');
+    const {readingViewKey,readingViewDefaults,saveReadingView}=await import('/src/reader/view.ts');
+    const [comic]=await catalog.list('comics');saveReadingView(readingViewKey(comic.id),{...readingViewDefaults(),fit:'width'});
+  });
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(()=>window.readerFixture.submitted.length===4);
@@ -90,7 +96,26 @@ try{
   await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').waitFor();
   assert.deepEqual(await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').first().evaluate(image=>[image.naturalWidth,image.naturalHeight]),[640,900]);
   assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
-  check('single-page reader downloads the next completed translation while still showing page 1');
+  const resultPath=`/v1/translations/${nextJob}/result`;
+  await page.waitForFunction(path=>window.readerFixture.requests.includes(path),resultPath);
+  await page.waitForFunction(async id=>{
+    const [{translationScope,readJobs},{resultBlobKey},{translationCache},{API_ORIGIN}]=await Promise.all([
+      import('/src/translation/channels/adapters/nodelane/store.ts'),import('/src/storage/translations/results.ts'),
+      import('/src/storage/translations/index.ts'),import('/src/service.ts'),
+    ]);
+    const scope={key:translationScope(API_ORIGIN,'fixture-pipeline')},jobs=await readJobs(scope.key,[],[id]);
+    return !!jobs[0]&&await translationCache.has(resultBlobKey(scope,jobs[0]));
+  },nextJob);
+  assert.equal(await page.locator(`.nc-page-image[data-result-job="${nextJob}"]`).count(),0);
+  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal((await snapshot()).requests.filter(path=>path===resultPath).length,1);
+  check('single-page reader downloads, composes and persistently caches the completed offscreen page before navigation');
+  const firstJob=await page.locator('.nc-page-image').first().getAttribute('data-result-job');
+  await jump(2);await page.locator(`.nc-page-image[data-result-job="${nextJob}"]`).waitFor();
+  assert.equal((await snapshot()).requests.filter(path=>path===resultPath).length,1);
+  check('navigating to the prefetched translation reuses complete local bytes with zero additional result downloads');
+  await page.screenshot({path:path.join(out,'prefetched-result.png')});
+  await jump(1);await page.locator(`.nc-page-image[data-result-job="${firstJob}"]`).waitFor();
   await page.screenshot({path:path.join(out,'reading.png')});
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   await page.getByRole('button',{name:'连续',exact:true}).click();

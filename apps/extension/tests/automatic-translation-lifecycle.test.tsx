@@ -6,7 +6,7 @@ import {acquireImage} from '../src/comics/application/image-access';
 import {StaleOperation} from '../src/concurrency';
 import {ReaderPicture} from '../src/reader/ReaderPicture';
 import {readingImage,type ImageLoadState} from '../src/reader/presentation';
-import {translationCache} from '../src/storage/translations';
+import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
 import {loadResultBlob,readMaterializedResult,resultBlobKey,validateMaterializedResult} from '../src/storage/translations/results';
 import {needsTranslation} from '../src/translation/automatic';
 import type {ChannelConnection,RuntimeOptions,TranslationScope} from '../src/translation/channels/contracts';
@@ -69,11 +69,11 @@ function images(node:ReactNode):ReactElement<ImgHTMLAttributes<HTMLImageElement>
   return node.type==='img'?[node as ReactElement<ImgHTMLAttributes<HTMLImageElement>>]:images(node.props.children);
 }
 function channelFixture(scope:TranslationScope={key:crypto.randomUUID()}){
-  const session={current:true},download=vi.fn(async():Promise<Blob>=>{throw Error('Unexpected result download');}),translate=vi.fn();
+  const session={current:true},download=vi.fn(async(_job:Job,_signal?:AbortSignal):Promise<Blob>=>{throw Error('Unexpected result download');}),translate=vi.fn();
   const runtimes:{options:RuntimeOptions;dispose:ReturnType<typeof vi.fn>;manual:ReturnType<typeof vi.fn>}[]=[];
   const channel:ChannelConnection={key:crypto.randomUUID(),scope,label:'Fixture',available:true,requiresInternet:false,isCurrent:()=>session.current,
     capabilities:{modes:[{id:'classic',label:'Classic',enabled:true}],languages:[{id:'en',label:'English'},{id:'ja',label:'Japanese'}],limits:{max_bytes:1000,max_pixels:1000,max_dimension:1000,max_translation_ids:20},entitlements:null},
-    validateResult:vi.fn(async()=>{}),readResult:vi.fn((value:Job)=>loadResultBlob({scope,job:value,isCurrent:()=>session.current,download})),dispose(){},
+    validateResult:vi.fn(async()=>{}),readResult:vi.fn((value:Job,signal?:AbortSignal)=>loadResultBlob({scope,job:value,isCurrent:()=>session.current&&!signal?.aborted,download:()=>download(value,signal)})),dispose(){},
     createRuntime(options){
       const runtime={options,dispose:vi.fn(),manual:vi.fn(async()=>{})};runtimes.push(runtime);
       return {...runtime,init:async()=>{},restore:async()=>{},submit:async targets=>{for(const value of targets)if(needsTranslation(value.page,value.mode,options.language,scope.key))translate(value);},wait:async()=>false,hasPending:false,waitingIds:[],retryDelay:0,stateFor:()=>undefined,refresh:async()=>{}};
@@ -152,5 +152,109 @@ describe('automatic translation result-reader lifecycle',()=>{
     f.switchLanguage('ja');await f.settle();f.unmount();authorization.resolve();await f.settle();
     for(const language of ['en','ja'])await expect(readMaterializedResult(f.key(language))).rejects.toThrow('Result reader unavailable');
     for(const runtime of f.runtimes)expect(runtime.dispose).toHaveBeenCalledOnce();
+  });
+});
+
+async function prefetchFixture(){
+  const connection=channelFixture(),{scope}=connection.channel,frame=new Frame();
+  vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:800,height:1200,close(){}})));
+  connection.download.mockResolvedValue(new Blob(['complete translation'],{type:'image/png'}));
+  let copy:ReadingEntry={id:'book',contentId:'content',title:'Prefetch',source:'local',sourceKey:'fixture',generation:1,createdAt:0,updatedAt:0,pageId:'page-0',relativeOffset:0,discoveryComplete:true,
+    pages:Array.from({length:7},(_,n)=>({...target(n).page,translationScope:scope.key,jobs:[job(n,{target_language:'en'})]}))};
+  let translation:ReturnType<typeof useAutomaticTranslation>,mounted=true;
+  const update=(next:ReadingEntry)=>{copy=next;frame.dirty=true;};
+  const render=()=>{translation=frame.render(()=>useAutomaticTranslation({channel:connection.channel,copies:[copy],updateEntry:update,language:'en',currentId:copy.id}));frame.cleanup();frame.create();};
+  const settle=async()=>{for(let i=0;i<40;i++){await nextTurn();if(mounted&&frame.dirty)render();}};
+  const window=(indexes:number[])=>translation.onReadingWindow(indexes.map(n=>({entryId:copy.id,page:copy.pages[n],mode:'classic'})),[copy.pages[0]]);
+  const emit=async(...values:Job[])=>{const runtime=connection.runtimes.at(-1)!;await runtime.options.onJobs(values);runtime.options.onChange();await settle();};
+  const unmount=()=>{if(mounted){mounted=false;frame.unmount();}};unmounts.push(unmount);
+  render();window([0,1,2,3]);await settle();
+  return {...connection,emit,settle,window,unmount,key:(n:number)=>resultBlobKey(scope,job(n,{status:'succeeded'})),get copy(){return copy;}};
+}
+const completed=(n:number,extra:Partial<Job>={})=>job(n,{status:'succeeded',target_language:'en',...extra});
+
+describe('automatic translation result prefetch',()=>{
+  it('persists a completed offscreen result before display and reuses it without another download',async()=>{
+    const f=await prefetchFixture();await f.emit(completed(1));
+    expect(await translationCache.has(f.key(1))).toBe(true);
+    expect(f.copy.pages[1].outputBlobs['job-1']).toBe(f.key(1));
+    expect(f.copy.pages[1]).toMatchObject({blobKey:'blob-1',width:800,height:1200});
+    await f.emit(completed(1));expect(f.download).toHaveBeenCalledOnce();
+    const lease=await acquireImage(f.key(1));expect(await lease.blob.text()).toBe('complete translation');lease.release();
+    expect(f.download).toHaveBeenCalledOnce();expect(f.translate).not.toHaveBeenCalled();
+  });
+
+  it('only warms the current language and requested window, excluding no-text and revoked results',async()=>{
+    const f=await prefetchFixture();f.window([0,1,2,3,4,5]);
+    await f.emit(completed(0,{status:'no_text'}),completed(1,{target_language:'ja'}),completed(2,{result_expired:true,result_available:false}),completed(3),completed(4),completed(5),completed(6));
+    expect(f.download.mock.calls.map(([job])=>job.id)).toEqual(['job-3','job-4']);
+    f.window([]);await f.settle();await f.emit(completed(1));
+    expect(f.download).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves a failed prefetch successful and lets display retry the same result independently',async()=>{
+    const f=await prefetchFixture();f.download.mockRejectedValueOnce(Error('download unavailable'));
+    await f.emit(completed(1),completed(2));await f.emit(completed(1),completed(2));
+    expect(f.download.mock.calls.map(([job])=>job.id)).toEqual(['job-1','job-2']);
+    expect(f.copy.pages[1].jobs[0].status).toBe('succeeded');expect(f.copy.pages[1].translationError).toBeUndefined();
+    expect(await translationCache.has(f.key(1))).toBe(false);expect(await translationCache.has(f.key(2))).toBe(true);
+    await readMaterializedResult(f.key(1));expect(f.download.mock.calls.map(([job])=>job.id)).toEqual(['job-1','job-2','job-1']);
+    expect(f.translate).not.toHaveBeenCalled();expect(f.runtimes[0].manual).not.toHaveBeenCalled();
+  });
+
+  it.each(['leave','hidden','unmount','account'])('does not cache a late result after %s',async reason=>{
+    const f=await prefetchFixture(),pending=Promise.withResolvers<Blob>();f.download.mockImplementationOnce(()=>pending.promise);
+    await f.emit(completed(1),completed(2));expect(f.download).toHaveBeenCalledOnce();
+    if(reason==='leave')f.window([]);
+    else if(reason==='hidden'){(document as unknown as Visibility).hidden=true;document.dispatchEvent(new Event('visibilitychange'));}
+    else if(reason==='account'){f.session.current=false;f.unmount();}
+    else f.unmount();
+    expect(f.download.mock.calls[0][1]?.aborted).toBe(true);
+    pending.resolve(new Blob(['late translation']));await f.settle();
+    expect(await translationCache.has(f.key(1))).toBe(false);expect(f.download).toHaveBeenCalledOnce();
+    if(reason==='hidden'){
+      (document as unknown as Visibility).hidden=false;document.dispatchEvent(new Event('visibilitychange'));await vi.advanceTimersByTimeAsync(0);await f.settle();
+      expect(await translationCache.has(f.key(1))).toBe(true);expect(await translationCache.has(f.key(2))).toBe(true);
+    }
+  });
+
+  it('shares an in-flight prefetch with foreground display instead of downloading twice',async()=>{
+    const f=await prefetchFixture(),pending=Promise.withResolvers<Blob>();f.download.mockImplementationOnce(()=>pending.promise);
+    await f.emit(completed(1));const shown=readMaterializedResult(f.key(1));await f.settle();
+    expect(f.download).toHaveBeenCalledOnce();pending.resolve(new Blob(['shared translation']));
+    expect(await(await shown).text()).toBe('shared translation');expect(f.download).toHaveBeenCalledOnce();
+  });
+
+  it.each([true,false])('honors the channel internet requirement (%s) while offline',async requiresInternet=>{
+    const f=await prefetchFixture();f.channel.requiresInternet=requiresInternet;vi.stubGlobal('navigator',{onLine:false});
+    window.dispatchEvent(new Event('offline'));await f.emit(completed(1));
+    expect(f.download).toHaveBeenCalledTimes(requiresInternet?0:1);
+    vi.stubGlobal('navigator',{onLine:true});window.dispatchEvent(new Event('online'));
+    await vi.advanceTimersByTimeAsync(0);await f.settle();
+    expect(await translationCache.has(f.key(1))).toBe(true);expect(f.download).toHaveBeenCalledOnce();
+  });
+
+  it('lets foreground display recover when its shared prefetch is cancelled',async()=>{
+    const f=await prefetchFixture(),pending=Promise.withResolvers<Blob>();f.download.mockImplementationOnce(()=>pending.promise);
+    await f.emit(completed(0));const shown=readMaterializedResult(f.key(0));await f.settle();
+    f.window([]);pending.resolve(new Blob(['cancelled']));
+    expect(await(await shown).text()).toBe('complete translation');expect(f.download).toHaveBeenCalledTimes(2);
+    expect(f.translate).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a cache entry cleared during prefetch',async()=>{
+    const f=await prefetchFixture(),pending=Promise.withResolvers<Blob>();f.download.mockImplementationOnce(()=>pending.promise);
+    await f.emit(completed(1));await translationCache.clear();pending.resolve(new Blob(['deleted']));await f.settle();
+    await f.emit(completed(1));expect(await translationCache.has(f.key(1))).toBe(false);expect(f.download).toHaveBeenCalledOnce();
+    expect(await(await readMaterializedResult(f.key(1))).text()).toBe('complete translation');expect(f.download).toHaveBeenCalledTimes(2);
+  });
+
+  it('respects a zero disk budget while reusing bounded session bytes for display',async()=>{
+    const f=await prefetchFixture(),budget=(await translationCache.usage()).budgetBytes;
+    try{
+      await setTranslationCacheLimitMb(0);await f.emit(completed(1));
+      expect(await translationCache.has(f.key(1))).toBe(false);
+      expect(await(await readMaterializedResult(f.key(1))).text()).toBe('complete translation');expect(f.download).toHaveBeenCalledOnce();
+    }finally{await setTranslationCacheLimitMb(budget===Infinity?-1:budget/1024**2);}
   });
 });
