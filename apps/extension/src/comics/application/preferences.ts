@@ -41,3 +41,14 @@ export function readSearchSiteSelection():Record<string,boolean> {
 export function saveSearchSiteSelection(selection:Readonly<Record<string,boolean>>) {
   try{localStorage.setItem('nc-search-sites',JSON.stringify({...readSearchSiteSelection(),...selection}));}catch{/* Preference storage is optional. */}
 }
+
+export const siteFavoritesKey = 'nc-site-favorites';
+export function readSiteFavorites(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(siteFavoritesKey) ?? '[]');
+    return Array.isArray(saved) ? [...new Set(saved.filter((key): key is string => typeof key === 'string' && key.length > 0))] : [];
+  } catch {return [];}
+}
+export function saveSiteFavorites(favorites: readonly string[]) {
+  try {localStorage.setItem(siteFavoritesKey, JSON.stringify([...new Set(favorites)]));} catch {/* Keep the current UI choice if storage is unavailable. */}
+}

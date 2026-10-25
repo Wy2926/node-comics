@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Lokale Daten werden geladen…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Nach dem Leeren bei Bedarf erneut geladen. Comics und Lesepositionen bleiben erhalten.",
   "漫画网站": "Comic-Websites",
+  "收藏网站": "Website zu Favoriten hinzufügen",
+  "取消收藏网站": "Website aus Favoriten entfernen",
   "免费": "Kostenlos",
   "全站漫画免费阅读": "Alle Comics auf dieser Website können kostenlos gelesen werden.",
   "需要登录": "Anmeldung nötig",

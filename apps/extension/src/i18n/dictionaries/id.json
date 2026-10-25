@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Memuat data lokal…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Dimuat kembali sesuai kebutuhan setelah dibersihkan. Komik dan posisi baca tetap tersimpan.",
   "漫画网站": "Situs komik",
+  "收藏网站": "Tambahkan situs ke favorit",
+  "取消收藏网站": "Hapus situs dari favorit",
   "免费": "Gratis",
   "全站漫画免费阅读": "Semua komik di situs ini dapat dibaca gratis.",
   "需要登录": "Perlu login",

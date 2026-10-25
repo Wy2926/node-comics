@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Chargement des données locales…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Rechargé au besoin après le nettoyage. Les BD et les positions de lecture sont conservées.",
   "漫画网站": "Sites de BD",
+  "收藏网站": "Ajouter le site aux favoris",
+  "取消收藏网站": "Retirer le site des favoris",
   "免费": "Gratuit",
   "全站漫画免费阅读": "Toutes les BD de ce site sont gratuites à lire.",
   "需要登录": "Connexion requise",

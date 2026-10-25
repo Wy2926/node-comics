@@ -10,7 +10,7 @@ import type {GigaViewerSerialProtocol} from '../serial-protocol';
 
 export function verifySerialSite(definition: SourceDefinition, protocol: GigaViewerSerialProtocol,
   network: ReturnType<typeof gigaViewerSerialNetwork>['network'] & ReturnType<typeof gigaViewerSerialSearch>,
-  cdn: string, route: GigaViewerSearchMarkup, mixed: boolean) {
+  cdn: string, route: GigaViewerSearchMarkup, mixed: boolean, adaptedOn = '2026-10-23') {
   const {sourceId, origin, catalogUrl, episodeUrl} = protocol;
   const work = catalogUrl('7'), chapter = episodeUrl('11', '7'), query = {siteId: sourceId, query: '作品'};
   const image = `${cdn}/public/page/2/900-abcdef`, cover = `${cdn}/public/series-thumbnail/7-abcdef`;
@@ -45,7 +45,7 @@ export function verifySerialSite(definition: SourceDefinition, protocol: GigaVie
     it('registers explicit Japanese raw metadata, install scope, catalog sync and network search', () => {
       expect(sourceNetworks[sourceId]).toBe(network);
       expect(validateSearchCapability(definition, definition.sites![0])).toBe(true);
-      expect(definition.sites![0]).toMatchObject({isRaw: true, primaryLanguages: ['ja'], contentTags: ['manga'], adaptedOn: '2026-10-23'});
+      expect(definition.sites![0]).toMatchObject({isRaw: true, primaryLanguages: ['ja'], contentTags: ['manga'], adaptedOn});
       expect(definition.catalogSync?.intervalMinutes).toBe(720);
       expect(definition.installation.optionalContentMatches).toContain(origin + '/episode/*');
       expect(definition.identify(new URL(work))).toMatchObject({kind: 'catalog', catalog: {key: `${sourceId}:series:7`}});

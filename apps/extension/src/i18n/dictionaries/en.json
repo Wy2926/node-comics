@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Loading local data…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Loaded again as needed after clearing. Comics and reading positions are kept.",
   "漫画网站": "Comic websites",
+  "收藏网站": "Favorite website",
+  "取消收藏网站": "Remove website from favorites",
   "免费": "Free",
   "全站漫画免费阅读": "All comics on this site are free to read.",
   "需要登录": "Login required",

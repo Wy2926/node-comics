@@ -42,7 +42,7 @@ describe('comic website directory presentation', () => {
   it('defaults to two visible groups with advanced filters collapsed and a disabled reset', () => {
     const html = render();
     expect(html.match(/class="nc-site-filter-group"/g)).toHaveLength(4);
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(13);
+    expect(html.match(/aria-pressed="false"/g)).toHaveLength(13 + listSupportedSites().length);
     expect(html).toContain(`显示 ${listSupportedSites().length} / ${listSupportedSites().length} 个网站`);
     expect(html).toContain('disabled="">清空筛选');
     expect(html).toContain('同组多选匹配任一项，不同组同时满足。');
@@ -72,5 +72,16 @@ describe('comic website directory presentation', () => {
     expect(html).toContain('Clear filters');
     expect(html).toContain('RawOtaku');
     expect(html).not.toContain('收费待确认');
+    expect(html).toContain('Favorite website');
+  });
+  it('restores favorite sites at the top with a separate accessible toggle, not a nested link button', () => {
+    const site = listSupportedSites().at(-1)!;
+    vi.stubGlobal('localStorage', {getItem: (key: string) => key === 'nc-site-favorites' ? JSON.stringify([site.key]) : null});
+    const html = render();
+    expect(html.match(/data-site-key="([^"]+)"/)?.[1]).toBe(site.key);
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('title="取消收藏网站"');
+    expect(html).toContain('</a><div class="nc-site-card-footer">');
+    expect(html).not.toMatch(/<a\b[^>]*>(?:(?!<\/a>)[\s\S])*<button/);
   });
 });

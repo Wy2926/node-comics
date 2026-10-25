@@ -12,9 +12,10 @@ vi.mock('react', async importOriginal => ({
   useState: (initial: unknown) => [typeof initial === 'function' ? initial() : initial, vi.fn()],
   useRef: () => ({current: section}),
   useCallback: (callback: () => void) => callback,
+  useMemo: (factory: () => unknown) => factory(),
   useEffect: (effect: () => void | (() => void)) => effects.push(effect),
 }));
-vi.mock('../src/sources', () => ({listSupportedSites: () => [], matchesSiteFilters: vi.fn(), safeImageUrl: vi.fn()}));
+vi.mock('../src/sources', () => ({listSupportedSites: () => [], sortSupportedSites: () => [], matchesSiteFilters: vi.fn(), safeImageUrl: vi.fn()}));
 vi.mock('../src/ui/SupportRequestForm', () => ({SupportRequestForm: () => null}));
 
 type Click = {button: number; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; preventDefault: () => void};

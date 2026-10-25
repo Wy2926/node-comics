@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Yerel veriler yükleniyor…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Temizledikten sonra gerektiğinde yeniden yüklenir. Çizgi romanlar ve okuma konumları korunur.",
   "漫画网站": "Çizgi roman siteleri",
+  "收藏网站": "Siteyi favorilere ekle",
+  "取消收藏网站": "Siteyi favorilerden kaldır",
   "免费": "Ücretsiz",
   "全站漫画免费阅读": "Bu sitedeki tüm çizgi romanlar ücretsiz okunabilir.",
   "需要登录": "Giriş gerekli",

@@ -1,5 +1,9 @@
 // Fixed public, read-only samples. No accounts or translation providers.
 export const samples = [
+  {id: 'comictrail', name: 'コミックトレイル', origin: 'https://comic-trail.com',
+    cdn: 'https://cdn-img.comic-trail.com', query: 'ときめき', episode: '12207421984318727912', series: '12207421984318687209'},
+  {id: 'magcomi', name: 'マグコミ', origin: 'https://magcomi.com',
+    cdn: 'https://cdn-img.magcomi.com', query: '君とは一緒に死ねない', paginationQuery: 'の', episode: '12207421984406812438', series: '12207421984406802550'},
   {id: 'shonenjumpplus', name: '少年ジャンプ＋', origin: 'https://shonenjumpplus.com',
     cdn: 'https://cdn-ak-img.shonenjumpplus.com', query: 'SPY', episode: '10834108156648240735', series: '10834108156648240732'},
   {id: 'tonarinoyj', name: 'となりのヤングジャンプ', origin: 'https://tonarinoyj.jp',

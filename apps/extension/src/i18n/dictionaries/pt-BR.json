@@ -777,6 +777,8 @@
   "正在读取本机资料…": "Carregando dados locais…",
   "{0} · 清理后按需重新读取，漫画与阅读位置保留。": "{0} · Recarregado conforme necessário após a limpeza. Quadrinhos e posições de leitura são mantidos.",
   "漫画网站": "Sites de quadrinhos",
+  "收藏网站": "Adicionar site aos favoritos",
+  "取消收藏网站": "Remover site dos favoritos",
   "免费": "Gratuito",
   "全站漫画免费阅读": "Todos os quadrinhos deste site podem ser lidos gratuitamente.",
   "需要登录": "Login necessário",

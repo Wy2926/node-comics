@@ -1,6 +1,6 @@
 import {existsSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {listSupportedSites, matchesSiteFilters, type SiteFilters} from '../src/sources/registry/sites';
+import {listSupportedSites, sortSupportedSites, matchesSiteFilters, type SiteFilters} from '../src/sources/registry/sites';
 import type {SourceSite} from '../src/sources/contracts/definition';
 import {definitions} from '../src/sources/registry/definitions';
 
@@ -17,7 +17,7 @@ describe('adapter-owned website directory', () => {
     expect(listSupportedSites([{...adapter, capabilities: {...adapter.capabilities, importable: false}}])).toEqual([]);
     expect(listSupportedSites([{...adapter, sites: undefined}])).toEqual([]);
   });
-  it('orders dates newest first across adapters and preserves equal-date entry order', () => {
+  it('orders dates across adapters regardless of pricing without mutating declarations', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites: SourceSite[] = [
       {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', pricing: 'free'},
@@ -32,6 +32,20 @@ describe('adapter-owned website directory', () => {
       ['mangacopy:new', 'unknown'], ['other:same-day', 'freemium'], ['mangacopy:old', 'free'],
     ]);
     expect(sites.map(site => site.id)).toEqual(['old', 'new', 'same-day']);
+  });
+  it('pins favorites then orders by newest date only; ties keep declaration order', () => {
+    const base = definitions.find(value => value.id === 'mangacopy')!.sites![0];
+    const make = (key: string, isRaw: boolean, pricing: SourceSite['pricing'], adaptedOn = '2026-10-01') => ({...base, key, isRaw, pricing, adaptedOn});
+    const sites = [make('translated-free', false, 'free', '2026-10-26'), make('raw-paid', true, 'freemium', '2026-10-27'),
+      make('raw-free-old', true, 'free'), make('raw-free-new', true, 'free', '2026-10-25'),
+      make('raw-free-tie', true, 'free', '2026-10-25'), make('translated-unknown', false, 'unknown', '2026-10-28'), make('raw-unknown', true, 'unknown')];
+    const normal = ['translated-unknown', 'raw-paid', 'translated-free', 'raw-free-new', 'raw-free-tie', 'raw-free-old', 'raw-unknown'];
+    expect(sortSupportedSites(sites).map(site => site.key)).toEqual(normal);
+    const favorites = ['raw-free-old', 'translated-free', 'raw-free-tie', 'raw-free-new', 'removed:site'];
+    expect(sortSupportedSites(sites, favorites).map(site => site.key))
+      .toEqual(['translated-free', 'raw-free-new', 'raw-free-tie', 'raw-free-old', ...normal.filter(key => !favorites.includes(key))]);
+    expect(sortSupportedSites(sites, []).map(site => site.key)).toEqual(normal);
+    expect(sites[0].key).toBe('translated-free');
   });
   it('ships complete, unique website metadata and packaged icons', () => {
     const sites = listSupportedSites();
@@ -66,6 +80,7 @@ describe('adapter-owned website directory', () => {
       expect(sites.filter(site => site.adapterId === id).every(site => !site.isRaw), id).toBe(true);
     }
     expect(sites.find(site => site.adapterId === 'comicdays')?.pricing).toBe('freemium');
+    expect(sites.find(site => site.adapterId === 'comictrail')?.pricing).toBe('freemium');
     expect(sites.find(site => site.adapterId === 'mangadot')?.contentTags).toContain('manhua');
     expect(sites.find(site => site.adapterId === 'pixiv')?.contentTags).toContain('illustration');
   });
@@ -76,7 +91,7 @@ describe('website directory multi-select filters', () => {
   const sites = listSupportedSites();
   const filter = (selection: Partial<SiteFilters>) => sites.filter(site => matchesSiteFilters(site, {...empty, ...selection}));
 
-  it('keeps every entry and date order when no filters are selected', () => {
+  it('keeps every entry and priority order when no filters are selected', () => {
     expect(filter({})).toEqual(sites);
   });
   it('uses OR inside each group and AND between groups without duplicate cards', () => {

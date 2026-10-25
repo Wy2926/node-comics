@@ -3,9 +3,16 @@ import { definitions } from './definitions';
 
 /** Each adapter owns zero or more directory entries; the UI has no site-specific branches. */
 export function listSupportedSites(registry: readonly SourceDefinition[] = definitions) {
-  return registry.filter(adapter => adapter.capabilities.importable).flatMap(adapter =>
+  return sortSupportedSites(registry.filter(adapter => adapter.capabilities.importable).flatMap(adapter =>
     (adapter.sites ?? []).map(site => ({ ...site, adapterId: adapter.id, key: `${adapter.id}:${site.id}` })),
-  ).sort((a, b) => b.adaptedOn.localeCompare(a.adaptedOn));
+  ));
+}
+
+/** Favorites are a local UI choice; source definitions and search scope stay unchanged. */
+export function sortSupportedSites<T extends SourceSite & {key: string}>(sites: readonly T[], favorites: readonly string[] = []): T[] {
+  const saved = new Set(favorites);
+  return [...sites].sort((a, b) => Number(saved.has(b.key)) - Number(saved.has(a.key))
+    || b.adaptedOn.localeCompare(a.adaptedOn));
 }
 
 export interface SiteFilters {

@@ -1,12 +1,32 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { defaults } from '../src/types';
-import { readSearchLanguage, readSearchSiteSelection, saveSearchLanguage, saveSearchSiteSelection, saveSettings, settings } from '../src/comics/application/preferences';
+import { readSearchLanguage, readSearchSiteSelection, saveSearchLanguage, saveSearchSiteSelection, saveSettings, settings, readSiteFavorites, saveSiteFavorites, siteFavoritesKey } from '../src/comics/application/preferences';
 
 beforeEach(() => {
   const data = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) });
 });
 afterEach(() => vi.unstubAllGlobals());
+it('persists and removes site favorites independently of search scope and reader settings', () => {
+  saveSearchSiteSelection({'a:a': false});
+  expect(readSiteFavorites()).toEqual([]);
+  saveSiteFavorites(['a:a', 'b:b', 'a:a']);
+  expect(readSiteFavorites()).toEqual(['a:a', 'b:b']);
+  saveSiteFavorites(['b:b']); expect(readSiteFavorites()).toEqual(['b:b']);
+  saveSiteFavorites([]); expect(readSiteFavorites()).toEqual([]);
+  expect(readSearchSiteSelection()).toEqual({'a:a': false});
+  expect(localStorage.getItem('nc-settings')).toBeNull();
+});
+it('rejects malformed favorite lists and tolerates unavailable storage', () => {
+  for (const value of ['null', '{}', 'broken', '"a:a"']) {
+    localStorage.setItem(siteFavoritesKey, value); expect(readSiteFavorites()).toEqual([]);
+  }
+  localStorage.setItem(siteFavoritesKey, JSON.stringify(['a:a', 1, null, '', 'a:a', 'b:b']));
+  expect(readSiteFavorites()).toEqual(['a:a', 'b:b']);
+  vi.stubGlobal('localStorage', {getItem: () => {throw Error('blocked');}, setItem: () => {throw Error('blocked');}});
+  expect(readSiteFavorites()).toEqual([]);
+  expect(() => saveSiteFavorites(['a:a'])).not.toThrow();
+});
 it('accepts only listed search languages without converting unsupported values', () => {
   saveSearchLanguage('zh-Hant'); expect(readSearchLanguage('en')).toBe('zh-Hant');
   saveSearchLanguage('zh'); expect(localStorage.getItem('nc-search-language')).toBe('zh-Hant');
