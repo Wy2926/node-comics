@@ -10,12 +10,13 @@ export function pageFrame(page: Pick<Page,'width'|'height'>, viewport: {width:nu
   return {width, height:width / ratio};
 }
 
-export function thumbnailRows(pages: Page[], width: number) {
-  let top = 0;
-  return pages.map(page => {
-    const pictureHeight = Math.max(1,width - 2) * Math.max(1,page.height) / Math.max(1,page.width);
-    const row = {top, pictureHeight, height:pictureHeight + 82};
-    top += row.height;
-    return row;
-  });
+export const thumbnailRowHeight = 112;
+/** One spare row on either side; page dimensions do not affect directory layout. */
+export function thumbnailWindow(count: number, scrollTop: number, height: number) {
+  if (!count || height <= 0) return {start: 0, end: 0};
+  const top = Math.max(0, Math.min(scrollTop, Math.max(0, count * thumbnailRowHeight - height)));
+  return {
+    start: Math.max(0, Math.floor(top / thumbnailRowHeight) - 1),
+    end: Math.min(count, Math.ceil((top + height) / thumbnailRowHeight) + 1),
+  };
 }

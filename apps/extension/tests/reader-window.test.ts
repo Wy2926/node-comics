@@ -1,9 +1,37 @@
 import {describe,expect,it,vi} from 'vitest';
 import {chapterWindow,chapterResources,chapterGeometry,pageWindow,pageAtHeight,nextImagePages,type ChapterWindow} from '../src/reader/virtual-window';
-import {pageFrame} from '../src/reader/geometry';
+import {pageFrame,thumbnailRowHeight,thumbnailWindow} from '../src/reader/geometry';
 import type {ReadingEntry,Page} from '../src/types';
 
 const chapter=(id:string,count:number):ReadingEntry=>({id,title:id,source:'local',sourceKey:id,pages:Array.from({length:count},(_,index)=>({id:`${id}-${index}`,name:`${index}`,width:800,height:1000+index,jobs:[],outputBlobs:{}} as Page)),generation:1,createdAt:0,updatedAt:0,pageId:`${id}-0`,relativeOffset:0,discoveryComplete:true});
+describe('bounded thumbnail directory',()=>{
+ it('does not mount images for an empty or unmeasured directory',()=>{
+  expect(thumbnailWindow(0,0,500)).toEqual({start:0,end:0});
+  expect(thumbnailWindow(1000,0,0)).toEqual({start:0,end:0});
+ });
+ it('covers partial rows and keeps only one spare row on either side',()=>{
+  const top=500*thumbnailRowHeight+30,height=400;
+  const range=thumbnailWindow(1000,top,height);
+  expect(range).toEqual({start:499,end:505});
+  expect((range.start+1)*thumbnailRowHeight).toBeLessThanOrEqual(top);
+  expect((range.end-1)*thumbnailRowHeight).toBeGreaterThanOrEqual(top+height);
+  expect(thumbnailWindow(1000,top+5,height)).toEqual(range);
+ });
+ it('clamps overscroll and stale positions after a directory shrinks',()=>{
+  expect(thumbnailWindow(16,-40,500)).toEqual({start:0,end:6});
+  expect(thumbnailWindow(16,100000,500)).toEqual({start:10,end:16});
+  expect(thumbnailWindow(2,100000,500)).toEqual({start:0,end:2});
+ });
+ it.each([120,1000,100000])('keeps every visible row covered throughout a %i-page directory',count=>{
+  for(const height of [104,500,900])for(let step=0;step<=1000;step++){
+   const top=step/1000*Math.max(0,count*thumbnailRowHeight-height),{start,end}=thumbnailWindow(count,top,height);
+   expect(start).toBeGreaterThanOrEqual(0);expect(end).toBeLessThanOrEqual(count);
+   expect(start*thumbnailRowHeight).toBeLessThanOrEqual(top);
+   expect(end*thumbnailRowHeight).toBeGreaterThanOrEqual(top+height);
+   expect(end-start).toBeLessThanOrEqual(Math.ceil(height/thumbnailRowHeight)+3);
+  }
+ });
+});
 describe('bounded reader geometry',()=>{
  it('reuses chapter offsets and widths across a thousand page-window shifts without measuring pages again',()=>{
   const copies=[chapter('before',1000),chapter('current',1000),chapter('after',1000)];

@@ -1,8 +1,8 @@
 import {msg} from '../i18n/runtime';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Mode, Page } from '../types';
 import { Thumbnail } from './Images';
-import { thumbnailRows } from './geometry';
+import { thumbnailRowHeight, thumbnailWindow } from './geometry';
 import { pageTranslation, taskText } from './presentation';
 import { TaskActivity } from './TaskActivity';
 export function ThumbnailDirectory({ pages, index, mode, language, translationScope, onJump }: {
@@ -14,33 +14,37 @@ export function ThumbnailDirectory({ pages, index, mode, language, translationSc
   onJump: (n: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [size, setSize] = useState({ width: 320, height: 500 });
-  const rows = useMemo(() => thumbnailRows(pages, size.width), [pages, size.width]);
-  const current = rows[index];
+  const [height, setHeight] = useState(0);
+  const [range, setRange] = useState({start: 0, end: 0});
+  function updateWindow(scrollTop: number) {
+    const next = thumbnailWindow(pages.length, scrollTop, height);
+    setRange(previous => previous.start === next.start && previous.end === next.end ? previous : next);
+  }
   useLayoutEffect(() => {
-    const el = ref.current; const row = current; if (!el || !row)
-      return; if (row.top < el.scrollTop || row.top + row.height > el.scrollTop + el.clientHeight)
-      el.scrollTop = row.top - Math.max(0, (el.clientHeight - row.height) / 2); setScrollTop(el.scrollTop);
-  }, [pages[index]?.id, index, current?.top, current?.height, size.height]);
+    const el = ref.current; if (!el || !pages[index] || height <= 0) return;
+    const top = index * thumbnailRowHeight, rowHeight = thumbnailRowHeight - 8;
+    if (top < el.scrollTop || top + rowHeight > el.scrollTop + height)
+      el.scrollTop = top - Math.max(0, (height - rowHeight) / 2);
+    updateWindow(el.scrollTop);
+  }, [pages.length, pages[index]?.id, index, height]);
   useEffect(() => {
     if (!ref.current)
-      return; const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height })); observer.observe(ref.current); return () => observer.disconnect();
+      return; const observer = new ResizeObserver(([entry]) => setHeight(entry.contentRect.height)); observer.observe(ref.current); return () => observer.disconnect();
   }, []);
-  const visible = rows.map((row, n) => ({ ...row, n })).filter(row => row.top + row.height >= scrollTop - 400 && row.top <= scrollTop + size.height + 400);
-  const total = rows.length ? rows[rows.length - 1].top + rows[rows.length - 1].height : 0;
-  return <div className="nc-thumb-list" ref={ref} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} data-thumbnail-count={visible.length}>
-    <div style={{ height: total, position: 'relative' }}>{visible.map(({ n, top, height, pictureHeight }) => {
-      const p = pages[n];
+  const visible = pages.slice(range.start, range.end);
+  return <div className="nc-thumb-list" ref={ref} onScroll={e => updateWindow(e.currentTarget.scrollTop)} data-thumbnail-count={visible.length}>
+    <div style={{ height: pages.length * thumbnailRowHeight, position: 'relative' }}>{visible.map((p, offset) => {
+      const n = range.start + offset;
       const t = pageTranslation(p, mode, language, translationScope);
-      return <div className={`nc-thumb-row ${n === index ? 'current' : ''}`} style={{ position: 'absolute', top, height: height - 12 }} key={p.id}>
+      const status = t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.result ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入");
+      return <div className={`nc-thumb-row ${n === index ? 'current' : ''}`} style={{ position: 'absolute', top: n * thumbnailRowHeight, height: thumbnailRowHeight - 8 }} key={p.id}>
         <button className="nc-thumb-main" aria-current={n === index ? 'page' : undefined} onClick={() => onJump(n)}>
-          <span className="nc-thumb-picture" style={{ height: pictureHeight }}>
+          <span className="nc-thumb-picture">
             <Thumbnail blobKey={p.blobKey} alt={msg("第 {0} 页缩略图", {"0": n + 1})} />
           </span>
           <span className="nc-thumb-info">
             <b>{msg("第 {0} 页", {"0": n + 1})}{n === index && <i>{msg("阅读中")}</i>}</b>
-            <small>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}{t.pending ? taskText(t.pending) : t.expired ? msg("译图已过期") : t.ready || t.result?.result ? msg("已有译图") : t.latest ? taskText(t.latest) : p.blobKey ? msg("原图") : msg("原图待导入")}</small>
+            <small title={status}>{t.pending && t.pending.status !== 'outcome_unknown' && <TaskActivity waiting={t.pending.status === 'queued'} />}<span>{status}</span></small>
           </span>
         </button></div>;
     })}</div>
