@@ -1,3 +1,4 @@
+import {ReaderProgress} from './ReaderProgress';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type Rendition from "epubjs/types/rendition";
 import type { Location } from "epubjs/types/rendition";
@@ -435,11 +436,11 @@ export function EpubReader({
           <ReaderNumberInput label={msg('跳转章节')} value={chapter + 1} max={chapterCount} disabled={disabled}
             onCommit={value => jumpChapter(value - 1)}/><span>/ {chapterCount}</span>
         </label>
-        <input className="nc-reader-progress" type="range" aria-label={msg('阅读进度')} aria-valuetext={`${progress}%`}
-          min={0} max={100} step={1} value={progress} disabled={disabled}
-          onChange={event => {
+        <ReaderProgress key={JSON.stringify([copy.id,copy.contentId,copy.generation])} valueText={value => `${value}%`} percentage
+          min={0} max={100} value={progress} disabled={disabled}
+          onCommit={value => {
             const count = copy.document?.chapters.length ?? 0;
-            const target = Number(event.target.value) / 100 * count;
+            const target = value / 100 * count;
             const index = Math.min(count - 1, Math.floor(target));
             const href = copy.document?.chapters[index]?.href;
             if (href) run(() => restoreEpubLocation(session.current!, rendition.current!, {href, progression: target - index}));

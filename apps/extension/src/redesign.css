@@ -1861,7 +1861,7 @@ a {
 .nc-reader-navigation>label {
   grid-row: 2;
 }
-.nc-reader-navigation>.nc-reader-progress {
+.nc-reader-navigation>.nc-reader-progress-control {
   grid-row: 3;
 }
 .nc-reader-navigation>.nc-epub-progress-label {

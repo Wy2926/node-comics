@@ -20,6 +20,16 @@ import '../src/ui/theme/surfaces.css';
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
 const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
+const scrubFixture=query.get('scrub')==='1';
+// Leave a synthetic held-key preview open so native Escape/blur and the label can be checked.
+function previewProgress(){
+ const input=document.querySelector<HTMLInputElement>('.nc-reader-progress');if(!input)return;
+ input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+ for(let value=1;value<=Math.min(12,Number(input.max));value++){
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,String(value));
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+ }
+}
 const fractionalDimensions=performanceFixture&&query.get('fractional')==='1';
 const width=highResolution?4000:fractionalDimensions?817:800,height=highResolution?6000:fractionalDimensions?1203:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:performanceFixture?3:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:performanceFixture&&query.get('pages')==='1000'?1000:120;
 // Opt-in geometry-read counts belong to this fixture, not the production reader.
@@ -103,10 +113,11 @@ function Fixture(){
  useShortcuts({'app.shortcuts':()=>setShortcutsOpen(true)});
  const requestedLayout=query.get('initialLayout'),initialLayout=requestedLayout==='continuous'||requestedLayout==='double'?requestedLayout:pagination?'single':'continuous';
  const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[0].id),[config,setConfig]=useState<Settings>({...defaults,layout:initialLayout,direction:initialLayout==='double'?'rtl':defaults.direction,fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
+ const [saves,setSaves]=useState(0);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
  const viewKey=layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
  const copy=copies.find(value=>value.id===id)!;
- const update=useCallback((next:ReadingEntry)=>setCopies(previous=>previous.map(value=>value.id===next.id?next:value)),[]);
+ const update=useCallback((next:ReadingEntry)=>{if(scrubFixture)setSaves(value=>value+1);setCopies(previous=>previous.map(value=>value.id===next.id?next:value));},[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async(entryId:string)=>setMarkedRead(previous=>[...previous,entryId]),[]);
  const loadEntry=useCallback(async(entryId:string,options?:ChapterLoadOptions)=>{
   if(!lazyChapters)return;
@@ -133,6 +144,7 @@ function Fixture(){
  }
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
+  {scrubFixture&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output><button onClick={previewProgress}>模拟长按预览</button></div>}
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
   {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
    <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>

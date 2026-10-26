@@ -13,3 +13,6 @@
 .nc-reader-progress::-webkit-slider-thumb { appearance: none; width: 12px; height: 24px; margin-left: -4px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
 .nc-reader-progress::-moz-range-track { width: 6px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
 .nc-reader-progress::-moz-range-thumb { width: 12px; height: 24px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
+
+.nc-reader-progress-control { position: relative; display: flex; align-items: center; justify-content: center; height: var(--reader-range-size); min-width: 0; }
+.nc-reader-progress-preview { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1; padding: 0 5px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface); color: var(--accent); font-size: var(--text-caption); line-height: 16px; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }

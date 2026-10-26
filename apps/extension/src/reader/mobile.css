@@ -73,16 +73,17 @@
     font-size: max(16px, 1rem);
   }
 
-  .nc-app .nc-reader .nc-reader-navigation > .nc-reader-progress {
+  .nc-app .nc-reader .nc-reader-navigation > .nc-reader-progress-control {
     grid-area: 2 / 1 / 3 / -1;
-    writing-mode: horizontal-tb;
     width: 100%;
     height: 44px;
     min-height: 44px;
     margin: 0;
   }
 
-  .nc-app .nc-reader .nc-reader-navigation:has(.nc-epub-progress-label) > .nc-reader-progress { grid-column-end: 5; }
+  .nc-app .nc-reader .nc-reader-progress-control .nc-reader-progress { writing-mode: horizontal-tb; width: 100%; height: 44px; }
+
+  .nc-app .nc-reader .nc-reader-navigation:has(.nc-epub-progress-label) > .nc-reader-progress-control { grid-column-end: 5; }
   .nc-app .nc-reader .nc-reader-navigation > .nc-epub-progress-label { grid-area: 2 / 5; text-align: center; }
   .nc-app .nc-reader .nc-reader-progress::-webkit-slider-runnable-track { width: 100%; height: 6px; }
   .nc-app .nc-reader .nc-reader-progress::-webkit-slider-thumb { width: 24px; height: 18px; margin: -7px 0 0; }
@@ -188,7 +189,7 @@
   .nc-app .nc-reader .nc-reader-rail.left:has(.nc-epub-progress-label) {
     grid-template-columns: 44px 44px 44px 84px minmax(44px, 1fr) 44px 44px;
   }
-  .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > .nc-reader-progress { grid-area: 1 / 5; }
+  .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > .nc-reader-progress-control { grid-area: 1 / 5; }
   .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > .nc-epub-progress-label { grid-area: 1 / 6; }
   .nc-app .nc-reader .nc-reader-rail.left .nc-reader-navigation > button:last-child { grid-area: 1 / -2; }
 }
