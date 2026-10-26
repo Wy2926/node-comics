@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Real Chromium reader, local synthetic API. Start extension Vite on :5176.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -11,7 +12,7 @@ const page=await browser.newPage({viewport:{width:1280,height:900}}),checks=[],e
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const snapshot=()=>page.evaluate(()=>({submitted:window.readerFixture.submitted,requests:window.readerFixture.requests,translations:window.readerFixture.translationRequests,jobs:window.readerFixture.jobs,completedAt:window.readerFixture.completedAt,downloadedAt:window.readerFixture.downloadedAt}));
-async function jump(n){const input=page.getByLabel('跳转页码',{exact:true});await input.fill(String(n));await input.press('Enter');}
+async function jump(n){const input=page.getByLabel('阅读进度',{exact:true});await setReaderProgress(input, String(n));}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline&long');
@@ -47,7 +48,7 @@ try{
     await page.locator('.nc-reading-viewport').evaluate((v,top)=>{v.scrollTop=top;},metrics.top+threshold+3);
     await page.waitForFunction(n=>window.readerFixture.submitted.includes(n),current+3);
     assert(Date.now()-started<1000,'threshold refill should not wait for previous translations');
-    assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),String(current));
+    assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),String(current));
     await page.waitForTimeout(300);const rolling=await snapshot();
     assert.equal(rolling.submitted.filter(n=>n===current+3).length,1);assert(!rolling.submitted.includes(current+4));
   }
@@ -58,7 +59,7 @@ try{
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const started=Date.now();await jump(10);await page.waitForFunction(()=>window.readerFixture.submitted.includes(9));
   assert(Date.now()-started<1000);await page.waitForFunction(()=>window.readerFixture.submitted.includes(13));
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'10');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'10');
   check('a fit-to-window short page admits its extra slot before scrolling, while a direct jump still starts the current page within one second');
   await page.evaluate(()=>window.readerFixture.unknown=true);await jump(14);
   await page.waitForFunction(()=>!window.readerFixture.unknown&&window.readerFixture.requests.includes('/v1/translations'));
@@ -95,7 +96,7 @@ try{
   await page.waitForFunction(()=>window.readerFixture.downloadedAt>=window.readerFixture.completedAt);
   await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').waitFor();
   assert.deepEqual(await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').first().evaluate(image=>[image.naturalWidth,image.naturalHeight]),[640,900]);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   const resultPath=`/v1/translations/${nextJob}/result`;
   await page.waitForFunction(path=>window.readerFixture.requests.includes(path),resultPath);
   await page.waitForFunction(async id=>{
@@ -107,7 +108,7 @@ try{
     return !!jobs[0]&&await translationCache.has(resultBlobKey(scope,jobs[0]));
   },nextJob);
   assert.equal(await page.locator(`.nc-page-image[data-result-job="${nextJob}"]`).count(),0);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   assert.equal((await snapshot()).requests.filter(path=>path===resultPath).length,1);
   check('single-page reader downloads, composes and persistently caches the completed offscreen page before navigation');
   const firstJob=await page.locator('.nc-page-image').first().getAttribute('data-result-job');
@@ -129,11 +130,11 @@ try{
   assert(top>100);assert(resultId&&resultId!=='original');
   await page.getByRole('button',{name:'原图',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')==='original');
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
   await page.getByRole('button',{name:'翻译',exact:true}).click();
   await page.waitForFunction(id=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')===id,resultId);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
   state=await snapshot();assert.equal(state.translations.length,submittedBeforeSwitch);
   assert(!state.requests.some(p=>p.startsWith('/v1/comic-titles/')),'body translation must not query the title translation service');

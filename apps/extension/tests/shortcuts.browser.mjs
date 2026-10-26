@@ -28,7 +28,7 @@ const scrollport = () => panel().locator('.nc-shortcut-scroll');
 const scopeLabels = {global: '通用操作', app: '首页与标签页', reader: '阅读器', web: '网页内翻译'};
 const group = scope => panel().locator(`.nc-shortcut-group[data-shortcut-scope="${scope}"]`);
 const anchor = scope => panel().getByRole('navigation', {name: '快捷键范围', exact: true}).getByRole('button', {name: scopeLabels[scope], exact: true});
-const pageNumber = () => page.getByRole('spinbutton', {name: '跳转页码', exact: true});
+const pageNumber = () => page.getByRole('slider', {name: '阅读进度', exact: true});
 const viewport = () => page.locator('.nc-reading-viewport');
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function stablePanelLayout() {
@@ -52,7 +52,7 @@ async function stablePanelLayout() {
   });
 }
 async function waitPage(value) {
-  await page.waitForFunction(value => document.querySelector('[aria-label="跳转页码"]')?.value === String(value), value);
+  await page.waitForFunction(value => document.querySelector('[aria-label="阅读进度"]')?.value === String(value), value);
   await settle();
 }
 async function reader() {

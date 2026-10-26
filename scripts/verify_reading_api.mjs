@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Real local API + classic worker + Chromium, configured in an isolated acceptance environment.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -38,12 +39,12 @@ try{
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:45000});
   assert(translations.some(p=>p.status===202));assert(translations.every(p=>[200,202].includes(p.status)&&p.body.mode==='classic'),JSON.stringify(translations));
   check('actual independent translation requests, automatic-start original upload, worker settlement and result download deliver a translated image');
-  await page.getByLabel('跳转页码',{exact:true}).fill('4');await page.getByLabel('跳转页码',{exact:true}).press('Enter');
-  await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='4');
+  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '4');
+  await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='4');
   await page.waitForTimeout(3500);
   const operations=await request('/v1/translations?limit=100',reader);
   const jobIds=new Set(operations.items.map(i=>i.id));assert(jobIds.size>=6,`expected current + 3 across both windows, got ${jobIds.size}`);
-  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'4');
+  await page.reload();await page.locator('.nc-book').filter({has:page.getByRole('heading',{name:'cluster-eight',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('阅读进度',{exact:true}).waitFor();assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'4');
   await page.waitForFunction(()=>!!document.querySelector('.nc-page-image[data-result-job]:not([data-result-job="original"])'),null,{timeout:15000});
   const restored=await request('/v1/translations?limit=100',reader);assert.equal(new Set(restored.items.map(i=>i.id)).size,jobIds.size);
   check('new reader reload restores the current page and existing result without an extra translation');

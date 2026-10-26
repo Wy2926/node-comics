@@ -3,6 +3,7 @@ import {bookmarkKey,type BookmarkLocation,type ReaderBookmark} from '../domain/b
 import {epubLocation} from '../formats/epub-location';
 import {randomId} from '../../random-id';
 import {msg} from '../../i18n/runtime';
+import {pageReference,pageRenderProfile} from '../pages/identity';
 export {bookmarkLocation,bookmarkKey,applyBookmark} from '../domain/bookmarks';
 export type {BookmarkLocation,ReaderBookmark} from '../domain/bookmarks';
 
@@ -14,6 +15,15 @@ export function listBookmarks(comicId:string,before?:ReaderBookmark){
     range:IDBKeyRange.bound([comicId,0,''],before?[comicId,before.createdAt,before.id]:[comicId,Number.MAX_SAFE_INTEGER,'\uffff'],false,!!before)});
 }
 export const subscribeBookmarks=(listener:()=>void)=>catalog.subscribe(change=>{if(change.table==='bookmarks')listener();});
+/** Resolve only a visible bookmark's exact page; never load a chapter or use its old ordinal. */
+export async function bookmarkImageKey(location:BookmarkLocation,signal?:AbortSignal):Promise<string|undefined>{
+  signal?.throwIfAborted();
+  if(location.documentLocation)return;
+  const [entry,page]=await Promise.all([catalog.get('entries',location.entryId),catalog.get('pageDescriptors',[location.contentId,location.pageId])]);
+  signal?.throwIfAborted();
+  if(!entry||entry.comicId!==location.comicId||entry.contentId!==location.contentId||entry.format==='epub'||!page)return;
+  return pageReference({entryId:entry.id,contentId:entry.contentId,pageId:page.pageId,renderProfileId:pageRenderProfile(entry.format)});
+}
 export async function addBookmark(location:BookmarkLocation,restore?:ReaderBookmark):Promise<ReaderBookmark>{
   return catalog.mutate(['bookmarks','entries','comics','pageDescriptors'],async tx=>{
     const entry=await tx.get('entries',location.entryId),comic=await tx.get('comics',location.comicId);

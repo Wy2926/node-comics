@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Built MV3, isolated profile. Default is synthetic; RUN_LIVE_COMICPASH=1 reads public source data.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -68,7 +69,7 @@ try {
   }
   await site.screenshot({path: path.join(out, 'entry.png')});
   const before = created.length, opening = context.waitForEvent('page');await entry.click();reader = await opening;
-  await reader.getByLabel('跳转页码').waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度').waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   const details = await reader.evaluate(async () => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -78,8 +79,8 @@ try {
   assert(details.complete); assert(details.total > 0); assert.equal(created.length, before + 1);
   await site.close(); checks.push('Embedded button imports a complete catalog and chapter without acquisition tabs');
   for (let n = 1; n <= details.total; n++) {
-    await reader.getByLabel('跳转页码').fill(String(n), {force: true});
-    await reader.getByLabel('跳转页码').press('Enter');
+    await setReaderProgress(reader.getByLabel('阅读进度'), String(n));
+
     await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, n - 1, {timeout: 60000});
     if (n === 1 || n === details.total) await reader.screenshot({path: path.join(out, `reader-${n}.png`)});
   }
@@ -92,8 +93,8 @@ try {
     });
     assert.deepEqual(pixels, [0,255,100,255]);checks.push('Decoded synthetic pixels match the expected original tile');
   }
-  const restore = Math.min(details.total, 10); await reader.getByLabel('跳转页码').fill(String(restore), {force: true});
-  await reader.getByLabel('跳转页码').press('Enter');
+  const restore = Math.min(details.total, 10); await setReaderProgress(reader.getByLabel('阅读进度'), String(restore));
+
   await reader.waitForFunction(async ({id, index}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js')), entry = await catalog.get('entries', id), pages = await catalog.listPages(entry.contentId);
     return (await catalog.get('positions', id))?.pageId === pages[index]?.pageId;

@@ -101,7 +101,7 @@ function Fixture(){
   document.querySelector<HTMLButtonElement>('.nc-reader-navigation button:last-child')?.click();
   requestAnimationFrame(()=>{
    const canvases=[...document.querySelectorAll<HTMLCanvasElement>('[data-swipe-snapshot] .nc-page-preview')].filter(canvas=>canvas.style.display!=='none');
-   setStatus(`翻页预览快照 ${canvases.length}；像素 Alpha ${canvases.map(canvas=>canvas.getContext('2d')?.getImageData(20,20,1,1).data[3]).join(',')||'无'}；当前位置 ${document.querySelector<HTMLInputElement>('.nc-reader-navigation input[type=number]')?.value}`);
+   setStatus(`翻页预览快照 ${canvases.length}；像素 Alpha ${canvases.map(canvas=>canvas.getContext('2d')?.getImageData(20,20,1,1).data[3]).join(',')||'无'}；当前位置 ${document.querySelector<HTMLElement>('.nc-reader-position')?.dataset.value}`);
   });
  }
  function translated(){setCopy(previous=>previous&&({...previous,pages:previous.pages.map(page=>({...page,translationScope:'stream-fixture',jobs:[{id:`result-${page.id}`,mode:'classic',target_language:settings.language,status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true}],outputBlobs:{[`result-${page.id}`]:resultKey}}))}));}

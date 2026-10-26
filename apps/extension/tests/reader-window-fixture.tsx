@@ -1,5 +1,6 @@
 import {catalog} from '../src/comics/repositories';
 import {applyBookmark} from '../src/comics/application/bookmarks';
+import {pageReference,RENDER_PROFILE} from '../src/comics/pages/identity';
 import {Scrollbars} from '../src/ui/Scrollbars';
 /** Development-only, synthetic data on a dedicated origin. Never calls a supplier or cloud API. */
 import {useCallback,useState} from 'react';
@@ -14,6 +15,7 @@ import {useShortcuts} from '../src/shortcuts/react';
 import {defaults,type Page,type ReadingEntry,type Settings} from '../src/types';
 import type {ReadingTarget} from '../src/translation/automatic';
 import {sourcePageCache} from '../src/storage/source-pages';
+import {thumbnailCache} from '../src/storage/thumbnails';
 import {readerLoadingMetrics} from './reader-loading-metrics';
 import '../src/styles.css';
 import '../src/redesign.css';
@@ -22,8 +24,12 @@ import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
 const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
+document.documentElement.dataset.appearance=query.get('theme')==='dark'?'dark':'light';
+document.documentElement.dataset.accent=query.get('accent')??'sky';
+document.documentElement.style.setProperty('--text-scale',query.has('largeText')?'1.25':'1');
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
 const scrubFixture=query.get('scrub')==='1';
+let scrubPointer:{y:number;moves:string[]}|undefined;
 const turnFixture=query.get('turns')==='1';
 const FlipMetrics=query.has('curl')?(await import('./reader-flip-metrics')).ReaderFlipMetrics:undefined;
 const priorityFixture=pagination&&query.get('priority')==='1';
@@ -32,13 +38,21 @@ const readOrder:string[]=[];
 let bookmarkImageReads=0;
 if(query.has('bookmarks')){const get=sourcePageCache.get.bind(sourcePageCache);sourcePageCache.get=async key=>{bookmarkImageReads++;return get(key);};}
 // Leave a synthetic held-key preview open so native Escape/blur and the label can be checked.
-function previewProgress(){
+function previewProgress(report:(message:string)=>void){
  const input=document.querySelector<HTMLInputElement>('.nc-reader-progress');if(!input)return;
+ const reads=bookmarkImageReads,position=document.querySelector<HTMLElement>('.nc-reader-position')?.dataset.value;
  input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
- for(let value=1;value<=Math.min(12,Number(input.max));value++){
+ const target=query.get('preview')==='end'?Number(input.max):query.get('preview')==='start'?Number(input.min):Math.min(12,Number(input.max));
+ for(let step=1;step<=12;step++){
+  const value=Math.round(Number(input.min)+(target-Number(input.min))*step/12);
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,String(value));
   input.dispatchEvent(new Event('input',{bubbles:true}));
  }
+ requestAnimationFrame(()=>{
+  const lens=document.querySelector<HTMLElement>('.nc-reader-progress-preview'),bounds=lens?.getBoundingClientRect();
+  const count=document.querySelector<HTMLElement>('.nc-reader-position');
+  report(`预览 ${input.value}；正文 ${count?.dataset.value}（原 ${position}）；额外读图 ${bookmarkImageReads-reads}；浮窗 ${bounds?`${Math.round(bounds.width)}×${Math.round(bounds.height)}`:'无'}；越界 ${!!bounds&&(bounds.left<0||bounds.right>innerWidth||bounds.top<0||bounds.bottom>innerHeight)}；页码溢出 ${!!count&&count.scrollWidth>count.clientWidth}`);
+ });
 }
 const fractionalDimensions=performanceFixture&&query.get('fractional')==='1';
 const width=highResolution?4000:fractionalDimensions?817:800,height=highResolution?6000:fractionalDimensions?1203:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:performanceFixture?3:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:performanceFixture&&query.get('pages')==='1000'?1000:120;
@@ -65,11 +79,13 @@ if(!highResolution&&!pagination){await sourcePageCache.put(originalKey(0,0),orig
 const samples:ReadingEntry[]=Array.from({length:chapterCount},(_,chapter)=>({id:`window-fixture-${chapter}`,title:`第 ${chapter+1} 章 · 窗口验收`,source:'fixture',sourceKey:`window-fixture-${chapter}`,generation:1,retention:'offline',createdAt:0,updatedAt:0,discoveryComplete:true,pageId:`window-page-${chapter}-0`,relativeOffset:0,pages:Array.from({length:pageCount},(_,index)=>({id:`window-page-${chapter}-${index}`,name:`第 ${index+1} 页`,...dimensions(index),blobKey:index===failedIndex?undefined:originalKey(chapter,index),fetchError:index===failedIndex?'隔离样本：本页读取失败，可重试。':undefined,jobs:[],outputBlobs:{}}))}));
 if(query.has('bookmarks')){
  const comicId='bookmark-ui-fixture';
+ await catalog.put('connections',{id:'local',provider:'local',displayName:'Local fixture',status:'connected',generation:1,createdAt:1,updatedAt:1});
  await catalog.put('comics',{id:comicId,title:'书签验收',sourceKey:comicId,source:{connectionId:'local',providerItemId:comicId,locator:{},status:'active',generation:1},sourceName:'Fixture',createdAt:1,updatedAt:1});
  for(const [order,chapter] of samples.entries()){
   chapter.comicId=comicId;chapter.contentId=chapter.id+':content';
   await catalog.put('entries',{id:chapter.id,comicId,contentId:chapter.contentId,title:chapter.title,order,format:'cbz',generation:1,indexState:'ready',createdAt:1,updatedAt:1});
   await catalog.putPages(chapter.id,chapter.contentId,chapter.pages.map((page,ordinal)=>({pageId:page.id,contentId:chapter.contentId!,ordinal,name:page.name,formatLocator:String(ordinal),locator:{}})),1);
+  for(const page of chapter.pages)if(page.blobKey)page.blobKey=pageReference({entryId:chapter.id,contentId:chapter.contentId,pageId:page.id,renderProfileId:RENDER_PROFILE});
  }
 }
 if(performanceFixture)for(const chapter of samples)for(const page of chapter.pages)for(const dimension of ['width','height'] as const){
@@ -181,20 +197,28 @@ function Fixture(){
   for(let step=0;step<6;step++){
    document.querySelector<HTMLButtonElement>('.nc-reader-navigation button:last-child')?.click();
    await new Promise(resolve=>setTimeout(resolve,80));
-   pages.push(document.querySelector<HTMLInputElement>('.nc-reader-navigation input[type=number]')?.value??'?');
+   pages.push(document.querySelector<HTMLElement>('.nc-reader-position')?.dataset.value??'?');
    peak=Math.max(peak,document.querySelectorAll('[data-swipe-snapshot]').length);
   }
   observer.disconnect();
   setTurnCheck(`6 次点击 / 80ms：${pages.join(' → ')}；共创建 ${created} 个旧页快照，最多同时 ${peak} 个；减少动态效果：${matchMedia('(prefers-reduced-motion: reduce)').matches?'开启':'关闭'}`);setCheckingTurns(false);
  }
- async function checkBookmarkCost(){
+ async function checkBookmarkCost(cold=false){
+  if(cold)for(const chapter of samples)await thumbnailCache.deleteOwner(chapter.id);
   const before=bookmarkImageReads,viewport=document.querySelector<HTMLElement>('[data-decoded-pages]'),decodedBefore=viewport?.dataset.decodedPages;
   const trigger=[...document.querySelectorAll<HTMLButtonElement>('[data-reader-bookmarks-trigger]')].find(button=>button.getClientRects().length);
   if(!trigger)return;
   const start=performance.now();trigger.click();await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
-  const decodedAfter=viewport?.dataset.decodedPages,thumbnails=document.querySelectorAll('.nc-bookmarks img,.nc-bookmarks canvas').length,elapsed=performance.now()-start;
+  const elapsed=performance.now()-start;
+  while(performance.now()-start<2500){
+   const visible=[...document.querySelectorAll('.nc-bookmarks [data-thumbnail-visible]')];
+   if(visible.length&&visible.every(item=>item.querySelector<HTMLImageElement>('img')?.complete))break;
+   await new Promise(resolve=>setTimeout(resolve,50));
+  }
+  const decodedAfter=viewport?.dataset.decodedPages,thumbnails=document.querySelectorAll('.nc-bookmarks img').length,ready=performance.now()-start;
+  const panel=document.querySelector<HTMLElement>('.nc-bookmarks'),overflow=!!panel&&panel.scrollWidth>panel.clientWidth;
   document.querySelector<HTMLButtonElement>('[data-bookmarks=true] .nc-drawer-title button')?.click();
-  setStatus(`书签面板：解码 ${decodedBefore} → ${decodedAfter} 页；新增图片读取 ${bookmarkImageReads-before}；缩略图 ${thumbnails}；显示 ${elapsed.toFixed(1)}ms`);
+  setStatus(`书签面板：正文解码 ${decodedBefore} → ${decodedAfter} 页；新增原图读取 ${bookmarkImageReads-before}；缩略图 ${thumbnails}；文字 ${elapsed.toFixed(1)}ms / 图片 ${ready.toFixed(1)}ms；横向溢出 ${overflow}`);
  }
  async function checkGeometry(){
   flushSync(()=>setCheckingGeometry(true));
@@ -207,11 +231,15 @@ function Fixture(){
   }
   setStatus(`50 次进度更新：尺寸读取 ${dimensionReads} 次；同步更新 ${elapsed.toFixed(1)}ms`);setCheckingGeometry(false);
  }
- return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
-  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination&&!query.has('bookmarks')}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status">{status}</span>}</div>
-  {query.has('bookmarks')&&<div><button onClick={()=>navigate(samples[(Number(id.split('-').at(-1))+1)%samples.length].id)}>切换测试章节</button><button onClick={()=>setCopies(previous=>previous.map(chapter=>chapter.id===id?{...chapter,contentId:chapter.contentId+':changed'}:chapter))}>模拟内容更新</button><button onClick={()=>void checkBookmarkCost()}>检查书签开销</button></div>}
+ return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}
+  onPointerDownCapture={event=>{if(scrubFixture&&(event.target as Element).matches('.nc-reader-progress'))scrubPointer={y:event.clientY,moves:[]};}}
+  onPointerMoveCapture={event=>{if(scrubPointer){scrubPointer.moves.push(`${Math.round(event.clientY)}[${event.buttons}]`);if(scrubPointer.moves.length>6)scrubPointer.moves.shift();}}}
+  onPointerCancelCapture={()=>{scrubPointer=undefined;}}
+  onPointerUpCapture={event=>{if(scrubPointer){setStatus(`原生拖动：${scrubPointer.y.toFixed(0)} → ${event.clientY.toFixed(0)}；最近移动 ${scrubPointer.moves.join(' → ')}；控件值 ${document.querySelector<HTMLInputElement>('.nc-reader-progress')?.value}`);scrubPointer=undefined;}}}><Scrollbars/>
+  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'var(--surface)',zIndex:20,flexWrap:pagination||thumbnailFixture||scrubFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination&&!query.has('bookmarks')}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status" style={scrubFixture?{flexBasis:"100%",height:60,overflow:"auto",fontSize:12}:undefined}>{status}</span>}</div>
+  {query.has('bookmarks')&&<div><button onClick={()=>navigate(samples[(Number(id.split('-').at(-1))+1)%samples.length].id)}>切换测试章节</button><button onClick={()=>setCopies(previous=>previous.map(chapter=>chapter.id===id?{...chapter,contentId:chapter.contentId+':changed'}:chapter))}>模拟内容更新</button><button onClick={()=>void checkBookmarkCost()}>检查书签开销</button><button onClick={()=>void checkBookmarkCost(true)}>检查首次缩略图</button></div>}
   {FlipMetrics&&<FlipMetrics/>}
-  {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
+  {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={()=>previewProgress(setStatus)}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   {performanceFixture&&<div><button disabled={checkingGeometry} onClick={()=>void checkGeometry()}>测量 50 次进度更新</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}
   {thumbnailFixture&&<div><button onClick={()=>{const list=document.querySelector<HTMLElement>('.nc-thumb-list');if(!list){setStatus('请先打开页面目录');return;}const bounds=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.nc-thumb-row')],full=rows.filter(row=>{const rect=row.getBoundingClientRect();return rect.top>=bounds.top&&rect.bottom<=bounds.bottom;}).length;setStatus(`缩略图：挂载 ${rows.length} 行，完整可见 ${full} 行；正文解码 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages} 页`);}}>检查缩略图窗口</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}

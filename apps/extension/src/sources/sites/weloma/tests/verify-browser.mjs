@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real public source/CDN + isolated built MV3 extension. No login or model calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -50,7 +51,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = context.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   details = await reader.evaluate(async chapter => {
     const p = await import(chrome.runtime.getURL('verify-source.js'));
@@ -61,8 +62,8 @@ try {
   assert(details.chapters > 0 && details.pages > 1 && details.pages <= 100);
   const imageSelector = index => `[data-copy-id="${details.entryId}"] [data-page-index="${index}"] img.nc-page-image`;
   const jump = async number => {
-    await reader.getByLabel('跳转页码', {exact: true}).fill(String(number), {force: true});
-    await reader.getByLabel('跳转页码', {exact: true}).press('Enter');
+    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(number));
+
     await reader.waitForFunction(selector => {
       const img = document.querySelector(selector); return img?.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
     }, imageSelector(number - 1), {timeout: 60000});
@@ -92,7 +93,7 @@ try {
   const route = reader.url(); await reader.close(); reader = await context.newPage(); await reader.goto(route);
   await reader.getByRole('button', {name: '打开漫画 ' + details.title, exact: true}).click();
   await reader.waitForFunction(({selector, page}) => document.querySelector(selector)?.naturalWidth > 0 &&
-    document.querySelector('input[aria-label="跳转页码"]')?.value === String(page), {selector: imageSelector(restorePage - 1), page: restorePage});
+    document.querySelector('input[aria-label="阅读进度"]')?.value === String(page), {selector: imageSelector(restorePage - 1), page: restorePage});
   await reader.screenshot({path: path.join(out, 'reopened.png')});
   checks.push(`Close/reopen restores the selected chapter and page ${restorePage}`);
   await setup.getByRole('button', {name: '我的漫画', exact: true}).click();
@@ -109,7 +110,7 @@ try {
   checks.push('Dedicated shelf artwork decodes; repeated refresh needs no source tab and creates no duplicate updates');
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill(details.catalogUrl); await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.waitForFunction(page => document.querySelector('input[aria-label="跳转页码"]')?.value === String(page), restorePage);
+  await setup.waitForFunction(page => document.querySelector('input[aria-label="阅读进度"]')?.value === String(page), restorePage);
   assert.equal(await setup.evaluate(async () => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length), 1);
   checks.push('Catalog link reimport preserves the chosen chapter/page and a single library record');
   assert.deepEqual(errors, []);

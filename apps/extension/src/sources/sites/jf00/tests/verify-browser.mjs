@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Public source HTTP in a fresh MV3 profile. Requires the current extension build; no model calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -37,7 +38,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = context.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   const details = await reader.evaluate(async () => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -47,11 +48,11 @@ try {
   });
   assert(details.chapters >= 800 && details.total === 18);
   for (let number = 1; number <= details.total; number++) {
-    await reader.getByLabel('跳转页码', {exact: true}).fill(String(number), {force: true});
+    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(number));
     await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, number - 1, {timeout: 60000});
   }
   checks.push('Live chapter embedded entry imports the 800-entry catalog and decodes all 18 pages');
-  await reader.getByLabel('跳转页码', {exact: true}).fill('10', {force: true});
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '10');
   await reader.waitForFunction(async id => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const entry = await catalog.get('entries', id), pages = await catalog.listPages(entry.contentId), position = await catalog.get('positions', id);
     return position?.pageId === pages[9]?.pageId;}, details.entryId);
@@ -59,7 +60,7 @@ try {
   const route = reader.url(); await reader.close(); reader = await context.newPage(); await reader.goto(route);
   await reader.getByRole('button', {name: '打开漫画 一人之下', exact: true}).click();
   await reader.waitForFunction(() => document.querySelector('[data-page-index="9"] img.nc-page-image')?.naturalWidth > 0);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '10');
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '10');
   await reader.screenshot({path: path.join(out, 'reopened-10.png')}); checks.push('Reader reopen restores exact page 10');
   await setup.getByRole('button', {name: '我的漫画', exact: true}).click();
   const cover = setup.locator(`[data-comic-id="${details.comicId}"] .nc-thumbnail img`); await cover.waitFor(); await cover.evaluate(i => i.decode());
@@ -73,8 +74,8 @@ try {
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill('https://www.00jf.com/comic_13871.html');
   await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
-  assert.equal(await setup.getByLabel('跳转页码', {exact: true}).inputValue(), '10');
+  await setup.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), '10');
   assert.equal(await setup.evaluate(async () => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length), 1);
   checks.push('Catalog link reimport preserves one comic and existing page 10'); assert.deepEqual(errors, []);
   await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', checks, details, errors, models: false}, null, 2));

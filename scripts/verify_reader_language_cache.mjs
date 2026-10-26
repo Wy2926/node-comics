@@ -44,7 +44,7 @@ try{
   for(const [language,id] of [['简体中文',chinese],['English',english],['简体中文',chinese],['English',english]]){
     await selectLanguage(language);await displayed(id);
     assert.deepEqual(await counts(),cached,'cached language switches must not translate or download again');
-    assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+    assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
     assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(view=>view.scrollTop)-top)<1);
     checks.push(language+' displays its cached result without retry or position changes');
   }

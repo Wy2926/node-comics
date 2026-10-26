@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Dedicated Vite 5181 fixture; no account, supplier, or external image requests.
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -27,7 +28,7 @@ async function loadNextBatch(){
 }
 try{
  await page.goto('http://127.0.0.1:5181/tests/reader-directory-fixture.html');
- await page.getByLabel('跳转页码').fill('80');await openPanel();await centered();
+ await setReaderProgress(page.getByLabel('阅读进度'), '80');await openPanel();await centered();
  assert.match(await current.innerText(),/第 250 章/);assert.equal(await page.locator('.nc-chapter-entry').count(),400);
  const before=await position();await page.screenshot({path:path.join(out,'long-directory.png')});
  checks.push('Opening includes and centers chapter 250 beyond the first 200 entries');
@@ -78,19 +79,19 @@ try{
  checks.push('Search reset locates the chapter and nested source groups open automatically');
  await page.getByLabel('验收章节').fill('450');await centered();assert.match(await current.innerText(),/第 450 章/);
  checks.push('Changing the active chapter while the directory stays open follows its new group');
- await closePanel();await page.getByLabel('跳转页码').fill('90');const reading=await position();
+ await closePanel();await setReaderProgress(page.getByLabel('阅读进度'), '90');const reading=await position();
  await openPanel();await page.getByRole('tab',{name:'页面',exact:false}).click();
  const thumb=page.locator('.nc-thumb-main[aria-current="page"]');await thumb.waitFor();
  assert.match(await thumb.innerText(),/第 90 页/);
  assert(await thumb.evaluate(el=>{const a=el.closest('.nc-thumb-list').getBoundingClientRect(),b=el.getBoundingClientRect();return b.top>=a.top&&b.bottom<=a.bottom;}));
  assert.equal(await position(),reading);await page.screenshot({path:path.join(out,'current-page.png')});
  checks.push('The virtual thumbnail list reveals page 90 without changing the reading position');
- await closePanel();await page.getByLabel('跳转页码').fill('8');
+ await closePanel();await setReaderProgress(page.getByLabel('阅读进度'), '8');
  await page.locator('[data-copy-id="chapter-450"] [data-page-index="7"] .nc-image-failure').waitFor();
  await openPanel();await centered();checks.push('Image failure does not block current chapter location');
- await closePanel();await page.getByLabel('跳转页码').fill('90');
+ await closePanel();await setReaderProgress(page.getByLabel('阅读进度'), '90');
  await page.getByRole('button',{name:'关闭阅读器',exact:true}).click();await page.getByRole('button',{name:'重开阅读器',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('[aria-label="跳转页码"]')?.value==='90');
+ await page.waitForFunction(()=>document.querySelector('[aria-label="阅读进度"]')?.value==='90');
  await openPanel();await centered();checks.push('Closing and reopening restores page 90 and locates its chapter');
  await closePanel();await page.getByRole('button',{name:'切换页面就绪',exact:true}).click();await openPanel();await centered();
  checks.push('Current chapter still locates when its page list is not ready');

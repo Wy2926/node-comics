@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Built MV3 extension, isolated profile and synthetic Comix routes; no translation calls.
 import {createRequire} from 'node:module';
 import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
@@ -49,8 +50,8 @@ try{
  const waitImage=page=>page.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth>0,null,{timeout:30000});
  let opened=context.waitForEvent('page');await button.click();let reader=await opened;await waitImage(reader);
  await reader.screenshot({path:path.join(out,'imported-reader.png')});checks.push('Granted host auto-registers the entry; first click after SPA navigation imports and renders the comic');
- await reader.getByLabel('跳转页码').fill('2');await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
- await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitImage(reader);assert.equal(await reader.getByLabel('跳转页码').inputValue(),'2');await reader.close();
+ await setReaderProgress(reader.getByLabel('阅读进度'), '2');await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+ await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitImage(reader);assert.equal(await reader.getByLabel('阅读进度').inputValue(),'2');await reader.close();
  checks.push('Imported comic reopens at its saved page');
  await source.getByRole('button',{name:'Replace actions',exact:true}).click();await button.waitFor();assert.equal(await button.count(),1);
  await source.getByRole('button',{name:'Leave comic',exact:true}).click();await button.waitFor({state:'detached'});

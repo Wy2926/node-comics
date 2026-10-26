@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Start extension Vite on :5176. Isolated Chrome profile and synthetic API only.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -47,14 +48,14 @@ try{
   check('account navigation still works and unknown hashes return to the library');
 
   await openBook();
-  await page.getByLabel('跳转页码',{exact:true}).fill('5');await page.getByLabel('跳转页码',{exact:true}).press('Enter');
-  await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='5');
+  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '5');
+  await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='5');
   await page.waitForTimeout(600);
   await page.screenshot({path:path.join(out,'reader.png')});
   await page.evaluate(()=>{location.hash='history';});
   await inLibrary();
   await openBook();
-  await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='5');
+  await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='5');
   check('leaving the reader through the legacy hash retains the saved page on reopening');
   await page.evaluate(()=>{location.hash='queue';});
   await inLibrary();

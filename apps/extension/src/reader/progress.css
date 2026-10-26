@@ -15,4 +15,12 @@
 .nc-reader-progress::-moz-range-thumb { width: 12px; height: 24px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
 
 .nc-reader-progress-control { position: relative; display: flex; align-items: center; justify-content: center; height: var(--reader-range-size); min-width: 0; }
-.nc-reader-progress-preview { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1; padding: 0 5px; border: 1px solid var(--line); border-radius: var(--comic-control-radius); background: var(--surface); color: var(--accent); font-size: var(--text-caption); line-height: 16px; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+.nc-reader-progress-preview { position: fixed; z-index: 33; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; padding: 12px; border: var(--comic-border); border-radius: var(--comic-panel-radius); background: var(--surface); color: var(--accent); box-shadow: var(--comic-shadow); font-variant-numeric: tabular-nums; pointer-events: none; user-select: none; }
+.nc-reader-progress-preview::before { content: ''; position: absolute; width: 12px; height: 12px; background: var(--surface); transform: rotate(45deg); }
+.nc-reader-progress-preview[data-axis=vertical]::before { left: -8px; top: calc(var(--thumb-offset) - 6px); border-left: var(--comic-border); border-bottom: var(--comic-border); }
+.nc-reader-progress-preview[data-axis=horizontal]::before { top: -8px; left: calc(var(--thumb-offset) - 6px); border-left: var(--comic-border); border-top: var(--comic-border); }
+.nc-reader-progress-preview>span { max-width: 100%; font-size: var(--text-caption); line-height: 1.3; color: var(--muted); text-align: center; }
+.nc-reader-progress-preview>strong { font-size: 52px; line-height: 1; letter-spacing: -.04em; }
+.nc-reader-progress-preview[data-long=true]>strong { font-size: 36px; }
+.nc-reader-progress-preview strong>small { font-size: 24px; letter-spacing: 0; }
+.nc-app .nc-reader-position[data-long=true] .nc-reader-position-pages>strong { font-size: var(--text-small); }

@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real public source/CDN in an isolated built MV3 extension. No translation provider calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -58,7 +59,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = context.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   details = await reader.evaluate(async chapter => {
     const {catalog, sourceLocation} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -74,7 +75,7 @@ try {
     return {position: (await catalog.get('positions', entryId)) ?? null, lastEntryId: comic.lastEntryId};
   }, details);
   for (let number = 1; number <= details.total; number++) {
-    await reader.getByLabel('跳转页码', {exact: true}).fill(String(number), {force: true});
+    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(number));
     await reader.waitForFunction(({id, index}) => {
       const image = document.querySelector(`[data-copy-id="${id}"] [data-page-index="${index}"] img.nc-page-image`);
       return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
@@ -82,8 +83,8 @@ try {
       {id: details.entryId, index: number - 1}, {timeout: 60000});
   }
   checks.push(`Live embedded chapter import binds the complete ${details.chapters}-entry catalog and decodes all ${details.total} original pages`);
-  await reader.getByLabel('跳转页码', {exact: true}).evaluate(input => input.blur()); await reader.keyboard.press('Home');
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(restorePage), {force: true});
+  await reader.getByLabel('阅读进度', {exact: true}).evaluate(input => input.blur()); await reader.keyboard.press('Home');
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(restorePage));
   await reader.evaluate(async ({id, index}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js')), deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
@@ -115,7 +116,7 @@ try {
   await reader.waitForFunction(selector => {
     const image = document.querySelector(selector); return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
   }, restoreImage);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), String(restorePage));
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
   assert.equal((await readingState()).lastEntryId, details.entryId);
   await reader.screenshot({path: path.join(out, `reopened-${restorePage}.png`)}); checks.push(`Reader close/reopen restores exact page ${restorePage}`);
   await setup.getByRole('button', {name: '我的漫画', exact: true}).click();
@@ -152,8 +153,8 @@ try {
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill(details.catalogUrl);
   await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
-  assert.equal(await setup.getByLabel('跳转页码', {exact: true}).inputValue(), String(restorePage));
+  await setup.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
   assert.equal(await setup.evaluate(async () => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length), 1);
   checks.push(`Catalog link reimport keeps one comic and existing page ${restorePage}`); assert.deepEqual(errors, []);
   await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', checks, details, errors, sourceFailures, liveSource: true, liveProvider: false}, null, 2));

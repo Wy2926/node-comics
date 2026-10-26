@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Isolated MV3 profile, fixture by default; RUN_LIVE_WEBTOONS=1 exercises real public pages.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -71,10 +72,10 @@ try {
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? liveTitle : 'WEBTOON fixture', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 120000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 120000});
   const imported = await state(); assert.equal(imported.comics.length, 1); activeEntry = imported.entries.find(e => e.indexState === 'ready')?.id; assert(activeEntry);
   const active = imported.entries.find(e => e.id === activeEntry);
-  await waitImage(); await reader.getByLabel('跳转页码', {exact: true}).fill('3'); await waitImage(3);
+  await waitImage(); await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '3'); await waitImage(3);
   await reader.waitForFunction(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')), e = await catalog.get('entries', entry);
     return (await catalog.get('positions', entry))?.pageId === (await catalog.listPages(e.contentId))[2]?.pageId;}, activeEntry);
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Search -> full catalog -> real image decode -> page 3');
@@ -86,7 +87,7 @@ try {
   await reader.locator('.nc-book .nc-thumbnail img').evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.getByRole('button', {name: '继续阅读', exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
   checks.push('Cover decode, reopen and refresh preserve page 3');
   if (!live) {failCatalog = true; const before = await state(); await assert.rejects(refresh()); assert.deepEqual((await state()).entries, before.entries);
     failCatalog = false; addChapter = true; assert.equal(await refresh(), imported.entries.length + 1); await refresh();

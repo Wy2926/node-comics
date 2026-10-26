@@ -1,43 +1,49 @@
 .nc-reader .nc-bookmark-tools { display:flex; flex-direction:column; gap:var(--reader-tool-gap); }
-.nc-reader .nc-bookmark-tools.mobile { display:none; }
-.nc-reader .nc-reader-rail.left:has(.nc-bookmark-tools) { grid-template-rows:repeat(2,var(--reader-tool-size)) auto 9px auto; }
-.nc-reader .nc-reader-rail.left>.nc-bookmark-tools { grid-row:3; }
-.nc-reader .nc-reader-rail.left:has(.nc-bookmark-tools)>.nc-rail-divider { grid-row:4; }
-.nc-reader .nc-reader-rail.left:has(.nc-bookmark-tools)>.nc-reader-navigation { grid-row:5; }
 .nc-reader .nc-bookmark-tools button { min-height:44px; }
 .nc-reader .nc-bookmark-tools button[aria-pressed=true] { color:var(--accent); background:var(--accent-soft); --icon-stroke:var(--accent); }
 .nc-reader .nc-bookmark-tools small { font:inherit; }
-.nc-bookmarks { display:flex; flex-direction:column; min-height:0; flex:1; padding:12px 16px; gap:12px; }
-.nc-bookmark-current,.nc-bookmark-return { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:var(--surface-soft); border-radius:10px; }
+.nc-bookmarks { display:flex; flex-direction:column; min-height:0; flex:1; padding:12px 14px; gap:12px; }
+.nc-app .nc-bookmarks .button,.nc-app .nc-bookmarks .button.small { min-height:44px; padding:8px 10px; }
+.nc-bookmark-current,.nc-bookmark-return { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:12px; margin-bottom:16px; border:var(--comic-border); border-radius:var(--comic-card-radius); box-shadow:var(--comic-shadow-small); }
 .nc-bookmark-current>div,.nc-bookmark-return>div { min-width:0; display:grid; gap:4px; }
-.nc-bookmark-return { border:1px solid var(--line); background:transparent; font-size:.85rem; }
-.nc-bookmark-return b { overflow-wrap:anywhere; }
-.nc-bookmark-return small { color:var(--muted); }
-.nc-bookmark-return button { flex:none; }
-.nc-bookmark-current small,.nc-bookmark-destination small,.nc-bookmark-local { color:var(--muted); font-size:.78rem; }
-.nc-bookmark-current button { flex:none; display:flex; align-items:center; gap:6px; }
-.nc-bookmarks button:not(.icon-button) { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--surface); color:var(--ink); min-height:44px; }
-.nc-bookmarks button[aria-pressed=true] { color:var(--accent); background:var(--accent-soft); }
-.nc-bookmark-local { margin:0; }
-.nc-bookmark-scroll { overflow:auto; overscroll-behavior:contain; min-height:0; flex:1; }
-.nc-bookmark-scroll ul { list-style:none; margin:0; padding:0; }
-.nc-bookmark-row { border-bottom:1px solid var(--line); padding-block:6px; }
-.nc-bookmark-row-main { display:flex; align-items:start; }
-.nc-bookmark-row-main>.icon-button { flex:none; min-width:44px; height:44px; font-weight:800; }
-.nc-bookmark-row-main>.nc-bookmark-destination { display:flex; align-items:start; gap:12px; flex:1; min-width:0; text-align:start; border:0; background:transparent; }
-.nc-bookmark-destination:hover { background:var(--surface-soft); }
-.nc-bookmark-destination>span:last-child { min-width:0; display:grid; gap:5px; }
-.nc-bookmark-destination b { font-size:.9rem; overflow-wrap:anywhere; }
-.nc-bookmark-destination p { margin:2px 0 0; font-size:.82rem; overflow-wrap:anywhere; }
-.nc-bookmark-page { display:grid; place-items:center; flex:none; width:36px; height:48px; border:1px solid var(--line); border-radius:5px; background:var(--surface-soft); color:var(--accent); font-weight:800; }
-.nc-bookmark-actions { display:flex; justify-content:end; gap:8px; padding:4px 8px; }
-.nc-bookmark-note { display:flex; flex-wrap:wrap; justify-content:end; gap:8px; padding:8px; }
-.nc-bookmark-note label { width:100%; display:grid; gap:6px; font-size:.82rem; }
-.nc-bookmark-note input { width:100%; min-width:0; min-height:44px; font-size:16px; }
-.nc-bookmark-empty { text-align:center; padding:28px 12px; color:var(--muted); }
-.nc-bookmark-empty h3 { color:var(--ink); font-size:1rem; }
-.nc-bookmark-empty p { font-size:.85rem; }
-.nc-reader .nc-bookmark-notice { position:absolute; z-index:36; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:10px 12px; max-width:calc(100% - 32px); width:max-content; border:1px solid var(--line); border-radius:12px; box-shadow:var(--comic-dialog-shadow); background:var(--surface); color:var(--ink); font-size:.85rem; }
+.nc-bookmark-current>div { flex:1 1 120px; }
+.nc-bookmark-current b,.nc-bookmark-return b { font-size:var(--text-small); overflow-wrap:anywhere; }
+.nc-bookmark-current small,.nc-bookmark-return small,.nc-bookmark-local { color:var(--muted); font-size:var(--text-caption); }
+.nc-bookmark-current .button { flex:none; }
+.nc-bookmark-current .button[aria-pressed=true] { color:var(--accent); }
+.nc-bookmark-return { background:var(--surface-soft); }
+.nc-bookmark-return>div { flex:1 1 140px; }
+.nc-bookmark-local { margin:0 0 12px; line-height:1.5; }
+.nc-bookmark-scroll { overflow:auto; overscroll-behavior:contain; min-height:0; flex:1; padding:3px 6px 6px 3px; }
+.nc-bookmark-scroll ul { display:grid; gap:12px; list-style:none; margin:0; padding:0; }
+.nc-bookmark-row { border:var(--comic-border); border-radius:var(--comic-card-radius); box-shadow:var(--comic-shadow-small); background:var(--surface); }
+.nc-bookmark-row[data-current=true] { border-color:var(--accent); background:var(--accent-soft); }
+.nc-bookmark-row-main { position:relative; border-radius:inherit; }
+.nc-bookmark-row-main>.icon-button { position:absolute; top:6px; inset-inline-end:6px; min-width:44px; height:44px; border-color:transparent; background:transparent; }
+.nc-bookmark-row-main>.icon-button[aria-expanded=true] { border-color:var(--comic-stroke); color:var(--accent); background:var(--accent-soft); }
+.nc-bookmark-destination { display:grid; grid-template-columns:64px minmax(0,1fr); align-items:start; gap:10px 12px; width:100%; min-width:0; padding:12px; text-align:start; border:0; border-radius:inherit; background:transparent; color:var(--ink); }
+.nc-bookmark-destination:focus-visible { outline-offset:-3px; }
+.nc-bookmark-summary { min-width:0; display:grid; gap:6px; padding-inline-end:36px; }
+.nc-bookmark-summary b { font-size:var(--text-small); line-height:1.5; overflow-wrap:anywhere; }
+.nc-bookmark-title { font-size:var(--text-caption); color:var(--muted); line-height:1.5; overflow-wrap:anywhere; }
+.nc-bookmark-reading { display:flex; align-items:center; gap:4px; color:var(--accent); font-size:var(--text-caption); font-weight:700; }
+.nc-bookmark-note-preview { grid-column:1/-1; padding-top:10px; border-top:var(--comic-perforation); white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--text-small); line-height:1.6; }
+.nc-bookmark-picture { position:relative; display:grid; place-items:center; width:64px; height:88px; overflow:hidden; border:var(--comic-badge-border); border-radius:var(--comic-control-radius); background:var(--surface-soft); }
+.nc-bookmark-picture .nc-thumbnail { grid-template:minmax(0,1fr)/minmax(0,1fr); width:100%; height:100%; min-height:0; }
+.nc-bookmark-picture .nc-thumbnail img { object-fit:contain; object-position:center; }
+.nc-bookmark-page { position:absolute; inset-inline-start:3px; bottom:3px; min-width:22px; padding:1px 5px; text-align:center; border:var(--comic-badge-border); border-radius:var(--comic-badge-radius); background:var(--surface); color:var(--ink); font-size:var(--text-caption); font-weight:800; font-variant-numeric:tabular-nums; }
+.nc-bookmark-actions,.nc-bookmark-note { gap:10px; margin:0 12px; padding:12px 0 14px; border-top:var(--comic-perforation); }
+.nc-bookmark-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.nc-bookmark-note { display:flex; flex-wrap:wrap; align-items:center; justify-content:end; scroll-margin-block:8px; }
+.nc-bookmark-note label { width:100%; display:grid; gap:8px; font-size:var(--text-small); }
+.nc-bookmark-note textarea { width:100%; min-width:0; font-size:max(16px,var(--text-small)); line-height:1.5; }
+.nc-bookmark-note-count { margin-inline-end:auto; color:var(--muted); font-size:var(--text-caption); font-variant-numeric:tabular-nums; }
+.nc-bookmark-more { width:100%; margin-top:16px; }
+.nc-bookmark-empty { display:grid; justify-items:center; gap:12px; text-align:center; padding:28px 16px; margin:0; color:var(--muted); border:var(--comic-perforation); border-radius:var(--comic-card-radius); background:var(--surface-soft); }
+.nc-bookmark-empty h3 { margin:0; color:var(--ink); font-size:var(--text-body); }
+.nc-bookmark-empty p { margin:0; font-size:var(--text-small); }
+@media (hover:hover) { .nc-bookmark-destination:hover:not(:disabled) { background:var(--accent-soft); } }
+.nc-reader .nc-bookmark-notice { position:absolute; z-index:36; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:10px 12px; max-width:calc(100% - 32px); width:max-content; border:var(--comic-border); border-radius:var(--comic-card-radius); box-shadow:var(--comic-dialog-shadow); background:var(--surface); color:var(--ink); font-size:var(--text-small); }
 .nc-bookmark-notice .nc-notification-content { display:flex; align-items:center; gap:10px; }
 .nc-bookmark-notice .nc-notification-content>p { min-width:0; }
 .nc-bookmark-notice .nc-notification-actions { flex:none; }
@@ -46,27 +52,15 @@
 .nc-reader .nc-bookmark-notice.inside { position:static; width:auto; max-width:none; transform:none; box-shadow:none; flex:none; }
 
 @media (max-width:700px), (max-width:1000px) and (max-height:500px) and (pointer:coarse), (max-width:1000px) and (max-height:500px) and (hover:none) {
-  .nc-app .nc-reader .nc-bookmark-tools.desktop { display:none; }
-  .nc-app .nc-reader .nc-bookmark-tools.mobile { display:flex; flex-direction:row; }
-  .nc-app .nc-reader .nc-reader-rail.left:has(.nc-bookmark-tools) { grid-template-rows:44px 44px; }
-  .nc-app .nc-reader .nc-reader-rail.right:has(.nc-bookmark-tools) { grid-template-columns:auto minmax(0,1fr) 1px auto; column-gap:2px; }
-  .nc-app .nc-reader .nc-reader-rail.right .nc-bookmark-tools + .nc-reader-tool-group { overflow-x:auto; overscroll-behavior-x:contain; }
-  .nc-app .nc-reader .nc-reader-rail.right .nc-bookmark-tools button,
-  .nc-app .nc-reader .nc-reader-tool-group>button,
-  .nc-app .nc-reader .nc-page-versions button { width:44px; }
   .nc-app .nc-reader .nc-bookmark-tools button>span { font-size:10px; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
   .nc-app .nc-reader .nc-reader-drawer.left[data-bookmarks=true] {
     --bookmark-sheet-height:min(72dvh,650px,var(--nc-viewport-height,100dvh) - 12px);
     position:fixed; inset:auto auto auto var(--nc-viewport-left,0px);
     top:calc(var(--nc-viewport-top,0px) + var(--nc-viewport-height,100dvh) - var(--bookmark-sheet-height));
     width:var(--nc-viewport-width,100vw); height:var(--bookmark-sheet-height); max-height:calc(var(--nc-viewport-height,100dvh) - 12px);
-    border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom,0px);
+    border-radius:var(--comic-sheet-radius); padding-bottom:env(safe-area-inset-bottom,0px);
   }
   .nc-app .nc-reader .nc-bookmark-notice:not(.inside) { bottom:calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom,0px) + 12px); }
-  .nc-app .nc-bookmarks { padding:12px; }
+  .nc-app .nc-bookmarks { padding:10px; }
 }
-@media (max-width:1000px) and (max-height:500px) and (orientation:landscape) and (pointer:coarse), (max-width:1000px) and (max-height:500px) and (orientation:landscape) and (hover:none) {
-  .nc-app .nc-reader .nc-reader-rail.left:has(.nc-bookmark-tools) { grid-template-rows:44px; }
-}
-
 .nc-reader .nc-drawer-scrim[data-bookmarks=true] { z-index:34; }

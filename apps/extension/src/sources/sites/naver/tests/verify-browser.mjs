@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real NAVER + isolated unpacked MV3 profile. Host grants are preauthorized; no user profile or login.
 import {createRequire} from 'node:module';
 import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
@@ -54,7 +55,7 @@ try {
   assert(state.chapters > 200); checks.push({buttonImport: state.chapters});
   await reader.screenshot({path: path.join(out, 'reader-first.png')});
   for (const number of [2, 10]) {
-    await reader.getByLabel('跳转页码').fill(String(number), {force: true});
+    await setReaderProgress(reader.getByLabel('阅读进度'), String(number));
     await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, number - 1, {timeout: 60000});
   }
   await reader.screenshot({path: path.join(out, 'reader-page-10.png')});

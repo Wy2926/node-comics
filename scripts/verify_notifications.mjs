@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 /** Desktop Chrome regression; isolated Vite fixtures and synthetic identity/API only. */
 import {createRequire} from 'node:module';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -83,7 +84,7 @@ try{
  phase='real App auth lifecycle';await page.close();page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
  await page.goto(base+'/tests/auth-lifecycle-fixture.html');
  await page.getByRole('button',{name:'打开漫画 会话过期时继续阅读',exact:true}).click();
- const jump=page.getByRole('spinbutton',{name:'跳转页码'});await jump.fill('2');await jump.press('Enter');
+ const jump=page.getByRole('slider',{name:'阅读进度'});await setReaderProgress(jump, '2');
  await page.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
  const workspaceBefore=await page.locator('#nc-workspace').boundingBox();
  await page.getByRole('button',{name:'模拟授权撤销',exact:true}).click();
@@ -97,7 +98,7 @@ try{
  for(const label of ['外观与设置','我的账户','我的漫画']){await page.getByRole('button',{name:label,exact:true}).click();assert.equal(await notice().filter({hasText:'登录已过期'}).count(),0);}
  checks.push('真实 App 撤权后显示可关闭共享提示，不挤压阅读布局；关闭后跨页面不重复出现');
  await page.getByRole('button',{name:'打开漫画 会话过期时继续阅读',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='2');
  await page.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
  checks.push('会话失效与关闭提示后，原图仍解码显示并恢复第 2 页');
  await page.getByRole('button',{name:'登录账户 B',exact:true}).click();await page.getByRole('button',{name:'模拟授权撤销',exact:true}).click();

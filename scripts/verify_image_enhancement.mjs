@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Vite :5176, synthetic local source / MTU / nunif only. No external model calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -214,8 +215,8 @@ try {
   await toggle();
   await page.waitForFunction(()=>document.querySelector('.nc-manga-page[data-page-index="0"] img.nc-page-image')?.naturalWidth===640);
   const count=(await read()).enhancement.length;
-  await page.getByLabel('跳转页码',{exact:true}).fill('10');
-  await page.getByLabel('跳转页码',{exact:true}).press('Enter');
+  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '10');
+
   await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='10');
   await page.waitForTimeout(1200);assert.equal((await read()).enhancement.length,count);
   check('turning enhancement off prevents new requests while paging');
@@ -374,7 +375,7 @@ try {
     });
     await single.waitForFunction(()=>window.readerFixture.enhancements.length===6);
     assert.deepEqual(await ordinals(),[0,1,2,3,4,5]);
-    assert.equal(await single.getByLabel('跳转页码',{exact:true}).inputValue(),'2');
+    assert.equal(await single.getByLabel('阅读进度',{exact:true}).inputValue(),'2');
     assert.equal(await single.locator('.nc-manga-page').count(),1);
     assert.equal(await single.evaluate(()=>window.readerFixture.translationRequests.length),0);
     check('single-page mode prefetches the next three without mounting them, reuses the next result, and expands once at the shared scroll threshold');

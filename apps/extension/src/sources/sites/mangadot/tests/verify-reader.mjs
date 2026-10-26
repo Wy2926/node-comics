@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Built MV3 extension, isolated profile. RUN_LIVE_MANGADOT=1 enables public source HTTP.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -64,7 +65,7 @@ async function waitImage(page = 1) {
     {entry: activeEntry, page}, {timeout: 60000});
 }
 async function jump(page) {
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(page)); await waitImage(page);
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page)); await waitImage(page);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const data = await catalog.get('entries', entry), pages = await catalog.listPages(data.contentId), position = await catalog.get('positions', entry);
     return position?.pageId === pages[page - 1]?.pageId;}, {entry: activeEntry, page});
@@ -88,7 +89,7 @@ async function choose(entry, page = 1) {
     await slot.locator(`[data-release-choice="true"][data-entry-id="${entry.id}"]`).click();
   } else await slot.locator(`[data-chapter-main="true"][data-entry-id="${entry.id}"]`).click();
   activeEntry = entry.id;
-  await reader.waitForFunction(page => document.querySelector('[aria-label="跳转页码"]')?.value === String(page), page);
+  await reader.waitForFunction(page => document.querySelector('[aria-label="阅读进度"]')?.value === String(page), page);
   await waitImage(page);
 }
 async function refresh() {return reader.evaluate(async () => {const p = await import(chrome.runtime.getURL('verify-source.js')), comic = (await p.catalog.list('comics'))[0];
@@ -107,7 +108,7 @@ try {
   assert.match(await hit.locator('.nc-search-result-chapter').innerText(), /^Ch\. -?\d+(?:\.\d+)?$/);
   await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
   const imported = await state(); assert.equal(imported.comics.length, 1);
   const en = imported.entries.find(e => e.sourceEntryId === (live ? 'mangadot:scraper:chapter:286652' : 'mangadot:scraper:chapter:1'));
   assert(en); activeEntry = en.id; await waitImage(); await jump(3);
@@ -123,7 +124,7 @@ try {
   const cover = reader.locator('.nc-book .nc-thumbnail img'); await cover.waitFor(); await cover.evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.getByRole('button', {name: '打开漫画 ' + imported.comics[0].title, exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3');
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
   assert.equal(await refresh(), imported.entries.length);
   checks.push('Dedicated cover, reader reopen and full refresh preserve the selected release and page 3');
   if (!live) {

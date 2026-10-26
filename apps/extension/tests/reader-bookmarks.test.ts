@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto';
 import {describe,expect,it,vi} from 'vitest';
 import {IDBIndex,IDBObjectStore} from 'fake-indexeddb';
 import {catalog} from '../src/comics/repositories';
-import {addBookmark,deleteBookmark,noteBookmark,countBookmarks,findBookmark,listBookmarks,bookmarkLocation,applyBookmark,bookmarkKey} from '../src/comics/application/bookmarks';
+import {addBookmark,deleteBookmark,noteBookmark,countBookmarks,findBookmark,listBookmarks,bookmarkLocation,applyBookmark,bookmarkKey,bookmarkImageKey} from '../src/comics/application/bookmarks';
+import {parsePageReference,PDF_RENDER_PROFILE,RENDER_PROFILE} from '../src/comics/pages/identity';
 import {seedComic} from './comic-fixture';
 import type {ReadingEntry} from '../src/types';
 
@@ -14,6 +15,23 @@ async function sample(count=3){
   return {comic,entry,copy,location:bookmarkLocation(copy)!};
 }
 describe('reader bookmarks',()=>{
+  it('resolves thumbnails by exact content/page identity, including another chapter and the PDF render profile',async()=>{
+    const {location,copy}=await sample(),other=await sample();
+    expect(parsePageReference((await bookmarkImageKey(location))!)).toEqual({entryId:copy.id,contentId:copy.contentId,pageId:copy.pageId,renderProfileId:RENDER_PROFILE});
+    expect(parsePageReference((await bookmarkImageKey(other.location))!)?.entryId).toBe(other.copy.id);
+    await catalog.patch('entries',copy.id,{format:'pdf'});
+    expect(parsePageReference((await bookmarkImageKey(location))!)?.renderProfileId).toBe(PDF_RENDER_PROFILE);
+    for(const patch of [{comicId:'other'},{entryId:'other'},{contentId:'changed'},{pageId:'missing'},{documentLocation:{href:'chapter.xhtml'}}])expect(await bookmarkImageKey({...location,...patch})).toBeUndefined();
+    await catalog.patch('entries',copy.id,{contentId:copy.id+':changed'});
+    expect(await bookmarkImageKey(location)).toBeUndefined();
+  });
+  it('does not scan page lists or read image bytes while resolving a visible thumbnail, and honours cancellation',async()=>{
+    const {location}=await sample();const getAll=vi.spyOn(IDBObjectStore.prototype,'getAll'),cursor=vi.spyOn(IDBIndex.prototype,'openCursor');
+    try{
+      await bookmarkImageKey(location);expect(getAll).not.toHaveBeenCalled();expect(cursor).not.toHaveBeenCalled();
+      const controller=new AbortController();controller.abort();await expect(bookmarkImageKey(location,controller.signal)).rejects.toThrow();
+    }finally{vi.restoreAllMocks();}
+  });
   it('deduplicates concurrent clicks without changing the saved long-page offset or auto progress',async()=>{
     const {location,entry}=await sample();
     const [a,b]=await Promise.all([addBookmark(location),addBookmark({...location,relativeOffset:.8})]);

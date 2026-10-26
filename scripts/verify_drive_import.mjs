@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Compiled MV3 acceptance with a fresh profile and local TLS/DNS fixtures only.
 // Build with VITE_DRIVE_CONNECT_URL first. Requires Playwright and Python cryptography.
 // Google account, top-level Picker, metadata and bytes are synthetic; no real OAuth or Drive.
@@ -187,7 +188,7 @@ try{
     checks.push('The compiled MOBI import makes four index Range reads; opening the reader reuses them without duplicate media requests');
   }
   phase='restore reading position';
-  const pageNumber=reader.getByRole('spinbutton',{name:'跳转页码'});await pageNumber.fill('2');await pageNumber.press('Enter');
+  const pageNumber=reader.getByRole('slider',{name:'阅读进度'});await setReaderProgress(pageNumber, '2');
   await reader.waitForFunction(()=>{const image=document.querySelector('[data-page-index="1"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
   await reader.getByRole('button',{name:'继续阅读',exact:true}).click();

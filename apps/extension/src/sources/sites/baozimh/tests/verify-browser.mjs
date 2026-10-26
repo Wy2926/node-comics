@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Built MV3, isolated profile. RUN_LIVE_BAOZIMH=1 uses public source pages/images.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -81,10 +82,10 @@ try {
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? '葬送者芙莉莲' : 'Bao fixture & work', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
   const imported = await state(); assert.equal(imported.comics.length, 1); assert(imported.entries.length >= (live ? 100 : 27));
   const active = imported.entries.find(e => e.indexState === 'ready'); assert(active); activeEntry = active.id; await waitImage();
-  await reader.getByLabel('跳转页码', {exact: true}).fill('3'); await waitImage(3);
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '3'); await waitImage(3);
   await reader.waitForFunction(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')); const row = await catalog.get('entries', entry);
     const pages = await catalog.listPages(row.contentId), position = await catalog.get('positions', entry); return position?.pageId === pages[2]?.pageId;}, activeEntry);
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Search -> complete hidden catalog -> full HTTP pages -> page 3 without source tab');
@@ -97,7 +98,7 @@ try {
   await reader.locator('.nc-book .nc-thumbnail img').evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.getByRole('button', {name: '继续阅读', exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
   checks.push('Cover, reopen and complete refresh preserve page 3');
   if (!live) {
     const before = await state(); failCatalog = true; await assert.rejects(refresh()); assert.deepEqual((await state()).entries, before.entries);
@@ -118,7 +119,7 @@ try {
     await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.getByRole('button', {name: '漫画网站', exact: true}).click();
     await reader.getByLabel('通过链接添加漫画').fill(volume.sourceUrl.replace('.html', '_2.html'));
     await reader.getByRole('button', {name: '添加到书架', exact: true}).click(); activeEntry = volume.id; await waitImage();
-    await reader.getByLabel('跳转页码', {exact: true}).fill('55'); await waitImage(55);
+    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '55'); await waitImage(55);
     const pageCount = await reader.evaluate(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
       const row = await catalog.get('entries', entry); return (await catalog.listPages(row.contentId, {limit: 1500})).length;}, volume.id);
     assert(pageCount > 100); assert.equal((await state()).comics.length, 1);

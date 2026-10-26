@@ -147,15 +147,10 @@
     .nc-app .nc-reader .nc-reader-rail.right { bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
     .nc-app .nc-reader .nc-drawer-content { padding: 12px; }
     .nc-app .nc-reader .nc-reader-option { padding-block: 10px; gap: 8px; }
-    .nc-app .nc-reader .nc-reader-navigation input[type=number] { width: max(44px, calc(4ch + 4px)); flex: none; }
 
     @media (min-width: 360px) {
       .nc-app .nc-library .nc-shelf-window>.nc-shelf-grid,
       .nc-app .nc-discovery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) { --reader-mobile-header: 60px; }
-      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-rail.left { grid-template-columns: 44px 44px 44px max-content minmax(44px, 1fr) 44px; grid-template-rows: 44px; }
-      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-navigation>button:last-child { grid-area: 1/6; }
-      .nc-app .nc-reader:not(:has(.nc-epub-progress-label)) .nc-reader-navigation>.nc-reader-progress { grid-area: 1/5; }
     }
     @media (min-width: 701px) {
       .nc-app:not(.is-reading) { --nc-mobile-nav-size: max(58px, 3.625rem); }

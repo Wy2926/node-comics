@@ -23,7 +23,7 @@ import {languageLabel, modeLabels, type Capabilities, type Mode, type Page, type
 import type {ReadingTarget, TranslationState} from '../translation/automatic';
 import { useShortcuts } from "../shortcuts/react";
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
-import {ReaderShell, ReaderNavigation, ReaderDrawer, ReaderNumberInput} from './ReaderChrome';
+import {ReaderShell, ReaderNavigation, ReaderDrawer, ReaderPosition} from './ReaderChrome';
 import {ReaderSettings, ReaderScale, ReaderTranslationSettings} from './ReaderSettings';
 import {PageTranslationBar} from './PageTranslationBar';
 import {EpubDirectory} from './EpubDirectory';
@@ -138,7 +138,7 @@ export function EpubReader({
       try{await restoreEpubLocation(session.current,rendition.current,target.documentLocation);return !session.current?.signal?.aborted;}
       finally{positioning.current=false;capturePosition.current?.();}
     },close:()=>{if(panel)closePanel();else reveal();}});
-  const bookmarkTools=(placement:'desktop'|'mobile')=><BookmarkTools bookmarks={bookmarks} placement={placement} open={panel==='bookmarks'} onOpen={()=>togglePanel('bookmarks')}/>;
+  const bookmarkTools=<BookmarkTools bookmarks={bookmarks} open={panel==='bookmarks'} onOpen={()=>togglePanel('bookmarks')}/>;
   const language = caps?.languages.find(value => value.id === settings.language)?.label ?? languageLabel(settings.language);
   function selectView(value: 'original' | Mode) {
     if (value !== 'original' && caps && !caps.modes.some(mode => mode.id === value && mode.enabled)) return false;
@@ -442,14 +442,12 @@ export function EpubReader({
   const disabled = loading || !!error || bookmarks.busy;
   return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
     <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} onBack={leaveReader}
-      bookmarks={bookmarkTools('desktop')} progressStatus={progressStatus} directoryOpen={panel === 'directory'} onDirectory={() => togglePanel('directory')}>
+      bookmarks={bookmarkTools} progressStatus={progressStatus} directoryOpen={panel === 'directory'} onDirectory={() => togglePanel('directory')}>
       <div className="nc-reader-navigation">
         <button aria-label={msg('上一页')} title={msg('上一页')} disabled={disabled || position?.atStart}
           onClick={() => run(() => turnEpub(rendition.current!, -1))}><Icon name="chevron" style={{transform: 'rotate(-90deg)'}}/></button>
-        <label title={msg('第 {0} 章，共 {1} 章', {'0': chapter + 1, '1': chapterCount})}>
-          <ReaderNumberInput label={msg('跳转章节')} value={chapter + 1} max={chapterCount} disabled={disabled}
-            onCommit={value => jumpChapter(value - 1)}/><span>/ {chapterCount}</span>
-        </label>
+        <ReaderPosition label={`${msg('第 {0} 章，共 {1} 章', {'0': chapter + 1, '1': chapterCount})} · ${progress}%`}
+          value={chapter + 1} total={chapterCount} progress={progress}/>
         <ReaderProgress key={JSON.stringify([copy.id,copy.contentId,copy.generation])} valueText={value => `${value}%`} percentage
           min={0} max={100} value={progress} disabled={disabled}
           onCommit={value => {
@@ -459,12 +457,11 @@ export function EpubReader({
             const href = copy.document?.chapters[index]?.href;
             if (href) run(() => restoreEpubLocation(session.current!, rendition.current!, {href, progression: target - index}));
           }}/>
-        <span className="nc-epub-progress-label">{progress}%</span>
         <button aria-label={msg('下一页')} title={msg('下一页')} disabled={disabled || position?.atEnd}
           onClick={() => run(() => turnEpub(rendition.current!, 1))}><Icon name="chevron" style={{transform: 'rotate(90deg)'}}/></button>
       </div>
     </ReaderNavigation>
-    <PageTranslationBar bookmarks={bookmarkTools('mobile')} selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
+    <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
       modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
     <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>

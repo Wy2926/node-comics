@@ -1,3 +1,4 @@
+import {setReaderProgress} from './reader-progress-driver.mjs';
 // Run with the isolated Vite fixture on 127.0.0.1:5181:
 // node --test tests/reader-next-chapter.browser.mjs
 // Synthetic descriptors/PNG bytes, isolated Chromium profile, no source or cloud API.
@@ -34,7 +35,7 @@ afterEach(async () => {await page?.close(); assert.deepEqual(errors, []);});
 
 const viewport = () => page.locator('.nc-reading-viewport');
 const cells = () => viewport().locator('.nc-manga-page');
-const pageNumber = () => page.getByRole('spinbutton', {name: '跳转页码', exact: true});
+const pageNumber = () => page.getByRole('slider', {name: '阅读进度', exact: true});
 const pageId = (number, chapter = 0) => `window-page-${chapter}-${number - 1}`;
 const snapshot = name => page.locator(`[data-testid="${name}"]`).textContent().then(JSON.parse);
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -61,14 +62,14 @@ async function shown(number, visible, chapter = 0) {
     const viewport = document.querySelector('.nc-reading-viewport');
     const pages = [...(viewport?.querySelectorAll('.nc-manga-page') || [])];
     const images = [...(viewport?.querySelectorAll('img.nc-page-image') || [])];
-    return document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+    return document.querySelector('[aria-label="阅读进度"]')?.value === String(number)
       && JSON.stringify(pages.map(element => element.dataset.pageId)) === JSON.stringify(visible)
       && images.length === visible.length && images.every(image => image.complete && image.naturalWidth > 0)
       && !viewport.querySelector('.nc-page-image-pending') && (viewport.dataset.swipePhase || 'idle') === 'idle';
   }, {number, visible: visible.map(number => pageId(number, chapter))});
   await settle();
 }
-async function jump(number) {await pageNumber().fill(String(number)); await pageNumber().press('Enter'); await settle();}
+async function jump(number) {await setReaderProgress(pageNumber(), String(number));  await settle();}
 async function manifest(chapter, phase) {
   await page.waitForFunction(({chapter, phase}) => window.__readerFixtureManifests.events.some(event => event.id === `window-fixture-${chapter - 1}` && event.phase === phase), {chapter, phase});
 }

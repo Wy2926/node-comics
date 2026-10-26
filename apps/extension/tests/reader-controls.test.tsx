@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import type {FocusEvent, KeyboardEvent, PointerEvent} from 'react';
+import type {FocusEvent, PointerEvent} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 
 // Run the shared image/EPUB chrome hook with real fake-timer scheduling.
@@ -30,7 +30,7 @@ vi.mock('react', async original => ({
   },
 }));
 import {useReaderControls} from '../src/reader/useReaderControls';
-import {ReaderShell, dismissReaderKeyboard} from '../src/reader/ReaderChrome';
+import {ReaderShell} from '../src/reader/ReaderChrome';
 import {defaults, type Settings} from '../src/types';
 
 let blocked: boolean, focusVisible: boolean, active: boolean, hovered: boolean, finePointer: boolean, compact: boolean;
@@ -72,20 +72,6 @@ beforeEach(() => {
   render();
 });
 afterEach(() => {cleanup(); vi.useRealTimers(); vi.unstubAllGlobals();});
-
-describe('reader numeric keyboard', () => {
-  it.each([
-    {key: 'Enter', composing: false, keyCode: 13, dismiss: true},
-    {key: 'Enter', composing: true, keyCode: 13, dismiss: false},
-    {key: 'Enter', composing: false, keyCode: 229, dismiss: false},
-    {key: 'ArrowRight', composing: false, keyCode: 39, dismiss: false},
-  ])('dismisses only a completed Done key: %j', ({key, composing, keyCode, dismiss}) => {
-    const blur = vi.fn(), preventDefault = vi.fn();
-    dismissReaderKeyboard({key, nativeEvent: {isComposing: composing, keyCode}, currentTarget: {blur}, preventDefault} as unknown as KeyboardEvent<HTMLInputElement>);
-    expect(blur).toHaveBeenCalledTimes(Number(dismiss));
-    expect(preventDefault).toHaveBeenCalledTimes(Number(dismiss));
-  });
-});
 
 describe('immersive reader controls', () => {
   it('enters fullscreen for the whole reader document and exits the active fullscreen view', async () => {

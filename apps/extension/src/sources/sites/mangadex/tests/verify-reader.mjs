@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Isolated MV3 reader using the built manifest host access. Never opens a MangaDex website tab.
 // Default: synthetic API/images. RUN_LIVE_MANGADEX=1: public API and image hosts.
 import {createRequire} from 'node:module';
@@ -89,8 +90,8 @@ async function openDirectory(){
 async function waitEntry(remote,page){
   const entry=await entryFor(remote);activeEntryId=entry.id;
   await reader.waitForFunction(title=>document.querySelector('[aria-label="打开目录"]')?.title.includes(title),entry.title);
-  if(page!==undefined)await reader.waitForFunction(page=>document.querySelector('[aria-label="跳转页码"]')?.value===String(page),page);
-  await image((page??Number(await reader.getByLabel('跳转页码',{exact:true}).inputValue()))-1);
+  if(page!==undefined)await reader.waitForFunction(page=>document.querySelector('[aria-label="阅读进度"]')?.value===String(page),page);
+  await image((page??Number(await reader.getByLabel('阅读进度',{exact:true}).inputValue()))-1);
 }
 async function slotFor(remote){
   const entry=await entryFor(remote),chapter=(await directory()).chapters.find(chapter=>chapter.entryIds.includes(entry.id));assert(chapter,'Missing logical chapter');
@@ -117,7 +118,7 @@ async function setLayout(label){await closePanel();await reader.getByRole('butto
 async function readingGeometry(entryId){return reader.evaluate(entryId=>{
   const viewport=document.querySelector('.nc-reading-viewport'),target=document.querySelector(`[data-copy-id="${entryId}"] [data-page-index="0"]`),stack=target?.closest('.nc-page-stack');
   const box=element=>{const rect=element?.getBoundingClientRect();return rect?{top:rect.top,bottom:rect.bottom,height:rect.height}:null;};
-  return {title:document.querySelector('[aria-label="打开目录"]')?.title,page:document.querySelector('[aria-label="跳转页码"]')?.value,
+  return {title:document.querySelector('[aria-label="打开目录"]')?.title,page:document.querySelector('[aria-label="阅读进度"]')?.value,
     viewport:box(viewport),scrollTop:viewport?.scrollTop,scrollHeight:viewport?.scrollHeight,target:box(target),stack:box(stack),
     chapters:[...document.querySelectorAll('[data-copy-id]')].map(chapter=>({id:chapter.getAttribute('data-copy-id'),...box(chapter),pages:[...chapter.querySelectorAll('[data-page-index]')].map(page=>({index:page.getAttribute('data-page-index'),...box(page)}))}))};
 },entryId);}
@@ -135,7 +136,7 @@ async function scrollToRelease(remote){
   await reader.mouse.wheel(0,diagnostic.before.target.top-viewport.y-40||1);diagnostic.after=await readingGeometry(entry.id);
   try{await waitEntry(remote);diagnostic.selected=await readingGeometry(entry.id);}catch(error){diagnostic.failed=await readingGeometry(entry.id);throw error;}
 }
-async function jump(number,remote){await reader.getByLabel('跳转页码',{exact:true}).fill(String(number));await image(number-1);
+async function jump(number,remote){await setReaderProgress(reader.getByLabel('阅读进度',{exact:true}), String(number));await image(number-1);
   await reader.waitForFunction(async({remote,ordinal})=>{const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));const entry=(await catalog.list('entries',{limit:10000})).find(item=>item.sourceEntryId==='mangadex:chapter:'+remote);if(!entry)return false;const position=await catalog.get('positions',entry.id),pages=await catalog.listPages(entry.contentId);return position?.pageId===pages[ordinal]?.pageId;},{remote,ordinal:number-1});}
 async function refresh(){return reader.evaluate(async()=>{const p=await import(chrome.runtime.getURL('verify-source.js')),comic=(await p.catalog.list('comics'))[0];const snapshot=await p.readWebsiteCatalog(comic.sourceUrl);await p.applyCatalogRefresh(comic.id,comic.source.generation,snapshot);return snapshot.entries.length;});}
 try{
@@ -143,7 +144,7 @@ try{
   reader=await context.newPage();await reader.goto(home);await reader.evaluate(async()=>{const settings={uiLanguage:'zh-CN',language:'zh-Hans',layout:'continuous',fit:'window'};localStorage.setItem('nc-settings',JSON.stringify(settings));await chrome.storage.local.set({'nc-reader-settings':settings});});await reader.reload();
   await reader.getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('heading',{name:'MangaDex',exact:true}).waitFor();
   await reader.getByLabel('通过链接添加漫画').fill(`https://mangadex.org/title/${manga}`);await reader.getByRole('button',{name:'添加到书架',exact:true}).click();
-  await reader.getByLabel('跳转页码',{exact:true}).waitFor({timeout:60000});
+  await reader.getByLabel('阅读进度',{exact:true}).waitFor({timeout:60000});
   const imported=await state();assert.equal(imported.comics.length,1);assert.equal(imported.entries.length,live?84:8);
   assert.equal(await reader.getByRole('region',{name:'选择开始阅读的位置'}).count(),0);
   checks.push('Title import immediately opens the first readable chapter, keeps one comic and imports every release without a start-position screen');
@@ -171,7 +172,7 @@ try{
     await openDirectory();assert.equal((await directory()).chapters.length,5);assert.equal(await reader.locator('[data-reading-slot]').count(),5);
     const first=await slotFor(ids.en1),collapse=first.slot.getByRole('button',{name:'收起章节选项',exact:true});if(await collapse.isVisible())await collapse.click();
     assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),0);await first.slot.getByRole('button',{name:'展开章节选项',exact:true}).click();
-    assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),2);assert.equal(await reader.getByLabel('跳转页码').inputValue(),'3');
+    assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),2);assert.equal(await reader.getByLabel('阅读进度').inputValue(),'3');
     await reader.screenshot({path:path.join(out,'merged-directory.png')});
     checks.push('The compact directory contains five logical chapters for eight releases and expands language choices without changing the current page');
     await chooseRelease(ids.zh1,1);await jump(4,ids.zh1);await chooseRelease(ids.en1,3);
@@ -223,7 +224,7 @@ try{
     blockedImageHosts.add(server);server='third-fixture.mangadex.network';failChapterApi='at-home';const beforeFailedRefresh=apiCounts(ids.en2b);
     await reader.getByRole('button',{name:'继续阅读',exact:true}).click();
     const failedPage=reader.locator(`[data-copy-id="${chosen.id}"] [data-page-index="2"] .nc-image-failure`);await failedPage.waitFor();
-    assert.equal(await reader.getByLabel('跳转页码',{exact:true}).inputValue(),'3');await image(0);
+    assert.equal(await reader.getByLabel('阅读进度',{exact:true}).inputValue(),'3');await image(0);
     assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeFailedRefresh.chapter+1,atHome:beforeFailedRefresh.atHome+1},'A failed at-home refresh must not loop');
     const failedRefresh=await state();assert.deepEqual(pageIdentity(failedRefresh,chosen),chosenIdentity);assert.equal(failedRefresh.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
     await reader.screenshot({path:path.join(out,'expired-node-refresh-failure.png')});

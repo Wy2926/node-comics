@@ -45,7 +45,7 @@ function assertState(state) {
   assert(state.comic.hasDedicatedCover, 'The work must have a dedicated source cover');
 }
 async function currentEntry() {
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
   await reader.waitForFunction(() => Number(document.querySelector('.nc-reading-viewport')?.getAttribute('data-page-count')) > 0);
   const id = await reader.locator('.nc-stream-chapter').first().getAttribute('data-copy-id'), state = await inspect();
   assertState(state);
@@ -68,7 +68,7 @@ async function decoded(pageNumber) {
   return size;
 }
 async function jump(pageNumber) {
-  const control = reader.getByLabel('跳转页码', {exact: true});
+  const control = reader.getByLabel('阅读进度', {exact: true});
   await control.fill(String(pageNumber)); await control.press('Enter');
   const size = await decoded(pageNumber);
   await reader.waitForFunction(async ({entry, number}) => {
@@ -247,7 +247,7 @@ export async function position(entryId:string,number:number) {const entry=await 
   await navigate('library');
   await reader.getByRole('button', {name: '打开漫画 ' + saved.comic.title, exact: true}).click();
   const reopened = await currentEntry(); assert.equal(reopened.entry.id, selected.at(-1).entryId);
-  assert.equal(await reader.getByLabel('跳转页码', {exact:true}).inputValue(), String(selected.at(-1).testedPage));
+  assert.equal(await reader.getByLabel('阅读进度', {exact:true}).inputValue(), String(selected.at(-1).testedPage));
   await decoded(selected.at(-1).testedPage);
   assert.deepEqual(stablePositions(reopened.state), stablePositions(saved));
   await reader.screenshot({path: path.join(out, 'reopened.png')});
@@ -262,7 +262,7 @@ export async function position(entryId:string,number:number) {const entry=await 
     assert.deepEqual(stablePositions(refreshed.state), stablePositions(previous));
     assert.equal(refreshed.state.comic.updates, previous.comic.updates);
     assert.equal(refreshed.entry.id, selected.at(-1).entryId);
-    assert.equal(await reader.getByLabel('跳转页码', {exact:true}).inputValue(), String(selected.at(-1).testedPage));
+    assert.equal(await reader.getByLabel('阅读进度', {exact:true}).inputValue(), String(selected.at(-1).testedPage));
     await decoded(selected.at(-1).testedPage);
   }
   checks.push('Two ordinary catalog-link reimports refresh without duplicate comics/chapters, false updates or lost reading positions');

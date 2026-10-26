@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Built MV3 + isolated profile + synthetic source/artwork. No external API/model requests.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -90,7 +91,7 @@ try {
   const entry = site.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true}); await entry.waitFor();
   await site.screenshot({path: path.join(out, 'embedded-entry.png')});
   const opened = browser.waitForEvent('page'); await entry.click(); reader = await opened;
-  await reader.waitForURL('**/reader.html?catalog=*'); await reader.getByLabel('跳转页码', {exact: true}).waitFor();
+  await reader.waitForURL('**/reader.html?catalog=*'); await reader.getByLabel('阅读进度', {exact: true}).waitFor();
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0);
   const details = await reader.evaluate(async chapter => {
     const p = await import(chrome.runtime.getURL('verify-source.js')), comic = (await p.catalog.list('comics'))[0];
@@ -98,7 +99,7 @@ try {
     return {comicId: comic.id, entryId: entry.id, entries: entries.length, pages: entry.pageCount};
   }, f.reader);
   assert.equal(details.entries, 3); assert.equal(details.pages, 6);
-  const jump = reader.getByLabel('跳转页码', {exact: true}); await jump.fill('4'); await jump.press('Enter');
+  const jump = reader.getByLabel('阅读进度', {exact: true}); await setReaderProgress(jump, 4);
   await reader.waitForFunction(async ({entryId}) => {
     const p = await import(chrome.runtime.getURL('verify-source.js')), entry = await p.catalog.get('entries', entryId);
     const pages = await p.catalog.listPages(entry.contentId), pos = await p.catalog.get('positions', entryId);
@@ -118,8 +119,8 @@ try {
   }, details);
   const before = await state(), route = reader.url(); await reader.close(); reader = await browser.newPage(); await reader.goto(route);
   await reader.getByRole('button', {name: '打开漫画 ' + f.title, exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor();
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '4');
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor();
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '4');
   await waitVisiblePage();
   await reader.screenshot({path: path.join(out, 'reopened.png')}); checks.push('Close/reopen restores the selected chapter and page');
   const refresh = async () => reader.evaluate(async ({comicId, url}) => {

@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Vite :5181, synthetic chapter/window fixture. No account or translation service.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -14,12 +15,11 @@ const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()
 const viewport=page.locator('.nc-reading-viewport');
 const position=()=>viewport.evaluate(node=>node.scrollTop);
 const pageTop=(chapter,index)=>page.locator(`[data-copy-id="window-fixture-${chapter}"] [data-page-index="${index}"]`).evaluate(node=>node.getBoundingClientRect().top-node.closest('.nc-reading-viewport').getBoundingClientRect().top);
-const input=page.getByLabel('跳转页码',{exact:true});
+const input=page.getByLabel('阅读进度',{exact:true});
 async function jump(number){
- // ReaderNumberInput keeps draft text local until Enter blurs and commits it.
- await input.fill(String(number));await input.press('Enter');await settle();
- assert.equal(Number(await input.inputValue()),Number(number),'page input retains the requested numeric value');
- assert.equal(Number(await page.getByLabel('阅读进度',{exact:true}).inputValue()),Number(number),'page input commits before scrolling');
+ await setReaderProgress(input, String(number));await settle();
+ assert.equal(Number(await input.inputValue()),Number(number),'progress range retains the requested value');
+ assert.equal(Number(await page.getByLabel('阅读进度',{exact:true}).inputValue()),Number(number),'progress range commits before scrolling');
 }
 async function refresh(){await page.getByRole('button',{name:/更新模拟翻译状态/}).click();await settle();}
 async function openMore(){const more=page.getByRole('dialog',{name:'阅读设置',exact:true}).locator('details.nc-reader-more');if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();}

@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Production MV3 in an isolated Chromium profile. RUN_LIVE_WEBRY=1 reads the public website.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -60,8 +61,8 @@ async function waitImage(page = 1) {await reader.waitForFunction(({entry, page})
   document.querySelector(`[data-copy-id="${entry}"] [data-page-index="${page - 1}"] img.nc-page-image`)?.naturalWidth > 0,
   {entry: activeEntry, page}, {timeout: 60000});}
 async function jump(page) {
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(page));
-  await reader.getByLabel('跳转页码', {exact: true}).press('Enter'); await waitImage(page);
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page));
+   await waitImage(page);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
     const data = await catalog.get('entries', entry), pages = await catalog.listPages(data.contentId), position = await catalog.get('positions', entry);
     return position?.pageId === pages[page - 1]?.pageId;}, {entry: activeEntry, page});
@@ -106,7 +107,7 @@ try {
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? '葬送のフリーレン' : 'Webry fixture', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
   const imported = await state(); assert.equal(imported.comics.length, 1);
   assert.equal(imported.comics[0].source.connectionId, 'website:sundaywebry');
   const active = imported.entries.find(e => e.indexState === 'ready'); assert(active); activeEntry = active.id;
@@ -125,7 +126,7 @@ try {
   const cover = reader.locator('.nc-book .nc-thumbnail img'); await cover.waitFor(); await cover.evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.locator('.nc-book-cover').click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '3');
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
   assert.equal(await refresh(), imported.entries.length);
   checks.push('Cover loads; reopening and complete refresh retain page 3');
   if (!live) {

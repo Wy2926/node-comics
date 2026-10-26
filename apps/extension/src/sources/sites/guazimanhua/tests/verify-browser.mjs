@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Explicit live HTTP acceptance in a fresh MV3 profile using the built manifest host access. No product API/model calls.
 // From repository root, after building: node apps/extension/src/sources/sites/guazimanhua/tests/verify-browser.mjs
 import {createRequire} from 'node:module';
@@ -54,7 +55,7 @@ try {
   const opened = context.waitForEvent('page'); await popup.getByRole('button',{name:'开始阅读',exact:true}).click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
   console.log('Catalog imported; waiting for reader images');
-  await reader.getByLabel('跳转页码').waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度').waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 90000});
   const details = await reader.evaluate(async () => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -67,13 +68,13 @@ try {
   assert.equal(chapterRequests,1,'Parent discovery HTML must be reused across worker and reader');
   checks.push('Popup bare-chapter import creates the complete work; worker-to-reader handoff fetches chapter HTML only once');
   for (let number = 1; number <= details.total; number++) {
-    await reader.getByLabel('跳转页码').fill(String(number), {force: true});
+    await setReaderProgress(reader.getByLabel('阅读进度'), String(number));
     await reader.waitForFunction(index => document.querySelector(`[data-page-index="${index}"] img.nc-page-image`)?.naturalWidth > 0, number - 1, {timeout: 60000});
     if (number === 1 || number === details.total) await reader.screenshot({path: path.join(out, `reader-${number}.png`)});
   }
   checks.push('Live catalog imported through popup action; all 18 pages decoded in the reader');
   console.log(checks.at(-1));
-  await reader.getByLabel('跳转页码').fill('10', {force: true});
+  await setReaderProgress(reader.getByLabel('阅读进度'), '10');
   await waitState(reader, async id => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const entry = await catalog.get('entries', id), pages = await catalog.listPages(entry.contentId), position = await catalog.get('positions', id);
@@ -82,7 +83,7 @@ try {
   const route = reader.url(); await reader.close(); reader = await context.newPage(); await reader.goto(route);
   await reader.getByRole('button', {name: /继续阅读/}).click();
   await reader.waitForFunction(() => document.querySelector('[data-page-index="9"] img.nc-page-image')?.naturalWidth > 0);
-  assert.equal(await reader.getByLabel('跳转页码').inputValue(), '10');
+  assert.equal(await reader.getByLabel('阅读进度').inputValue(), '10');
   await reader.screenshot({path: path.join(out, 'reopened-10.png')});
   checks.push('Reopening restores page 10');
   await setup.getByRole('button', {name: '我的漫画', exact: true}).click();
@@ -111,9 +112,9 @@ try {
     await setup.getByRole('button',{name:'漫画网站',exact:true}).click();
     await setup.getByLabel('通过链接添加漫画').fill(link);
     await setup.getByRole('button',{name:'添加到书架',exact:true}).click();
-    await setup.getByLabel('跳转页码').waitFor();
+    await setup.getByLabel('阅读进度').waitFor();
     await setup.waitForFunction(()=>document.querySelector('[data-page-index="9"] img.nc-page-image')?.naturalWidth>0);
-    assert.equal(await setup.getByLabel('跳转页码').inputValue(),'10');
+    assert.equal(await setup.getByLabel('阅读进度').inputValue(),'10');
     assert.equal(await setup.evaluate(async()=> (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length),1);
     await setup.screenshot({path:path.join(out,'link-import-restored.png')});
     await setup.getByRole('button',{name:'返回我的漫画',exact:true}).click();

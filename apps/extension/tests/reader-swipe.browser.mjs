@@ -1,3 +1,4 @@
+import {setReaderProgress} from './reader-progress-driver.mjs';
 // Start the isolated Vite fixture on 127.0.0.1:5181, then run from apps/extension:
 // node --test tests/reader-swipe.browser.mjs
 // Uses PLAYWRIGHT_MODULE / CHROMIUM_PATH, synthetic images and real CDP touch input.
@@ -107,7 +108,7 @@ const viewport = () => page.locator('.nc-reading-viewport');
 const surface = () => viewport().locator('.nc-reading-surface');
 const oldLayer = () => viewport().locator('[data-swipe-snapshot]');
 const cells = () => surface().locator('.nc-manga-page');
-const pageNumber = () => page.getByRole('spinbutton', {name: '跳转页码', exact: true});
+const pageNumber = () => page.getByRole('slider', {name: '阅读进度', exact: true});
 const settings = () => page.getByRole('dialog', {name: '阅读设置', exact: true});
 const pageId = (number, chapter = 0) => `window-page-${chapter}-${number - 1}`;
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -129,7 +130,7 @@ async function selected(number, visible, chapter = 0) {
   await page.waitForFunction(({number, visible}) => {
     const viewport = document.querySelector('.nc-reading-viewport');
     const surface = viewport?.querySelector('.nc-reading-surface');
-    return document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+    return document.querySelector('[aria-label="阅读进度"]')?.value === String(number)
       && JSON.stringify([...(surface?.querySelectorAll('.nc-manga-page') || [])].map(element => element.dataset.pageId)) === JSON.stringify(visible)
       && !viewport?.hasAttribute('data-swipe-phase') && !viewport?.querySelector('[data-swipe-snapshot]')
       && getComputedStyle(surface).visibility !== 'hidden';
@@ -143,7 +144,7 @@ async function shown(number, visible, imageCount = visible.length, chapter = 0) 
     const surface = viewport?.querySelector('.nc-reading-surface');
     const ids = [...(surface?.querySelectorAll('.nc-manga-page') || [])].map(element => element.dataset.pageId);
     const images = [...(surface?.querySelectorAll('img.nc-page-image') || [])];
-    return document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+    return document.querySelector('[aria-label="阅读进度"]')?.value === String(number)
       && JSON.stringify(ids) === JSON.stringify(visible)
       && images.length === imageCount && images.every(image => image.complete && image.naturalWidth > 0)
       && !surface?.querySelector('.nc-page-image-pending') && !viewport?.hasAttribute('data-swipe-phase')
@@ -152,7 +153,7 @@ async function shown(number, visible, imageCount = visible.length, chapter = 0) 
   catch (error) {
     console.log('Swipe fixture diagnostic:', await page.evaluate(() => {
       const element = document.querySelector('.nc-reading-viewport');
-      return {number: document.querySelector('[aria-label="跳转页码"]')?.value, phase: element?.dataset.swipePhase,
+      return {number: document.querySelector('[aria-label="阅读进度"]')?.value, phase: element?.dataset.swipePhase,
         width: element?.clientWidth, scrollWidth: element?.scrollWidth, touchAction: element && getComputedStyle(element).touchAction,
         scale: window.visualViewport?.scale, events: window.__swipeEvents, trace: window.__swipeTrace.slice(-12)};
     }));
@@ -186,8 +187,8 @@ async function direction(value) {
 }
 async function jump(number) {
   await page.keyboard.press('Escape');
-  await pageNumber().fill(String(number));
-  await pageNumber().press('Enter');
+  await setReaderProgress(pageNumber(), String(number));
+
   await settle();
 }
 async function point(x = .5, y = .5) {
@@ -245,7 +246,7 @@ async function releaseRead(number, result = false) {
 async function entering(number) {
   await page.waitForFunction(number => {
     const viewport = document.querySelector('.nc-reading-viewport');
-    return viewport?.dataset.swipePhase === 'entering' && document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+    return viewport?.dataset.swipePhase === 'entering' && document.querySelector('[aria-label="阅读进度"]')?.value === String(number)
       && !!viewport.querySelector('[data-swipe-snapshot] .stf__item');
   }, number);
 }
@@ -416,7 +417,7 @@ test('direct page selection cancels an entrance without allowing late image byte
   await reader({controlled: true, holdPages: [2]}); await resetTrace();
   await page.getByRole('button', {name: '下一页', exact: true}).click();
   await entering(2);
-  await pageNumber().fill('5'); await pageNumber().press('Enter');
+  await setReaderProgress(pageNumber(), '5');
   await releaseRead(2);
   await assertNoLateNavigation(5, [5]);
   await mouseDrag(-230); await shown(6, [6]);
@@ -530,7 +531,7 @@ for (const cancel of ['Escape', 'Home']) test(`canceling a loaded final-page ent
   await page.getByRole('button', {name: '下一页', exact: true}).click();
   await page.waitForFunction(() => {
     const viewport = document.querySelector('.nc-reading-viewport');
-    if (viewport?.dataset.swipePhase !== 'entering' || document.querySelector('[aria-label="跳转页码"]').value !== '8') return false;
+    if (viewport?.dataset.swipePhase !== 'entering' || document.querySelector('[aria-label="阅读进度"]').value !== '8') return false;
     return true;
   });
   await page.waitForFunction(() => document.querySelector('[data-page-index="7"] img.nc-page-image')?.naturalWidth > 0);

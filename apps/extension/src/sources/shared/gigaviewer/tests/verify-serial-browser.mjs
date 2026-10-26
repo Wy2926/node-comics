@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real public source/CDN in an isolated built MV3 extension. No translation provider calls.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -57,8 +58,8 @@ const waitImage = page => reader.waitForFunction(({id, index}) => {
   return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 }, {id: details.entryId, index: page - 1}, {timeout: 60000});
 async function jump(page) {
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(page), {force: true});
-  await reader.getByLabel('跳转页码', {exact: true}).press('Enter');
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page));
+
   await waitImage(page);
   await reader.waitForFunction(async ({id, index}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.mjs')), entry = await catalog.get('entries', id);
@@ -123,7 +124,7 @@ try {
   const opened = context.waitForEvent('page');
   await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
   details = await reader.evaluate(async ({chapter, sourceId}) => {
     const {catalog, sourceLocation} = await import(chrome.runtime.getURL('verify-source.mjs'));
     const comic = (await catalog.list('comics')).find(comic => comic.source.connectionId === 'website:' + sourceId);
@@ -180,7 +181,7 @@ try {
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.locator(`[data-comic-id="${details.comicId}"] .nc-book-cover`).click();
   await waitImage(restorePage);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), String(restorePage));
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
   assert.equal((await state()).lastEntryId, details.entryId);
   await reader.screenshot({path: path.join(out, 'restored.png')});
   checks.push(`Closing and reopening the reader restores page ${restorePage}`);
@@ -228,8 +229,8 @@ try {
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill(chapter);
   await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000});
-  assert.equal(await setup.getByLabel('跳转页码', {exact: true}).inputValue(), String(restorePage));
+  await setup.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
   assert.equal(await setup.evaluate(async () =>
     (await (await import(chrome.runtime.getURL('verify-source.mjs'))).catalog.list('comics')).length), 1);
   assert.deepEqual(await state(), beforeFailure);

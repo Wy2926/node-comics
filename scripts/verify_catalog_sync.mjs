@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Automatic directory updates: isolated MV3, local synthetic site, real adapter and alarms.
 // Build apps/extension first. All website/API requests below use local synthetic responses.
 // The isolated TLS fixture needs Python with cryptography installed.
@@ -79,7 +80,7 @@ try{
  console.log('Importing two adapted comics in an isolated profile');
  await worker.evaluate(()=>chrome.storage.local.set({'nc-reader-settings':{uiLanguage:'zh-CN'}}));
  console.log('Preparing reader preferences');await openReader();await reader.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await reader.close();
- await importComic('first');const jump=reader.getByRole('spinbutton',{name:'跳转页码'});await jump.fill('2');await jump.press('Enter');await rendered(1);await shelf();
+ await importComic('first');const jump=reader.getByRole('slider',{name:'阅读进度'});await setReaderProgress(jump, '2');await rendered(1);await shelf();
  const baseline=await waitFor(value=>value.positions.some(position=>value.pages.find(page=>page.pageId===position.pageId)?.ordinal===1));
  const first=baseline.comics.find(comic=>comic.title===title('first')),position=baseline.positions.find(position=>position.comicId===first.id);
  assert.equal(await reader.locator('.nc-card-update').count(),0);await reader.close();
@@ -117,7 +118,7 @@ try{
  const managed=await worker.evaluate(async()=>Object.keys(await chrome.storage.session.get(null)).filter(key=>key.startsWith('nc-catalog-tab:')));assert.deepEqual(managed,[]);
  await card('first').getByRole('button',{name:/^打开漫画 /}).click();await rendered(1);counts.first=6;
  await makeDue();await reader.evaluate(()=>chrome.runtime.sendMessage({type:'NC_CHECK_DUE_CATALOGS'}));await waitFor(value=>value.entries.filter(entry=>entry.comicId===first.id).length===6);await rendered(1);
- assert.equal(await reader.getByRole('spinbutton',{name:'跳转页码'}).inputValue(),'2');
+ assert.equal(await reader.getByRole('slider',{name:'阅读进度'}).inputValue(),'2');
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();await reader.getByText('第6话',{exact:true}).waitFor();await reader.screenshot({path:path.join(out,'live-directory-preserves-position.png')});
  await reader.getByRole('button',{name:'关闭面板',exact:true}).click();await shelf();await card('first').locator('.nc-card-update').waitFor();checks.push('阅读中同步新增目录立即可见，停留在第2页，新到达提示不会被旧阅读确认清除');
  await card('second').getByRole('button',{name:/^打开漫画 /}).click();await rendered();

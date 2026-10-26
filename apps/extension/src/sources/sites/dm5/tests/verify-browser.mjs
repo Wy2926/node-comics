@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real DM5, isolated preauthorized MV3 profile; no product API or model calls.
 // Run from repo root after npm run build in apps/extension.
 import {createRequire} from 'node:module';
@@ -63,7 +64,7 @@ try {
   const opened = context.waitForEvent('page', {predicate: p => p !== site});
   await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('跳转页码').waitFor({timeout: 90000});
+  await reader.getByLabel('阅读进度').waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 90000});
   console.log('Embedded button imported the live catalog and displayed page 1');
   const details = await reader.evaluate(async () => {
@@ -73,7 +74,7 @@ try {
     return {comicId: comic.id, entryId: entry.id, chapters: entries.length, total: entry.pageCount};
   });
   for (let number = 1; number <= details.total; number++) {
-    await reader.getByLabel('跳转页码').fill(String(number), {force: true});
+    await setReaderProgress(reader.getByLabel('阅读进度'), String(number));
     await reader.waitForFunction(index => {
       const cell = document.querySelector(`[data-page-index="${index}"]`);
       return cell?.querySelector('img.nc-page-image')?.naturalWidth > 0 || !!cell?.querySelector('.nc-image-failure');
@@ -83,7 +84,7 @@ try {
     if (number === 1 || number === 10 || number === details.total) await reader.screenshot({path: path.join(out, `reader-${number}.png`)});
     if (number % 10 === 0) console.log(`Reader displayed ${number}/${details.total} pages`);
   }
-  await reader.getByLabel('跳转页码').fill('10', {force: true});
+  await setReaderProgress(reader.getByLabel('阅读进度'), '10');
   await reader.waitForFunction(() => document.querySelector('[data-page-index="9"] img.nc-page-image')?.naturalWidth > 0);
   await waitForState(reader, async id => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));

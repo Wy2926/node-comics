@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Exercise the built reader, including source fetch, normalization, digest worker, cache and display.
 // Run from repo root against the current build.
 import {createRequire} from 'node:module';
@@ -28,9 +29,9 @@ try{
     const manifest=await readNetworkPages('https://comix.to/title/nr83-the-sword-bearing-flower/6887743-chapter-2');return {id:manifest.id,count:manifest.items.length};
   });const before=created;
   await page.goto(reader+'?manifest='+encodeURIComponent(sourceManifest.id));
-  await page.getByLabel('跳转页码').waitFor({timeout:60000});
+  await page.getByLabel('阅读进度').waitFor({timeout:60000});
   for(let number=1;number<=sourceManifest.count;number++){
-    await page.getByLabel('跳转页码').fill(String(number),{force:true});
+    await setReaderProgress(page.getByLabel('阅读进度'), String(number));
     await page.waitForFunction(index=>{const cell=document.querySelector(`[data-page-index="${index}"]`);return cell?.querySelector('img.nc-page-image')?.naturalWidth>0||!!cell?.querySelector('.nc-image-failure');},number-1,{timeout:60000});
     const row=await page.locator(`[data-page-index="${number-1}"]`).evaluate((cell,number)=>({page:number,shown:!!cell.querySelector('img.nc-page-image')?.naturalWidth,error:cell.querySelector('.nc-image-failure p')?.textContent}),number);
     rows.push(row);if(number%10===0)console.log('reader '+number+': '+(row.shown?'shown':row.error));
@@ -41,8 +42,8 @@ try{
   const digest=await page.evaluate(url=>new Promise((resolve,reject)=>{const worker=new Worker(url,{type:'module'});worker.onmessage=event=>{worker.terminate();event.data.error?reject(Error(event.data.error)):resolve(event.data.sha256);};worker.onerror=()=>{worker.terminate();reject(Error('worker failed'));};worker.postMessage(new Blob([new Uint8Array(2*1024*1024).fill(97)]));}),url);
   const digestMatches=digest===createHash('sha256').update(Buffer.alloc(2*1024*1024,97)).digest('hex');assert(digestMatches);
   await page.goto(reader+'?manifest='+encodeURIComponent(sourceManifest.id));
-  await page.getByLabel('跳转页码').waitFor({timeout:60000});
-  await page.getByLabel('跳转页码').fill('10',{force:true});
+  await page.getByLabel('阅读进度').waitFor({timeout:60000});
+  await setReaderProgress(page.getByLabel('阅读进度'), '10');
   await page.waitForFunction(()=>document.querySelector('[data-page-index="9"] img.nc-page-image')?.naturalWidth>0,{},{timeout:30000});
   await page.locator('.busy-pill').waitFor({state:'hidden',timeout:30000});
   await page.screenshot({path:path.join(out,'reopened-10.png')});

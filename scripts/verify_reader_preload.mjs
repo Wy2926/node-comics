@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Vite :5181, real 4000 x 6000 synthetic PNGs. No account, supplier, or external image requests.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -33,11 +34,11 @@ await page.addInitScript(()=>{
  window.readerPreloadMetrics=()=>({liveUrls:live.size,peakUrls,created,liveKeys:[...live.values()].map(value=>value.key),reads,decodes,decodeFailures,activeDecodes,peakDecodes});
 });
 const viewport=page.locator('.nc-reading-viewport');
-const input=page.getByLabel('跳转页码',{exact:true});
+const input=page.getByLabel('阅读进度',{exact:true});
 const cell=index=>page.locator(`[data-copy-id="window-fixture-0"] [data-page-index="${index}"]`);
 const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 const position=()=>viewport.evaluate(node=>node.scrollTop);
-async function jump(number){await input.fill(String(number));await input.press('Enter');await settle();}
+async function jump(number){await setReaderProgress(input, String(number));await settle();}
 async function decoded(indices,panes=1){
  await page.waitForFunction(({indices,panes})=>indices.every(index=>{
   const images=document.querySelectorAll(`[data-copy-id="window-fixture-0"] [data-page-index="${index}"] .nc-page-image`);
@@ -56,7 +57,7 @@ async function sample(label,panes=1){
  const value=await page.evaluate(label=>{
   const v=document.querySelector('.nc-reading-viewport'),m=window.readerPreloadMetrics();
   const images=[...document.querySelectorAll('.nc-reading-viewport .nc-page-image')];
-  return {label,currentPage:Number(document.querySelector('[aria-label="跳转页码"]').value),selectedPages:Number(v.dataset.decodedPages),mountedPages:v.querySelectorAll('.nc-manga-page').length,displayedImages:images.length,liveUrls:m.liveUrls,distinctReadKeys:new Set(m.reads.map(item=>item.key)).size,heldEncodedBytes:m.liveKeys.reduce((total,key)=>total+(m.reads.find(item=>item.key===key)?.bytes??0),0),estimatedDisplayedRgbaBytes:images.reduce((total,image)=>total+image.naturalWidth*image.naturalHeight*4,0)};
+  return {label,currentPage:Number(document.querySelector('[aria-label="阅读进度"]').value),selectedPages:Number(v.dataset.decodedPages),mountedPages:v.querySelectorAll('.nc-manga-page').length,displayedImages:images.length,liveUrls:m.liveUrls,distinctReadKeys:new Set(m.reads.map(item=>item.key)).size,heldEncodedBytes:m.liveKeys.reduce((total,key)=>total+(m.reads.find(item=>item.key===key)?.bytes??0),0),estimatedDisplayedRgbaBytes:images.reduce((total,image)=>total+image.naturalWidth*image.naturalHeight*4,0)};
  },label);
  assert(value.mountedPages<=11,`${label}: page DOM exceeded its window`);
  assert(value.selectedPages<=11,`${label}: selected pages exceeded the decoded window`);

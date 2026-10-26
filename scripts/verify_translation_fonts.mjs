@@ -231,10 +231,10 @@ try{
   let before=await state();assert(before.translations.every(value=>value.body.font_id===first.id));
   await finish();await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').first().waitFor();
   await page.locator('.nc-reading-viewport').evaluate(element=>{element.scrollTop=180;});await page.waitForTimeout(250);
-  const top=await position(),pageNumber=await page.getByLabel('跳转页码',{exact:true}).inputValue();assert(top>100);
+  const top=await position(),pageNumber=await page.getByLabel('阅读进度',{exact:true}).inputValue();assert(top>100);
   before=await state();await fontInReader(second.id);await page.waitForTimeout(400);
   assert.equal((await state()).translations.length,before.translations.length);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),pageNumber);assert(Math.abs(await position()-top)<1);
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),pageNumber);assert(Math.abs(await position()-top)<1);
   check('changing a font keeps existing images and the exact reading position without submitting tasks');
   await page.getByRole('button',{name:'重新翻译此页',exact:true}).click();
   await page.waitForFunction(count=>window.readerFixture.translationRequests.length>count,before.translations.length);
@@ -248,7 +248,7 @@ try{
   await fontInReader(first.id);await page.getByRole('button',{name:'重新翻译此页',exact:true}).click();
   await page.waitForFunction(count=>window.readerFixture.translationRequests.length>count,pendingCount);
   current=await state();assert.equal(current.translations.at(-1).body.font_id,first.id);assert(current.translations.at(-1).body.regenerate_of);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),pageNumber);assert(Math.abs(await position()-top)<1);
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),pageNumber);assert(Math.abs(await position()-top)<1);
   check('returning to the language default explicitly freezes its concrete font_id on regeneration');
   await page.screenshot({path:path.join(out,'reader-font-selection.png')});
 

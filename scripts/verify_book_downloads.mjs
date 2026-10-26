@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Real MV3 UI/IndexedDB acceptance with synthetic directories and a local image server.
 // No live source or user profile is accessed. Build apps/extension before running.
 import {createRequire} from 'node:module';
@@ -147,7 +148,7 @@ try{
   assert.deepEqual((await state()).metadata.find(value=>value.id==='download-languages:fixture-book'),languagePreference);
   checks.push('右上角进入整页空离线中心；单语言漫画隐藏缓存语言，多语言默认全选并独立保存中英文选择');
   await shelf().getByRole('button',{name:'开始阅读',exact:true}).click();await rendered();
-  const jump=reader.getByRole('spinbutton',{name:'跳转页码'});await jump.fill('2');await jump.press('Enter');await rendered();
+  const jump=reader.getByRole('slider',{name:'阅读进度'});await setReaderProgress(jump, '2');await rendered();
   assert.equal((await state()).tasks.length,0,'Automatic reading must not register downloads');
   assert.equal(await button('离线缓存').count(),0);assert.equal(await button('缓存整本').count(),0);
   await button('阅读设置').click();assert.equal(await button('下载原图').count(),0);await button('关闭面板').click();
@@ -220,7 +221,7 @@ try{
   await center();await readCachedBook();await rendered();contents=await directory();
   await contents.locator('[data-release-choice][data-entry-id="entry:7"]').click();
   await reader.waitForFunction(()=>document.querySelector('[data-page-id="entry:7:p0"] img.nc-page-image')?.naturalWidth===800);
-  const offlineJump=reader.getByRole('spinbutton',{name:'跳转页码'});await offlineJump.fill('2');await offlineJump.press('Enter');
+  const offlineJump=reader.getByRole('slider',{name:'阅读进度'});await setReaderProgress(offlineJump, '2');
   await reader.waitForFunction(()=>document.querySelector('[data-page-id="entry:7:p1"] img.nc-page-image')?.naturalWidth===800);
   assert.equal(requests.length,requestsBeforeOffline);await snapshot('offline-reading');
   checks.push('暗色大字号整页及980px宽桌面无横向溢出；清空普通缓存并断网、重开插件后，通过阅读器目录读取另一已缓存章节');

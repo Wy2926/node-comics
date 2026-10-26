@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Start isolated Vite :5181. Native Chromium, synthetic local PNGs and status updates.
 // READER_PERF_LABEL names artifacts only; every run enforces the current contract.
 // Timings include development React and fixture instrumentation, not real source/network/model work.
@@ -42,8 +43,8 @@ try{
   await page.goto(`${origin}/tests/reader-window-fixture.html?performance=1&pages=${pages}`);
   await page.locator('.nc-page-image').first().waitFor();await settle(page);
   assert(await page.evaluate(()=>window.__readerFixturePerformance.snapshot().dimensionReads>0),'geometry instrumentation must observe the initial layout');
-  const input=page.getByLabel('跳转页码',{exact:true});
-  await input.fill(String(Math.floor(pages/2)));await input.press('Enter');await readyWindow(page);
+  const input=page.getByLabel('阅读进度',{exact:true});
+  await setReaderProgress(input, String(Math.floor(pages/2)));await readyWindow(page);
   for(const phase of ['status','scroll','scroll-status']){
    await page.evaluate(()=>{window.__readerFixturePerformance.reset();window.__readerLongTasks.length=0;});
    const before=await metrics(session);
@@ -92,7 +93,7 @@ try{
   await page.goto(`${origin}/tests/reader-window-fixture.html?performance=1&fractional=1`);
   await page.locator('.nc-page-image').first().waitFor();await settle(page);
   await page.getByRole('button',{name:'切下一章',exact:true}).click();await settle(page);
-  const input=page.getByLabel('跳转页码',{exact:true});await input.fill('60');await input.press('Enter');await readyWindow(page);
+  const input=page.getByLabel('阅读进度',{exact:true});await setReaderProgress(input, '60');await readyWindow(page);
   const result=await page.evaluate(async()=>{
    const viewport=document.querySelector('.nc-reading-viewport'),stack=document.querySelector('[data-copy-id="window-fixture-1"] .nc-page-stack');
    const status=[...document.querySelectorAll('button')].find(button=>button.textContent.startsWith('更新模拟翻译状态'));

@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 /** Isolated MV3 card presentation; synthetic metadata, no real account or network. */
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -75,13 +76,13 @@ try{
  checks.push('停留书架一分钟自动刷新相对时间');
  await page.clock.resume();
  await page.locator('input[type=file]').setInputFiles(path.join(root,'artifacts/import-validation/pages.cbz'));
- const jump=page.getByRole('spinbutton',{name:'跳转页码'});await jump.fill('3');await jump.press('Enter');
+ const jump=page.getByRole('slider',{name:'阅读进度'});await setReaderProgress(jump, '3');
  await page.waitForFunction(()=>{const image=document.querySelector('[data-page-index="2"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
  await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await search.fill('pages');
  await page.waitForFunction(()=>document.querySelector('.nc-card-position')?.textContent==='第 3 页，共 3 页');
  const title=await page.locator('.nc-card-title button').innerText();await page.reload();
  await search.fill(title);await page.getByRole('button',{name:'打开漫画 '+title,exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='3');
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='3');
  await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await search.fill('');
  checks.push('真实 CBZ 导入后读到第3页，卡片同步位置，刷新后继续阅读恢复第3页');
  assert.deepEqual(errors,[]);

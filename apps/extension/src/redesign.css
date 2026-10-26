@@ -1687,7 +1687,7 @@ a {
 /* The left navigation retains its page controls; right tools grow away from the divider. */
 .nc-reader-rail.left {
   left: 10px;
-  grid-template-rows: repeat(2,var(--reader-tool-size)) 9px calc(2 * var(--reader-step-size) + 96px + var(--reader-range-size));
+  grid-template-rows: repeat(2,var(--reader-tool-size)) auto 9px auto;
 }
 .nc-reader-rail.left>[data-reader-back-trigger] {
   grid-row: 1;
@@ -1695,11 +1695,12 @@ a {
 .nc-reader-rail.left>[data-reader-directory-trigger] {
   grid-row: 2;
 }
+.nc-reader-rail.left>.nc-bookmark-tools { grid-row: 3; }
 .nc-reader-rail.left>.nc-rail-divider {
-  grid-row: 3;
+  grid-row: 4;
 }
 .nc-reader-rail.left>.nc-reader-navigation {
-  grid-row: 4;
+  grid-row: 5;
 }
 .nc-reader-rail.right {
   --reader-tools-upper-height: calc(var(--reader-tools-above) * var(--reader-tool-size) + max(0,calc(var(--reader-tools-above) - 1)) * var(--reader-tool-gap));
@@ -1800,46 +1801,19 @@ a {
 .nc-reader-navigation {
   display: grid;
   grid-template-columns: minmax(0,1fr);
-  grid-template-rows: var(--reader-step-size) 52px var(--reader-range-size) 16px var(--reader-step-size);
+  grid-template-rows: var(--reader-step-size) auto var(--reader-range-size) var(--reader-step-size);
   justify-items: center;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
 }
-.nc-reader-navigation>button:first-child {
-  grid-row: 1;
-}
-.nc-reader-navigation>label {
-  grid-row: 2;
-}
-.nc-reader-navigation>.nc-reader-progress-control {
-  grid-row: 3;
-}
-.nc-reader-navigation>.nc-epub-progress-label {
-  grid-row: 4;
-}
-.nc-reader-navigation>button:last-child {
-  grid-row: 5;
-}
-.nc-reader-navigation label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.nc-reader-navigation input[type=number] {
-  width: 48px;
-  min-height: 32px;
-  padding: 4px 0;
-  text-align: center;
-  font-size: 14px;
-  appearance: textfield;
-}
-.nc-reader-navigation input::-webkit-inner-spin-button {
-  appearance: none;
-}
+.nc-reader-navigation>button:first-child { grid-row: 1; }
+.nc-reader-navigation>.nc-reader-position { grid-row: 2; }
+.nc-reader-navigation>.nc-reader-progress-control { grid-row: 3; }
+.nc-reader-navigation>button:last-child { grid-row: 4; }
+.nc-reader-position { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; max-width: 100%; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nc-reader-position-pages { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nc-reader-position-pages>strong { color: var(--accent); font-size: var(--text-title); font-weight: 800; line-height: 1.1; }
+.nc-reader-position-pages>span, .nc-reader-position>small { color: var(--muted); font-size: var(--text-caption); line-height: 1.3; }
 .nc-reader-navigation .nc-reader-progress {
   writing-mode: vertical-lr;
   direction: ltr;
@@ -1942,6 +1916,7 @@ a {
   }
   .nc-reader-rail.left {
     left: 3px;
+    width: 56px;
   }
   .nc-reader-rail.right {
     right: 3px;
@@ -1952,13 +1927,6 @@ a {
   }
   .nc-reader-rail.right .nc-reader-tool-group>button>span {
     display: none;
-  }
-  .nc-reader-navigation input[type=number] {
-    width: 32px;
-    font-size: 12px;
-  }
-  .nc-reader-navigation label {
-    font-size: 10px;
   }
   .nc-reader .nc-reader-drawer {
     top: 8px;

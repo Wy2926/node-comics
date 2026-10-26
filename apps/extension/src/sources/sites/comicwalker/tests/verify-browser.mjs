@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real public source in an isolated MV3 profile. No translation provider or account is used.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -49,7 +50,7 @@ try {
   const started = Date.now();
   await page.getByLabel('通过链接添加漫画').fill('https://comic-walker.com/viewer/KC_0085970000200011_E');
   await page.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await page.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 90000}); await waitImage(0);
+  await page.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000}); await waitImage(0);
   timings.importFirstPageMs = Date.now() - started;
   details = await page.evaluate(async chapter => {
     const p = await import(chrome.runtime.getURL('verify-source.mjs'));
@@ -60,8 +61,8 @@ try {
   }, chapter);
   assert.equal(details.pages, 56); assert(details.entries > 8);
   checks.push('Registered site, legacy viewer-link ownership resolution and real decoded first page');
-  const next = Date.now(); await page.getByLabel('跳转页码', {exact: true}).fill('5', {force: true});
-  await page.getByLabel('跳转页码', {exact: true}).press('Enter'); await waitImage(4);
+  const next = Date.now(); await setReaderProgress(page.getByLabel('阅读进度', {exact: true}), '5');
+   await waitImage(4);
   await page.waitForFunction(async ({id, entryId}) => {
     const p = await import(chrome.runtime.getURL('verify-source.mjs')), entry = await p.catalog.get('entries', entryId);
     const pages = await p.catalog.listPages(entry.contentId), position = await p.catalog.get('positions', entryId);
@@ -71,7 +72,7 @@ try {
   await page.screenshot({path: path.join(out, 'reader-page-5.png')});
   const before = await state(); await page.close(); page = await browser.newPage(); await page.goto(home);
   await page.locator(`[data-comic-id="${details.comicId}"] .nc-book-cover`).click(); await waitImage(4);
-  assert.equal(await page.getByLabel('跳转页码', {exact: true}).inputValue(), '5'); assert.deepEqual(await state(), before);
+  assert.equal(await page.getByLabel('阅读进度', {exact: true}).inputValue(), '5'); assert.deepEqual(await state(), before);
   await page.screenshot({path: path.join(out, 'restored.png')});
   checks.push('Closing/reopening retains chapter and page 5');
   await page.evaluate(async id => {

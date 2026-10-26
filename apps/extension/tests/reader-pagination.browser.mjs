@@ -1,3 +1,4 @@
+import {setReaderProgress} from './reader-progress-driver.mjs';
 // Start Vite in apps/extension on 127.0.0.1:5181, then run from the repository root:
 // node --test apps/extension/tests/reader-pagination.browser.mjs
 // Uses installed PLAYWRIGHT_MODULE / CHROMIUM_PATH, isolated storage and synthetic images.
@@ -43,7 +44,7 @@ afterEach(async () => {await page?.close(); assert.deepEqual(errors, []);});
 
 const viewport = () => page.locator('.nc-reading-viewport');
 const cells = () => viewport().locator('.nc-manga-page');
-const pageNumber = () => page.getByRole('spinbutton', {name: '跳转页码', exact: true});
+const pageNumber = () => page.getByRole('slider', {name: '阅读进度', exact: true});
 const settings = () => page.getByRole('dialog', {name: '阅读设置', exact: true});
 const pageId = (number, chapter = 0) => `window-page-${chapter}-${number - 1}`;
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -65,7 +66,7 @@ async function shown(number, visible, imageCount = visible.length, chapter = 0) 
     const pages = [...(viewport?.querySelectorAll('.nc-manga-page') || [])];
     const ids = pages.map(element => element.getAttribute('data-page-id'));
     const images = [...(viewport?.querySelectorAll('img.nc-page-image') || [])];
-    return document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+    return document.querySelector('[aria-label="阅读进度"]')?.value === String(number)
       && JSON.stringify(ids) === JSON.stringify(visible)
       && images.length === imageCount && images.every(image => image.complete && image.naturalWidth > 0)
       && !viewport?.querySelector('.nc-page-image-pending');
@@ -134,8 +135,8 @@ async function assertTurnCursor(side) {
   assert.equal(value.transform, side === 'left' ? 'translate(24 0) scale(-1 1)' : null);
 }
 async function jump(number) {
-  await pageNumber().fill(String(number));
-  await pageNumber().press('Enter');
+  await setReaderProgress(pageNumber(), String(number));
+
   await settle();
 }
 async function assertFits(label) {

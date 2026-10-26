@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Isolated MV3 shelf acceptance. RUN_LIVE_COVERS=1 reads five public catalogs and their artwork.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -97,7 +98,7 @@ try{
   if(!live){
     const naver=imported.find(item=>item.site==='naver');await card(naver.id).getByRole('button',{name:'打开漫画 '+naver.title,exact:true}).click();
     await reader.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth===600);
-    await reader.getByLabel('跳转页码').fill('2');
+    await setReaderProgress(reader.getByLabel('阅读进度'), '2');
     await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth===600);
     await reader.waitForFunction(async id=>{const {catalog}=await import(chrome.runtime.getURL('verify-covers.js'));const comic=await catalog.get('comics',id);return comic.lastPage===2;},naver.id);
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
@@ -106,7 +107,7 @@ try{
     assert(color[0]>200&&color[2]<150,'Shelf must show pink artwork rather than the blue body');
     await reader.reload();await card(naver.id).getByRole('button',{name:'继续阅读',exact:true}).click();
     await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth===600);
-    assert.equal(await reader.getByLabel('跳转页码').inputValue(),'2');
+    assert.equal(await reader.getByLabel('阅读进度').inputValue(),'2');
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
     checks.push('Chapter indexing never replaces the dedicated cover; reopening restores page 2');
     const before=coverRequests;

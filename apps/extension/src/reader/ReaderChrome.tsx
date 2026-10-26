@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref} from 'react';
+import {useEffect,useRef, type CSSProperties, type ReactNode, type Ref} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import type {Settings} from '../types';
@@ -14,33 +14,12 @@ export function isCompactReaderDevice():boolean{
   return !!window.matchMedia?.(compactReaderQuery).matches&&window.matchMedia('(max-device-width: 1000px) and (pointer: coarse), (max-device-width: 1000px) and (hover: none)').matches;
 }
 
-/** Done releases the phone keyboard; numeric inputs commit through the resulting blur. */
-export function dismissReaderKeyboard(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-  event.preventDefault();
-  event.currentTarget.blur();
-}
-
-/** Keep unfinished edits local instead of navigating on an empty or partial number. */
-export function ReaderNumberInput({label, value, max, disabled, onCommit}: {
-  label: string;
-  value: number;
-  max: number;
-  disabled?: boolean;
-  onCommit(value: number): void;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  return <input aria-label={label} type="number" inputMode="numeric" enterKeyHint="done"
-    min={1} max={max} value={draft ?? value} disabled={disabled}
-    onChange={event => setDraft(event.currentTarget.value)}
-    onKeyDown={dismissReaderKeyboard}
-    onBlur={event => {
-      const raw = event.currentTarget.value;
-      setDraft(null);
-      if (!raw.trim() || !Number.isInteger(Number(raw))) return;
-      const next = Math.max(1, Math.min(max, Number(raw)));
-      if (next !== value) onCommit(next);
-    }}/>
+/** A passive position indicator: navigation belongs to the arrows, range and directory. */
+export function ReaderPosition({label, value, total, progress}: {label: string; value: number; total: number; progress?: number}) {
+  return <span className="nc-reader-position" role="group" aria-label={label} title={label} data-value={value} data-long={String(Math.max(value, total)).length > 3}>
+    <span className="nc-reader-position-pages" aria-hidden="true"><strong>{value}</strong><span>/ {total}</span></span>
+    {progress !== undefined && <small aria-hidden="true">{progress}%</small>}
+  </span>;
 }
 
 /** One layout and one set of chrome classes for both image and document renderers. */

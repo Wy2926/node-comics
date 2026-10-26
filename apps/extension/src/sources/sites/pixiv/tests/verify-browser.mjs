@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Isolated built MV3 reader. Fixtures by default; opt in to real public Pixiv with RUN_LIVE_PIXIV=1.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -51,7 +52,7 @@ const refresh = comicId => reader.evaluate(async comicId => {const p = await imp
   const snapshot = await p.readWebsiteCatalog(comic.sourceUrl); await p.applyCatalogRefresh(comic.id, comic.source.generation, snapshot); return snapshot.entries.length;}, comicId);
 const importLink = async url => {await reader.getByRole('button', {name: '漫画网站', exact: true}).click();
   await reader.getByLabel('通过链接添加漫画').fill(url); await reader.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await reader.getByLabel('跳转页码', {exact: true}).waitFor({timeout: 120000});};
+  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 120000});};
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker'), home = new URL('reader.html', worker.url()).href;
   reader = await context.newPage(); await reader.goto(home);
@@ -76,7 +77,7 @@ try {
     await entrySource.screenshot({path: path.join(out, 'source-entry.png')});
     const opened = context.waitForEvent('page', p => p.url().includes('reader.html'));
     await importButton.click(); await reader.close(); reader = await opened;
-    await reader.getByLabel('跳转页码', {exact: true}).waitFor();
+    await reader.getByLabel('阅读进度', {exact: true}).waitFor();
     checks.push('Embedded import works on first click after native artwork to author SPA navigation; no alternative-language button');
   }
   const imported = await state(); assert.equal(imported.comics.length, 1); const comic = imported.comics[0];
@@ -84,7 +85,7 @@ try {
   if (live) assert(imported.entries.length > 0); else assert.equal(imported.entries.length, 3); await waitImage();
   const savedPage = await reader.evaluate(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')), e = await catalog.get('entries', entry);
     return Math.min(2, (await catalog.listPages(e.contentId)).length);}, activeEntry);
-  await reader.getByLabel('跳转页码', {exact: true}).fill(String(savedPage)); await waitImage(savedPage);
+  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(savedPage)); await waitImage(savedPage);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')), e = await catalog.get('entries', entry);
     return (await catalog.get('positions', entry))?.pageId === (await catalog.listPages(e.contentId))[page - 1]?.pageId;}, {entry: activeEntry, page: savedPage});
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Author home import, complete directory and original image decode');
@@ -94,7 +95,7 @@ try {
   await reader.getByRole('button', {name: '关闭面板', exact: true}).click();
   await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.close();
   reader = await context.newPage(); await reader.goto(home); await reader.getByRole('button', {name: '打开漫画 ' + comic.title, exact: true}).click(); await waitImage(savedPage);
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), String(savedPage)); assert.equal(await refresh(comic.id), imported.entries.length);
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(savedPage)); assert.equal(await refresh(comic.id), imported.entries.length);
   const synced = await reader.evaluate(async comicId => {const p = await import(chrome.runtime.getURL('probe.mjs'));
     await p.catalog.mutate(['comics'], async tx => {const c = await tx.get('comics', comicId); await tx.put('comics', {...c, catalogSync: {...c.catalogSync, nextCheckAt: 0}});});
     await p.syncNextCatalog(); return (await p.catalog.get('comics', comicId)).catalogSync;}, comic.id);
@@ -111,7 +112,7 @@ try {
   const tagEntries = separate.entries.filter(e => e.comicId === tagComic.id);
   if (live) assert(tagEntries.length > 0 && tagEntries.length <= imported.entries.length); else assert.equal(tagEntries.length, 3);
   activeEntry = tagEntries.find(e => e.indexState === 'ready')?.id; assert(activeEntry); await waitImage();
-  assert.equal(await reader.getByLabel('跳转页码', {exact: true}).inputValue(), '1');
+  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '1');
   await reader.screenshot({path: path.join(out, 'tag-reader.png')});
   await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.screenshot({path: path.join(out, 'shelf.png')});
   checks.push('Tag import creates an independent book and reading position');
@@ -152,7 +153,7 @@ try {
     assert(await importButton.isEnabled()); failCatalog = false;
     const reopened = context.waitForEvent('page', p => p.url().includes('reader.html'));
     await importButton.click(); const seriesReader = await reopened;
-    await seriesReader.getByLabel('跳转页码', {exact: true}).waitFor(); await seriesReader.close();
+    await seriesReader.getByLabel('阅读进度', {exact: true}).waitFor(); await seriesReader.close();
     await worker.evaluate(async url => {const tab = (await chrome.tabs.query({})).find(t => t.url === url); await chrome.tabs.update(tab.id, {active: true});}, entrySource.url());
     const popupOpened = context.waitForEvent('page');
     await worker.evaluate(async home => chrome.tabs.create({url: new URL('popup.html', home).href, active: false}), home);

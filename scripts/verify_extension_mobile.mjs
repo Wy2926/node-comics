@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Isolated Vite UI regression. All external HTTP is mocked; no account or model calls.
 // Start apps/extension with npm run dev -- --port 5181, then run from the repo root.
 import assert from 'node:assert/strict';
@@ -226,28 +227,27 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     assert.deepEqual(pageGeometry.map(page=>page.index),[0,1,2]);
     assert(pageGeometry.every((page,index)=>Math.abs(page.height-page.expectedHeight)<1&&(!index||Math.abs(page.top-pageGeometry[index-1].bottom)<1)),`Phone continuous reader adds gaps or letterboxing: ${JSON.stringify(pageGeometry)}`);
     check('normal, short and tall pages keep their intrinsic ratio with no added continuous-page gap');
-    assert(await page.locator('.nc-reader').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--reader-mobile-header'))<=92),'Phone reading chrome must leave more space for the page');
+    assert(await page.locator('.nc-reader').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--reader-mobile-header'))<=106),'Phone reading chrome must leave more space for the page');
     await inViewport(page.getByRole('button',{name:'返回我的漫画',exact:true}));
     await inViewport(page.getByRole('button',{name:'打开目录',exact:true}));
     await inViewport(page.getByRole('button',{name:'阅读设置',exact:true}));
     const notice=await page.locator('.nc-notifications').boundingBox(),tools=await page.locator('#nc-reader-translation-tools').boundingBox();
     assert(notice.y+notice.height<=tools.y,'Notification area covers reading tools');
-    const jump=page.getByRole('spinbutton',{name:'跳转页码',exact:true});
     const currentPage=page.getByRole('slider',{name:'阅读进度',exact:true});
-    const waitPage=value=>page.waitForFunction(value=>document.querySelector('.nc-reader-progress').value===String(value),value);
-    await jump.fill('3');await jump.press('Enter');await waitPage(3);
-    await jump.fill('');assert.equal(await jump.inputValue(),'');assert.equal(await currentPage.inputValue(),'3');
-    await jump.fill('2');assert.equal(await currentPage.inputValue(),'3');
-    await jump.press('Enter');await waitPage(2);
-    assert.equal(await jump.evaluate(element=>document.activeElement===element),false);
-    await jump.fill('1');await jump.fill('12');assert.equal(await currentPage.inputValue(),'2');
-    await jump.press('Tab');await waitPage(8);assert.equal(await jump.inputValue(),'8');
-    for(const invalid of ['','2.5']){
-      await jump.fill(invalid);await jump.press('Enter');
-      assert.equal(await currentPage.inputValue(),'8');assert.equal(await jump.inputValue(),'8');
-    }
-    await jump.fill('0');await jump.press('Enter');await waitPage(1);
-    check('page draft supports clearing, multi-digit edits, integer bounds and Done/blur commit');
+    const position=page.locator('.nc-reader-position');
+    assert.equal(await page.locator('.nc-reader-navigation input[type=number]').count(),0);
+    await inViewport(page.locator('#nc-reader-navigation-tools [data-reader-bookmarks-trigger]'));
+    assert.equal(await page.locator('#nc-reader-translation-tools .nc-bookmark-tools').count(),0);
+    await setReaderProgress(currentPage,3);
+    await page.waitForFunction(()=>document.querySelector('.nc-reader-position').dataset.value==='3');
+    await currentPage.focus();await page.keyboard.down('ArrowLeft');
+    assert.equal(await position.getAttribute('data-value'),'3','A held range key must not navigate');
+    assert.equal(await currentPage.inputValue(),'2');
+    await page.keyboard.up('ArrowLeft');
+    await page.waitForFunction(()=>document.querySelector('.nc-reader-position').dataset.value==='2');
+    await currentPage.press('Home');
+    await page.waitForFunction(()=>document.querySelector('.nc-reader-position').dataset.value==='1');
+    check('read-only page counter, top bookmarks and one range commit on key release');
     await viewport.evaluate(el=>el.scrollTo(0,400));
     const offset=await viewport.evaluate(el=>el.scrollTop);
     const translation=page.getByRole('button',{name:'翻译',exact:true});
@@ -306,14 +306,14 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Stationary mouse hover hid the toolbar');
         await mouse.mouse.move(640,450);await hidden(mouse);
         await mouse.keyboard.press('Escape');await visible(mouse);
-        const number=mouse.getByRole('spinbutton',{name:'跳转页码',exact:true});
-        await number.fill('2');await mouse.mouse.move(640,450);await mouse.waitForTimeout(1600);
-        assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Page-number editing hid the toolbar');
-        await number.press('Enter');await hidden(mouse);await mouse.screenshot({path:path.join(out,`${engine}-reader-desktop-hidden.png`)});
+        const progress=mouse.getByRole('slider',{name:'阅读进度',exact:true});
+        await progress.focus();await progress.press('ArrowRight');await mouse.mouse.move(640,450);await mouse.waitForTimeout(1600);
+        assert.equal(await mouse.locator('.nc-reader').evaluate(el=>el.classList.contains('controls-hidden')),false,'Keyboard focus on the range hid the toolbar');
+        await progress.blur();await hidden(mouse);await mouse.screenshot({path:path.join(out,`${engine}-reader-desktop-hidden.png`)});
         await mouse.setViewportSize({width:650,height:900});await hidden(mouse);
         assert.equal((await area.boundingBox()).y,0,'Immersive narrow-window tools still reserve canvas height');
         assert.equal((await area.boundingBox()).height,900,'Immersive narrow-window canvas does not fill the height');
-        check('desktop and narrow-window immersive geometry, hover/leave and numeric keyboard focus');
+        check('desktop and narrow-window immersive geometry, hover/leave and range keyboard focus');
       }finally{await desktop.close();}
     }
     if(!readerOnly){

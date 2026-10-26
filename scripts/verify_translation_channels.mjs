@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Real desktop Chromium UI; synthetic HTTP responses only, no live MTU/official account.
 // Start extension Vite on :5176. Uses a fresh browser context and synthetic source files.
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ let readingWindow;
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const read=()=>page.evaluate(async()=>({requests:window.channelFixture.requests,official:window.channelFixture.officialTranslations,auth:!!(await window.channelFixture.readAuth()).session,channels:await window.channelFixture.listChannels(),pageReads:window.channelFixture.pageReads,chapterContentIds:window.channelFixture.chapterContentIds}));
-async function openBook(){await page.getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('跳转页码',{exact:true}).waitFor();}
+async function openBook(){await page.getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('阅读进度',{exact:true}).waitFor();}
 const guideUrl='https://comics.nodelane.net/guides/local-translation/';
 const channelSettings=()=>page.locator('.nc-channel-settings');
 const channelCard=name=>page.locator('.nc-channel-card').filter({has:page.getByRole('radio',{name,exact:true})});
@@ -86,12 +87,12 @@ try{
   await page.evaluate(()=>window.channelFixture.selectChannel('nodelane'));
   await page.getByRole('button',{name:'登录后翻译',exact:true}).first().waitFor();
   assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   await page.evaluate(id=>window.channelFixture.selectChannel(id),localId);
   await page.waitForTimeout(1200);
   assert.equal(await page.getByRole('button',{name:'翻译',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal((await read()).requests.length,initialRequests);
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   check('switching channels preserves reading position, isolates official login, and reuses local results');
   current=await read();
   assert.equal(current.chapterContentIds.length,100);
@@ -116,8 +117,8 @@ try{
   assert.equal((await read()).requests.length,initialRequests+1);
   check('clearing local images does not submit requests; explicit retranslation submits once');
   await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false}));
-  await page.getByLabel('跳转页码',{exact:true}).fill('10');
-  await page.getByLabel('跳转页码',{exact:true}).press('Enter');
+  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '10');
+
   await page.waitForFunction(count=>window.channelFixture.requests.length===count,initialRequests+6);
   await page.waitForTimeout(1200);
   assert.equal((await read()).requests.length,initialRequests+6);
@@ -127,7 +128,7 @@ try{
   await page.getByRole('button').filter({hasText:'合成章节 100'}).click();
   await page.waitForFunction(()=>window.channelFixture.pageReads.includes(window.channelFixture.chapterContentIds[99]));
   await page.waitForFunction(()=>{const image=document.querySelector('.nc-stream-chapter[data-copy-id$=":chapter:99"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
-  assert.equal(await page.getByLabel('跳转页码',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
   await page.screenshot({path:path.join(out,'distant-chapter.png')});
   check('an unloaded distant chapter remains readable when explicitly opened');
 

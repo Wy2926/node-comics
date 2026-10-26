@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 /** Single-source reader acceptance: fresh profile, generated comics, no external account or API. */
 import {createRequire} from 'node:module';
 import {mkdtemp,mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -35,7 +36,7 @@ async function rendered(index){await page.waitForFunction(index=>{const image=do
 async function shelf(){await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();await page.locator('.nc-library').waitFor();}
 async function importFile(name,buffer){await page.locator('input[type=file]').setInputFiles({name,mimeType:'application/octet-stream',buffer});}
 async function closeResult(){const dock=page.locator('.nc-import-dock');if(await dock.isVisible())await dock.getByRole('button').click();const panel=page.locator('.nc-local-import-modal');if(await panel.isVisible())await panel.getByRole('button',{name:'完成',exact:true}).click();}
-async function jump(n){const box=page.getByRole('spinbutton',{name:'跳转页码'});await box.fill(String(n));await box.press('Enter');}
+async function jump(n){const box=page.getByRole('slider',{name:'阅读进度'});await setReaderProgress(box, String(n));}
 async function screenshot(name){await page.screenshot({path:path.join(output,name+'.png')});}
 try{
  await boot();await screenshot('empty');assert.equal(await page.getByText('网站下载资料',{exact:true}).count(),0);

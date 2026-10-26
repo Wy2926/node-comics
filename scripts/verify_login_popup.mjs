@@ -1,3 +1,4 @@
+import {setReaderProgress} from '../apps/extension/tests/reader-progress-driver.mjs';
 // Real Chrome identity popup, isolated profile, local TLS/OIDC/API fixtures only.
 import {createRequire} from 'node:module';
 import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
@@ -61,7 +62,7 @@ try{
   await reader.goto(new URL('reader.html',worker.url()).href);
   await reader.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single'})));await reader.reload();
   await reader.locator('input[type=file]').setInputFiles(path.join(root,'artifacts/import-validation/pages.cbz'));
-  await reader.getByRole('spinbutton',{name:'跳转页码'}).fill('2');await reader.getByRole('spinbutton',{name:'跳转页码'}).press('Enter');
+  await setReaderProgress(reader.getByRole('slider',{name:'阅读进度'}), '2');
   await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
   await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
   await reader.getByRole('button',{name:'我的账户',exact:true}).click();await reader.getByRole('button',{name:'登录账户',exact:true}).click();
@@ -88,7 +89,7 @@ try{
   phase='resume-card';
   await reader.getByRole('button',{name:'打开漫画 pages',exact:true}).click();
   phase='resume-position';
-  await reader.waitForFunction(()=>document.querySelector('input[aria-label="跳转页码"]')?.value==='2');
+  await reader.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='2');
   await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
   checks.push('Original comic resumes on page 2 after cancellation, authorization failure and successful login');
   assert.equal(tokenRequests,1);assert.deepEqual(pageErrors,[]);
