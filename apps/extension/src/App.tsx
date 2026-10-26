@@ -116,7 +116,7 @@ export function App(){
   const next=typeof change==='function'?change(settingsRef.current):change;
   settingsRef.current=next;applySettings(next);void saveSettings(next);
  },[]);
- const [busy,setBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState(''),[drag,setDrag]=useState(false);
+ const [busy,setBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState<{message:string}>(),[drag,setDrag]=useState(false);
  const [progressStatus,setProgressStatus]=useState<ReadingProgressStatus>('local');
  const [readingProgress]=useState(()=>new ReadingProgress(undefined,setProgressStatus));
  const readingOpen=useRef<AbortController|undefined>(undefined);
@@ -130,7 +130,7 @@ export function App(){
  const apiRef=useRef(api);apiRef.current=api;api.isCurrent=()=>apiRef.current===api;
  const [caps,setCaps]=useState<Capabilities>(),[usage,setUsage]=useState<Entitlements>();
  const updateEntitlements=useCallback((value:Entitlements)=>{const current=apiRef.current.rememberEntitlements(value);setUsage(current);setCaps(c=>c?{...c,entitlements:current}:c);},[]);
- const notify=useCallback((message:string)=>setToast(message),[]),login=useLogin(currentId,setCurrentId,notify);
+ const notify=useCallback((message:string)=>setToast({message}),[]),login=useLogin(currentId,setCurrentId,notify);
  const downloads=useBookDownloads(notify,()=>nav('downloads'));
  const activeDownloads=downloads.activeCount;
  const {channel,error:channelError}=useTranslationChannel();
@@ -414,9 +414,9 @@ export function App(){
   {drag&&!current&&<div className="drop-overlay" onDragLeave={()=>setDrag(false)}><Icon name="upload" size={60}/><h2>{msg('把故事放在这里')}</h2><p>{'CBZ / ZIP · CBR / RAR · PDF · MOBI · EPUB'}</p></div>}
   {(busy||readingBusy)&&<div className="busy-pill" role="status"><span className="spinner"/>{busy||msg('正在打开漫画')}</div>}
   <div className="nc-notifications">
-   {auth.reason==='expired'&&!dismissedExpiry&&<Notification tone="info" message={expiredMessage()} onClose={()=>setDismissedExpiry(true)} action={{label:msg('重新登录'),onClick:()=>login.setOpen(true)}}/>}
+   {auth.reason==='expired'&&!dismissedExpiry&&<Notification tone="info" message={expiredMessage()} onClose={()=>setDismissedExpiry(true)} action={<button className="nc-notification-action" onClick={()=>{setDismissedExpiry(true);login.setOpen(true);}}>{msg('重新登录')}<Icon name="arrow" size={14}/></button>}/>}
    {error&&!expiredError&&<Notification tone="error" message={error} onClose={()=>setError('')}/>}
-   {toast&&<Notification tone="success" message={toast} duration={6000} onClose={()=>setToast('')}/>}
+   {toast&&<Notification tone="success" notificationKey={toast} message={toast.message} duration={6000} onClose={()=>setToast(undefined)}/>}
   </div>
   </div>
   {comicSearch&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:${comicSearch.key}`} open={comicSearch.open} seed={comicSearch.seed} onClose={()=>setComicSearch(value=>value?{...value,open:false}:value)} onImportHit={openSearchHit} currentIdentity={comicSearch.seed.origin}/> }

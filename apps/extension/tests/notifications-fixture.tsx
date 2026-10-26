@@ -38,7 +38,7 @@ function Fixture(){
    </div><label style={{display:'block',marginTop:20}}>提示之外的焦点 <input aria-label="提示之外的焦点"/></label>
    <output data-testid="metrics">关闭 {closed} 次 · 登录入口 {opened} 次 · 页面隐藏 {String(visibility)}</output>
   </main>
-  <div className="nc-notifications">{notice&&<Notification key={notice.key} message={notice.message} tone={notice.tone} onClose={close} duration={notice.tone==='success'?6000:undefined} action={notice.tone==='info'?{label:'重新登录',onClick:()=>setOpened(value=>value+1)}:undefined}/>}</div>
+  <div className="nc-notifications">{notice&&<Notification notificationKey={notice.key} message={notice.message} tone={notice.tone} onClose={close} duration={notice.tone==='success'?6000:undefined} action={notice.tone==='info'?<button className="nc-notification-action" onClick={()=>{close();setOpened(value=>value+1);}}>重新登录</button>:undefined}/>}</div>
  </div>;
 }
 function ReaderFixture(){

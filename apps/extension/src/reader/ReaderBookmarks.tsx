@@ -1,6 +1,7 @@
 import {useRef,useState} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
+import {Notification} from '../ui/Notification';
 import type {BookmarkLocation,ReaderBookmark} from '../comics/application/bookmarks';
 import type {ReaderBookmarksController} from './useReaderBookmarks';
 import './bookmarks.css';
@@ -17,12 +18,11 @@ export function BookmarkTools({bookmarks:b,open,onOpen,placement}:{bookmarks:Rea
   </div>;
 }
 export function BookmarkNotice({bookmarks:b,inside=false}:{bookmarks:ReaderBookmarksController;inside?:boolean}){
-  if(!b.notice&&!b.returnTo)return null;
-  return <div className={`nc-bookmark-notice nc-reader-controls${inside?' inside':''}`} role="status">
-    <span>{b.notice?.text??msg('已跳转到书签')}</span>
-    {(b.notice?.action||!b.notice&&b.returnTo)&&<button disabled={b.busy} onClick={b.act}>{b.notice?.action??msg('返回刚才')}</button>}
-    <button className="icon-button" aria-label={msg('关闭提示')} onClick={b.dismiss}><Icon name="close" size={16}/></button>
-  </div>;
+  if(!b.notice)return null;
+  return <Notification className={`nc-bookmark-notice nc-reader-controls${inside?' inside':''}`} icon={null}
+    message={b.notice.text} notificationKey={b.notice} tone={b.notice.tone??'info'} onClose={b.dismiss}
+    duration={b.notice.action?10000:b.notice.tone==='error'?12000:3000} paused={b.busy}
+    action={b.notice.action&&<button disabled={b.busy} onClick={()=>void b.act()}>{b.notice.action}</button>}/>;
 }
 function BookmarkRow({item,bookmarks:b}:{item:ReaderBookmark;bookmarks:ReaderBookmarksController}){
   const options=useRef<HTMLButtonElement>(null);
@@ -47,6 +47,7 @@ export function BookmarkList({bookmarks:b}:{bookmarks:ReaderBookmarksController}
   return <div className="nc-bookmarks">
     <div className="nc-bookmark-current"><div><b>{msg('当前位置')}</b><small>{b.current?bookmarkLabel(b.current):msg('页面尚未就绪')}</small></div><button disabled={!b.current||b.busy} aria-pressed={b.saved} onClick={b.toggle}><Icon name="bookmark" size={17}/>{b.saved?msg('已加书签'):msg('加书签')}</button></div>
     <p className="nc-bookmark-local">{msg('仅保存在此设备 · 最新添加在前')}</p>
+    {b.returnTo&&b.notice?.kind!=='return'&&<div className="nc-bookmark-return"><div><b>{b.returnTo.title}</b><small>{bookmarkLabel(b.returnTo)}</small></div><button disabled={b.busy} onClick={()=>void b.goBack()}>{msg('返回刚才')}</button></div>}
     <div className="nc-bookmark-scroll" aria-busy={b.loading}>
       {b.error?<p role="alert">{msg('无法读取书签')} <button onClick={b.retry}>{msg('重试')}</button></p>:b.loading&&!b.items.length?<p role="status">{msg('加载中…')}</p>:<>
         {!b.items.length?<div className="nc-bookmark-empty"><Icon name="bookmark" size={32}/><h3>{msg('还没有书签')}</h3><p>{msg('看到想回来的地方，点一下“加书签”。')}</p></div>:<ul>{b.items.map(item=><BookmarkRow key={item.id} item={item} bookmarks={b}/>)}</ul>}

@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {msg} from '../i18n/runtime';
 import {addBookmark,deleteBookmark,noteBookmark,countBookmarks,findBookmark,listBookmarks,subscribeBookmarks,bookmarkKey,type BookmarkLocation,type ReaderBookmark} from '../comics/application/bookmarks';
 
-type Notice={text:string;action?:string;run?:()=>Promise<unknown>};
+type Notice={text:string;action?:string;run?:()=>Promise<unknown>;kind?:'return';tone?:'error'};
 export function useReaderBookmarks({comicId,current,open,capture,navigate,close}:{
   comicId?:string;current?:BookmarkLocation;open:boolean;
   capture():BookmarkLocation|undefined;navigate(location:BookmarkLocation):boolean|Promise<boolean>;close():void;
@@ -35,8 +35,8 @@ export function useReaderBookmarks({comicId,current,open,capture,navigate,close}
   },[comicId,open,revision]);
   async function run(operation:()=>Promise<unknown>){
     if(lock.current)return false;lock.current=true;setBusy(true);
-    try{await operation();return true;}
-    catch{if(alive.current)setNotice({text:msg('书签操作失败，请重试；原有书签仍保留。')});return false;}
+    try{return await operation()!==false;}
+    catch{if(alive.current)setNotice({text:msg('书签操作失败，请重试；原有书签仍保留。'),tone:'error'});return false;}
     finally{lock.current=false;if(alive.current)setBusy(false);}
   }
   async function remove(item:ReaderBookmark){
@@ -49,15 +49,17 @@ export function useReaderBookmarks({comicId,current,open,capture,navigate,close}
     if(existing)await remove(existing);
     else{await addBookmark(location);if(alive.current)setNotice({text:msg('已添加书签')});}
   });}
-  function jump(location:BookmarkLocation,returning=false){void run(async()=>{
+  function jump(location:BookmarkLocation,returning=false){return run(async()=>{
     const previous=capture();
-    if(!await navigate(location)){setNotice({text:msg('书签位置已不可用，请重新打开内容。')});return;}
+    if(!await navigate(location)){if(alive.current)setNotice({text:msg('书签位置已不可用，请重新打开内容。'),tone:'error'});return false;}
     if(!alive.current)return;
-    setReturnTo(returning?undefined:previous);setNotice(undefined);close();
+    setReturnTo(returning?undefined:previous);
+    setNotice(returning?undefined:{text:msg('已跳转到书签'),kind:'return',action:previous?msg('返回刚才'):undefined});close();
   });}
+  const goBack=()=>returnTo?jump(returnTo,true):Promise.resolve(false);
   return {items,count,saved:savedState.key===currentKey&&savedState.value,loading,error,busy,current,notice,returnTo,toggle,jump,
-    retry:()=>setRevision(n=>n+1),dismiss:()=>{setNotice(undefined);setReturnTo(undefined);},
-    act:()=>{if(notice?.run)void run(notice.run);else if(returnTo)jump(returnTo,true);},
+    retry:()=>setRevision(n=>n+1),dismiss:()=>setNotice(undefined),goBack,
+    act:()=>notice?.kind==='return'?goBack():notice?.run?run(notice.run):Promise.resolve(false),
     remove:(item:ReaderBookmark)=>run(()=>remove(item)),
     saveNote:(item:ReaderBookmark,note:string)=>run(async()=>{await noteBookmark(item.id,note);setNotice(undefined);}),
     more:()=>{if(!comicId)return;void run(async()=>{const epoch=listEpoch.current,next=await listBookmarks(comicId,items.at(-1));if(alive.current&&epoch===listEpoch.current)setItems(previous=>[...previous,...next.filter(item=>!previous.some(old=>old.id===item.id))]);});},

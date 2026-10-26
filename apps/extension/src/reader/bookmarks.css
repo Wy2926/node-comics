@@ -8,8 +8,12 @@
 .nc-reader .nc-bookmark-tools button[aria-pressed=true] { color:var(--accent); background:var(--accent-soft); --icon-stroke:var(--accent); }
 .nc-reader .nc-bookmark-tools small { font:inherit; }
 .nc-bookmarks { display:flex; flex-direction:column; min-height:0; flex:1; padding:12px 16px; gap:12px; }
-.nc-bookmark-current { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:var(--surface-soft); border-radius:10px; }
-.nc-bookmark-current>div { min-width:0; display:grid; gap:4px; }
+.nc-bookmark-current,.nc-bookmark-return { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:var(--surface-soft); border-radius:10px; }
+.nc-bookmark-current>div,.nc-bookmark-return>div { min-width:0; display:grid; gap:4px; }
+.nc-bookmark-return { border:1px solid var(--line); background:transparent; font-size:.85rem; }
+.nc-bookmark-return b { overflow-wrap:anywhere; }
+.nc-bookmark-return small { color:var(--muted); }
+.nc-bookmark-return button { flex:none; }
 .nc-bookmark-current small,.nc-bookmark-destination small,.nc-bookmark-local { color:var(--muted); font-size:.78rem; }
 .nc-bookmark-current button { flex:none; display:flex; align-items:center; gap:6px; }
 .nc-bookmarks button:not(.icon-button) { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--surface); color:var(--ink); min-height:44px; }
@@ -33,10 +37,13 @@
 .nc-bookmark-empty { text-align:center; padding:28px 12px; color:var(--muted); }
 .nc-bookmark-empty h3 { color:var(--ink); font-size:1rem; }
 .nc-bookmark-empty p { font-size:.85rem; }
-.nc-bookmark-notice { position:absolute; z-index:36; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:10px 12px; max-width:calc(100% - 32px); width:max-content; border:1px solid var(--line); border-radius:12px; box-shadow:var(--comic-dialog-shadow); background:var(--surface); color:var(--ink); font-size:.85rem; }
-.nc-bookmark-notice>span { min-width:0; }
+.nc-reader .nc-bookmark-notice { position:absolute; z-index:36; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:10px 12px; max-width:calc(100% - 32px); width:max-content; border:1px solid var(--line); border-radius:12px; box-shadow:var(--comic-dialog-shadow); background:var(--surface); color:var(--ink); font-size:.85rem; }
+.nc-bookmark-notice .nc-notification-content { display:flex; align-items:center; gap:10px; }
+.nc-bookmark-notice .nc-notification-content>p { min-width:0; }
+.nc-bookmark-notice .nc-notification-actions { flex:none; }
 .nc-bookmark-notice button { flex:none; min-height:44px; color:var(--accent); font-weight:700; }
-.nc-bookmark-notice.inside { position:static; width:auto; max-width:none; transform:none; box-shadow:none; flex:none; }
+.nc-app .nc-bookmark-notice .nc-notification-close { margin:0; width:44px; min-width:44px; height:44px; min-height:44px; }
+.nc-reader .nc-bookmark-notice.inside { position:static; width:auto; max-width:none; transform:none; box-shadow:none; flex:none; }
 
 @media (max-width:700px), (max-width:1000px) and (max-height:500px) and (pointer:coarse), (max-width:1000px) and (max-height:500px) and (hover:none) {
   .nc-app .nc-reader .nc-bookmark-tools.desktop { display:none; }
