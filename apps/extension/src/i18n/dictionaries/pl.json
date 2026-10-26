@@ -1165,5 +1165,10 @@
   "还没有书签": "Brak zakładek",
   "阅读进度 {0}%": "Postęp czytania {0}%",
   "默认缩放": "Domyślne powiększenie",
-  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Stosowane tylko przy pierwszym otwarciu komiksu. Wcześniej otwarte komiksy zachowują własne powiększenie."
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Stosowane tylko przy pierwszym otwarciu komiksu. Wcześniej otwarte komiksy zachowują własne powiększenie.",
+  "翻页动画": "Animacja stron",
+  "仿真翻页": "Kartkowanie",
+  "左右滑动": "Przesuwanie",
+  "淡入淡出": "Przenikanie",
+  "无动画": "Brak"
 }

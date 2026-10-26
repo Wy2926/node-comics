@@ -10,7 +10,14 @@ vi.mock('@gullabs/flipbook-core',()=>({PageFlip:class{
  on(name:string,callback:Function){this.handlers.set(name,callback);}
  finish(){this.handlers.get('changeState')?.({data:{state:'read'}});}
 }}));
-import {pageTurn} from '../src/reader/page-turn';
+import {pageTurn,type PageTurnAnimation} from '../src/reader/page-turn';
+class NativeAnimation {
+ static all:NativeAnimation[]=[];
+ readonly completion=Promise.withResolvers<void>();
+ readonly finished=this.completion.promise;
+ cancel=vi.fn(()=>this.completion.reject(new DOMException('Canceled','AbortError')));
+ constructor(readonly keyframes:Keyframe[],readonly options:KeyframeAnimationOptions){NativeAnimation.all.push(this);}
+}
 class Element extends EventTarget{
  style:Record<string,string>={};dataset:Record<string,string>={};children:Element[]=[];parent?:Element;
  className='';inert=false;clientWidth=800;clientHeight=600;scrollLeft=0;scrollTop=30;
@@ -20,10 +27,11 @@ class Element extends EventTarget{
  replaceChildren(...children:Element[]){for(const child of [...this.children])child.remove();this.append(...children);}
  remove(){if(this.parent)this.parent.children=this.parent.children.filter(child=>child!==this);this.parent=undefined;}
  getBoundingClientRect(){return {left:10,top:20,right:810,bottom:620};}
+ animate(keyframes:Keyframe[],options:KeyframeAnimationOptions){return new NativeAnimation(keyframes,options);}
 }
 let frames:Map<number,FrameRequestCallback>,id:number;
 beforeEach(()=>{
- vi.useFakeTimers();frames=new Map();id=0;mocks.fail=mocks.refuse=false;mocks.instances=[];
+ vi.useFakeTimers();frames=new Map();id=0;mocks.fail=mocks.refuse=false;mocks.instances=[];NativeAnimation.all=[];
  vi.stubGlobal('document',{createElement:()=>new Element()});
  vi.stubGlobal('getComputedStyle',()=>({getPropertyValue:()=> '#f5f5f5'}));
  vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{frames.set(++id,callback);return id;});
@@ -31,13 +39,55 @@ beforeEach(()=>{
  mocks.capture.mockReset().mockImplementation((_v,_s,columns)=>({leaves:Array.from({length:columns},()=>{const leaf=new Element();leaf.append(new Element());return leaf;}),dispose:vi.fn()}));
 });
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
-function fixture(columns=1,sign=-1){
+function fixture(columns=1,sign=-1,animation:PageTurnAnimation='curl'){
  const viewport=new Element(),surface=Object.assign(new Element(),{querySelectorAll:()=>Array.from({length:columns},()=>new Element())});
  if(columns===2)viewport.dataset.layout='double';
- const turn=pageTurn(viewport as unknown as HTMLDivElement,surface as unknown as HTMLDivElement,sign);
+ const turn=pageTurn(viewport as unknown as HTMLDivElement,surface as unknown as HTMLDivElement,sign,animation);
  return {viewport,surface,turn,engine:mocks.instances.at(-1)};
 }
 function frame(){const callbacks=[...frames.values()];frames.clear();for(const callback of callbacks)callback(20);}
+describe('shared animation selection and flat transitions',()=>{
+ it('creates no engine, snapshots or overlay when animation is disabled',()=>{
+  const f=fixture(1,-1,'none');expect(f.turn).toBeUndefined();expect(f.viewport.children).toHaveLength(0);
+  expect(mocks.instances).toHaveLength(0);expect(mocks.capture).not.toHaveBeenCalled();
+ });
+ it.each([-1,1])('slides both faces in physical direction %s and coalesces pointer moves',sign=>{
+  const f=fixture(2,sign,'slide'),[next,old]=f.viewport.children[0].children;
+  f.turn!.drag({x:400,y:300},{x:400+sign*20,y:310});f.turn!.drag({x:400,y:300},{x:400+sign*160,y:320});
+  expect(frames.size).toBe(1);frame();
+  expect(old.style.transform).toBe(`translate3d(${sign*160}px,0,0)`);
+  expect(next.style.transform).toBe(`translate3d(${-sign*640}px,0,0)`);
+  expect(f.turn!.canCommit()).toBe(true);expect(mocks.capture).toHaveBeenCalledOnce();expect(mocks.instances).toHaveLength(0);
+  f.turn!.dispose();expect(f.viewport.children).toHaveLength(0);expect(frames.size).toBe(0);
+ });
+ it.each(['slide','fade'] as const)('reuses the prepared destination and releases both %s faces on completion',async kind=>{
+  const f=fixture(1,-1,kind),preview=new Element() as unknown as HTMLDivElement,done=vi.fn(()=>f.turn!.dispose());
+  f.turn!.preview(preview);f.turn!.preview(preview);expect(mocks.capture).toHaveBeenCalledTimes(2);
+  f.turn!.drag({x:400,y:300},{x:200,y:300});f.turn!.play(done);
+  expect(mocks.capture).toHaveBeenCalledTimes(2);expect(NativeAnimation.all).toHaveLength(2);
+  const [old,next]=NativeAnimation.all;
+  expect(old.keyframes).toEqual(kind==='fade'?[{opacity:'0.75'},{opacity:'0'}]:[{transform:'translate3d(-200px,0,0)'},{transform:'translate3d(-800px,0,0)'}]);
+  expect(next.keyframes.at(-1)).toEqual(kind==='fade'?{opacity:'1'}:{transform:'translate3d(0px,0,0)'});
+  for(const animation of NativeAnimation.all)animation.completion.resolve();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(done).toHaveBeenCalledOnce();expect(f.viewport.children).toHaveLength(0);expect(vi.getTimerCount()).toBe(0);
+  for(const result of mocks.capture.mock.results)expect(result.value.dispose).toHaveBeenCalledOnce();
+ });
+ it('returns a short fade without acquiring a destination and ignores late animation completion after cancellation',async()=>{
+  const f=fixture(1,-1,'fade'),done=vi.fn();f.turn!.drag({x:400,y:300},{x:370,y:300});
+  expect(f.turn!.canCommit()).toBe(false);f.turn!.revert(done);expect(mocks.capture).toHaveBeenCalledOnce();
+  f.turn!.dispose();for(const animation of NativeAnimation.all)animation.completion.resolve();
+  await Promise.resolve();await Promise.resolve();vi.runAllTimers();
+  expect(done).not.toHaveBeenCalled();expect(f.viewport.children).toHaveLength(0);
+ });
+ it('cleans up stalled native animation and handles partially unavailable animation APIs',async()=>{
+  const f=fixture(1,-1,'slide'),done=vi.fn(()=>f.turn!.dispose());f.turn!.play(done);
+  vi.advanceTimersByTime(360);expect(done).toHaveBeenCalledOnce();expect(f.viewport.children).toHaveLength(0);
+  const g=fixture(1,1,'fade'),fallback=vi.fn(()=>g.turn!.dispose());g.viewport.children[0].children[0].animate=()=>{throw Error('Unavailable');};
+  g.turn!.play(fallback);expect(fallback).toHaveBeenCalledOnce();expect(g.viewport.children).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(0);expect(vi.getTimerCount()).toBe(0);
+ });
+});
 describe('bounded library page curl',()=>{
  it.each([-1,1])('uses one clipped landscape leaf for single-page sign %s without canvas-cloning portrait mode',sign=>{
   const f=fixture(1,sign),host=f.viewport.children[0],book=host.children[0];

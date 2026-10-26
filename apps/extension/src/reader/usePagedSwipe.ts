@@ -1,5 +1,5 @@
 import {useLayoutEffect, useRef, type RefObject} from 'react';
-import {pageTurn} from './page-turn';
+import {pageTurn,type PageTurnAnimation} from './page-turn';
 import {READER_INTERACTIVE} from './reader-input';
 
 type Turn = -1 | 1;
@@ -12,6 +12,7 @@ type Options = {
  enabled:boolean;
  blocked:boolean;
  direction:'ltr'|'rtl';
+ animation:PageTurnAnimation;
  // Navigation commits may precede the destination manifest or images.
  identity:string;
  // Display configuration only; page/chapter identity belongs to navigation.
@@ -23,7 +24,7 @@ type Options = {
 };
 type Controls = {turn:(delta:Turn)=>false|void;cancel:()=>void;sync:()=>void};
 
-/** Reader input arbitration; all page-curl rendering belongs to the library adapter. */
+/** Reader input arbitration; the chosen renderer owns visual motion and its disposable resources. */
 export function usePagedSwipe(options:Options){
  const latest=useRef(options);latest.current=options;
  const controls=useRef<Controls|null>(null);
@@ -34,12 +35,12 @@ export function usePagedSwipe(options:Options){
   let phase:Phase|undefined,timer:ReturnType<typeof setTimeout>|undefined;
   let snapshot:ReturnType<typeof pageTurn>|undefined;
   let generation=0,identity=latest.current.identity,resetKey=latest.current.resetKey;
-  let blocked=latest.current.blocked,direction=latest.current.direction;
+  let blocked=latest.current.blocked,direction=latest.current.direction,animation=latest.current.animation;
   let size=[viewport.clientWidth,viewport.clientHeight];
   let pending=false;
   let gesture:{id:number;x:number;y:number;lastX:number;lastTime:number;velocity:number;dragging:boolean;sign?:number}|undefined;
   const touches=new Set<number>();
-  const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
+  const reduced=()=>latest.current.animation==='none'||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
   const setPhase=(next:Phase|undefined)=>{
    const active=!!phase;phase=next;
    if(next)viewport.dataset.swipePhase=next;else delete viewport.dataset.swipePhase;
@@ -69,7 +70,7 @@ export function usePagedSwipe(options:Options){
   };
   const navigate=(delta:Turn,sign:number)=>{
    pending=true;setPhase('entering');
-   if(!reduced()&&!snapshot)snapshot=pageTurn(viewport,surface,sign);
+   if(!reduced()&&!snapshot)snapshot=pageTurn(viewport,surface,sign,latest.current.animation);
    if(snapshot)surface.style.visibility='hidden';
    // Guard only a navigation that never commits. Image loading never holds navigation.
    timer=setTimeout(()=>reset(),1000);
@@ -106,7 +107,7 @@ export function usePagedSwipe(options:Options){
    const x=event.clientX-drag.x,sign=x<0?-1:1;
    if(Math.abs(x)>=10&&drag.sign!==sign){
     snapshot?.dispose();snapshot=undefined;surface.style.removeProperty('visibility');drag.sign=sign;
-    if(!reduced()&&latest.current.canTurn(deltaFor(x)))snapshot=pageTurn(viewport,surface,sign);
+    if(!reduced()&&latest.current.canTurn(deltaFor(x)))snapshot=pageTurn(viewport,surface,sign,latest.current.animation);
     latest.current.onPreviewChange?.(snapshot?deltaFor(x):undefined);
    }
    snapshot?.drag({x:drag.x,y:drag.y},{x:event.clientX,y:event.clientY});
@@ -170,14 +171,14 @@ export function usePagedSwipe(options:Options){
     const current=latest.current;
     snapshot?.position();
     if(latest.current.preview)snapshot?.preview(latest.current.preview.current);
-    if(resetKey!==current.resetKey||blocked!==current.blocked||direction!==current.direction)reset();
+    if(resetKey!==current.resetKey||blocked!==current.blocked||direction!==current.direction||animation!==current.animation)reset();
     else if(identity!==current.identity){
      if(pending)enter();
      else if(phase==='dragging')reset();
      // Once committed, manifest/image updates refresh the incoming surface.
      // Direct navigation cancels explicitly; data readiness is not a new turn.
     }
-    identity=current.identity;resetKey=current.resetKey;blocked=current.blocked;direction=current.direction;
+    identity=current.identity;resetKey=current.resetKey;blocked=current.blocked;direction=current.direction;animation=current.animation;
    },
   };
   controls.current=control;

@@ -1165,5 +1165,10 @@
   "还没有书签": "Noch keine Lesezeichen",
   "阅读进度 {0}%": "Lesefortschritt {0}%",
   "默认缩放": "Standardzoom",
-  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Gilt nur beim ersten Öffnen eines Comics. Bereits geöffnete Comics behalten ihren Zoom."
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Gilt nur beim ersten Öffnen eines Comics. Bereits geöffnete Comics behalten ihren Zoom.",
+  "翻页动画": "Seitenanimation",
+  "仿真翻页": "Umblättern",
+  "左右滑动": "Schieben",
+  "淡入淡出": "Überblenden",
+  "无动画": "Keine"
 }

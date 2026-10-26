@@ -45,7 +45,7 @@ let documentEvents:Events&{hidden:boolean};
 let reduced=false,selection='';
 function fixture(extra:Partial<Options>={}){
  const viewport=new Surface(),surface=new Surface();
- const options:Options={viewport:{current:viewport as unknown as HTMLDivElement},surface:{current:surface as unknown as HTMLDivElement},enabled:true,blocked:false,direction:'ltr',identity:'page-1',resetKey:'single',canTurn:vi.fn(()=>true),onTurn:vi.fn(),onSettled:vi.fn(),onActivityChange:vi.fn(),...extra};
+ const options:Options={viewport:{current:viewport as unknown as HTMLDivElement},surface:{current:surface as unknown as HTMLDivElement},enabled:true,blocked:false,direction:'ltr',animation:'curl',identity:'page-1',resetKey:'single',canTurn:vi.fn(()=>true),onTurn:vi.fn(),onSettled:vi.fn(),onActivityChange:vi.fn(),...extra};
  let controls:ReturnType<typeof usePagedSwipe>;
  const render=(changes:Partial<Options>={})=>{
   Object.assign(options,changes);hooks.cursor=0;hooks.effectCursor=0;hooks.pending=[];
@@ -72,6 +72,20 @@ afterEach(()=>{
 });
 
 describe('library page-turn input and reading lifecycle',()=>{
+ it.each(['slide','fade'] as const)('uses the same gesture/navigation lifecycle for %s',animation=>{
+  const f=fixture({animation});f.controls.turn(1);
+  expect(snapshots.create).toHaveBeenCalledExactlyOnceWith(f.viewport,f.surface,-1,animation);
+  f.render({identity:'page-2'});f.finish();expect(f.options.onSettled).toHaveBeenCalledOnce();
+ });
+ it('keeps commands and swipes functional with no animation, snapshots or preview reads',()=>{
+  const preview=vi.fn(),f=fixture({animation:'none',onPreviewChange:preview});
+  f.controls.turn(1);f.render({identity:'page-2'});
+  f.pointer('pointerdown',700);f.pointer('pointermove',200,100,{timeStamp:1000});f.pointer('pointerup',200,100,{timeStamp:1500});
+  f.render({identity:'page-3'});
+  expect(f.options.onTurn).toHaveBeenCalledTimes(2);expect(f.options.onSettled).toHaveBeenCalledTimes(2);
+  expect(snapshots.create).not.toHaveBeenCalled();expect(preview.mock.calls.every(([value])=>value===undefined)).toBe(true);
+  expect(f.surface.style.visibility).toBe('');expect(f.viewport.dataset.swipePhase).toBeUndefined();
+ });
  it('navigates immediately, then plays the library after identity commits without waiting for images',()=>{
   const f=fixture();f.controls.turn(1);
   expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);expect(f.snapshot.play).not.toHaveBeenCalled();
@@ -103,11 +117,11 @@ describe('library page-turn input and reading lifecycle',()=>{
  });
  it.each(['ltr','rtl'] as const)('maps command and swipe direction to physical paper movement for %s',direction=>{
   const f=fixture({direction}),sign=direction==='ltr'?-1:1;
-  f.controls.turn(1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,sign);
-  f.render({identity:'page-2'});f.finish();f.controls.turn(-1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,-sign);
+  f.controls.turn(1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,sign,'curl');
+  f.render({identity:'page-2'});f.finish();f.controls.turn(-1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,-sign,'curl');
   f.render({identity:'page-1'});f.finish();f.pointer('pointerdown',500);f.pointer('pointermove',500+sign*200,105,{timeStamp:200});
   expect(f.surface.style.transform).toBe('');expect(f.viewport.captures.has(1)).toBe(true);
-  f.pointer('pointerup',500+sign*200,105,{timeStamp:210});expect(f.options.onTurn).toHaveBeenLastCalledWith(1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,sign);
+  f.pointer('pointerup',500+sign*200,105,{timeStamp:210});expect(f.options.onTurn).toHaveBeenLastCalledWith(1);expect(snapshots.create).toHaveBeenLastCalledWith(f.viewport,f.surface,sign,'curl');
  });
  it('accepts a new swipe during curl without stealing an interactive press',()=>{
   const f=fixture();f.controls.turn(1);f.render({identity:'page-2'});const old=f.snapshot;
@@ -212,9 +226,9 @@ describe('library page-turn input and reading lifecycle',()=>{
   if(reason==='second-finger')f.pointer('pointerdown',220,100,{pointerId:2,pointerType:'touch',isPrimary:false});if(reason==='escape')browser.emit('keydown',{key:'Escape'});if(reason==='blur')browser.emit('blur');if(reason==='hidden'){documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
   f.pointer('pointerup',200,100,{timeStamp:210});vi.runAllTimers();expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
  });
- it.each(['resetKey','direction','blocked','enabled','resize','cancel','unmount','blur','hidden'] as const)('disposes animation resources on %s and ignores a late completion',reason=>{
+ it.each(['resetKey','direction','animation','blocked','enabled','resize','cancel','unmount','blur','hidden'] as const)('disposes animation resources on %s and ignores a late completion',reason=>{
   const f=fixture();f.controls.turn(1);f.render({identity:'page-2'});const old=f.snapshot;
-  if(reason==='resetKey')f.render({resetKey:'double'});if(reason==='direction')f.render({direction:'rtl'});if(reason==='blocked')f.render({blocked:true});if(reason==='enabled')f.render({enabled:false});
+  if(reason==='resetKey')f.render({resetKey:'double'});if(reason==='direction')f.render({direction:'rtl'});if(reason==='animation')f.render({animation:'none'});if(reason==='blocked')f.render({blocked:true});if(reason==='enabled')f.render({enabled:false});
   if(reason==='resize'){f.viewport.clientWidth=600;browser.emit('resize');}if(reason==='cancel')f.controls.cancel();if(reason==='unmount'){for(const effect of hooks.effects)effect.cleanup?.();hooks.effects=[];}if(reason==='blur')browser.emit('blur');if(reason==='hidden'){documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
   old.finish();vi.runAllTimers();expect(old.dispose).toHaveBeenCalledOnce();expect(f.options.onSettled).not.toHaveBeenCalled();expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.surface.style.visibility).toBe('');
  });

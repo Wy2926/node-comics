@@ -34,7 +34,7 @@ export function ReaderTranslationSettings({settings, setSettings, caps, channelL
 }
 
 /** Format-specific sizing and actions are slots, not a second settings implementation. */
-export function ReaderSettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, children, immersive, onImmersive, onFullscreen,
+export function ReaderSettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, animation, children, immersive, onImmersive, onFullscreen,
   onShortcuts, onReload, busy, extraActions, allowDouble = false}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
@@ -43,6 +43,7 @@ export function ReaderSettings({settings, setSettings, layout, direction, onLayo
   onLayout(layout: Settings['layout'] | undefined): void;
   onDirection(direction: Settings['direction']): void;
   sizing: ReactNode;
+  animation?: ReactNode;
   children?: ReactNode;
   immersive: boolean;
   onImmersive(): void;
@@ -55,6 +56,7 @@ export function ReaderSettings({settings, setSettings, layout, direction, onLayo
 }) {
   return <>
     <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing} allowDouble={allowDouble}/>
+    {animation}
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>
     </div>

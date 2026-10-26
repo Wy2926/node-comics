@@ -1,6 +1,6 @@
 import {retainReaderImageURL} from './image-urls';
 
-/** Inert paper faces. They borrow displayed URLs; they never acquire or decode a source. */
+/** Inert visual faces. They borrow displayed URLs; they never acquire or decode a source. */
 export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,columns:1|2,frame={left:0,top:0,width:viewport.clientWidth,height:viewport.clientHeight}){
  const bounds=viewport.getBoundingClientRect(),rect=surface.getBoundingClientRect();
  const width=frame.width/columns;
@@ -9,7 +9,7 @@ export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,colu
  const pageBounds=[...surface.querySelectorAll<HTMLElement>('.nc-manga-page')].map(page=>page.getBoundingClientRect());
  const leaves=Array.from({length:columns},(_,column)=>{
   const leaf=document.createElement('div'),pixels=surface.cloneNode(true) as HTMLDivElement;
-  leaf.className='nc-flip-leaf';leaf.setAttribute('aria-hidden','true');leaf.inert=true;
+  leaf.className='nc-page-turn-face';leaf.setAttribute('aria-hidden','true');leaf.inert=true;
   Object.assign(pixels.style,{position:'absolute',left:`${rect.left-bounds.left-viewport.clientLeft-frame.left-column*width}px`,top:`${rect.top-bounds.top-viewport.clientTop-frame.top}px`,
    width:`${surface.offsetWidth}px`,height:`${surface.offsetHeight}px`,minWidth:'0',minHeight:'0',boxSizing:'border-box',transform:'none',visibility:'visible',willChange:'auto'});
   pixels.className='nc-reading-snapshot';

@@ -1165,5 +1165,10 @@
   "还没有书签": "Ainda não há marcadores",
   "阅读进度 {0}%": "Progresso de leitura {0}%",
   "默认缩放": "Zoom padrão",
-  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Usado apenas ao abrir um quadrinho pela primeira vez. Quadrinhos já abertos mantêm seu próprio zoom."
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Usado apenas ao abrir um quadrinho pela primeira vez. Quadrinhos já abertos mantêm seu próprio zoom.",
+  "翻页动画": "Animação de página",
+  "仿真翻页": "Virar folha",
+  "左右滑动": "Deslizar",
+  "淡入淡出": "Esmaecer",
+  "无动画": "Nenhuma"
 }

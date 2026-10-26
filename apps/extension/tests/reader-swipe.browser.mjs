@@ -86,6 +86,11 @@ beforeEach(async () => {
           pages: [...surface.querySelectorAll('.nc-manga-page')].map(element => element.dataset.pageId),
           oldX, oldImages: snapshot?.querySelectorAll('[data-flip-face=outgoing] img.nc-page-image').length || 0,
           oldVisible: visible(snapshot), currentVisible: visible(surface), ready,
+          animation: snapshot?.dataset.turnAnimation || (snapshot ? 'curl' : null),
+          outgoingX: offset(snapshot?.querySelector('[data-flip-face=outgoing]')),
+          incomingX: offset(snapshot?.querySelector('[data-flip-face=incoming]')),
+          outgoingOpacity: snapshot && Number(getComputedStyle(snapshot.querySelector('[data-flip-face=outgoing]')).opacity),
+          incomingOpacity: snapshot && Number(getComputedStyle(snapshot.querySelector('[data-flip-face=incoming]')).opacity),
           fold: [...snapshot?.querySelectorAll('.stf__item') || []].map(leaf => `${getComputedStyle(leaf).transform}:${getComputedStyle(leaf).clipPath}`).join('|'),
           turnStatus: viewport.querySelectorAll('.nc-page-turn-status').length,
           pageDOM: surface.querySelectorAll('[data-page-id]').length, width: viewport.clientWidth,
@@ -186,6 +191,12 @@ async function direction(value) {
   await settings().getByRole('group', {name: '阅读方向', exact: true}).getByRole('button', {name: value, exact: true}).click();
   await closeSettings();
 }
+async function animation(value) {
+  await openSettings();
+  const choice = settings().getByRole('group', {name: '翻页动画', exact: true}).getByRole('button', {name: value, exact: true});
+  await choice.click(); assert.equal(await choice.getAttribute('aria-pressed'), 'true');
+  await closeSettings();
+}
 async function jump(number) {
   await page.keyboard.press('Escape');
   await setReaderProgress(pageNumber(), String(number));
@@ -245,6 +256,21 @@ async function assertNoLateNavigation(number, visible, imageCount = visible.leng
   await page.waitForTimeout(400);
   await shown(number, visible, imageCount);
 }
+async function assertFlatAnimation(kind, sign) {
+  const frames = await trace(), motion = frames.filter(frame => frame.phase === 'entering');
+  assert(motion.length >= 3, 'A real transition spans several browser frames');
+  assert(motion.every(frame => frame.animation === kind && !frame.fold), 'Only the selected renderer is active');
+  const values = motion.map(frame => kind === 'slide' ? frame.outgoingX : frame.outgoingOpacity);
+  assert(new Set(values).size >= 3, 'The selected visual property changes across frames');
+  if (kind === 'slide') assert(motion.some(frame => frame.outgoingX * sign > 10 && frame.incomingX * sign < -10), 'Both faces move in the physical navigation direction');
+  else assert(motion.some(frame => frame.outgoingOpacity > 0 && frame.outgoingOpacity < 1 && frame.incomingOpacity > 0 && frame.incomingOpacity < 1));
+  assert(frames.every(frame => Math.abs(frame.x) < .1 && frame.turnStatus === 0), 'The live surface and loading lifecycle remain independent of the visual effect');
+  assert(motion.every(frame => frame.oldVisible || frame.currentVisible), 'Every transition frame retains pixels or a page-local status');
+  const start = motion[0], end = frames.find(frame => frame.time > start.time && frame.phase === 'idle');
+  assert(end && end.time - start.time < 500, 'Native animation completes within the bounded transition deadline');
+  observations.push({kind, sign, durationMs: Number((end.time - start.time).toFixed(1)),
+    pages: Math.max(...frames.map(frame => frame.pageDOM)), images: Math.max(...frames.map(frame => frame.images)), urls: Math.max(...frames.map(frame => frame.urls))});
+}
 async function releaseRead(number, result = false) {
   await page.evaluate(({number, result}) => window.__readerFixtureReads.release(number, result), {number, result});
 }
@@ -270,6 +296,71 @@ async function assertSnapshot({imageCount, urls} = {}) {
   assert(value.images.every(image => image.ready), 'The outgoing image remains usable during the bounded animation');
   if (urls) for (const url of urls) assert(value.urlsActive.includes(url), 'Snapshot explicitly retains the old image URL until cleanup');
 }
+
+for (const [kind, label] of [['slide', '左右滑动'], ['fade', '淡入淡出']]) {
+  for (const mode of ['单页', '双页']) test(`${kind} ${mode}: gestures, buttons and keyboard share direction, cancellation and bounded resources`, async () => {
+    await reader(); await layout(mode); await animation(label);
+    await resetTrace(); await mouseDrag(-20); await shown(1, [1]);
+    assert((await trace()).some(frame => frame.phase === 'returning'), 'A short drag returns without selecting a page');
+    const center = await point(); await page.mouse.click(center.x, center.y);
+    await resetTrace(); await mouseDrag(-230, {release: false});
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-flip-face=incoming] img.nc-page-image')].some(image => image.complete && image.naturalWidth));
+    await assertSnapshot({imageCount: 1});
+    assert.equal(await oldLayer().getAttribute('data-turn-animation'), kind);
+    await page.screenshot({path: resolve(artifacts, `${kind}-${mode}-held.png`)});
+    await page.mouse.up(); await shown(2, mode === '双页' ? [2, 3] : [2]); await assertFlatAnimation(kind, -1);
+    assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+    assert((await trace()).every(frame => frame.urls <= (mode === '双页' ? 4 : 2)), 'No image collection beyond the outgoing and destination groups');
+    await direction('从右向左');
+    await resetTrace(); await mouseDrag(-230); await shown(1, [1]); await assertFlatAnimation(kind, -1);
+    await page.keyboard.press('Escape'); await resetTrace(); await page.getByRole('button', {name: '下一页', exact: true}).click();
+    await shown(2, mode === '双页' ? [2, 3] : [2]); await assertFlatAnimation(kind, 1);
+    await resetTrace(); await page.keyboard.press('ArrowRight'); await shown(1, [1]); await assertFlatAnimation(kind, -1);
+    await page.waitForFunction(() => window.__swipeUrls.active.size === 1);
+  });
+
+  test(`${kind} mobile: real touch gestures retain the selected effect in single and RTL double layouts`, async () => {
+    await page.setViewportSize({width: 390, height: 844}); await reader(); await animation(label);
+    await resetTrace(); await touchDrag(-140); await shown(2, [2]); await assertFlatAnimation(kind, -1);
+    await direction('从右向左'); await layout('双页'); await shown(2, [2, 3]);
+    await resetTrace(); await touchDrag(140); await shown(4, [4]); await assertFlatAnimation(kind, 1);
+    await page.screenshot({path: resolve(artifacts, `${kind}-mobile-settled.png`)});
+  });
+
+  test(`${kind} slow and failed images never block navigation or leave animation URLs after close`, async () => {
+    await reader({controlled: true, holdPages: [2], failure: true}); await animation(label);
+    await resetTrace(); await page.getByRole('button', {name: '下一页', exact: true}).click(); await selected(2, [2]); await assertFlatAnimation(kind, -1);
+    assert.equal(await surface().locator('.nc-image-placeholder').count(), 1);
+    await mouseDrag(-230); await shown(3, [3]);
+    await jump(6); await shown(6, [6], 0);
+    await resetTrace(); await mouseDrag(-230); await shown(7, [7]); await assertFlatAnimation(kind, -1);
+    await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click(); await releaseRead(2);
+    await page.waitForFunction(() => window.__swipeUrls.active.size === 0);
+    assert.equal(await oldLayer().count(), 0);
+    await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(7, [7]);
+    await openSettings(); assert.equal(await settings().getByRole('button', {name: label, exact: true}).getAttribute('aria-pressed'), 'true');
+  });
+
+  test(`${kind} respects reduced motion without allocating a transition or waiting for incoming images`, async () => {
+    await page.emulateMedia({reducedMotion: 'reduce'}); await reader({controlled: true, holdPages: [2]}); await animation(label);
+    await resetTrace(); await page.getByRole('button', {name: '下一页', exact: true}).click(); await selected(2, [2]);
+    assert.equal(await oldLayer().count(), 0); assert((await trace()).every(frame => frame.phase === 'idle'));
+    await resetTrace(); await mouseDrag(-230); await shown(3, [3]);
+    assert((await trace()).every(frame => frame.animation === null && frame.phase !== 'entering'));
+  });
+}
+
+test('none preserves horizontal page gestures and immediate loading-page navigation with no visual snapshots', async () => {
+  await reader({controlled: true, holdPages: [2]}); await animation('无动画');
+  await resetTrace(); await mouseDrag(-230, {release: false});
+  assert.equal(await oldLayer().count(), 0); assert.equal(await pageNumber().inputValue(), '1');
+  await page.mouse.up(); await selected(2, [2]); assert.equal(await surface().locator('.nc-image-placeholder').count(), 1);
+  assert((await trace()).every(frame => frame.animation === null && frame.phase !== 'entering'));
+  await mouseDrag(-230); await shown(3, [3]);
+  await layout('双页'); await shown(3, [2, 3], 1); await direction('从右向左');
+  await resetTrace(); await mouseDrag(230); await shown(4, [4]);
+  assert((await trace()).every(frame => frame.animation === null && frame.phase !== 'entering'));
+});
 
 test('mouse single-page LTR and RTL swipes animate in reading order and preserve one-page resource bounds', async () => {
   await reader();

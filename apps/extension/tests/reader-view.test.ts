@@ -3,6 +3,18 @@ import {initialReadingView,readingViewKey,readReadingView,readStoredReadingView,
 
 afterEach(()=>vi.unstubAllGlobals());
 describe('comic viewing choices',()=>{
+  it.each(['curl','slide','fade','none'] as const)('restores the %s animation only for its own comic',animation=>{
+    const saved=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
+    saveReadingView('comic-a',{...readReadingView('comic-a'),animation,zoom:140,layout:'double'});
+    expect(readReadingView('comic-a')).toMatchObject({animation,zoom:140,layout:'double'});
+    expect(readReadingView('comic-b').animation??'curl').toBe('curl');
+  });
+  it.each([undefined,null,'unknown',0,{},[]])('keeps legacy or invalid animation %j on the existing page curl',animation=>{
+    vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({animation,zoom:140,layout:'single',direction:'rtl'})});
+    const view=readReadingView('comic');expect(view.animation??'curl').toBe('curl');
+    expect(view).toMatchObject({zoom:140,layout:'single',direction:'rtl'});
+  });
   it('distinguishes an absent comic view from an existing legacy or corrupt record',()=>{
     vi.stubGlobal('localStorage',{getItem:()=>null});expect(readStoredReadingView('comic')).toBeUndefined();
     for(const raw of ['null','broken','{}',JSON.stringify({mode:'classic',preference:'translation',zoom:140})]){

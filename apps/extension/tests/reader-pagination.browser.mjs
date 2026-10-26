@@ -698,6 +698,30 @@ for (const [label, value, inheritedLabel, inherited] of [
   assert.equal(await viewport().locator('.nc-page-stack').getAttribute('data-direction'), value);
 });
 
+test('page animation defaults to curl and persists per comic across reload, chapters and layout changes', async () => {
+  await reader({layoutSettings: true, chapters: true}); await openSettings();
+  const choices = () => settings().getByRole('group', {name: '翻页动画', exact: true});
+  assert.deepEqual(await choices().getByRole('button').allTextContents(), ['仿真翻页', '左右滑动', '淡入淡出', '无动画']);
+  assert.equal(await choices().getByRole('button', {name: '仿真翻页', exact: true}).getAttribute('aria-pressed'), 'true');
+  assert.equal((await comicView('A')).animation, undefined, 'Existing records need no animation migration');
+  for (const [value, label] of [['slide', '左右滑动'], ['none', '无动画'], ['fade', '淡入淡出']]) {
+    await choices().getByRole('button', {name: label, exact: true}).click();
+    assert.equal((await comicView('A')).animation, value);
+  }
+  await closeSettings(); await layout('连续'); await openSettings();
+  assert.equal(await choices().count(), 0, 'Continuous reading has no unrelated page-turn control');
+  await closeSettings(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [2, 3]);
+  await page.getByRole('button', {name: '切下一章', exact: true}).click(); await shown(1, [1], 1, 1);
+  await openSettings(); assert.equal(await choices().getByRole('button', {name: '淡入淡出', exact: true}).getAttribute('aria-pressed'), 'true');
+  await closeSettings(); await switchComic('B'); await openSettings();
+  assert.equal(await choices().getByRole('button', {name: '仿真翻页', exact: true}).getAttribute('aria-pressed'), 'true');
+  await closeSettings(); await switchComic('A');
+  await page.reload(); await viewport().waitFor(); await openSettings();
+  assert.equal(await choices().getByRole('button', {name: '淡入淡出', exact: true}).getAttribute('aria-pressed'), 'true');
+});
+
 test('the immersive preference survives reopening and comic changes without saving temporary toolbar visibility', async () => {
   await reader({layoutSettings: true}); await openSettings();
   const immersive = () => settings().getByRole('switch', {name: '沉浸阅读', exact: true});
@@ -730,7 +754,7 @@ async function readerLocale(locale, scale = 1) {
     await (await import('/src/i18n/load.ts')).setUiLanguage(locale);
     document.documentElement.style.setProperty('--text-scale', String(scale));
     const {msg} = await import('/src/i18n/runtime.ts');
-    return ['阅读设置', '阅读布局', '默认', '连续', '单页', '双页', '打开来源'].map(key => msg(key));
+    return ['阅读设置', '阅读布局', '默认', '连续', '单页', '双页', '打开来源', '翻页动画'].map(key => msg(key));
   }, {locale, scale});
   await settle();
   await page.evaluate(() => document.fonts.ready);
@@ -779,7 +803,7 @@ for (const width of [320, 390, 1280]) test(`layout and action cards fit all 16 l
   await page.setViewportSize({width, height: 844}); await reader({layoutSettings: true}); await openSettings();
   const locales = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'es', 'pt-BR', 'de', 'it', 'ru', 'pl', 'uk', 'tr', 'vi', 'id'];
   for (const scale of [1, 1.25]) for (const locale of locales) {
-    const [title, layoutLabel, defaultLabel, continuousLabel, singleLabel, doubleLabel, sourceLabel] = await readerLocale(locale, scale);
+    const [title, layoutLabel, defaultLabel, continuousLabel, singleLabel, doubleLabel, sourceLabel, animationLabel] = await readerLocale(locale, scale);
     const dialog = page.getByRole('dialog', {name: title, exact: true});
     const choices = dialog.getByRole('group', {name: layoutLabel, exact: true}), actions = dialog.locator('.nc-reader-more .nc-reader-actions');
     assert.deepEqual(await choices.getByRole('button').allTextContents(), [defaultLabel, continuousLabel, singleLabel, doubleLabel]);
@@ -788,6 +812,9 @@ for (const width of [320, 390, 1280]) test(`layout and action cards fit all 16 l
     await settle();
     await assertCardGrid(choices, `${locale}/${scale} layouts`);
     if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) await page.screenshot({path: resolve(artifacts, `settings-layout-${locale}-${scale}.png`)});
+    const animation = dialog.getByRole('group', {name: animationLabel, exact: true});
+    await animation.scrollIntoViewIfNeeded(); await settle(); await assertCardGrid(animation, `${locale}/${scale} animation`);
+    if (width === 320 && ['zh-CN', 'de', 'fr'].includes(locale)) await page.screenshot({path: resolve(artifacts, `settings-animation-${locale}-${scale}.png`)});
     await dialog.locator('.nc-reader-primary-actions').scrollIntoViewIfNeeded();
     await assertCardGrid(dialog.locator('.nc-reader-primary-actions'), `${locale}/${scale} fullscreen`, 1, 1);
     await openMore(dialog); await actions.scrollIntoViewIfNeeded();

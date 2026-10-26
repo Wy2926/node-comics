@@ -1165,5 +1165,10 @@
   "还没有书签": "No bookmarks yet",
   "阅读进度 {0}%": "Reading progress {0}%",
   "默认缩放": "Default zoom",
-  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Used only when you first open a comic. Previously opened comics keep their own zoom."
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Used only when you first open a comic. Previously opened comics keep their own zoom.",
+  "翻页动画": "Page turn animation",
+  "仿真翻页": "Page curl",
+  "左右滑动": "Slide",
+  "淡入淡出": "Fade",
+  "无动画": "None"
 }
