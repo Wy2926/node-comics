@@ -2,7 +2,7 @@ import {msg} from '../../i18n/runtime';
 import {Sha256} from '../../importers/hash';
 import {imageMimeFromBytes} from '../formats/identify';
 import HashWorker from './hash.worker?worker';
-import {needsNormalization} from './image-metadata';
+import {needsNormalization,probeImageMetadata} from './image-metadata';
 import {bitmapPng} from '../../../../../backend/shared/translation-images/png';
 import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
 export interface PageInput {name: string; blob: Blob; width?: number; height?: number}
@@ -37,14 +37,25 @@ export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
   const mime=imageMimeFromBytes(new Uint8Array(await item.blob.slice(0,12).arrayBuffer()));
   if(!mime)throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': item.name}));
   const input=item.blob.type===mime?item.blob:item.blob.slice(0,item.blob.size,mime);
+  const normalize=await needsNormalization(input);
+  const metadata=normalize?undefined:await probeImageMetadata(input);
+  signal?.throwIfAborted();
+  // Static bytes are already the reading asset. Decode pixels only where they
+  // are consumed (display/translation), not just to rediscover header dimensions.
+  if(metadata){
+    checkDimensions(metadata.width,metadata.height,item.name);
+    const imageSha256=await digestPage(input,signal);
+    return {blob:input,width:metadata.width,height:metadata.height,imageSha256};
+  }
   let bitmap: ImageBitmap;
   try { bitmap = await createImageBitmap(input,{imageOrientation:'from-image',colorSpaceConversion:'default'}); }
   catch { throw Error(msg('{0} 无法解码，请检查图片是否损坏。', {'0': item.name})); }
+  let blob = input;
+  const {width, height} = bitmap;
   try {
     signal?.throwIfAborted();
-    const {width, height} = bitmap; checkDimensions(width, height, item.name);
-    let blob = input;
-    if (await needsNormalization(blob)) {
+    checkDimensions(width, height, item.name);
+    if (normalize) {
       if(Math.max(width,height)>16383)blob=await bitmapPng(bitmap);
       else{
         const canvas = createImageCanvas(width, height);
@@ -52,9 +63,10 @@ export async function prepareComicPage(item: PageInput, signal?: AbortSignal) {
         finally { canvas.width = canvas.height = 1; }
       }
     }
-    const imageSha256 = await digestPage(blob, signal);
-    signal?.throwIfAborted(); return {blob, width, height, imageSha256};
   } finally { bitmap.close(); }
+  // Pixel work is complete; hashing must not keep a full decoded page alive.
+  const imageSha256 = await digestPage(blob, signal);
+  signal?.throwIfAborted(); return {blob, width, height, imageSha256};
 }
 function checkDimensions(width: number, height: number, name: string) {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || !Number.isSafeInteger(width * height))

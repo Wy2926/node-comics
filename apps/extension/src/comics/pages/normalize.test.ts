@@ -7,6 +7,9 @@ afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
 
 function workerPage(size=1024*1024){
   const bytes=new Uint8Array(size);bytes.set([137,80,78,71,13,10,26,10]);
+  // Dimension probing deliberately falls back to the stubbed decoder; do not
+  // turn padding into thousands of artificial container headers.
+  bytes.set([0,0,0,0,73,69,78,68,0,0,0,0],8);
   const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width:1024,height:1024,close}));
   vi.stubGlobal('Worker',class {});
   let sent!:()=>void;const started=new Promise<void>(resolve=>{sent=resolve;});
@@ -15,6 +18,16 @@ function workerPage(size=1024*1024){
   return {bytes,blob:new Blob([bytes],{type:'image/png'}),close,worker,started};
 }
 describe('materialized image normalization',()=>{
+  it.each([
+    ['image/png','iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAYAAACAcVaiAAAAFElEQVR4nGMUsYmqZoACJhiDBA4ASGUBLySXec0AAAAASUVORK5CYII='],
+    ['image/webp','UklGRh4AAABXRUJQVlA4TBEAAAAvAgABEAdQnlJUq3uBiOh/AAA='],
+  ])('keeps ordinary %s bytes and reads real header dimensions without allocating pixels',async(type,encoded)=>{
+    const bytes=Buffer.from(encoded,'base64'),blob=new Blob([bytes],{type});
+    const decode=vi.fn();vi.stubGlobal('createImageBitmap',decode);
+    const prepared=await prepareComicPage({name:'static',blob,width:999,height:999});
+    expect(prepared).toEqual({blob,width:3,height:5,imageSha256:createHash('sha256').update(bytes).digest('hex')});
+    expect(decode).not.toHaveBeenCalled();
+  });
   it('keeps source bytes above the former 32 MiB page ceiling',async()=>{
     const {blob,close,worker,started}=workerPage(41*1024*1024),pending=prepareComicPage({name:'large',blob});await started;
     worker.onmessage!({data:{sha256:'large-page-digest'}});
@@ -30,6 +43,7 @@ describe('materialized image normalization',()=>{
   it('uses the bundled worker for large page digests and releases both resources',async()=>{
     const {bytes,blob,close,worker,started}=workerPage(),digest=createHash('sha256').update(bytes).digest('hex');
     const pending=prepareComicPage({name:'large',blob});await started;
+    expect(close).toHaveBeenCalledOnce();
     expect(worker.postMessage).toHaveBeenCalledWith(blob);worker.onmessage!({data:{sha256:digest}});
     expect((await pending).imageSha256).toBe(digest);expect(worker.terminate).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
   });

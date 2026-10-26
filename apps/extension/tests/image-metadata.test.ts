@@ -1,5 +1,6 @@
 import {expect,it,vi} from 'vitest';
-import {probeImageMetadata} from '../src/comics/pages/image-metadata';
+import {probeImageMetadata,needsNormalization} from '../src/comics/pages/image-metadata';
+import {readFile} from 'node:fs/promises';
 
 // Pillow-generated 3 × 5 images: ordinary PNG/JPEG and all three WebP dimension headers.
 const fixtures = {
@@ -12,6 +13,34 @@ const fixtures = {
 const bytes = (name: keyof typeof fixtures) => Uint8Array.from(Buffer.from(fixtures[name], 'base64'));
 it.each(['png','jpeg','vp8','vp8l','vp8x'] as const)('reads actual %s image dimensions without decoding', async name => {
   expect(await probeImageMetadata(new Blob([bytes(name)]))).toEqual({mime: name === 'png' ? 'image/png' : name === 'jpeg' ? 'image/jpeg' : 'image/webp', width:3, height:5});
+});
+it.each(['png','jpeg','vp8','vp8l','vp8x'] as const)('recognizes ordinary %s without reading the whole file',async name=>{
+ const blob=new Blob([bytes(name)],{type:name==='png'?'image/png':name==='jpeg'?'image/jpeg':'image/webp'});
+ const whole=vi.spyOn(blob,'arrayBuffer').mockRejectedValue(Error('whole-file read'));
+ expect(await needsNormalization(blob)).toBe(false);expect(whole).not.toHaveBeenCalled();
+});
+it.each([
+ ['orientation-6.jpg','image/jpeg'],['srgb-icc.png','image/png'],
+ ['animated.png','image/png'],['animated.webp','image/webp'],['animated.gif','image/gif'],
+])('preserves required normalization for %s',async(name,type)=>{
+ const blob=new Blob([await readFile(new URL(`./fixtures/normalization/${name}`,import.meta.url))],{type});
+ expect(await needsNormalization(blob)).toBe(true);
+});
+it.each(['image/png','image/webp'])('skips a large %s pixel chunk while still finding metadata after it',async type=>{
+ const length=2*1024*1024,chunk=new Uint8Array(length+(type==='image/png'?12:8)),view=new DataView(chunk.buffer);
+ if(type==='image/png'){view.setUint32(0,length);chunk.set(new TextEncoder().encode('IDAT'),4);}
+ else{chunk.set(new TextEncoder().encode('VP8 '));view.setUint32(4,length,true);}
+ const header=type==='image/png'?bytes('png').subarray(0,33):bytes('vp8').subarray(0,12);
+ const tail=type==='image/png'?new Uint8Array([0,0,0,0,105,67,67,80,0,0,0,0]):new Uint8Array([69,88,73,70,0,0,0,0]);
+ const blob=new Blob([header,chunk,tail],{type}),whole=vi.spyOn(blob,'arrayBuffer').mockRejectedValue(Error('whole-file read')),slice=vi.spyOn(blob,'slice');
+ expect(await needsNormalization(blob)).toBe(true);expect(whole).not.toHaveBeenCalled();
+ expect(slice.mock.calls.reduce((total,[start,end])=>total+end!-start!,0)).toBeLessThanOrEqual(8192);
+});
+it('keeps reads bounded in memory without changing static bytes for many container headers',async()=>{
+ const chunk=new Uint8Array([0,0,0,0,116,69,88,116,0,0,0,0]);
+ const blob=new Blob([bytes('png').subarray(0,33),...Array.from({length:5000},()=>chunk)],{type:'image/png'});
+ const slice=vi.spyOn(blob,'slice');expect(await needsNormalization(blob)).toBe(false);
+ expect(slice.mock.calls.length).toBeLessThan(20);
 });
 it('skips long JPEG EXIF data with bounded slice reads and no whole-file allocation', async () => {
   const jpeg = bytes('jpeg'), segment = new Uint8Array(65537);

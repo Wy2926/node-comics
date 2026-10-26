@@ -53,35 +53,45 @@ export async function probeImageMetadata(blob: Blob): Promise<{mime: 'image/png'
 /** Metadata that can make sent bytes decode differently from the browser's static sRGB page. */
 export async function needsNormalization(blob: Blob): Promise<boolean> {
   if (blob.type === 'image/gif') return true;
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const view = new DataView(bytes.buffer);
-  const tag = (offset: number) => String.fromCharCode(...bytes.subarray(offset, offset + 4));
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type)) return false;
+  // Inspect container headers, skipping compressed pixels and metadata payloads.
+  // A small read-ahead avoids an asynchronous Blob read for every short JPEG marker.
+  let buffer = new Uint8Array(), start = 0;
+  const read = async (at: number, length: number) => {
+    if (at < start || at + length > start + buffer.length) {
+      start = at; buffer = new Uint8Array(await blob.slice(at, at + 4096).arrayBuffer());
+    }
+    return buffer.subarray(at - start, at - start + length);
+  };
+  const tag = (bytes: Uint8Array, offset = 0) => String.fromCharCode(...bytes.subarray(offset, offset + 4));
 
   if (blob.type === 'image/png') {
-    for (let at = 8; at + 12 <= bytes.length;) {
-      const length = view.getUint32(at);
-      const name = tag(at + 4);
+    for (let at = 8; at + 12 <= blob.size;) {
+      const bytes = await read(at, 8), length = new DataView(bytes.buffer, bytes.byteOffset).getUint32(0);
+      const name = tag(bytes, 4);
       if (['iCCP', 'gAMA', 'cHRM', 'eXIf', 'acTL'].includes(name)) return true;
-      if (name === 'IEND' || at + length + 12 > bytes.length) break;
+      if (name === 'IEND' || at + length + 12 > blob.size) break;
       at += length + 12;
     }
   } else if (blob.type === 'image/jpeg') {
-    for (let at = 2; at + 4 <= bytes.length;) {
-      if (bytes[at] !== 255) break;
-      const marker = bytes[at + 1];
+    for (let at = 2; at + 4 <= blob.size;) {
+      const bytes = await read(at, 4);
+      if (bytes[0] !== 255) break;
+      const marker = bytes[1];
       if (marker === 0xda || marker === 0xd9) break;
       if (marker === 0xe1 || marker === 0xe2) return true;
       if (marker === 255) { at++; continue; }
-      const length = view.getUint16(at + 2);
+      if (marker === 1 || marker >= 0xd0 && marker <= 0xd7) { at += 2; continue; }
+      const length = new DataView(bytes.buffer, bytes.byteOffset).getUint16(2);
       if (length < 2) break;
       at += length + 2;
     }
   } else if (blob.type === 'image/webp') {
-    for (let at = 12; at + 8 <= bytes.length;) {
-      const name = tag(at);
-      const length = view.getUint32(at + 4, true);
+    for (let at = 12; at + 8 <= blob.size;) {
+      const bytes = await read(at, 8), name = tag(bytes);
+      const length = new DataView(bytes.buffer, bytes.byteOffset).getUint32(4, true);
       if (['ICCP', 'EXIF', 'ANIM', 'ANMF'].includes(name)) return true;
-      if (at + length + 8 > bytes.length) break;
+      if (at + length + 8 > blob.size) break;
       at += 8 + length + (length & 1);
     }
   }
