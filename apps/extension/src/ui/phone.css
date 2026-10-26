@@ -77,8 +77,14 @@
     .nc-app .nc-discovery-poster-bottom { padding: 22px 6px 6px; gap: 2px; }
     .nc-app .nc-discovery-filter-row { gap: 8px; padding-top: 12px; }
 
-    /* Search keeps its inline scope and anchored filters on phones. */
+    /* Keep scope available without pushing results below the first phone viewport. */
     .nc-app .nc-search-composer { padding: 12px; }
+    .nc-app .nc-search-scope .nc-search-scope-toggle { display: inline-flex; margin-inline-start: auto; }
+    .nc-app .nc-search-scope-toggle>.nc-icon { transform: rotate(90deg); }
+    .nc-app .nc-search-scope-toggle[aria-expanded=true]>.nc-icon { transform: rotate(-90deg); }
+    .nc-app .nc-search-scope[data-expanded=false] .nc-search-selection-actions,
+    .nc-app .nc-search-scope[data-expanded=false] .nc-search-scope-body { display: none; }
+    .nc-app .nc-search-selection-actions { flex-basis: 100%; }
     .nc-app .nc-search-form, .nc-app .nc-search-fields { gap: 10px; }
     .nc-app .nc-search-submit-row { gap: 8px; }
     .nc-app .nc-search-submit-hint>p { display: none; }

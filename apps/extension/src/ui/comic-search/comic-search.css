@@ -24,6 +24,7 @@
 .nc-search-scope-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; }
 .nc-search-scope-heading h2 { margin:0; font-size:.875rem; }
 .nc-search-scope-heading>span,.nc-search-scope-summary>span { color:var(--muted); font-size:var(--text-caption); }
+.nc-app .nc-search-scope .nc-search-scope-toggle { display:none; }
 .nc-search-scope-trigger { white-space:nowrap; }
 .nc-search-scope-trigger b { min-width:18px; padding:0 4px; border-radius:var(--comic-badge-radius); background:var(--accent-soft); font-size:var(--text-caption); }
 .nc-search-scope-trigger[data-filtered] { background:var(--accent-soft); }
@@ -75,7 +76,7 @@
 .nc-search-site-option input { accent-color:var(--accent); margin:0; flex:none; }
 .nc-search-site-icon { position:relative; display:inline-grid; place-items:center; width:22px; height:22px; flex:none; color:var(--muted); border-radius:var(--comic-control-radius); overflow:hidden; }
 .nc-search-site-icon img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:var(--surface); }
-.nc-search-site-option b { font-size:.75rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nc-search-site-option b { min-width:0; font-size:.75rem; overflow-wrap:anywhere; }
 .nc-search-query { margin-top:16px; padding:16px 0 0; border-top:var(--comic-perforation); }
 .nc-search-query>div:first-child { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:10px; }
 .nc-search-query label { font-size:.8125rem; font-weight:750; }

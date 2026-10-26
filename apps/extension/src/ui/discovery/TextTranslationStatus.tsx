@@ -1,24 +1,13 @@
-import {useEffect, useState} from 'react';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
 import type {TextTranslationError} from '../../text-translation';
+import {useRetryClock} from '../useRetryClock';
 
 export function TextTranslationStatus({pending, error, translated, original, onOriginal, onRetry, onTranslate}: {
   pending?: boolean; error?: TextTranslationError; translated: boolean; original: boolean;
   onOriginal: () => void; onRetry: () => void; onTranslate?: () => void;
 }) {
-  const [clock, setClock] = useState(Date.now());
-  useEffect(() => {
-    if (!error?.retryAt) return;
-    const deadline = error.retryAt;
-    setClock(Date.now());
-    if (Date.now() >= deadline) return;
-    const timer = setInterval(() => {
-      setClock(Date.now());
-      if (Date.now() >= deadline) clearInterval(timer);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [error]);
+  const clock = useRetryClock(error?.retryAt);
   const wait = Math.max(0, Math.ceil(((error?.retryAt ?? 0) - clock) / 1000));
   return <div className="nc-discovery-text-status">
     {!pending && !error && !translated && onTranslate && <button type="button" className="nc-discovery-inline-action" onClick={onTranslate}><Icon name="translate" size={14}/><span>{msg('翻译')}</span></button>}

@@ -16,6 +16,7 @@ import {SearchSiteIcon} from './SearchSiteIcon';
 import {SearchScopeSettings} from './SearchScopeSettings';
 import {emptySiteFilters} from '../SiteFilterControls';
 import {useDialogViewport} from '../visual-viewport';
+import {useRetryClock} from '../useRetryClock';
 import './comic-search.css';
 
 export interface ComicSearchPanelProps {
@@ -52,7 +53,10 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const coverCache=useRef(new Map<string,string>()),titleId=useId(),queryId=useId(),sourceId=useId();
   const [scopeFilters,setScopeFilters]=useState<SiteFilters>(emptySiteFilters);
   const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
-  const [siteFilter,setSiteFilter]=useState(''),[clock,setClock]=useState(Date.now()),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
+  const [siteFilter,setSiteFilter]=useState(''),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
+  const filteredSite=snapshot.sites.find(state=>state.status!=='idle'&&state.site.key===siteFilter);
+  const titleDeadline=mode==='translate'||snapshot.titleError?snapshot.titleRetryAt:undefined;
+  const clock=useRetryClock(open?Math.max(titleDeadline??0,filteredSite?.error?.retryAt??0):0);
   const wasOpened=useRef(false),scrollPosition=useRef(0),sheet=presentation==='sheet';
   useDialogViewport(dialog,open&&sheet);
   const lastQuery=useRef(snapshot.query);
@@ -65,7 +69,6 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
     return()=>window.removeEventListener('storage',storageChanged);
   },[open,session]);
   useEffect(()=>{const retained=new Set(snapshot.results.map(hit=>searchResultCoverKey(hit.coverHit??hit)));for(const [key,url] of coverCache.current)if(!retained.has(key)){URL.revokeObjectURL(url);coverCache.current.delete(key);}},[snapshot.results]);
-  useEffect(()=>{if(!open)return;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);},[open]);
   useEffect(()=>()=>{session.dispose();coverCache.current.forEach(url=>URL.revokeObjectURL(url));coverCache.current.clear();},[session]);
   useLayoutEffect(()=>{
     if(!open){session.stop();return;}
@@ -83,7 +86,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   if(!open)return null;
 
   const scopeSites=snapshot.sites.filter(state=>matchesSiteFilters(state.site,scopeFilters));
-  const selected=scopeSites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle'),filteredSite=resultSites.find(state=>state.site.key===siteFilter);
+  const selected=scopeSites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle');
   const siteWait=waitSeconds(filteredSite?.error?.retryAt,clock),titleWait=waitSeconds(snapshot.titleRetryAt,clock);
   const siteBusy=filteredSite?.status==='running'||filteredSite?.status==='queued',siteRetry=filteredSite?.status==='error'||filteredSite?.status==='stopped';
   const returned=resultSites.filter(state=>state.status==='ready'||state.status==='empty').length,failed=resultSites.filter(state=>state.status==='error').length;

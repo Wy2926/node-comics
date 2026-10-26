@@ -67,7 +67,10 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         if(name==='搜索漫画'){
           const input=await page.getByRole('textbox',{name:'搜索名称',exact:true}).boundingBox(),submit=await page.getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
           assert(Math.abs(input.y-submit.y)<1,'Phone direct search action should sit beside the input');
-          assert.equal(await page.locator('.nc-search-site-options').isVisible(),true,'Phone search sites remain inline');
+          const scopeToggle=page.locator('.nc-search-scope-toggle');
+          assert.equal(await page.locator('.nc-search-site-options').isVisible(),false,'Phone scope starts collapsed so results stay close to the input');
+          await scopeToggle.click();
+          assert.equal(await page.locator('.nc-search-site-options').isVisible(),true,'Phone search scope expands inline');
           assert.equal(await page.locator('.nc-search-site-option').count(),10,'Collapsed scope shows ten sites');
           const scope=page.locator('.nc-search-scope-trigger');
           await scope.click();
@@ -78,7 +81,10 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
           const selected=await firstSite.isChecked();await firstSite.setChecked(!selected);
           await page.locator('.nc-search-scope-expand').click();await page.locator('.nc-search-scope-expand').click();
           assert.equal(await firstSite.isChecked(),!selected,'Collapsing scope must retain site selection');
+          await scopeToggle.click();await scopeToggle.click();
+          assert.equal(await firstSite.isChecked(),!selected,'Collapsing the phone scope must retain site selection');
           await firstSite.setChecked(selected);
+          await scopeToggle.click();
         }
         if(name==='发现'){
           const columns=await page.locator('.nc-discovery-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
