@@ -134,3 +134,5 @@ export async function acquirePage(request:PageRequest):Promise<PageLease>{
   const cancelled=new Promise<never>((_,reject)=>{rejectAbort=reject;request.signal?.addEventListener('abort',abort,{once:true});});
   try{const value=await Promise.race([chosen.promise,cancelled]);await Promise.race([value.validate(),cancelled]);request.signal?.throwIfAborted();return {blob:value.blob,identity:value.identity,release};}catch(error){release();throw error;}
 }
+/** Reprioritize an existing reader lease without acquiring another consumer or restarting its source. */
+export function promotePage(request:PageReference){pending.get(pageReference(request))?.promote(0);}

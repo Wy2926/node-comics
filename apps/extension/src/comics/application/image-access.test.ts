@@ -1,15 +1,20 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {pageReference,RENDER_PROFILE} from '../pages/identity';
-const mocks=vi.hoisted(()=>({acquire:vi.fn(),readResult:vi.fn(),memory:vi.fn(),cache:vi.fn(),source:vi.fn()}));
-vi.mock('../pages/service',()=>({acquirePage:mocks.acquire}));
+const mocks=vi.hoisted(()=>({acquire:vi.fn(),promote:vi.fn(),readResult:vi.fn(),memory:vi.fn(),cache:vi.fn(),source:vi.fn()}));
+vi.mock('../pages/service',()=>({acquirePage:mocks.acquire,promotePage:mocks.promote}));
 vi.mock('../../storage/translations/results',()=>({resultInMemory:mocks.memory,readMaterializedResult:mocks.readResult}));
 vi.mock('../../storage/translations',()=>({translationCache:{get:mocks.cache}}));
 vi.mock('../../storage/source-pages',()=>({sourcePageCache:{get:mocks.source}}));
-import {acquireImage} from './image-access';
+import {acquireImage,promoteImage} from './image-access';
 
 const reference={entryId:'entry',contentId:'content',pageId:'page',renderProfileId:RENDER_PROFILE};
 beforeEach(()=>{vi.clearAllMocks();mocks.acquire.mockResolvedValue({blob:new Blob(['pixels']),release:vi.fn()});});
 describe('image acquisition priority',()=>{
+ it('promotes only page references without opening another image or result',()=>{
+  promoteImage(pageReference(reference));promoteImage('result:translated');promoteImage('inline-original:sample');promoteImage('page:[]');promoteImage('page:broken');
+  expect(mocks.promote).toHaveBeenCalledExactlyOnceWith(reference);
+  expect(mocks.acquire).not.toHaveBeenCalled();expect(mocks.readResult).not.toHaveBeenCalled();expect(mocks.source).not.toHaveBeenCalled();
+ });
  it('defaults existing callers to current priority and preserves the returned lease',async()=>{
   const lease=await acquireImage(pageReference(reference));
   expect(mocks.acquire).toHaveBeenCalledExactlyOnceWith({...reference,signal:undefined,priority:'current',purpose:'reading'});

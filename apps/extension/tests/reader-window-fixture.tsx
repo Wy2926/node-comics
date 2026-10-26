@@ -22,6 +22,8 @@ const query=new URLSearchParams(location.search),pagination=query.get('paginatio
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
 const scrubFixture=query.get('scrub')==='1';
 const turnFixture=query.get('turns')==='1';
+const priorityFixture=pagination&&query.get('priority')==='1';
+const readOrder:string[]=[];
 // Leave a synthetic held-key preview open so native Escape/blur and the label can be checked.
 function previewProgress(){
  const input=document.querySelector<HTMLInputElement>('.nc-reader-progress');if(!input)return;
@@ -72,6 +74,11 @@ if(pagination)for(const chapter of samples)for(const page of chapter.pages){
 }
 canvas.width=canvas.height=1;
 const initial=samples.map((chapter,index)=>lazyChapters&&index>0?{...chapter,pages:[],discoveryComplete:false}:index===0&&query.get('incompleteCurrent')==='1'?{...chapter,discoveryComplete:false}:chapter);
+if(priorityFixture){
+ initial[0].pageId=initial[0].pages[7].id;
+ const read=sourcePageCache.get.bind(sourcePageCache);
+ sourcePageCache.get=async key=>{if(readOrder.length<64&&key.startsWith('inline-original:pagination-fixture-'))readOrder.push(key);return read(key);};
+}
 // Optional, origin-guarded byte-read gates for carousel/prefetch acceptance tests.
 // They delay only synthetic fixture keys and never replace image decoding or DOM load events.
 if(pagination&&query.get('controlledReads')==='1'){
@@ -117,7 +124,7 @@ function Fixture(){
  const [saves,setSaves]=useState(0);
  const [turnCheck,setTurnCheck]=useState(''),[checkingTurns,setCheckingTurns]=useState(false);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
- const viewKey=layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
+ const viewKey=priorityFixture?'isolated-priority-fixture':layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
  const copy=copies.find(value=>value.id===id)!;
  const update=useCallback((next:ReadingEntry)=>{if(scrubFixture||turnFixture)setSaves(value=>value+1);setCopies(previous=>previous.map(value=>value.id===next.id?next:value));},[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async(entryId:string)=>setMarkedRead(previous=>[...previous,entryId]),[]);
@@ -157,6 +164,7 @@ function Fixture(){
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
   {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
+  {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
   {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
    <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>

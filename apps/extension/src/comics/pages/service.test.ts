@@ -17,7 +17,7 @@ vi.mock('../../storage/downloads', async original => ({...await original<typeof 
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
-import {acquirePage,downloadKey,materializationId,type PageLease} from './service';
+import {acquirePage,promotePage,downloadKey,materializationId,type PageLease} from './service';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference,parsePageReference} from './identity';
 import {ReaderImagePrefetch} from '../../reader/image-prefetch';
 import {SourceDatabaseSchemaError} from '../../storage/database';
@@ -252,6 +252,20 @@ describe('page leases and trusted source routing', () => {
     await vi.waitFor(()=>expect(reads.started[3]).toBe('earlier'));
     reads.finish('active-b');reads.finish('earlier');leases.push(aLease,...await Promise.all([b,earlier]));
     for(const lease of leases)lease.release();
+  });
+  it('promotes a mounted queued page without another lease, source read or concurrency slot',async()=>{
+    const reads=controlledReads(),a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));
+    await vi.waitFor(()=>expect(reads.started).toHaveLength(2));
+    const earlier=acquirePage({...queuedPage('earlier'),priority:'prefetch'}),target=queuedPage('target');
+    const visible=acquirePage({...target,priority:'prefetch'});
+    promotePage(queuedPage('absent'));promotePage(target);promotePage(target);
+    reads.finish('active-a');const aLease=await a;
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b','target']));
+    reads.finish('target');const lease=await visible;lease.release();
+    expect(reads.waiting.get('target')!.signal.aborted).toBe(true);
+    await vi.waitFor(()=>expect(reads.started).toEqual(['active-a','active-b','target','earlier']));
+    reads.finish('earlier');reads.finish('active-b');for(const value of [aLease,...await Promise.all([earlier,b])])value.release();
+    expect(reads.maximum).toBe(2);
   });
   it.each(['prefetch','current'] as const)('keeps a promoted shared read alive after its %s consumer cancels while queued',async canceled=>{
     const reads=controlledReads(),a=acquirePage(queuedPage('active-a')),b=acquirePage(queuedPage('active-b'));

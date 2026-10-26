@@ -1,4 +1,4 @@
-import { acquirePage, pageAccess, type PageLease } from '../pages/service';
+import { acquirePage, pageAccess, promotePage, type PageLease } from '../pages/service';
 import { parsePageReference } from '../pages/identity';
 import { resultInMemory,readMaterializedResult,validateMaterializedResult } from '../../storage/translations/results';
 import type {ProcessingInput} from '../../image-processing/contracts';
@@ -10,6 +10,11 @@ import {openSourceCover} from './cover-access';
 import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
 
 const thumbnails=new RequestPool(2);
+export function promoteImage(key:string){
+  // Acquisition reports malformed identities through the page error UI; scheduling must not crash an effect.
+  let reference;try{reference=parsePageReference(key);}catch{return;}
+  if(reference)promotePage(reference);
+}
 export function processingInput(key:string,owner:string,sourceKey=key):ProcessingInput{
   const reference=parsePageReference(sourceKey);
   let access:Promise<()=>Promise<void>>|undefined;
