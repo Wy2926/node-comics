@@ -12,7 +12,7 @@ export function Thumbnail({blobKey,alt='',className='',retryKey=0,onError}:{blob
 }
 export {type ShownImage} from './ReaderPicture';
 import {ReaderPicture,type ReaderPictureProps} from './ReaderPicture';
-export type BlobPictureProps=Omit<ReaderPictureProps,'acquire'>&{priority?:'current'|'prefetch'};
+export type BlobPictureProps=Omit<ReaderPictureProps,'acquire'>;
 export function BlobPicture({priority='current',...props}:BlobPictureProps){
   const current=useRef(priority);current.current=priority;
   const acquire=useCallback(async(key:string,signal:AbortSignal)=>{
@@ -23,5 +23,5 @@ export function BlobPicture({priority='current',...props}:BlobPictureProps){
   useEffect(()=>{
     if(priority==='current')for(const key of new Set([props.blobKey,props.originalKey]))if(key)promoteImage(key);
   },[priority,props.blobKey,props.originalKey]);
-  return <ReaderPicture {...props} acquire={acquire}/>;
+  return <ReaderPicture {...props} priority={priority} acquire={acquire}/>;
 }

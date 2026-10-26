@@ -4,7 +4,7 @@ import {Icon} from '../icons';
 import type {ProcessingImage} from '../image-processing/contracts';
 import {EnhancementStatus} from './EnhancementStatus';
 import type {Job} from '../types';
-import {prepareReaderImage} from './prepare-image';
+import {prepareReaderImage,setReaderImagePriority} from './prepare-image';
 import {createReaderImageURL,releaseReaderImageURL} from './image-urls';
 import type {ImageLoadState} from './presentation';
 import './image-notices.css';
@@ -13,12 +13,14 @@ import './image-notices.css';
 export type ShownImage={scope:string;key:string;job?:Job};
 type PreparedImage=ShownImage&{id:string;url:string};
 type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
-export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal)=>Promise<{blob:Blob;release():void}>;scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
-export function ReaderPicture({acquire,scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
+export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal)=>Promise<{blob:Blob;release():void}>;priority?:'current'|'prefetch';scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
+export function ReaderPicture({acquire,priority='current',scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
   const [loaded,setLoaded]=useState<PreparedImage>();const [displayError,setDisplayError]=useState('');const [retry,setRetry]=useState(0);const [revision,setRevision]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
   // At most one original, one selected result and one ready enhancement share this loader.
   const requests=useRef(new Map<string,ImageRequest>());
+  const decodePriority=useRef(priority);decodePriority.current=priority;
+  useEffect(()=>{for(const request of requests.current.values())if(request.url)setReaderImagePriority(request.url,priority);},[priority]);
   const [dismissed,setDismissed]=useState<string>();const retryButton=useRef<HTMLButtonElement>(null);
   const callback=useRef(onShown);callback.current=onShown;
   const loadCallback=useRef(onLoadState);loadCallback.current=onLoadState;
@@ -70,7 +72,7 @@ export function ReaderPicture({acquire,scope,blobKey,originalKey=blobKey,job,alt
         }
         request.controller.signal.throwIfAborted();
         request.url=createReaderImageURL(blob);urls.current.add(request.url);request.phase='decoding';setRevision(value=>value+1);
-        await prepareReaderImage(request.url,request.controller.signal);
+        await prepareReaderImage(request.url,request.controller.signal,decodePriority.current);
         if(!active(request)){revoke(request.url);return;}
         request.image={id,scope,key:request.key,job:request.job,url:request.url};request.phase='displaying';setRevision(value=>value+1);
       })().catch(reason=>{if(active(request)){request.error=(reason as Error).message;request.image=undefined;setRevision(value=>value+1);}revoke(request.url);request.url='';});
@@ -94,5 +96,5 @@ export function ReaderPicture({acquire,scope,blobKey,originalKey=blobKey,job,alt
   // Cached bytes are not a displayed result. Report preparation through the actual DOM load.
   const phase=failure?'error':shown&&shown.key===blobKey&&shown.job?.id===job?.id?'ready':targetRequest?.phase??enhancedRequest?.phase??'reading';
   useLayoutEffect(()=>{loadCallback.current?.({scope,key:blobKey,phase,error:failure||undefined,retry:reload,originalSettled});return()=>loadCallback.current?.(undefined);},[scope,blobKey,phase,failure,reload,originalSettled]);
-  return <><EnhancementStatus state={enhancement?.state} onRetry={()=>enhancement?.retry()}/>{[shown,pending].map(image=>image&&<img key={image.url} className={image===pending?'nc-page-image-pending':'nc-page-image'} src={image.url} alt={image===pending?'':`${alt}${image.job?msg("译图"):msg("原图")}`} aria-hidden={image===pending||undefined} style={image===pending?{position:'absolute',visibility:'hidden',pointerEvents:'none'}:undefined} data-result-job={image.job?.id??'original'} onLoad={event=>confirm(image,event.currentTarget)} onError={()=>fail(image)}/>)}{!shown&&!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&(shown&&dismissed===failureSignature?<button ref={retryButton} className="nc-image-failure-retry" title={failure} aria-label={msg('重试')} disabled={reloadBusy} onClick={e=>{e.stopPropagation();reload();}}><Icon name="refresh" size={16}/></button>:<div className={`nc-image-failure ${shown?'over-image':''}`} role="status">{shown&&<button className="nc-image-failure-dismiss" aria-label={msg('关闭错误提示')} onClick={e=>{e.stopPropagation();setDismissed(failureSignature);}}><Icon name="close" size={16}/></button>}<Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><div className="nc-image-failure-actions">{blobKey&&<button className="button secondary" disabled={reloadBusy} onClick={reload}>{msg('重试')}</button>}{onReload&&<button className="button secondary" disabled={reloadBusy} onClick={onReload}><Icon name="refresh" size={16}/>{msg('重新载入')}</button>}{!sourceUrl&&<button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>}{sourceUrl&&<a className="button secondary" href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div></div>)}</>;
+  return <><EnhancementStatus state={enhancement?.state} onRetry={()=>enhancement?.retry()}/>{[shown,pending].map(image=>image&&<img key={image.url} decoding="async" className={image===pending?'nc-page-image-pending':'nc-page-image'} src={image.url} alt={image===pending?'':`${alt}${image.job?msg("译图"):msg("原图")}`} aria-hidden={image===pending||undefined} style={image===pending?{position:'absolute',visibility:'hidden',pointerEvents:'none'}:undefined} data-result-job={image.job?.id??'original'} onLoad={event=>confirm(image,event.currentTarget)} onError={()=>fail(image)}/>)}{!shown&&!failure?<div className="nc-image-placeholder"><span className="spinner"/>{msg("正在读取这一页")}</div>:null}{failure&&(shown&&dismissed===failureSignature?<button ref={retryButton} className="nc-image-failure-retry" title={failure} aria-label={msg('重试')} disabled={reloadBusy} onClick={e=>{e.stopPropagation();reload();}}><Icon name="refresh" size={16}/></button>:<div className={`nc-image-failure ${shown?'over-image':''}`} role="status">{shown&&<button className="nc-image-failure-dismiss" aria-label={msg('关闭错误提示')} onClick={e=>{e.stopPropagation();setDismissed(failureSignature);}}><Icon name="close" size={16}/></button>}<Icon name="image"/><b>{shown?msg("新图片暂未显示"):msg("图片暂不可用")}</b><p>{failure}</p><div className="nc-image-failure-actions">{blobKey&&<button className="button secondary" disabled={reloadBusy} onClick={reload}>{msg('重试')}</button>}{onReload&&<button className="button secondary" disabled={reloadBusy} onClick={onReload}><Icon name="refresh" size={16}/>{msg('重新载入')}</button>}{!sourceUrl&&<button className="button secondary" onClick={onImport}>{msg("重新导入")}</button>}{sourceUrl&&<a className="button secondary" href={sourceUrl} target="_blank" rel="noopener noreferrer">{msg("返回来源网页")}</a>}</div></div>)}</>;
 }

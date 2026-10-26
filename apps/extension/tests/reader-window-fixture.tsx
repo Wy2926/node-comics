@@ -12,6 +12,7 @@ import {useShortcuts} from '../src/shortcuts/react';
 import {defaults,type Page,type ReadingEntry,type Settings} from '../src/types';
 import type {ReadingTarget} from '../src/translation/automatic';
 import {sourcePageCache} from '../src/storage/source-pages';
+import {readerLoadingMetrics} from './reader-loading-metrics';
 import '../src/styles.css';
 import '../src/redesign.css';
 import '../src/library.css';
@@ -77,6 +78,7 @@ if(pagination)for(const chapter of samples)for(const page of chapter.pages){
 }
 canvas.width=canvas.height=1;
 const startingChapter=query.get('startChapter')==='2'&&chapterCount>1?1:query.get('startChapter')==='3'&&chapterCount>2?2:0;
+const loadingMetrics=highResolution&&query.has('loading')?readerLoadingMetrics(originalBlob):undefined;
 const initial=samples.map((chapter,index)=>lazyChapters&&index!==startingChapter?{...chapter,pages:[],discoveryComplete:false}:index===startingChapter&&query.get('incompleteCurrent')==='1'?{...chapter,discoveryComplete:false}:chapter);
 if(priorityFixture){
  initial[0].pageId=initial[0].pages[7].id;
@@ -129,7 +131,7 @@ function Fixture(){
  const [turnCheck,setTurnCheck]=useState(''),[checkingTurns,setCheckingTurns]=useState(false);
  const [checkingGeometry,setCheckingGeometry]=useState(false);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
- const viewKey=priorityFixture?'isolated-priority-fixture':layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
+ const viewKey=loadingMetrics?'isolated-image-loading-fixture':priorityFixture?'isolated-priority-fixture':layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
  const copy=copies.find(value=>value.id===id)!;
  const update=useCallback((next:ReadingEntry)=>{if(scrubFixture||turnFixture)setSaves(value=>value+1);setCopies(previous=>previous.map(value=>value.id===next.id?next:value));},[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async(entryId:string)=>setMarkedRead(previous=>[...previous,entryId]),[]);
@@ -183,12 +185,13 @@ function Fixture(){
   setStatus(`50 次进度更新：尺寸读取 ${dimensionReads} 次；同步更新 ${elapsed.toFixed(1)}ms`);setCheckingGeometry(false);
  }
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
-  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&<span role="status">{status}</span>}</div>
+  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status">{status}</span>}</div>
   {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   {performanceFixture&&<div><button disabled={checkingGeometry} onClick={()=>void checkGeometry()}>测量 50 次进度更新</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}
   {thumbnailFixture&&<div><button onClick={()=>{const list=document.querySelector<HTMLElement>('.nc-thumb-list');if(!list){setStatus('请先打开页面目录');return;}const bounds=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.nc-thumb-row')],full=rows.filter(row=>{const rect=row.getBoundingClientRect();return rect.top>=bounds.top&&rect.bottom<=bounds.bottom;}).length;setStatus(`缩略图：挂载 ${rows.length} 行，完整可见 ${full} 行；正文解码 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages} 页`);}}>检查缩略图窗口</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
+  {loadingMetrics&&<div><button onClick={()=>setStatus(loadingMetrics.snapshot())}>读取大图加载指标</button><button onClick={()=>{setMounted(false);void loadingMetrics.prepare().then(setStatus);}}>测量来源准备</button><output role="status" style={{display:"block",height:80,fontSize:12,lineHeight:"16px",overflow:"auto",overflowWrap:"anywhere"}}>{status}</output></div>}
   {lazyChapters&&<div><span>{copy.title}</span>{query.has('holdManifests')&&<button onClick={()=>{for(const gate of manifestGates.values())gate.release();manifestGates.clear();}}>继续模拟章节加载</button>}</div>}
   {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
    <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>

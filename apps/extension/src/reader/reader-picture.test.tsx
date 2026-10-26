@@ -26,9 +26,9 @@ function effect(callback: () => void | (() => void), deps: unknown[]) {
     previous?.cleanup?.(); hooks.effects[at] = {deps, cleanup: callback() || undefined};
   });
 }
-vi.mock('./prepare-image', () => ({prepareReaderImage: vi.fn(async (_url: string, signal: AbortSignal) => signal.throwIfAborted())}));
+vi.mock('./prepare-image', () => ({prepareReaderImage: vi.fn(async (_url: string, signal: AbortSignal) => signal.throwIfAborted()),setReaderImagePriority:vi.fn()}));
 import {ReaderPicture, type ReaderPictureProps} from './ReaderPicture';
-import {prepareReaderImage} from './prepare-image';
+import {prepareReaderImage,setReaderImagePriority} from './prepare-image';
 import {msg} from '../i18n/runtime';
 
 let options: ReaderPictureProps;
@@ -66,12 +66,29 @@ beforeEach(() => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:reader-test-${++id}`);
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   vi.mocked(prepareReaderImage).mockReset().mockImplementation(async(_url,signal)=>signal.throwIfAborted());
+  vi.mocked(setReaderImagePriority).mockClear();
   options = {scope: 'slot-1', blobKey: 'original', alt: 'Page 1', onImport: vi.fn(),
     acquire: vi.fn(async () => ({blob: new Blob(['image']), release: vi.fn()}))};
 });
 afterEach(() => {cleanup(); vi.restoreAllMocks();});
 
 describe('shared reader pixel presentation', () => {
+  it('promotes a queued neighbor without reacquiring bytes or restarting preparation',async()=>{
+    const pending=deferred<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(pending.promise);
+    render({priority:'prefetch'});await flush();
+    expect(prepareReaderImage).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1',expect.any(AbortSignal),'prefetch');
+    render({priority:'current'});
+    expect(setReaderImagePriority).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1','current');
+    render({priority:'prefetch'});expect(setReaderImagePriority).toHaveBeenLastCalledWith('blob:reader-test-1','prefetch');
+    expect(options.acquire).toHaveBeenCalledOnce();expect(prepareReaderImage).toHaveBeenCalledOnce();
+    pending.resolve();await flush();displayed();
+  });
+  it('uses current priority if the page becomes visible while source bytes are pending',async()=>{
+    const {acquire,reads}=controlledReads();render({priority:'prefetch',acquire});
+    render({priority:'current'});reads[0].resolve();await flush();
+    expect(prepareReaderImage).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1',expect.any(AbortSignal),'current');
+    expect(acquire).toHaveBeenCalledOnce();
+  });
   it('commits only after the actual display loads and releases its URL and source lease on removal', async () => {
     const release = vi.fn(), shown = vi.fn();
     render({acquire: vi.fn(async () => ({blob: new Blob(['image']), release})), onShown: shown});

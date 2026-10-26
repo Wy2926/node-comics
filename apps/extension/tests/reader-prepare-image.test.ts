@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { prepareReaderImage } from '../src/reader/prepare-image';
+import { prepareReaderImage, setReaderImagePriority } from '../src/reader/prepare-image';
 
 class FakeImage extends EventTarget {
   static instances: FakeImage[] = [];
@@ -59,6 +59,47 @@ beforeEach(() => {
 afterEach(() => {vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('reader image preparation', () => {
+  it('reserves a foreground slot and promotes a queued page ahead of old neighbors',async()=>{
+    const controllers=Array.from({length:4},()=>new AbortController());
+    const requests=controllers.map((controller,index)=>prepareReaderImage(`blob:neighbor-${index}`,controller.signal,'prefetch'));
+    const completed=Promise.allSettled(requests);
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:neighbor-0']);
+    setReaderImagePriority('blob:neighbor-3','current');
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:neighbor-0','blob:neighbor-3']);
+    FakeImage.instances[1].load();FakeImage.instances[1].decoding.resolve();await requests[3];
+    expect(FakeImage.instances).toHaveLength(2);
+    FakeImage.instances[0].load();FakeImage.instances[0].decoding.resolve();await requests[0];
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:neighbor-0','blob:neighbor-3','blob:neighbor-1']);
+    controllers.forEach(controller=>controller.abort());await completed;
+  });
+  it('allows two current pages, cancels queued work without constructing an Image, and releases slots after failure',async()=>{
+    const controllers=Array.from({length:4},()=>new AbortController());
+    const requests=controllers.map((controller,index)=>prepareReaderImage(`blob:current-${index}`,controller.signal));
+    const completed=Promise.allSettled(requests);
+    expect(FakeImage.instances).toHaveLength(2);
+    controllers[2].abort();await expect(requests[2]).rejects.toMatchObject({name:'AbortError'});
+    FakeImage.instances[0].fail();await expect(requests[0]).rejects.toMatchObject({name:'EncodingError'});
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:current-0','blob:current-1','blob:current-3']);
+    controllers.forEach(controller=>controller.abort());await completed;
+  });
+  it('gives a running neighbor current priority without creating a second decode',async()=>{
+    const first=new AbortController(),second=new AbortController();
+    const requests=[prepareReaderImage('blob:first',first.signal,'prefetch'),prepareReaderImage('blob:second',second.signal,'prefetch')];
+    const completed=Promise.allSettled(requests);
+    expect(FakeImage.instances).toHaveLength(1);setReaderImagePriority('blob:first','current');
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:first','blob:second']);
+    setReaderImagePriority('blob:first','current');expect(FakeImage.instances).toHaveLength(2);
+    first.abort();second.abort();await completed;
+  });
+  it('demotes skipped current pages so a later current page does not wait behind them',async()=>{
+    const controllers=Array.from({length:4},()=>new AbortController());
+    const requests=controllers.map((controller,index)=>prepareReaderImage(`blob:jump-${index}`,controller.signal));
+    const completed=Promise.allSettled(requests);
+    setReaderImagePriority('blob:jump-2','prefetch');
+    FakeImage.instances[0].load();FakeImage.instances[0].decoding.resolve();await requests[0];
+    expect(FakeImage.instances.map(image=>image.src)).toEqual(['blob:jump-0','blob:jump-1','blob:jump-3']);
+    controllers.forEach(controller=>controller.abort());await completed;
+  });
   it.each(['predecode','fallback'] as const)('times out stalled %s and ignores late completion', async phase => {
     vi.useFakeTimers();
     const {ready,image,settled}=start();
