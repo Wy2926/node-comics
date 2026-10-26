@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Lisez plus confortablement.",
+        "items": [
+          "Tournez les pages à votre façon: Choisissez un effet de page tournée, de glissement ou de fondu, ou désactivez les animations.",
+          "Retrouvez vos pages favorites: Ajoutez des marque-pages, parcourez leurs miniatures et revenez directement au passage enregistré.",
+          "Plus de sites et des favoris: Découvrez les nouveaux sites compatibles et enregistrez vos sources favorites pour les retrouver facilement.",
+          "Une lecture plus fluide: Chargement des images et des traductions, passages entre chapitres et réglages du zoom améliorés."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Lisez en double page. Traduisez à votre façon.",

@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Czytaj jeszcze wygodniej.",
+        "items": [
+          "Przewracaj strony po swojemu: Wybierz efekt kartki, przesuwania lub przenikania albo wyłącz animacje.",
+          "Wracaj dzięki zakładkom: Zapisuj ulubione strony, przeglądaj miniatury i wracaj bezpośrednio do zaznaczonego miejsca.",
+          "Więcej stron i ulubione: Odkrywaj nowe obsługiwane serwisy z komiksami i zapisuj ulubione źródła, by łatwo do nich wracać.",
+          "Płynniejsze czytanie: Ulepszono ładowanie obrazów i tłumaczeń, przejścia między rozdziałami oraz ustawienia powiększenia."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Czytaj rozkładówki. Tłumacz po swojemu.",

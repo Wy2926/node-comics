@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Leia com mais conforto.",
+        "items": [
+          "Vire as páginas do seu jeito: Escolha o efeito de folha, deslizamento ou transição suave, ou desative as animações.",
+          "Marque e volte quando quiser: Salve suas páginas favoritas, veja as miniaturas e volte direto ao marcador.",
+          "Mais sites e favoritos: Explore os novos sites de quadrinhos compatíveis e salve suas fontes favoritas para encontrá-las facilmente.",
+          "Leitura mais fluida: Melhorias no carregamento de imagens e traduções, na troca de capítulos e nos ajustes de zoom."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Leia em página dupla. Traduza do seu jeito.",

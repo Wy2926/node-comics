@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Reading made easier.",
+        "items": [
+          "Turn pages your way: Choose page curl, slide or fade effects, or turn animations off.",
+          "Bookmark and return: Save your favorite moments, browse thumbnail previews and jump back to your bookmarks.",
+          "More sites, easy favorites: Explore newly supported comic sites and save your favorite sources for easy access.",
+          "Smoother reading: Improved image and translation loading, chapter transitions and zoom settings."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Read in spreads. Translate your way.",

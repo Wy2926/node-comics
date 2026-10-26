@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Noch angenehmer lesen.",
+        "items": [
+          "Blättern nach deinem Geschmack: Wähle Umblättern, Schieben oder Überblenden als Effekt, oder schalte Animationen aus.",
+          "Mit Lesezeichen zurückfinden: Markiere Lieblingsstellen, sieh dir die Vorschaubilder an und springe direkt zum Lesezeichen zurück.",
+          "Mehr Seiten und Favoriten: Entdecke neu unterstützte Comic-Websites und speichere häufig genutzte Quellen als Favoriten.",
+          "Flüssiger weiterlesen: Verbessertes Laden von Bildern und Übersetzungen, Kapitelwechsel und Zoom-Einstellungen."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Doppelseiten lesen. Individuell übersetzen.",

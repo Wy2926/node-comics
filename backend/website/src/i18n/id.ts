@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Membaca makin nyaman.",
+        "items": [
+          "Balik halaman sesuai selera: Pilih efek lipatan kertas, geser, atau pudar, atau matikan animasi.",
+          "Tandai dan kembali: Simpan halaman favorit, lihat pratinjau kecilnya, lalu langsung kembali ke posisi penanda.",
+          "Lebih banyak situs dan favorit: Jelajahi situs komik baru yang didukung dan simpan sumber favorit agar mudah ditemukan lagi.",
+          "Membaca lebih lancar: Pemuatan gambar dan terjemahan, perpindahan bab, serta pengaturan zoom ditingkatkan."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Baca dua halaman. Terjemahkan sesukamu.",

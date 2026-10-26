@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Đọc thoải mái hơn.",
+        "items": [
+          "Lật trang theo ý bạn: Chọn hiệu ứng lật giấy, trượt hoặc mờ dần, hay tắt hiệu ứng chuyển trang.",
+          "Đánh dấu để quay lại: Lưu trang yêu thích, xem ảnh thu nhỏ và quay lại ngay vị trí đã đánh dấu.",
+          "Thêm trang web và mục yêu thích: Khám phá các trang truyện mới được hỗ trợ và lưu nguồn yêu thích để dễ tìm lại.",
+          "Đọc liền mạch hơn: Cải thiện tải ảnh gốc và bản dịch, chuyển trang giữa các chương và cài đặt thu phóng."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Đọc hai trang. Dịch theo ý bạn.",

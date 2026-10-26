@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Leggere è ancora più comodo.",
+        "items": [
+          "Sfoglia come preferisci: Scegli tra effetto pagina, scorrimento e dissolvenza, oppure disattiva le animazioni.",
+          "Un segnalibro per ritornare: Salva le pagine preferite, sfoglia le miniature e torna direttamente al punto segnato.",
+          "Più siti e preferiti: Scopri i nuovi siti di fumetti supportati e salva le fonti preferite per ritrovarle facilmente.",
+          "Una lettura più fluida: Migliorati il caricamento di immagini e traduzioni, i passaggi tra capitoli e le impostazioni dello zoom."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Leggi a doppia pagina. Traduci a modo tuo.",

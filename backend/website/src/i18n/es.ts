@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Lee con más comodidad.",
+        "items": [
+          "Pasa las páginas a tu manera: Elige entre efecto de hoja, deslizamiento o fundido, o desactiva las animaciones.",
+          "Marca y vuelve al instante: Guarda tus páginas favoritas, consulta sus miniaturas y vuelve directamente al marcador.",
+          "Más sitios y favoritos: Explora los nuevos sitios de cómics compatibles y guarda tus fuentes favoritas para encontrarlas fácilmente.",
+          "Una lectura más fluida: Mejoras en la carga de imágenes y traducciones, el paso entre capítulos y los ajustes de zoom."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Lee a doble página. Traduce a tu manera.",

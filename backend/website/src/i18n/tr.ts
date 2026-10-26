@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.1.0",
+        "date": "2026-10-27",
+        "title": "1.1.0 · Daha rahat okuyun.",
+        "items": [
+          "Sayfaları dilediğiniz gibi çevirin: Sayfa kıvrılması, kaydırma veya solma efektini seçin ya da animasyonları kapatın.",
+          "Yer imiyle hemen geri dönün: Sevdiğiniz sayfaları kaydedin, küçük resimlere göz atın ve işaretlediğiniz yere dönün.",
+          "Daha fazla site ve favoriler: Yeni desteklenen çizgi roman sitelerini keşfedin ve sık kullandığınız kaynakları favorilere ekleyin.",
+          "Daha akıcı okuma: Görsel ve çeviri yükleme, bölümler arası geçişler ve yakınlaştırma ayarları iyileştirildi."
+        ]
+      },
+      {
         "id": "1.0.0",
         "date": "2026-10-17",
         "title": "1.0.0 · Çift sayfa okuyun. Dilediğiniz gibi çevirin.",
