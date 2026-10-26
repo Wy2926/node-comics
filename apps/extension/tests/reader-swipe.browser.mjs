@@ -58,7 +58,7 @@ beforeEach(async () => {
         x: event.clientX, y: event.clientY, target: event.target.className});
       if (window.__swipeEvents.length > 30) window.__swipeEvents.shift();
     }, true);
-    // Record actual compositor-frame transforms, not merely the final page number.
+    // Sample library leaf geometry each animation frame; this is not a physical paint trace.
     const sample = () => {
       const viewport = document.querySelector('.nc-reading-viewport');
       const surface = viewport?.querySelector('.nc-reading-surface');
@@ -83,11 +83,11 @@ beforeEach(async () => {
           !!pane.querySelector('.nc-image-failure') || [...pane.querySelectorAll('img.nc-page-image')].some(image => image.complete && image.naturalWidth > 0));
         const frame = {time: performance.now(), phase: viewport.dataset.swipePhase || 'idle', x,
           pages: [...surface.querySelectorAll('.nc-manga-page')].map(element => element.dataset.pageId),
-          oldX, oldImages: snapshot?.querySelectorAll('img.nc-page-image').length || 0,
+          oldX, oldImages: snapshot?.querySelectorAll('[data-flip-face=outgoing] img.nc-page-image').length || 0,
           oldVisible: visible(snapshot), currentVisible: visible(surface), ready,
-          durations: surface.getAnimations().map(animation => animation.effect.getTiming().duration),
+          fold: [...snapshot?.querySelectorAll('.stf__item') || []].map(leaf => `${getComputedStyle(leaf).transform}:${getComputedStyle(leaf).clipPath}`).join('|'),
           turnStatus: viewport.querySelectorAll('.nc-page-turn-status').length,
-          pageDOM: viewport.querySelectorAll('.nc-manga-page').length, width: viewport.clientWidth,
+          pageDOM: surface.querySelectorAll('[data-page-id]').length, width: viewport.clientWidth,
           images: viewport.querySelectorAll('img.nc-page-image').length, urls: window.__swipeUrls.active.size,
           read: document.querySelector('[data-testid="marked-read"]')?.textContent || '[]'};
         const previous = window.__swipeTrace.at(-1);
@@ -220,26 +220,20 @@ async function touchDrag(dx, dy = 0, {release = true, start = .5, y = .5} = {}) 
 }
 async function assertAnimation(sign, {dragged = false} = {}) {
   const frames = await trace(), phases = new Set(frames.map(frame => frame.phase));
-  if (dragged) assert(phases.has('dragging'), 'A horizontal drag visibly follows the pointer');
-  assert(phases.has('entering'), `Incoming animation missing: ${[...phases]}`);
-  assert(!phases.has('exiting'), 'An outgoing-only stage must never leave the reader blank');
+  if (dragged) assert(phases.has('dragging'), 'The reader recognizes horizontal swipe intent');
+  assert(phases.has('entering'), `Library curl missing: ${[...phases]}`);
   assert(!phases.has('preparing'), 'Image loading must not create a navigation-wait phase');
-  assert(frames.every(frame => frame.turnStatus === 0), 'Page turns do not show a preparation notice');
-  assert(frames.some(frame => frame.phase === 'entering' && frame.oldX * sign > 2), 'Old page visibly leaves while the new page enters');
-  assert(frames.some(frame => frame.phase === 'entering' && frame.x * sign < -2), 'New page enters from the opposite side');
+  assert(frames.every(frame => frame.turnStatus === 0), 'No blocking preparation notice');
   const motion = frames.filter(frame => frame.phase === 'entering');
-  assert(motion.some(frame => frame.durations.includes(240)), 'The slide has a fixed 240ms duration independent of image readiness');
-  assert(motion.every(frame => frame.oldVisible || frame.currentVisible), 'A frame contains page pixels or the incoming page-local loading/error state');
-  assert(motion.every(frame => frame.oldX !== null), 'The outgoing snapshot lives for the entire entrance');
-  assert(motion.every(frame => Math.abs((frame.oldX - frame.x) * sign - frame.width) < 2), 'Old and new groups stay adjacent and move together');
-  assert(frames.some(frame => frame.phase === 'idle' && Math.abs(frame.x) < .1), 'Animation settles at its untransformed reading position');
-  assert(frames.filter(frame => frame.phase !== 'idle').length >= 3, 'Animation spans actual browser frames');
-  const start = motion[0];
-  const end = frames.find(frame => frame.time > start.time && frame.phase === 'idle');
-  assert(end, 'A completed transition has an observed final idle frame');
-  observations.push({durationMs: Number((end.time - start.time).toFixed(1)),
-    pages: Math.max(...frames.map(frame => frame.pageDOM)), images: Math.max(...frames.map(frame => frame.images)),
-    urls: Math.max(...frames.map(frame => frame.urls))});
+  assert(new Set(motion.map(frame => frame.fold)).size >= 3, 'The library changes real paper transforms and clipping across frames');
+  assert(motion.every(frame => frame.oldVisible || frame.currentVisible), 'Pixels or page-local loading/error states remain visible');
+  assert(motion.every(frame => frame.oldX !== null), 'The bounded visual layer remains until completion');
+  assert(frames.every(frame => Math.abs(frame.x) < .1), 'The live reading surface is never translated by a competing animation');
+  const start = motion[0], end = frames.find(frame => frame.time > start.time && frame.phase === 'idle');
+  assert(end, 'A completed curl has an observed idle frame');
+  assert(end.time-start.time < 800, 'A healthy engine completes before the safety cleanup deadline');
+  observations.push({sign,durationMs: Number((end.time-start.time).toFixed(1)),
+    pages: Math.max(...frames.map(frame=>frame.pageDOM)),images: Math.max(...frames.map(frame=>frame.images)),urls: Math.max(...frames.map(frame=>frame.urls))});
 }
 async function assertNoLateNavigation(number, visible, imageCount = visible.length) {
   await page.waitForTimeout(400);
@@ -248,34 +242,24 @@ async function assertNoLateNavigation(number, visible, imageCount = visible.leng
 async function releaseRead(number, result = false) {
   await page.evaluate(({number, result}) => window.__readerFixtureReads.release(number, result), {number, result});
 }
-async function entering(number, {pause = false} = {}) {
-  await page.waitForFunction(({number, pause}) => {
+async function entering(number) {
+  await page.waitForFunction(number => {
     const viewport = document.querySelector('.nc-reading-viewport');
-    if (viewport?.dataset.swipePhase !== 'entering' || document.querySelector('[aria-label="跳转页码"]')?.value !== String(number)) return false;
-    const surface = viewport.querySelector('.nc-reading-surface'), snapshot = viewport.querySelector('[data-swipe-snapshot]');
-    const animations = surface?.getAnimations();
-    if (!snapshot || !animations?.length) return false;
-    if (pause) for (const animation of [...animations, ...snapshot.getAnimations()]) {animation.pause(); animation.currentTime = 0;}
-    return true;
-  }, {number, pause});
+    return viewport?.dataset.swipePhase === 'entering' && document.querySelector('[aria-label="跳转页码"]')?.value === String(number)
+      && !!viewport.querySelector('[data-swipe-snapshot] .stf__item');
+  }, number);
 }
-async function resumeEntrance() {
-  await viewport().evaluate(element => {
-    for (const target of element.querySelectorAll('.nc-reading-surface,[data-swipe-snapshot]')) for (const animation of target.getAnimations()) animation.play();
-  });
-}
-async function assertSnapshot({imageCount, urls, offset} = {}) {
+async function assertSnapshot({imageCount, urls} = {}) {
   const value = await oldLayer().evaluate(element => {
     const matrix = getComputedStyle(element).transform;
     return {hidden: element.getAttribute('aria-hidden'), inert: element.inert, visible: getComputedStyle(element).visibility !== 'hidden',
       identities: element.querySelectorAll('[data-page-id],[data-page-index],[id]').length,
       x: matrix === 'none' ? 0 : new DOMMatrixReadOnly(matrix).m41,
-      images: [...element.querySelectorAll('img.nc-page-image')].map(image => ({url: image.src, ready: image.complete && image.naturalWidth > 0})),
+      images: [...element.querySelectorAll('[data-flip-face=outgoing] img.nc-page-image')].map(image => ({url: image.src, ready: image.complete && image.naturalWidth > 0})),
       urlsActive: [...window.__swipeUrls.active]};
   });
   assert.equal(value.hidden, 'true'); assert.equal(value.inert, true);
   assert.equal(value.visible, true); assert.equal(value.identities, 0, 'Snapshot cannot masquerade as reader identity/evidence');
-  if (offset !== undefined) assert(Math.abs(value.x - offset) < 1, `Old layer begins at its previous visual offset: ${value.x}`);
   if (imageCount !== undefined) assert.equal(value.images.length, imageCount);
   assert(value.images.every(image => image.ready), 'The outgoing image remains usable during the bounded animation');
   if (urls) for (const url of urls) assert(value.urlsActive.includes(url), 'Snapshot explicitly retains the old image URL until cleanup');
@@ -297,7 +281,7 @@ test('mouse double-page gestures move the entire RTL spread, respect landscape p
   await resetTrace(); await mouseDrag(230, {release: false});
   assert.equal(await viewport().getAttribute('data-swipe-phase'), 'dragging');
   const dragged = await cells().evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
-  assert(Math.abs((dragged[0] - positions[0]) - (dragged[1] - positions[1])) < 1, 'Both pages travel together, not independently');
+  assert(dragged.every((x,index)=>Math.abs(x-positions[index])<1), 'Both pages stay in place until the swipe is released');
   await page.screenshot({path: resolve(artifacts, 'double-mouse-drag.png')});
   await page.mouse.up(); await shown(4, [4]); await assertAnimation(1, {dragged: true});
   assert((await trace()).every(frame => frame.pageDOM <= 4 && frame.urls <= 4), 'Spread animation retains at most old and new groups');
@@ -318,7 +302,7 @@ test('navigation buttons and keyboard use the same outgoing/incoming animation a
   await shown(2, [2, 3]); await assertAnimation(-1);
 });
 
-test('short drags spring back, boundaries resist dragging, and a drag never toggles reader chrome', async () => {
+test('short and boundary swipes leave the page in place without toggling reader chrome', async () => {
   await reader(); await page.keyboard.press('Escape');
   await resetTrace(); await mouseDrag(-14, {release: false});
   await page.waitForTimeout(120); await page.mouse.up(); await shown(1, [1]);
@@ -326,7 +310,7 @@ test('short drags spring back, boundaries resist dragging, and a drag never togg
   assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false, 'Drag-generated click does not hide controls');
   await resetTrace(); await mouseDrag(150, {release: false});
   const offset = await viewport().locator('.nc-reading-surface').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41);
-  assert(offset > 0 && offset < 150, `First-page boundary dampens the drag: ${offset}`);
+  assert.equal(offset, 0, 'An unavailable boundary leaves the page in place');
   await page.mouse.up(); await shown(1, [1]);
   assert(!(await trace()).some(frame => frame.phase === 'exiting'), 'First page cannot navigate backwards');
   await jump(8); await shown(8, [8]);
@@ -364,7 +348,7 @@ test('vertical touch pans a long single page natively without turning pages or s
   await resetTrace(); await touchDrag(15, -230, {y: .7});
   await page.waitForFunction(() => document.querySelector('.nc-reading-viewport').scrollTop > 50);
   await shown(9, [9]);
-  assert((await trace()).every(frame => frame.phase === 'idle'), 'A vertical gesture never starts the carousel');
+  assert((await trace()).every(frame => frame.phase === 'idle'), 'A vertical gesture never starts the page turn');
   try {await page.waitForFunction(() => Number(document.querySelector('[aria-label="保存位置"]').textContent.split(' · ')[1]) > 0);}
   catch (error) {
     console.log('Long-page pan diagnostic:', await page.evaluate(() => {
@@ -388,7 +372,7 @@ test('vertical touch pans a long single page natively without turning pages or s
   assert(Math.abs((await viewport().evaluate(element => element.scrollTop)) - metrics.top) < 2, 'Reopening restores the pan position, not an animation transform');
 });
 
-test('a second real touch cancels the carousel and leaves multi-touch to the browser', async () => {
+test('a second real touch cancels the page turn and leaves multi-touch to the browser', async () => {
   await page.setViewportSize({width: 390, height: 844}); await reader();
   await resetTrace(); const from = await touchDrag(-100, 0, {release: false});
   assert.equal(await viewport().getAttribute('data-swipe-phase'), 'dragging', JSON.stringify(await page.evaluate(() => ({events: window.__swipeEvents, trace: window.__swipeTrace}))));
@@ -425,13 +409,13 @@ test('horizontal overflow keeps native touch panning instead of stealing it for 
   await resetTrace(); await touchDrag(distance); await assertNoLateNavigation(1, [1]);
   const after = await viewport().evaluate(element => element.scrollLeft);
   assert(Math.abs(after - before.left) > 30, `Native horizontal pan should move: ${before.left} -> ${after}`);
-  assert((await trace()).every(frame => frame.phase === 'idle'), 'Overflow pan never enters the carousel');
+  assert((await trace()).every(frame => frame.phase === 'idle'), 'Overflow pan never enters the page turn');
 });
 
 test('direct page selection cancels an entrance without allowing late image bytes to overwrite the selection', async () => {
   await reader({controlled: true, holdPages: [2]}); await resetTrace();
   await page.getByRole('button', {name: '下一页', exact: true}).click();
-  await entering(2, {pause: true});
+  await entering(2);
   await pageNumber().fill('5'); await pageNumber().press('Enter');
   await releaseRead(2);
   await assertNoLateNavigation(5, [5]);
@@ -457,7 +441,7 @@ test('opening settings, changing layout and closing the reader cancel unfinished
 test('visibility loss removes an animation snapshot without undoing an already selected loading page', async () => {
   await reader({controlled: true, holdPages: [2]});
   await page.getByRole('button', {name: '下一页', exact: true}).click();
-  await entering(2, {pause: true});
+  await entering(2);
   // Exercise the lifecycle signal deterministically; touch tests above use native CDP input.
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'hidden'});
@@ -475,7 +459,7 @@ test('reduced motion selects a permanently loading page immediately and permits 
   await page.getByRole('button', {name: '下一页', exact: true}).click(); await selected(2, [2]);
   assert.equal(await surface().locator('img.nc-page-image').count(), 0);
   assert.equal(await oldLayer().count(), 0);
-  assert((await trace()).every(frame => frame.phase === 'idle'), 'Reduced motion never waits for images or runs a slide');
+  assert((await trace()).every(frame => frame.phase === 'idle'), 'Reduced motion never waits for images or runs a curl');
   await resetTrace(); await mouseDrag(-230); await shown(3, [3]);
   assert(!(await trace()).some(frame => frame.phase === 'entering'), 'Reduced motion commits the gesture without a transition');
   assert.equal(await page.evaluate(() => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(2) && event.phase === 'ready')), false, 'The unavailable page was skipped without releasing its byte gate');
@@ -506,7 +490,7 @@ test('dragging an interactive error action does not steal its gesture or turn th
   await resetTrace(); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 - 180, box.y + box.height / 2, {steps: 8});
   await page.mouse.up(); await assertNoLateNavigation(6, [6], 0);
-  assert((await trace()).every(frame => frame.phase === 'idle'), 'A control-origin gesture never starts the carousel');
+  assert((await trace()).every(frame => frame.phase === 'idle'), 'A control-origin gesture never starts the page turn');
   await action.click();
   await page.getByRole('status').filter({hasText: '本地样本导入入口'}).waitFor();
 });
@@ -547,7 +531,6 @@ for (const cancel of ['Escape', 'Home']) test(`canceling a loaded final-page ent
   await page.waitForFunction(() => {
     const viewport = document.querySelector('.nc-reading-viewport');
     if (viewport?.dataset.swipePhase !== 'entering' || document.querySelector('[aria-label="跳转页码"]').value !== '8') return false;
-    viewport.querySelector('.nc-reading-surface').getAnimations().forEach(animation => animation.pause());
     return true;
   });
   await page.waitForFunction(() => document.querySelector('[data-page-index="7"] img.nc-page-image')?.naturalWidth > 0);
@@ -557,14 +540,14 @@ for (const cancel of ['Escape', 'Home']) test(`canceling a loaded final-page ent
   assert.equal(await page.locator('[data-testid="marked-read"]').textContent(), cancel === 'Home' ? '[]' : '["window-fixture-0"]');
 });
 
-test('a permanently loading original finishes its slide and can be skipped without a preparation overlay', async () => {
+test('a permanently loading original finishes its curl and can be skipped without a preparation overlay', async () => {
   await reader({controlled: true, holdPages: [2]});
   const oldUrls = await surface().locator('img.nc-page-image').evaluateAll(images => images.map(image => image.src));
   await resetTrace(); await page.getByRole('button', {name: '下一页', exact: true}).click(); await selected(2, [2]);
   assert.equal(await surface().locator('img.nc-page-image').count(), 0);
   assert.equal(await surface().locator('.nc-image-placeholder').count(), 1, 'Only the selected page reports its local image load');
   await assertAnimation(-1);
-  assert((await trace()).some(frame => frame.phase === 'entering' && !frame.ready), 'The slide genuinely runs while the original is unavailable');
+  assert((await trace()).some(frame => frame.phase === 'entering' && !frame.ready), 'The curl genuinely runs while the original is unavailable');
   await page.waitForFunction(urls => urls.every(url => window.__swipeUrls.revoked.has(url)), oldUrls);
   assert.equal(await oldLayer().count(), 0);
   await page.screenshot({path: resolve(artifacts, 'pending-original-navigation-unblocked.png')});
@@ -573,16 +556,12 @@ test('a permanently loading original finishes its slide and can be skipped witho
   assert.equal(await page.locator('[data-testid="marked-read"]').textContent(), '[]', 'A skipped loading page supplies no reading evidence');
 });
 
-test('a released drag starts the bounded slide at its exact offset even when the incoming image never loads', async () => {
+test('a released swipe curls the old page even when the incoming image never loads', async () => {
   await reader({controlled: true, holdPages: [2]}); await resetTrace();
   await mouseDrag(-230, {release: false});
-  const before = await surface().locator('img.nc-page-image').boundingBox();
-  await page.mouse.up(); await entering(2, {pause: true});
-  await assertSnapshot({imageCount: 1, offset: -230});
-  const after = await oldLayer().locator('img.nc-page-image').boundingBox();
-  assert(Math.abs(after.x - before.x) < 1, `Snapshot adoption preserves the displayed image X: ${before.x} -> ${after.x}`);
-  await resumeEntrance(); await selected(2, [2]); await assertAnimation(-1, {dragged: true});
-  await mouseDrag(-230); await shown(3, [3]);
+  await page.mouse.up(); await entering(2); await assertSnapshot({imageCount:1});
+  await selected(2,[2]); await assertAnimation(-1,{dragged:true});
+  await mouseDrag(-230); await shown(3,[3]);
 });
 
 test('a permanently loading translation does not hold a single-page turn or block the next turn', async () => {
@@ -625,7 +604,7 @@ test('double-page comparison shows independent original fallbacks while a source
 
 test('closing during a held read disposes the snapshot and late bytes cannot recreate the reader or its URLs', async () => {
   await reader({controlled: true, holdPages: [2]});
-  await page.getByRole('button', {name: '下一页', exact: true}).click(); await entering(2, {pause: true});
+  await page.getByRole('button', {name: '下一页', exact: true}).click(); await entering(2);
   await assertSnapshot({imageCount: 1});
   await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
   assert.equal(await viewport().count(), 0);

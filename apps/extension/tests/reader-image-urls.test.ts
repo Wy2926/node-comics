@@ -62,23 +62,23 @@ describe('outgoing page snapshot',()=>{
   pending.src=createReaderImageURL(new Blob(['pending pixels']));pending.className='nc-page-image-pending';pixels.append(image);pixels.append(pending);
   const cloneNode=vi.fn(()=>pixels);Object.assign(surface,{cloneNode});
   vi.stubGlobal('document',{createElement:()=>new ElementStub()});
-  return {viewport,surface,pixels,image,pending,cloneNode,create:()=>pageSnapshot(viewport as unknown as HTMLDivElement,surface as unknown as HTMLDivElement,25)};
+  return {viewport,surface,pixels,image,pending,cloneNode,create:()=>pageSnapshot(viewport as unknown as HTMLDivElement,surface as unknown as HTMLDivElement,1)};
  }
  it('clones synchronously without waiting for image decoding and pins only displayed URLs',()=>{
   vi.useFakeTimers();const f=fixture(),url=f.image.src,pendingURL=f.pending.src;
-  const imageListener=vi.spyOn(f.image,'addEventListener'),snapshot=f.create(),host=f.viewport.children[0];
+  const imageListener=vi.spyOn(f.image,'addEventListener'),snapshot=f.create();
   expect(f.cloneNode).toHaveBeenCalledExactlyOnceWith(true);expect(snapshot).not.toHaveProperty('ready');expect(snapshot).not.toHaveProperty('show');
   expect(f.image.decode).not.toHaveBeenCalled();expect(imageListener).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
-  expect(snapshot.element.style.visibility).toBeUndefined();expect(snapshot.element.inert).toBe(true);expect(snapshot.element.getAttributeNames()).toEqual(['data-swipe-snapshot','aria-hidden']);
+  expect(snapshot.leaves[0].style.visibility).toBeUndefined();expect(snapshot.leaves[0].inert).toBe(true);expect(snapshot.leaves[0].getAttributeNames()).toEqual(['aria-hidden']);
   expect(f.pixels.getAttributeNames()).toEqual(['data-direction','data-paged']);expect(f.image.getAttributeNames()).toEqual(['src']);expect(f.pending.parent).toBeUndefined();
-  expect(f.pixels.style).toMatchObject({left:'63px',top:'-93px',width:'640px',height:'900px',transform:'none'});expect(host.style).toMatchObject({width:'800px',height:'600px',left:'0px',top:'40px'});
+  expect(f.pixels.style).toMatchObject({left:'88px',top:'-93px',width:'640px',height:'900px',transform:'none'});
   releaseReaderImageURL(url);expect(URL.revokeObjectURL).not.toHaveBeenCalled();releaseReaderImageURL(pendingURL);expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(pendingURL);
   snapshot.dispose();snapshot.dispose();expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);expect(URL.revokeObjectURL).toHaveBeenLastCalledWith(url);expect(f.image.src).toBe('');expect(f.viewport.children).toHaveLength(0);
  });
- it('tracks the viewport pan until disposal without retaining scroll listeners',()=>{
-  const f=fixture(),snapshot=f.create(),host=f.viewport.children[0],url=f.image.src,pendingURL=f.pending.src;
-  f.viewport.scrollLeft=15;f.viewport.scrollTop=80;f.viewport.dispatchEvent(new Event('scroll'));expect(host.style).toMatchObject({left:'15px',top:'80px'});
-  snapshot.dispose();expect(URL.revokeObjectURL).not.toHaveBeenCalled();f.viewport.scrollTop=200;f.viewport.dispatchEvent(new Event('scroll'));expect(host.style.top).toBe('80px');
+ it('captures the native vertical pan without mounting another reading surface',()=>{
+  const f=fixture(),snapshot=f.create(),url=f.image.src,pendingURL=f.pending.src;
+  expect(f.pixels.style.top).toBe('-93px');expect(f.viewport.children).toHaveLength(0);
+  snapshot.dispose();expect(URL.revokeObjectURL).not.toHaveBeenCalled();
   releaseReaderImageURL(url);releaseReaderImageURL(pendingURL);expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
  });
 });

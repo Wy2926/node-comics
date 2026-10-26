@@ -23,6 +23,7 @@ const query=new URLSearchParams(location.search),pagination=query.get('paginatio
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
 const scrubFixture=query.get('scrub')==='1';
 const turnFixture=query.get('turns')==='1';
+const FlipMetrics=query.has('curl')?(await import('./reader-flip-metrics')).ReaderFlipMetrics:undefined;
 const priorityFixture=pagination&&query.get('priority')==='1';
 const thumbnailFixture=query.get('thumbnails')==='1';
 const readOrder:string[]=[];
@@ -48,7 +49,7 @@ const failedIndex=pagination?(query.get('failure')==='1'?5:-1):7;
 const paginationSample=query.get('long')==='1'?'pagination-fixture-long':'pagination-fixture';
 const originalKey=(chapter:number,index:number)=>pagination?`inline-original:${paginationSample}-${chapter}-${index}`:highResolution?`inline-original:window-fixture-high-${chapter}-${index}`:'inline-original:window-fixture';
 const resultKey=(pageId:string)=>pagination?`inline-original:${paginationSample}-result-${pageId}`:highResolution?`inline-original:window-fixture-high-result-${pageId}`:'inline-original:window-fixture-result';
-const dimensions=(index:number)=>pagination&&index===3?{width:1600,height:1000}:pagination&&index===8&&query.get('long')==='1'?{width:800,height:4000}:{width,height};
+const dimensions=(index:number)=>pagination&&query.has('unequal')&&index===1?{width:600,height:1200}:pagination&&index===3?{width:1600,height:1000}:pagination&&index===8&&query.get('long')==='1'?{width:800,height:4000}:{width,height};
 const canvas=new OffscreenCanvas(width,height),context=canvas.getContext('2d')!;
 context.scale(width/800,height/1200);
 context.fillStyle='#f1e8ff';context.fillRect(0,0,800,1200);context.fillStyle='#ab87d8';context.fillRect(40,40,720,800);
@@ -161,7 +162,7 @@ function Fixture(){
  async function checkTurns(){
   setCheckingTurns(true);const pages:string[]=[];let peak=0,created=0;
   const viewport=document.querySelector('.nc-reading-viewport'),observer=new MutationObserver(records=>{
-   for(const record of records)for(const node of record.addedNodes)if(node instanceof Element)created+=node.querySelectorAll('[data-swipe-snapshot]').length;
+   for(const record of records)for(const node of record.addedNodes)if(node instanceof Element)created+=Number(node.matches('[data-swipe-snapshot]'))+node.querySelectorAll('[data-swipe-snapshot]').length;
   });
   if(viewport)observer.observe(viewport,{childList:true});
   for(let step=0;step<6;step++){
@@ -186,6 +187,7 @@ function Fixture(){
  }
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status">{status}</span>}</div>
+  {FlipMetrics&&<FlipMetrics/>}
   {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   {performanceFixture&&<div><button disabled={checkingGeometry} onClick={()=>void checkGeometry()}>测量 50 次进度更新</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}

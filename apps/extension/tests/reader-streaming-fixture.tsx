@@ -34,8 +34,9 @@ catalog.get=async(table,id)=>records.get(JSON.stringify([table,id])) as never;
 catalog.putMaterialization=async identity=>{records.set(JSON.stringify(['materializations',identity.id]),identity);return true;};
 registerSourceDriver({id:'reader-stream-fixture',label:'Synthetic loopback',cachePages:false,cacheRanges:false});
 if(!streaming)PagePreview.prototype.add=()=>()=>{};
+const FlipMetrics=query.has('curl')?(await import('./reader-flip-metrics')).ReaderFlipMetrics:undefined;
 const viewKey='reader-streaming-fixture';
-saveReadingView(viewKey,{...readingViewDefaults(),layout:query.get('layout')==='single'?'single':'continuous',fit:'width',zoom:100});
+saveReadingView(viewKey,{...readingViewDefaults(),layout:query.get('layout')==='double'?'double':query.get('layout')==='single'?'single':'continuous',fit:'width',zoom:100});
 type Timing={requests:number;bytes:number;downloadMs?:number;previewMs?:number;shownMs?:number;paints:number};
 let run='',started=0,timings:Record<string,Timing>={},decoderCount=0,decoders=0,peakDecoders=0,paintMs=0,longTasks:number[]=[];
 const elapsed=()=>Math.round(performance.now()-started);
@@ -105,6 +106,7 @@ function Fixture(){
  }
  function translated(){setCopy(previous=>previous&&({...previous,pages:previous.pages.map(page=>({...page,translationScope:'stream-fixture',jobs:[{id:`result-${page.id}`,mode:'classic',target_language:settings.language,status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true}],outputBlobs:{[`result-${page.id}`]:resultKey}}))}));}
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}>
+  {FlipMetrics&&<FlipMetrics/>}
   <div style={{padding:6,display:'flex',gap:6,flexWrap:'wrap',background:'white',zIndex:20}}><strong>{streaming?'流式':'完整下载'} · {kib||'不限速'} KiB/s</strong><button onClick={()=>void begin()} disabled={checking}>开始慢网加载</button>{count===1&&<button onClick={()=>void series()} disabled={checking}>{checking?'三轮测量中':'运行三轮对照'}</button>}<button onClick={()=>setMounted(value=>!value)} disabled={!copy||checking}>{mounted?'关闭并保存位置':'重开阅读器'}</button><button onClick={()=>void metrics()} disabled={!copy||checking}>读取指标</button><button onClick={translated} disabled={!copy||checking}>提供模拟译图</button>{count>1&&<button onClick={checkTurn} disabled={!copy}>检查慢加载翻页</button>}<output>已读 {marked} · 位置 {copy?.pageId??'-'} / {copy?.relativeOffset.toFixed(3)??'0'}</output></div>
   <div style={{flexShrink:0,maxHeight:180,overflow:'auto',fontSize:12}}>{report.map((line,index)=><p key={index} style={{margin:3}}>{line}</p>)}{status}</div>
   {mounted&&copy&&<Reader key={copy.id} viewKey={viewKey} translationScope="stream-fixture" copy={copy} sequence={[copy]} settings={settings} setSettings={setSettings} update={setCopy} onActiveEntry={noop} onLoadEntry={noop} onMarkRead={async()=>{setMarked(value=>value+1);}} onNavigate={noop} onBack={()=>setMounted(false)} onOpenShortcuts={noop} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={()=>undefined} onImport={noop} notify={setStatus} onReadingWindow={noop} busy={false}/>}

@@ -788,13 +788,11 @@ a {
   z-index: 2;
   overflow: hidden;
   pointer-events: none;
-}
-.nc-page-transition {
-  position: absolute;
-  inset: 0;
   background: var(--reading-background);
-  will-change: transform;
 }
+.nc-page-turn { position: absolute; top: 0; }
+.nc-flip-leaf { overflow: clip; }
+.nc-page-transition-clip .spinner { animation: none; }
 .nc-reader-end[data-paged="true"] {
   height: 0;
   padding: 0;

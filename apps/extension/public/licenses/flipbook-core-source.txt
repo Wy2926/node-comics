@@ -1,0 +1,10 @@
+@gullabs/flipbook-core 3.2.2
+Upstream: https://github.com/gul-labs/flipbook
+Package: https://registry.npmjs.org/@gullabs/flipbook-core/-/flipbook-core-3.2.2.tgz
+Integrity: sha512-W2MC/6SBrQWD6qktCnay/IJPJOe4zSGKhHPr4dnJbrRhj+vr5RTjYa+8tWx8rOuJc8bp2jnWgTBC7JDIdHxDug==
+License: MPL-2.0, with retained Nodlik/StPageFlip MIT notices.
+The complete upstream license is in flipbook-core.txt in this directory.
+Unmodified library. The exact package above contains the original TypeScript
+source in the sourcesContent fields of dist/index.js.map, as well as the CSS.
+Node Comics uses its public API; page geometry, clipping, shadows and animation
+frames are calculated by the upstream library.

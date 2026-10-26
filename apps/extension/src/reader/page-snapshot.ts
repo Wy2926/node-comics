@@ -1,40 +1,45 @@
 import {retainReaderImageURL} from './image-urls';
 
-/** Visual-only outgoing layer: no React callbacks, reading evidence, or source requests. */
-export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,offset:number){
+/** Inert paper faces. They borrow displayed URLs; they never acquire or decode a source. */
+export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,columns:1|2,frame={left:0,top:0,width:viewport.clientWidth,height:viewport.clientHeight}){
  const bounds=viewport.getBoundingClientRect(),rect=surface.getBoundingClientRect();
- const host=document.createElement('div'),layer=document.createElement('div'),pixels=surface.cloneNode(true) as HTMLDivElement;
- host.className='nc-page-transition-clip';
- layer.className='nc-page-transition';layer.setAttribute('data-swipe-snapshot','');layer.setAttribute('aria-hidden','true');layer.inert=true;
- Object.assign(host.style,{width:`${viewport.clientWidth}px`,height:`${viewport.clientHeight}px`});
- // Keep the old geometry, including the native vertical pan, independent of the incoming spread.
- Object.assign(pixels.style,{position:'absolute',left:`${rect.left-bounds.left-viewport.clientLeft-offset}px`,top:`${rect.top-bounds.top-viewport.clientTop}px`,
-  width:`${surface.offsetWidth}px`,height:`${surface.offsetHeight}px`,minWidth:'0',minHeight:'0',boxSizing:'border-box',transform:'none',willChange:'auto'});
- pixels.className='nc-reading-snapshot';
- // No duplicated document identities or reader selectors; keep only presentation classes.
- for(const element of [pixels,...pixels.querySelectorAll<HTMLElement>('*')]){
-  element.removeAttribute('id');
-  for(const name of element.getAttributeNames())if(name.startsWith('data-')&&name!=='data-direction'&&name!=='data-paged')element.removeAttribute(name);
- }
- for(const element of pixels.querySelectorAll('.nc-page-image-pending'))element.remove();
- // cloneNode does not copy canvas pixels. Freeze only a visible in-flight preview, once per turn.
+ const width=frame.width/columns;
+ const images:HTMLImageElement[]=[],canvases:HTMLCanvasElement[]=[],releases:(()=>void)[]=[];
  const originals=[...surface.querySelectorAll<HTMLCanvasElement>('.nc-page-preview')];
- const previews=[...pixels.querySelectorAll<HTMLCanvasElement>('.nc-page-preview')];
- previews.forEach((canvas,index)=>{
-  const original=originals[index];
-  if(original?.style.display!=='none'&&original?.width>1&&original.height>1){
-   try{canvas.getContext('2d')?.drawImage(original,0,0);}catch{/* Navigation still proceeds if the browser cannot retain this preview. */}
+ const pageBounds=[...surface.querySelectorAll<HTMLElement>('.nc-manga-page')].map(page=>page.getBoundingClientRect());
+ const leaves=Array.from({length:columns},(_,column)=>{
+  const leaf=document.createElement('div'),pixels=surface.cloneNode(true) as HTMLDivElement;
+  leaf.className='nc-flip-leaf';leaf.setAttribute('aria-hidden','true');leaf.inert=true;
+  Object.assign(pixels.style,{position:'absolute',left:`${rect.left-bounds.left-viewport.clientLeft-frame.left-column*width}px`,top:`${rect.top-bounds.top-viewport.clientTop-frame.top}px`,
+   width:`${surface.offsetWidth}px`,height:`${surface.offsetHeight}px`,minWidth:'0',minHeight:'0',boxSizing:'border-box',transform:'none',visibility:'visible',willChange:'auto'});
+  pixels.className='nc-reading-snapshot';
+  const previews=[...pixels.querySelectorAll<HTMLCanvasElement>('.nc-page-preview')];
+  // Keep the layout box, but do not retain images from the other half of a spread.
+  [...pixels.querySelectorAll<HTMLElement>('.nc-manga-page')].forEach((page,index)=>{
+   const rect=pageBounds[index],left=bounds.left+frame.left+column*width;
+   if(rect&&(rect.right<=left+.5||rect.left>=left+width-.5))page.replaceChildren();
+  });
+  for(const element of [pixels,...pixels.querySelectorAll<HTMLElement>('*')]){
+   element.removeAttribute('id');
+   for(const name of element.getAttributeNames())if(name.startsWith('data-')&&name!=='data-direction'&&name!=='data-paged')element.removeAttribute(name);
   }
+  for(const pending of pixels.querySelectorAll('.nc-page-image-pending'))pending.remove();
+  previews.forEach((canvas,index)=>{
+   if(!pixels.contains(canvas))return;
+   const original=originals[index];canvases.push(canvas);
+   if(original?.style.display!=='none'&&original?.width>1&&original.height>1){
+    try{canvas.getContext('2d')?.drawImage(original,0,0);}catch{/* A failed visual copy must not block navigation. */}
+   }
+  });
+  for(const image of pixels.querySelectorAll<HTMLImageElement>('img')){images.push(image);releases.push(retainReaderImageURL(image.src));}
+  leaf.append(pixels);return leaf;
  });
- const images=[...pixels.querySelectorAll<HTMLImageElement>('img')];
- const releases=images.map(image=>retainReaderImageURL(image.src));
- layer.append(pixels);host.append(layer);viewport.append(host);
  let disposed=false;
- const position=()=>{host.style.left=`${viewport.scrollLeft}px`;host.style.top=`${viewport.scrollTop}px`;};
- position();viewport.addEventListener('scroll',position,{passive:true});
- return {
-  element:layer,
-  position,
-  dispose(){if(disposed)return;disposed=true;viewport.removeEventListener('scroll',position);host.remove();for(const image of images)image.removeAttribute('src');for(const canvas of previews)canvas.width=canvas.height=1;for(const release of releases)release();},
- };
+ return {leaves,dispose(){
+  if(disposed)return;disposed=true;
+  for(const image of images)image.removeAttribute('src');
+  for(const canvas of canvases)canvas.width=canvas.height=1;
+  for(const release of releases)release();
+  for(const leaf of leaves)leaf.remove();
+ }};
 }

@@ -22,6 +22,7 @@
     "audit:i18n": "node scripts/check-i18n.mjs --json"
   },
   "dependencies": {
+    "@gullabs/flipbook-core": "3.2.2",
     "@zip.js/zip.js": "2.15.0",
     "epubjs": "0.3.93",
     "node-unrar-js": "2.0.2",
