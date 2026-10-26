@@ -30,6 +30,7 @@ vi.mock('./prepare-image', () => ({prepareReaderImage: vi.fn(async (_url: string
 import {ReaderPicture, type ReaderPictureProps} from './ReaderPicture';
 import {prepareReaderImage,setReaderImagePriority} from './prepare-image';
 import {msg} from '../i18n/runtime';
+import {createReaderImageURL,releaseReaderImageURL,shareReaderImageURL,borrowReaderImageURL} from './image-urls';
 
 let options: ReaderPictureProps;
 let tree: ReactNode;
@@ -78,6 +79,36 @@ beforeEach(() => {
 afterEach(() => {cleanup(); vi.restoreAllMocks();});
 
 describe('shared reader pixel presentation', () => {
+  it('validates a foreground lease before reusing prepared turn-preview pixels without another decode',async()=>{
+    const url=createReaderImageURL(new Blob(['prepared'])),id=JSON.stringify(['slot-1','original',undefined]),unpublish=shareReaderImageURL(id,url);
+    const {acquire,reads}=controlledReads();render({acquire});expect(images(tree)).toHaveLength(0);expect(acquire).toHaveBeenCalledOnce();
+    reads[0].resolve();await flush();expect(images(tree)[0].src).toBe(url);expect(prepareReaderImage).not.toHaveBeenCalled();
+    displayed();unpublish();releaseReaderImageURL(url);expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    cleanup();expect(reads[0].release).toHaveBeenCalledOnce();expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(url);
+  });
+  it('shares a preview display URL without sharing reading evidence and removes it when the preview unmounts',async()=>{
+    const id=JSON.stringify(['slot-1','original',undefined]);render({shareForTurn:true});await flush();
+    const borrowed=borrowReaderImageURL(id)!;expect(borrowed).toBe(images(tree)[0].src);displayed();
+    cleanup();expect(borrowReaderImageURL(id)).toBeUndefined();expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    releaseReaderImageURL(borrowed);expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(borrowed);
+  });
+  it('cannot reuse prepared pixels across a different page scope',async()=>{
+    const url=createReaderImageURL(new Blob(['old scope'])),unpublish=shareReaderImageURL(JSON.stringify(['other-scope','original',undefined]),url);
+    render();await flush();expect(images(tree)[0].src).not.toBe(url);expect(prepareReaderImage).toHaveBeenCalledOnce();
+    unpublish();releaseReaderImageURL(url);
+  });
+  it('never displays a shared preview URL when source access is rejected',async()=>{
+    const url=createReaderImageURL(new Blob(['preview'])),unpublish=shareReaderImageURL(JSON.stringify(['slot-1','original',undefined]),url);
+    render({acquire:vi.fn(async()=>{throw Error('access revoked');})});await flush();
+    expect(images(tree)).toHaveLength(0);expect(prepareReaderImage).not.toHaveBeenCalled();unpublish();releaseReaderImageURL(url);
+  });
+  it('shares an in-flight preview URL so its next owner does not start a second decode',async()=>{
+    const decode=deferred<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(decode.promise);
+    render({shareForTurn:true});await flush();expect(images(tree)).toHaveLength(0);
+    const borrowed=borrowReaderImageURL(JSON.stringify(['slot-1','original',undefined]))!;expect(borrowed).toBe('blob:reader-test-1');
+    cleanup();expect(URL.revokeObjectURL).not.toHaveBeenCalled();decode.resolve();await Promise.resolve();
+    releaseReaderImageURL(borrowed);expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(borrowed);
+  });
   it('shows streamed pixels while reading without committing identity, then releases the canvas after final display',async()=>{
     const {acquire,reads}=controlledReads(),shown=vi.fn(),states=vi.fn();render({acquire,onShown:shown,onLoadState:states});
     const drawImage=vi.fn(),canvas={width:1,height:1,getContext:()=>({drawImage})};previewCanvas(tree)!.ref.current=canvas;

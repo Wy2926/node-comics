@@ -196,7 +196,11 @@ async function point(x = .5, y = .5) {
   assert(box, 'Reading viewport is visible');
   return {x: box.x + box.width * x, y: box.y + box.height * y, width: box.width, height: box.height};
 }
-async function mouseDrag(distance, {release = true, start = .5, vertical = 0} = {}) {
+async function mouseDrag(distance, {release = true, start = distance>0?.15:.85, vertical = 0} = {}) {
+  if(Math.abs(distance)>=200){
+    const span=await cells().evaluateAll(elements=>{const boxes=elements.map(element=>element.getBoundingClientRect());return Math.max(...boxes.map(box=>box.right))-Math.min(...boxes.map(box=>box.left));});
+    distance=Math.sign(distance)*Math.max(Math.abs(distance),span*.65);
+  }
   const from = await point(start);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
@@ -282,7 +286,9 @@ test('mouse double-page gestures move the entire RTL spread, respect landscape p
   await resetTrace(); await mouseDrag(230, {release: false});
   assert.equal(await viewport().getAttribute('data-swipe-phase'), 'dragging');
   const dragged = await cells().evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
-  assert(dragged.every((x,index)=>Math.abs(x-positions[index])<1), 'Both pages stay in place until the swipe is released');
+  assert(dragged.every((x,index)=>Math.abs(x-positions[index])<1), 'The live surface keeps its layout while library paper faces follow the pointer');
+  assert(new Set((await trace()).filter(frame=>frame.phase==='dragging').map(frame=>frame.fold)).size>=3, 'Held pointer movement visibly updates the curl before navigation');
+  assert.equal(await pageNumber().inputValue(),'2','Holding the fold does not commit navigation');
   await page.screenshot({path: resolve(artifacts, 'double-mouse-drag.png')});
   await page.mouse.up(); await shown(4, [4]); await assertAnimation(1, {dragged: true});
   assert((await trace()).every(frame => frame.pageDOM <= 4 && frame.urls <= 4), 'Spread animation retains at most old and new groups');

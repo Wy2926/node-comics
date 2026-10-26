@@ -4,6 +4,8 @@ vi.mock('../src/reader/page-snapshot',()=>({pageSnapshot:mocks.capture}));
 vi.mock('@gullabs/flipbook-core',()=>({PageFlip:class{
  handlers=new Map();destroy=vi.fn();loadFromHTML=vi.fn(()=>{if(mocks.fail)throw Error('Renderer failed');});
  flipNext=vi.fn(()=>!mocks.refuse);flipPrev=vi.fn(()=>!mocks.refuse);
+ startUserTouch=vi.fn();userStop=vi.fn();getState=()=> 'user_fold';
+ userMove=vi.fn((point:{x:number})=>{this.handlers.get('turnProgress')?.({data:{progress:this.settings.initialPage===0?1-point.x/(this.settings.width*2):point.x/(this.settings.width*2)}});});
  constructor(public host:unknown,public settings:any){mocks.instances.push(this);}
  on(name:string,callback:Function){this.handlers.set(name,callback);}
  finish(){this.handlers.get('changeState')?.({data:{state:'read'}});}
@@ -41,6 +43,7 @@ describe('bounded library page curl',()=>{
   const f=fixture(1,sign),host=f.viewport.children[0],book=host.children[0];
   expect(f.engine.settings).toMatchObject({width:800,height:600,usePortrait:false,pointerInput:[],injectStyles:false,initialPage:sign<0?0:2,flippingTime:360});
   expect(book.style).toMatchObject({width:'1600px',left:sign<0?'-800px':'0px'});
+  expect(book.style.clipPath).toBe(`inset(0 ${sign>0?800:0}px 0 ${sign<0?800:0}px)`);
   expect(f.engine.loadFromHTML.mock.calls[0][0]).toHaveLength(4);expect(host.inert).toBe(true);
   expect(host.style).toMatchObject({width:'100%',height:'100%'});f.turn!.dispose();
  });
@@ -66,6 +69,14 @@ describe('bounded library page curl',()=>{
   change();expect(previous.dispose).toHaveBeenCalledOnce();expect(f.engine.loadFromHTML).toHaveBeenCalledOnce();expect(f.engine.flipNext).toHaveBeenCalledOnce();
   f.turn!.dispose();expect(disconnect).toHaveBeenCalledOnce();change();expect(mocks.capture).toHaveBeenCalledTimes(3);
  });
+ it('reveals the destination before commit and retains its ready paper through the live-page handoff',()=>{
+  const f=fixture(),preview=new Element() as unknown as HTMLDivElement;
+  f.turn!.preview(preview);expect(mocks.capture).toHaveBeenCalledTimes(2);expect(mocks.capture.mock.calls[1][1]).toBe(preview);
+  f.turn!.drag({x:700,y:300},{x:200,y:250});f.turn!.play(()=>{});frame();
+  expect(mocks.capture).toHaveBeenCalledTimes(2);expect(f.engine.flipNext).not.toHaveBeenCalled();
+  f.turn!.preview(f.surface as unknown as HTMLDivElement);expect(mocks.capture).toHaveBeenCalledTimes(2);f.turn!.dispose();
+  for(const result of mocks.capture.mock.results)expect(result.value.dispose).toHaveBeenCalledOnce();
+ });
  it.each([-1,1])('captures the committed destination before calling the library for sign %s, then releases both snapshots',async sign=>{
   const f=fixture(1,sign),done=vi.fn(()=>f.turn!.dispose());f.turn!.play(done);
   expect(mocks.capture).toHaveBeenCalledTimes(2);expect(f.engine.flipNext).not.toHaveBeenCalled();expect(f.engine.flipPrev).not.toHaveBeenCalled();
@@ -87,5 +98,36 @@ describe('bounded library page curl',()=>{
  });
  it('cleans a failed renderer initialization so reading can continue',()=>{
   mocks.fail=true;const f=fixture();expect(f.turn).toBeUndefined();expect(f.viewport.children).toHaveLength(0);expect(mocks.capture.mock.results[0].value.dispose).toHaveBeenCalledOnce();expect(f.engine.destroy).toHaveBeenCalledOnce();
+ });
+ it.each([-1,1])('coalesces pointer moves and seeds the physical edge before crossing the spine, sign %s',sign=>{
+  const f=fixture(1,sign),start={x:400,y:300};
+  f.turn!.drag(start,{x:400+sign*20,y:320});f.turn!.drag(start,{x:400+sign*450,y:340});
+  expect(f.engine.userMove).not.toHaveBeenCalled();expect(frames.size).toBe(1);frame();
+  expect(f.engine.startUserTouch).toHaveBeenCalledExactlyOnceWith({x:sign<0?1600:0,y:320});
+  expect(f.engine.userMove.mock.calls).toEqual([[{x:sign<0?1594:6,y:320},true],[{x:sign<0?700:900,y:320},true]]);
+  expect(f.turn!.canCommit()).toBe(true);expect(mocks.capture).toHaveBeenCalledOnce();
+  expect(f.engine.userMove).toHaveBeenCalledTimes(2);f.turn!.dispose();
+ });
+ it('settles an accepted drag from its current fold without replaying a programmed turn',async()=>{
+  const f=fixture(),done=vi.fn(()=>f.turn!.dispose());
+  f.turn!.drag({x:700,y:300},{x:200,y:250});expect(f.turn!.canCommit()).toBe(true);
+  f.turn!.play(done);frame();expect(f.engine.userStop).toHaveBeenCalledExactlyOnceWith({x:600,y:230},false);
+  expect(f.engine.flipNext).not.toHaveBeenCalled();f.engine.finish();await Promise.resolve();expect(done).toHaveBeenCalledOnce();
+ });
+ it('returns a short drag using the library without reading or cloning a destination',async()=>{
+  const f=fixture(),done=vi.fn(()=>f.turn!.dispose());
+  f.turn!.drag({x:700,y:300},{x:650,y:350});f.turn!.revert(done);frame();
+  expect(mocks.capture).toHaveBeenCalledOnce();expect(f.engine.userStop).toHaveBeenCalledExactlyOnceWith({x:1500,y:330},false);
+  expect(f.engine.flipNext).not.toHaveBeenCalled();f.engine.finish();await Promise.resolve();expect(done).toHaveBeenCalledOnce();
+ });
+ it('uses the library touch-flick path and the grabbed corner for an early release',()=>{
+  const f=fixture();f.turn!.drag({x:700,y:100},{x:650,y:110});expect(f.turn!.canCommit()).toBe(false);
+  f.turn!.play(()=>{});frame();expect(f.engine.userStop).toHaveBeenCalledWith({x:1500,y:90},true);
+  expect(f.engine.flipNext).toHaveBeenCalledExactlyOnceWith('top');f.turn!.dispose();
+ });
+ it('keeps double-page motion at pointer scale and cancels an unpainted drag on disposal',()=>{
+  const f=fixture(2);f.turn!.drag({x:700,y:300},{x:500,y:350});frame();
+  expect(f.engine.userMove).toHaveBeenLastCalledWith({x:600,y:330},true);expect(f.turn!.canCommit()).toBe(false);
+  f.turn!.drag({x:700,y:300},{x:100,y:350});f.turn!.dispose();frame();expect(f.engine.userMove).toHaveBeenCalledTimes(2);
  });
 });

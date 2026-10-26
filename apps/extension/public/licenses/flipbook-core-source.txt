@@ -4,7 +4,16 @@ Package: https://registry.npmjs.org/@gullabs/flipbook-core/-/flipbook-core-3.2.2
 Integrity: sha512-W2MC/6SBrQWD6qktCnay/IJPJOe4zSGKhHPr4dnJbrRhj+vr5RTjYa+8tWx8rOuJc8bp2jnWgTBC7JDIdHxDug==
 License: MPL-2.0, with retained Nodlik/StPageFlip MIT notices.
 The complete upstream license is in flipbook-core.txt in this directory.
-Unmodified library. The exact package above contains the original TypeScript
-source in the sourcesContent fields of dist/index.js.map, as well as the CSS.
-Node Comics uses its public API; page geometry, clipping, shadows and animation
-frames are calculated by the upstream library.
+The exact package above contains the original TypeScript source in the
+sourcesContent fields of dist/index.js.map, as well as the CSS.
+Node Comics modifies only FlipCalculation.getBottomClipArea: keep the side
+intersection when a small corner fold does not intersect the top edge.
+Preferred-source modification: flipbook-core-small-fold.patch (same directory).
+Apply with patch -p1 to the extracted TypeScript tree. The original modified
+file is sourcesContent[sources.indexOf('../src/Flip/FlipCalculation.ts')].
+Original FlipCalculation.ts SHA-256: 3be15fe875e39808b2f903dce6826f8bedde3283cf386777b46136be761d9ebb
+Modified FlipCalculation.ts SHA-256: 06d9dcdc11caf6c8128d0e81af4fd0660103d415ebdcc428dcd6c7566410fe41
+The equivalent compiled-method change is applied at build time by
+apps/extension/flipbook-clip.ts, with an exact upstream-method SHA-256 check.
+No runtime monkey-patch. The engine still computes geometry, clipping,
+shadows and animation; Node Comics calls its public API.

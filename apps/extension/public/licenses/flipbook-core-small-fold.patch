@@ -1,0 +1,7 @@
+--- a/packages/core/src/Flip/FlipCalculation.ts
++++ b/packages/core/src/Flip/FlipCalculation.ts
+@@ -172,2 +172,2 @@
+-    if (this.sideIntersectPoint !== null && this.topIntersectPoint !== null) {
+-      if (distanceBetween(this.sideIntersectPoint, this.topIntersectPoint) >= 10) {
++    if (this.sideIntersectPoint !== null) {
++      if (this.topIntersectPoint === null || distanceBetween(this.sideIntersectPoint, this.topIntersectPoint) >= 10) {

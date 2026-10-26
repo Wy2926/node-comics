@@ -8,6 +8,12 @@ export interface PageSpread {
   end: number;
 }
 
+/** Shared by navigation and the inert turn preview, including chapter edges. */
+export function pageTurnIndex(spreads:readonly PageSpread[],index:number,delta:-1|1){
+ const current=spreadAt(spreads,index);
+ return current?(delta>0?current.end:spreadAt(spreads,current.start-1)?.start??-1):index+delta;
+}
+
 /** Missing source dimensions remain a square placeholder until the image is known. */
 function aspectRatio(page: PageSize): number {
   const ratio = page.width / page.height;

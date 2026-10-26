@@ -8,9 +8,9 @@ import {ReadingProgress,READING_TARGETS} from '../reading-window';
 
 export const pageKey=(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`;
 export const completeManifest=completePageList;
-type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];motion?:RefObject<boolean>;update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
+type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];previewEntry?:string;motion?:RefObject<boolean>;update:(copy:ReadingEntry)=>void;onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;onMarkRead:(id:string)=>Promise<void>;notify:(message:string)=>void};
 /** Three metadata chapters, with viewport position independent of mounted page DOM. */
-export function useChapterStream({copy,sequence,layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
+export function useChapterStream({copy,sequence,layout,previewEntry,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
  const initialIndex=useMemo(()=>Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId)),[copy.pages,copy.pageId]);
  const [active,setActive]=useState({entryId:copy.id,index:initialIndex});
  const pendingChapterEnd=useRef<string|undefined>(undefined);
@@ -35,7 +35,11 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  const previous=useMemo(()=>sequence[sequence.findIndex(chapter=>chapter.id===copy.id)-1],[sequence,copy.id]);
  const next=completeManifest(copy)?nextOf(copy):undefined;
  const [foreground,setForeground]=useState(()=>!document.hidden);
- const resourceChapters=useMemo(()=>foreground?chapterResources(stream,copy,index,next,layout):[copy],[foreground,stream,copy,index,next,layout]);
+ const resourceChapters=useMemo(()=>{
+  const chapters=foreground?chapterResources(stream,copy,index,next,layout):[copy];
+  const preview=foreground&&layout!=='continuous'&&previewEntry?sequence.find(chapter=>chapter.id===previewEntry):undefined;
+  return preview&&!chapters.some(chapter=>chapter.id===preview.id)?[...chapters,preview]:chapters;
+ },[foreground,stream,copy,index,next,layout,previewEntry,sequence]);
  const elementTop=(element:HTMLElement)=>{const v=viewport.current!;return element.getBoundingClientRect().top-v.getBoundingClientRect().top+v.scrollTop-v.clientTop;};
  function position(chapter:ReadingEntry,n:number):{top:number;height:number;stackTop?:number}|undefined{
   if(!viewport.current||n<0||n>=chapter.pages.length)return;

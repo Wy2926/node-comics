@@ -6,10 +6,10 @@ vi.mock('../src/reader/page-turn',()=>({pageTurn:snapshots.create}));
 vi.mock('react',async original=>({
  ...await original<typeof import('react')>(),
  useRef:(current:unknown)=>hooks.refs[hooks.cursor++]??(hooks.refs[hooks.cursor-1]={current}),
- useLayoutEffect:(effect:()=>void|(()=>void),deps:unknown[])=>{
+ useLayoutEffect:(effect:()=>void|(()=>void),deps?:unknown[])=>{
   const index=hooks.effectCursor++,previous=hooks.effects[index];
-  if(previous&&deps.every((value,i)=>Object.is(value,previous.deps[i])))return;
-  hooks.pending.push(()=>{previous?.cleanup?.();hooks.effects[index]={deps,cleanup:effect()||undefined};});
+  if(previous&&deps&&deps.every((value,i)=>Object.is(value,previous.deps[i])))return;
+  hooks.pending.push(()=>{previous?.cleanup?.();hooks.effects[index]={deps:deps??[],cleanup:effect()||undefined};});
  },
 }));
 import {usePagedSwipe} from '../src/reader/usePagedSwipe';
@@ -37,7 +37,7 @@ class Surface extends Events{
 }
 function snapshot(){
  let done=()=>{};
- const result={pinned:true,position:vi.fn(),play:vi.fn((callback:()=>void)=>{done=callback;}),finish:()=>done(),dispose:vi.fn(()=>{result.pinned=false;})};
+ const result={pinned:true,position:vi.fn(),preview:vi.fn(),drag:vi.fn(),canCommit:vi.fn(()=>false),revert:vi.fn((callback:()=>void)=>{done=callback;}),play:vi.fn((callback:()=>void)=>{done=callback;}),finish:()=>done(),dispose:vi.fn(()=>{result.pinned=false;})};
  return result;
 }
 let browser:Events&{matchMedia:()=>{matches:boolean};getSelection:()=>{toString:()=>string};visualViewport:{scale:number}};
@@ -53,7 +53,7 @@ function fixture(extra:Partial<Options>={}){
  };
  render();
  const pointer=(name:string,x:number,y=100,extra:Record<string,unknown>={})=>{
-  const event={pointerId:1,pointerType:'mouse',isPrimary:true,button:0,clientX:x,clientY:y,timeStamp:0,target:{closest:()=>null},...extra};
+  const event={pointerId:1,pointerType:'mouse',isPrimary:true,button:0,buttons:1,clientX:x,clientY:y,timeStamp:0,target:{closest:()=>null},...extra};
   if(name==='pointerdown'){browser.emit(name,event);return viewport.emit(name,event);}
   return browser.emit(name,event);
  };
@@ -115,10 +115,12 @@ describe('library page-turn input and reading lifecycle',()=>{
   f.pointer('pointerdown',500,100,{pointerType:'touch'});expect(old.pinned).toBe(false);
   f.pointer('pointermove',300,100,{timeStamp:200});f.pointer('pointerup',300,100,{timeStamp:210});expect(f.options.onTurn).toHaveBeenCalledTimes(2);
  });
- it('keeps the image in place until a swipe is released and supports a quick short flick',()=>{
-  const f=fixture();f.pointer('pointerdown',500,100,{pointerType:'touch'});f.pointer('pointermove',460,100,{timeStamp:30});
-  expect(f.surface.style.transform).toBe('');expect(snapshots.create).not.toHaveBeenCalled();
+ it.each(['mouse','touch'])('follows %s during a drag without navigating and supports a quick short flick',pointerType=>{
+  const f=fixture();f.pointer('pointerdown',500,100,{pointerType});f.pointer('pointermove',460,100,{timeStamp:30,pointerType});
+  expect(f.surface.style.transform).toBe('');expect(f.surface.style.visibility).toBe('hidden');expect(snapshots.create).toHaveBeenCalledOnce();
+  expect(f.snapshot.drag).toHaveBeenLastCalledWith({x:500,y:100},{x:460,y:100});expect(f.options.onTurn).not.toHaveBeenCalled();
   f.pointer('pointerup',460,100,{timeStamp:40});expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);
+  expect(snapshots.create).toHaveBeenCalledOnce();
  });
  it('does not cancel when implicit image capture transfers to the viewport',()=>{
   const f=fixture();f.pointer('pointerdown',500,100,{pointerType:'touch'});f.pointer('pointermove',300,100,{timeStamp:200});
@@ -127,7 +129,8 @@ describe('library page-turn input and reading lifecycle',()=>{
  });
  it('leaves a slow short swipe in place and suppresses only the trailing click',()=>{
   const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});
-  expect(f.viewport.dataset.swipePhase).toBeUndefined();expect(f.options.onTurn).not.toHaveBeenCalled();expect(snapshots.create).not.toHaveBeenCalled();
+  expect(f.viewport.dataset.swipePhase).toBe('returning');expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.snapshot.revert).toHaveBeenCalledOnce();
+  f.finish();expect(f.viewport.dataset.swipePhase).toBeUndefined();
   const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();
  });
  it.each([false,true])('accepts a fresh primary press even without a previous trailing click, blocked=%s',blocked=>{
@@ -151,6 +154,46 @@ describe('library page-turn input and reading lifecycle',()=>{
   const f=fixture();f.pointer('pointerdown',500);const small=f.pointer('pointermove',495,103);expect(small.preventDefault).not.toHaveBeenCalled();f.pointer('pointerup',495,103);
   f.pointer('pointerdown',500);f.pointer('pointermove',493,140);f.pointer('pointermove',100,140);f.pointer('pointerup',100,140);
   expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.viewport.captures.size).toBe(0);expect(snapshots.create).not.toHaveBeenCalled();
+ });
+ it('uses the library fold threshold for a slow drag and reuses its engine through commit',()=>{
+  const f=fixture();f.pointer('pointerdown',700);f.pointer('pointermove',200,120,{timeStamp:1000});
+  f.snapshot.canCommit.mockReturnValue(true);f.pointer('pointerup',200,120,{timeStamp:1400});
+  expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);expect(snapshots.create).toHaveBeenCalledOnce();
+  f.render({identity:'page-2'});expect(f.snapshot.play).toHaveBeenCalledOnce();f.finish();expect(f.snapshot.pinned).toBe(false);
+ });
+ it('opens only one inert destination preview and releases it when the drag is canceled',()=>{
+  const onPreviewChange=vi.fn(),preview={current:null as HTMLDivElement|null},f=fixture({onPreviewChange,preview});
+  f.pointer('pointerdown',500);f.pointer('pointermove',350,100,{timeStamp:300});f.pointer('pointermove',300,100,{timeStamp:600});
+  expect(onPreviewChange).toHaveBeenCalledExactlyOnceWith(1);
+  preview.current={} as HTMLDivElement;f.render();expect(f.snapshot.preview).toHaveBeenLastCalledWith(preview.current);
+  f.pointer('pointercancel',300);expect(onPreviewChange).toHaveBeenLastCalledWith(undefined);expect(f.options.onTurn).not.toHaveBeenCalled();
+ });
+ it('can drag past the commit threshold and pull back without navigation',()=>{
+  const f=fixture();f.pointer('pointerdown',700);f.pointer('pointermove',100,120,{timeStamp:1000});
+  f.pointer('pointermove',670,120,{timeStamp:2000});f.pointer('pointerup',670,120,{timeStamp:2400});
+  expect(f.snapshot.drag).toHaveBeenLastCalledWith({x:700,y:100},{x:670,y:120});
+  expect(f.snapshot.revert).toHaveBeenCalledOnce();expect(f.options.onTurn).not.toHaveBeenCalled();f.finish();
+ });
+ it('reverses direction with at most one snapshot and preserves boundary behavior',()=>{
+  const f=fixture({canTurn:delta=>delta===1});f.pointer('pointerdown',400);f.pointer('pointermove',200,100,{timeStamp:100});const old=f.snapshot;
+  f.pointer('pointermove',450,100,{timeStamp:200});expect(old.pinned).toBe(false);expect(f.surface.style.visibility).toBe('');
+  f.pointer('pointermove',150,100,{timeStamp:300});expect(snapshots.create).toHaveBeenCalledTimes(2);
+  expect(snapshots.create.mock.results.filter(r=>r.value.pinned)).toHaveLength(1);
+  f.pointer('pointercancel',150);expect(f.snapshot.pinned).toBe(false);expect(f.options.onTurn).not.toHaveBeenCalled();
+ });
+ it('cancels a mouse gesture if its pressed-button state is lost',()=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',400,100,{timeStamp:100});
+  f.pointer('pointermove',200,100,{timeStamp:200,buttons:0});f.pointer('pointerup',200);
+  expect(f.snapshot.pinned).toBe(false);expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
+ });
+ it('lets a new navigation interrupt a returning fold and ignores its late completion',()=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});
+  const old=f.snapshot;f.controls.turn(1);expect(old.pinned).toBe(false);old.finish();expect(f.options.onSettled).not.toHaveBeenCalled();
+  f.render({identity:'page-2'});f.finish();expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.options.onSettled).toHaveBeenCalledOnce();
+ });
+ it.each(['mouse','touch'])('keeps reduced-motion %s swipes free of snapshots',pointerType=>{
+  reduced=true;const f=fixture();f.pointer('pointerdown',700,100,{pointerType});f.pointer('pointermove',200,100,{timeStamp:1000,pointerType});f.pointer('pointerup',200,100,{timeStamp:1500,pointerType});
+  expect(f.options.onTurn).toHaveBeenCalledOnce();expect(snapshots.create).not.toHaveBeenCalled();expect(f.surface.style.visibility).toBe('');
  });
  it.each(['interactive','selection','overflow','pinch','secondary','modifier','blocked'] as const)('does not steal %s interaction',reason=>{
   const f=fixture({blocked:reason==='blocked'});if(reason==='selection')selection='text';if(reason==='overflow')f.viewport.scrollWidth=1000;if(reason==='pinch')browser.visualViewport.scale=2;
@@ -191,7 +234,7 @@ describe('library page-turn input and reading lifecycle',()=>{
  it('cancels an uncommitted drag if its source page changes',()=>{
   const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',200,100,{timeStamp:200});
   f.render({identity:'changed-source'});f.pointer('pointerup',200,100,{timeStamp:210});
-  expect(f.options.onTurn).not.toHaveBeenCalled();expect(snapshots.create).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
+  expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.snapshot.dispose).toHaveBeenCalledOnce();expect(f.viewport.dataset.swipePhase).toBeUndefined();
  });
  it('disposes a navigation that never commits without replaying a late page',()=>{
   const f=fixture();f.controls.turn(1);vi.advanceTimersByTime(1000);expect(f.snapshot.pinned).toBe(false);f.render({identity:'late'});expect(f.snapshot.play).not.toHaveBeenCalled();expect(f.options.onSettled).not.toHaveBeenCalled();

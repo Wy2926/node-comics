@@ -5,6 +5,7 @@ import { writeStoreLocales } from './store-locales';
 import { unrarCsp } from './unrar-csp';
 import { extensionIdentity } from './extension-identity';
 import { pdfjsCsp } from './pdfjs-csp';
+import { flipbookClip } from './flipbook-clip';
 writeStoreLocales();
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -14,8 +15,8 @@ export default defineConfig({
     includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'backend/shared/translation-fonts.{ts,json}', 'LICENSE'],
   },
   vite:()=>({
-    plugins:[importAssets(),unrarCsp(),pdfjsCsp()],
-    optimizeDeps:{exclude:['node-unrar-js','pdfjs-dist']},
+    plugins:[importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()],
+    optimizeDeps:{exclude:['node-unrar-js','pdfjs-dist','@gullabs/flipbook-core']},
     // Reviewable extension code, including Vite-bundled workers.
     build:{minify:false},
     worker:{format:'es',plugins:()=>[unrarCsp()]},

@@ -791,6 +791,8 @@ a {
   background: var(--reading-background);
 }
 .nc-page-turn { position: absolute; top: 0; }
+.nc-reading-turn-preview { position: absolute; left: 0; display: grid; place-items: center; visibility: hidden; overflow: hidden; pointer-events: none; }
+.nc-reading-turn-preview .nc-page-stack { display: flex; }
 .nc-flip-leaf { overflow: clip; }
 .nc-page-transition-clip .spinner { animation: none; }
 .nc-reader-end[data-paged="true"] {

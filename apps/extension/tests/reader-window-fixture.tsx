@@ -97,9 +97,11 @@ if(highResolution)for(const chapter of samples)for(const page of chapter.pages){
 // Each key owns real local image bytes so eviction and independent failures are observable.
 if(pagination)for(const chapter of samples)for(const page of chapter.pages){
  const sample=new OffscreenCanvas(page.width,page.height),paint=sample.getContext('2d')!;
- paint.fillStyle='#f1e8ff';paint.fillRect(0,0,page.width,page.height);
+ const sampleNumber=Number(page.id.split('-').at(-1));
+ paint.fillStyle=query.has('curl')?['#e3f2fc','#fff0ce','#e1f5e8','#f4e8ff'][sampleNumber%4]:'#f1e8ff';paint.fillRect(0,0,page.width,page.height);
  paint.strokeStyle='#ab87d8';paint.lineWidth=16;paint.strokeRect(16,16,page.width-32,page.height-32);
  paint.fillStyle='#382155';paint.font='bold 100px sans-serif';paint.fillText(page.name.replace('第 ','PAGE ').replace(' 页',''),60,150);
+ if(query.has('curl')){paint.font='bold 50px sans-serif';for(let y=400;y<page.height-60;y+=300)paint.fillText(`PAGE ${sampleNumber+1} / CHAPTER ${Number(chapter.id.split('-').at(-1))+1}`,60,y);}
  if(lazyChapters){paint.font='bold 40px sans-serif';paint.fillText(`CHAPTER ${Number(chapter.id.split('-').at(-1))+1}`,60,210);}
  if(page.blobKey)await sourcePageCache.put(page.blobKey,await sample.convertToBlob({type:'image/png'}));
  paint.fillStyle='#246d51';paint.font='bold 52px sans-serif';paint.fillText('TRANSLATED',60,250);
@@ -117,6 +119,7 @@ if(priorityFixture){
 }
 // Optional, origin-guarded byte-read gates for carousel/prefetch acceptance tests.
 // They delay only synthetic fixture keys and never replace image decoding or DOM load events.
+let releaseDelayedImages:(()=>void)|undefined;
 if(pagination&&query.get('controlledReads')==='1'){
  const read=sourcePageCache.get.bind(sourcePageCache),gates=new Map<string,{wait:Promise<void>;release:()=>void}>(),failures=new Set<string>();
  const events:{key:string;phase:'start'|'ready'|'error';time:number}[]=[];
@@ -135,6 +138,7 @@ if(pagination&&query.get('controlledReads')==='1'){
   const blob=await read(key);events.push({key,phase:'ready',time:performance.now()});return blob;
  };
  Object.assign(window,{__readerFixtureReads:{events,hold,release,failNext,keyFor}});
+ releaseDelayedImages=()=>{for(const gate of gates.values())gate.release();gates.clear();};
 }
 // Metadata discovery stays separate from image-byte reads, like a source adapter.
 // Gates deliberately may resolve after cancellation; the fixture loader obeys the
@@ -239,6 +243,7 @@ function Fixture(){
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'var(--surface)',zIndex:20,flexWrap:pagination||thumbnailFixture||scrubFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination&&!query.has('bookmarks')}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status" style={scrubFixture?{flexBasis:"100%",height:60,overflow:"auto",fontSize:12}:undefined}>{status}</span>}</div>
   {query.has('bookmarks')&&<div><button onClick={()=>navigate(samples[(Number(id.split('-').at(-1))+1)%samples.length].id)}>切换测试章节</button><button onClick={()=>setCopies(previous=>previous.map(chapter=>chapter.id===id?{...chapter,contentId:chapter.contentId+':changed'}:chapter))}>模拟内容更新</button><button onClick={()=>void checkBookmarkCost()}>检查书签开销</button><button onClick={()=>void checkBookmarkCost(true)}>检查首次缩略图</button></div>}
   {FlipMetrics&&<FlipMetrics/>}
+  {releaseDelayedImages&&<button onClick={releaseDelayedImages}>继续模拟图片加载</button>}
   {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={()=>previewProgress(setStatus)}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   {performanceFixture&&<div><button disabled={checkingGeometry} onClick={()=>void checkGeometry()}>测量 50 次进度更新</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}

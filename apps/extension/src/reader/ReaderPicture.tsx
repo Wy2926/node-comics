@@ -5,7 +5,7 @@ import type {ProcessingImage} from '../image-processing/contracts';
 import {EnhancementStatus} from './EnhancementStatus';
 import type {Job} from '../types';
 import {prepareReaderImage,setReaderImagePriority} from './prepare-image';
-import {createReaderImageURL,releaseReaderImageURL} from './image-urls';
+import {createReaderImageURL,releaseReaderImageURL,shareReaderImageURL,borrowReaderImageURL} from './image-urls';
 import type {ImageLoadState} from './presentation';
 import type {PagePreviewTarget} from '../comics/application/image-access';
 import './image-notices.css';
@@ -13,9 +13,9 @@ import './image-notices.css';
 /** Pixel presentation owns URLs and decoding; its caller owns source access and persistence. */
 export type ShownImage={scope:string;key:string;job?:Job};
 type PreparedImage=ShownImage&{id:string;url:string};
-type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
-export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal,preview?:PagePreviewTarget)=>Promise<{blob:Blob;release():void}>;priority?:'current'|'prefetch';scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
-export function ReaderPicture({acquire,priority='current',scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
+type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;unshare?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
+export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal,preview?:PagePreviewTarget)=>Promise<{blob:Blob;release():void}>;priority?:'current'|'prefetch';shareForTurn?:boolean;scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
+export function ReaderPicture({acquire,priority='current',shareForTurn=false,scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
   const [loaded,setLoaded]=useState<PreparedImage>();const [displayError,setDisplayError]=useState('');const [retry,setRetry]=useState(0);const [revision,setRevision]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
   // At most one original, one selected result and one ready enhancement share this loader.
@@ -52,7 +52,7 @@ export function ReaderPicture({acquire,priority='current',scope,blobKey,original
   const revoke=(url:string)=>{if(url&&urls.current.delete(url))releaseReaderImageURL(url);};
   const active=(request:ImageRequest)=>requests.current.get(request.id)===request&&!request.controller.signal.aborted;
   const clearPreview=(request?:ImageRequest)=>{if(request&&previewOwner.current!==request)return;previewOwner.current=undefined;setPreviewId(undefined);if(canvas.current)canvas.current.width=canvas.current.height=1;};
-  const retire=(request:ImageRequest)=>{clearPreview(request);requests.current.delete(request.id);request.controller.abort();request.release?.();request.release=undefined;if(displayed.current?.url!==request.url)revoke(request.url);};
+  const retire=(request:ImageRequest)=>{clearPreview(request);requests.current.delete(request.id);request.controller.abort();request.unshare?.();request.release?.();request.release=undefined;if(displayed.current?.url!==request.url)revoke(request.url);};
   useLayoutEffect(()=>{if(shown)clearPreview();},[shown]);
   const failureSignature=JSON.stringify([scope,blobKey,retry,failure]);
   useEffect(()=>{setLoaded(current=>current?.scope===scope?current:undefined);setDisplayError('');setDismissed(undefined);},[scope,targetId,enhancedId,retry]);
@@ -92,11 +92,14 @@ export function ReaderPicture({acquire,priority='current',scope,blobKey,original
           request.release=lease.release;blob=lease.blob;
         }
         request.controller.signal.throwIfAborted();
-        request.url=createReaderImageURL(blob);urls.current.add(request.url);request.phase='decoding';setRevision(value=>value+1);
-        await prepareReaderImage(request.url,request.controller.signal,decodePriority.current);
+        const borrowed=borrowReaderImageURL(request.id);
+        request.url=borrowed??createReaderImageURL(blob);urls.current.add(request.url);
+        if(shareForTurn)request.unshare=shareReaderImageURL(id,request.url);
+        request.phase='decoding';setRevision(value=>value+1);
+        if(!borrowed)await prepareReaderImage(request.url,request.controller.signal,decodePriority.current);
         if(!active(request)){revoke(request.url);return;}
         request.image={id,scope,key:request.key,job:request.job,url:request.url};request.phase='displaying';setRevision(value=>value+1);
-      })().catch(reason=>{if(active(request)){clearPreview(request);request.error=(reason as Error).message;request.image=undefined;setRevision(value=>value+1);}revoke(request.url);request.url='';});
+      })().catch(reason=>{if(active(request)){clearPreview(request);request.error=(reason as Error).message;request.image=undefined;setRevision(value=>value+1);}request.unshare?.();revoke(request.url);request.url='';});
     }
     if(changed)setRevision(value=>value+1);
   },[scope,originalKey,targetId,enhancedId,enhancement?.blob,retry,acquire,shown,revision]);
@@ -109,7 +112,7 @@ export function ReaderPicture({acquire,priority='current',scope,blobKey,original
     else if(displayed.current===image){displayed.current=undefined;setLoaded(undefined);}
     else return;
     const message=msg('{0} 无法解码，请检查图片是否损坏。',{'0':alt}),request=requests.current.get(image.id);
-    if(request){clearPreview(request);request.image=undefined;request.error=message;request.url='';setRevision(value=>value+1);}else setDisplayError(message);
+    if(request){clearPreview(request);request.unshare?.();request.image=undefined;request.error=message;request.url='';setRevision(value=>value+1);}else setDisplayError(message);
     revoke(image.url);
   }
   // Commit the identity only after the actual display element loads; keep the old image until then.

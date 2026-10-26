@@ -18,7 +18,7 @@ import {processingInput} from '../comics/application/image-access';
 import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
 import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
-import {pageSpreads,spreadAt,spreadFrames} from './pagination';
+import {pageSpreads,spreadAt,spreadFrames,pageTurnIndex} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
 import {useChapterStream,pageKey,completeManifest} from './useChapterStream';
@@ -35,6 +35,7 @@ import {ReaderShell,ReaderNavigation,ReaderTools,ReaderSettingsButton,ReaderDraw
 import {ReaderChoice as Choice,ReaderScale,ReaderSettings,ReaderTranslationSettings} from './ReaderSettings';
 import {useReaderControls} from './useReaderControls';
 import {usePagedSwipe} from './usePagedSwipe';
+import {ReaderTurnPreview} from './ReaderTurnPreview';
 import {usePagedNavigation} from './usePagedNavigation';
 import {useSpreadZoom} from './useSpreadZoom';
 import {ignoreReaderClick} from './reader-input';
@@ -46,6 +47,8 @@ type Panel='bookmarks'|'directory'|'translation'|'settings';
 export function Reader({onBookmarkNavigate,progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings:globalSettings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,fontSelection,translationScope,channelLabel,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
 const motion=useRef(false),surface=useRef<HTMLDivElement>(null),spreadStack=useRef<HTMLDivElement>(null);
 const [moving,setMoving]=useState(false);
+const previewSurface=useRef<HTMLDivElement>(null);
+const [previewRequest,setPreviewRequest]=useState<{entryId:string;index:number|'last'}>();
 const [compactAtOpen]=useState(isCompactReaderDevice);
 const [savedView,setView]=useState<ReadingView|undefined>(()=>{
  const page=copy.pages.find(page=>page.id===copy.pageId)??copy.pages[0];
@@ -54,7 +57,7 @@ const [savedView,setView]=useState<ReadingView|undefined>(()=>{
 const view=savedView??readingViewDefaults();
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
 const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
-const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
+const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
@@ -167,7 +170,8 @@ useReaderPrefetch({scope:JSON.stringify([viewKey,scopeBase]),identities:prefetch
  current:imageWindows.flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).flatMap(p=>p.blobKey?[p.blobKey]:[])),
  next:aheadPages.flatMap(p=>p.blobKey?[p.blobKey]:[]),enabled:resources.ready(copy),ready:windowReady&&!moving,
 });
-const swipe=usePagedSwipe({viewport,surface,enabled:settings.layout!=='continuous',blocked:swipeBlocked||spreadZoom.zoomed,direction:settings.direction,
+const previewChapter=previewRequest?(previewRequest.entryId===copy.id?copy:sequence.find(chapter=>chapter.id===previewRequest.entryId)):undefined;
+const swipe=usePagedSwipe({viewport,surface,preview:previewSurface,onPreviewChange:previewTurn,enabled:settings.layout!=='continuous',blocked:swipeBlocked||spreadZoom.zoomed,direction:settings.direction,
  identity:JSON.stringify([copy.id,copy.contentId,copy.generation,page?.id]),
  resetKey:JSON.stringify([viewKey,settings.layout,viewportSize.width,viewportSize.height,fit,zoom,compare,mode,preference,scopeBase]),
  canTurn,
@@ -205,10 +209,15 @@ useEffect(()=>{
 useEffect(()=>()=>onReadingWindow([],[]),[onReadingWindow]);
 function navigate(offset:-1|1){if(!page)return false;if(spreadZoom.zoomed){if(swipeBlocked||!canTurn(offset))return false;swipe.cancel();spreadZoom.reset();movePage(offset);return;}return swipe.turn(offset);}
 function jump(n:number){swipe.cancel();spreadZoom.reset();jumpImmediately(n);}
+function previewTurn(offset:-1|1|undefined){
+ if(offset===undefined){setPreviewRequest(undefined);return;}
+ const target=pageTurnIndex(spreads,indexRef.current,offset);
+ const chapter=target<0?previous:target>=copy.pages.length?next:copy;
+ setPreviewRequest(chapter?{entryId:chapter.id,index:target<0?'last':chapter.id!==copy.id?0:target}:undefined);
+}
 function movePage(offset:-1|1){
  if(!page)return false;
- const current=spreadAt(spreads,indexRef.current);
- jumpImmediately(current?(offset>0?current.end:spreadAt(spreads,current.start-1)?.start??-1):indexRef.current+offset);
+ jumpImmediately(pageTurnIndex(spreads,indexRef.current,offset));
 }
 function reloadContent(chapter:ReadingEntry){if(busy||!onReload)return;swipe.cancel();preserve();persist();onReload(chapter.id);}
 function leaveReader(){swipe.cancel();preserve();persist();onBack();}
@@ -278,7 +287,9 @@ onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellK
 {settings.layout==='continuous'?<>{!continuation&&<Icon name="spark" size={32}/>}
 {!chapter.pages.length?<><p>{directory?.entries.find(e=>e.id===chapter.id)?.error??directory?.entries.find(e=>e.id===chapter.id)?.status??msg("正在准备页面…")}</p><button className="button secondary" onClick={()=>{preserve();persist();onNavigate(chapter.id);}}>{msg("重试")}</button></>:!completeManifest(chapter)?<><p>{msg("当前已发现 {0} 页", {"0": chapter.pages.length})}</p><small>{msg("完整载入后可继续阅读")}</small></>:!continuation&&<p>{msg("已到当前内容末尾")}</p>}</>
  :!completeManifest(chapter)&&end===chapter.pages.length&&<div className="nc-paged-notice" role="status"><p>{msg("当前已发现 {0} 页", {"0": chapter.pages.length})}</p><small>{msg("完整载入后可继续阅读")}</small></div>}
-</div></div>;})}</div></div></div>
+</div></div>;})}</div></div>
+{previewRequest&&<ReaderTurnPreview ref={previewSurface} chapter={previewChapter} index={previewRequest.index} ready={!!previewChapter&&resources.ready(previewChapter)} viewport={viewportSize} layout={settings.layout} direction={settings.direction} compare={compare} mode={mode} translated={preference!=='original'} language={settings.language} translationScope={translationScope} scope={scope} fit={fit} zoom={zoom} top={viewport.current?.scrollTop??0}/>}
+</div>
 {readerPanel}{panel!=='bookmarks'&&<BookmarkNotice bookmarks={bookmarks}/>}
 </ReaderShell>;
 }

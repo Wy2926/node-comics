@@ -3,10 +3,12 @@ import {pageTurn} from './page-turn';
 import {READER_INTERACTIVE} from './reader-input';
 
 type Turn = -1 | 1;
-type Phase = 'dragging' | 'entering';
+type Phase = 'dragging' | 'entering' | 'returning';
 type Options = {
  viewport:RefObject<HTMLDivElement|null>;
  surface:RefObject<HTMLDivElement|null>;
+ preview?:RefObject<HTMLDivElement|null>;
+ onPreviewChange?:(delta:Turn|undefined)=>void;
  enabled:boolean;
  blocked:boolean;
  direction:'ltr'|'rtl';
@@ -35,7 +37,7 @@ export function usePagedSwipe(options:Options){
   let blocked=latest.current.blocked,direction=latest.current.direction;
   let size=[viewport.clientWidth,viewport.clientHeight];
   let pending=false;
-  let gesture:{id:number;x:number;y:number;lastX:number;lastTime:number;velocity:number;dragging:boolean}|undefined;
+  let gesture:{id:number;x:number;y:number;lastX:number;lastTime:number;velocity:number;dragging:boolean;sign?:number}|undefined;
   const touches=new Set<number>();
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
   const setPhase=(next:Phase|undefined)=>{
@@ -54,6 +56,7 @@ export function usePagedSwipe(options:Options){
    if(gesture?.dragging)clickUntil=Date.now()+500;
    const id=gesture?.id;gesture=undefined;if(id!==undefined)release(id);
    snapshot?.dispose();snapshot=undefined;
+   latest.current.onPreviewChange?.(undefined);
    surface.style.removeProperty('visibility');setPhase(undefined);
    if(settled)latest.current.onSettled?.();
   };
@@ -67,7 +70,7 @@ export function usePagedSwipe(options:Options){
   };
   const navigate=(delta:Turn,sign:number)=>{
    pending=true;setPhase('entering');
-   if(!reduced())snapshot=pageTurn(viewport,surface,sign);
+   if(!reduced()&&!snapshot)snapshot=pageTurn(viewport,surface,sign);
    if(snapshot)surface.style.visibility='hidden';
    // Guard only a navigation that never commits. Image loading never holds navigation.
    timer=setTimeout(()=>reset(),1000);
@@ -77,7 +80,7 @@ export function usePagedSwipe(options:Options){
    const current=latest.current;
    if(!current.enabled){current.onTurn(delta);return;}
    // Wait only for the destination commit or an active gesture, never queue inputs.
-   if(phase&&(phase!=='entering'||pending))return;
+   if(phase&&(phase==='dragging'||pending))return;
    if(!current.canTurn(delta))return false;
    if(current.blocked||document.hidden)return false;
    // A newer action replaces the committed entrance. Do not credit skipped pixels as read.
@@ -92,7 +95,7 @@ export function usePagedSwipe(options:Options){
    // A fresh press is not the trailing click of the previous drag, which some
    // touch browsers omit entirely after preventDefault or pointer capture.
    if(event.isPrimary!==false&&event.button===0)clickUntil=0;
-   if(unavailable()||(phase&&(phase!=='entering'||pending))||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+   if(unavailable()||(phase&&(phase==='dragging'||pending))||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
    const target=event.target as Element|null;
    if(target?.closest?.(READER_INTERACTIVE)||window.getSelection?.()?.toString())return;
    if(phase)reset();
@@ -103,9 +106,19 @@ export function usePagedSwipe(options:Options){
    touches.add(event.pointerId);
    if(touches.size>1&&gesture)reset();
   };
+  const preview=(drag:NonNullable<typeof gesture>,event:PointerEvent)=>{
+   const x=event.clientX-drag.x,sign=x<0?-1:1;
+   if(Math.abs(x)>=10&&drag.sign!==sign){
+    snapshot?.dispose();snapshot=undefined;surface.style.removeProperty('visibility');drag.sign=sign;
+    if(!reduced()&&latest.current.canTurn(deltaFor(x)))snapshot=pageTurn(viewport,surface,sign);
+    latest.current.onPreviewChange?.(snapshot?deltaFor(x):undefined);
+   }
+   snapshot?.drag({x:drag.x,y:drag.y},{x:event.clientX,y:event.clientY});
+   if(snapshot)surface.style.visibility='hidden';
+  };
   const move=(event:PointerEvent)=>{
    const drag=gesture;if(!drag||drag.id!==event.pointerId)return;
-   if(unavailable()){reset();return;}
+   if(unavailable()||event.pointerType==='mouse'&&event.buttons===0){reset();return;}
    const x=event.clientX-drag.x,y=event.clientY-drag.y;
    if(!drag.dragging){
     if(Math.abs(y)>=10&&Math.abs(y)>Math.abs(x)*1.1){gesture=undefined;return;}
@@ -117,8 +130,7 @@ export function usePagedSwipe(options:Options){
    const elapsed=event.timeStamp-drag.lastTime;
    if(elapsed>0)drag.velocity=(event.clientX-drag.lastX)/elapsed;
    drag.lastX=event.clientX;drag.lastTime=event.timeStamp;
-   // A recognized swipe turns on release. Do not run a second, homemade drag
-   // animation beside the library, or move pixels away before a destination exists.
+   preview(drag,event);
   };
   const up=(event:PointerEvent)=>{
    touches.delete(event.pointerId);
@@ -127,10 +139,15 @@ export function usePagedSwipe(options:Options){
    clickUntil=Date.now()+500;
    const x=event.clientX-drag.x,delta=deltaFor(x),width=viewport.clientWidth;
    const flick=Math.abs(x)>=30&&Math.abs(drag.velocity)>=.5&&drag.velocity*x>0&&event.timeStamp-drag.lastTime<100;
-   if(!unavailable()&&latest.current.canTurn(delta)&&(Math.abs(x)>=Math.max(48,Math.min(120,width*.18))||flick)){
-    gesture=undefined;release(event.pointerId);
+   preview(drag,event);
+   const complete=snapshot?snapshot.canCommit():Math.abs(x)>=Math.max(48,Math.min(120,width*.18));
+   gesture=undefined;release(event.pointerId);
+   if(!unavailable()&&latest.current.canTurn(delta)&&(complete||flick)){
     const sign=delta*(latest.current.direction==='rtl'?1:-1);
     navigate(delta,sign);
+   }else if(snapshot&&!unavailable()&&!complete){
+    setPhase('returning');const version=generation;
+    snapshot.revert(()=>{if(version===generation)reset(true);});
    }else reset(true);
   };
   const canceled=(event:PointerEvent)=>{
@@ -157,6 +174,7 @@ export function usePagedSwipe(options:Options){
    sync:()=>{
     const current=latest.current;
     snapshot?.position();
+    if(latest.current.preview)snapshot?.preview(latest.current.preview.current);
     if(resetKey!==current.resetKey||blocked!==current.blocked||direction!==current.direction)reset();
     else if(identity!==current.identity){
      if(pending)enter();
@@ -196,7 +214,7 @@ export function usePagedSwipe(options:Options){
    document.removeEventListener('visibilitychange',hidden);
   };
  },[options.viewport,options.surface,options.enabled]);
- useLayoutEffect(()=>{controls.current?.sync();},[options.enabled,options.blocked,options.direction,options.identity,options.resetKey]);
+ useLayoutEffect(()=>{controls.current?.sync();});
  const clickCapture:MouseEventHandler<HTMLDivElement>=event=>{
   if(controls.current?.click()){event.preventDefault();event.stopPropagation();}
  };
