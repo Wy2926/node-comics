@@ -17,6 +17,15 @@ export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,offs
   for(const name of element.getAttributeNames())if(name.startsWith('data-')&&name!=='data-direction'&&name!=='data-paged')element.removeAttribute(name);
  }
  for(const element of pixels.querySelectorAll('.nc-page-image-pending'))element.remove();
+ // cloneNode does not copy canvas pixels. Freeze only a visible in-flight preview, once per turn.
+ const originals=[...surface.querySelectorAll<HTMLCanvasElement>('.nc-page-preview')];
+ const previews=[...pixels.querySelectorAll<HTMLCanvasElement>('.nc-page-preview')];
+ previews.forEach((canvas,index)=>{
+  const original=originals[index];
+  if(original?.style.display!=='none'&&original?.width>1&&original.height>1){
+   try{canvas.getContext('2d')?.drawImage(original,0,0);}catch{/* Navigation still proceeds if the browser cannot retain this preview. */}
+  }
+ });
  const images=[...pixels.querySelectorAll<HTMLImageElement>('img')];
  const releases=images.map(image=>retainReaderImageURL(image.src));
  layer.append(pixels);host.append(layer);viewport.append(host);
@@ -26,6 +35,6 @@ export function pageSnapshot(viewport:HTMLDivElement,surface:HTMLDivElement,offs
  return {
   element:layer,
   position,
-  dispose(){if(disposed)return;disposed=true;viewport.removeEventListener('scroll',position);host.remove();for(const image of images)image.removeAttribute('src');for(const release of releases)release();},
+  dispose(){if(disposed)return;disposed=true;viewport.removeEventListener('scroll',position);host.remove();for(const image of images)image.removeAttribute('src');for(const canvas of previews)canvas.width=canvas.height=1;for(const release of releases)release();},
  };
 }

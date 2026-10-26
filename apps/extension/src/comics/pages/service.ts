@@ -13,11 +13,12 @@ import { SourceDatabaseSchemaError } from '../../storage/database';
 import { pageRenderProfile, pageReference, type PageReference } from './identity';
 import type { PageDescriptor, PageMaterialization } from '../domain';
 import {entryContentKind} from '../domain';
+import {PagePreview,type PagePreviewTarget} from './preview';
 
-export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; }
+export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; preview?:PagePreviewTarget; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
 interface Value { blob: Blob; identity: PageMaterialization; validate():Promise<void>; }
-interface Work { controller: AbortController; promise: Promise<Value>; users: number; promote(priority:number):void; }
+interface Work { controller: AbortController; promise: Promise<Value>; users: number; promote(priority:number):void; preview:PagePreview; }
 const pending=new Map<string,Work>();
 const listeners=new Set<(identity:PageMaterialization)=>void>();
 let active=0;
@@ -56,7 +57,7 @@ async function pageContext(request:PageReference){
 }
 /** Validates catalog identity and access without opening the source or reading image bytes. */
 export async function pageAccess(request:PageReference){return (await pageContext(request)).assertSourceCurrent;}
-async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
+async function read(request:PageRequest,signal:AbortSignal,preview:PagePreview):Promise<Value>{
   signal.throwIfAborted();
   const {descriptor,doc,binding,connection,assertSourceCurrent}=await pageContext(request);
   const cachePages=getSourceDriver(connection.provider)?.cachePages!==false;
@@ -71,7 +72,7 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
       const readImage=(page:PageDescriptor)=>{
         const {url,manifestId,sourceId}=page.locator;
         if(typeof url!=='string'||typeof manifestId!=='string'||typeof sourceId!=='string')throw Error('原图来源清单缺失，请重新发现来源。');
-        return readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal);
+        return readSourceImage({manifestId,pageId:sourceId,expectedUrl:url},signal,preview.feed);
       };
       try{blob=await readImage(descriptor);}
       catch(error){
@@ -121,18 +122,26 @@ async function read(request:PageRequest,signal:AbortSignal):Promise<Value>{
 export async function acquirePage(request:PageRequest):Promise<PageLease>{
   request.signal?.throwIfAborted();
   const key=pageReference(request);let work=pending.get(key);
+  const joining=!!work;
   const priority=request.priority==='background'?2:request.priority==='prefetch'?1:0;
   if(!work){
-    const controller=new AbortController();
-    work={controller,...schedule(priority,()=>read(request,controller.signal)),users:0};pending.set(key,work);
+    const controller=new AbortController(),preview=new PagePreview();
+    work={controller,preview,...schedule(priority,()=>read(request,controller.signal,preview)),users:0};pending.set(key,work);
+    void work.promise.then(()=>preview.finish(),()=>preview.finish(true));
     void work.promise.catch(()=>{});
   }else work.promote(priority);
-  const chosen=work;chosen.users++;let released=false;
-  const release=()=>{if(released)return;released=true;request.signal?.removeEventListener('abort',abort);chosen.users--;if(!chosen.users){chosen.controller.abort();if(pending.get(key)===chosen)pending.delete(key);}};
+  const chosen=work;chosen.users++;let released=false,removePreview:(()=>void)|undefined;
+  const release=()=>{if(released)return;released=true;removePreview?.();request.signal?.removeEventListener('abort',abort);chosen.users--;if(!chosen.users){chosen.preview.finish();chosen.controller.abort();if(pending.get(key)===chosen)pending.delete(key);}};
   let rejectAbort:(error:unknown)=>void=()=>{};
   const abort=()=>{release();rejectAbort(request.signal?.reason??new DOMException('Aborted','AbortError'));};
   const cancelled=new Promise<never>((_,reject)=>{rejectAbort=reject;request.signal?.addEventListener('abort',abort,{once:true});});
+  if(request.preview&&request.purpose==='reading'){
+    const target=request.preview;
+    // New work validates before the first source chunk. A joining consumer must validate independently.
+    if(!joining)removePreview=chosen.preview.add(target);
+    else void pageAccess(request).then(validate=>validate()).then(()=>{if(!released)removePreview=chosen.preview.add(target);}).catch(()=>{});
+  }
   try{const value=await Promise.race([chosen.promise,cancelled]);await Promise.race([value.validate(),cancelled]);request.signal?.throwIfAborted();return {blob:value.blob,identity:value.identity,release};}catch(error){release();throw error;}
 }
 /** Reprioritize an existing reader lease without acquiring another consumer or restarting its source. */
-export function promotePage(request:PageReference){pending.get(pageReference(request))?.promote(0);}
+export function promotePage(request:PageReference){const work=pending.get(pageReference(request));work?.promote(0);work?.preview.refresh();}

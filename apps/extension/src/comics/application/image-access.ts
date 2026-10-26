@@ -8,6 +8,8 @@ import { thumbnailCache } from '../../storage/thumbnails';
 import { RequestPool } from '../../concurrency';
 import {openSourceCover} from './cover-access';
 import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
+import type {PagePreviewTarget} from '../pages/preview';
+export type {PagePreviewTarget} from '../pages/preview';
 
 const thumbnails=new RequestPool(2);
 export function promoteImage(key:string){
@@ -23,9 +25,9 @@ export function processingInput(key:string,owner:string,sourceKey=key):Processin
     if(key.startsWith('result:'))await validateMaterializedResult(key);
   }};
 }
-export async function acquireImage(key:string,signal?:AbortSignal,priority:'current'|'prefetch'|'background'='current'):Promise<Pick<PageLease,'blob'|'release'>>{
+export async function acquireImage(key:string,signal?:AbortSignal,priority:'current'|'prefetch'|'background'='current',preview?:PagePreviewTarget):Promise<Pick<PageLease,'blob'|'release'>>{
   const reference=parsePageReference(key);
-  if(reference)return acquirePage({...reference,signal,priority,purpose:'reading'});
+  if(reference)return acquirePage({...reference,signal,priority,purpose:'reading',...(preview?{preview}:{})});
   signal?.throwIfAborted();
   const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key)
     :key.startsWith('result:')?await readMaterializedResult(key,signal):resultInMemory(key)??await translationCache.get(key);

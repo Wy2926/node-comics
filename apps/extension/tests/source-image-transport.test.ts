@@ -9,10 +9,48 @@ beforeEach(()=>{
   fixture.headers=[];
   vi.stubGlobal('chrome',{permissions:{contains:vi.fn(async()=>true)}});
 });
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 const source='https://reader.test/chapter/1?key=test#page-2',image='https://cdn.test/page.png';
 
 describe('common image request context',()=>{
+  it('allows a slow download beyond 30 seconds while bytes keep arriving, but times out a stalled body',async()=>{
+    vi.useFakeTimers();let input!:ReadableStreamDefaultController<Uint8Array>;
+    const response=()=>new Response(new ReadableStream<Uint8Array>({start(controller){input=controller;}}));
+    vi.stubGlobal('fetch',vi.fn(async(_url:string,{signal}:{signal:AbortSignal})=>{const value=response();signal.addEventListener('abort',()=>input.error(signal.reason),{once:true});return value;}));
+    const pending=fetchSourceImage(image);await vi.advanceTimersByTimeAsync(0);
+    for(let n=0;n<3;n++){await vi.advanceTimersByTimeAsync(20000);input.enqueue(new Uint8Array([n]));await vi.advanceTimersByTimeAsync(0);}
+    input.close();expect((await pending).blob.size).toBe(3);expect(vi.getTimerCount()).toBe(0);
+    const stalled=fetchSourceImage(image),failed=expect(stalled).rejects.toMatchObject({name:'TimeoutError'});
+    await vi.advanceTimersByTimeAsync(30000);await failed;expect(vi.getTimerCount()).toBe(0);
+  });
+  it('publishes borrowed chunks before EOF from one fetch and preserves the complete original bytes',async()=>{
+    let input!:ReadableStreamDefaultController<Uint8Array>;
+    const body=new ReadableStream<Uint8Array>({start(controller){input=controller;}}),fetcher=vi.fn(async()=>new Response(body,{headers:{'content-type':'image/png'}}));
+    vi.stubGlobal('fetch',fetcher);const progress=vi.fn();
+    const result=fetchSourceImage(image,undefined,undefined,undefined,progress);
+    const first=new Uint8Array([1,2,3]),last=new Uint8Array([4,5]);input.enqueue(first);
+    await vi.waitFor(()=>expect(progress).toHaveBeenCalledOnce());
+    const chunks=progress.mock.calls[0][0].chunks;expect(chunks[0]).toBe(first);expect(progress.mock.calls[0][0].done).toBe(false);
+    input.enqueue(last);input.close();const value=await result;
+    expect(progress).toHaveBeenLastCalledWith({chunks,done:true});expect(chunks[1]).toBe(last);
+    expect([...new Uint8Array(await value.blob.arrayBuffer())]).toEqual([1,2,3,4,5]);expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it('invalidates previews on an interrupted download without swallowing the network error',async()=>{
+    let input!:ReadableStreamDefaultController<Uint8Array>;const body=new ReadableStream<Uint8Array>({start(controller){input=controller;}});
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(body)));const progress=vi.fn();
+    const result=fetchSourceImage(image,undefined,undefined,undefined,progress);input.enqueue(new Uint8Array([1]));
+    await vi.waitFor(()=>expect(progress).toHaveBeenCalledOnce());input.error(Error('connection lost'));
+    await expect(result).rejects.toThrow('connection lost');expect(progress).toHaveBeenLastCalledWith(undefined);
+  });
+  it('does not fail the source when an optional preview throws',async()=>{
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response('pixels')));
+    const result=await fetchSourceImage(image,undefined,undefined,undefined,()=>{throw Error('detached preview');});
+    expect(await result.blob.text()).toBe('pixels');
+  });
+  it('turns a browser body-network failure into the same actionable message as a header-network failure',async()=>{
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(new ReadableStream({start(controller){controller.error(new TypeError('network error'));}}))));
+    await expect(fetchSourceImage(image)).rejects.toThrow('图片网络请求失败');
+  });
   it('checks host permission without a port but requests the exact image port',async()=>{
     const fetch=vi.fn(async()=>new Response('image'));vi.stubGlobal('fetch',fetch);
     const url='http://127.0.0.1:4737/source.png';

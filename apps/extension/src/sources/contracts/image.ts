@@ -15,3 +15,8 @@ export interface SourceImageAdapter {
   decodeInline?(blob:Blob, headers:Headers, url:string, signal?:AbortSignal):Promise<Blob>;
 }
 export interface SourceImageReference {manifestId:string; pageId:string; expectedUrl:string}
+
+/** Borrowed download chunks, valid only during this read. Observers must not mutate/detach them. */
+export interface SourceImageProgress {chunks:readonly Uint8Array<ArrayBuffer>[];done:boolean;}
+/** Undefined invalidates a failed attempt, including before a source-locator retry. */
+export type SourceImageProgressListener=(progress:SourceImageProgress|undefined)=>void;

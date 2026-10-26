@@ -194,6 +194,15 @@ describe('renewable HTTP manifest registration',()=>{
 
 describe('source image facade',()=>{
   const ref={manifestId:'manifest',pageId:'one',expectedUrl:'https://images.test/one.png'};
+  it('exposes authorized direct-image bytes but never streams an adapter-encoded recipe',async()=>{
+    send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url,sourceId:'fixture'}});
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response('pixels')));const progress=vi.fn();
+    await readSourceImage(ref,undefined,progress);expect(progress).toHaveBeenCalled();progress.mockClear();
+    fixture.images.fixture={decode:async()=>new Blob(['decoded'])};
+    await readSourceImage(ref,undefined,progress);expect(progress).not.toHaveBeenCalled();
+    delete fixture.images.fixture;send.mockResolvedValue({ok:true,data:{url:'https://other.test/1.png'}});
+    await expect(readSourceImage(ref,undefined,progress)).rejects.toThrow('来源已变化');expect(progress).not.toHaveBeenCalled();
+  });
   it('decodes an adapter image independently of network discovery',async()=>{
     const decode=vi.fn(async()=>new Blob(['decoded']));fixture.images.fixture={decode};
     send.mockResolvedValue({ok:true,data:{url:ref.expectedUrl,pageUrl:url,sourceId:'fixture',processing:'recipe-1'}});

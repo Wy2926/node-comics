@@ -91,10 +91,11 @@ async function fixture(){
   let channel=connection.channel,language='en',translation:ReturnType<typeof useAutomaticTranslation>,load:ImageLoadState|undefined,element:ReactNode,mounted=true;
   const parent=new Frame(),picture=new Frame(),failures:string[]=[];
   const update=(next:ReadingEntry)=>{copy=next;parent.dirty=true;};
+  const acquire:Parameters<typeof ReaderPicture>[0]['acquire']=(key,signal,preview)=>acquireImage(key,signal,'current',preview);
   const render=()=>{
     translation=parent.render(()=>useAutomaticTranslation({channel,copies:[copy],updateEntry:update,language,currentId:copy.id}));
     const selected=readingImage(copy.pages[0],'classic',true,language,channel.scope.key);
-    element=picture.render(()=>ReaderPicture({acquire:acquireImage,scope:JSON.stringify([channel.scope.key,language,copy.id]),blobKey:selected.key,originalKey:original,job:selected.job,alt:'Page',onImport(){},onLoadState:state=>{load=state;if(state?.error)failures.push(state.error);}}));
+    element=picture.render(()=>ReaderPicture({acquire,scope:JSON.stringify([channel.scope.key,language,copy.id]),blobKey:selected.key,originalKey:original,job:selected.job,alt:'Page',onImport(){},onLoadState:state=>{load=state;if(state?.error)failures.push(state.error);}}));
     parent.cleanup();picture.cleanup();picture.create();parent.create();
   };
   const settle=async()=>{for(let i=0;i<40;i++){await nextTurn();if(mounted&&(parent.dirty||picture.dirty))render();}};

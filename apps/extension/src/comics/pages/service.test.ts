@@ -18,6 +18,7 @@ vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
 import {acquirePage,promotePage,downloadKey,materializationId,type PageLease} from './service';
+import {PagePreview,type PagePreviewTarget} from './preview';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference,parsePageReference} from './identity';
 import {ReaderImagePrefetch} from '../../reader/image-prefetch';
 import {SourceDatabaseSchemaError} from '../../storage/database';
@@ -64,6 +65,25 @@ beforeEach(() => {
 });
 afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
+  it('shares a live preview with an authorized reader joining prefetch and keeps the download after that reader cancels',async()=>{
+    let resolve!:(blob:Blob)=>void;const waiting=new Promise<Blob>(done=>{resolve=done;});mocks.sourceImage.mockReturnValueOnce(waiting);
+    const add=vi.spyOn(PagePreview.prototype,'add');
+    const background=acquirePage({...request,priority:'prefetch'});await vi.waitFor(()=>expect(mocks.sourceImage).toHaveBeenCalledOnce());
+    const controller=new AbortController(),preview:PagePreviewTarget={active:()=>true,draw:vi.fn(),clear:vi.fn()};
+    const visible=acquirePage({...request,purpose:'reading',signal:controller.signal,preview});const rejected=expect(visible).rejects.toMatchObject({name:'AbortError'});
+    await vi.waitFor(()=>expect(add).toHaveBeenCalledWith(preview));controller.abort();await rejected;
+    expect(mocks.sourceImage.mock.calls[0][1].aborted).toBe(false);
+    resolve(new Blob(['pixels'],{type:'image/png'}));const lease=await background;lease.release();expect(mocks.sourceImage).toHaveBeenCalledOnce();add.mockRestore();
+  });
+  it('does not attach a joining preview after source access is revoked',async()=>{
+    let resolve!:(blob:Blob)=>void;mocks.sourceImage.mockReturnValueOnce(new Promise<Blob>(done=>{resolve=done;}));
+    const add=vi.spyOn(PagePreview.prototype,'add'),background=acquirePage({...request,priority:'prefetch'});const failedBackground=expect(background).rejects.toThrow('来源');
+    await vi.waitFor(()=>expect(mocks.sourceImage).toHaveBeenCalledOnce());
+    put('connections','connection',{id:'connection',generation:2,provider:'website',status:'revoked'});
+    const preview:PagePreviewTarget={active:()=>true,draw:vi.fn(),clear:vi.fn()},visible=acquirePage({...request,purpose:'reading',preview});const failedVisible=expect(visible).rejects.toThrow('来源');
+    for(let n=0;n<12;n++)await Promise.resolve();expect(add).not.toHaveBeenCalled();
+    resolve(new Blob(['pixels'],{type:'image/png'}));await Promise.all([failedBackground,failedVisible]);expect(preview.draw).not.toHaveBeenCalled();add.mockRestore();
+  });
   it('routes EPUB artwork through the shared original pipeline without rasterizing text or storing fake page descriptors', async () => {
     const image = new Blob(['epub pixels'], {type: 'image/png'});
     put('entries', 'document', {id:'document',comicId:'comic',contentId:'revision',containerId:'container',generation:1,format:'epub',document:{kind:'epub',images:[{href:'OPS/art.png',mediaType:'image/png'}]}});
@@ -106,7 +126,7 @@ describe('page leases and trusted source routing', () => {
   it('validates manifest membership and reuses normalized cached pixels without decoding or hashing again', async () => {
     renewable();
     const first = await acquirePage(request); first.release();
-    expect(mocks.sourceImage).toHaveBeenCalledWith({manifestId:'manifest',pageId:'source-page',expectedUrl:'https://image.example/page.png'},expect.any(AbortSignal));
+    expect(mocks.sourceImage).toHaveBeenCalledWith({manifestId:'manifest',pageId:'source-page',expectedUrl:'https://image.example/page.png'},expect.any(AbortSignal),expect.any(Function));
     const second = await acquirePage(request); second.release();
     expect(mocks.sourceImage).toHaveBeenCalledTimes(1); expect(mocks.prepare).toHaveBeenCalledTimes(1);
     expect(mocks.refresh).not.toHaveBeenCalled();
@@ -123,7 +143,7 @@ describe('page leases and trusted source routing', () => {
     const lease=await acquirePage(request);lease.release();
     expect(mocks.refresh).toHaveBeenCalledWith(expect.objectContaining({id:'document',contentId:'revision'}),page,expect.any(AbortSignal));
     expect(mocks.sourceImage).toHaveBeenCalledTimes(2);
-    expect(mocks.sourceImage).toHaveBeenLastCalledWith({manifestId:'renewed',pageId:'source-page',expectedUrl:'https://new.example/page.png'},expect.any(AbortSignal));
+    expect(mocks.sourceImage).toHaveBeenLastCalledWith({manifestId:'renewed',pageId:'source-page',expectedUrl:'https://new.example/page.png'},expect.any(AbortSignal),expect.any(Function));
   });
   it('does not loop when the renewed image also fails',async()=>{
     const page=renewable();mocks.refresh.mockResolvedValueOnce(page);

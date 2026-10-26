@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Icon} from '../icons';
-import {acquireImage,promoteImage,readThumbnail} from '../comics/application/image-access';
+import {acquireImage,promoteImage,readThumbnail,type PagePreviewTarget} from '../comics/application/image-access';
 import './image-notices.css';
 
 export function Thumbnail({blobKey,alt='',className='',retryKey=0,onError}:{blobKey?:string;alt?:string;className?:string;retryKey?:number;onError?:(error:unknown)=>void}){
@@ -15,10 +15,10 @@ import {ReaderPicture,type ReaderPictureProps} from './ReaderPicture';
 export type BlobPictureProps=Omit<ReaderPictureProps,'acquire'>;
 export function BlobPicture({priority='current',...props}:BlobPictureProps){
   const current=useRef(priority);current.current=priority;
-  const acquire=useCallback(async(key:string,signal:AbortSignal)=>{
+  const acquire=useCallback(async(key:string,signal:AbortSignal,preview?:PagePreviewTarget)=>{
     // Let the current page claim a source slot before earlier DOM neighbors from the same commit.
     if(current.current==='prefetch')await Promise.resolve();
-    return acquireImage(key,signal,current.current);
+    return acquireImage(key,signal,current.current,preview);
   },[]);
   useEffect(()=>{
     if(priority==='current')for(const key of new Set([props.blobKey,props.originalKey]))if(key)promoteImage(key);

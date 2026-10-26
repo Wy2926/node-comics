@@ -43,7 +43,7 @@ describe('mounted image reading priority',()=>{
  it('uses the latest priority if navigation overtakes a deferred neighbor read',async()=>{
   const page=picture({priority:'prefetch'}),pending=page.initial.acquire('original',new AbortController().signal);
   page.render({priority:'current'});await pending;
-  expect(access.acquire).toHaveBeenCalledExactlyOnceWith('original',expect.any(AbortSignal),'current');
+  expect(access.acquire).toHaveBeenCalledExactlyOnceWith('original',expect.any(AbortSignal),'current',undefined);
  });
  it('preserves cancellation before deferred acquisition and does not promote an absent target',async()=>{
   const page=picture({priority:'prefetch',blobKey:undefined}),controller=new AbortController();

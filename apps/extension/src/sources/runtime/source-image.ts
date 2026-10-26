@@ -1,4 +1,4 @@
-import type {SourceImageReference} from '../contracts/image';
+import type {SourceImageReference,SourceImageProgressListener} from '../contracts/image';
 import {sourceImages} from '../registry/images';
 import {fetchSourceImage} from './image-fetch';
 import {sourceMessage} from './client';
@@ -46,7 +46,7 @@ export async function readInlineSourceImage(url:string,pageUrl:string,signal?:Ab
 }
 
 /** The application sees a resource reference and decoded bytes, never a site's image recipe. */
-export async function readSourceImage(reference:SourceImageReference,signal?:AbortSignal):Promise<Blob> {
+export async function readSourceImage(reference:SourceImageReference,signal?:AbortSignal,onProgress?:SourceImageProgressListener):Promise<Blob> {
   signal?.throwIfAborted();
   const valid=await sourceMessage<{url:string;pageUrl:string;data?:string;sourceId?:string;processing?:string}>({type:'NC_SOURCE_IMAGE',manifestId:reference.manifestId,pageId:reference.pageId});
   signal?.throwIfAborted();
@@ -55,7 +55,7 @@ export async function readSourceImage(reference:SourceImageReference,signal?:Abo
   if(valid.processing&&!adapter?.decode)throw Error('来源图片处理器不可用。');
   const headers=valid.data?undefined:typeof adapter?.headers==='function'?adapter.headers(valid.url):adapter?.headers;
   const response=await fetchSourceImage(valid.data??valid.url,signal,headers,valid.data?undefined:{pageUrl:valid.pageUrl,safariTransport:adapter?.safariTransport,
-    ...(adapter?.readerReferrerPolicy?{referrerPolicy:adapter.readerReferrerPolicy}:{})});
+    ...(adapter?.readerReferrerPolicy?{referrerPolicy:adapter.readerReferrerPolicy}:{})},adapter?.decode||valid.data||!/^https?:/.test(valid.url)?undefined:onProgress);
   signal?.throwIfAborted();
   const blob=adapter?.decode?await adapter.decode(response.blob,response.headers,valid.processing,signal):response.blob;
   signal?.throwIfAborted();

@@ -9,6 +9,7 @@ export type * from './contracts/definition';
 export type * from './contracts/source';
 export type * from './contracts/search';
 export type * from './contracts/work';
+export type {SourceImageProgress,SourceImageProgressListener} from './contracts/image';
 export {consumeSearchSeed} from './runtime/search-entry';
 export {SourceSearchError} from './contracts/search';
 export {normalizeSearchLanguage, sourceSearchLimits} from './core/search';

@@ -49,7 +49,7 @@
 
 多语言目录可提供条目的 `contentLanguage` 和 `readingSlotId`。前者是实际源内容的规范语言标签；后者是适配器依据源站明确关系给出的不透明阅读位置键，同位置候选使用相同顺序。`sequenceId` 声明安全的逻辑连读范围，可以包含同话的不同语言；同一位置的多个发布条目保留各自稳定 ID，公共层负责按话合并目录、逐话自动选择及独立进度。目录直接使用条目标题，发布组等说明通过已有 `rawTypes` 提供；源站明确标注外链、不可用或无正文时使用 `readable: false`，未提供表示没有目录层不可读证据。无可信对应关系时不共享位置；无位置键时每个条目独立。相同位置候选按完整快照中的稳定顺序选择，完整目录包含全部支持语言。目标语言、手动选择和续读属于本机应用数据，选择规则见[单来源阅读](SIMPLE_COMIC_READING_DESIGN.md#网站与只读目录)。
 
-公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 只向页面服务交付 Blob。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
+公共执行边界以 [resolve.ts](../apps/extension/src/sources/core/resolve.ts)、[catalog.ts](../apps/extension/src/sources/core/catalog.ts)、[resources.ts](../apps/extension/src/sources/core/resources.ts) 和 [runtime](../apps/extension/src/sources/runtime) 为准。HTTP 与 DOM 清单共用校验；`readSourceImage` 向页面服务交付 Blob，未经过站点编码的图片另可按[公共图片读取](IMAGE_ACCESS.md)发布下载分块用于阅读预览。精确图片 URL 的请求头由公共层以 Web Lock 隔离，完成或取消后释放。资源大小、超时和缓存预算不由站点绕过。
 
 HTTP 页面可提供源站证明的 `contentKey`，用于内容不变而临时下载地址变化的场景；页槽 ID 与内容键保持一致时只刷新取图定位，不重置页身份和进度。打开或预载已完整索引的条目时复用已有清单，优先读取离线原图与普通阅读缓存；缺图先读取已登记地址，读取失败才合并同一章节清单的并发刷新，并重试取图一次。取消、权限不足或限流不触发自动刷新；发现失败保留原索引与缓存。内容键变化、消失或页槽变化仍需明确重新载入。未提供内容键的页面继续以 URL 与页槽判断变化；实际字节摘要始终由页面服务独立核验。页面绑定的临时资源不能声明此键。
 
@@ -79,7 +79,7 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 封面确需浏览器会话时可显式声明 `image.coverTransport: 'page'`，同时适用于已校验目录与已登记搜索候选的封面；不作为 HTTP 失败后的自动兜底。封面 CDN 不要求适配器另行声明主机，按已校验封面 URL 检查浏览器实际访问权限。公共层仅复用完全相同 URL 的图片标签页，否则临时打开后台图片页，在该文档内同源读取原始字节并优先复用导航缓存。与网页目录共享单会话限制、主文档绑定、取消和回收机制，读取前后重查图片权限；每次读取最多 30 秒／4 MiB，会话总时限 60 秒。允许浏览器实际 HTTP 重定向，绑定最终图片文档，注入前检查最终地址权限；页面内取图允许原生重定向，返回字节前重查最终响应地址权限。仍拒绝用户主动导航、绑定后的文档变化、验证页和非栅格图片。首次未缓存封面增加一次图片页加载，成功后沿用现有缩略图缓存；不改变正文与原位取图通道。
 
-公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，不设插件跳转次数上限，保留循环检测与整个读取链的 30 秒超时；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。读取与验证规则见[公共图片读取](IMAGE_ACCESS.md)。
+公共层使用 `webRequest` 在当前请求期间观察扩展自身精确 URL 的重定向响应头，配合 `fetch` 手动跳转，不设插件跳转次数上限，保留循环检测；每跳检查权限与 URL，跨来源不转发站点请求头，重新生成来源 Referer。读取完成、失败或取消后移除监听与会话规则；不增加 debugger／页面捕获权限，不代理上传 Cookie。图片无数据超时、读取与验证规则见[公共图片读取](IMAGE_ACCESS.md)。
 
 二进制只读 API 可使用可选 `context.requestBytes(url, {referer, body?, form?})`，仅在普通扩展 HTTP 通道提供，返回原始字节。无正文时为 GET，`body` 为二进制 POST，`form` 为 UTF-8 表单 POST，两者不可同时提供。与文本请求复用来源权限、Referer、取消、30 秒和 8 MiB 响应预算，请求体限 1 MiB；不进入 GET 交接缓存，不自动改用网页上下文。消息字段与协议语义留在站点目录，无站点语义的 wire 基础可复用 `shared/protobuf.ts`。
 

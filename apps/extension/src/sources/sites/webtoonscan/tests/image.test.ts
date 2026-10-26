@@ -37,11 +37,12 @@ describe('WebtoonScan cover transport', () => {
     expect(fixture.http).not.toHaveBeenCalled();
   });
   it('keeps chapter and generic inline images on their existing HTTP paths', async () => {
-    await readSourceImage({manifestId: 'fixture', pageId: 'image-0', expectedUrl: image});
+    const progress=vi.fn();
+    await readSourceImage({manifestId: 'fixture', pageId: 'image-0', expectedUrl: image},undefined,progress);
     await readInlineSourceImage(image, reader, undefined, 'origin');
     expect(fixture.http.mock.calls).toEqual([
-      [image, undefined, undefined, {pageUrl: reader}],
-      [image, undefined, undefined, {pageUrl: reader, referrerPolicy: 'origin'}],
+      [image, undefined, undefined, {pageUrl: reader,safariTransport:undefined},progress],
+      [image, undefined, undefined, {pageUrl: reader,safariTransport:undefined, referrerPolicy: 'origin'}],
     ]);
     expect(fixture.page).not.toHaveBeenCalled();
   });

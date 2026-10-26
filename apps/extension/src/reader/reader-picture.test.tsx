@@ -51,6 +51,11 @@ function images(node: ReactNode): ImageProps[] {
   return node.type === 'img' ? [node.props] : images(node.props.children);
 }
 function displayed() {const image = images(tree).find(image => image.className === 'nc-page-image-pending'); expect(image).toBeDefined(); image!.onLoad({currentTarget: {naturalWidth: 800, naturalHeight: 1200}}); render();}
+function previewCanvas(node:ReactNode):{ref:{current:unknown};style:{display?:string}}|undefined{
+  if(Array.isArray(node))return node.map(previewCanvas).find(Boolean);
+  if(!isValidElement<{ref:{current:unknown};style:{display?:string};children?:ReactNode}>(node))return;
+  return node.type==='canvas'?node.props:previewCanvas(node.props.children);
+}
 function cleanup() {for (const effect of hooks.effects) effect?.cleanup?.(); hooks.effects = [];}
 type Lease={blob:Blob;release():void};
 function deferred<T>(){let resolve!:(value:T)=>void,reject!:(reason:Error)=>void;const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};}
@@ -73,6 +78,23 @@ beforeEach(() => {
 afterEach(() => {cleanup(); vi.restoreAllMocks();});
 
 describe('shared reader pixel presentation', () => {
+  it('shows streamed pixels while reading without committing identity, then releases the canvas after final display',async()=>{
+    const {acquire,reads}=controlledReads(),shown=vi.fn(),states=vi.fn();render({acquire,onShown:shown,onLoadState:states});
+    const drawImage=vi.fn(),canvas={width:1,height:1,getContext:()=>({drawImage})};previewCanvas(tree)!.ref.current=canvas;
+    const preview=acquire.mock.calls[0][2]!,frame={displayWidth:2400,displayHeight:3600} as VideoFrame;
+    expect(preview.active()).toBe(true);preview.draw(frame);render();expect(canvas.width).toBe(2400);expect(previewCanvas(tree)!.style.display).toBeUndefined();
+    expect(shown.mock.calls.some(([value])=>value?.key)).toBe(false);expect(states).toHaveBeenLastCalledWith(expect.objectContaining({phase:'reading',originalSettled:false}));
+    reads[0].resolve();await flush();expect(previewCanvas(tree)!.style.display).toBeUndefined();
+    displayed();expect(previewCanvas(tree)!.style.display).toBe('none');expect(canvas.width).toBe(1);expect(preview.active()).toBe(false);
+    expect(shown).toHaveBeenLastCalledWith(expect.objectContaining({key:'original'}));expect(drawImage).toHaveBeenCalledOnce();
+  });
+  it('discards failed and retired previews and ignores late frames without restarting the source',async()=>{
+    const {acquire,reads}=controlledReads();render({acquire});const drawImage=vi.fn(),canvas={width:1,height:1,getContext:()=>({drawImage})};previewCanvas(tree)!.ref.current=canvas;
+    const preview=acquire.mock.calls[0][2]!,frame={displayWidth:800,displayHeight:1200} as VideoFrame;
+    preview.draw(frame);render();preview.clear();render();expect(canvas.width).toBe(1);expect(previewCanvas(tree)!.style.display).toBe('none');
+    preview.draw(frame);render();reads[0].reject(Error('network failed'));await flush();expect(canvas.width).toBe(1);expect(previewCanvas(tree)!.style.display).toBe('none');
+    render({scope:'next',blobKey:'next'});preview.draw(frame);render();expect(drawImage).toHaveBeenCalledTimes(2);expect(acquire).toHaveBeenCalledTimes(2);
+  });
   it('promotes a queued neighbor without reacquiring bytes or restarting preparation',async()=>{
     const pending=deferred<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(pending.promise);
     render({priority:'prefetch'});await flush();
