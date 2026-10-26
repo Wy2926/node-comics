@@ -109,7 +109,7 @@ npm run build
 
 通用夹具、环境和启动顺序见[脚本入口](../scripts/README.md)。站点 README 只保留支持的 URL／能力、协议或依赖来源、可复现命令，以及各验证入口的环境与范围。区分隔离样本、真实站点、浏览器安装权限／撤权恢复与模型翻译效果；测试结果和截图写入忽略的产物目录，不在 README 追加流水记录。
 
-网页作品名交接可在构建后从仓库根目录运行 `node apps/extension/tests/source-work.browser.mjs`，沿用 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`／`CHROMIUM_PATH`。该隔离 MV3 夹具覆盖作品／章节网页按钮、插件弹窗、缺名手填和错误归属，确认打开搜索不会额外请求目录或名称服务；不代表真实来源或模型效果。
+网页作品名交接可在构建后从仓库根目录运行 `node apps/extension/tests/source-work.browser.mjs`，沿用 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM`／`CHROMIUM_PATH`。该隔离 MV3 夹具逐站覆盖 Madara、MangaThemesia、GigaViewer 分话站点及 GoodToon 等作品／章节网页按钮、插件弹窗、缺名手填和错误归属，确认打开搜索不会额外请求目录或名称服务，并保持源网页阅读位置；不代表真实来源或模型效果。
 
 ## 现有站点
 

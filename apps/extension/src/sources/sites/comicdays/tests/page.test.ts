@@ -3,10 +3,14 @@ import {createSourceNavigation} from '../../../page';
 import {definitions} from '../../../registry/definitions';
 import {pageFactories} from '../../../registry/pages';
 import {definition} from '../definition';
-import {parsePages} from '../pages';
 import {image} from '../image';
 import {pageUrl} from '../urls';
 import {episodeUrl, imageUrl, readerData} from './fixtures';
+import {verifySerialWork} from '../../../shared/gigaviewer/tests/work-contract';
+import {protocol} from '../protocol';
+
+const {parsePages} = protocol;
+verifySerialWork(definition, protocol);
 
 afterEach(() => vi.unstubAllGlobals());
 describe('Comic DAYS engine binding', () => {

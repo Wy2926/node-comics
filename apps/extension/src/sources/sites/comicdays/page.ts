@@ -1,5 +1,5 @@
 import type {CreateSourcePage} from '../../contracts/page';
-import {gigaViewerPage} from '../../shared/gigaviewer/page';
-import {parsePages} from './pages';
+import {gigaViewerSerialPage} from '../../shared/gigaviewer/serial-page';
+import {protocol} from './protocol';
 
-export const createPage: CreateSourcePage = context => gigaViewerPage(context, parsePages);
+export const createPage: CreateSourcePage = context => gigaViewerSerialPage(context, protocol);

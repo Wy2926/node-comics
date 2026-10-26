@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {samples as serials} from '../src/sources/shared/gigaviewer/tests/serial-samples.mjs';
 
 const root = process.cwd(), extension = path.resolve(process.env.SOURCE_WORK_EXTENSION || 'apps/extension/.output/chrome-mv3');
 const base = path.join(root, 'artifacts/source-work'); await mkdir(base, {recursive: true});
@@ -43,6 +44,22 @@ for (const [host, suffix] of [['lagoonscans.com', 'chapter-12'], ['arenascan.com
   add(host, 'catalog', work, `<div class="postbody"><h1 class="entry-title">${escape(name)}</h1></div>`, name, canonical(work));
   add(host, 'reader', chapter, `<div class="chapterbody"><h1>${chapterTitle}</h1><div class="allc">${link(work, name)}</div></div>`, name, canonical(chapter));
 }
+for (const {id, origin} of serials) {
+  const work = origin + '/series/7/first_episode', chapter = origin + '/episode/11', name = id + ' · ' + title;
+  // Locked/unloaded pages still carry a work identity; title lookup must not require pageStructure.
+  const data = {readableProduct: {id: '11', typeName: 'episode', permalink: chapter, title: chapterTitle,
+    series: {id: '7', title: name}, pageStructure: null}};
+  const body = `<script id="episode-json" data-value="${escape(JSON.stringify(data))}"></script><h1>${chapterTitle}</h1>`;
+  const canonical = `<link rel="canonical" href="${chapter}">`;
+  add(id, 'catalog', work, body, name, canonical);
+  add(id, 'reader', chapter, body, name, canonical);
+  add(id, 'wrong-owner', chapter + '#nodelane-' + (id === 'comicdays' ? 'days' : id) + '=8', body, '', canonical);
+}
+const goodtoonWork = 'https://www.goodtoon008.com/manga/gt-42/', goodtoonReader = goodtoonWork + 'chapter-1/';
+add('goodtoon', 'catalog', goodtoonWork, `<h1 class="summary-title">${escape(title)}</h1><section hidden><h1 class="reader-title-manga">${escape(title)}</h1><a class="reader-ctl" href="${goodtoonWork}">작품 정보</a></section>`,
+  title, `<link rel="canonical" href="${goodtoonWork}">`);
+add('goodtoon', 'reader', goodtoonReader, `<h1 class="reader-title-manga">${escape(title)}</h1><h1 id="chapter-heading">${chapterTitle}</h1><a class="reader-ctl" href="${goodtoonWork}">목록</a>`,
+  title, `<link rel="canonical" href="${goodtoonReader}">`);
 const welomaWork = 'https://weloma.net/m/Work1', welomaReader = 'https://weloma.net/c/Chap1';
 const welomaName = 'WeLoMa · ' + title, encoded = Buffer.from(welomaName).toString('base64');
 add('weloma.net', 'catalog', welomaWork, `<div id="login"></div><script type="application/json">window.location.href='${welomaWork}';</script><div class="manga-info"><h3 data-enc="${encoded}"></h3></div>`, welomaName);
@@ -90,11 +107,13 @@ try {
   }
   source = await context.newPage();
   async function verify(trigger, item, label) {
+    const position = await source.evaluate(() => ({x: scrollX, y: scrollY}));
     const opened = context.waitForEvent('page'); await trigger(); latest = await opened;
     await latest.waitForURL(/^chrome-extension:.*\/reader\.html/);
     const input = latest.locator('dialog.nc-comic-search[open] .nc-search-name input'); await input.waitFor();
     assert.equal(await input.inputValue(), item.expected, label);
     assert.equal(source.url(), item.url, 'Search leaves the source tab unchanged');
+    assert.deepEqual(await source.evaluate(() => ({x: scrollX, y: scrollY})), position, 'Search preserves the source reading position');
     assert(!latest.url().includes(encodeURIComponent(item.expected || title)), 'Work names do not enter the URL');
     assert(!latest.url().includes(item.url) && !latest.url().includes(encodeURIComponent(item.url)), 'Source URLs do not enter the address bar');
     if (!item.expected) {await input.fill('手动作品名'); assert.equal(await input.inputValue(), '手动作品名');}
@@ -103,6 +122,7 @@ try {
   }
   for (const item of cases) {
     await source.goto(item.url); await searchButton(source).waitFor();
+    await source.evaluate(() => {document.body.style.minHeight = '2500px'; scrollTo(0, 500);});
     await verify(() => searchButton(source).click(), item, item.id + '-' + item.kind);
   }
   const item = cases.find(item => item.id === 'lagoonscans.com' && item.kind === 'reader'); await source.goto(item.url);

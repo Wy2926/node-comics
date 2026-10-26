@@ -5,11 +5,11 @@ import {validateSearchCapability, validateSearchPage} from '../../../core/search
 import {sourceNetworks} from '../../../registry/networks';
 import {catalogUrl, definition} from '../definition';
 import {network, parseEntries, parseInfo} from '../network';
-import {parsePages} from '../pages';
-import {coverUrl, parseReader} from '../protocol';
+import {coverUrl, parseReader, protocol} from '../protocol';
 import {parseSearch} from '../search';
 import {cover, entry, episodeUrl, imageUrl, info, readerData, readerHtml, searchHtml, workUrl} from './fixtures';
 
+const {parsePages} = protocol;
 const query = {siteId: 'comicdays', query: 'テスト'};
 function fixture() {
   const request = vi.fn(async (url: string) => {

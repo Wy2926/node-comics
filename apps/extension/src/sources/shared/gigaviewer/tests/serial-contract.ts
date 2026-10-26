@@ -7,10 +7,12 @@ import {sourceNetworks} from '../../../registry/networks';
 import {gigaViewerSerialNetwork} from '../serial-network';
 import {gigaViewerSerialSearch, type GigaViewerSearchMarkup} from '../serial-search';
 import type {GigaViewerSerialProtocol} from '../serial-protocol';
+import {verifySerialWork} from './work-contract';
 
 export function verifySerialSite(definition: SourceDefinition, protocol: GigaViewerSerialProtocol,
   network: ReturnType<typeof gigaViewerSerialNetwork>['network'] & ReturnType<typeof gigaViewerSerialSearch>,
   cdn: string, route: GigaViewerSearchMarkup, mixed: boolean, adaptedOn = '2026-10-23') {
+  verifySerialWork(definition, protocol);
   const {sourceId, origin, catalogUrl, episodeUrl} = protocol;
   const work = catalogUrl('7'), chapter = episodeUrl('11', '7'), query = {siteId: sourceId, query: '作品'};
   const image = `${cdn}/public/page/2/900-abcdef`, cover = `${cdn}/public/series-thumbnail/7-abcdef`;

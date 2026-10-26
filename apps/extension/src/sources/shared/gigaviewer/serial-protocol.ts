@@ -48,18 +48,21 @@ export function gigaViewerSerialProtocol(identity: GigaViewerIdentity, urls: {
     if (loc.series && id(series.id) !== loc.series) throw changed();
     return result;
   }
-  function parseReader(raw: string, url: string) {
-    const loc = location(url), html = inertHtml(raw);
-    const canonical = tags(html, 'link').filter(attrs => attrs.rel === 'canonical');
-    if (canonical.length !== 1) throw changed();
-    const episode = identity.episode(new URL(canonical[0].href));
+  function parseReaderData(value: unknown, canonical: string, url: string) {
+    const loc = location(url), episode = identity.episode(new URL(canonical, url));
     if (!episode || !loc.catalog && loc.episode !== episode) throw changed();
+    const parsed = product(value, identity.episodeUrl(episode, loc.series));
+    const series = object(parsed.series), seriesId = id(series.id);
+    return {episode, series: seriesId, title: text(series.title), product: parsed};
+  }
+  function parseReader(raw: string, url: string) {
+    const html = inertHtml(raw);
+    const canonical = tags(html, 'link').filter(attrs => attrs.rel === 'canonical');
+    if (canonical.length !== 1 || !canonical[0].href) throw changed();
     const scripts = [...raw.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi)]
       .map(match => attributes(match[0].slice(0, match[0].indexOf('>') + 1))).filter(attrs => attrs.id === 'episode-json');
     if (scripts.length !== 1) throw changed();
-    const parsed = product(json(text(scripts[0]['data-value'], 4_000_000)), identity.episodeUrl(episode, loc.series));
-    const series = object(parsed.series), seriesId = id(series.id);
-    return {episode, series: seriesId, title: text(series.title), product: parsed};
+    return parseReaderData(json(text(scripts[0]['data-value'], 4_000_000)), canonical[0].href, url);
   }
   function parsePages(value: unknown, url: string) {
     const parsed = product(value, url);
@@ -67,7 +70,7 @@ export function gigaViewerSerialProtocol(identity: GigaViewerIdentity, urls: {
     return {url, adapter: identity.sourceId, title: typeof parsed.title === 'string' ? parsed.title : '', direction,
       discoveryComplete: true, knownTotal: items.length, note: '', items};
   }
-  return {...identity, ...urls, location, parseReader, parsePages};
+  return {...identity, ...urls, location, parseReaderData, parseReader, parsePages};
 }
 export type GigaViewerSerialProtocol = ReturnType<typeof gigaViewerSerialProtocol>;
 

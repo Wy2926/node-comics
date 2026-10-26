@@ -13,6 +13,7 @@
 
 `identity.ts`、`serial-protocol.ts`、`serial-network.ts`、`serial-search.ts` 从既有 Comic DAYS 实现提取，供上述十二个分话适配器显式接入；Sunday Webry 保持原有搜索与目录。纯 URL 身份规则保留 Comic DAYS 的 `nodelane-days` 绑定，其余站点各有自己的命名空间，不合并同名作品。
 
+- `serial-page.ts` 组合原位识图与「寻找其他语言」：点击时只读取当前文档的 canonical 和 `episode-json`，复用网络解析的章节、permalink 与作品绑定校验，从 `series.title` 取得作品名。作品入口跳转到首话后与普通章节使用同一逻辑；付费／未加载正文不影响可靠作品名的读取。缺失、冲突或过期元数据留空手填，不使用章节标题，不请求目录、正文、封面或名称服务，也不新增缓存。
 - 目录通过源站 `readable_product_pagination_information` 的总数与每页大小串行读取 `pagination_readable_products`，核对数量、唯一章节和首话作品归属；多段再核对总数与首尾段，失败不修改调用方的旧目录。不请求会跳转的作品入口，无全站扫描和额外缓存。
 - 目录仅包含 `type=episode` 的完整分话清单，不包含单行本或杂志。可读性只采用源站当前的 `purchase_info.can_read`，不是站点收费标签、`is_free` 或 `open_limit` 倒计时文案；限时开放章与常驻公开章使用同一读取流程。保留不可读条目，刷新目录后随源站更新状态；实际请求正文时仍须取得当前 `pageStructure`，不能因旧目录显示可读就放行。不请求购买、租借、阅读券或阅读计数接口。
 - 搜索验证站点指定的路由或 SSR 媒体身份、查询回显、结果容器与作品封面。コミックガルド、webアクション、マグコミ与 Seasons 显式使用已验证的新版 SSR 搜索组件，只解析可见 HTML，不读取或执行 hydration 脚本；CSS 构建哈希不参与身份。启用混合商品模板的站点只跳过本站 `/volume/`、`/magazine/` 结果，不把这些商品当作分话作品。未知主机或结构报错。源站一次返回全部命中，UI 每页 50 条并校验结果指纹；翻页仍需重新读取该查询响应，不请求候选目录。
@@ -22,7 +23,7 @@
 
 ## 验证
 
-公共单测在 `tests/engine.test.ts`，各站测试调用 `tests/serial-contract.ts`。源码测试覆盖分页完整性、限时开放／到期／再开放的状态变化、旧目录可读但正文已关闭、锁定状态、身份与资源归属、搜索游标、取消、重复页、未知格式、稳定扫描的解析次数、导航及资源释放。
+公共单测在 `tests/engine.test.ts`，各站测试调用 `tests/serial-contract.ts`，作品名交接共用 `tests/work-contract.ts`。源码测试覆盖分页完整性、限时开放／到期／再开放的状态变化、旧目录可读但正文已关闭、锁定状态、身份与资源归属、搜索游标、取消、重复页、未知格式、稳定扫描的解析次数、导航及资源释放。构建后运行 `node apps/extension/tests/source-work.browser.mjs`，用隔离源站夹具逐站检查网页按钮、作品名交接、错误归属手填、零额外源站请求和原页面位置保持；不代替真实站点验证。
 
 从仓库根运行 `node apps/extension/src/sources/shared/gigaviewer/tests/verify-serial-http.mjs [site-id]`，省略 ID 验证十二个分话适配器；检查真实搜索、完整目录、正文、封面、空搜索和锁定章节拒绝。复用同一目录响应统计免费、已下架及购买／租借／订阅能力，不增加收费核查请求；免费站出现交易能力或未知字段时失败，须复核站点收费依据，不能自动改标签或把下架等同收费。该抽样检查不代替站点级官方说明。新版 SSR 搜索另用公开宽泛关键词检查两页不重复结果。固定样本、请求／字节预算见脚本，不记录签名图片 URL。
 
