@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Pagina {0} · {1}% della pagina",
   "返回刚才": "Torna indietro",
   "还没有书签": "Nessun segnalibro ancora",
-  "阅读进度 {0}%": "Avanzamento lettura {0}%"
+  "阅读进度 {0}%": "Avanzamento lettura {0}%",
+  "默认缩放": "Zoom predefinito",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Si applica solo alla prima apertura di un fumetto. I fumetti già aperti mantengono il proprio zoom."
 }

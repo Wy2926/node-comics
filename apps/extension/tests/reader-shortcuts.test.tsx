@@ -303,24 +303,46 @@ describe('reader shortcut action integration',()=>{
   expect(actions.preserve).not.toHaveBeenCalled();
  });
  it.each([
-  {compact:false,phoneDevice:false,phone:false},
-  {compact:true,phoneDevice:false,phone:false},
-  {compact:false,phoneDevice:true,phone:false},
-  {compact:true,phoneDevice:true,phone:true},
- ])('uses phone sizing only when both device and compact viewport gates match: %j',({compact,phoneDevice,phone})=>{
-  vi.stubGlobal('window',{matchMedia:(query:string)=>({matches:query.includes('max-device-width')?phoneDevice:compact}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
-  render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:phone?'window':'width',zoom:phone?100:50});
+  {compact:false,touch:false},
+  {compact:true,touch:false},
+  {compact:false,touch:true},
+  {compact:true,touch:true},
+ ])('uses 100 percent for phones and tablets without changing their initial fit: %j',({compact,touch})=>{
+  vi.stubGlobal('window',{matchMedia:(query:string)=>({matches:query==='(pointer: coarse), (hover: none)'||query.includes('max-device-width')?touch:compact}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:compact&&touch?'window':'width',zoom:touch?100:50});
  });
- it('waits through unloaded phone pages and placeholders before saving the first actual long-image preset',()=>{
+ it('saves the opening zoom before phone images load and preserves it through global changes and long-image detection',()=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
-  const setItem=vi.fn();vi.stubGlobal('localStorage',{getItem:()=>null,setItem});
-  const props=fixture({copy:{...copy,pages:[]}});render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
+  const stored=new Map<string,string>(),setItem=vi.fn((key:string,value:string)=>stored.set(key,value));
+  vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem});
+  const props=fixture({settings:{...defaults,readerZoom:130},copy:{...copy,pages:[]}});render(props);flushEffects();
+  const opening={mode:'classic',preference:'original',fit:'window',zoom:130};
+  expect(JSON.parse(stored.get('fixture')!)).toEqual(opening);
+  props.settings={...props.settings,readerZoom:70};
   props.copy={...copy,pages:copy.pages.map(page=>({...page,width:900,height:1300,imageSha256:undefined}))};
-  render(props);flushEffects();expect(setItem).not.toHaveBeenCalled();
+  render(props);flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual(opening);
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,width:800,height:24000,imageSha256:`real-${page.id}`}))};
-  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'original',fit:'width',zoom:100});
-  expect(actions.preserve).toHaveBeenCalledOnce();expect(setItem).not.toHaveBeenCalled();
+  render(props);flushEffects();expect(view()).toEqual({...opening,fit:'width'});
+  expect(actions.preserve).toHaveBeenCalledOnce();
   render(props);flushEffects();expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
+ });
+ it.each([false,true])('keeps the opening zoom across global changes, chapters and reopening; only another unread comic uses the new value (touch: %s)',touch=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:touch}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  const stored=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
+  const props=fixture({settings:{...defaults,readerZoom:130}});render(props);flushEffects();
+  expect(view().zoom).toBe(130);
+  props.settings={...props.settings,readerZoom:70};render(props);flushEffects();expect(view().zoom).toBe(130);
+  props.copy={...copy,id:'next-chapter'};render(props);flushEffects();expect(view().zoom).toBe(130);
+  hooks.states=[];render(props);expect(view().zoom).toBe(130);
+  hooks.states=[];render({...props,viewKey:'unread-comic'});expect(view().zoom).toBe(70);
+  expect(props.setSettings).not.toHaveBeenCalled();
+ });
+ it('keeps the first zoom on reopening even if image loading never succeeded',()=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  const stored=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
+  const props=fixture({settings:{...defaults,readerZoom:120},copy:{...copy,pages:[]}});render(props);flushEffects();
+  hooks.states=[];render({...props,settings:{...props.settings,readerZoom:60}});
+  expect(view()).toEqual({mode:'classic',preference:'original',fit:'window',zoom:120});
  });
  it.each(['fit','zoomIn'] as const)('preserves a manual %s change made before the actual long-image dimensions arrive',command=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
@@ -343,10 +365,10 @@ describe('reader shortcut action integration',()=>{
   expect(selected).toEqual({mode:'classic',preference:'original',fit:'window',zoom:110});
   flushEffects();expect(view()).toEqual(selected);
  });
- it('keeps an existing legacy view and its zoom when opening a long-image comic',()=>{
-  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom:140}),setItem:vi.fn()});
-  const props=fixture({copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
-  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'translation',fit:'window',zoom:140});
+ it.each([undefined,140])('keeps an existing legacy view with zoom %s independently of the new global default',zoom=>{
+  vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',zoom}),setItem:vi.fn()});
+  const props=fixture({settings:{...defaults,readerZoom:70},copy:{...copy,pages:copy.pages.map(page=>({...page,height:6000}))}});
+  render(props);flushEffects();expect(view()).toEqual({mode:'classic',preference:'translation',fit:'window',zoom:zoom??100});
  });
  it('shares drawer controls and replaces the old help modal with the app-owned panel',()=>{
   const props=fixture();render(props);hooks.handlers['reader.directory']();

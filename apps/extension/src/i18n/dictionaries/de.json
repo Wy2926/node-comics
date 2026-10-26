@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Seite {0} · {1}% der Seite",
   "返回刚才": "Zurück",
   "还没有书签": "Noch keine Lesezeichen",
-  "阅读进度 {0}%": "Lesefortschritt {0}%"
+  "阅读进度 {0}%": "Lesefortschritt {0}%",
+  "默认缩放": "Standardzoom",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Gilt nur beim ersten Öffnen eines Comics. Bereits geöffnete Comics behalten ihren Zoom."
 }

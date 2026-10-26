@@ -110,8 +110,18 @@ async function expectLayoutChoice(value) {
 }
 async function globalPreference(name, value) {
   await page.getByRole('button', {name: '全局阅读偏好', exact: true}).click();
-  await page.getByRole('combobox', {name, exact: true}).click();
-  await page.getByRole('option', {name: value, exact: true}).click();
+  if (name === '默认缩放') {
+    const control = page.getByRole('group', {name, exact: true}), target = Number.parseInt(value);
+    let current = Number.parseInt(await control.locator(':scope > span').textContent());
+    while (current !== target) {
+      await control.getByRole('button', {name: current < target ? '放大' : '缩小', exact: true}).click();
+      const next = Number.parseInt(await control.locator(':scope > span').textContent());
+      assert.equal(next, current + (current < target ? 10 : -10)); current = next;
+    }
+  } else {
+    await page.getByRole('combobox', {name, exact: true}).click();
+    await page.getByRole('option', {name: value, exact: true}).click();
+  }
   await page.getByRole('button', {name: '返回阅读器', exact: true}).click();
   await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
 }
@@ -452,7 +462,10 @@ test('both spread pages are translation targets and four comparison images still
   const window = await snapshot('reading-window');
   assert.deepEqual(window.visible, [pageId(2), pageId(3)]);
   assert.equal(window.immediate, true);
-  assert.equal(await viewport().locator('img.nc-page-image:not([data-result-job="original"])').count(), 2);
+  await page.waitForFunction(() => {
+    const images = [...document.querySelectorAll('.nc-reading-viewport img.nc-page-image:not([data-result-job="original"])')];
+    return images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0);
+  });
   await openSettings(); await openMore(); await settings().getByRole('switch', {name: '并排对照', exact: true}).click(); await closeSettings();
   await shown(3, [2, 3], 4); await assertFits('double comparison desktop');
   await page.setViewportSize({width: 360, height: 740}); await shown(3, [2, 3], 4); await assertFits('double comparison narrow');
@@ -545,6 +558,59 @@ test('one forward action from the final spread opens the next chapter cover with
   await assertFits('next chapter cover');
   await page.keyboard.press('PageDown'); await shown(2, [2, 3], 2, 1);
   assert.deepEqual(await snapshot('marked-read'), [], 'Skipping a chapter cannot mark it read while crossing the boundary');
+});
+
+for (const device of [
+  {name: 'desktop', width: 1280, height: 900, touch: false, fit: 'width'},
+  {name: 'narrow-desktop', width: 650, height: 900, touch: false, fit: 'width'},
+  {name: 'phone-portrait', width: 390, height: 844, touch: true, fit: 'window'},
+  {name: 'phone-landscape', width: 844, height: 390, touch: true, fit: 'window'},
+  {name: 'tablet', width: 768, height: 1024, touch: true, fit: 'width'},
+  {name: 'large-tablet-portrait', width: 1024, height: 1366, touch: true, fit: 'width'},
+  {name: 'large-tablet-landscape', width: 1366, height: 1024, touch: true, fit: 'width'},
+]) test(`first-open zoom is 100% on touch devices and 50% on desktop: ${device.name}`, async () => {
+  await page.setViewportSize({width: device.width, height: device.height});
+  const session = await page.context().newCDPSession(page);
+  await session.send('Emulation.setTouchEmulationEnabled', {enabled: device.touch});
+  await reader({layoutSettings: true});
+  assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse), (hover: none)').matches), device.touch);
+  const expected = {mode: 'classic', preference: 'original', zoom: device.touch ? 100 : 50, fit: device.fit};
+  assert.deepEqual(await comicView('A'), expected);
+  if (device.fit === 'window') await assertFits(device.name);
+  else assert(Math.abs((await cells().first().boundingBox()).width - await viewport().evaluate(element => element.clientWidth) * expected.zoom / 100) < 2, 'Rendered width matches the opening zoom');
+  await openSettings();
+  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText(`${expected.zoom}%`, {exact: true}).waitFor();
+  await page.screenshot({path: resolve(artifacts, `default-zoom-${device.name}.png`)});
+  await closeSettings(); await jump(3); await shown(3, [3]);
+  await globalPreference('默认缩放', '140%'); await shown(3, [3]);
+  assert.deepEqual(await comicView('A'), expected, 'Changing the global zoom leaves this comic and its page intact');
+  await switchComic('B');
+  assert.equal((await comicView('B')).zoom, 140, 'Only the unread comic receives the new global zoom');
+  await switchComic('A'); assert.deepEqual(await comicView('A'), expected);
+  if (device.name === 'desktop' || device.name === 'phone-portrait') {
+    await page.getByRole('button', {name: '全局阅读偏好', exact: true}).click();
+    await page.locator('.settings-card').filter({has: page.getByRole('heading', {name: '阅读偏好', exact: true})})
+      .screenshot({path: resolve(artifacts, `global-zoom-${device.name}.png`)});
+  }
+});
+
+test('first-open global zoom survives chapter switches, manual zoom, reopening, and reload', async () => {
+  await reader({layoutSettings: true, chapters: true});
+  await globalPreference('默认缩放', '130%');
+  assert.equal((await comicView('A')).zoom, 50);
+  await switchComic('B'); assert.equal((await comicView('B')).zoom, 130);
+  await jump(4); await shown(4, [4]);
+  await openSettings();
+  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByRole('button', {name: '放大', exact: true}).click();
+  await closeSettings(); assert.equal((await comicView('B')).zoom, 140);
+  await globalPreference('默认缩放', '70%'); await shown(4, [4]);
+  assert.equal((await comicView('B')).zoom, 140);
+  await page.getByRole('button', {name: '切下一章', exact: true}).click(); await shown(1, [1], 1, 1);
+  assert.equal((await comicView('B')).zoom, 140);
+  await switchComic('A'); assert.equal((await comicView('A')).zoom, 50);
+  await switchComic('B'); assert.equal((await comicView('B')).zoom, 140);
+  await page.reload(); await viewport().waitFor();
+  await switchComic('B'); assert.equal((await comicView('B')).zoom, 140);
 });
 
 test('comic layouts inherit the real global preference until overridden and Default clears only the comic override', async () => {

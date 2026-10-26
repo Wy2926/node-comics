@@ -27,7 +27,7 @@ import {ComicDirectory,contentLanguageLabel} from './ComicDirectory';
 import {acknowledgeCatalogUpdates} from '../comics/application/catalog-service';
 import type {ReadingDirectory} from '../comics/application/library-service';
 import {PageTranslationBar} from './PageTranslationBar';
-import {initialReadingView,readingViewDefaults,readStoredReadingView,saveReadingView,type ReadingView} from './view';
+import {initialReadingView,normalizeReaderZoom,readingViewDefaults,readStoredReadingView,saveReadingView,type ReadingView} from './view';
 import {track,type AnalyticsFields} from '../analytics';
 import type {ReaderAnalytics} from './analytics';
 import {useReaderAnalytics} from './useReaderAnalytics';
@@ -49,12 +49,12 @@ const motion=useRef(false),surface=useRef<HTMLDivElement>(null),spreadStack=useR
 const [moving,setMoving]=useState(false);
 const previewSurface=useRef<HTMLDivElement>(null);
 const [previewRequest,setPreviewRequest]=useState<{entryId:string;index:number|'last'}>();
-const [compactAtOpen]=useState(isCompactReaderDevice);
+const [initialSizing]=useState(()=>({compact:isCompactReaderDevice(),readerZoom:normalizeReaderZoom(globalSettings.readerZoom)}));
 const [savedView,setView]=useState<ReadingView|undefined>(()=>{
  const page=copy.pages.find(page=>page.id===copy.pageId)??copy.pages[0];
- return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
+ return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256?page:undefined,initialSizing.compact,initialSizing.readerZoom);
 });
-const view=savedView??readingViewDefaults();
+const view=savedView??{...readingViewDefaults(),zoom:initialSizing.readerZoom};
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
 const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
 const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
@@ -96,11 +96,12 @@ useEffect(()=>{if(!moving&&shown&&copy.comicId&&copy.catalogUpdateRevision)void 
 useEffect(()=>{setActual({});setLoads({});},[scopeBase]);
 useEffect(()=>{
  if(savedView)return;
- // Compact defaults wait for real image dimensions, not descriptor placeholders.
- const initialView=initialReadingView(page?.imageSha256?page:undefined,compactAtOpen);
+ // Compact fit waits for real image dimensions; zoom is fixed at the first opening.
+ const initialView=initialReadingView(page?.imageSha256?page:undefined,initialSizing.compact,initialSizing.readerZoom);
  if(initialView){preserve();setView(previous=>previous??initialView);}
 },[savedView,page?.id,page?.imageSha256,page?.width,page?.height]);
-useEffect(()=>{if(savedView)saveReadingView(viewKey,savedView);},[viewKey,savedView]);
+// Persist the opening zoom even if image loading fails before fit can be detected.
+useEffect(()=>{saveReadingView(viewKey,view);},[viewKey,savedView]);
 useEffect(()=>{
  if(!viewport.current)return;
  let measured=false;

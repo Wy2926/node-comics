@@ -56,11 +56,17 @@ async function geometry(locale, width, scale) {
     const theme = root.querySelector('.nc-theme-row'), description = theme.firstElementChild;
     const model = root.querySelector('.nc-model-trigger');
     const target = root.querySelector('.nc-channel-settings .setting-row .nc-select');
+    const zoom = root.querySelector('.nc-scale-control');
     return {page: rect(root), contentWidth: root.scrollWidth, row: rect(theme), description: rect(description), colors: rect(root.querySelector('.nc-theme-options')),
+      zoom: rect(zoom), zoomParts: [...zoom.children].map(rect),
       model: rect(model), target: rect(target), font: parseFloat(getComputedStyle(document.documentElement).fontSize)};
   });
   assert(value.page.x >= -1 && value.page.right <= width + 1, `${locale}: settings outside viewport`);
   assert(value.contentWidth <= value.page.width + 1, `${locale}: settings content overflows`);
+  assert(value.zoom.x >= value.page.x && value.zoom.right <= value.page.right + 1, `${locale}: zoom control overflows`);
+  const [minus, percentage, plus] = value.zoomParts;
+  assert(minus.right <= percentage.x && percentage.right <= plus.x, `${locale}: zoom buttons must flank the percentage`);
+  assert([minus, plus].every(button => button.width >= 44 && button.height >= 44), `${locale}: zoom buttons need a touch target`);
   assert(value.description.width >= value.row.width * .9, `${locale}: theme description is squeezed`);
   assert(value.colors.y >= value.description.bottom, `${locale}: theme choices squeeze the description`);
   assert(Math.abs(value.model.width - value.target.width) < 1, `${locale}: model and target controls differ in width`);
@@ -79,6 +85,23 @@ try {
   assert.equal(await page.locator('.nc-channel-settings .nc-model-picker').count(), 1);
   assert.equal(await page.locator('.nc-channel-settings').getByRole('switch', {name: ja['翻译书名与简介']}).count(), 1);
   check('no title banner; appearance, reading, translation, enhancement, shortcuts, privacy and storage order');
+
+  const zoomControl = page.getByRole('group', {name: ja['默认缩放'], exact: true});
+  assert.equal(await zoomControl.locator(':scope > span').textContent(), '50%');
+  for (const zoom of [40, 200, 130]) {
+    let current = Number.parseInt(await zoomControl.locator(':scope > span').textContent());
+    while (current !== zoom) {
+      await zoomControl.getByRole('button', {name: ja[current < zoom ? '放大' : '缩小'], exact: true}).click();
+      const next = Number.parseInt(await zoomControl.locator(':scope > span').textContent());
+      assert.equal(next, current + (current < zoom ? 10 : -10)); current = next;
+    }
+    assert.equal(await zoomControl.getByRole('button', {name: ja['缩小'], exact: true}).isDisabled(), zoom === 40);
+    assert.equal(await zoomControl.getByRole('button', {name: ja['放大'], exact: true}).isDisabled(), zoom === 200);
+    await page.waitForFunction(zoom => JSON.parse(localStorage.getItem('nc-settings')).readerZoom === zoom, zoom);
+  }
+  await page.reload(); await trigger.waitFor();
+  assert.equal(await zoomControl.locator(':scope > span').textContent(), '130%');
+  check('global zoom minus/plus controls step by 10%, stop at 40–200%, and persist across reloads');
 
   await geometry('ja', 1440, 1);
   await shot('ja-desktop');
@@ -132,6 +155,7 @@ try {
     await selectOption(combo(dictionary['界面语言']), locale);
     dictionary = next;
     await page.getByRole('region', {name: dictionary['外观与偏好'], exact: true}).waitFor();
+    assert.equal(await page.getByRole('group', {name: dictionary['默认缩放'], exact: true}).locator(':scope > span').textContent(), '130%');
     for (const scale of [1, 1.25]) {
       await selectOption(combo(dictionary['界面文字大小']), String(scale));
       for (const width of [1024, 700, 390]) await geometry(locale, width, scale);

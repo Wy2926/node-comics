@@ -9,7 +9,7 @@ import './mobile.css';
 
 // Some touch browsers report a fine pointer but no hover (including Android emulators).
 export const compactReaderQuery = '(max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none)';
-/** Match the phone.css device gate so narrow desktop windows keep desktop image defaults. */
+/** Match the phone.css device gate for the compact reader's initial image fit. */
 export function isCompactReaderDevice():boolean{
   return !!window.matchMedia?.(compactReaderQuery).matches&&window.matchMedia('(max-device-width: 1000px) and (pointer: coarse), (max-device-width: 1000px) and (hover: none)').matches;
 }

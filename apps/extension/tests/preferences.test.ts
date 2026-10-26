@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { defaults } from '../src/types';
+import {normalizeReaderZoom} from '../src/reader/view';
 import { readSearchLanguage, readSearchSiteSelection, saveSearchLanguage, saveSearchSiteSelection, saveSettings, settings, readSiteFavorites, saveSiteFavorites, siteFavoritesKey } from '../src/comics/application/preferences';
 
 beforeEach(() => {
@@ -82,6 +83,22 @@ it('persists all reader layouts, including double-page reading, across reloads',
   for (const layout of ['spread', '', 2, null]) {
     localStorage.setItem('nc-settings', JSON.stringify({layout}));
     expect(settings().layout).toBe(defaults.layout);
+  }
+});
+it.each([false,true])('resolves an unset zoom on the reading device and persists an explicit global choice (touch: %s)',async touch=>{
+  vi.stubGlobal('window',{matchMedia:()=>({matches:touch})});
+  expect(normalizeReaderZoom(settings().readerZoom)).toBe(touch?100:50);
+  localStorage.setItem('nc-settings',JSON.stringify({language:'ja'}));
+  expect(normalizeReaderZoom(settings().readerZoom)).toBe(touch?100:50);
+  for(const readerZoom of [40,70,100,130,200]){
+    await saveSettings({...settings(),readerZoom});
+    expect(settings().readerZoom).toBe(readerZoom);
+    expect(JSON.parse(localStorage.getItem('nc-settings')!).readerZoom).toBe(readerZoom);
+  }
+  for(const readerZoom of [null,'150',39,201,155,{},true]){
+    localStorage.setItem('nc-settings',JSON.stringify({language:'ja',readerZoom}));
+    expect(normalizeReaderZoom(settings().readerZoom)).toBe(touch?100:50);
+    expect(settings().language).toBe('ja');
   }
 });
 it('mirrors double-page reading to trusted extension settings and reader preferences', async () => {

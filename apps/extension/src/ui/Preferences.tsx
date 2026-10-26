@@ -10,6 +10,8 @@ import { AppearanceSettings } from './Appearance';
 import { SettingRow } from './components';
 import {TranslationChannels} from './TranslationChannels';
 import {EnhancementSettings} from './EnhancementSettings';
+import {normalizeReaderZoom} from '../reader/view';
+import {ScaleControl} from './ScaleControl';
 import {AnalyticsConsent} from '../analytics/AnalyticsConsent';
 import {TranslationModelPicker} from './TranslationModelPicker';
 import {TranslationFontPicker} from './TranslationFontPicker';
@@ -37,6 +39,9 @@ export function Preferences({ settings, setSettings, caps, modelSelection, fontS
           <option value="single">{msg("单页")}</option>
           <option value="double">{msg("双页")}</option>
         </Select>
+      </SettingRow>
+      <SettingRow title={msg('默认缩放')} description={msg('仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。')}>
+        <ScaleControl label={msg('默认缩放')} value={normalizeReaderZoom(settings.readerZoom)} min={40} max={200} onChange={readerZoom=>setSettings(s=>({...s,readerZoom}))}/>
       </SettingRow>
       <SettingRow title={msg('翻页方向')} description={msg('翻页模式中的方向键遵循此设置。')}>
         <Select aria-label={msg('翻页方向')} value={settings.direction} onChange={e=>setSettings(s=>({...s,direction:e.target.value as Settings['direction']}))}>

@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Trang {0} · Vị trí {1}% trong trang",
   "返回刚才": "Quay lại",
   "还没有书签": "Chưa có dấu trang",
-  "阅读进度 {0}%": "Tiến độ đọc {0}%"
+  "阅读进度 {0}%": "Tiến độ đọc {0}%",
+  "默认缩放": "Mức thu phóng mặc định",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Chỉ áp dụng khi mở truyện lần đầu. Truyện đã mở giữ nguyên mức thu phóng riêng."
 }

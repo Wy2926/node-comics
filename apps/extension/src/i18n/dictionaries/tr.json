@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Sayfa {0} · Sayfanın %{1} konumu",
   "返回刚才": "Geri dön",
   "还没有书签": "Henüz yer imi yok",
-  "阅读进度 {0}%": "Okuma ilerlemesi %{0}"
+  "阅读进度 {0}%": "Okuma ilerlemesi %{0}",
+  "默认缩放": "Varsayılan yakınlaştırma",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Yalnızca bir çizgi romanı ilk kez açtığınızda uygulanır. Daha önce açılmış çizgi romanlar kendi yakınlaştırma oranını korur."
 }

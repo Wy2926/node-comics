@@ -76,6 +76,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('EPUB comic-specific reading options', () => {
+  it('keeps document font size independent of the global image zoom', () => {
+    const props = fixture({readerZoom: 50}); render(props); flushEffects();
+    expect(view().zoom).toBe(100);
+    props.settings = {...props.settings, readerZoom: 180}; render(props);
+    expect(view().zoom).toBe(100);
+    hooks.handlers['reader.zoomIn'](); render(props); flushEffects();
+    expect(saved(props).zoom).toBe(110);
+    hooks.states = []; render(props); expect(view().zoom).toBe(110);
+  });
+
   it.each(['continuous', 'single', 'double'] as const)('inherits global %s without pinning it to the comic', layout => {
     const props = fixture({layout}); const tree = render(props);
     expect(flow(tree)).toBe(layout === 'continuous' ? 'scrolled-continuous' : 'paginated');

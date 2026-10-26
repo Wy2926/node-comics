@@ -26,6 +26,14 @@ describe('comic viewing choices',()=>{
   it.each([undefined,{width:0,height:1300},{width:900,height:0},{width:NaN,height:3000},{width:900,height:Infinity}])('waits for known valid phone image dimensions %j',page=>{
     expect(initialReadingView(page,true)).toBeUndefined();
   });
+  it.each([false,true])('uses the selected global zoom only for a new comic (touch: %s)',touch=>{
+    const stored=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
+    const page={width:800,height:2400},key=readingViewKey('existing');
+    saveReadingView(key,initialReadingView(page,touch,130)!);
+    expect((readStoredReadingView(key)??initialReadingView(page,touch,70))?.zoom).toBe(130);
+    expect((readStoredReadingView(readingViewKey('new'))??initialReadingView(page,touch,70))?.zoom).toBe(70);
+  });
   it('starts each work on originals and shares explicit choices only within that work',()=>{
     const saved=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});

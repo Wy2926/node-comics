@@ -9,6 +9,8 @@
 .nc-app .nc-directory-tabs { border-bottom: var(--comic-perforation); }
 .nc-reader-sizing { margin-bottom: 20px; }
 .nc-reader-sizing > .nc-reader-option:last-child { padding-top: 0; padding-bottom: 14px; }
+.nc-reader-scale { flex-wrap: wrap; }
+.nc-reader-scale > .nc-scale-control { margin-inline-start: auto; }
 .nc-app .nc-reader-choice-cards button { flex-direction: row; justify-content: flex-start; min-height: 44px; padding: 8px; text-align: start; }
 .nc-reader-choice-cards button > .nc-icon { flex: none; }
 .nc-reader-primary-actions { grid-template-columns: minmax(0, 1fr); }

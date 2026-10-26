@@ -2,6 +2,7 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {settings,saveSettings} from '../src/comics/application/preferences';
 import {connectReaderSettings,initialReaderSettings,readReaderSettings,settingsKey,translationLanguageChanged} from '../src/inline/settings';
 import {defaults,languageLabels} from '../src/types';
+import {normalizeReaderZoom} from '../src/reader/view';
 
 let local:Map<string,string>,stored:Record<string,unknown>;
 let get:ReturnType<typeof vi.fn>,set:ReturnType<typeof vi.fn>;
@@ -122,6 +123,19 @@ it('initializes a background-first entry once and shares it with the popup and r
   browserLanguages(['en-US']);await connectReaderSettings(settings());
   expect(settings().language).toBe('ja');
   expect(set).toHaveBeenCalledTimes(1);
+});
+it('leaves device zoom unresolved in the background and mirrors the explicit reader choice',async()=>{
+  vi.stubGlobal('window',undefined);
+  expect((await readReaderSettings()).readerZoom).toBeUndefined();
+  vi.stubGlobal('window',{matchMedia:()=>({matches:true})});
+  await connectReaderSettings(settings());
+  expect(normalizeReaderZoom(settings().readerZoom)).toBe(100);
+  await saveSettings({...settings(),readerZoom:140});
+  local.clear();
+  vi.stubGlobal('window',{matchMedia:()=>({matches:false})});
+  await connectReaderSettings(settings());
+  expect(settings().readerZoom).toBe(140);
+  expect((await readReaderSettings()).readerZoom).toBe(140);
 });
 it.each([true,false])('never overwrites a concurrent manual save with initialization (initialize first: %s)',async initializeFirst=>{
   const manual={...defaults,language:'fr'};

@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Página {0} · {1}% da página",
   "返回刚才": "Voltar",
   "还没有书签": "Ainda não há marcadores",
-  "阅读进度 {0}%": "Progresso de leitura {0}%"
+  "阅读进度 {0}%": "Progresso de leitura {0}%",
+  "默认缩放": "Zoom padrão",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Usado apenas ao abrir um quadrinho pela primeira vez. Quadrinhos já abertos mantêm seu próprio zoom."
 }

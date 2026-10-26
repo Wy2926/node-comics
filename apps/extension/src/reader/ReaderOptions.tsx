@@ -2,6 +2,7 @@ import type {ReactNode} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import type {Settings} from '../types';
+import {ScaleControl} from '../ui/ScaleControl';
 
 /** Shared display controls for image and EPUB readers. */
 export function ReaderChoice<T extends string>({label, value, options, onChange, variant = 'segmented'}: {
@@ -17,14 +18,8 @@ export function ReaderChoice<T extends string>({label, value, options, onChange,
   </div></div>;
 }
 
-export function ReaderScale({label, value, min, max, disabled, onChange}: {
-  label: string; value: number; min: number; max: number; disabled?: boolean; onChange(value: number): void;
-}) {
-  return <div className="nc-reader-option"><b>{label}</b><div className="nc-inline">
-    <button className="icon-button" aria-label={msg('缩小')} disabled={disabled || value <= min} onClick={() => onChange(value - 10)}><Icon name="minus"/></button>
-    <span>{value}%</span>
-    <button className="icon-button" aria-label={msg('放大')} disabled={disabled || value >= max} onClick={() => onChange(value + 10)}><Icon name="plus"/></button>
-  </div></div>;
+export function ReaderScale(props:Parameters<typeof ScaleControl>[0]) {
+  return <div className="nc-reader-option nc-reader-scale"><b>{props.label}</b><ScaleControl {...props}/></div>;
 }
 
 export function ReaderDisplaySettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, allowDouble = false}: {

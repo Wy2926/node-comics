@@ -1163,5 +1163,7 @@
   "第 {0} 页 · 页内 {1}%": "Page {0} · {1}% dans la page",
   "返回刚才": "Revenir",
   "还没有书签": "Aucun signet pour le moment",
-  "阅读进度 {0}%": "Progression de lecture {0}%"
+  "阅读进度 {0}%": "Progression de lecture {0}%",
+  "默认缩放": "Zoom par défaut",
+  "仅在首次阅读漫画时使用，已读漫画保留各自的缩放比例。": "Utilisé uniquement à la première ouverture d’une BD. Les BD déjà ouvertes conservent leur zoom."
 }
