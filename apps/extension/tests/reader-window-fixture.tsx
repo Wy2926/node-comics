@@ -21,6 +21,7 @@ if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the 
 const query=new URLSearchParams(location.search),pagination=query.get('pagination')==='1',highResolution=!pagination&&query.get('highres')==='1',lazyChapters=pagination&&query.get('lazyChapters')==='1',layoutSettings=pagination&&query.get('layoutSettings')==='1';
 const performanceFixture=!pagination&&!highResolution&&query.get('performance')==='1';
 const scrubFixture=query.get('scrub')==='1';
+const turnFixture=query.get('turns')==='1';
 // Leave a synthetic held-key preview open so native Escape/blur and the label can be checked.
 function previewProgress(){
  const input=document.querySelector<HTMLInputElement>('.nc-reader-progress');if(!input)return;
@@ -114,10 +115,11 @@ function Fixture(){
  const requestedLayout=query.get('initialLayout'),initialLayout=requestedLayout==='continuous'||requestedLayout==='double'?requestedLayout:pagination?'single':'continuous';
  const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[0].id),[config,setConfig]=useState<Settings>({...defaults,layout:initialLayout,direction:initialLayout==='double'?'rtl':defaults.direction,fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
  const [saves,setSaves]=useState(0);
+ const [turnCheck,setTurnCheck]=useState(''),[checkingTurns,setCheckingTurns]=useState(false);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
  const viewKey=layoutSettings?`isolated-layout-comic-${comic}`:pagination?'isolated-pagination-fixture':'isolated-window-fixture';
  const copy=copies.find(value=>value.id===id)!;
- const update=useCallback((next:ReadingEntry)=>{if(scrubFixture)setSaves(value=>value+1);setCopies(previous=>previous.map(value=>value.id===next.id?next:value));},[]);
+ const update=useCallback((next:ReadingEntry)=>{if(scrubFixture||turnFixture)setSaves(value=>value+1);setCopies(previous=>previous.map(value=>value.id===next.id?next:value));},[]);
  const noop=useCallback(()=>{},[]),mark=useCallback(async(entryId:string)=>setMarkedRead(previous=>[...previous,entryId]),[]);
  const loadEntry=useCallback(async(entryId:string,options?:ChapterLoadOptions)=>{
   if(!lazyChapters)return;
@@ -142,9 +144,19 @@ function Fixture(){
  function completeTranslation(){
   setCopies(previous=>previous.map(chapter=>({...chapter,pages:chapter.pages.map(page=>page.blobKey?{...page,translationScope:'window-fixture',jobs:[{id:`result-${page.id}`,mode:'classic',target_language:config.language,status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true}],outputBlobs:{[`result-${page.id}`]:resultKey(page.id)}}:page)})));
  }
+ async function checkTurns(){
+  setCheckingTurns(true);const pages:string[]=[];let peak=0;
+  for(let step=0;step<6;step++){
+   document.querySelector<HTMLButtonElement>('.nc-reader-navigation button:last-child')?.click();
+   await new Promise(resolve=>setTimeout(resolve,80));
+   pages.push(document.querySelector<HTMLInputElement>('.nc-reader-navigation input[type=number]')?.value??'?');
+   peak=Math.max(peak,document.querySelectorAll('[data-swipe-snapshot]').length);
+  }
+  setTurnCheck(`6 次点击 / 80ms：${pages.join(' → ')}；最多 ${peak} 个旧页快照`);setCheckingTurns(false);
+ }
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
   <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output><span role="status">{status}</span></div>
-  {scrubFixture&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output><button onClick={previewProgress}>模拟长按预览</button></div>}
+  {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
   {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
    <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>

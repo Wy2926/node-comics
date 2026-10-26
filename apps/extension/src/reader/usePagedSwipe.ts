@@ -94,10 +94,12 @@ export function usePagedSwipe(options:Options){
   const turn=(delta:Turn):false|void=>{
    const current=latest.current;
    if(!current.enabled){current.onTurn(delta);return;}
-   // Consume repeated shortcut presses without letting native PageDown/arrow scrolling leak through.
-   if(phase)return;
+   // Wait only for the destination commit or an active gesture, never queue inputs.
+   if(phase&&(phase!=='entering'||pending))return;
    if(!current.canTurn(delta))return false;
    if(current.blocked||document.hidden)return false;
+   // A newer action replaces the committed entrance. Do not credit skipped pixels as read.
+   if(phase)reset();
    const sign=delta*(current.direction==='rtl'?1:-1);
    navigate(delta,sign);
   };
@@ -113,9 +115,10 @@ export function usePagedSwipe(options:Options){
    // A fresh press is not the trailing click of the previous drag, which some
    // touch browsers omit entirely after preventDefault or pointer capture.
    if(event.isPrimary!==false&&event.button===0)clickUntil=0;
-   if(unavailable()||phase||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+   if(unavailable()||(phase&&(phase!=='entering'||pending))||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
    const target=event.target as Element|null;
    if(target?.closest?.(READER_INTERACTIVE)||window.getSelection?.()?.toString())return;
+   if(phase)reset();
    gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastTime:event.timeStamp,velocity:0,offset:0,dragging:false};
   };
   const allDown=(event:PointerEvent)=>{

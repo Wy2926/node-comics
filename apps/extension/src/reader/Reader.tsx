@@ -158,7 +158,7 @@ const swipe=usePagedSwipe({viewport,surface,enabled:settings.layout!=='continuou
  canTurn,
  onTurn:movePage,onActivityChange:active=>{motion.current=active;setMoving(active);},onSettled:settleMotion,
 });
-const pagedNavigation=usePagedNavigation({viewport,enabled:settings.layout!=='continuous'&&!!page,blocked:swipeBlocked||spreadZoom.zoomed||moving,direction:settings.direction,canTurn,onTurn:swipe.turn});
+const pagedNavigation=usePagedNavigation({viewport,enabled:settings.layout!=='continuous'&&!!page,blocked:swipeBlocked||spreadZoom.zoomed,direction:settings.direction,canTurn,onTurn:swipe.turn});
 useLayoutEffect(()=>{restore();},[viewportSize,fit,zoom,compare,settings.layout,!!page]);
 // Bindings and event arbitration belong to the shared runner; these are the same reader actions as the controls.
 useShortcuts({

@@ -110,10 +110,43 @@ describe('paged swipe animation',()=>{
   const f=fixture();f.controls.turn(1);f.render();
   expect(f.surface.animations).toHaveLength(0);expect(f.viewport.dataset.swipePhase).toBe('entering');expect(f.snapshot.dispose).not.toHaveBeenCalled();
  });
- it('consumes repeat commands until the commit and bounded animation finish without queueing or native scrolling',()=>{
+ it('consumes repeat commands until the destination commits without queueing or native scrolling',()=>{
   const f=fixture();f.controls.turn(1);expect(f.controls.turn(1)).toBeUndefined();expect(f.controls.turn(-1)).toBeUndefined();
-  f.render({identity:'page-2'});expect(f.controls.turn(1)).toBeUndefined();expect(f.controls.turn(-1)).toBeUndefined();f.finish();
+  f.render({identity:'page-2'});f.finish();
   expect(f.options.onTurn).toHaveBeenCalledOnce();expect(snapshots.create).toHaveBeenCalledOnce();
+ });
+ it.each([1,-1] as const)('immediately replaces a committed entrance with a %s turn and ignores stale completion',delta=>{
+  const f=fixture();f.controls.turn(1);f.render({identity:'page-2'});
+  const old=f.snapshot,late=f.surface.animations[0].onfinish!;
+  vi.advanceTimersByTime(80);f.controls.turn(delta);
+  expect(f.options.onTurn).toHaveBeenNthCalledWith(2,delta);expect(old.dispose).toHaveBeenCalledOnce();expect(old.pinned).toBe(false);
+  expect(f.snapshot.pinned).toBe(true);expect(f.surface.animations[0].cancel).toHaveBeenCalledOnce();expect(old.element.animations[0].cancel).toHaveBeenCalledOnce();
+  late();expect(f.snapshot.pinned).toBe(true);expect(f.options.onSettled).not.toHaveBeenCalled();
+  f.render({identity:delta===1?'page-3':'page-1'});f.finish();
+  expect(f.options.onSettled).toHaveBeenCalledOnce();expect(f.snapshot.pinned).toBe(false);expect(vi.getTimerCount()).toBe(0);
+ });
+ it('keeps six rapid committed turns bounded to one outgoing snapshot and no delayed extra turn',()=>{
+  const f=fixture();
+  for(let page=2;page<=7;page++){
+   f.controls.turn(1);f.render({identity:`page-${page}`});vi.advanceTimersByTime(80);
+   expect(snapshots.create.mock.results.filter(({value})=>value.pinned)).toHaveLength(1);
+  }
+  expect(f.options.onTurn).toHaveBeenCalledTimes(6);expect(f.options.onSettled).not.toHaveBeenCalled();
+  f.finish();vi.runAllTimers();expect(f.options.onTurn).toHaveBeenCalledTimes(6);expect(f.options.onSettled).toHaveBeenCalledOnce();
+  expect(snapshots.create.mock.results.every(({value})=>value.dispose.mock.calls.length===1)).toBe(true);
+ });
+ it('accepts a new touch swipe during entrance without stealing an interactive press',()=>{
+  const f=fixture();f.controls.turn(1);f.render({identity:'page-2'});const old=f.snapshot;
+  f.pointer('pointerdown',500,100,{target:{closest:()=>({})}});expect(old.pinned).toBe(true);
+  f.pointer('pointerdown',500,100,{pointerType:'touch'});expect(old.pinned).toBe(false);expect(f.options.onSettled).not.toHaveBeenCalled();
+  f.pointer('pointermove',300,100,{pointerType:'touch',timeStamp:80});f.pointer('pointerup',300,100,{pointerType:'touch',timeStamp:90});
+  expect(f.options.onTurn).toHaveBeenCalledTimes(2);expect(f.viewport.dataset.swipePhase).toBe('entering');
+  f.render({identity:'page-3'});f.finish();expect(f.options.onSettled).toHaveBeenCalledOnce();
+ });
+ it('does not interrupt an entrance for an unavailable next page',()=>{
+  const f=fixture();f.controls.turn(1);f.render({identity:'last-page',canTurn:delta=>delta<0});
+  expect(f.controls.turn(1)).toBe(false);expect(f.snapshot.pinned).toBe(true);expect(f.options.onTurn).toHaveBeenCalledOnce();
+  f.finish();expect(f.options.onSettled).toHaveBeenCalledOnce();
  });
  it.each(['ltr','rtl'] as const)('preserves the finger offset and keeps outgoing/incoming layers one viewport apart for %s',async direction=>{
   const f=fixture({direction}),offset=direction==='ltr'?-200:200,x=500+offset,sign=direction==='ltr'?-1:1;
