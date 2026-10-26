@@ -19,8 +19,10 @@ export interface PageRequest extends PageReference { signal?: AbortSignal; prior
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
 interface Value { blob: Blob; identity: PageMaterialization; validate():Promise<void>; }
 interface Work { controller: AbortController; promise: Promise<Value>; users: number; promote(priority:number):void; preview:PagePreview; }
+/** Preview dimensions are transient metadata; only a full materialization has a digest. */
+export type PageImageMetadata=Pick<PageMaterialization,'contentId'|'pageId'|'renderProfileId'|'width'|'height'>|PageMaterialization;
 const pending=new Map<string,Work>();
-const listeners=new Set<(identity:PageMaterialization)=>void>();
+const listeners=new Set<(metadata:PageImageMetadata)=>void>();
 let active=0;
 const queue:{priority:number;run:()=>void}[]=[];
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
@@ -38,7 +40,8 @@ function schedule<T>(priority:number,action:()=>Promise<T>){
 function drain(){while(active<2&&queue.length)queue.shift()!.run();}
 export {downloadKey} from '../../storage/downloads';
 export const materializationId=(ref:PageReference)=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId]);
-export const onMaterialized=(listener:(identity:PageMaterialization)=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
+export const onPageImageMetadata=(listener:(metadata:PageImageMetadata)=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
+function publishMetadata(metadata:PageImageMetadata){for(const listener of listeners){try{listener(metadata);}catch{/* A UI subscriber cannot interrupt source reading. */}}}
 
 async function pageContext(request:PageReference){
   const [storedDescriptor,doc]=await Promise.all([catalog.get('pageDescriptors',[request.contentId,request.pageId]),catalog.get('entries',request.entryId)]);
@@ -115,7 +118,7 @@ async function read(request:PageRequest,signal:AbortSignal,preview:PagePreview):
   catch(error){if((error as Error).name!=='QuotaExceededError')throw error;}
   if(!trustedCache&&cacheToken&&request.purpose!=='download')await sourcePageCache.put(pageReference(request),prepared.blob,{owner:doc.id,token:cacheToken,connectionId:connection.id,contentId:doc.contentId}).catch(cacheUnavailable);
   await assertSourceCurrent();
-  for(const listener of listeners){try{listener(identity);}catch{/* A UI subscriber cannot make prepared source bytes unavailable. */}}
+  publishMetadata(identity);
   return {blob:prepared.blob,identity,validate:assertSourceCurrent};
 }
 /** Every consumer releases its own lease; a cancelled thumbnail cannot cancel an active reader. */
@@ -125,7 +128,7 @@ export async function acquirePage(request:PageRequest):Promise<PageLease>{
   const joining=!!work;
   const priority=request.priority==='background'?2:request.priority==='prefetch'?1:0;
   if(!work){
-    const controller=new AbortController(),preview=new PagePreview();
+    const controller=new AbortController(),preview=new PagePreview(size=>publishMetadata({contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,...size}));
     work={controller,preview,...schedule(priority,()=>read(request,controller.signal,preview)),users:0};pending.set(key,work);
     void work.promise.then(()=>preview.finish(),()=>preview.finish(true));
     void work.promise.catch(()=>{});

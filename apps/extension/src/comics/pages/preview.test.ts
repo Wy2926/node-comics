@@ -22,24 +22,28 @@ beforeEach(()=>{Decoder.all=[];vi.stubGlobal('ImageDecoder',Decoder);vi.useFakeT
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe('incremental page previews',()=>{
   it('shares one decoder and borrowed chunks across panes, paints before completion, and releases previous frames',async()=>{
-    const preview=new PagePreview(),first=target(),second=target(),chunks=[jpeg()];
+    const size=vi.fn(),preview=new PagePreview(size),first=target(),second=target(),chunks=[jpeg()];
     preview.add(first);preview.add(second);preview.feed({chunks,done:false});await flush();
     const decoder=Decoder.all[0];expect(Decoder.all).toHaveLength(1);expect(decoder.chunks[0]).toBe(chunks[0]);
     const initial=decoder.emit();await flush();expect(first.draw).toHaveBeenCalledWith(initial);expect(second.draw).toHaveBeenCalledWith(initial);
+    expect(size).toHaveBeenCalledExactlyOnceWith({width:2400,height:3600});
+    expect(size.mock.invocationCallOrder[0]).toBeLessThan(first.draw.mock.invocationCallOrder[0]);
     const late=target();preview.add(late);expect(late.draw).toHaveBeenCalledExactlyOnceWith(initial);
     chunks.push(new Uint8Array([1,2,3]));preview.feed({chunks,done:false});await flush();
     expect(decoder.chunks).toEqual(chunks);expect(decoder.decode).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(100);const final=decoder.emit(frame(),true);await flush();
     expect(initial.close).toHaveBeenCalledOnce();expect(first.draw).toHaveBeenLastCalledWith(final);
+    expect(size).toHaveBeenCalledOnce();
     preview.feed({chunks,done:true});await flush();await decoder.completed;
     preview.finish();expect(final.close).toHaveBeenCalledOnce();expect(decoder.close).toHaveBeenCalledOnce();expect(first.clear).not.toHaveBeenCalled();
   });
   it('starts a promoted reader from the existing download and stops when no visible consumer remains',async()=>{
-    const preview=new PagePreview(),sink=target(false),chunks=[jpeg(),new Uint8Array([2])];
+    const size=vi.fn(),preview=new PagePreview(size),sink=target(false),chunks=[jpeg(),new Uint8Array([2])];
     const remove=preview.add(sink);preview.feed({chunks,done:false});expect(Decoder.all).toHaveLength(0);
     sink.active.mockReturnValue(true);preview.refresh();await flush();expect(Decoder.all[0].chunks).toEqual(chunks);
     remove();expect(Decoder.all[0].close).toHaveBeenCalledOnce();
     const stale=Decoder.all[0].emit();await flush();expect(stale.close).toHaveBeenCalledOnce();expect(sink.draw).not.toHaveBeenCalled();
+    expect(size).not.toHaveBeenCalled();
     preview.finish();
   });
   it('does not repeatedly try a failed codec and clears pixels before a renewed source attempt',async()=>{

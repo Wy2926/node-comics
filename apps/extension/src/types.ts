@@ -21,7 +21,7 @@ export interface TranslationSnapshot {id:string;state:'needs_input'|'queued'|'ru
 export interface TranslationBatch {items:TranslationSnapshot[];missing_ids:string[];}
 export interface ImageRateLimit {window_seconds:number;limit:number;remaining?:number;retry_after_seconds?:number;}
 /** Reader-only projection; persisted page descriptors never contain jobs or image bytes. */
-export interface Page { translationScope?: string; entryId?: string; contentId?: string; renderProfileId?: string; id: string; name: string; width: number; height: number; imageSha256?: string; imageByteSize?:number;imageMime?:string; blobKey?: string; sourceUrl?: string; fetchError?: string; translationError?: string; ownerId?: string; apiOrigin?:string; jobs: Job[]; outputBlobs: Record<string, string>; }
+export interface Page { translationScope?: string; entryId?: string; contentId?: string; renderProfileId?: string; id: string; name: string; width: number; height: number; imageDimensionsKnown?:boolean; imageSha256?: string; imageByteSize?:number;imageMime?:string; blobKey?: string; sourceUrl?: string; fetchError?: string; translationError?: string; ownerId?: string; apiOrigin?:string; jobs: Job[]; outputBlobs: Record<string, string>; }
 /** Bounded reader session view model, not a persisted catalog record. */
 export interface ReadingEntry {
   comicId?:string; contentId?:string; id:string; title:string; source:string; sourceKey:string;

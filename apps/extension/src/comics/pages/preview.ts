@@ -12,6 +12,9 @@ export class PagePreview {
   private frame?:VideoFrame;
   private failed?:SourceImageProgress['chunks'];
   private finished=false;
+  private size?:{width:number;height:number};
+
+  constructor(private onSize?:(size:{width:number;height:number})=>void){}
 
   add(target:PagePreviewTarget){
     if(this.finished)return ()=>{};
@@ -60,6 +63,10 @@ export class PagePreview {
         const {image,complete}=await session.decoder.decode({completeFramesOnly:false});
         if(this.session!==session){image.close();return;}
         this.frame?.close();this.frame=image;
+        // Publish the real ratio with the first pixels, not after the complete download/hash.
+        if(this.size?.width!==image.displayWidth||this.size.height!==image.displayHeight){
+          this.size={width:image.displayWidth,height:image.displayHeight};this.onSize?.(this.size);
+        }
         for(const target of this.activeTargets())this.draw(target,image);
         if(complete)return;
         // First pixels are immediate. Later refinements share the decoder without flooding canvas paints.

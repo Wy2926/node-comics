@@ -19,7 +19,7 @@ import {prepareEntryContent} from './comics/application/entry-content';
 import { settings as readSettings, saveSettings } from './comics/application/preferences';
 import { discoverEntryContent } from './comics/acquisition';
 import { chooseSourceFiles, sourceImportOptions } from './comics/application/source-service';
-import { onMaterialized } from './comics/pages/service';
+import { onPageImageMetadata } from './comics/pages/service';
 import { initializeSources } from './comics/application/source-lifecycle';
 import { Reader } from './reader/Reader';
 import type {ChapterLoadOptions} from './reader/chapter-resources';
@@ -292,7 +292,10 @@ export function App(){
    }).catch(()=>{});
    return()=>{stopped=true;};
  },[channel?.scope.key]);
- useEffect(()=>onMaterialized(identity=>setCopies(values=>values.map(c=>c.contentId===identity.contentId?{...c,pages:c.pages.map(p=>p.id===identity.pageId?{...p,imageSha256:identity.imageSha256,imageByteSize:identity.byteSize,imageMime:identity.mime,width:identity.width,height:identity.height}:p)}:c))),[]);
+ useEffect(()=>onPageImageMetadata(metadata=>setCopies(values=>values.map(c=>c.contentId===metadata.contentId?{...c,pages:c.pages.map(p=>p.id===metadata.pageId?{
+   ...p,width:metadata.width,height:metadata.height,imageDimensionsKnown:true,
+   ...('imageSha256' in metadata?{imageSha256:metadata.imageSha256,imageByteSize:metadata.byteSize,imageMime:metadata.mime}:{}),
+ }:p)}:c))),[]);
  // Initialization and other surfaces already persisted their values; only user changes write back.
  useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null){const next=readSettings();settingsRef.current=next;applySettings(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
  useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setShortcutScope(location.hash==='#settings/shortcuts'?'web':undefined);leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);

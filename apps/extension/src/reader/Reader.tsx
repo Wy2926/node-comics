@@ -52,7 +52,7 @@ const [previewRequest,setPreviewRequest]=useState<{entryId:string;index:number|'
 const [initialSizing]=useState(()=>({compact:isCompactReaderDevice(),readerZoom:normalizeReaderZoom(globalSettings.readerZoom)}));
 const [savedView,setView]=useState<ReadingView|undefined>(()=>{
  const page=copy.pages.find(page=>page.id===copy.pageId)??copy.pages[0];
- return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256?page:undefined,initialSizing.compact,initialSizing.readerZoom);
+ return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256||page?.imageDimensionsKnown?page:undefined,initialSizing.compact,initialSizing.readerZoom);
 });
 const view=savedView??{...readingViewDefaults(),zoom:initialSizing.readerZoom};
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
@@ -94,12 +94,12 @@ async function retryCurrentPage(){
 const analytics=useReaderAnalytics({session:analyticsSession,viewport,cells,actual,dimensions:{source_type:analyticsSource,format:['cbz','zip','cbr','rar','pdf','mobi','website','image-sequence'].includes(copy.source)?copy.source as AnalyticsFields['format']:'unknown',layout:settings.layout,mode:compare?'compare':preference==='original'?'original':mode,target_language:settings.language as AnalyticsFields['target_language']},channel:analyticsChannel,pageCount:copy.pages.length,blocked:moving||analyticsBlocked||searchOpen||!!panel,quotaBlocked:!!page&&preference!=='original'&&translationState(copy.id,page,mode)?.kind==='upgrade'});
 useEffect(()=>{if(!moving&&shown&&copy.comicId&&copy.catalogUpdateRevision)void acknowledgeCatalogUpdates(copy.comicId,copy.catalogUpdateRevision).catch(()=>{});},[moving,!!shown,copy.comicId,copy.catalogUpdateRevision]);
 useEffect(()=>{setActual({});setLoads({});},[scopeBase]);
-useEffect(()=>{
+useLayoutEffect(()=>{
  if(savedView)return;
  // Compact fit waits for real image dimensions; zoom is fixed at the first opening.
- const initialView=initialReadingView(page?.imageSha256?page:undefined,initialSizing.compact,initialSizing.readerZoom);
+ const initialView=initialReadingView(page?.imageSha256||page?.imageDimensionsKnown?page:undefined,initialSizing.compact,initialSizing.readerZoom);
  if(initialView){preserve();setView(previous=>previous??initialView);}
-},[savedView,page?.id,page?.imageSha256,page?.width,page?.height]);
+},[savedView,page?.id,page?.imageSha256,page?.imageDimensionsKnown,page?.width,page?.height]);
 // Persist the opening zoom even if image loading fails before fit can be detected.
 useEffect(()=>{saveReadingView(viewKey,view);},[viewKey,savedView]);
 useEffect(()=>{

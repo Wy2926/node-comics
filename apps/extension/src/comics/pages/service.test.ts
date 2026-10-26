@@ -17,7 +17,7 @@ vi.mock('../../storage/downloads', async original => ({...await original<typeof 
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
-import {acquirePage,promotePage,downloadKey,materializationId,type PageLease} from './service';
+import {acquirePage,promotePage,downloadKey,materializationId,onPageImageMetadata,type PageLease} from './service';
 import {PagePreview,type PagePreviewTarget} from './preview';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference,parsePageReference} from './identity';
 import {ReaderImagePrefetch} from '../../reader/image-prefetch';
@@ -65,6 +65,26 @@ beforeEach(() => {
 });
 afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
+  it('publishes preview dimensions before pixels without persisting or inventing a materialized identity',async()=>{
+    const download=Promise.withResolvers<Blob>(),metadata=vi.fn(),preview:PagePreviewTarget={active:()=>true,draw:vi.fn(),clear:vi.fn()};
+    const unsubscribe=onPageImageMetadata(metadata),brokenSubscriber=onPageImageMetadata(()=>{throw Error('Detached UI');});
+    vi.stubGlobal('ImageDecoder',class {
+      completed=Promise.resolve();close=vi.fn();
+      decode=async()=>({image:{displayWidth:100,displayHeight:200,close:vi.fn()},complete:true});
+    });
+    mocks.sourceImage.mockImplementationOnce((_request,_signal,progress)=>{progress({chunks:[new Uint8Array([255,216,255,224,0,0,0,0,0,0,0,0])],done:false});return download.promise;});
+    let lease:PageLease|undefined;
+    try{
+      const reading=acquirePage({...request,purpose:'reading',preview});
+      await vi.waitFor(()=>expect(preview.draw).toHaveBeenCalledOnce());
+      expect(metadata).toHaveBeenCalledExactlyOnceWith({contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,width:100,height:200});
+      expect(metadata.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(preview.draw).mock.invocationCallOrder[0]);
+      expect(mocks.prepare).not.toHaveBeenCalled();expect(mocks.put).not.toHaveBeenCalled();
+      download.resolve(new Blob(['pixels'],{type:'image/png'}));lease=await reading;
+      expect(metadata).toHaveBeenCalledTimes(2);expect(metadata).toHaveBeenLastCalledWith(lease.identity);
+      expect(mocks.sourceImage).toHaveBeenCalledOnce();expect(mocks.put).toHaveBeenCalledOnce();
+    }finally{lease?.release();unsubscribe();brokenSubscriber();vi.unstubAllGlobals();}
+  });
   it('shares a live preview with an authorized reader joining prefetch and keeps the download after that reader cancels',async()=>{
     let resolve!:(blob:Blob)=>void;const waiting=new Promise<Blob>(done=>{resolve=done;});mocks.sourceImage.mockReturnValueOnce(waiting);
     const add=vi.spyOn(PagePreview.prototype,'add');

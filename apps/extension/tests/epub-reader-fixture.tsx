@@ -11,7 +11,7 @@ import {createOpdsProvider} from '../src/comics/sources/opds/provider';
 import {connectRemoteLibrary, browseRemoteLibrary, openRemotePublication} from '../src/comics/application/remote-library-service';
 import {loadEntry, saveReaderState} from '../src/comics/application/library-service';
 import {importLocalFile} from '../src/comics/application/import-service';
-import {onMaterialized} from '../src/comics/pages/service';
+import {onPageImageMetadata} from '../src/comics/pages/service';
 import {useEffect} from 'react';
 import {ReadingProgress, type ReadingProgressStatus} from '../src/comics/application/reading-progress';
 import {catalog} from '../src/comics/repositories';
@@ -147,7 +147,8 @@ function Fixture() {
     setVisibleImages(previous => JSON.stringify(previous) === JSON.stringify(visible.map(value => value.id)) ? previous : visible.map(value => value.id));
     translation.onReadingWindow(targets, visible);
   }, [translation.onReadingWindow]);
-  useEffect(() => onMaterialized(identity => {
+  useEffect(() => onPageImageMetadata(identity => {
+    if (!('imageSha256' in identity)) return;
     enhancementParents.set(identity.imageSha256, identity.pageId.replace(/^epub-image:/, ''));
     setCopy(previous => ({...previous, pages: previous.pages.map(page => page.id === identity.pageId ? {...page, imageSha256: identity.imageSha256, width: identity.width, height: identity.height, imageByteSize: identity.byteSize, imageMime: identity.mime} : page)}));
   }), []);

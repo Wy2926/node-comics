@@ -1,5 +1,5 @@
 /** Real fetch/stream/normalization/reader, with synthetic catalog and extension authorization only. */
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {Reader} from '../src/reader/Reader';
@@ -8,6 +8,7 @@ import {catalog} from '../src/comics/repositories';
 import {registerSourceDriver} from '../src/comics/sources/registry';
 import {pageReference,RENDER_PROFILE} from '../src/comics/pages/identity';
 import {PagePreview} from '../src/comics/pages/preview';
+import {onPageImageMetadata} from '../src/comics/pages/service';
 import {readingViewDefaults,saveReadingView} from '../src/reader/view';
 import {sourcePageCache} from '../src/storage/source-pages';
 import '../src/styles.css';
@@ -36,7 +37,8 @@ registerSourceDriver({id:'reader-stream-fixture',label:'Synthetic loopback',cach
 if(!streaming)PagePreview.prototype.add=()=>()=>{};
 const FlipMetrics=query.has('curl')?(await import('./reader-flip-metrics')).ReaderFlipMetrics:undefined;
 const viewKey='reader-streaming-fixture';
-saveReadingView(viewKey,{...readingViewDefaults(),layout:query.get('layout')==='double'?'double':query.get('layout')==='single'?'single':'continuous',fit:'width',zoom:100});
+const layout=query.get('layout')==='double'?'double':query.get('layout')==='single'?'single':'continuous';
+if(!query.has('newComic'))saveReadingView(viewKey,{...readingViewDefaults(),layout,fit:'width',zoom:100});
 type Timing={requests:number;bytes:number;downloadMs?:number;previewMs?:number;shownMs?:number;paints:number};
 let run='',started=0,timings:Record<string,Timing>={},decoderCount=0,decoders=0,peakDecoders=0,paintMs=0,longTasks:number[]=[];
 const elapsed=()=>Math.round(performance.now()-started);
@@ -70,7 +72,9 @@ const resultCanvas=new OffscreenCanvas(800,1200),resultPaint=resultCanvas.getCon
 resultPaint.fillStyle='#e0f0df';resultPaint.fillRect(0,0,800,1200);resultPaint.fillStyle='#204e36';resultPaint.font='bold 60px sans-serif';resultPaint.fillText('TRANSLATED',80,240);
 const resultKey='inline-original:reader-stream-fixture-result';await sourcePageCache.put(resultKey,await resultCanvas.convertToBlob({type:'image/png'}));resultCanvas.width=resultCanvas.height=1;
 function Fixture(){
- const [copy,setCopy]=useState<ReadingEntry>(),[mounted,setMounted]=useState(false),[settings,setSettings]=useState<Settings>({...defaults,layout:'continuous'}),[report,setReport]=useState<string[]>([]),[status,setStatus]=useState(''),[marked,setMarked]=useState(0),[checking,setChecking]=useState(false);
+ const [copy,setCopy]=useState<ReadingEntry>(),[mounted,setMounted]=useState(false),[settings,setSettings]=useState<Settings>({...defaults,layout}),[report,setReport]=useState<string[]>([]),[status,setStatus]=useState(''),[marked,setMarked]=useState(0),[checking,setChecking]=useState(false);
+ // Match the app's source-size publication, including sources without manifest dimensions.
+ useEffect(()=>onPageImageMetadata(metadata=>setCopy(previous=>previous?.contentId===metadata.contentId?{...previous,pages:previous.pages.map(page=>page.id===metadata.pageId?{...page,width:metadata.width,height:metadata.height,imageDimensionsKnown:true,...('imageSha256' in metadata?{imageSha256:metadata.imageSha256}:{} )}:page)}:previous)),[]);
  async function begin(){
   flushSync(()=>setMounted(false));records.clear();urls.clear();run=crypto.randomUUID();timings={};decoderCount=decoders=peakDecoders=paintMs=0;longTasks=[];setMarked(0);setReport([]);setStatus('');
   const put=(table:string,id:unknown,value:unknown)=>records.set(JSON.stringify([table,id]),value);
@@ -81,7 +85,7 @@ function Fixture(){
    const pageId=String(index+1),name=count===1?format:formats[index];
    const url=`http://127.0.0.1:5211/${name}?run=${run}&page=${pageId}&kib=${kib}${query.has('fault')&&index===0?'&fault=1':''}`;
    urls.set(pageId,url);put('pageDescriptors',[run,pageId],{name:pageId,pageId,contentId:run,ordinal:index,locator:{url,manifestId:run,sourceId:pageId}});
-   return {id:pageId,name:`第 ${pageId} 页`,width:2400,height:3600,jobs:[],outputBlobs:{},blobKey:pageReference({entryId:run,contentId:run,pageId,renderProfileId:RENDER_PROFILE})};
+   return {id:pageId,name:`第 ${pageId} 页`,width:query.has('unknownSize')?900:2400,height:query.has('unknownSize')?1300:3600,jobs:[],outputBlobs:{},blobKey:pageReference({entryId:run,contentId:run,pageId,renderProfileId:RENDER_PROFILE})};
   });
   started=performance.now();setCopy({id:run,contentId:run,title:'慢网流式阅读验收',source:'website',sourceKey:run,generation:1,createdAt:0,updatedAt:0,pages,pageId:'1',relativeOffset:0,discoveryComplete:true});setMounted(true);
  }
