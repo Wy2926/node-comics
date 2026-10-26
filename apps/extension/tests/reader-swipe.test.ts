@@ -253,10 +253,37 @@ describe('paged swipe animation',()=>{
   const f=fixture();f.controls.turn(1);await flush();expect(f.snapshot.pinned).toBe(true);vi.advanceTimersByTime(1000);
   expect(f.viewport.dataset.swipePhase).toBeUndefined();expect(f.snapshot.pinned).toBe(false);expect(f.surface.style.visibility).toBe('');expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.options.onSettled).not.toHaveBeenCalled();f.render({identity:'late-chapter'});expect(f.surface.animations).toHaveLength(0);
  });
- it('honors reduced motion and releases outgoing pixels immediately when the touch destination commits',()=>{
+ it('honors reduced motion without preparing outgoing pixels when a touch destination commits',()=>{
   reduced=true;const f=fixture();f.pointer('pointerdown',500,100,{pointerType:'touch'});f.pointer('pointermove',200,100,{pointerType:'touch',timeStamp:200});f.pointer('pointerup',200,100,{pointerType:'touch',timeStamp:210});
+  expect(snapshots.create).not.toHaveBeenCalled();expect(f.surface.style.visibility).toBe('');expect(f.surface.style.willChange).toBe('');
   expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);f.render({identity:'page-2'});
-  expect(f.surface.animations).toHaveLength(0);expect(f.snapshot.element.animations).toHaveLength(0);expect(f.snapshot.dispose).toHaveBeenCalledOnce();expect(f.viewport.dataset.swipePhase).toBeUndefined();expect(f.surface.style.visibility).toBe('');expect(f.options.onSettled).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+  expect(f.surface.animations).toHaveLength(0);expect(snapshots.create).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();expect(f.surface.style.visibility).toBe('');expect(f.options.onSettled).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+ });
+ it('keeps six reduced-motion command turns immediate without clones, pins or animations',()=>{
+  reduced=true;const f=fixture();
+  for(let n=0;n<6;n++){f.controls.turn(1);f.render({identity:`page-${n+2}`});}
+  expect(f.options.onTurn).toHaveBeenCalledTimes(6);expect(f.options.onSettled).toHaveBeenCalledTimes(6);
+  expect(snapshots.create).not.toHaveBeenCalled();expect(f.surface.animations).toHaveLength(0);expect(vi.getTimerCount()).toBe(0);
+ });
+ it('keeps the live page visible and guards duplicate commands while a reduced-motion destination is pending',()=>{
+  reduced=true;const f=fixture();f.controls.turn(1);f.controls.turn(1);
+  expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.surface.style.visibility).toBe('');expect(f.surface.style.willChange).toBe('');
+  f.render({identity:'chapter-2'});expect(f.options.onSettled).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+  f.controls.turn(-1);expect(f.options.onTurn).toHaveBeenCalledTimes(2);expect(snapshots.create).not.toHaveBeenCalled();
+ });
+ it.each(['cancel','timeout','hidden'] as const)('does not credit or animate a late reduced-motion destination after %s',reason=>{
+  reduced=true;const f=fixture();f.controls.turn(1);
+  if(reason==='cancel')f.controls.cancel();
+  else if(reason==='timeout')vi.advanceTimersByTime(1000);
+  else{documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
+  f.render({identity:'late-chapter'});
+  expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.options.onSettled).not.toHaveBeenCalled();
+  expect(snapshots.create).not.toHaveBeenCalled();expect(f.surface.animations).toHaveLength(0);expect(f.surface.style.visibility).toBe('');expect(vi.getTimerCount()).toBe(0);
+ });
+ it('releases an already prepared snapshot if reduced motion is enabled before the page commits',()=>{
+  const f=fixture();f.controls.turn(1);const outgoing=f.snapshot;reduced=true;f.render({identity:'page-2'});
+  expect(outgoing.dispose).toHaveBeenCalledOnce();expect(f.surface.animations).toHaveLength(0);expect(outgoing.element.animations).toHaveLength(0);
+  expect(f.options.onSettled).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
  });
  it('keeps continuous navigation immediate and does not snapshot or animate',()=>{
   const f=fixture({enabled:false,canTurn:()=>false});f.controls.turn(1);expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);expect(f.surface.animations).toHaveLength(0);expect(snapshots.create).not.toHaveBeenCalled();

@@ -157,14 +157,19 @@ function Fixture(){
   setCopies(previous=>previous.map(chapter=>({...chapter,pages:chapter.pages.map(page=>page.blobKey?{...page,translationScope:'window-fixture',jobs:[{id:`result-${page.id}`,mode:'classic',target_language:config.language,status:'succeeded',phase:'done',quota_pages:0,created_at:'2026-01-01T00:00:00Z',version:1,cache_hit:true}],outputBlobs:{[`result-${page.id}`]:resultKey(page.id)}}:page)})));
  }
  async function checkTurns(){
-  setCheckingTurns(true);const pages:string[]=[];let peak=0;
+  setCheckingTurns(true);const pages:string[]=[];let peak=0,created=0;
+  const viewport=document.querySelector('.nc-reading-viewport'),observer=new MutationObserver(records=>{
+   for(const record of records)for(const node of record.addedNodes)if(node instanceof Element)created+=node.querySelectorAll('[data-swipe-snapshot]').length;
+  });
+  if(viewport)observer.observe(viewport,{childList:true});
   for(let step=0;step<6;step++){
    document.querySelector<HTMLButtonElement>('.nc-reader-navigation button:last-child')?.click();
    await new Promise(resolve=>setTimeout(resolve,80));
    pages.push(document.querySelector<HTMLInputElement>('.nc-reader-navigation input[type=number]')?.value??'?');
    peak=Math.max(peak,document.querySelectorAll('[data-swipe-snapshot]').length);
   }
-  setTurnCheck(`6 次点击 / 80ms：${pages.join(' → ')}；最多 ${peak} 个旧页快照`);setCheckingTurns(false);
+  observer.disconnect();
+  setTurnCheck(`6 次点击 / 80ms：${pages.join(' → ')}；共创建 ${created} 个旧页快照，最多同时 ${peak} 个；减少动态效果：${matchMedia('(prefers-reduced-motion: reduce)').matches?'开启':'关闭'}`);setCheckingTurns(false);
  }
  async function checkGeometry(){
   flushSync(()=>setCheckingGeometry(true));

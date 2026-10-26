@@ -40,8 +40,8 @@ export function usePagedSwipe(options:Options){
   const snapshotTransform=(x:number)=>{if(snapshot)snapshot.element.style.transform=`translate3d(${x}px,0,0)`;};
   const setPhase=(next:Phase|undefined)=>{
    const active=!!phase;phase=next;
-   if(next){viewport.dataset.swipePhase=next;surface.style.willChange='transform';}
-   else{delete viewport.dataset.swipePhase;surface.style.removeProperty('will-change');}
+   if(next)viewport.dataset.swipePhase=next;else delete viewport.dataset.swipePhase;
+   if(next&&!(next==='entering'&&reduced()))surface.style.willChange='transform';else surface.style.removeProperty('will-change');
    if(active!==!!next)latest.current.onActivityChange?.(!!next);
   };
   const stopAnimation=()=>{
@@ -85,8 +85,11 @@ export function usePagedSwipe(options:Options){
   const navigate=(delta:Turn,sign:number,offset=0)=>{
    pending={identity:latest.current.identity,sign,offset};
    setPhase('entering');
-   snapshot=pageSnapshot(viewport,surface,offset);snapshotTransform(offset);
-   surface.style.visibility='hidden';surface.style.removeProperty('transform');
+   if(!reduced()){
+    snapshot=pageSnapshot(viewport,surface,offset);snapshotTransform(offset);
+    surface.style.visibility='hidden';
+   }
+   surface.style.removeProperty('transform');
    // Guard only a navigation that never commits. A committed page starts the slide immediately.
    timer=setTimeout(()=>reset(),1000);
    latest.current.onTurn(delta);
