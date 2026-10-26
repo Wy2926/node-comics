@@ -8,7 +8,7 @@ export const emptySiteFilters: SiteFilters = {content: [], pricing: [], raw: [],
 
 export function siteLabels() {
   const contentTagLabels: Record<SourceSiteContentTag, string> = {
-    manga: msg('日漫'), manhwa: msg('韩漫'), manhua: msg('国漫'), webtoon: msg('条漫'), doujin: msg('同人'), illustration: msg('插画'),
+    western: msg('欧美漫画'), manga: msg('日漫'), manhwa: msg('韩漫'), manhua: msg('国漫'), webtoon: msg('条漫'), doujin: msg('同人'), illustration: msg('插画'),
   };
   const accessTagLabels: Record<SourceSiteAccessTag, {label: string; description: string}> = {
     'login-required': {label: msg('需要登录'), description: msg('部分漫画或章节需要登录账号才能阅读')},

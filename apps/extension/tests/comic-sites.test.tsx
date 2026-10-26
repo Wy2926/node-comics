@@ -42,7 +42,7 @@ describe('comic website directory presentation', () => {
   it('defaults to two visible groups with advanced filters collapsed and a disabled reset', () => {
     const html = render();
     expect(html.match(/class="nc-site-filter-group"/g)).toHaveLength(4);
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(13 + listSupportedSites().length);
+    expect(html.match(/aria-pressed="false"/g)).toHaveLength(14 + listSupportedSites().length);
     expect(html).toContain(`显示 ${listSupportedSites().length} / ${listSupportedSites().length} 个网站`);
     expect(html).toContain('disabled="">清空筛选');
     expect(html).toContain('同组多选匹配任一项，不同组同时满足。');
@@ -69,6 +69,7 @@ describe('comic website directory presentation', () => {
     const html = render();
     expect(html).toContain('Pricing unconfirmed');
     expect(html).toContain('Mostly raw');
+    expect(html).toContain('Western comics');
     expect(html).toContain('Clear filters');
     expect(html).toContain('RawOtaku');
     expect(html).not.toContain('收费待确认');

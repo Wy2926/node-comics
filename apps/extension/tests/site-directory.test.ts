@@ -57,7 +57,7 @@ describe('adapter-owned website directory', () => {
       expect(new Date(site.adaptedOn + 'T00:00:00Z').toISOString().slice(0, 10)).toBe(site.adaptedOn);
       expect(site.contentTags.length).toBeGreaterThan(0);
       expect(new Set(site.contentTags).size).toBe(site.contentTags.length);
-      for (const tag of site.contentTags) expect(['manga', 'manhwa', 'manhua', 'webtoon', 'doujin', 'illustration']).toContain(tag);
+      for (const tag of site.contentTags) expect(['western', 'manga', 'manhwa', 'manhua', 'webtoon', 'doujin', 'illustration']).toContain(tag);
       expect(new Set(site.accessTags).size).toBe(site.accessTags?.length ?? 0);
       for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web']).toContain(tag);
       expect(['free', 'freemium'], site.key).toContain(site.pricing);
@@ -93,6 +93,9 @@ describe('website directory multi-select filters', () => {
 
   it('keeps every entry and priority order when no filters are selected', () => {
     expect(filter({})).toEqual(sites);
+  });
+  it('lists Western comics separately from manga with the new source metadata', () => {
+    expect(filter({content: ['western']})).toEqual([expect.objectContaining({adapterId: 'readcomicsonline', pricing: 'free', primaryLanguages: ['en']})]);
   });
   it('uses OR inside each group and AND between groups without duplicate cards', () => {
     const selected = filter({content: ['manga', 'webtoon'], pricing: ['free', 'freemium'], raw: [true]});

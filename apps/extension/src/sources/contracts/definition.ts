@@ -5,7 +5,7 @@ export interface SourceLocation {
   url: string;
   catalog?: { key: string; url: string };
 }
-export type SourceSiteContentTag = 'manga' | 'manhwa' | 'manhua' | 'webtoon' | 'doujin' | 'illustration';
+export type SourceSiteContentTag = 'western' | 'manga' | 'manhwa' | 'manhua' | 'webtoon' | 'doujin' | 'illustration';
 export type SourceSiteAccessTag = 'login-required' | 'partial-web';
 export type SourceSitePricing = 'free' | 'freemium' | 'unknown';
 export interface SourceSite {
