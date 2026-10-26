@@ -1,9 +1,9 @@
-import {useLayoutEffect,useRef,useState,type MouseEventHandler,type RefObject} from 'react';
+import {useLayoutEffect,useRef,useState,type RefObject} from 'react';
 import {READER_INTERACTIVE} from './reader-input';
 
 type Options={viewport:RefObject<HTMLDivElement|null>;stack:RefObject<HTMLDivElement|null>;enabled:boolean;blocked:boolean;resetKey:string};
 type Pose={scale:number;x:number;y:number};
-type Controls={change:(value:number|((zoom:number)=>number))=>void;reset:()=>void;cancel:()=>void;click:()=>boolean};
+type Controls={change:(value:number|((zoom:number)=>number))=>void;reset:()=>void;cancel:()=>void};
 
 /** Temporary inspection of the fitted spread; never changes page geometry or the saved single-page zoom. */
 export function useSpreadZoom(options:Options){
@@ -13,7 +13,7 @@ export function useSpreadZoom(options:Options){
  useLayoutEffect(()=>{
   if(!options.enabled)return;
   const viewport=options.viewport.current;if(!viewport)return;
-  let pose:Pose={scale:1,x:0,y:0},clickUntil=0;
+  let pose:Pose={scale:1,x:0,y:0};
   // React may detach or replace the callback ref before cleanup; keep the node we changed.
   let transformedStack:HTMLDivElement|null=null;
   const clearTransform=()=>{transformedStack?.style.removeProperty('transform');transformedStack=null;};
@@ -21,7 +21,6 @@ export function useSpreadZoom(options:Options){
   const touches=new Set<number>();
   const cancel=()=>{
    const drag=gesture;gesture=undefined;delete viewport.dataset.zoomDragging;
-   if(drag?.dragging)clickUntil=Date.now()+500;
    try{if(drag&&viewport.hasPointerCapture?.(drag.id))viewport.releasePointerCapture(drag.id);}catch{/* Pointer may already have ended. */}
   };
   const apply=(next:Pose)=>{
@@ -57,8 +56,6 @@ export function useSpreadZoom(options:Options){
    scaleTo(pose.scale*100*Math.exp(-Math.max(-600,Math.min(600,delta))*.002),{x:event.clientX,y:event.clientY});
   };
   const down=(event:PointerEvent)=>{
-   // A new primary press must remain usable even if the last pan emitted no click.
-   if(event.isPrimary!==false&&event.button===0)clickUntil=0;
    if(pose.scale===1||unavailable()||gesture||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
    if((event.target as Element|null)?.closest?.(READER_INTERACTIVE)||window.getSelection?.()?.toString())return;
    gesture={id:event.pointerId,x:event.clientX,y:event.clientY,startX:pose.x,startY:pose.y,dragging:false};
@@ -66,7 +63,7 @@ export function useSpreadZoom(options:Options){
   const allDown=(event:PointerEvent)=>{if(event.pointerType==='touch'){touches.add(event.pointerId);if(touches.size>1)cancel();}};
   const move=(event:PointerEvent)=>{
    const drag=gesture;if(!drag||drag.id!==event.pointerId)return;
-   if(unavailable()){cancel();return;}
+   if(unavailable()||event.pointerType==='mouse'&&event.buttons!==1||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey){cancel();return;}
    const x=event.clientX-drag.x,y=event.clientY-drag.y;
    if(!drag.dragging){
     if(Math.hypot(x,y)<5)return;
@@ -80,13 +77,12 @@ export function useSpreadZoom(options:Options){
   const inactive=()=>{touches.clear();cancel();};
   const hidden=()=>{if(document.hidden)inactive();};
   const dragstart=(event:DragEvent)=>{if(pose.scale>1&&(event.target as Element|null)?.closest?.('img'))event.preventDefault();};
-  controls.current={change:value=>scaleTo(typeof value==='function'?value(pose.scale*100):value),reset,cancel,click:()=>{
-   if(Date.now()>=clickUntil)return false;clickUntil=0;return true;
-  }};
+  controls.current={change:value=>scaleTo(typeof value==='function'?value(pose.scale*100):value),reset,cancel};
   viewport.addEventListener('wheel',wheel,{passive:false});
   viewport.addEventListener('pointerdown',down);
   viewport.addEventListener('lostpointercapture',lostCapture);
   viewport.addEventListener('dragstart',dragstart);
+  viewport.addEventListener('contextmenu',cancel);
   window.addEventListener('pointerdown',allDown,true);
   window.addEventListener('pointermove',move,{passive:false});
   window.addEventListener('pointerup',up);
@@ -98,6 +94,7 @@ export function useSpreadZoom(options:Options){
    delete viewport.dataset.zoomed;delete viewport.dataset.spreadZoom;controls.current=null;
    viewport.removeEventListener('wheel',wheel);viewport.removeEventListener('pointerdown',down);
    viewport.removeEventListener('lostpointercapture',lostCapture);viewport.removeEventListener('dragstart',dragstart);
+   viewport.removeEventListener('contextmenu',cancel);
    window.removeEventListener('pointerdown',allDown,true);window.removeEventListener('pointermove',move);
    window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);window.removeEventListener('blur',inactive);
    document.removeEventListener('visibilitychange',hidden);
@@ -105,6 +102,5 @@ export function useSpreadZoom(options:Options){
  },[options.enabled,options.viewport,options.stack]);
  useLayoutEffect(()=>{controls.current?.reset();setZoom(100);},[options.enabled,options.resetKey]);
  useLayoutEffect(()=>{if(options.blocked)controls.current?.cancel();},[options.blocked]);
- const clickCapture:MouseEventHandler<HTMLDivElement>=event=>{if(controls.current?.click()){event.preventDefault();event.stopPropagation();}};
- return {zoom,zoomed:options.enabled&&zoom>100,change:(value:number|((zoom:number)=>number))=>controls.current?.change(value),reset:()=>controls.current?.reset(),clickCapture};
+ return {zoom,zoomed:options.enabled&&zoom>100,change:(value:number|((zoom:number)=>number))=>controls.current?.change(value),reset:()=>controls.current?.reset()};
 }

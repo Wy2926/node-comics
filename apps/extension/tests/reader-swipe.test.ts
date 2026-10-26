@@ -127,20 +127,10 @@ describe('library page-turn input and reading lifecycle',()=>{
   f.viewport.emit('lostpointercapture',{pointerId:1,target:{tagName:'IMG'}});expect(f.viewport.dataset.swipePhase).toBe('dragging');
   f.pointer('pointerup',300,100,{timeStamp:210});expect(f.options.onTurn).toHaveBeenCalledOnce();
  });
- it('leaves a slow short swipe in place and suppresses only the trailing click',()=>{
+ it('leaves a slow short swipe in place',()=>{
   const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});
   expect(f.viewport.dataset.swipePhase).toBe('returning');expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.snapshot.revert).toHaveBeenCalledOnce();
   f.finish();expect(f.viewport.dataset.swipePhase).toBeUndefined();
-  const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();
- });
- it.each([false,true])('accepts a fresh primary press even without a previous trailing click, blocked=%s',blocked=>{
-  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});f.render({blocked});
-  f.pointer('pointerdown',500,100,{pointerType:'touch',pointerId:2});f.pointer('pointerup',500,100,{pointerType:'touch',pointerId:2});
-  const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);expect(click.preventDefault).not.toHaveBeenCalled();
- });
- it.each([{button:2},{pointerId:2,isPrimary:false}])('does not clear trailing-click protection for %j',press=>{
-  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',470,100,{timeStamp:200});f.pointer('pointerup',470,100,{timeStamp:400});f.pointer('pointerdown',500,100,press);
-  const click={preventDefault:vi.fn(),stopPropagation:vi.fn()};f.controls.clickCapture(click as never);expect(click.preventDefault).toHaveBeenCalledOnce();
  });
  it('never wraps or creates animation resources at an unavailable boundary',()=>{
   const f=fixture({canTurn:delta=>delta===1});expect(f.controls.turn(-1)).toBe(false);
@@ -152,8 +142,24 @@ describe('library page-turn input and reading lifecycle',()=>{
  });
  it('keeps taps and vertical scrolling native',()=>{
   const f=fixture();f.pointer('pointerdown',500);const small=f.pointer('pointermove',495,103);expect(small.preventDefault).not.toHaveBeenCalled();f.pointer('pointerup',495,103);
-  f.pointer('pointerdown',500);f.pointer('pointermove',493,140);f.pointer('pointermove',100,140);f.pointer('pointerup',100,140);
+  f.pointer('pointerdown',500,100,{pointerType:'touch'});f.pointer('pointermove',493,140,{pointerType:'touch'});f.pointer('pointermove',100,140,{pointerType:'touch'});f.pointer('pointerup',100,140,{pointerType:'touch'});
   expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.viewport.captures.size).toBe(0);expect(snapshots.create).not.toHaveBeenCalled();
+ });
+ it('recognizes a mouse swipe after an initially vertical movement',()=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',496,114,{timeStamp:20});
+  expect(snapshots.create).not.toHaveBeenCalled();
+  f.pointer('pointermove',300,116,{timeStamp:100});f.pointer('pointerup',300,116,{timeStamp:110});
+  expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);
+ });
+ it.each(['wheel','contextmenu','modifier','mouse-chord','selection','modified-release'] as const)('yields a drag to %s without a late page turn',reason=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',400,100,{timeStamp:100});
+  if(reason==='wheel'||reason==='contextmenu')f.viewport.emit(reason);
+  else{
+   if(reason==='selection')selection='selected text';
+   f.pointer('pointermove',300,100,{timeStamp:200,ctrlKey:reason==='modifier',buttons:reason==='mouse-chord'?3:1});
+  }
+  f.pointer('pointerup',200,100,{timeStamp:210,ctrlKey:reason==='modified-release'});
+  expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.snapshot.pinned).toBe(false);
  });
  it('uses the library fold threshold for a slow drag and reuses its engine through commit',()=>{
   const f=fixture();f.pointer('pointerdown',700);f.pointer('pointermove',200,120,{timeStamp:1000});

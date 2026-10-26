@@ -89,7 +89,8 @@ beforeEach(async () => {
           fold: [...snapshot?.querySelectorAll('.stf__item') || []].map(leaf => `${getComputedStyle(leaf).transform}:${getComputedStyle(leaf).clipPath}`).join('|'),
           turnStatus: viewport.querySelectorAll('.nc-page-turn-status').length,
           pageDOM: surface.querySelectorAll('[data-page-id]').length, width: viewport.clientWidth,
-          images: viewport.querySelectorAll('img.nc-page-image').length, urls: window.__swipeUrls.active.size,
+          images: viewport.querySelectorAll('img.nc-page-image').length,
+          uniqueImages: new Set([...viewport.querySelectorAll('img.nc-page-image')].map(image => image.src)).size, urls: window.__swipeUrls.active.size,
           read: document.querySelector('[data-testid="marked-read"]')?.textContent || '[]'};
         const previous = window.__swipeTrace.at(-1);
         if (frame.phase !== 'idle' || !previous || previous.phase !== frame.phase || Math.abs(previous.x - x) > .5 || previous.pages.join() !== frame.pages.join() || previous.read !== frame.read) {
@@ -336,6 +337,68 @@ test('a plain mouse click still hides and reveals immersive controls after a com
   await shown(2, [2]);
 });
 
+test('a hidden toolbar stays hidden while a mouse page drag crosses its screen edge', async () => {
+  await reader();
+  const center = await point(), from = await point(.8);
+  await page.mouse.click(center.x, center.y);
+  await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(8, from.y, {steps: 12}); await settle();
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true, 'Dragging to an edge is not a request for tools');
+  await page.mouse.up(); await shown(2, [2]);
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+  await page.screenshot({path: resolve(artifacts, 'hidden-toolbar-after-edge-drag.png')});
+});
+
+test('a mouse swipe tolerates initial vertical jitter without becoming a toolbar click', async () => {
+  await reader();
+  const center = await point(), from = await point(.8);
+  await page.mouse.click(center.x, center.y);
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(from.x - 4, from.y + 14);
+  await page.mouse.move(center.x - 70, from.y + 16, {steps: 8});
+  await page.mouse.up(); await shown(2, [2]);
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+});
+
+test('a vertical mouse drag ending in the center is not a toolbar tap', async () => {
+  await reader(); const center = await point();
+  await page.mouse.click(center.x, center.y);
+  await page.mouse.move(center.x, center.y); await page.mouse.down();
+  await page.mouse.move(center.x + 2, center.y + 50, {steps: 8}); await page.mouse.up();
+  await shown(1, [1]);
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+  await page.mouse.click(center.x, center.y); await settle();
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false, 'The next intentional tap still opens the tools');
+});
+
+for(const value of ['单页','双页','连续']) test(`mouse drags cannot toggle hidden tools after cancellation or vertical movement in ${value}`, async () => {
+  await reader(); await layout(value);
+  const center = await point();
+  await page.mouse.click(center.x, center.y);
+  await page.mouse.move(center.x, center.y); await page.mouse.down();
+  await page.mouse.move(center.x + 3, center.y + 40, {steps: 4});
+  await page.mouse.wheel(0, 20);
+  await page.waitForTimeout(650); await page.mouse.up(); await settle();
+  assert.equal(await pageNumber().inputValue(), '1');
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+  await page.mouse.click(center.x, center.y); await settle();
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false);
+});
+
+test('zoomed spread panning across an edge preserves hidden tools and the next tap stays usable', async () => {
+  await reader(); await layout('双页'); await jump(2); await shown(2, [2, 3]);
+  const center = await point();
+  await page.mouse.move(center.x, center.y); await page.mouse.wheel(0, -350);
+  await page.waitForFunction(() => document.querySelector('.nc-reading-viewport')?.dataset.zoomed === 'true');
+  await page.mouse.click(center.x, center.y);
+  await page.mouse.down(); await page.mouse.move(8, center.y, {steps: 8}); await page.mouse.up(); await settle();
+  assert.equal(await pageNumber().inputValue(), '2');
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), true);
+  await page.mouse.click(center.x, center.y); await settle();
+  assert.equal(await page.locator('.nc-reader').evaluate(element => element.classList.contains('controls-hidden')), false);
+});
+
 test('mobile CDP touch swipes animate single pages and RTL double spreads without synthetic pointer input', async () => {
   await page.setViewportSize({width: 390, height: 844}); await reader();
   await resetTrace(); await touchDrag(-140); await shown(2, [2]); await assertAnimation(-1, {dragged: true});
@@ -391,7 +454,8 @@ test('a second real touch cancels the page turn and leaves multi-touch to the br
   // visual viewport intentionally disables swipes. Reset zoom before testing recovery.
   await touch.send('Emulation.setPageScaleFactor', {pageScaleFactor: 1});
   await page.waitForFunction(() => window.visualViewport.scale === 1);
-  await resetTrace(); await touchDrag(-140); await shown(2, [2]); await assertAnimation(-1, {dragged: true});
+  // Recovery must not depend on CDP dispatch staying above the short-flick velocity threshold.
+  await resetTrace(); await touchDrag(-260, 0, {start: .8}); await shown(2, [2]); await assertAnimation(-1, {dragged: true});
 });
 
 test('touchCancel and window blur cancel pending drags with no delayed navigation', async () => {
@@ -598,7 +662,8 @@ test('double-page comparison shows independent original fallbacks while a source
   assert.deepEqual(await surface().locator('[data-page-id="window-page-0-7"] img.nc-page-image').evaluateAll(images => images.map(image => image.dataset.resultJob)), ['original', 'original']);
   await assertAnimation(1);
   const frames = await trace();
-  assert(frames.every(frame => frame.pageDOM <= 4 && frame.images <= 8 && frame.urls <= 8), 'Only old/new comparison groups can overlap');
+  // Live incoming pixels and their inert paper snapshot share URLs, but are separate DOM nodes.
+  assert(frames.every(frame => frame.pageDOM <= 2 && frame.images <= 12 && frame.uniqueImages <= 8 && frame.urls <= 8), 'Only old/new comparison image resources can overlap');
   assert(frames.some(frame => frame.phase === 'entering' && frame.oldImages === 4 && !frame.ready), 'All old comparison pixels move while incoming panes are still loading');
   await page.waitForFunction(urls => urls.every(url => window.__swipeUrls.revoked.has(url)), oldUrls);
   await page.screenshot({path: resolve(artifacts, 'pending-double-comparison-navigation-unblocked.png')});

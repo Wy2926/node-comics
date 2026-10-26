@@ -17,7 +17,9 @@ type Options={
 /** Edge taps share the carousel action; the middle remains the reader's chrome toggle. */
 export function usePagedNavigation({viewport,enabled,blocked,direction,canTurn,onTurn}:Options){
  const hover=useRef<Point|undefined>(undefined);
- const nonPrimaryPointer=useRef<number|undefined>(undefined);
+ // A click belongs to its press, not to a timeout after a particular gesture.
+ // Keep this across paging, native scrolling and spread inspection alike.
+ const press=useRef<{id:number;x:number;y:number;tap:boolean;released:boolean}|undefined>(undefined);
  const turnFor=(side:Side):Turn=>(side==='left'?-1:1)*(direction==='rtl'?-1:1) as Turn;
  const protectedTarget=(target:EventTarget|null)=>!!(target as Element|null)?.closest?.(READER_INTERACTIVE)||!!window.getSelection?.()?.toString();
  const sideAt=(point:Point):Side|null|undefined=>{
@@ -47,11 +49,17 @@ export function usePagedNavigation({viewport,enabled,blocked,direction,canTurn,o
  // A turn or panel/layout change may invalidate the hint while the pointer stays still.
  useLayoutEffect(refreshHint);
  const modified=(event:{altKey:boolean;ctrlKey:boolean;metaKey:boolean;shiftKey:boolean})=>event.altKey||event.ctrlKey||event.metaKey||event.shiftKey;
+ const moved=(event:PointerEvent<HTMLDivElement>)=>{
+  const start=press.current;
+  if(start?.id===event.pointerId&&start.tap&&!start.released&&Math.hypot(event.clientX-start.x,event.clientY-start.y)>=5)start.tap=false;
+ };
+ const cancelPress=()=>{if(press.current&&!press.current.released)press.current.tap=false;};
  return {
   /** Called after ignoreReaderClick; true means the center/chrome action must not run. */
   click(event:MouseEvent<HTMLDivElement>):boolean{
+   const start=press.current;
+   if(event.detail!==0&&start&&(!start.tap||!start.released))return true;
    if(!enabled)return false;
-   if(nonPrimaryPointer.current!==undefined&&(event.nativeEvent as globalThis.PointerEvent).pointerId===nonPrimaryPointer.current)return true;
    const side=sideAt(event);
    if(side===null)return false;
    if(!side)return true;
@@ -62,13 +70,28 @@ export function usePagedNavigation({viewport,enabled,blocked,direction,canTurn,o
   onPointerDown(event:PointerEvent<HTMLDivElement>){
    // Chromium reports isPrimary=false on real mouse click events. Only the press
    // carries reliable primary-pointer identity; button=0 still guards the click.
-   nonPrimaryPointer.current=event.isPrimary===false?event.pointerId:undefined;
+   if(event.isPrimary===false||event.button!==0){
+    if(press.current)press.current.tap=false;
+    else press.current={id:event.pointerId,x:event.clientX,y:event.clientY,tap:false,released:false};
+    return;
+   }
+   press.current={id:event.pointerId,x:event.clientX,y:event.clientY,tap:!modified(event)&&!protectedTarget(event.target),released:false};
   },
   onPointerMove(event:PointerEvent<HTMLDivElement>){
+   moved(event);
+   if(modified(event))cancelPress();
    if(event.defaultPrevented||event.pointerType!=='mouse'||event.isPrimary===false||event.buttons!==0||modified(event))hover.current=undefined;
    else hover.current={clientX:event.clientX,clientY:event.clientY,target:event.target};
    refreshHint();
   },
-  onPointerLeave(){hover.current=undefined;hint();},
+  onPointerUp(event:PointerEvent<HTMLDivElement>){
+   moved(event);
+   if(modified(event))cancelPress();
+   if(press.current?.id===event.pointerId)press.current.released=true;
+  },
+  onPointerCancel:cancelPress,
+  onWheel:cancelPress,
+  onContextMenu:cancelPress,
+  onPointerLeave(){cancelPress();hover.current=undefined;hint();},
  };
 }

@@ -37,8 +37,8 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
   return <div ref={ref} className={`nc-reader${immersive ? ' is-immersive' : ''}${hidden ? ' controls-hidden' : ''}`}
     data-background={background}
     onPointerMove={immersive ? event => {
-      // Touch scrolling is not a request to reopen the tools at a screen edge.
-      if (event.pointerType !== 'mouse' || !hidden) return;
+      // Edge reveal belongs to mouse hover, never a drag or touch scroll.
+      if (event.pointerType !== 'mouse' || event.buttons !== 0 || event.defaultPrevented || !hidden) return;
       if ((event.target as Element).closest('.nc-reader-controls')) {reveal(); return;}
       const bounds = event.currentTarget.getBoundingClientRect();
       const compact = window.matchMedia?.(compactReaderQuery).matches;
@@ -48,7 +48,7 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
     onPointerDownCapture={revealControl}
     onPointerUpCapture={revealControl}
     onPointerCancelCapture={revealControl}
-    onPointerOver={revealControl}
+    onPointerOver={immersive ? event => {if(event.buttons===0)revealControl?.(event);} : undefined}
     onPointerOut={immersive ? event => {
       if (!hidden && !(event.relatedTarget as Element | null)?.closest?.('.nc-reader-controls')) revealControl?.(event);
     } : undefined}

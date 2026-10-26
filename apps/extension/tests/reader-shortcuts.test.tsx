@@ -6,7 +6,7 @@ import type {ReadingView} from '../src/reader/view';
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
 const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
-const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn(),clickCapture:vi.fn()}));
+const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn()}));
 const swipe=vi.hoisted(()=>({options:undefined as Parameters<typeof import('../src/reader/usePagedSwipe').usePagedSwipe>[0]|undefined}));
 vi.mock('../src/reader/usePagedSwipe',async original=>{
  const {usePagedSwipe}=await original<typeof import('../src/reader/usePagedSwipe')>();

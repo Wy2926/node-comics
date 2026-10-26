@@ -43,9 +43,10 @@ function fixture(extra:Partial<Options>={}){
   altKey:false,ctrlKey:false,metaKey:false,shiftKey:false,pointerType:'mouse',isPrimary:true,pointerId:1,
   preventDefault:vi.fn(),...extra,
  });
+ const pointer=(name:'onPointerDown'|'onPointerMove'|'onPointerUp',x=500,extra:Record<string,unknown>={})=>handlers[name](event(x,extra) as unknown as PointerEvent<HTMLDivElement>);
  render();
  const dispatchClick=(event:MouseEvent<HTMLDivElement>)=>ignoreReaderClick(event)||handlers.click(event);
- return {options,element,target,event,render,get handlers(){return handlers;},
+ return {options,element,target,event,render,pointer,get handlers(){return handlers;},
   dispatchClick,click:(x=500,extra:Record<string,unknown>={})=>dispatchClick(event(x,extra) as unknown as MouseEvent<HTMLDivElement>),
   hover:(x=500,extra:Record<string,unknown>={})=>handlers.onPointerMove(event(x,extra) as unknown as PointerEvent<HTMLDivElement>),
  };
@@ -101,17 +102,45 @@ describe('paged edge navigation',()=>{
  });
 
  it('accepts real Chromium mouse clicks whose click event reports isPrimary=false',()=>{
-  const f=fixture();f.handlers.onPointerDown(f.event(800) as unknown as PointerEvent<HTMLDivElement>);
+  const f=fixture();f.pointer('onPointerDown',800);f.pointer('onPointerUp',800);
   expect(f.click(800,{nativeEvent:{isPrimary:false,pointerId:1,pointerType:'mouse'}})).toBe(true);
   expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);
  });
 
- it('does not reject the primary pointer after a different non-primary finger and clears rejection on a new primary press',()=>{
-  const f=fixture();f.handlers.onPointerDown(f.event(200,{isPrimary:false,pointerId:2}) as unknown as PointerEvent<HTMLDivElement>);
-  f.click(800,{nativeEvent:{isPrimary:false,pointerId:2}});expect(f.options.onTurn).not.toHaveBeenCalled();
-  f.click(800,{nativeEvent:{isPrimary:false,pointerId:1}});expect(f.options.onTurn).toHaveBeenCalledExactlyOnceWith(1);
-  f.handlers.onPointerDown(f.event(200,{isPrimary:true,pointerId:2}) as unknown as PointerEvent<HTMLDivElement>);
+ it('rejects a multi-touch sequence and accepts the next primary tap',()=>{
+  const f=fixture();f.pointer('onPointerDown',800);f.pointer('onPointerDown',200,{isPrimary:false,pointerId:2});
+  f.pointer('onPointerUp',800);f.click(800,{nativeEvent:{isPrimary:false,pointerId:1}});expect(f.options.onTurn).not.toHaveBeenCalled();
+  f.click(200,{nativeEvent:{isPrimary:false,pointerId:2}});expect(f.options.onTurn).not.toHaveBeenCalled();
+  f.pointer('onPointerDown',200,{isPrimary:true,pointerId:2});f.pointer('onPointerUp',200,{pointerId:2});
   f.click(200,{nativeEvent:{isPrimary:false,pointerId:2}});expect(f.options.onTurn).toHaveBeenLastCalledWith(-1);
+ });
+
+ for(const enabled of [false,true])it.each(['vertical','diagonal','out-and-back','release-only','cancel','leave','wheel','context-menu','modifier','interactive-start'] as const)(`rejects %s movement as a click in paging=${enabled}, then accepts a fresh tap`,reason=>{
+  const f=fixture({enabled});
+  if(reason==='interactive-start')f.target.closest.mockReturnValue({} as never);
+  f.pointer('onPointerDown');f.target.closest.mockReturnValue(null);
+  if(reason==='vertical'||reason==='diagonal')f.pointer('onPointerMove',reason==='diagonal'?550:500,{clientY:350});
+  if(reason==='out-and-back'){f.pointer('onPointerMove',540);f.pointer('onPointerMove',500);}
+  if(reason==='cancel')f.handlers.onPointerCancel();
+  if(reason==='leave')f.handlers.onPointerLeave();
+  if(reason==='wheel')f.handlers.onWheel();
+  if(reason==='context-menu')f.handlers.onContextMenu();
+  if(reason==='modifier')f.pointer('onPointerMove',500,{ctrlKey:true});
+  f.pointer('onPointerUp',reason==='release-only'?540:500);
+  expect(f.click()).toBe(true);expect(f.options.onTurn).not.toHaveBeenCalled();
+  f.pointer('onPointerDown');f.pointer('onPointerUp');expect(f.click()).toBe(false);
+ });
+
+ it.each([false,true])('clears an omitted drag click on a fresh press in paging=%s without a suppression timeout',enabled=>{
+  const f=fixture({enabled});f.pointer('onPointerDown');f.pointer('onPointerMove',400);f.pointer('onPointerUp',400);
+  f.pointer('onPointerDown');f.pointer('onPointerUp');expect(f.click()).toBe(false);
+ });
+
+ it('keeps small tap jitter and non-pointer activation available',()=>{
+  const f=fixture();f.pointer('onPointerDown');f.pointer('onPointerMove',502,{clientY:302});f.pointer('onPointerUp',502,{clientY:302});
+  expect(f.click(502)).toBe(false);
+  f.pointer('onPointerDown');f.pointer('onPointerMove',450);f.pointer('onPointerUp',450);
+  expect(f.click(500,{detail:0})).toBe(false);
  });
 
  it.each([{clientX:99},{clientX:900},{clientY:49},{clientY:650},{clientX:NaN},{clientY:Infinity}])('does not navigate or toggle controls for a point outside the viewport: %j',point=>{

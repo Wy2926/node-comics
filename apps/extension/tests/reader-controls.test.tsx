@@ -230,7 +230,7 @@ describe('immersive reader controls', () => {
 
   it('keeps stationary mouse hover open and resumes after leaving the toolbar', () => {
     finePointer = hovered = true;
-    shell().onPointerOver!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
+    shell().onPointerOver!({buttons: 0, target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
     advance(10000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     shell().onPointerOut!({target: target(true), relatedTarget: target(true)} as unknown as PointerEvent<HTMLDivElement>);
     expect(vi.getTimerCount()).toBe(0);
@@ -258,10 +258,10 @@ describe('immersive reader controls', () => {
     expect(shell().onBlurCapture).toBeUndefined();
     enable();
     const bounds = vi.fn(() => ({left: 0, right: 1000}));
-    shell().onPointerMove!({pointerType: 'mouse', target: target(true), currentTarget: {getBoundingClientRect: bounds}} as unknown as PointerEvent<HTMLDivElement>);
+    shell().onPointerMove!({pointerType: 'mouse', buttons: 0, target: target(true), currentTarget: {getBoundingClientRect: bounds}} as unknown as PointerEvent<HTMLDivElement>);
     expect(bounds).not.toHaveBeenCalled();
     advance(); expect(controls.hidden).toBe(true);
-    shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 4} as unknown as PointerEvent<HTMLDivElement>);
+    shell().onPointerMove!({pointerType: 'mouse', buttons: 0, target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 4} as unknown as PointerEvent<HTMLDivElement>);
     render(); expect(controls.hidden).toBe(false);
     expect(bounds).toHaveBeenCalledOnce();
   });
@@ -269,7 +269,7 @@ describe('immersive reader controls', () => {
   it('does not measure the canvas or restart timers for visible-toolbar mouse movement', () => {
     const bounds = vi.fn();
     advance(1000);
-    for (let i = 0; i < 100; i++) shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
+    for (let i = 0; i < 100; i++) shell().onPointerMove!({pointerType: 'mouse', buttons: 0, target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
     expect(bounds).not.toHaveBeenCalled();
     advance(5000); expect(controls.hidden).toBe(true);
   });
@@ -277,7 +277,7 @@ describe('immersive reader controls', () => {
   it('uses the top/bottom edges for compact toolbars instead of the page sides', () => {
     compact = true; advance();
     const bounds = vi.fn(() => ({left: 0, right: 390, top: 0, bottom: 844}));
-    const move = (clientX: number, clientY: number) => {shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX, clientY} as unknown as PointerEvent<HTMLDivElement>); render();};
+    const move = (clientX: number, clientY: number) => {shell().onPointerMove!({pointerType: 'mouse', buttons: 0, target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX, clientY} as unknown as PointerEvent<HTMLDivElement>); render();};
     move(2, 400); expect(controls.hidden).toBe(true);
     move(195, 2); expect(controls.hidden).toBe(false);
     advance(); move(195, 842); expect(controls.hidden).toBe(false);
@@ -291,5 +291,15 @@ describe('immersive reader controls', () => {
     expect(controls.hidden).toBe(true);
     expect(bounds).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([1,2,4,3])('does not reveal or measure hidden tools while mouse buttons=%s cross an edge or control', buttons => {
+    advance();
+    const bounds = vi.fn(() => ({left: 0, right: 1000}));
+    for(const inControls of [false,true]){
+      shell().onPointerMove!({pointerType: 'mouse', buttons, target: target(inControls), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
+      shell().onPointerOver!({pointerType: 'mouse', buttons, target: target(inControls)} as unknown as PointerEvent<HTMLDivElement>);
+    }
+    render();expect(controls.hidden).toBe(true);expect(bounds).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
   });
 });

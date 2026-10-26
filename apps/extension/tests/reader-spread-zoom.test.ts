@@ -56,15 +56,12 @@ function fixture(extra:Partial<Options>={}){
  };
  render();
  const pointer=(name:string,x=500,y=350,extra:Record<string,unknown>={})=>{
-  const event={pointerId:1,pointerType:'mouse',isPrimary:true,button:0,clientX:x,clientY:y,target:{closest:()=>null},...extra};
+  const event={pointerId:1,pointerType:'mouse',isPrimary:true,button:0,buttons:1,clientX:x,clientY:y,target:{closest:()=>null},...extra};
   if(name==='pointerdown'){browser.emit(name,event);return viewport.emit(name,event);}
   return browser.emit(name,event);
  };
  const wheel=(extra:Record<string,unknown>={})=>viewport.emit('wheel',{deltaY:-100,deltaMode:0,clientX:500,clientY:350,target:{closest:()=>null},...extra});
- const click=()=>{
-  const event={preventDefault:vi.fn(),stopPropagation:vi.fn()};render().clickCapture(event as never);return event;
- };
- return {viewport,stack,render,pointer,wheel,click,get options(){return options;},get controls(){return render();}};
+ return {viewport,stack,render,pointer,wheel,get options(){return options;},get controls(){return render();}};
 }
 beforeEach(()=>{
  vi.useFakeTimers();selection='';hooks.refs=[];hooks.states=[];hooks.effects=[];hooks.pending=[];
@@ -103,15 +100,13 @@ describe('double-page inspection zoom',()=>{
   for(const value of [NaN,Infinity,-Infinity]){f.controls.change(value);expect(f.controls.zoom).toBe(250);}
   f.controls.change(500);expect(f.controls.zoom).toBe(400);f.controls.change(-20);expect(f.controls.zoom).toBe(100);
  });
- it('drags both axes only after clear intent, clamps the image, and consumes only the synthetic click',()=>{
+ it('drags both axes only after clear intent and clamps the image',()=>{
   const f=fixture();f.controls.change(200);f.pointer('pointerdown');
   const small=f.pointer('pointermove',502,352);expect(small.preventDefault).not.toHaveBeenCalled();expect(f.viewport.captures.size).toBe(0);
   const moved=f.pointer('pointermove',2000,-2000);expect(moved.preventDefault).toHaveBeenCalledOnce();expect(f.viewport.captures.has(1)).toBe(true);
   expect(f.stack.pose).toEqual({scale:2,x:360,y:-260});expect(f.viewport.dataset.zoomDragging).toBe('true');
   f.pointer('pointermove',-2000,2000);expect(f.stack.pose).toEqual({scale:2,x:-360,y:260});
   f.pointer('pointerup',-2000,2000);expect(f.viewport.captures.size).toBe(0);expect(f.viewport.dataset.zoomDragging).toBeUndefined();
-  const click=f.click();expect(click.preventDefault).toHaveBeenCalledOnce();expect(click.stopPropagation).toHaveBeenCalledOnce();
-  expect(f.click().stopPropagation).not.toHaveBeenCalled();
  });
  it('does not invent pan room while both scaled axes still fit inside the viewport',()=>{
   const f=fixture();f.controls.change(105);f.pointer('pointerdown');f.pointer('pointermove',2000,-2000);f.pointer('pointerup',2000,-2000);
@@ -126,27 +121,13 @@ describe('double-page inspection zoom',()=>{
   const box=f.stack.getBoundingClientRect();
   expect(box.left+box.width).toBe(900);expect(box.top+box.height).toBe(650);
  });
- it('does not pan at the fit minimum or consume an ordinary tap after zooming',()=>{
+ it('does not pan at the fit minimum or for a small tap after zooming',()=>{
   const f=fixture();f.pointer('pointerdown');expect(f.pointer('pointermove',800,500).preventDefault).not.toHaveBeenCalled();f.pointer('pointerup');
-  expect(f.stack.style.transform).toBe('');expect(f.click().stopPropagation).not.toHaveBeenCalled();
+  expect(f.stack.style.transform).toBe('');
   f.controls.change(200);f.pointer('pointerdown');f.pointer('pointermove',501,351);f.pointer('pointerup',501,351);
-  expect(f.stack.pose).toEqual({scale:2,x:0,y:0});expect(f.click().stopPropagation).not.toHaveBeenCalled();
+  expect(f.stack.pose).toEqual({scale:2,x:0,y:0});
  });
- it('expires click suppression without blocking the next intentional toolbar toggle',()=>{
-  const f=fixture();f.controls.change(200);f.pointer('pointerdown');f.pointer('pointermove',600,400);f.pointer('pointerup',600,400);
-  vi.advanceTimersByTime(501);expect(f.click().stopPropagation).not.toHaveBeenCalled();
- });
- it.each([100,200])('accepts a new primary press after a pan with no synthetic click, including at %s%% zoom',zoom=>{
-  const f=fixture();f.controls.change(200);f.pointer('pointerdown');f.pointer('pointermove',600,400);f.pointer('pointerup',600,400);
-  if(zoom===100)f.controls.reset();
-  f.pointer('pointerdown',500,350,{pointerType:'touch',pointerId:2});f.pointer('pointerup',500,350,{pointerType:'touch',pointerId:2});
-  expect(f.click().stopPropagation).not.toHaveBeenCalled();expect(f.controls.zoom).toBe(zoom);
- });
- it.each([{button:2},{pointerId:2,isPrimary:false}])('keeps trailing pan-click suppression for a non-primary press: %j',press=>{
-  const f=fixture();f.controls.change(200);f.pointer('pointerdown');f.pointer('pointermove',600,400);f.pointer('pointerup',600,400);
-  f.pointer('pointerdown',500,350,press);expect(f.click().stopPropagation).toHaveBeenCalledOnce();
- });
- it.each(['pointercancel','lostpointercapture','second-finger','blur','hidden','blocked'] as const)('cancels drag on %s while preserving the inspection position',reason=>{
+ it.each(['pointercancel','lostpointercapture','second-finger','blur','hidden','blocked','contextmenu','buttons-lost','modifier'] as const)('cancels drag on %s while preserving the inspection position',reason=>{
   const f=fixture();f.controls.change(200);f.pointer('pointerdown',500,350,{pointerType:'touch'});f.pointer('pointermove',580,410,{pointerType:'touch'});
   const pose=f.stack.pose;
   if(reason==='pointercancel')f.pointer('pointercancel',580,410);
@@ -155,9 +136,10 @@ describe('double-page inspection zoom',()=>{
   if(reason==='blur')browser.emit('blur');
   if(reason==='hidden'){documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
   if(reason==='blocked')f.render({blocked:true});
+  if(reason==='contextmenu')f.viewport.emit('contextmenu');
+  if(reason==='buttons-lost'||reason==='modifier')f.pointer('pointermove',600,420,{buttons:reason==='buttons-lost'?0:1,ctrlKey:reason==='modifier'});
   expect(f.viewport.captures.size).toBe(0);expect(f.viewport.dataset.zoomDragging).toBeUndefined();
   expect(f.pointer('pointermove',700,500).preventDefault).not.toHaveBeenCalled();expect(f.stack.pose).toEqual(pose);
-  expect(f.click().stopPropagation).toHaveBeenCalledOnce();
  });
  it('ignores capture transfer from an image and resumes cleanly after both fingers lift',()=>{
   const f=fixture();f.controls.change(200);f.pointer('pointerdown',500,350,{pointerType:'touch'});f.pointer('pointermove',580,410,{pointerType:'touch'});
@@ -231,7 +213,7 @@ describe('double-page inspection zoom',()=>{
  });
  it('stays usable when DOM refs are absent and attaches when enabled after pages mount',()=>{
   const f=fixture({enabled:false,viewport:{current:null},stack:{current:null}});
-  expect(()=>{f.controls.change(200);f.controls.reset();f.click();}).not.toThrow();
+  expect(()=>{f.controls.change(200);f.controls.reset();}).not.toThrow();
   f.options.viewport.current=f.viewport as unknown as HTMLDivElement;f.options.stack.current=f.stack as unknown as HTMLDivElement;
   f.render({enabled:true});f.wheel();expect(f.controls.zoom).toBeGreaterThan(100);
  });

@@ -1,4 +1,4 @@
-import {useLayoutEffect, useRef, type MouseEventHandler, type RefObject} from 'react';
+import {useLayoutEffect, useRef, type RefObject} from 'react';
 import {pageTurn} from './page-turn';
 import {READER_INTERACTIVE} from './reader-input';
 
@@ -21,7 +21,7 @@ type Options = {
  onActivityChange?:(active:boolean)=>void;
  onSettled?:()=>void;
 };
-type Controls = {turn:(delta:Turn)=>false|void;cancel:()=>void;sync:()=>void;click:()=>boolean};
+type Controls = {turn:(delta:Turn)=>false|void;cancel:()=>void;sync:()=>void};
 
 /** Reader input arbitration; all page-curl rendering belongs to the library adapter. */
 export function usePagedSwipe(options:Options){
@@ -33,7 +33,7 @@ export function usePagedSwipe(options:Options){
   if(!viewport||!surface)return;
   let phase:Phase|undefined,timer:ReturnType<typeof setTimeout>|undefined;
   let snapshot:ReturnType<typeof pageTurn>|undefined;
-  let generation=0,clickUntil=0,identity=latest.current.identity,resetKey=latest.current.resetKey;
+  let generation=0,identity=latest.current.identity,resetKey=latest.current.resetKey;
   let blocked=latest.current.blocked,direction=latest.current.direction;
   let size=[viewport.clientWidth,viewport.clientHeight];
   let pending=false;
@@ -53,7 +53,6 @@ export function usePagedSwipe(options:Options){
   };
   const reset=(settled=false)=>{
    generation++;clearPendingTimeout();pending=false;
-   if(gesture?.dragging)clickUntil=Date.now()+500;
    const id=gesture?.id;gesture=undefined;if(id!==undefined)release(id);
    snapshot?.dispose();snapshot=undefined;
    latest.current.onPreviewChange?.(undefined);
@@ -92,9 +91,6 @@ export function usePagedSwipe(options:Options){
    viewport.scrollWidth>viewport.clientWidth+1||(window.visualViewport?.scale??1)>1;
   const deltaFor=(x:number):Turn=>(x<0?1:-1)*(latest.current.direction==='rtl'?-1:1) as Turn;
   const down=(event:PointerEvent)=>{
-   // A fresh press is not the trailing click of the previous drag, which some
-   // touch browsers omit entirely after preventDefault or pointer capture.
-   if(event.isPrimary!==false&&event.button===0)clickUntil=0;
    if(unavailable()||(phase&&(phase==='dragging'||pending))||touches.size>1||event.isPrimary===false||event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
    const target=event.target as Element|null;
    if(target?.closest?.(READER_INTERACTIVE)||window.getSelection?.()?.toString())return;
@@ -118,10 +114,11 @@ export function usePagedSwipe(options:Options){
   };
   const move=(event:PointerEvent)=>{
    const drag=gesture;if(!drag||drag.id!==event.pointerId)return;
-   if(unavailable()||event.pointerType==='mouse'&&event.buttons===0){reset();return;}
+   if(unavailable()||event.pointerType==='mouse'&&event.buttons!==1||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||window.getSelection?.()?.toString()){reset();return;}
    const x=event.clientX-drag.x,y=event.clientY-drag.y;
    if(!drag.dragging){
-    if(Math.abs(y)>=10&&Math.abs(y)>Math.abs(x)*1.1){gesture=undefined;return;}
+    // Mouse drags may start with vertical jitter. Touch must still yield to native scrolling.
+    if(event.pointerType!=='mouse'&&Math.abs(y)>=10&&Math.abs(y)>Math.abs(x)*1.1){gesture=undefined;return;}
     if(Math.abs(x)<10||Math.abs(x)<Math.abs(y)*1.25)return;
     drag.dragging=true;setPhase('dragging');
     try{viewport.setPointerCapture(event.pointerId);}catch{/* Synthetic events and canceled pointers cannot be captured. */}
@@ -136,7 +133,7 @@ export function usePagedSwipe(options:Options){
    touches.delete(event.pointerId);
    const drag=gesture;if(!drag||drag.id!==event.pointerId)return;
    if(!drag.dragging){gesture=undefined;return;}
-   clickUntil=Date.now()+500;
+   if(event.button!==0||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey){reset();return;}
    const x=event.clientX-drag.x,delta=deltaFor(x),width=viewport.clientWidth;
    const flick=Math.abs(x)>=30&&Math.abs(drag.velocity)>=.5&&drag.velocity*x>0&&event.timeStamp-drag.lastTime<100;
    preview(drag,event);
@@ -166,11 +163,9 @@ export function usePagedSwipe(options:Options){
   const dragstart=(event:DragEvent)=>{
    if(latest.current.enabled&&!latest.current.blocked&&(event.target as Element|null)?.closest?.('img'))event.preventDefault();
   };
+  const interrupt=()=>{if(gesture)reset();};
   const control:Controls={
-   turn,cancel:()=>reset(),click:()=>{
-    if(Date.now()>=clickUntil)return false;
-    clickUntil=0;return true;
-   },
+   turn,cancel:()=>reset(),
    sync:()=>{
     const current=latest.current;
     snapshot?.position();
@@ -189,6 +184,8 @@ export function usePagedSwipe(options:Options){
   viewport.addEventListener('pointerdown',down);
   viewport.addEventListener('lostpointercapture',lostCapture);
   viewport.addEventListener('dragstart',dragstart);
+  viewport.addEventListener('wheel',interrupt,{passive:true});
+  viewport.addEventListener('contextmenu',interrupt);
   window.addEventListener('pointerdown',allDown,true);
   window.addEventListener('pointermove',move,{passive:false});
   window.addEventListener('pointerup',up);
@@ -204,6 +201,8 @@ export function usePagedSwipe(options:Options){
    viewport.removeEventListener('pointerdown',down);
    viewport.removeEventListener('lostpointercapture',lostCapture);
    viewport.removeEventListener('dragstart',dragstart);
+   viewport.removeEventListener('wheel',interrupt);
+   viewport.removeEventListener('contextmenu',interrupt);
    window.removeEventListener('pointerdown',allDown,true);
    window.removeEventListener('pointermove',move);
    window.removeEventListener('pointerup',up);
@@ -215,9 +214,6 @@ export function usePagedSwipe(options:Options){
   };
  },[options.viewport,options.surface,options.enabled]);
  useLayoutEffect(()=>{controls.current?.sync();});
- const clickCapture:MouseEventHandler<HTMLDivElement>=event=>{
-  if(controls.current?.click()){event.preventDefault();event.stopPropagation();}
- };
  return {
   turn:(delta:Turn):false|void=>{
    if(controls.current)return controls.current.turn(delta);
@@ -225,6 +221,5 @@ export function usePagedSwipe(options:Options){
    latest.current.onTurn(delta);
   },
   cancel:()=>controls.current?.cancel(),
-  clickCapture,
  };
 }
