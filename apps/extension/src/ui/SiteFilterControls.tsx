@@ -43,11 +43,13 @@ export function PricingIcon({pricing}: {pricing: SourceSitePricing}) {
   </svg>;
 }
 
-export function SiteFilterControls({filters, onChange, visibleCount, totalCount}: {
+export function SiteFilterControls({filters, onChange, visibleCount, totalCount, expanded, onExpandedChange}: {
   filters: SiteFilters; onChange: (filters: SiteFilters) => void; visibleCount: number; totalCount: number;
+  expanded?: boolean; onExpandedChange?: (expanded: boolean) => void;
 }) {
   const {contentTagLabels, accessTagLabels, pricingLabels} = siteLabels();
-  const [advanced, setAdvanced] = useState(false), advancedId = useId();
+  const [localAdvanced, setLocalAdvanced] = useState(false), advancedId = useId();
+  const advanced = expanded ?? localAdvanced, setAdvanced = onExpandedChange ?? setLocalAdvanced;
   const advancedCount = filters.raw.length + filters.access.length;
   const hasFilters = Object.values(filters).some(values => values.length > 0);
   return <div className="nc-site-filters" role="group" aria-label={msg('筛选')}>
@@ -58,6 +60,6 @@ export function SiteFilterControls({filters, onChange, visibleCount, totalCount}
       <FilterGroup label={msg('访问条件')} options={Object.entries(accessTagLabels).map(([value, entry]) => ({value: value as SourceSiteAccessTag, label: entry.label}))} selected={filters.access} onChange={access => onChange({...filters, access})}/>
       <p className="nc-site-filter-help">{msg('同组多选匹配任一项，不同组同时满足。')}</p>
     </div>
-    <div className="nc-site-filter-summary"><span role="status">{msg('显示 {0} / {1} 个网站', {'0': visibleCount, '1': totalCount})}</span><div className="nc-site-filter-actions"><button type="button" disabled={!hasFilters} onClick={() => onChange(emptySiteFilters)}>{msg('清空筛选')}</button><button className="nc-site-filter-toggle" type="button" aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(value => !value)}><Icon name="filter" size={16}/>{advanced ? msg('收起筛选') : msg('更多筛选')}{advancedCount > 0 && <b>{advancedCount}</b>}<Icon name="chevron" size={12}/></button></div></div>
+    <div className="nc-site-filter-summary"><span role="status">{msg('显示 {0} / {1} 个网站', {'0': visibleCount, '1': totalCount})}</span><div className="nc-site-filter-actions"><button type="button" disabled={!hasFilters} onClick={() => onChange(emptySiteFilters)}>{msg('清空筛选')}</button><button className="nc-site-filter-toggle" type="button" aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(!advanced)}><Icon name="filter" size={16}/>{advanced ? msg('收起筛选') : msg('更多筛选')}{advancedCount > 0 && <b>{advancedCount}</b>}<Icon name="chevron" size={12}/></button></div></div>
   </div>;
 }

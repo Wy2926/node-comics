@@ -51,6 +51,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_translation_fonts_extension.mjs` | 隔离 profile 加载构建后的 MV3 副本，核对 21 个 WOFF2 的字节与摘要、扩展页和 HTTP 网页的真实字体加载，以及未开放资源的访问拒绝；不调用模型，沿用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM`／`TEST_EXTENSION_DIR` |
 | `verify_shelf_cards.mjs` | 隔离 MV3 卡片的相对时间、无时钟图标、标题与阅读位置省略、深浅主题、窄屏和 CBZ 续读恢复；使用上方自制样本与浏览器环境变量 |
 | `verify_shelf_performance.mjs` | 隔离 MV3 书架的重复切换、封面复用、数据库读取量、菜单与滚动位置；`SHELF_PERF_BOOKS=17` 指定漫画数，`SHELF_PERF_LABEL=before` 记录基准，默认 `after` 检查读取范围与封面复用，`SHELF_PERF_EXTENSION` 可指定对照构建 |
+| `apps/extension/tests/site-directory.html` | 在插件目录运行 `npm run dev -- --port 5205`，用 Chrome 打开 `http://127.0.0.1:5205/tests/site-directory.html`；真实目录组件、隔离导入失败与禁用网络请求。检查名称／域名搜索、组合筛选、收藏、空结果恢复、语言切换及离开返回位置；`?performance=1` 显示可重置的 React 提交数、渲染耗时、日期格式器创建数、卡片数与滚动位置。先重置计数，再逐字输入 `abcdefghij` 或切换单张卡片收藏；开发模式耗时只供同机对比。沿用 `locale=en`／`locale=de`、`appearance=dark` 与 `brokenIcon` 参数，不代表真实网站导入或 MV3 权限验收 |
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
 | `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |
 | `verify_image_transport.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与默认 HTTP 缓存复用 |

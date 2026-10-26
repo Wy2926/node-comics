@@ -1,32 +1,55 @@
-import { formatDate, msg } from '../i18n/runtime';
+import { msg } from '../i18n/runtime';
+import {useUiLocale} from '../i18n/react';
 import { Icon } from '../icons';
-import { listSupportedSites, sortSupportedSites, matchesSiteFilters, safeImageUrl, type SiteFilters } from '../sources';
+import { listSupportedSites, sortSupportedSites, matchesSiteFilters, type SiteFilters } from '../sources';
 import {readSiteFavorites, saveSiteFavorites, siteFavoritesKey} from '../comics/application/preferences';
-import {emptySiteFilters, PricingIcon, SiteFilterControls, siteLabels} from './SiteFilterControls';
+import {emptySiteFilters, SiteFilterControls, siteLabels} from './SiteFilterControls';
 import { SupportRequestForm } from './SupportRequestForm';
-import { LanguageFlag } from './LanguageFlag';
-import { languageLabel } from '../types';
+import {ComicSiteCard} from './ComicSiteCard';
+import {SiteLinkImport} from './SiteLinkImport';
 import './comic-sites.css';
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject} from 'react';
 
-const sites = listSupportedSites();
+const normalize = (value: string) => value.normalize('NFKC').toLowerCase();
+const sites = listSupportedSites().map(site => {
+  const hostname = new URL(site.url).hostname;
+  return {...site, domain: hostname.replace(/^www\./, ''), searchText: normalize(`${site.name} ${hostname}`)};
+});
+export type SiteDirectoryView = {filters: SiteFilters; query: string; advanced: boolean; scrollTop: number};
 
-export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
-  const {contentTagLabels, accessTagLabels, pricingLabels} = siteLabels();
-  const [filters, setFilters] = useState<SiteFilters>(emptySiteFilters);
+export function ComicSites({onImport, view}:{onImport?:(url:string)=>Promise<void>; view?: RefObject<SiteDirectoryView | undefined>}) {
+  const locale = useUiLocale(), labels = useMemo(siteLabels, [locale]);
+  const [filters, setFilters] = useState<SiteFilters>(() => view?.current?.filters ?? emptySiteFilters);
+  const [query, setQuery] = useState(() => view?.current?.query ?? '');
+  const [advanced, setAdvanced] = useState(() => view?.current?.advanced ?? false);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [favorites, setFavorites] = useState(readSiteFavorites);
   const orderedSites = useMemo(() => sortSupportedSites(sites, favorites), [favorites]);
-  const filteredSites = orderedSites.filter(site => matchesSiteFilters(site, filters));
-  function toggleFavorite(key: string) {
-    const next = favorites.includes(key) ? favorites.filter(value => value !== key) : [...favorites, key];
+  const favoriteKeys = useMemo(() => new Set(favorites), [favorites]);
+  const filteredSites = useMemo(() => {
+    const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
+    return orderedSites.filter(site => matchesSiteFilters(site, filters) && terms.every(term => site.searchText.includes(term)));
+  }, [orderedSites, filters, query]);
+  const toggleFavorite = useCallback((key: string) => {
+    const saved = readSiteFavorites();
+    const next = saved.includes(key) ? saved.filter(value => value !== key) : [...saved, key];
     saveSiteFavorites(next); setFavorites(next);
-  }
+  }, []);
+  useLayoutEffect(() => {
+    if (view) view.current = {filters, query, advanced, scrollTop: view.current?.scrollTop ?? 0};
+  }, [view, filters, query, advanced]);
+  useLayoutEffect(() => {
+    if (!view) return;
+    if (location.hash !== '#sites/request') window.scrollTo({top: view.current?.scrollTop ?? 0, behavior: 'instant'});
+    const rememberScroll = () => {if (view.current) view.current.scrollTop = window.scrollY;};
+    window.addEventListener('scroll', rememberScroll, {passive: true});
+    return () => window.removeEventListener('scroll', rememberScroll);
+  }, [view]);
   useEffect(() => {
     const sync = (event: StorageEvent) => {if (event.key === siteFavoritesKey || event.key === null) setFavorites(readSiteFavorites());};
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
   }, []);
-  const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [requestSite]=useState(()=>{
     if(location.hash!=='#sites/request')return;
     const query=new URLSearchParams(location.search);
@@ -61,38 +84,20 @@ export function ComicSites({onImport}:{onImport?:(url:string)=>Promise<void>}) {
     return()=>{cancelAnimationFrame(frame);window.removeEventListener('hashchange',locateRequest);};
   },[focusRequest]);
   return <div className="nc-sites-page">
-    {onImport&&<form className="nc-site-link-import" onSubmit={event=>{event.preventDefault();if(busy)return;setError('');setBusy(true);void onImport(url.trim()).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}>
-      <label htmlFor="nc-site-url">{msg('通过链接添加漫画')}</label>
-      <div><input id="nc-site-url" type="url" required value={url} onChange={event=>{setUrl(event.target.value);setError('');}} placeholder={msg('粘贴漫画详情页或章节链接')} disabled={busy}/><button className="button primary" disabled={busy}><Icon name="plus"/>{busy?msg('正在获取全部章节…'):msg('添加到书架')}</button></div>
-      <p>{msg('粘贴已适配网站的漫画详情页或章节链接，读取目录后即可开始阅读。')}</p>
-      {error&&<p role="alert">{error} {safeImageUrl(url.trim(),url.trim())&&<a href={url.trim()} target="_blank" rel="noopener noreferrer">{msg('打开来源')}</a>}</p>}
-    </form>}
+    {onImport&&<SiteLinkImport onImport={onImport}/>}
     <div className="nc-sites-layout">
       <section aria-labelledby="nc-sites-title">
         <div className="nc-section-heading nc-sites-section-heading"><div><h1 id="nc-sites-title">{msg('漫画网站')}</h1><span className="nc-muted">{msg('已适配 {0} 个网站', { '0': sites.length })}</span></div><a className="button secondary small nc-site-request-shortcut" href="#sites/request" onClick={event=>{
           if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||location.hash!=='#sites/request')return;
           event.preventDefault();focusRequest();
         }}><Icon name="message" size={16}/>{msg('申请适配网站')}</a></div>
-        <SiteFilterControls filters={filters} onChange={setFilters} visibleCount={filteredSites.length} totalCount={sites.length}/>
-        {!filteredSites.length && <div className="nc-sites-empty"><Icon name="filter" size={28}/><p>{msg('没有符合条件的网站，请调整或清除筛选。')}</p></div>}
-        <ul className="nc-sites-grid">{filteredSites.map(site => {const favorite = favorites.includes(site.key); return <li key={site.key} className="nc-site-card" data-site-key={site.key}>
-          <a className="nc-site-card-link" href={site.url} target="_blank" rel="noopener noreferrer" aria-label={`${site.name} · ${pricingLabels[site.pricing].label}${site.isRaw ? ' · ' + msg('生肉') : ''} · ${msg('在新标签页打开')}`}>
-            <span className={'nc-site-pricing-badge nc-site-pricing-' + site.pricing} role="img" title={pricingLabels[site.pricing].description} aria-label={pricingLabels[site.pricing].description}><PricingIcon pricing={site.pricing}/></span>
-            <div className="nc-site-card-top"><span className="nc-site-monogram" aria-hidden="true"><img src={site.icon} alt="" width={44} height={44} onError={event => { event.currentTarget.hidden = true; }}/><Icon name="globe" size={27}/></span><span className="nc-site-languages">{site.primaryLanguages.map(language => <span key={language} role="img" aria-label={languageLabel(language)} title={languageLabel(language)}><LanguageFlag language={language}/></span>)}</span></div>
-            <h3>{site.name}</h3><span className="nc-site-domain">{new URL(site.url).hostname.replace(/^www\./, '')}</span>
-            <div className="nc-site-tags">{site.isRaw && <span className="nc-site-raw" title={msg('以未翻译的日语或韩语原文内容为主')}>{msg('生肉')}</span>}{site.contentTags.map(tag=><span key={tag}>{contentTagLabels[tag]}</span>)}</div>
-          </a>
-          <div className="nc-site-card-footer"><span className="nc-site-adapted">
-              <span><span className="nc-site-supported"><Icon name="check" size={15}/>{msg('已适配')}</span>{site.accessTags?.map(tag => <span key={tag} className={'nc-site-access nc-site-access-' + tag} title={accessTagLabels[tag].description} aria-label={accessTagLabels[tag].description}>{accessTagLabels[tag].label}</span>)}</span>
-              <time dateTime={site.adaptedOn} title={msg('适配日期')}>{formatDate(site.adaptedOn + 'T00:00:00')}</time>
-            </span>
-            <button type="button" className="nc-site-favorite" aria-pressed={favorite}
-              aria-label={`${msg('收藏网站')} · ${site.name}`} title={favorite ? msg('取消收藏网站') : msg('收藏网站')}
-              onClick={() => toggleFavorite(site.key)}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill={favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1 6.2-5.6-3-5.6 3 1-6.2-4.5-4.4 6.3-.9Z"/></svg>
-            </button>
-          </div>
-        </li>;})}</ul>
+        <div className="nc-site-search">
+          <label className="nc-search"><Icon name="search" size={18}/><input ref={searchInput} type="search" aria-label={msg('搜索网站')} placeholder={msg('搜索网站名称或域名')} value={query} onChange={event => setQuery(event.target.value)}/></label>
+          {query && <button type="button" className="text-link" onClick={() => {setQuery(''); searchInput.current?.focus();}}>{msg('清除搜索')}</button>}
+        </div>
+        <SiteFilterControls filters={filters} onChange={setFilters} visibleCount={filteredSites.length} totalCount={sites.length} expanded={advanced} onExpandedChange={setAdvanced}/>
+        {!filteredSites.length && <div className="nc-sites-empty"><Icon name="filter" size={28}/><p>{msg('没有符合条件的网站，请调整或清除筛选。')}</p><button type="button" className="text-link" onClick={() => {setQuery(''); setFilters(emptySiteFilters); searchInput.current?.focus();}}>{msg('清空筛选')}</button></div>}
+        <ul className="nc-sites-grid">{filteredSites.map(site => <ComicSiteCard key={site.key} site={site} favorite={favoriteKeys.has(site.key)} onToggle={toggleFavorite} labels={labels} locale={locale}/>)}</ul>
         <p className="nc-sites-hint"><Icon name="info" size={19}/><span>{msg('进入漫画阅读页后，通过插件添加到书架。')}</span></p>
       </section>
       <section ref={requestSection} className="nc-site-request" aria-labelledby="nc-site-request-title">

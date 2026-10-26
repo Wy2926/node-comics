@@ -13,8 +13,10 @@ vi.mock('react', async importOriginal => ({
   useRef: () => ({current: section}),
   useCallback: (callback: () => void) => callback,
   useMemo: (factory: () => unknown) => factory(),
+  useLayoutEffect: (effect: () => void | (() => void)) => effects.push(effect),
   useEffect: (effect: () => void | (() => void)) => effects.push(effect),
 }));
+vi.mock('../src/i18n/react', () => ({useUiLocale: () => 'zh-CN'}));
 vi.mock('../src/sources', () => ({listSupportedSites: () => [], sortSupportedSites: () => [], matchesSiteFilters: vi.fn(), safeImageUrl: vi.fn()}));
 vi.mock('../src/ui/SupportRequestForm', () => ({SupportRequestForm: () => null}));
 

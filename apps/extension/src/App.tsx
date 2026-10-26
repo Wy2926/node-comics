@@ -33,7 +33,7 @@ import { AccountPage } from './ui/Account';
 import { useAppearance } from './ui/Appearance';
 import { BrandLogo } from './ui/BrandLogo';
 import { HeaderUtilities } from './ui/HeaderUtilities';
-import { ComicSites } from './ui/ComicSites';
+import { ComicSites, type SiteDirectoryView } from './ui/ComicSites';
 import { SupportRequestForm } from './ui/SupportRequestForm';
 import { Modal } from './ui/components';
 import { Library } from './ui/Library';
@@ -75,6 +75,7 @@ function viewFromHash():View {const value=location.hash.slice(1).split('/')[0];i
 export function App(){
  const [library,setLibrary]=useState(emptyLibrary),[copies,setCopies]=useState<ReadingEntry[]>([]),[directory,setDirectory]=useState<ReadingDirectory>();
  const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent',updatesOnly:false});
+ const siteDirectoryView=useRef<SiteDirectoryView | undefined>(undefined);
  const copiesRef=useRef(copies);copiesRef.current=copies;
  const [currentId,setCurrentId]=useState<string>(),current=copies.find(c=>c.id===currentId),[navigationKey,setNavigationKey]=useState(0);
  const currentRef=useRef(currentId);currentRef.current=currentId;
@@ -399,7 +400,7 @@ export function App(){
     onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});openPricing();}}/></Suspense>:current?<Reader progressStatus={progressStatus} analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={readerBackLabel} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={entryId=>void reloadCurrent(entryId)} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});openPricing();}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection} translationScope={channel?.scope.key} channelLabel={channel?.label}/>:
   view!=='search'&&view!=='discover'&&view!=='library'&&view!=='remote-library'?<main className="nc-main">
   {view==='downloads'&&<BookDownloads controller={downloads} onRead={id=>void openComic(id).catch(e=>setError(e.message))} onManageStorage={()=>nav('settings')}/>}
-  {view==='sites'&&<ComicSites onImport={importWebsiteUrl}/>}
+  {view==='sites'&&<ComicSites onImport={importWebsiteUrl} view={siteDirectoryView}/>}
   {view==='settings'&&<Preferences onOpenShortcuts={()=>setShortcutScope('global')} settings={settings} setSettings={setSettings} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage api={api} account={account} rights={rights??undefined} testing={login.development} onEntitlements={updateEntitlements} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>:null}
   <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>

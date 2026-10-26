@@ -4,6 +4,10 @@
 .nc-sites-section-heading h1 { font-size: var(--text-title); }
 .nc-sites-section-heading .nc-muted { font-size: var(--text-caption); }
 .nc-sites-page .nc-site-request-shortcut { display: none; }
+.nc-site-search { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; }
+.nc-site-search .nc-search { flex: 1 1 200px; min-width: 0; }
+.nc-site-search .nc-search input { width: 100%; min-width: 0; }
+.nc-site-search>.text-link { min-height: 44px; }
 .nc-sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; list-style: none; padding: 0; margin: 0; }
 .nc-site-card { position: relative; display: flex; flex-direction: column; min-width: 0; height: 100%; padding: 16px 16px 0; border: var(--comic-border); border-radius: var(--comic-card-radius); box-shadow: var(--comic-shadow-small); background: var(--surface); transition: box-shadow .15s; }
 .nc-site-card:hover { box-shadow: var(--comic-shadow-hover); }
