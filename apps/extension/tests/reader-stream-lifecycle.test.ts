@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import type {ReadingEntry} from '../src/types';
+import type {ReadingEntry, Settings} from '../src/types';
 
 // The real stream hook and timers, with only React scheduling and DOM geometry
 // simulated. No source, image or translation service participates in these tests.
@@ -43,19 +43,20 @@ import {useChapterStream} from '../src/reader/useChapterStream';
 
 const pageHeight = 16000;
 let entry: ReadingEntry, sequence: ReadingEntry[], mounted: boolean, attached: boolean;
+let layout: Settings['layout'];
 let stream: ReturnType<typeof useChapterStream>;
 let viewport: HTMLDivElement, stack: HTMLDivElement;
 let pageDocument: EventTarget & {hidden: boolean; visibilityState: string}, pageWindow: EventTarget;
-const update = vi.fn((next: ReadingEntry) => {entry = next; sequence = [entry]; hooks.dirty = true;});
+const update = vi.fn((next: ReadingEntry) => {if (entry.id === next.id) entry = next; sequence = sequence.map(item => item.id === next.id ? next : item); hooks.dirty = true;});
 let onUpdate: (next: ReadingEntry) => void;
-const onLoadEntry = vi.fn(), onActiveEntry = vi.fn(), onMarkRead = vi.fn(async () => {}), notify = vi.fn();
+const onLoadEntry = vi.fn(), onActiveEntry = vi.fn((id: string) => {entry = sequence.find(item => item.id === id)!; hooks.dirty = true;}), onMarkRead = vi.fn(async () => {}), notify = vi.fn();
 
 function render() {
   let remaining = 20;
   do {
     if (!remaining--) throw Error('Stream did not settle');
     hooks.state = hooks.ref = hooks.memo = hooks.effect = 0; hooks.dirty = false;
-    stream = useChapterStream({copy: entry, sequence, layout: 'continuous', update: onUpdate, onActiveEntry, onLoadEntry, onMarkRead, notify});
+    stream = useChapterStream({copy: entry, sequence, layout, update: onUpdate, onActiveEntry, onLoadEntry, onMarkRead, notify});
     stream.viewport.current = attached ? viewport : null;
     if (attached) stream.stacks.current.set(entry.id, stack);
     stream.geometry.current = new Map([[entry.id, {copy: entry, offsets: [0, pageHeight, pageHeight * 2], start: 0, end: 2, before: 0, after: 0}]]);
@@ -96,7 +97,7 @@ function readTo(relativeOffset: number) {
 
 beforeEach(() => {
   hooks.states = []; hooks.refs = []; hooks.memos = []; hooks.effects = []; hooks.layout = []; hooks.passive = [];
-  mounted = false; onUpdate = update;
+  mounted = false; onUpdate = update; layout = 'continuous'; onLoadEntry.mockReset();
   for (const callback of [update, onLoadEntry, onActiveEntry, onMarkRead, notify]) callback.mockClear();
   vi.useFakeTimers(); vi.setSystemTime(10000);
   pageDocument = Object.assign(new EventTarget(), {hidden: false, visibilityState: 'visible'}); pageWindow = new EventTarget();
@@ -105,6 +106,67 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', (id: ReturnType<typeof setTimeout>) => clearTimeout(id));
   viewport = {scrollTop: 0, clientTop: 0, clientHeight: 800, scrollHeight: pageHeight * 2, getBoundingClientRect: () => ({top: 0})} as unknown as HTMLDivElement;
   stack = {getBoundingClientRect: () => ({top: -viewport.scrollTop})} as unknown as HTMLDivElement;
+});
+
+describe('backward chapter navigation', () => {
+  function preceding(complete = true) {
+    const previous = {...entry, id: 'previous', contentId: 'previous-content', pageId: 'previous-0', relativeOffset: .75,
+      discoveryComplete: complete, pages: complete ? entry.pages.map((page, n) => ({...page, id: `previous-${n}`})) : []};
+    sequence = [previous, entry]; render(); return previous;
+  }
+  async function loaded() {for (let n = 0; n < 6; n++) await Promise.resolve(); render();}
+  it.each(['single', 'double', 'continuous'] as const)('returns to the preceding chapter end in %s and preserves the chapter being left', async mode => {
+    layout = mode; mount(.25, false); const previous = preceding();
+    stream.jump(-1); render(); await loaded();
+    expect(entry.id).toBe(previous.id); expect(stream.index).toBe(1);
+    expect(stream.anchor.current).toEqual({entryId: previous.id, pageId: 'previous-1', relativeOffset: 0});
+    expect(update.mock.calls[0][0]).toMatchObject({id: 'long-chapter', pageId: 'page-0', relativeOffset: .25});
+    expect(onMarkRead).not.toHaveBeenCalled();
+    expect(entry).toMatchObject({pageId: 'previous-1', relativeOffset: 0});
+    const saves = update.mock.calls.length; leave('pagehide'); expect(update).toHaveBeenCalledTimes(saves);
+    stream.jump(2); render(); expect(entry.id).toBe('long-chapter'); expect(stream.index).toBe(0);
+  });
+  it('keeps the first chapter bounded without wrapping', () => {
+    layout = 'single'; mount(0, false); expect(stream.previous).toBeUndefined();
+    stream.jump(-1); render(); expect(entry.id).toBe('long-chapter'); expect(stream.index).toBe(0); expect(onActiveEntry).not.toHaveBeenCalled();
+  });
+  it('loads an unknown preceding manifest on demand and resolves its actual last page', async () => {
+    layout = 'single'; mount(0, false); const previous = preceding(false);
+    expect(onLoadEntry).not.toHaveBeenCalled();
+    onLoadEntry.mockImplementation(async id => {
+      if (id !== previous.id) return;
+      update({...entry, discoveryComplete: true, pages: [0, 1, 2].map(n => ({id: `loaded-${n}`, name: String(n), width: 800, height: 1200, jobs: [], outputBlobs: {}}))});
+    });
+    stream.jump(-1); render(); await loaded();
+    expect(onLoadEntry).toHaveBeenCalledWith(previous.id, expect.objectContaining({speculative: false}));
+    expect(stream.index).toBe(2); expect(stream.anchor.current.pageId).toBe('loaded-2');
+  });
+  it('uses a refreshed last page when retained descriptors are replaced', async () => {
+    layout = 'double'; mount(0, false); const previous = preceding();
+    onLoadEntry.mockImplementation(async id => {
+      if (id === previous.id) update({...entry, generation: 2, pages: previous.pages.map(page => ({...page, id: `new-${page.id}`}))});
+    });
+    stream.jump(-1); render(); await loaded(); await loaded();
+    expect(stream.index).toBe(1); expect(stream.anchor.current.pageId).toBe('new-previous-1');
+  });
+  it('keeps cached pages readable after a refresh failure', async () => {
+    layout = 'single'; mount(0, false); preceding(); onLoadEntry.mockRejectedValue(Error('Offline'));
+    stream.jump(-1); render(); await loaded();
+    expect(stream.resources.ready(entry)).toBe(true); expect(stream.index).toBe(1); expect(stream.anchor.current.pageId).toBe('previous-1');
+  });
+  it('does not jump to the tail after the user has chosen another page', async () => {
+    layout = 'single'; mount(0, false); const previous = preceding();
+    let finish!: () => void; onLoadEntry.mockImplementation(() => new Promise<void>(resolve => {finish = resolve;}));
+    stream.jump(-1); render(); await loaded(); stream.jump(0); render(); finish(); await loaded();
+    expect(entry.id).toBe(previous.id); expect(stream.index).toBe(0); expect(stream.anchor.current.pageId).toBe('previous-0');
+  });
+  it('does not apply a late preceding manifest after leaving the chapter', async () => {
+    layout = 'single'; mount(0, false); const previous = preceding(false);
+    let finish!: () => void; onLoadEntry.mockImplementation(id => id === previous.id ? new Promise<void>(resolve => {finish = resolve;}) : undefined);
+    stream.jump(-1); render(); await loaded();
+    entry = sequence[1]; render(); finish(); await loaded();
+    expect(entry.id).toBe('long-chapter'); expect(stream.index).toBe(0); expect(stream.anchor.current.pageId).toBe('page-0');
+  });
 });
 afterEach(() => {unmount(); vi.useRealTimers(); vi.unstubAllGlobals();});
 

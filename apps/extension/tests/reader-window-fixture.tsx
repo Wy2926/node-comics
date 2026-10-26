@@ -76,7 +76,8 @@ if(pagination)for(const chapter of samples)for(const page of chapter.pages){
  sample.width=sample.height=1;
 }
 canvas.width=canvas.height=1;
-const initial=samples.map((chapter,index)=>lazyChapters&&index>0?{...chapter,pages:[],discoveryComplete:false}:index===0&&query.get('incompleteCurrent')==='1'?{...chapter,discoveryComplete:false}:chapter);
+const startingChapter=query.get('startChapter')==='2'&&chapterCount>1?1:query.get('startChapter')==='3'&&chapterCount>2?2:0;
+const initial=samples.map((chapter,index)=>lazyChapters&&index!==startingChapter?{...chapter,pages:[],discoveryComplete:false}:index===startingChapter&&query.get('incompleteCurrent')==='1'?{...chapter,discoveryComplete:false}:chapter);
 if(priorityFixture){
  initial[0].pageId=initial[0].pages[7].id;
  const read=sourcePageCache.get.bind(sourcePageCache);
@@ -123,7 +124,7 @@ function Fixture(){
  const [preferencesOpen,setPreferencesOpen]=useState(false),[comic,setComic]=useState<'A'|'B'>('A');
  useShortcuts({'app.shortcuts':()=>setShortcutsOpen(true)});
  const requestedLayout=query.get('initialLayout'),initialLayout=requestedLayout==='continuous'||requestedLayout==='double'?requestedLayout:pagination?'single':'continuous';
- const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[0].id),[config,setConfig]=useState<Settings>({...defaults,layout:initialLayout,direction:initialLayout==='double'?'rtl':defaults.direction,fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
+ const [copies,setCopies]=useState(initial),[id,setId]=useState(initial[startingChapter].id),[config,setConfig]=useState<Settings>({...defaults,layout:initialLayout,direction:initialLayout==='double'?'rtl':defaults.direction,fit:'window'}),[mounted,setMounted]=useState(true),[status,setStatus]=useState(''),[translationRevision,setTranslationRevision]=useState(0);
  const [saves,setSaves]=useState(0);
  const [turnCheck,setTurnCheck]=useState(''),[checkingTurns,setCheckingTurns]=useState(false);
  const [readingWindow,setReadingWindow]=useState('{}'),[markedRead,setMarkedRead]=useState<string[]>([]);
@@ -170,6 +171,7 @@ function Fixture(){
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
   {thumbnailFixture&&<div><button onClick={()=>{const list=document.querySelector<HTMLElement>('.nc-thumb-list');if(!list){setStatus('请先打开页面目录');return;}const bounds=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.nc-thumb-row')],full=rows.filter(row=>{const rect=row.getBoundingClientRect();return rect.top>=bounds.top&&rect.bottom<=bounds.bottom;}).length;setStatus(`缩略图：挂载 ${rows.length} 行，完整可见 ${full} 行；正文解码 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages} 页`);}}>检查缩略图窗口</button><output role="status" style={{display:'block',height:36,fontSize:12,lineHeight:'18px'}}>{status}</output></div>}
   <div><button onClick={()=>flushSync(()=>setTranslationRevision(value=>value+1))}>更新模拟翻译状态 {translationRevision}</button><button onClick={completeTranslation}>完成模拟翻译</button></div>
+  {lazyChapters&&<div><span>{copy.title}</span>{query.has('holdManifests')&&<button onClick={()=>{for(const gate of manifestGates.values())gate.release();manifestGates.clear();}}>继续模拟章节加载</button>}</div>}
   {layoutSettings&&<div style={{display:'flex',flexWrap:'wrap',gap:4}}>
    <button onClick={()=>setPreferencesOpen(value=>!value)}>{preferencesOpen?'返回阅读器':'全局阅读偏好'}</button>
    {(['A','B'] as const).map(value=><button key={value} aria-pressed={comic===value} onClick={()=>{setComic(value);setPreferencesOpen(false);setMounted(true);}}>漫画 {value}</button>)}

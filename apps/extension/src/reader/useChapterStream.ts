@@ -13,7 +13,9 @@ type Props={copy:ReadingEntry;sequence:ReadingEntry[];layout:Settings['layout'];
 export function useChapterStream({copy,sequence,layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify}:Props){
  const initialIndex=useMemo(()=>Math.max(0,copy.pages.findIndex(page=>page.id===copy.pageId)),[copy.pages,copy.pageId]);
  const [active,setActive]=useState({entryId:copy.id,index:initialIndex});
- const index=active.entryId===copy.id?Math.min(active.index,Math.max(0,copy.pages.length-1)):initialIndex;
+ const pendingChapterEnd=useRef<string|undefined>(undefined);
+ const index=pendingChapterEnd.current===copy.id&&completeManifest(copy)?copy.pages.length-1
+  :active.entryId===copy.id?Math.min(active.index,Math.max(0,copy.pages.length-1)):initialIndex;
  const stream=useMemo(()=>layout==='continuous'?chapterWindow(sequence,copy):[copy],[layout,sequence,copy]);
  const viewport=useRef<HTMLDivElement>(null),cells=useRef(new Map<string,HTMLDivElement>()),ends=useRef(new Map<string,HTMLDivElement>()),stacks=useRef(new Map<string,HTMLDivElement>());
  const geometry=useRef(new Map<string,ChapterWindow>());
@@ -30,6 +32,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  const [readingProgress]=useState(()=>new ReadingProgress());
  const [ahead,setAhead]=useState({key:'',count:READING_TARGETS});
  const nextOf=(chapter:ReadingEntry)=>{const at=sequence.findIndex(item=>item.id===chapter.id);return at<0?undefined:sequence[at+1];};
+ const previous=useMemo(()=>sequence[sequence.findIndex(chapter=>chapter.id===copy.id)-1],[sequence,copy.id]);
  const next=completeManifest(copy)?nextOf(copy):undefined;
  const [foreground,setForeground]=useState(()=>!document.hidden);
  const resourceChapters=useMemo(()=>foreground?chapterResources(stream,copy,index,next,layout):[copy],[foreground,stream,copy,index,next,layout]);
@@ -107,6 +110,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  }
  function scroll(){
   const v=viewport.current;if(!v||suppressScroll.current)return;
+  pendingChapterEnd.current=undefined;
   navigationReason.current='scroll';const previous=lastScrollTop.current,forward=v.scrollTop>previous;lastScrollTop.current=v.scrollTop;
   const line=v.scrollTop+Math.min(80,v.clientHeight*.1);
   if(layout==='continuous'){
@@ -121,16 +125,30 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  }
  function jump(n:number){
   navigationReason.current='direct';const chapter=copyRef.current;if(!Number.isFinite(n)||!chapter.pages.length)return;
+  pendingChapterEnd.current=undefined;
   restorePending.current=true;
-  if(n>=chapter.pages.length&&completeManifest(chapter)){
-   const destination=nextOf(chapter);
-   if(destination){markRead(chapter);persist();anchor.current={entryId:destination.id,pageId:destination.pages[0]?.id??'',relativeOffset:0};activate(destination,0);return;}
+  if(n<0||n>=chapter.pages.length&&completeManifest(chapter)){
+   const destination=n<0?sequence[sequence.findIndex(item=>item.id===chapter.id)-1]:nextOf(chapter);
+   if(destination){
+    if(n>=chapter.pages.length)markRead(chapter);
+    persist();const target=n<0?Math.max(0,destination.pages.length-1):0;
+    // The refreshed manifest may differ from retained descriptors. Resolve its
+    // last page once loading finishes, unless another navigation supersedes it.
+    if(n<0)pendingChapterEnd.current=destination.id;
+    anchor.current={entryId:destination.id,pageId:destination.pages[target]?.id??'',relativeOffset:0};activate(destination,target);return;
+   }
   }
   const target=Math.max(0,Math.min(chapter.pages.length-1,Math.trunc(n)));
   anchor.current={entryId:chapter.id,pageId:chapter.pages[target].id,relativeOffset:0};indexRef.current=target;setActive({entryId:chapter.id,index:target});persist();
  }
  // New geometry is already committed. Restore by stable page identity even when its old DOM was evicted.
  useLayoutEffect(()=>{
+  if(pendingChapterEnd.current!==copy.id)pendingChapterEnd.current=undefined;
+  if(pendingChapterEnd.current&&resources.ready(copy)&&completeManifest(copy)){
+   pendingChapterEnd.current=undefined;
+   const n=copy.pages.length-1;anchor.current={entryId:copy.id,pageId:copy.pages[n].id,relativeOffset:0};
+   indexRef.current=n;setActive({entryId:copy.id,index:n});restorePending.current=true;persist();
+  }
   if(anchor.current.entryId!==copy.id){anchor.current={entryId:copy.id,pageId:copy.pages[initialIndex]?.id??copy.pageId,relativeOffset:copy.relativeOffset};setActive({entryId:copy.id,index:initialIndex});}
   if(!anchor.current.pageId&&copy.pages.length){anchor.current.pageId=copy.pages[0].id;setActive({entryId:copy.id,index:0});}
   const v=viewport.current,n=copy.pages[indexRef.current]?.id===anchor.current.pageId?indexRef.current:copy.pages.findIndex(page=>page.id===anchor.current.pageId),p=position(copy,n);
@@ -163,5 +181,5 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
  },[resourceChapters,copy.id,onLoadEntry,resources]);
  useEffect(()=>()=>{resources.clear();clearTimeout(saveTimer.current);if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);},[]);
  const readingAhead=ahead.key===pageKey(copy,copy.pages[index]?.id??'')?ahead.count:READING_TARGETS;
- return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead};
+ return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead};
 }

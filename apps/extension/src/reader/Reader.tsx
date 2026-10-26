@@ -51,7 +51,7 @@ const [savedView,setView]=useState<ReadingView|undefined>(()=>{
 const view=savedView??readingViewDefaults();
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
 const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
-const {index,indexRef,viewport,cells,ends,stacks,geometry,stream,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
+const {index,indexRef,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
@@ -135,7 +135,7 @@ const swipeBlocked=!!searchOpen||!!analyticsBlocked||!!panel;
 const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layout==='double'&&!!page,blocked:swipeBlocked||moving,
  resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,spreadPages.map(p=>[p.width,p.height])]),
 });
-const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)>0:(spread?.end??indexRef.current+1)<copy.pages.length||!!next);
+const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)>0||!!previous:(spread?.end??indexRef.current+1)<copy.pages.length||!!next);
 const imageWindows=useMemo(()=>windows.filter(({copy:chapter,start,end})=>end>start&&resources.ready(chapter)),[windows,resourceVersion]);
 // The chosen next chapter is metadata only in paged layouts, never a hidden reading/translation window.
 const aheadChapter=next&&resources.ready(next)&&imageWindows.at(-1)?.copy.id===copy.id?next:undefined;
@@ -193,7 +193,7 @@ function jump(n:number){swipe.cancel();spreadZoom.reset();jumpImmediately(n);}
 function movePage(offset:-1|1){
  if(!page)return false;
  const current=spreadAt(spreads,indexRef.current);
- jumpImmediately(current?(offset>0?current.end:spreadAt(spreads,current.start-1)?.start??0):indexRef.current+offset);
+ jumpImmediately(current?(offset>0?current.end:spreadAt(spreads,current.start-1)?.start??-1):indexRef.current+offset);
 }
 function reloadContent(chapter:ReadingEntry){if(busy||!onReload)return;swipe.cancel();preserve();persist();onReload(chapter.id);}
 function leaveReader(){swipe.cancel();preserve();persist();onBack();}
@@ -250,7 +250,7 @@ if(!page)return <ReaderShell ref={root} background={settings.readerBackground} i
 </ReaderShell>;
 return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
 <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} notice={sourceStatus} onBack={leaveReader} progressStatus={progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}>
-<div className="nc-reader-navigation"><button aria-label={msg("上一页")} title={msg("上一页")} disabled={(spread?.start??index)===0} onClick={()=>navigate(-1)}><Icon name="chevron" style={{transform:'rotate(-90deg)'}}/></button><label><ReaderNumberInput label={msg("跳转页码")} value={index+1} max={copy.pages.length} onCommit={value=>jump(value-1)}/><span>/ {copy.pages.length}</span></label><ReaderProgress key={JSON.stringify([copy.id,copy.contentId,copy.generation])} valueText={value=>msg("第 {0} 页，共 {1} 页", {"0": value, "1": copy.pages.length})} min={1} max={copy.pages.length} value={index+1} disabled={copy.pages.length===1} onCommit={value=>jump(value-1)}/><button aria-label={msg("下一页")} title={msg("下一页")} disabled={(spread?.end??index+1)>=copy.pages.length&&!next} onClick={()=>navigate(1)}><Icon name="chevron" style={{transform:'rotate(90deg)'}}/></button></div>
+<div className="nc-reader-navigation"><button aria-label={msg("上一页")} title={msg("上一页")} disabled={!canTurn(-1)} onClick={()=>navigate(-1)}><Icon name="chevron" style={{transform:'rotate(-90deg)'}}/></button><label><ReaderNumberInput label={msg("跳转页码")} value={index+1} max={copy.pages.length} onCommit={value=>jump(value-1)}/><span>/ {copy.pages.length}</span></label><ReaderProgress key={JSON.stringify([copy.id,copy.contentId,copy.generation])} valueText={value=>msg("第 {0} 页，共 {1} 页", {"0": value, "1": copy.pages.length})} min={1} max={copy.pages.length} value={index+1} disabled={copy.pages.length===1} onCommit={value=>jump(value-1)}/><button aria-label={msg("下一页")} title={msg("下一页")} disabled={(spread?.end??index+1)>=copy.pages.length&&!next} onClick={()=>navigate(1)}><Icon name="chevron" style={{transform:'rotate(90deg)'}}/></button></div>
 </ReaderNavigation>
 <PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} selectedView={preference==='original'?'original':mode} onView={selectView} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>
 {sourceStatus&&panel!=='directory'&&<div className="nc-source-status nc-source-action nc-reader-controls" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}

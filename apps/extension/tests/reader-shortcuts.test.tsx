@@ -4,7 +4,7 @@ import type {ReadingEntry} from '../src/types';
 import type {ReadingView} from '../src/reader/view';
 
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
-const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4}));
+const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
 const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn(),clickCapture:vi.fn()}));
 vi.mock('../src/reader/useSpreadZoom',()=>({useSpreadZoom:()=>spreadZoom}));
@@ -23,8 +23,8 @@ vi.mock('../src/analytics',()=>({track:actions.track}));
 vi.mock('../src/reader/useChapterStream',()=>({
  pageKey:(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`,completeManifest:()=>true,
  useChapterStream:({copy}:{copy:ReadingEntry})=>({
-  index:2,indexRef:{current:2},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
-  stream:hooks.stream??[copy],next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
+  index:hooks.index,indexRef:{current:hooks.index},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
+  stream:hooks.stream??[copy],previous:hooks.previous,next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
  }),
 }));
 import {Reader} from '../src/reader/Reader';
@@ -62,7 +62,7 @@ function click(tree:ReactElement,match:(node:ReactElement<Record<string,unknown>
  const node=nodes(tree).find(match);expect(node).toBeDefined();(node!.props.onClick as ()=>void)();
 }
 beforeEach(()=>{
- hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;hooks.stream=undefined;hooks.readingAhead=4;
+ hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;hooks.stream=undefined;hooks.readingAhead=4;hooks.index=2;hooks.previous=undefined;
  for(const action of Object.values(actions))action.mockClear();
  spreadZoom.change.mockClear();spreadZoom.reset.mockClear();
  installDictionary('zh-CN',{});
@@ -73,6 +73,14 @@ beforeEach(()=>{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('reader shortcut action integration',()=>{
+ it.each(['single','double'] as const)('enables the first-page previous control only with a preceding chapter in %s',layout=>{
+  hooks.index=0;const props=fixture({settings:{...defaults,layout}});
+  const previous=(tree:ReactElement)=>nodes(tree).find(node=>node.props['aria-label']==='上一页')!;
+  expect(previous(render(props)).props.disabled).toBe(true);
+  hooks.previous={...copy,id:'previous'};
+  expect(previous(render(props)).props.disabled).toBe(false);
+  hooks.handlers['reader.previous']();expect(actions.jump).toHaveBeenLastCalledWith(-1);
+ });
  it.each(['contentId','generation'] as const)('changes both comparison pixel scopes when %s changes without changing page IDs',field=>{
   const props=fixture({settings:{...defaults,layout:'single'}});render(props);hooks.handlers['reader.compare']();
   const scopes=()=>nodes(render(props)).filter(node=>typeof node.props.scope==='string').map(node=>node.props.scope);
