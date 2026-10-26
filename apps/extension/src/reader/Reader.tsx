@@ -14,7 +14,7 @@ import {activeProcessingProfile} from '../image-processing/settings';
 import {processingInput} from '../comics/application/image-access';
 import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
-import {chapterGeometry,pageWindow,nextImagePages} from './virtual-window';
+import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
 import {pageSpreads,spreadAt,spreadFrames} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
@@ -102,9 +102,13 @@ const spread=spreadAt(spreads,index);
 const spreadPages=useMemo(()=>spread?copy.pages.slice(spread.start,spread.end):[],[copy.pages,spread]);
 const frames=useMemo(()=>new Map(spreadFrames(spreadPages,viewportSize,compare).map((frame,n)=>[spreadPages[n].id,frame])),[spreadPages,viewportSize,compare]);
 const frame=(p:Page)=>frames.get(p.id)??pageFrame(p,viewportSize,fit,zoom,compare);
-const continuousGeometry=useMemo(()=>settings.layout==='continuous'
- ?chapterGeometry(stream,p=>pageFrame(p,viewportSize,fit,zoom,compare)):[],
- [stream,viewportSize,fit,zoom,compare,settings.layout]);
+const geometryFrame=useMemo(()=>(p:Page)=>pageFrame(p,viewportSize,fit,zoom,compare),[viewportSize.width,viewportSize.height,fit,zoom,compare]);
+const previousGeometry=useRef<{frame:typeof geometryFrame;chapters:ChapterGeometry[]}|undefined>(undefined);
+const continuousGeometry=useMemo(()=>{
+ const previous=previousGeometry.current;
+ const chapters=chapterGeometry(settings.layout==='continuous'?stream:[],geometryFrame,previous?.frame===geometryFrame?previous.chapters:[]);
+ previousGeometry.current={frame:geometryFrame,chapters};return chapters;
+},[stream,geometryFrame,settings.layout]);
 const windows=useMemo(()=>settings.layout==='continuous'
  ?pageWindow(continuousGeometry,copy.id,index)
  :[{copy,start:spread?.start??index,end:spread?.end??Math.min(index+1,copy.pages.length),offsets:[],before:0,after:0}],

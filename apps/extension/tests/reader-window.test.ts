@@ -33,6 +33,36 @@ describe('bounded thumbnail directory',()=>{
  });
 });
 describe('bounded reader geometry',()=>{
+ it('reuses all three thousand-page geometries across progress saves while exposing the latest chapter metadata',()=>{
+  let copies=[chapter('before',1000),chapter('current',1000),chapter('after',1000)];
+  const frame=vi.fn((page:Page)=>pageFrame(page,{width:1200,height:900},'width',50));
+  let measured=chapterGeometry(copies,frame);const offsets=measured.map(chapter=>chapter.offsets);frame.mockClear();
+  for(let n=0;n<50;n++){
+   copies=copies.map(copy=>copy.id==='current'?{...copy,pageId:`current-${n}`,relativeOffset:.25,updatedAt:n}:copy);
+   measured=chapterGeometry(copies,frame,measured);
+   expect(measured.map(chapter=>chapter.copy)).toEqual(copies);
+   measured.forEach((chapter,n)=>expect(chapter.offsets).toBe(offsets[n]));
+  }
+  expect(frame).not.toHaveBeenCalled();expect(measured[1].copy.pageId).toBe('current-49');
+ });
+ it('remeasures only replaced page lists and drops geometry that leaves the chapter window',()=>{
+  const copies=[chapter('a',10),chapter('b',10),chapter('c',10)],frame=vi.fn((page:Page)=>({width:page.width,height:page.height}));
+  const before=chapterGeometry(copies,frame);frame.mockClear();
+  const changed={...copies[1],pages:copies[1].pages.map((page,n)=>n===0?{...page,height:page.height*2}:page)};
+  const next=chapterGeometry([changed,copies[2],chapter('d',10)],frame,before);
+  expect(frame).toHaveBeenCalledTimes(20);expect(next[0].offsets[1]).toBe(before[1].offsets[1]*2);expect(next[1].offsets).toBe(before[2].offsets);
+  expect(next.map(chapter=>chapter.copy.id)).toEqual(['b','c','d']);
+  frame.mockClear();chapterGeometry(copies,frame,next);expect(frame).toHaveBeenCalledTimes(20);
+ });
+ it('remeasures changed ordering, lengths and fresh descriptors without retaining stale source bindings',()=>{
+  const copy=chapter('a',3),frame=vi.fn((page:Page)=>({width:page.width,height:page.height})),before=chapterGeometry([copy],frame);
+  for(const pages of [[...copy.pages].reverse(),copy.pages.slice(1),copy.pages.map(page=>({...page,blobKey:'fresh-source'}))]){
+   frame.mockClear();const current={...copy,pages,generation:2},after=chapterGeometry([current],frame,before);
+   expect(frame).toHaveBeenCalledTimes(pages.length);expect(after[0].copy).toBe(current);
+   expect(after[0].offsets[1]).toBe(pages[0].height);
+  }
+  expect(chapterGeometry([],frame,before)).toEqual([]);
+ });
  it('reuses chapter offsets and widths across a thousand page-window shifts without measuring pages again',()=>{
   const copies=[chapter('before',1000),chapter('current',1000),chapter('after',1000)];
   copies[1].pages[600]={...copies[1].pages[600],width:1600};

@@ -17,9 +17,11 @@ export interface ChapterGeometry {
   offsets: number[];
   width: number;
 }
-/** Measure the bounded metadata stream once per layout, not once per scroll/page window. */
-export function chapterGeometry(copies: readonly ReadingEntry[], frame: (page: Page) => {width: number; height: number}): ChapterGeometry[] {
+/** Reuse immutable page lists from the preceding window, only with the same frame settings. */
+export function chapterGeometry(copies: readonly ReadingEntry[], frame: (page: Page) => {width: number; height: number}, previous: readonly ChapterGeometry[] = []): ChapterGeometry[] {
   return copies.map(copy => {
+    const measured = previous.find(chapter => chapter.copy.id === copy.id && chapter.copy.pages === copy.pages);
+    if (measured) return measured.copy === copy ? measured : {...measured, copy};
     const offsets = [0];
     let width = 0;
     for (const page of copy.pages) {
