@@ -53,6 +53,27 @@ describe('source database baseline isolation', () => {
     for (const name of names) { expect(actual.has('node-comics-' + name)).toBe(true); expect(actual.has(sourceDatabaseName(name==='translation-requests'?'translation-requests-overlay-v1':name))).toBe(true); }
   });
 
+  it('upgrades the populated pre-bookmark catalog without rewriting reading positions or page descriptors', async () => {
+    const {openCatalog}=await import('../src/comics/repositories');
+    const template=track(await openCatalog()),definitions=[...template.objectStoreNames].filter(name=>name!=='bookmarks').map(name=>{
+      const store=template.transaction(name).objectStore(name);
+      return {name,keyPath:store.keyPath,indexes:[...store.indexNames].map(name=>{const index=store.index(name);return {name,keyPath:index.keyPath,unique:index.unique};})};
+    });
+    template.close();vi.resetModules();vi.stubGlobal('indexedDB',new IDBFactory());
+    const old=await rawDatabase(sourceDatabaseName('catalog'),db=>{
+      for(const definition of definitions){const store=db.createObjectStore(definition.name,{keyPath:definition.keyPath});for(const index of definition.indexes)store.createIndex(index.name,index.keyPath,{unique:index.unique});}
+    });
+    const tx=old.transaction(['positions','pageDescriptors'],'readwrite'),done=completed(tx);
+    tx.objectStore('positions').put({id:'entry',entryId:'entry',comicId:'comic',contentId:'content',pageId:'page',relativeOffset:.42,updatedAt:9});
+    tx.objectStore('pageDescriptors').put({contentId:'content',pageId:'page',ordinal:0,formatLocator:'zip:0'});
+    await done;old.close();
+    const {openCatalog:reopen,catalog}=await import('../src/comics/repositories'),db=track(await reopen());
+    expect(db.version).toBe(2);expect(db.objectStoreNames.contains('bookmarks')).toBe(true);
+    expect(await catalog.get('positions','entry')).toMatchObject({relativeOffset:.42,updatedAt:9});
+    expect(await catalog.get('pageDescriptors',['content','page'])).toMatchObject({ordinal:0,formatLocator:'zip:0'});
+    expect(await catalog.list('bookmarks')).toEqual([]);
+  });
+
   it('rejects a partial current catalog before the first catalog transaction can throw NotFoundError', async () => {
     const database = await rawDatabase(sourceDatabaseName('catalog'), db => db.createObjectStore('comics', { keyPath: 'id' })); database.close();
     const { catalog, openCatalog } = await import('../src/comics/repositories');

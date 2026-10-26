@@ -1,9 +1,10 @@
-import {useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref} from 'react';
+import {useEffect,useRef,useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
 import type {Settings} from '../types';
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
 import {ReadingProgressBadge} from './ReadingProgressBadge';
+import {useDialogViewport} from '../ui/visual-viewport';
 import './mobile.css';
 
 // Some touch browsers report a fine pointer but no hover (including Android emulators).
@@ -78,7 +79,7 @@ export function ReaderShell({ref, background, immersive, hidden, reveal, childre
   </div>;
 }
 
-export function ReaderNavigation({backLabel, backText, title, notice, onBack, progressStatus, directoryOpen, onDirectory, children}: {
+export function ReaderNavigation({backLabel, backText, title, notice, onBack, progressStatus, directoryOpen, onDirectory, bookmarks, children}: {
   backLabel: string;
   backText: string;
   title: string;
@@ -88,6 +89,7 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
   directoryOpen: boolean;
   onDirectory(): void;
   children?: ReactNode;
+  bookmarks?:ReactNode;
 }) {
   return <><nav id="nc-reader-navigation-tools" className="nc-reader-rail left nc-reader-controls" data-scrollbar-mode="overlay" aria-label={msg('阅读导航')}>
     <button data-reader-back-trigger="true" aria-label={backLabel} title={backLabel} onClick={onBack}><Icon name="arrow" style={{transform: 'rotate(180deg)'}}/><span>{backText}</span></button>
@@ -95,6 +97,7 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
       aria-expanded={directoryOpen} onClick={onDirectory}>
       <Icon name="list"/><span>{msg('目录')}</span>{notice && <i className="nc-rail-notice" aria-hidden="true"/>}
     </button>
+    {bookmarks}
     {children && <><span className="nc-rail-divider"/>{children}</>}
   </nav><ReadingProgressBadge status={progressStatus}/></>;
 }
@@ -111,17 +114,34 @@ export function ReaderSettingsButton({open, onClick}: {open: boolean; onClick():
 }
 
 export function ReaderDrawer({kind, title, label, onClose, children}: {
-  kind: 'directory' | 'settings' | 'translation';
+  kind: 'directory' | 'bookmarks' | 'settings' | 'translation';
   title: string;
   label: string;
   onClose(): void;
   children: ReactNode;
 }) {
+  const drawer=useRef<HTMLElement>(null);
+  useDialogViewport(drawer,kind==='bookmarks');
+  useEffect(()=>{
+    if(kind!=='bookmarks')return;
+    const trap=(event:globalThis.KeyboardEvent)=>{
+      const element=drawer.current;
+      if(!element||event.defaultPrevented||document.querySelector('dialog[open]'))return;
+      if(event.key==='Escape'&&!element.contains(document.activeElement)&&!event.isComposing&&event.keyCode!==229){event.preventDefault();event.stopPropagation();onClose();return;}
+      if(event.key!=='Tab')return;
+      const buttons=[...element.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')].filter(node=>node.getClientRects().length);
+      const target=event.shiftKey?buttons.at(-1):buttons[0];
+      if(target&&(!element.contains(document.activeElement)||(event.shiftKey?document.activeElement===buttons[0]:document.activeElement===buttons.at(-1)))){event.preventDefault();target.focus();}
+    };
+    document.addEventListener('keydown',trap,true);return()=>document.removeEventListener('keydown',trap,true);
+  },[kind,onClose]);
   return <>
-    <button className={`nc-drawer-scrim${kind === 'translation' ? ' nc-translation-scrim' : ''}`} aria-label={msg('关闭阅读面板')} onClick={onClose}/>
-    <aside id={kind === 'translation' ? 'nc-translation-settings' : undefined} role="dialog"
-      className={kind === 'translation' ? 'nc-translation-popover nc-reader-controls' : `nc-reader-drawer ${kind === 'directory' ? 'left' : 'right'}`}
-      aria-label={label}>
+    <button data-bookmarks={kind==='bookmarks'||undefined} className={`nc-drawer-scrim${kind === 'translation' ? ' nc-translation-scrim' : ''}`} aria-label={msg('关闭阅读面板')} onClick={onClose}/>
+    <aside ref={drawer} aria-modal={kind==='bookmarks'||undefined} onKeyDown={event=>{
+      if(kind==='bookmarks'&&event.key==='Escape'&&!event.defaultPrevented&&!event.nativeEvent.isComposing&&event.nativeEvent.keyCode!==229){event.preventDefault();event.stopPropagation();onClose();}
+    }} id={kind === 'translation' ? 'nc-translation-settings' : undefined} role="dialog"
+      className={kind === 'translation' ? 'nc-translation-popover nc-reader-controls' : `nc-reader-drawer ${kind === 'directory'||kind === 'bookmarks' ? 'left' : 'right'}`}
+      data-bookmarks={kind==='bookmarks'||undefined} aria-label={label}>
       <div className="nc-drawer-title"><h2>{title}</h2><button className="icon-button" aria-label={msg('关闭面板')} onClick={onClose}><Icon name="close"/></button></div>
       {children}
     </aside>

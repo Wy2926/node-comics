@@ -1,3 +1,4 @@
+import type {ReaderBookmark} from './bookmarks';
 import type {EpubIndex, EpubLocation} from '../formats/contracts';
 /** Persistent metadata. Bytes, credentials and live browser handles have separate owners. */
 export type EntryFormat = 'zip' | 'cbz' | 'rar' | 'cbr' | 'pdf' | 'mobi' | 'epub' | 'website' | 'image-sequence';
@@ -72,7 +73,7 @@ export interface CatalogRecord { id: string; [key: string]: unknown }
 export interface CatalogTables {
   comics: Comic; entries: Entry; connections: SourceConnection;
   pageDescriptors: PageDescriptor; materializations: PageMaterialization;
-  positions: ReadingPosition; translationBindings: TranslationBinding;
+  positions: ReadingPosition; bookmarks: ReaderBookmark; translationBindings: TranslationBinding;
   catalogs: CatalogRecord;
   tasks: CatalogRecord; metadata: CatalogRecord; tombstones: CatalogRecord;
 }

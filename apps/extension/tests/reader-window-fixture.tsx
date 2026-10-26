@@ -1,3 +1,5 @@
+import {catalog} from '../src/comics/repositories';
+import {applyBookmark} from '../src/comics/application/bookmarks';
 import {Scrollbars} from '../src/ui/Scrollbars';
 /** Development-only, synthetic data on a dedicated origin. Never calls a supplier or cloud API. */
 import {useCallback,useState} from 'react';
@@ -27,6 +29,8 @@ const FlipMetrics=query.has('curl')?(await import('./reader-flip-metrics')).Read
 const priorityFixture=pagination&&query.get('priority')==='1';
 const thumbnailFixture=query.get('thumbnails')==='1';
 const readOrder:string[]=[];
+let bookmarkImageReads=0;
+if(query.has('bookmarks')){const get=sourcePageCache.get.bind(sourcePageCache);sourcePageCache.get=async key=>{bookmarkImageReads++;return get(key);};}
 // Leave a synthetic held-key preview open so native Escape/blur and the label can be checked.
 function previewProgress(){
  const input=document.querySelector<HTMLInputElement>('.nc-reader-progress');if(!input)return;
@@ -59,6 +63,15 @@ context.fillStyle='#fff';context.fillText('TRANSLATED RESULT',115,420);
 const translatedBlob=await canvas.convertToBlob({type:'image/png'});
 if(!highResolution&&!pagination){await sourcePageCache.put(originalKey(0,0),originalBlob);await sourcePageCache.put(resultKey(''),translatedBlob);}
 const samples:ReadingEntry[]=Array.from({length:chapterCount},(_,chapter)=>({id:`window-fixture-${chapter}`,title:`第 ${chapter+1} 章 · 窗口验收`,source:'fixture',sourceKey:`window-fixture-${chapter}`,generation:1,retention:'offline',createdAt:0,updatedAt:0,discoveryComplete:true,pageId:`window-page-${chapter}-0`,relativeOffset:0,pages:Array.from({length:pageCount},(_,index)=>({id:`window-page-${chapter}-${index}`,name:`第 ${index+1} 页`,...dimensions(index),blobKey:index===failedIndex?undefined:originalKey(chapter,index),fetchError:index===failedIndex?'隔离样本：本页读取失败，可重试。':undefined,jobs:[],outputBlobs:{}}))}));
+if(query.has('bookmarks')){
+ const comicId='bookmark-ui-fixture';
+ await catalog.put('comics',{id:comicId,title:'书签验收',sourceKey:comicId,source:{connectionId:'local',providerItemId:comicId,locator:{},status:'active',generation:1},sourceName:'Fixture',createdAt:1,updatedAt:1});
+ for(const [order,chapter] of samples.entries()){
+  chapter.comicId=comicId;chapter.contentId=chapter.id+':content';
+  await catalog.put('entries',{id:chapter.id,comicId,contentId:chapter.contentId,title:chapter.title,order,format:'cbz',generation:1,indexState:'ready',createdAt:1,updatedAt:1});
+  await catalog.putPages(chapter.id,chapter.contentId,chapter.pages.map((page,ordinal)=>({pageId:page.id,contentId:chapter.contentId!,ordinal,name:page.name,formatLocator:String(ordinal),locator:{}})),1);
+ }
+}
 if(performanceFixture)for(const chapter of samples)for(const page of chapter.pages)for(const dimension of ['width','height'] as const){
  const value=page[dimension];Object.defineProperty(page,dimension,{enumerable:true,configurable:true,get:()=>{dimensionReads++;return value;}});
 }
@@ -174,6 +187,15 @@ function Fixture(){
   observer.disconnect();
   setTurnCheck(`6 次点击 / 80ms：${pages.join(' → ')}；共创建 ${created} 个旧页快照，最多同时 ${peak} 个；减少动态效果：${matchMedia('(prefers-reduced-motion: reduce)').matches?'开启':'关闭'}`);setCheckingTurns(false);
  }
+ async function checkBookmarkCost(){
+  const before=bookmarkImageReads,viewport=document.querySelector<HTMLElement>('[data-decoded-pages]'),decodedBefore=viewport?.dataset.decodedPages;
+  const trigger=[...document.querySelectorAll<HTMLButtonElement>('[data-reader-bookmarks-trigger]')].find(button=>button.getClientRects().length);
+  if(!trigger)return;
+  const start=performance.now();trigger.click();await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
+  const decodedAfter=viewport?.dataset.decodedPages,thumbnails=document.querySelectorAll('.nc-bookmarks img,.nc-bookmarks canvas').length,elapsed=performance.now()-start;
+  document.querySelector<HTMLButtonElement>('[data-bookmarks=true] .nc-drawer-title button')?.click();
+  setStatus(`书签面板：解码 ${decodedBefore} → ${decodedAfter} 页；新增图片读取 ${bookmarkImageReads-before}；缩略图 ${thumbnails}；显示 ${elapsed.toFixed(1)}ms`);
+ }
  async function checkGeometry(){
   flushSync(()=>setCheckingGeometry(true));
   dimensionReads=0;let elapsed=0;
@@ -186,7 +208,8 @@ function Fixture(){
   setStatus(`50 次进度更新：尺寸读取 ${dimensionReads} 次；同步更新 ${elapsed.toFixed(1)}ms`);setCheckingGeometry(false);
  }
  return <div className="nc-app" style={{height:'100vh',display:'flex',flexDirection:'column'}}><Scrollbars/>
-  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status">{status}</span>}</div>
+  <div style={{padding:pagination?4:8,display:'flex',gap:pagination?4:12,alignItems:'center',background:'#fff',zIndex:20,flexWrap:pagination||thumbnailFixture?'wrap':undefined}}><strong>隔离阅读器验收</strong>{!pagination&&<span>{copy.title}</span>}<button onClick={()=>setMounted(value=>!value)}>{mounted?'关闭并保存位置':'重开阅读器'}</button>{!pagination&&<><button onClick={()=>{setCopies(previous=>previous.map(value=>value.id===id?{...value,pages:value.pages.map(page=>({...page,height:highResolution?8000:1600}))}:value));}}>更新真实尺寸</button><button onClick={()=>navigate(`window-fixture-${Math.min(chapterCount-1,Number(id.split('-').at(-1))+1)}`)}>切下一章</button></>}<output aria-label="保存位置" hidden={pagination&&!query.has('bookmarks')}>{copy.pageId} · {copy.relativeOffset.toFixed(3)}</output>{!thumbnailFixture&&!performanceFixture&&!loadingMetrics&&<span role="status">{status}</span>}</div>
+  {query.has('bookmarks')&&<div><button onClick={()=>navigate(samples[(Number(id.split('-').at(-1))+1)%samples.length].id)}>切换测试章节</button><button onClick={()=>setCopies(previous=>previous.map(chapter=>chapter.id===id?{...chapter,contentId:chapter.contentId+':changed'}:chapter))}>模拟内容更新</button><button onClick={()=>void checkBookmarkCost()}>检查书签开销</button></div>}
   {FlipMetrics&&<FlipMetrics/>}
   {(scrubFixture||turnFixture)&&<div><output aria-label="进度条验证">保存 {saves} 次 · {copy.pageId}</output>{scrubFixture&&<button onClick={previewProgress}>模拟长按预览</button>}{turnFixture&&<><button disabled={checkingTurns} onClick={()=>void checkTurns()}>快速翻页验证</button><output aria-label="连续翻页验证">{turnCheck}</output></>}</div>}
   {priorityFixture&&<button onClick={()=>setStatus(`读取顺序：${readOrder.slice(0,16).map(key=>Number(key.split('-').at(-1))+1).join(' → ')}；解码窗口 ${document.querySelector<HTMLElement>('[data-decoded-pages]')?.dataset.decodedPages}`)}>检查读取顺序</button>}
@@ -203,7 +226,7 @@ function Fixture(){
   </div>}
   <output hidden data-testid="reading-window">{readingWindow}</output><output hidden data-testid="marked-read">{JSON.stringify(markedRead)}</output>
   {lazyChapters&&<output hidden data-testid="chapter-state">{JSON.stringify({active:id,chapters:copies.map(chapter=>({id:chapter.id,pages:chapter.pages.length,complete:chapter.discoveryComplete,pageId:chapter.pageId}))})}</output>}
-  {layoutSettings&&preferencesOpen?<div style={{overflow:'auto',minHeight:0}}><Preferences settings={config} setSettings={setConfig}/></div>:mounted&&<Reader key={viewKey} viewKey={viewKey} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} onFind={layoutSettings?()=>setStatus('已触发寻找其他语言'):undefined} onReload={layoutSettings?()=>setStatus('已触发重新载入'):undefined} notify={setStatus} onReadingWindow={observeWindow} busy={false}/>}
+  {layoutSettings&&preferencesOpen?<div style={{overflow:'auto',minHeight:0}}><Preferences settings={config} setSettings={setConfig}/></div>:mounted&&<Reader onBookmarkNavigate={async target=>{const chapter=copies.find(item=>item.id===target.entryId),next=chapter&&applyBookmark(chapter,target);if(!next)return false;setCopies(previous=>previous.map(item=>item.id===next.id?next:item));setId(next.id);return true;}} key={viewKey} viewKey={viewKey} translationScope="window-fixture" copy={copy} sequence={copies} settings={config} setSettings={setConfig} update={update} onActiveEntry={active} onLoadEntry={loadEntry} onMarkRead={mark} onNavigate={navigate} onBack={()=>setMounted(false)} onOpenShortcuts={()=>setShortcutsOpen(true)} analyticsBlocked={shortcutsOpen} onRetry={noop} onUpgrade={noop} onLogin={noop} translationState={(_,page)=>page.jobs.length?undefined:translationRevision%2?{kind:'translating',message:'隔离样本：正在翻译'}:{kind:'error',message:'隔离样本：翻译失败，可重试'}} onImport={()=>setStatus('本地样本导入入口')} onFind={layoutSettings?()=>setStatus('已触发寻找其他语言'):undefined} onReload={layoutSettings?()=>setStatus('已触发重新载入'):undefined} notify={setStatus} onReadingWindow={observeWindow} busy={false}/>}
   {shortcutsOpen&&<ShortcutPanel initialScope="reader" onClose={()=>setShortcutsOpen(false)}/>}
  </div>;
 }

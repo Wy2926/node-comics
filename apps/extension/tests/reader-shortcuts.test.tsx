@@ -23,7 +23,7 @@ vi.mock('../src/analytics',()=>({track:actions.track}));
 vi.mock('../src/reader/useChapterStream',()=>({
  pageKey:(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`,completeManifest:()=>true,
  useChapterStream:({copy}:{copy:ReadingEntry})=>({
-  index:hooks.index,indexRef:{current:hooks.index},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
+  index:hooks.index,indexRef:{current:hooks.index},anchor:{current:{entryId:copy.id,pageId:copy.pages[hooks.index]?.id??copy.pageId,relativeOffset:copy.relativeOffset}},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
   stream:hooks.stream??[copy],previous:hooks.previous,next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
  }),
 }));

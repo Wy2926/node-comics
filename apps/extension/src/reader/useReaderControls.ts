@@ -52,9 +52,10 @@ export function useReaderControls<Panel extends string>({blocked, notify, settin
 
   function closePanel() {
     setPanel(undefined);
-    const selector = panel === 'directory' ? '[data-reader-directory-trigger]'
+    const selector = panel === 'bookmarks' ? '[data-reader-bookmarks-trigger]' : panel === 'directory' ? '[data-reader-directory-trigger]'
       : panel === 'translation' ? '.nc-translation-trigger' : '[data-reader-settings-trigger]';
-    root.current?.querySelector<HTMLButtonElement>(selector)?.focus({preventScroll: true});
+    const trigger=root.current?.querySelector<HTMLButtonElement>(selector);
+    (trigger?.getClientRects?.().length===0 ? [...(root.current?.querySelectorAll<HTMLButtonElement>(selector)??[])].find(button=>button.getClientRects().length) : trigger)?.focus({preventScroll:true});
   }
 
   async function fullscreen() {

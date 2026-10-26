@@ -32,7 +32,7 @@ export function menuPosition(anchor: Anchor, viewport: ViewportBounds, desiredWi
 }
 
 /** Observe only while a dialog is mounted; keyboard/browser bars must not hide its close control. */
-export function useDialogViewport(ref: RefObject<HTMLDialogElement | null>, enabled = true) {
+export function useDialogViewport(ref: RefObject<HTMLElement | null>, enabled = true) {
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element || !enabled) return;

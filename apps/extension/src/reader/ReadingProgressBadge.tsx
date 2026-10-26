@@ -11,7 +11,7 @@ export function ReadingProgressBadge({status='local'}:{status?:ReadingProgressSt
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" focusable="false">
         {status==='local'?<>
           <rect x="5" y="3" width="14" height="18" rx="2"/>
-          <path d="M9 3v9l3-2 3 2V3M10 17h4"/>
+          <path d="M9 8h6M9 12h6M9 16h4"/>
         </>:status==='syncing'?<g className="nc-reading-progress-arrows">
           <path d="M4 10a8 8 0 0 1 13.5-3.8L20 9M20 4v5h-5M20 14a8 8 0 0 1-13.5 3.8L4 15M4 20v-5h5"/>
         </g>:<>

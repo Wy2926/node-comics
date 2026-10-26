@@ -31,6 +31,7 @@ const schema: Record<Exclude<CatalogTable,'translationBindings'>, [string, strin
   pageDescriptors: [['contentId', 'contentId'], ['contentOrdinal', ['contentId', 'ordinal']], ['contentLocator', ['contentId', 'formatLocator'], true]],
   materializations: [['contentId', 'contentId'], ['pageId', 'pageId'], ['imageSha256', 'imageSha256']],
   positions: [['entryId', 'entryId', true], ['comicId', 'comicId'], ['updatedAt', 'updatedAt']],
+  bookmarks: [['comicId','comicId'], ['comicCreated',['comicId','createdAt','id']], ['locationKey','locationKey',true]],
   catalogs: [['comicId', 'comicId']],
   tasks: [['entryId', 'entryId'], ['status', 'status'], ['statusNextRun', ['status', 'nextRunAt']]],
   metadata: [], tombstones: [],
@@ -51,7 +52,12 @@ const databaseSchema: DatabaseSchema = Object.fromEntries(Object.entries(schema)
   indexes: indices.map(([name, keyPath, unique]) => ({ name, keyPath, unique })),
 }]));
 export function openCatalog(): Promise<IDBDatabase> {
-  if (!opening) opening = openSourceDatabase('catalog', databaseSchema, () => { opening = undefined; }).catch(error => { opening = undefined; throw error; });
+  if (!opening) opening = openSourceDatabase('catalog', databaseSchema, () => { opening = undefined; }, undefined, undefined, {version:2,upgrade:tx=>{
+    if(!tx.db.objectStoreNames.contains('bookmarks')){
+      const store=tx.db.createObjectStore('bookmarks',{keyPath:'id'});
+      for(const [name,keyPath,unique] of schema.bookmarks)store.createIndex(name,keyPath,{unique:!!unique});
+    }
+  }}).catch(error => { opening = undefined; throw error; });
   return opening;
 }
 function openTables(tables:CatalogTable[]):Promise<IDBDatabase>{
@@ -113,7 +119,7 @@ export const catalog = {
         const ids=writes.get(table);if(ids)ids.push(key);else writes.set(table,[key]);
       },
       async remove(table, id) {
-        tx.objectStore(table).delete(id); if(table!=='catalogs'&&table!=='tombstones')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
+        tx.objectStore(table).delete(id); if(table!=='bookmarks'&&table!=='catalogs'&&table!=='tombstones')tx.objectStore('tombstones').put({id: [table, id].join(':'), deletedAt: Date.now()});
         const ids=writes.get(table);if(ids)ids.push(id);else writes.set(table,[id]);
       },
     };
@@ -344,6 +350,11 @@ export const catalog = {
       }
       if(!removalConnectionId){entries.push(...batch);break;}
       if(batch.length<100)break;
+      }
+      for(;;){
+        const batch=await tx.list('bookmarks',{index:'comicId',range:comicId,limit:100});
+        for(const value of batch)await tx.remove('bookmarks',value.id);
+        if(batch.length<100)break;
       }
       for (const value of await tx.list('catalogs', {index: 'comicId', range: comicId, limit: 1})) await tx.remove('catalogs', value.id);
       await tx.remove('metadata', 'reading-preferences:' + comicId);

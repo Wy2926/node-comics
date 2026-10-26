@@ -123,7 +123,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
    for(const chapter of stream){const end=ends.current.get(chapter.id);if(!end)continue;const top=elementTop(end),crossed=top>previous&&top+end.offsetHeight<=v.scrollTop+v.clientHeight+1;if(crossed&&atEnd(chapter))markRead(chapter);}
   }
  }
- function jump(n:number){
+ function jump(n:number,relativeOffset=0){
   navigationReason.current='direct';const chapter=copyRef.current;if(!Number.isFinite(n)||!chapter.pages.length)return;
   pendingChapterEnd.current=undefined;
   restorePending.current=true;
@@ -139,7 +139,7 @@ export function useChapterStream({copy,sequence,layout,motion,update,onActiveEnt
    }
   }
   const target=Math.max(0,Math.min(chapter.pages.length-1,Math.trunc(n)));
-  anchor.current={entryId:chapter.id,pageId:chapter.pages[target].id,relativeOffset:0};indexRef.current=target;setActive({entryId:chapter.id,index:target});persist();
+  anchor.current={entryId:chapter.id,pageId:chapter.pages[target].id,relativeOffset:Math.max(0,Math.min(1,relativeOffset))};indexRef.current=target;setActive({entryId:chapter.id,index:target});persist();
  }
  // New geometry is already committed. Restore by stable page identity even when its old DOM was evicted.
  useLayoutEffect(()=>{

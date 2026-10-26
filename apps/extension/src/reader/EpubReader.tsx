@@ -1,3 +1,6 @@
+import {bookmarkLocation,applyBookmark} from '../comics/application/bookmarks';
+import {useReaderBookmarks} from './useReaderBookmarks';
+import {BookmarkTools,BookmarkList,BookmarkNotice} from './ReaderBookmarks';
 import {ReaderProgress} from './ReaderProgress';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type Rendition from "epubjs/types/rendition";
@@ -113,7 +116,7 @@ export function EpubReader({
   const [fixedLayout, setFixedLayout] = useState(false);
   const fontSize = Math.max(70, view.zoom);
   const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
-  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify, settings: globalSettings, setSettings});
+  const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'bookmarks' | 'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify, settings: globalSettings, setSettings});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
   const latest = useRef({ copy, update, settings, layout, fontSize, images, toggleControls });
   latest.current = { copy, update, settings, layout, fontSize, images, toggleControls };
@@ -125,6 +128,17 @@ export function EpubReader({
   const activeHref = tocHref ?? position?.start.href.replace(/^\//, '') ?? copy.documentLocation?.href;
   const chapter = Math.max(0, chapters.findIndex(item => item.href === activeHref));
   const progress = Math.round((copy.documentLocation?.totalProgression ?? 0) * 100);
+  function currentBookmark(){const location=bookmarkLocation(latest.current.copy);return location?{...location,title:chapters[chapter]?.label??copy.title}:undefined;}
+  const bookmarks=useReaderBookmarks({comicId:copy.comicId,current:loading||error?undefined:currentBookmark(),open:panel==='bookmarks',
+    capture:()=>{capturePosition.current?.();return currentBookmark();},
+    navigate:async location=>{
+      if(loading||positioning.current||!session.current||!rendition.current)return false;
+      const target=applyBookmark(latest.current.copy,location);if(!target?.documentLocation)return false;
+      positioning.current=true;
+      try{await restoreEpubLocation(session.current,rendition.current,target.documentLocation);return !session.current?.signal?.aborted;}
+      finally{positioning.current=false;capturePosition.current?.();}
+    },close:()=>{if(panel)closePanel();else reveal();}});
+  const bookmarkTools=(placement:'desktop'|'mobile')=><BookmarkTools bookmarks={bookmarks} placement={placement} open={panel==='bookmarks'} onOpen={()=>togglePanel('bookmarks')}/>;
   const language = caps?.languages.find(value => value.id === settings.language)?.label ?? languageLabel(settings.language);
   function selectView(value: 'original' | Mode) {
     if (value !== 'original' && caps && !caps.modes.some(mode => mode.id === value && mode.enabled)) return false;
@@ -145,7 +159,7 @@ export function EpubReader({
   useEffect(() => saveReadingView(viewKey, view), [viewKey, view]);
 
   const run = (operation: () => Promise<unknown>) => {
-    if (loading || positioning.current || session.current?.signal?.aborted)
+    if (bookmarks.busy || loading || positioning.current || session.current?.signal?.aborted)
       return;
     void operation().catch(() => setError(msg("加载失败")));
   };
@@ -176,7 +190,7 @@ export function EpubReader({
       "reader.zoomReset": () => setFontSize(100),
       "reader.back": leaveReader,
     },
-    { enabled: !controlsBlocked },
+    { enabled: !controlsBlocked&&!bookmarks.busy },
   );
 
   // Capture/release while the iframe is still attached. Firefox no longer exposes
@@ -425,10 +439,10 @@ export function EpubReader({
     reflow.current?.();
   }, [fontSize, settings.readerBackground, settings.textScale, settings.appearance, settings.accentTheme]);
 
-  const disabled = loading || !!error;
+  const disabled = loading || !!error || bookmarks.busy;
   return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
     <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} onBack={leaveReader}
-      progressStatus={progressStatus} directoryOpen={panel === 'directory'} onDirectory={() => togglePanel('directory')}>
+      bookmarks={bookmarkTools('desktop')} progressStatus={progressStatus} directoryOpen={panel === 'directory'} onDirectory={() => togglePanel('directory')}>
       <div className="nc-reader-navigation">
         <button aria-label={msg('上一页')} title={msg('上一页')} disabled={disabled || position?.atStart}
           onClick={() => run(() => turnEpub(rendition.current!, -1))}><Icon name="chevron" style={{transform: 'rotate(-90deg)'}}/></button>
@@ -450,7 +464,7 @@ export function EpubReader({
           onClick={() => run(() => turnEpub(rendition.current!, 1))}><Icon name="chevron" style={{transform: 'rotate(90deg)'}}/></button>
       </div>
     </ReaderNavigation>
-    <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
+    <PageTranslationBar bookmarks={bookmarkTools('mobile')} selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
       modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
     <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
@@ -462,9 +476,10 @@ export function EpubReader({
           onLogin={onLogin} onUpgrade={onUpgrade} onRetry={() => images.error ? images.retry() : onRetry(images.page!, view.mode)}/>}
       {!disabled && <EnhancementStatus state={images.enhancement} onRetry={images.retryEnhancement}/>}
     </main>
-    {panel && <ReaderDrawer kind={panel} title={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}
-      label={{directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译选项')}[panel]} onClose={closePanel}>
-      {panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
+    {panel && <ReaderDrawer kind={panel} title={{bookmarks:msg('书签'),directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}
+      label={{bookmarks:msg('书签'),directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译选项')}[panel]} onClose={closePanel}>
+      {(panel==='directory'||panel==='bookmarks')&&<div className="nc-directory-tabs" role="tablist" aria-label={msg('目录')}><button role="tab" aria-selected={panel==='directory'} onClick={()=>setPanel('directory')}>{msg('目录')}</button><button role="tab" aria-selected={panel==='bookmarks'} onClick={()=>setPanel('bookmarks')}>{msg('书签')}<span>{bookmarks.count}</span></button></div>}
+      {panel==='bookmarks'?<BookmarkList bookmarks={bookmarks}/>:panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
         href={tocHref ?? position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
         : <div className="nc-drawer-content">{panel === 'translation'
           ? <ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} modelSelection={modelSelection} fontSelection={fontSelection}
@@ -475,5 +490,6 @@ export function EpubReader({
             onShortcuts={() => {setPanel(undefined); reveal(); onOpenShortcuts();}} onReload={() => {capturePosition.current?.(); setRetry(value => value + 1);}}
             busy={loading}/>}</div>}
     </ReaderDrawer>}
+    {panel!=='bookmarks'&&<BookmarkNotice bookmarks={bookmarks}/>}
   </ReaderShell>;
 }

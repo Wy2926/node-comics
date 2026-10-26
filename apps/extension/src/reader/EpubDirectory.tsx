@@ -48,7 +48,7 @@ export function EpubDirectory({title, index, href, select}: {
       {visible.slice(0, count).map((item, i) => <div key={`${item.href}:${i}`} className="nc-directory-chapter" data-current={item === active || undefined}
         style={{marginInlineStart: `${Math.min(item.depth, 6)}em`}}>
         <div className="nc-directory-chapter-main"><button className="nc-chapter-entry" aria-current={item === active ? 'true' : undefined} onClick={() => select(item.href)}>
-          <span className="nc-chapter-info"><b>{item.label}</b>{item === active && <span className="nc-chapter-meta"><span className="nc-chapter-state current"><Icon name="bookmark" size={16}/><span>{msg('阅读中')}</span></span></span>}</span>
+          <span className="nc-chapter-info"><b>{item.label}</b>{item === active && <span className="nc-chapter-meta"><span className="nc-chapter-state current"><Icon name="book" size={16}/><span>{msg('阅读中')}</span></span></span>}</span>
         </button></div>
       </div>)}
       {!visible.length && <p className="nc-directory-empty">{msg('没有匹配的内容')}</p>}
