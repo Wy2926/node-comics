@@ -23,7 +23,9 @@ export function pageTurn(viewport:HTMLDivElement,surface:HTMLDivElement,sign:num
  const outgoing=pageSnapshot(viewport,surface,columns,paper);
  const host=document.createElement('div'),book=document.createElement('div');
  host.className='nc-page-transition-clip';host.dataset.swipeSnapshot='';host.setAttribute('aria-hidden','true');host.inert=true;
- Object.assign(host.style,{width:`${viewport.clientWidth}px`,height:`${viewport.clientHeight}px`});
+ // clientHeight rounds fractional CSS pixels. A rounded-up overlay can create
+ // native scrollbars, resize the viewport and cancel its own animation.
+ Object.assign(host.style,{width:'100%',height:'100%'});
  book.className='nc-page-turn';
  // Landscape leaves also serve single-page reading; the unused half is outside
  // the viewport. The library's portrait clone would lose streaming canvas pixels.

@@ -7,6 +7,11 @@ import type {ReadingView} from '../src/reader/view';
 const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
 const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn(),clickCapture:vi.fn()}));
+const swipe=vi.hoisted(()=>({options:undefined as Parameters<typeof import('../src/reader/usePagedSwipe').usePagedSwipe>[0]|undefined}));
+vi.mock('../src/reader/usePagedSwipe',async original=>{
+ const {usePagedSwipe}=await original<typeof import('../src/reader/usePagedSwipe')>();
+ return {usePagedSwipe:(options:NonNullable<typeof swipe.options>)=>{swipe.options=options;return usePagedSwipe(options);}};
+});
 vi.mock('../src/reader/useSpreadZoom',()=>({useSpreadZoom:()=>spreadZoom}));
 vi.mock('react',async original=>({
  ...await original<typeof import('react')>(),
@@ -73,6 +78,21 @@ beforeEach(()=>{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('reader shortcut action integration',()=>{
+ it.each(['single','double'] as const)('preserves the %s animation viewport and reset scope through an empty chapter and loaded content',layout=>{
+  const props=fixture({settings:{...defaults,layout}}),before=render(props),resetKey=swipe.options!.resetKey,identity=swipe.options!.identity;
+  props.copy={...copy,id:'chapter-two',contentId:'chapter-two-content',generation:2,pages:[]};
+  const loading=render(props);
+  expect(swipe.options).toMatchObject({enabled:true,resetKey});expect(swipe.options!.identity).not.toBe(identity);
+  expect(swipe.options!.canTurn(1)).toBe(false);
+  const viewportSlot=(tree:ReturnType<typeof Reader>)=>(tree.props.children as ReactElement<{className?:string}>[]).findIndex(child=>child?.props?.className==='nc-reading-viewport');
+  expect(viewportSlot(before)).toBeGreaterThanOrEqual(0);expect(viewportSlot(loading)).toBe(viewportSlot(before));
+  for(const tree of [before,loading]){
+   expect(nodes(tree).filter(node=>node.props.className==='nc-reading-surface')).toHaveLength(1);
+  }
+  props.copy={...props.copy,pages:copy.pages};render(props);
+  expect(swipe.options).toMatchObject({enabled:true,resetKey});
+  hooks.handlers['reader.layout']();render(props);expect(swipe.options!.resetKey).not.toBe(resetKey);
+ });
  it.each(['single','double'] as const)('enables the first-page previous control only with a preceding chapter in %s',layout=>{
   hooks.index=0;const props=fixture({settings:{...defaults,layout}});
   const previous=(tree:ReactElement)=>nodes(tree).find(node=>node.props['aria-label']==='上一页')!;

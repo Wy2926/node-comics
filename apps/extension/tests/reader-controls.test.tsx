@@ -56,7 +56,7 @@ function render() {
 function shell() {
   return ReaderShell({...controls, ref: controls.root, background: 'gray', children: null}).props;
 }
-function advance(ms = 1200) {vi.advanceTimersByTime(ms); render();}
+function advance(ms = 6000) {vi.advanceTimersByTime(ms); render();}
 function enable() {controls.setImmersive(true); render();}
 function cleanup() {for (const effect of hooks.effects) effect.cleanup?.();}
 const target = (inControls: boolean) => ({closest: vi.fn(() => inControls ? {} : null)});
@@ -111,7 +111,7 @@ describe('immersive reader controls', () => {
     controls.setImmersive(false); render();
     expect(settings).toEqual({...defaults, readerImmersive: false});
     cleanup(); hooks.states = []; hooks.refs = []; hooks.effects = []; hooks.pending = [];
-    render(); advance(5000);
+    render(); advance(10000);
     expect(controls.immersive).toBe(false);
     expect(controls.hidden).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
@@ -119,7 +119,7 @@ describe('immersive reader controls', () => {
 
   it('uses the latest shared preference and cancels hiding when another reader disables immersion', () => {
     advance(1000);
-    settings = {...settings, readerImmersive: false}; render(); advance(5000);
+    settings = {...settings, readerImmersive: false}; render(); advance(10000);
     expect(controls.hidden).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
     controls.setImmersive(previous => !previous); render();
@@ -161,19 +161,19 @@ describe('immersive reader controls', () => {
     render(); controls.toggleControls(); render();
     expect(controls.panel).toBeUndefined();
     expect(controls.hidden).toBe(false);
-    advance(5000); expect(controls.hidden).toBe(reason === 'panel');
+    advance(10000); expect(controls.hidden).toBe(reason === 'panel');
   });
 
-  it('hides after 1200ms and does not restart for unrelated renders', () => {
+  it('hides after 6000ms and does not restart for unrelated renders', () => {
     enable(); advance(1000); render();
     expect(controls.hidden).toBe(false);
-    advance(199); expect(controls.hidden).toBe(false);
+    advance(4999); expect(controls.hidden).toBe(false);
     advance(1); expect(controls.hidden).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
 
   it('hides after mouse closing settings even when focus returns to its trigger', () => {
-    controls.setPanel('settings'); render(); enable(); advance(5000);
+    controls.setPanel('settings'); render(); enable(); advance(10000);
     expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     controls.closePanel(); render();
     expect(focus).toHaveBeenCalledWith({preventScroll: true});
@@ -183,11 +183,11 @@ describe('immersive reader controls', () => {
   });
 
   it('protects keyboard/input focus, then resumes from blur without a blank-area click', () => {
-    focusVisible = true; enable(); advance(5000);
+    focusVisible = true; enable(); advance(10000);
     expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     shell().onBlurCapture!({target: target(true)} as unknown as FocusEvent<HTMLDivElement>);
     focusVisible = false; render();
-    advance(1199); expect(controls.hidden).toBe(false);
+    advance(5999); expect(controls.hidden).toBe(false);
     advance(1); expect(controls.hidden).toBe(true);
   });
 
@@ -195,7 +195,7 @@ describe('immersive reader controls', () => {
     enable(); advance(1000);
     focusVisible = true;
     shell().onFocusCapture!({target: target(true)} as unknown as FocusEvent<HTMLDivElement>);
-    advance(5000); expect(controls.hidden).toBe(false);
+    advance(10000); expect(controls.hidden).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -210,7 +210,7 @@ describe('immersive reader controls', () => {
     enable(); advance(900);
     for (let i = 0; i < 30; i++) controls.reveal();
     render(); expect(vi.getTimerCount()).toBe(1);
-    advance(1199); expect(controls.hidden).toBe(false);
+    advance(5999); expect(controls.hidden).toBe(false);
     advance(1); expect(controls.hidden).toBe(true);
     controls.reveal(); render(); expect(controls.hidden).toBe(false);
   });
@@ -220,7 +220,7 @@ describe('immersive reader controls', () => {
     if (reason === 'panel') controls.togglePanel('directory');
     else if (reason === 'blocked') blocked = true;
     else controls.setImmersive(false);
-    render(); advance(5000);
+    render(); advance(10000);
     expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     if (reason === 'panel') controls.setPanel(undefined);
     else if (reason === 'blocked') blocked = false;
@@ -236,7 +236,7 @@ describe('immersive reader controls', () => {
   it.each(['onPointerUpCapture', 'onPointerCancelCapture'] as const)('keeps a long control press visible, then rearms on %s', handler => {
     active = true;
     shell().onPointerDownCapture!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
-    advance(5000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
+    advance(10000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     active = false;
     shell()[handler]!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
     advance(); expect(controls.hidden).toBe(true);
@@ -245,7 +245,7 @@ describe('immersive reader controls', () => {
   it('keeps stationary mouse hover open and resumes after leaving the toolbar', () => {
     finePointer = hovered = true;
     shell().onPointerOver!({target: target(true)} as unknown as PointerEvent<HTMLDivElement>);
-    advance(5000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
+    advance(10000); expect(controls.hidden).toBe(false); expect(vi.getTimerCount()).toBe(0);
     shell().onPointerOut!({target: target(true), relatedTarget: target(true)} as unknown as PointerEvent<HTMLDivElement>);
     expect(vi.getTimerCount()).toBe(0);
     hovered = false;
@@ -285,7 +285,7 @@ describe('immersive reader controls', () => {
     advance(1000);
     for (let i = 0; i < 100; i++) shell().onPointerMove!({pointerType: 'mouse', target: target(false), currentTarget: {getBoundingClientRect: bounds}, clientX: 2} as unknown as PointerEvent<HTMLDivElement>);
     expect(bounds).not.toHaveBeenCalled();
-    advance(200); expect(controls.hidden).toBe(true);
+    advance(5000); expect(controls.hidden).toBe(true);
   });
 
   it('uses the top/bottom edges for compact toolbars instead of the page sides', () => {

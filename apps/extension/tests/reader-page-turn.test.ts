@@ -41,7 +41,8 @@ describe('bounded library page curl',()=>{
   const f=fixture(1,sign),host=f.viewport.children[0],book=host.children[0];
   expect(f.engine.settings).toMatchObject({width:800,height:600,usePortrait:false,pointerInput:[],injectStyles:false,initialPage:sign<0?0:2,flippingTime:360});
   expect(book.style).toMatchObject({width:'1600px',left:sign<0?'-800px':'0px'});
-  expect(f.engine.loadFromHTML.mock.calls[0][0]).toHaveLength(4);expect(host.inert).toBe(true);f.turn!.dispose();
+  expect(f.engine.loadFromHTML.mock.calls[0][0]).toHaveLength(4);expect(host.inert).toBe(true);
+  expect(host.style).toMatchObject({width:'100%',height:'100%'});f.turn!.dispose();
  });
  it('uses a center spine with exactly four faces for double-page reading',()=>{
   const f=fixture(2);expect(f.engine.settings.width).toBe(400);expect(mocks.capture).toHaveBeenCalledWith(f.viewport,f.surface,2,{left:0,top:0,width:800,height:600});
@@ -55,7 +56,7 @@ describe('bounded library page curl',()=>{
   ]});
   const turn=pageTurn(viewport as unknown as HTMLDivElement,surface as unknown as HTMLDivElement,-1)!;
   expect(mocks.instances[0].settings.width).toBe(500);
-  expect(viewport.children[0].style.width).toBe('800px');expect(viewport.children[0].children[0].style.left).toBe('-200px');
+  expect(viewport.children[0].style.width).toBe('100%');expect(viewport.children[0].children[0].style.left).toBe('-200px');
   expect(mocks.capture.mock.calls[0][3]).toEqual({left:-200,top:0,width:1000,height:600});turn.dispose();
  });
  it('refreshes an arriving image without restarting the engine and disconnects on disposal',()=>{

@@ -31,11 +31,6 @@ class Surface extends Events{
  style={transform:'',willChange:'',visibility:'',removeProperty:(name:string)=>{
   if(name==='transform')this.style.transform='';if(name==='will-change')this.style.willChange='';if(name==='visibility')this.style.visibility='';
  }};
- animations:{onfinish:null|(()=>void);cancel:ReturnType<typeof vi.fn>;finish:()=>void;frames:Keyframe[];options:KeyframeAnimationOptions;started:number}[]=[];
- animate(frames:Keyframe[],options:KeyframeAnimationOptions){
-  const result={onfinish:null as null|(()=>void),cancel:vi.fn(),frames,options,started:Date.now(),finish:()=>result.onfinish?.()};
-  this.animations.push(result);return result;
- }
  setPointerCapture(id:number){this.captures.add(id);}
  hasPointerCapture(id:number){return this.captures.has(id);}
  releasePointerCapture(id:number){this.captures.delete(id);}
@@ -168,11 +163,35 @@ describe('library page-turn input and reading lifecycle',()=>{
   if(reason==='second-finger')f.pointer('pointerdown',220,100,{pointerId:2,pointerType:'touch',isPrimary:false});if(reason==='escape')browser.emit('keydown',{key:'Escape'});if(reason==='blur')browser.emit('blur');if(reason==='hidden'){documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
   f.pointer('pointerup',200,100,{timeStamp:210});vi.runAllTimers();expect(f.options.onTurn).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
  });
- it.each(['identity','resetKey','direction','blocked','enabled','resize','cancel','unmount','blur','hidden'] as const)('disposes animation resources on %s and ignores a late completion',reason=>{
+ it.each(['resetKey','direction','blocked','enabled','resize','cancel','unmount','blur','hidden'] as const)('disposes animation resources on %s and ignores a late completion',reason=>{
   const f=fixture();f.controls.turn(1);f.render({identity:'page-2'});const old=f.snapshot;
-  if(reason==='identity')f.render({identity:'direct'});if(reason==='resetKey')f.render({resetKey:'double'});if(reason==='direction')f.render({direction:'rtl'});if(reason==='blocked')f.render({blocked:true});if(reason==='enabled')f.render({enabled:false});
+  if(reason==='resetKey')f.render({resetKey:'double'});if(reason==='direction')f.render({direction:'rtl'});if(reason==='blocked')f.render({blocked:true});if(reason==='enabled')f.render({enabled:false});
   if(reason==='resize'){f.viewport.clientWidth=600;browser.emit('resize');}if(reason==='cancel')f.controls.cancel();if(reason==='unmount'){for(const effect of hooks.effects)effect.cleanup?.();hooks.effects=[];}if(reason==='blur')browser.emit('blur');if(reason==='hidden'){documentEvents.hidden=true;documentEvents.emit('visibilitychange');}
   old.finish();vi.runAllTimers();expect(old.dispose).toHaveBeenCalledOnce();expect(f.options.onSettled).not.toHaveBeenCalled();expect(f.options.onTurn).toHaveBeenCalledOnce();expect(f.surface.style.visibility).toBe('');
+ });
+ it.each([1,-1] as const)('keeps one curl through a chapter %s loading its manifest and resolving the destination page',delta=>{
+  const f=fixture({identity:'chapter-2:page-1'});f.controls.turn(delta);
+  f.render({identity:'chapter-loading',canTurn:()=>false});const old=f.snapshot;
+  expect(old.play).toHaveBeenCalledOnce();expect(old.pinned).toBe(true);expect(vi.getTimerCount()).toBe(0);
+  f.render({identity:delta>0?'next-chapter:page-1':'previous-chapter:page-16',canTurn:()=>true});
+  expect(snapshots.create).toHaveBeenCalledOnce();expect(old.pinned).toBe(true);
+  f.finish();expect(old.dispose).toHaveBeenCalledOnce();expect(f.options.onSettled).toHaveBeenCalledOnce();
+  f.render({identity:'refreshed-content'});expect(snapshots.create).toHaveBeenCalledOnce();
+ });
+ it('does not replay an already completed curl when a slow chapter finally arrives',()=>{
+  const f=fixture();f.controls.turn(1);f.render({identity:'next-chapter-loading'});f.finish();
+  vi.advanceTimersByTime(5000);f.render({identity:'next-chapter:page-1'});
+  expect(snapshots.create).toHaveBeenCalledOnce();expect(f.snapshot.play).toHaveBeenCalledOnce();expect(f.viewport.dataset.swipePhase).toBeUndefined();
+ });
+ it('cancels a direct jump explicitly even when the old chapter load finishes later',()=>{
+  const f=fixture();f.controls.turn(1);f.render({identity:'next-chapter-loading'});const old=f.snapshot;
+  f.controls.cancel();f.render({identity:'bookmark-page'});old.finish();
+  expect(old.pinned).toBe(false);expect(f.options.onSettled).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
+ });
+ it('cancels an uncommitted drag if its source page changes',()=>{
+  const f=fixture();f.pointer('pointerdown',500);f.pointer('pointermove',200,100,{timeStamp:200});
+  f.render({identity:'changed-source'});f.pointer('pointerup',200,100,{timeStamp:210});
+  expect(f.options.onTurn).not.toHaveBeenCalled();expect(snapshots.create).not.toHaveBeenCalled();expect(f.viewport.dataset.swipePhase).toBeUndefined();
  });
  it('disposes a navigation that never commits without replaying a late page',()=>{
   const f=fixture();f.controls.turn(1);vi.advanceTimersByTime(1000);expect(f.snapshot.pinned).toBe(false);f.render({identity:'late'});expect(f.snapshot.play).not.toHaveBeenCalled();expect(f.options.onSettled).not.toHaveBeenCalled();

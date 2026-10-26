@@ -10,7 +10,9 @@ type Options = {
  enabled:boolean;
  blocked:boolean;
  direction:'ltr'|'rtl';
+ // Navigation commits may precede the destination manifest or images.
  identity:string;
+ // Display configuration only; page/chapter identity belongs to navigation.
  resetKey:string;
  canTurn:(delta:Turn)=>boolean;
  onTurn:(delta:Turn)=>void;
@@ -30,9 +32,9 @@ export function usePagedSwipe(options:Options){
   let phase:Phase|undefined,timer:ReturnType<typeof setTimeout>|undefined;
   let snapshot:ReturnType<typeof pageTurn>|undefined;
   let generation=0,clickUntil=0,identity=latest.current.identity,resetKey=latest.current.resetKey;
-  let enabled=latest.current.enabled,blocked=latest.current.blocked,direction=latest.current.direction;
+  let blocked=latest.current.blocked,direction=latest.current.direction;
   let size=[viewport.clientWidth,viewport.clientHeight];
-  let pending:{identity:string}|undefined;
+  let pending=false;
   let gesture:{id:number;x:number;y:number;lastX:number;lastTime:number;velocity:number;dragging:boolean}|undefined;
   const touches=new Set<number>();
   const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
@@ -48,7 +50,7 @@ export function usePagedSwipe(options:Options){
    try{if(viewport.hasPointerCapture?.(id))viewport.releasePointerCapture(id);}catch{/* Pointer may already have ended. */}
   };
   const reset=(settled=false)=>{
-   generation++;clearPendingTimeout();pending=undefined;
+   generation++;clearPendingTimeout();pending=false;
    if(gesture?.dragging)clickUntil=Date.now()+500;
    const id=gesture?.id;gesture=undefined;if(id!==undefined)release(id);
    snapshot?.dispose();snapshot=undefined;
@@ -57,14 +59,14 @@ export function usePagedSwipe(options:Options){
   };
   const enter=()=>{
    if(!pending)return;
-   pending=undefined;clearPendingTimeout();
+   pending=false;clearPendingTimeout();
    surface.style.removeProperty('visibility');
    if(reduced()||!snapshot){reset(true);return;}
    const version=generation;
    snapshot.play(()=>{if(version===generation)reset(true);});
   };
   const navigate=(delta:Turn,sign:number)=>{
-   pending={identity:latest.current.identity};setPhase('entering');
+   pending=true;setPhase('entering');
    if(!reduced())snapshot=pageTurn(viewport,surface,sign);
    if(snapshot)surface.style.visibility='hidden';
    // Guard only a navigation that never commits. Image loading never holds navigation.
@@ -155,12 +157,14 @@ export function usePagedSwipe(options:Options){
    sync:()=>{
     const current=latest.current;
     snapshot?.position();
-    if(resetKey!==current.resetKey||enabled!==current.enabled||blocked!==current.blocked||direction!==current.direction)reset();
+    if(resetKey!==current.resetKey||blocked!==current.blocked||direction!==current.direction)reset();
     else if(identity!==current.identity){
-     if(pending?.identity===identity)enter();
-     else reset();
+     if(pending)enter();
+     else if(phase==='dragging')reset();
+     // Once committed, manifest/image updates refresh the incoming surface.
+     // Direct navigation cancels explicitly; data readiness is not a new turn.
     }
-    identity=current.identity;resetKey=current.resetKey;enabled=current.enabled;blocked=current.blocked;direction=current.direction;
+    identity=current.identity;resetKey=current.resetKey;blocked=current.blocked;direction=current.direction;
    },
   };
   controls.current=control;

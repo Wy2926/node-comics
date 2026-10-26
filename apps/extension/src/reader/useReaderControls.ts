@@ -32,7 +32,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, settin
         if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches &&
           root.current?.querySelector('.nc-reader-controls:hover')) return;
         setHidden(true);
-      }, 1200);
+      }, 6000);
     }
   }
 
