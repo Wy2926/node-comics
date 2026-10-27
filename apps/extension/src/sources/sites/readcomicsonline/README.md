@@ -20,7 +20,7 @@
 - 目录校验 canonical、作品标题、专用封面及 `Chapters` 的完整闭合静态列表。倒序后的第一项必须与 `Read First` 一致；重复章节、跨作品条目和未知分页结构拒绝导入。
 - [章节页](https://readcomicsonline.ru/comic/absolute-batman-2024/1)同时包含单页显示区和隐藏的 `#reader-all` 完整条带。只用完整条带建立清单，逐项核对 `#page-list` 的页码地址、页数和图片 `alt`；两处显示的同一图片不会重复计页，条带内重复 URL 仍保留独立页槽。
 - 章节归属同时核对 canonical、面包屑作品链接、已选章节选项及图片路径。标题空白统一规范化，保留源站实际文本。作品名交接仅读当前 DOM，不请求目录。
-- 原图来自 `cdn.readcomicsonline.ru/uploads/manga/<slug>/chapters/<章节标识>/`；封面来自同作品的 `cover/cover[_宽x高].<后缀>`。保留图片查询参数。原图与封面可由公共 HTTP 管线直接读取，不需专用解码或图片页会话。
+- 原图来自 `cdn.readcomicsonline.ru/uploads/manga/<slug>/chapters/<章节标识>/`；封面来自同作品的 `cover/cover[_宽x高].<后缀>`。保留图片查询参数。插件阅读器及封面使用 `no-referrer` 经公共 HTTP 管线直接读取，避免附加源站 Referer 的跨站请求触发 Cloudflare 验证。图片不需专用解码或图片页会话，原位读取仍遵循网页实际策略。
 - 目录或章节各只请求一次 HTML，不下载整部作品或逐页 HTML。网页通道优先复用同作品标签页，必要时增加一次后台详情页导航；图片仍由公共阅读窗口按需读取。取消、请求预算和会话回收沿用公共运行时。
 
 ## 验证
