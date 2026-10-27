@@ -12,7 +12,8 @@ const page=await browser.newPage({viewport:{width:1280,height:900}}),checks=[],e
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const snapshot=()=>page.evaluate(()=>({submitted:window.readerFixture.submitted,requests:window.readerFixture.requests,translations:window.readerFixture.translationRequests,jobs:window.readerFixture.jobs,completedAt:window.readerFixture.completedAt,downloadedAt:window.readerFixture.downloadedAt}));
-async function jump(n){const input=page.getByLabel('阅读进度',{exact:true});await setReaderProgress(input, String(n));}
+async function jump(n){const input=page.getByRole('slider',{name:'阅读进度',exact:true});await setReaderProgress(input, String(n));}
+async function readerButton(name){await page.mouse.move(1,450);await page.getByRole('button',{name,exact:true}).click();}
 try{
   await page.route('**/*',route=>new URL(route.request().url()).origin===web?route.continue():route.abort());
   await page.goto(web+'/tests/reader-fixture.html?auto=pipeline&long');
@@ -24,11 +25,12 @@ try{
     const [comic]=await catalog.list('comics');saveReadingView(readingViewKey(comic.id),{...readingViewDefaults(),fit:'width'});
   });
   await page.locator('article.nc-book').filter({has:page.getByRole('button',{name:'打开漫画 自动翻译 · pipeline',exact:true})}).getByRole('button',{name:/^打开漫画 /}).click();
-  await page.getByRole('button',{name:'翻译',exact:true}).click();
+  await readerButton('翻译');
   await page.waitForFunction(()=>window.readerFixture.submitted.length===4);
   await page.waitForFunction(()=>window.readerFixture.requests.includes('/v1/translations/events'));
   let state=await snapshot();assert.deepEqual(state.submitted,[0,1,2,3]);
-  assert.equal(state.requests.filter(p=>p==='/v1/translations/events').length,1,'current and prefetch pages share their first SSE connection');
+  await page.waitForFunction(()=>window.readerFixture.eventStreams.ids.length===4);
+  assert.equal(await page.evaluate(()=>window.readerFixture.eventStreams.maxActive),1,'new UUIDs reconnect a single active stream without waiting for the full batch');
   assert(state.translations.slice(0,4).every(item=>!('priority' in item.body)),'reading order is local scheduling, not a server priority field');
   assert(state.translations.every(item=>/^[a-f0-9-]{36}$/.test(item.id)&&!('page_key' in item.body)&&!('session_id' in item.body)));
   assert(state.translations.every(item=>!('comic_title' in item.body)),'translation requests must not include work-title context');
@@ -48,18 +50,18 @@ try{
     await page.locator('.nc-reading-viewport').evaluate((v,top)=>{v.scrollTop=top;},metrics.top+threshold+3);
     await page.waitForFunction(n=>window.readerFixture.submitted.includes(n),current+3);
     assert(Date.now()-started<1000,'threshold refill should not wait for previous translations');
-    assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),String(current));
+    assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),String(current));
     await page.waitForTimeout(300);const rolling=await snapshot();
     assert.equal(rolling.submitted.filter(n=>n===current+3).length,1);assert(!rolling.submitted.includes(current+4));
   }
   await page.screenshot({path:path.join(out,'rolling-prefetch.png')});
   check('one-third progress on pages 1 and 2 admits pages 5 and 6 within one second, without moving the current page or waiting for earlier jobs');
-  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await readerButton('阅读设置');
   await page.getByRole('button',{name:'适应窗口',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const started=Date.now();await jump(10);await page.waitForFunction(()=>window.readerFixture.submitted.includes(9));
   assert(Date.now()-started<1000);await page.waitForFunction(()=>window.readerFixture.submitted.includes(13));
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'10');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'10');
   check('a fit-to-window short page admits its extra slot before scrolling, while a direct jump still starts the current page within one second');
   await page.evaluate(()=>window.readerFixture.unknown=true);await jump(14);
   await page.waitForFunction(()=>!window.readerFixture.unknown&&window.readerFixture.requests.includes('/v1/translations'));
@@ -88,7 +90,7 @@ try{
   assert.deepEqual(errors,[]);
   check('idle reading reuses SSE for 22 seconds with zero repeated HTTP reads, including ten focus events');
   await jump(1);
-  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await readerButton('阅读设置');
   await page.getByRole('button',{name:'单页',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
   const nextJob=await page.evaluate(()=>window.readerFixture.finishNext());assert(nextJob);
@@ -96,7 +98,7 @@ try{
   await page.waitForFunction(()=>window.readerFixture.downloadedAt>=window.readerFixture.completedAt);
   await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').waitFor();
   assert.deepEqual(await page.locator('.nc-page-image[data-result-job]:not([data-result-job="original"])').first().evaluate(image=>[image.naturalWidth,image.naturalHeight]),[640,900]);
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   const resultPath=`/v1/translations/${nextJob}/result`;
   await page.waitForFunction(path=>window.readerFixture.requests.includes(path),resultPath);
   await page.waitForFunction(async id=>{
@@ -108,7 +110,7 @@ try{
     return !!jobs[0]&&await translationCache.has(resultBlobKey(scope,jobs[0]));
   },nextJob);
   assert.equal(await page.locator(`.nc-page-image[data-result-job="${nextJob}"]`).count(),0);
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   assert.equal((await snapshot()).requests.filter(path=>path===resultPath).length,1);
   check('single-page reader downloads, composes and persistently caches the completed offscreen page before navigation');
   const firstJob=await page.locator('.nc-page-image').first().getAttribute('data-result-job');
@@ -118,7 +120,7 @@ try{
   await page.screenshot({path:path.join(out,'prefetched-result.png')});
   await jump(1);await page.locator(`.nc-page-image[data-result-job="${firstJob}"]`).waitFor();
   await page.screenshot({path:path.join(out,'reading.png')});
-  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await readerButton('阅读设置');
   await page.getByRole('button',{name:'连续',exact:true}).click();
   await page.getByRole('button',{name:'铺满宽度',exact:true}).click();
   await page.getByRole('button',{name:'关闭面板',exact:true}).click();
@@ -128,17 +130,18 @@ try{
   const resultId=await page.locator('.nc-page-image').first().getAttribute('data-result-job');
   const submittedBeforeSwitch=(await snapshot()).translations.length;
   assert(top>100);assert(resultId&&resultId!=='original');
-  await page.getByRole('button',{name:'原图',exact:true}).click();
+  await readerButton('原图');
   await page.waitForFunction(()=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')==='original');
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
-  await page.getByRole('button',{name:'翻译',exact:true}).click();
+  await readerButton('翻译');
   await page.waitForFunction(id=>document.querySelector('.nc-page-image')?.getAttribute('data-result-job')===id,resultId);
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   assert(Math.abs(await page.locator('.nc-reading-viewport').evaluate(node=>node.scrollTop)-top)<1);
   state=await snapshot();assert.equal(state.translations.length,submittedBeforeSwitch);
   assert(!state.requests.some(p=>p.startsWith('/v1/comic-titles/')),'body translation must not query the title translation service');
   assert.deepEqual(errors,[]);
+  assert.equal(await page.evaluate(()=>window.readerFixture.eventStreams.maxActive),1);
   check('original and translated views preserve a nonzero in-page reading position without resubmission');
   await page.screenshot({path:path.join(out,'switched-position.png')});
   assert(!state.requests.some(p=>p.startsWith('/v1/images/')&&p.endsWith('/access')));

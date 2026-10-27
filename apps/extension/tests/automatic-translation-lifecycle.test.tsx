@@ -10,9 +10,11 @@ import {setTranslationCacheLimitMb,translationCache} from '../src/storage/transl
 import {loadResultBlob,readMaterializedResult,resultBlobKey,validateMaterializedResult} from '../src/storage/translations/results';
 import {needsTranslation} from '../src/translation/automatic';
 import type {ChannelConnection,RuntimeOptions,TranslationScope} from '../src/translation/channels/contracts';
+import {TranslationCoordinator} from '../src/translation/channels/adapters/nodelane/coordinator';
+import type {PreparedInput} from '../src/translation/input/prepare';
 import {useAutomaticTranslation} from '../src/translation/useAutomaticTranslation';
-import type {Job,ReadingEntry} from '../src/types';
-import {job,target} from './translation-fixture';
+import type {Job,ReadingEntry,TranslationBatch} from '../src/types';
+import {fixture as coordinatorFixture,job,originalInput,snapshot,target} from './translation-fixture';
 
 type Action=()=>void;
 interface EffectSlot {deps?:DependencyList;cleanup?:Action}
@@ -257,5 +259,111 @@ describe('automatic translation result prefetch',()=>{
       expect(await translationCache.has(f.key(1))).toBe(false);
       expect(await(await readMaterializedResult(f.key(1))).text()).toBe('complete translation');expect(f.download).toHaveBeenCalledOnce();
     }finally{await setTranslationCacheLimitMb(budget===Infinity?-1:budget/1024**2);}
+  });
+});
+
+/** Exercise real persisted intents and SSE scheduling together, including overlapping warmup ticks. */
+async function schedulingFixture(prepare:(page:number,signal?:AbortSignal)=>Promise<PreparedInput>,indexes=[0,1,2,3]){
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance','Date']});
+  const f=coordinatorFixture(),connection=channelFixture({key:f.core.scope}),frame=new Frame();
+  const streams=new Set<{ids:string[];deliver:(batch:TranslationBatch|undefined)=>void}>();
+  vi.mocked(f.api.translationEvents).mockImplementation(async function*(ids,signal){
+    const stream={ids,deliver:(_batch:TranslationBatch|undefined)=>{}};streams.add(stream);
+    try{while(!signal.aborted){
+      const event=Promise.withResolvers<TranslationBatch|undefined>();stream.deliver=event.resolve;
+      const abort=()=>event.resolve(undefined);signal.addEventListener('abort',abort,{once:true});
+      const batch=await event.promise;signal.removeEventListener('abort',abort);
+      if(!batch)return;yield batch;
+    }}finally{streams.delete(stream);}
+  });
+  const preparation=vi.fn(prepare);let core!:TranslationCoordinator,options!:RuntimeOptions,submit!:ReturnType<typeof vi.spyOn>;
+  connection.channel.createRuntime=value=>{
+    options=value;f.api.isCurrent=value.isCurrent;
+    core=new TranslationCoordinator({api:f.api,userId:f.userId,language:value.language,getBlob:value.getBlob,rights:()=>f.rights,onJobs:value.onJobs,onChange:value.onChange,
+      prepareInput:(target,_current,_limits,signal)=>preparation(Number(target.page.id.replace('page-','')),signal)});
+    submit=vi.spyOn(core,'submit');
+    return {init:()=>core.init(),restore:targets=>core.restore(targets),submit:(...args)=>core.submit(...args),manual:target=>core.manual(target),wait:signal=>core.wait(signal),
+      get hasPending(){return core.hasPending;},get waitingIds(){return core.waitingIds;},get retryDelay(){return core.retryDelay;},stateFor:()=>undefined,refresh:async()=>{},dispose:()=>core.stopWatching()};
+  };
+  let copy:ReadingEntry={id:'book',contentId:'content',title:'Scheduling',source:'local',sourceKey:'fixture',generation:1,createdAt:0,updatedAt:0,pageId:'page-0',relativeOffset:0,discoveryComplete:true,
+    pages:Array.from({length:8},(_,n)=>target(n).page)};
+  let translation!:ReturnType<typeof useAutomaticTranslation>,mounted=true,renders=0;
+  const update=(next:ReadingEntry)=>{copy=next;frame.dirty=true;};
+  const render=()=>{renders++;translation=frame.render(()=>useAutomaticTranslation({channel:connection.channel,copies:[copy],updateEntry:update,language:'en',currentId:copy.id}));frame.cleanup();frame.create();};
+  const settle=async()=>{for(let i=0;i<60;i++){await nextTurn();if(mounted&&frame.dirty)render();}};
+  const advance=async(ms:number)=>{await vi.advanceTimersByTimeAsync(ms);await settle();await vi.advanceTimersByTimeAsync(0);await settle();};
+  const window=(indexes:number[],visible=copy.pages)=>translation.onReadingWindow(indexes.map(n=>({entryId:copy.id,page:copy.pages[n],mode:'classic'})),visible);
+  const unmount=()=>{if(mounted){mounted=false;frame.unmount();}};unmounts.push(unmount);
+  const submitted=()=>f.submit.mock.calls.map(([,body])=>Number(copy.pages.find(page=>'image' in body&&page.imageSha256===body.image.sha256)!.id.replace('page-','')));
+  render();window(indexes);await settle();await advance(0);
+  return {...f,...connection,preparation,settle,advance,window,unmount,submitted,streams,get core(){return core;},get options(){return options;},get submissions(){return submit.mock.calls.length;},get renders(){return renders;},get copy(){return copy;}};
+}
+
+describe('automatic translation scheduling',()=>{
+  it('observes submitted pages while another source is slow or failed, then advances without waiting for the old window',async()=>{
+    const held=Promise.withResolvers<PreparedInput>();
+    const f=await schedulingFixture(async n=>{if(n===1)return held.promise;if(n===2)throw Error('Source unavailable');return originalInput(n);});
+    expect(f.submitted()).toEqual([0]);expect([...f.streams].some(stream=>stream.ids.includes(f.submit.mock.calls[0][0]))).toBe(true);
+    await f.advance(150);expect(f.submitted()).toEqual([0,3]);expect(f.copy.pages[2].translationError).toBe('Source unavailable');
+    const [id,body]=f.submit.mock.calls[0],stream=[...f.streams].find(stream=>stream.ids.includes(id))!;
+    stream.deliver({items:[snapshot(id,body,{state:'running'})],missing_ids:[]});await f.settle();
+    expect(f.copy.pages[0].jobs[0].status).toBe('running');
+    f.window([6]);await f.advance(80);expect(f.submitted()).toEqual([0,3,6]);
+    expect(f.preparation.mock.calls.find(([n])=>n===1)![1]?.aborted).toBe(true);
+    held.resolve(originalInput(1));await f.settle();expect(f.submitted()).toEqual([0,3,6]);
+    expect([...f.streams].every(stream=>stream.ids.includes(f.submit.mock.calls.at(-1)![0]))).toBe(true);
+  });
+
+  it('expires warmup while the first page is slow, coalesces its preparation and never admits a sixth target',async()=>{
+    const held=Promise.withResolvers<PreparedInput>(),f=await schedulingFixture(async n=>n===0?held.promise:originalInput(n),[0,1,2,3,4,5]);
+    expect(f.submitted()).toEqual([]);await f.advance(150);
+    expect(f.submitted()).toEqual([1,2,3,4]);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4]);
+    held.resolve(originalInput(0));await f.settle();expect(f.submitted()).toEqual([1,2,3,4,0]);
+    expect(f.copy.pages[5].jobs).toEqual([]);expect(f.copy.pages[6].jobs).toEqual([]);
+  });
+
+  it('stays idle after admission instead of resubmitting on coordinator notifications',async()=>{
+    const f=await schedulingFixture(async n=>originalInput(n));await f.advance(150);
+    expect(f.submitted()).toEqual([0,1,2,3]);const count=f.submissions,requests=f.submit.mock.calls.length,renders=f.renders;
+    await f.advance(5000);expect(f.submissions).toBe(count);expect(f.renders).toBe(renders);
+    for(let i=0;i<10;i++)f.options.onChange();await f.advance(0);
+    expect(f.submissions).toBe(count);expect(f.submit).toHaveBeenCalledTimes(requests);expect(f.streams.size).toBe(1);
+  });
+
+  it('does not cancel preparation or reconnect SSE when only display resources change',async()=>{
+    const held=Promise.withResolvers<PreparedInput>(),f=await schedulingFixture(async n=>n===1?held.promise:originalInput(n));
+    await f.advance(150);const signal=f.preparation.mock.calls.find(([n])=>n===1)![1],streams=[...f.streams];
+    f.window([0,1,2,3],[{...f.copy.pages[0],blobKey:'new-display-reference'}]);await f.advance(0);
+    expect(signal?.aborted).toBe(false);expect([...f.streams]).toEqual(streams);
+    expect(f.preparation.mock.calls.filter(([n])=>n===1)).toHaveLength(1);
+    held.resolve(originalInput(1));await f.settle();expect(f.submitted()).toEqual([0,2,3,1]);
+  });
+
+  it('recovers the same UUID after leaving a window during admission without blocking the next page',async()=>{
+    const f=await schedulingFixture(async n=>originalInput(n),[0]),held=Promise.withResolvers<ReturnType<typeof snapshot>>();
+    f.submit.mockImplementationOnce(()=>held.promise);
+    f.window([5]);await f.advance(80);const [id,body,signal]=f.submit.mock.calls.at(-1)!;
+    expect(f.submitted()).toEqual([0,5]);
+    f.window([6]);await f.advance(80);expect(signal?.aborted).toBe(true);expect(f.submitted()).toEqual([0,5,6]);
+    const accepted=snapshot(id,body,{state:'running'});held.resolve(accepted);await f.settle();
+    vi.mocked(f.api.translations).mockImplementation(async ids=>({items:ids.includes(id)?[accepted]:[],missing_ids:ids.filter(value=>value!==id),unchanged:false as const,etag:'"recovered"'}));
+    f.window([5]);await f.advance(2001);
+    expect(f.copy.pages[5].jobs[0]).toMatchObject({id,status:'running'});
+    expect(f.submit.mock.calls.filter(([value])=>value===id)).toHaveLength(1);
+  });
+
+  it.each(['hidden','offline','unmount'])('releases preparation on %s and ignores late bytes',async reason=>{
+    const held=Promise.withResolvers<PreparedInput>(),f=await schedulingFixture(async n=>n===0?held.promise:originalInput(n));
+    if(reason==='hidden'){(document as unknown as Visibility).hidden=true;document.dispatchEvent(new Event('visibilitychange'));}
+    else if(reason==='offline'){f.channel.requiresInternet=true;vi.stubGlobal('navigator',{onLine:false});window.dispatchEvent(new Event('offline'));}
+    else f.unmount();
+    expect(f.preparation.mock.calls[0][1]?.aborted).toBe(true);
+    if(reason!=='unmount'){
+      f.window([6]);
+      if(reason==='hidden'){(document as unknown as Visibility).hidden=false;document.dispatchEvent(new Event('visibilitychange'));}
+      else{vi.stubGlobal('navigator',{onLine:true});window.dispatchEvent(new Event('online'));}
+      await f.advance(80);expect(f.submitted()).toEqual([6]);
+    }
+    held.resolve(originalInput(0));await f.settle();expect(f.submitted()).toEqual(reason==='unmount'?[]:[6]);
   });
 });

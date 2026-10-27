@@ -30,7 +30,7 @@ describe('model selection',()=>{
     const core=new TranslationCoordinator({...f.core.options,modelId:'b'});
     await core.submit([page]);
     expect(f.api.translations).toHaveBeenCalledWith([original.requestId],expect.anything());
-    expect(f.submit).toHaveBeenCalledWith(original.requestId,original.request);
+    expect(f.submit).toHaveBeenCalledWith(original.requestId,original.request,undefined);
     expect(await readOperation(operationId(core.scope,'zh-Hans',page,'b'))).toBeUndefined();
   });
   it('keeps completed results and only changes model on explicit regeneration',async()=>{

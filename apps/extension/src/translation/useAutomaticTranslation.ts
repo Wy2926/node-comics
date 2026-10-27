@@ -5,7 +5,7 @@ import {msg} from '../i18n/runtime';
 import {supportsLanguage,type Job,type Mode,type Page,type ReadingEntry} from '../types';
 import {mergeJobs} from '../reader/jobs';
 import {latestResults,pageTranslation} from '../reader/presentation';
-import {assertCurrent} from '../concurrency';
+import {abortable,assertCurrent} from '../concurrency';
 import {resultBlobKey,registerResultReader,assertResult} from '../storage/translations/results';
 import {applyChannelJobs} from './sync';
 import type {ChannelConnection,ChannelRuntime} from './channels/contracts';
@@ -21,7 +21,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   const [,render]=useState(0),[error,setError]=useState('');
   const copyRef=useRef(copies);copyRef.current=copies;
   const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode))),visible=useRef<Page[]>([]);
-  const runtime=useRef<ChannelRuntime|undefined>(undefined),wake=useRef<()=>void>(()=>{}),stamp=useRef(0);
+  const runtime=useRef<ChannelRuntime|undefined>(undefined),wake=useRef<(windowChanged?:boolean)=>void>(()=>{}),stamp=useRef(0);
   const resultReaders=useRef(new Map<string,()=>void>());
   const commit=useCallback((copy:ReadingEntry)=>{copyRef.current=copyRef.current.map(c=>c.id===copy.id?copy:c);updateEntry(copy);},[updateEntry]);
   const attach=useCallback(async(incoming:Job[])=>{
@@ -61,9 +61,9 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   useEffect(()=>{
     setError('');
     if(!channel?.available)return;
-    let stopped=false,running=false,wakePending=false,watching=false,pendingPrefetch=false,retry=0,watchedWindow='',submittedWindow='';
+    let stopped=false,watching=false,retry=0,tickVersion=0,scheduledAt=0;
     let watchedIds=new Set<string>();
-    let timer:ReturnType<typeof setTimeout>|undefined,watchController=new AbortController();
+    let timer:ReturnType<typeof setTimeout>|undefined,watchController=new AbortController(),submitController=new AbortController();
     const live=()=>!stopped&&channel.isCurrent();
     const online=()=>!channel.requiresInternet||navigator.onLine!==false;
     const resultPrefetch=new TranslationResultPrefetch();
@@ -76,7 +76,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
         return resultReaders.current.has(key)?[key]:[];
       }):[]);
     }
-    const core=channel.createRuntime({language,getBlob:readImage,readOriginal:ref=>acquirePage({...ref,purpose:'translation'}),isCurrent:live,onJobs:attach,onChange:()=>{if(live()){render(n=>n+1);wake.current();}}});
+    const core=channel.createRuntime({language,getBlob:readImage,readOriginal:ref=>acquirePage({...ref,purpose:'translation'}),isCurrent:live,onJobs:attach,onChange:()=>{if(live()){render(n=>n+1);void prepareResults();syncWatch();if(core.retryDelay>0)schedule(core.retryDelay);}}});
     runtime.current=core;
     async function prepareResults(){
       prefetchResults();
@@ -96,24 +96,33 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
         try{await prepareResult(job,current);if(current())prefetchResults();}catch(e){if(current())for(const copy of copyRef.current){if(copy.pages.some(p=>p.jobs.some(j=>j.id===job.id)))commit({...copy,pages:copy.pages.map(p=>p.jobs.some(j=>j.id===job.id)?{...p,translationError:(e as Error).message}:p)});}}
       }));
     }
-    const schedule=(delay=0)=>{clearTimeout(timer);if(live()&&!document.hidden&&online())timer=setTimeout(()=>void tick(),Math.max(0,delay));};
+    const schedule=(delay=0)=>{
+      if(!live()||document.hidden||!online())return;
+      const at=performance.now()+Math.max(0,delay);if(timer!==undefined&&scheduledAt<=at)return;
+      clearTimeout(timer);scheduledAt=at;timer=setTimeout(()=>{timer=undefined;void tick();},Math.max(0,delay));
+    };
     async function tick(){
-      if(running){wakePending=true;return;}if(!live()||document.hidden||!online())return;
-      running=true;wakePending=false;
+      if(!live()||document.hidden||!online())return;
+      const version=++tickVersion,signal=submitController.signal;
       try{
         const window=windowRef.current,now=performance.now();
         if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
         const targets=window.ready().map(t=>({...t,page:copyRef.current.find(c=>c.id===t.entryId)?.pages.find(p=>p.id===t.page.id)??t.page}));
-        const generation=stamp.current,caps=channel!.capabilities,signature=JSON.stringify(window.targets.map(t=>[t.entryId,t.page.id,t.mode]));
-        pendingPrefetch=targets.length<window.targets.length;
-        await core.submit(targets.filter(t=>caps.modes.some(m=>m.id===t.mode&&m.enabled)&&supportsLanguage(caps,t.mode,language)),()=>live()&&!document.hidden&&generation===stamp.current);
-        if(generation===stamp.current)submittedWindow=signature;
+        const caps=channel!.capabilities;
+        // Warmup must expire even while the first page is still reading its source.
+        if(window.delay()>0)schedule(window.delay());
+        await abortable(core.submit(targets.filter(t=>caps.modes.some(m=>m.id===t.mode&&m.enabled)&&supportsLanguage(caps,t.mode,language)),()=>live()&&!document.hidden&&!signal.aborted,signal),signal);
+        if(version!==tickVersion||signal.aborted)return;
         setError('');retry=0;void prepareResults();
-      }catch(e){if(live()){setError((e as Error).message);retry=Math.min(30000,Math.max(1000,retry*2));}}
-      finally{running=false;if(live()){void watch();const delay=windowRef.current.prefetchAt-performance.now();if(wakePending)schedule();else if(pendingPrefetch||delay>0)schedule(Math.max(0,delay));else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
+      }catch(e){if(live()&&!signal.aborted&&version===tickVersion){setError((e as Error).message);retry=Math.min(30000,Math.max(1000,retry*2));}}
+      finally{if(live()&&!signal.aborted&&version===tickVersion){syncWatch();const delay=windowRef.current.delay();if(delay>0)schedule(delay);else if(core.retryDelay>0)schedule(core.retryDelay);else if(retry)schedule(retry);}}
+    }
+    function syncWatch(){
+      if(core.waitingIds.some(id=>!watchedIds.has(id))){watchedIds=new Set(core.waitingIds);watchController.abort();watchController=new AbortController();}
+      void watch();
     }
     async function watch(){
-      if(running||watching||pendingPrefetch||submittedWindow!==watchedWindow||document.hidden||!live()||!windowRef.current.targets.length||!core.hasPending||!online())return;
+      if(watching||document.hidden||!live()||!windowRef.current.targets.length||!core.hasPending||!online())return;
       watching=true;const signal=watchController.signal;let failures=0;
       try{while(live()&&!document.hidden&&windowRef.current.targets.length&&!signal.aborted){
         try{const waiting=await core.wait(signal);failures=0;if(!live()||signal.aborted)return;void prepareResults();if(!waiting||!core.hasPending)break;}
@@ -122,24 +131,25 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     }
     async function foreground(){
       if(!live())return;
-      if(document.hidden||!online()){resultPrefetch.dispose();watchController.abort();clearTimeout(timer);return;}
-      if(watchController.signal.aborted)watchController=new AbortController();schedule();void watch();
+      if(document.hidden||!online()){resultPrefetch.dispose();submitController.abort();watchController.abort();clearTimeout(timer);timer=undefined;return;}
+      if(watchController.signal.aborted)watchController=new AbortController();if(submitController.signal.aborted)submitController=new AbortController();schedule();void watch();
       try{await core.refresh();if(live()){render(n=>n+1);schedule();}}catch{/* The runtime reports connection errors per image. */}
     }
-    wake.current=()=>{
-      const key=JSON.stringify(windowRef.current.targets.map(t=>[t.entryId,t.page.id,t.mode]));
-      if(key!==watchedWindow||core.waitingIds.some(id=>!watchedIds.has(id))){watchedWindow=key;submittedWindow='';watchedIds=new Set(core.waitingIds);watchController.abort();watchController=new AbortController();}
-      void prepareResults();schedule();if(!windowRef.current.targets.length){watchController.abort();return;}
-      if(watchController.signal.aborted)watchController=new AbortController();void watch();
+    wake.current=(windowChanged=true)=>{
+      if(windowChanged){
+        tickVersion++;submitController.abort();submitController=new AbortController();
+        watchedIds.clear();watchController.abort();watchController=new AbortController();
+      }
+      void prepareResults();schedule();
     };
     document.addEventListener('visibilitychange',foreground);window.addEventListener('online',foreground);window.addEventListener('offline',foreground);window.addEventListener('focus',foreground);
     void core.init().then(()=>{if(live()){render(n=>n+1);void prepareResults();schedule();void watch();}}).catch(e=>{if(live())setError(e.message);});
-    return()=>{stopped=true;resultPrefetch.dispose();watchController.abort();clearTimeout(timer);core.dispose();wake.current=()=>{};runtime.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('offline',foreground);window.removeEventListener('focus',foreground);};
+    return()=>{stopped=true;resultPrefetch.dispose();submitController.abort();watchController.abort();clearTimeout(timer);core.dispose();wake.current=()=>{};runtime.current=undefined;document.removeEventListener('visibilitychange',foreground);window.removeEventListener('online',foreground);window.removeEventListener('offline',foreground);window.removeEventListener('focus',foreground);};
   },[channel,language,attach,commit,prepareResult]);
   useEffect(()=>{if(!channel)return;for(const copy of copies){const changed=applyChannelJobs(copy,jobs.current,channel.scope);if(changed!==copy)commit(changed);}},[copies,channel,commit]);
   const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[],immediate=false)=>{
     const changed=windowRef.current.update(targets,performance.now(),immediate),imagesChanged=JSON.stringify(visible.current.map(p=>[p.id,p.blobKey]))!==JSON.stringify(visiblePages.map(p=>[p.id,p.blobKey]));
-    visible.current=visiblePages;if(changed||imagesChanged){stamp.current++;render(n=>n+1);wake.current();}
+    visible.current=visiblePages;if(changed||imagesChanged){stamp.current++;render(n=>n+1);wake.current(changed);}
   },[]);
   const retry=useCallback(async(entryId:string,page:Page,mode:Mode)=>{
     if(!channel?.available||!runtime.current)throw Error(channel?.unavailable?.message??msg('正在连接翻译服务'));

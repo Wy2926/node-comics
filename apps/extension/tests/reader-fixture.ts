@@ -36,6 +36,7 @@ for(const copy of stored)for(const page of copy.pages)for(const job of page.jobs
 
 const state={legacyFonts:!fontsScenario,modelPaid:paid,legacyModels:!parameters.has('models'),ordinals,imageOrdinals,enhancements:[] as {sha256:string;bytes:number;width:number;height:number}[],enhancementFail:false,get jobs(){return [...jobs.values()];},rateBlockedUntil:0,translationRequests:[] as {id:string;body:TranslationInput}[],completedAt:0,downloadedAt:0,finishNext(status:'succeeded'|'no_text'|'unchanged'='succeeded'){const next=[...jobs.values()].find(j=>['running','queued'].includes(j.status));if(next){next.status=status==='unchanged'?'succeeded':status;if(status==='unchanged')next.delivery={kind:'translated',representation:'original',normalization_version:1,input_sha256:next.image_sha256!,width:640,height};state.completedAt=performance.now();}return next?.id;},submitted:[] as number[],requests:[] as string[],delay:0,unknown:false,price:1,failNext:false,offline:new URLSearchParams(location.search).has('offline'),failDownloads:false};
 Object.assign(window,{readerFixture:state});
+const eventStreams={active:0,maxActive:0,ids:[] as string[]};Object.assign(state,{eventStreams});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 window.fetch=async(input,init={})=>{
   const url=new URL(String(input),origin);if(url.origin!==origin&&url.origin!==location.origin)throw Error('External requests disabled in this fixture.');
@@ -69,8 +70,9 @@ window.fetch=async(input,init={})=>{
   if(url.pathname==='/v1/translations/events'){
     const ids=(url.searchParams.get('ids')??'').split(',');let timer:ReturnType<typeof setInterval>|undefined,close=()=>{};
     const stream=new ReadableStream<Uint8Array>({start(controller){
+      eventStreams.active++;eventStreams.maxActive=Math.max(eventStreams.maxActive,eventStreams.active);eventStreams.ids=ids;
       let old='',closed=false;const encoder=new TextEncoder();
-      close=()=>{if(closed)return;closed=true;clearInterval(timer);init.signal?.removeEventListener('abort',close);controller.close();};
+      close=()=>{if(closed)return;closed=true;eventStreams.active--;clearInterval(timer);init.signal?.removeEventListener('abort',close);controller.close();};
       const update=()=>{
         const items=ids.map(snapshot).filter((item):item is TranslationSnapshot=>!!item),data=JSON.stringify({items,missing_ids:ids.filter(id=>!snapshot(id))});
         if(data!==old){old=data;controller.enqueue(encoder.encode('event: snapshot\ndata: '+data+'\n\n'));}

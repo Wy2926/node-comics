@@ -28,14 +28,16 @@ describe('translation result prefetch',()=>{
     prefetch.dispose();
   });
 
-  it('cancels obsolete work and waits for its cleanup before starting the latest window',async()=>{
+  it('starts the latest window even if an obsolete reader has not settled after cancellation',async()=>{
     const first=Promise.withResolvers<Blob>(),read=vi.fn(async(_key:string,_signal?:AbortSignal)=>new Blob(['result']));
     read.mockImplementationOnce(()=>first.promise);
     const prefetch=new TranslationResultPrefetch(read);
     prefetch.update(['a','b']);prefetch.update(['c','d']);
     expect(read.mock.calls[0][1]?.aborted).toBe(true);expect(read).toHaveBeenCalledOnce();
-    first.reject(new DOMException('Aborted','AbortError'));await flush();
+    await flush();
     expect(read.mock.calls.map(([key])=>key)).toEqual(['a','c','d']);
+    first.reject(new DOMException('Aborted','AbortError'));await flush();
+    expect(read).toHaveBeenCalledTimes(3);
     prefetch.dispose();
   });
 

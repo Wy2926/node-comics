@@ -147,7 +147,7 @@ describe('NodeLane channel boundary',()=>{
     expect(caps).not.toHaveBeenCalled();expect(connection.fontSelection!.value('zh-Hans')).toBeUndefined();
     await runtime.submit([target(0)]);
     const expected=stored==='lxgw-wenkai'?stored:defaultTranslationFont('zh-Hans')!.id;
-    expect(submit).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({font_id:expected}));
+    expect(submit).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({font_id:expected}),undefined);
     expect(connection.fontSelection!.value('zh-Hans')).toBe(expected);connection.dispose();
   });
   it('omits font_id when an older service exposes no font capability',async()=>{

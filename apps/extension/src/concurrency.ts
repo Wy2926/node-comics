@@ -10,6 +10,16 @@ export class StaleOperation extends Error {
 }
 export function assertCurrent(current: () => boolean) { if (!current()) throw new StaleOperation(); }
 
+/** Stop this wait promptly; the owner must also pass the signal to cancellable I/O. */
+export function abortable<T>(work:Promise<T>,signal?:AbortSignal):Promise<T>{
+  if(!signal)return work;
+  return new Promise<T>((resolve,reject)=>{
+    const abort=()=>reject(signal.reason);
+    if(signal.aborted)abort();else signal.addEventListener('abort',abort,{once:true});
+    work.then(resolve,reject).finally(()=>signal.removeEventListener('abort',abort));
+  });
+}
+
 /** FIFO pool used by uploads, control requests and thumbnail work. Downloads bypass it. */
 export class RequestPool {
   private active = 0;

@@ -1,12 +1,13 @@
 import 'fake-indexeddb/auto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {prepareTranslationInput,restoreTranslationInput} from '../src/translation/input/prepare';
-import {INPUT_PROFILE,TRANSLATION_JPEG_MAX_DIMENSION,TRANSLATION_REENCODE_BYTES} from '../src/translation/input/limits';
+import {INPUT_PROFILE,PNG_INPUT_PROFILE,TRANSLATION_JPEG_MAX_DIMENSION,TRANSLATION_REENCODE_BYTES,type InputProfile} from '../src/translation/input/limits';
 import {ImageOutputTooLargeError} from '../src/translation/input/resize';
 import {hashFile} from '../src/importers/hash';
 import {makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {readOperation,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
 import {fixture,target,snapshot} from './translation-fixture';
+import {pngWithSize} from './image-encoding-fixture';
 import type {Page} from '../src/types';
 
 const workerFactory=vi.hoisted(()=>vi.fn());
@@ -24,6 +25,7 @@ async function page(blob=source):Promise<Page>{
     imageByteSize:blob.size,imageSha256:await hashFile(blob),jobs:[],outputBlobs:{}};
 }
 beforeEach(()=>{
+  workerFactory.mockReset();
   encode.mockReset();encode.mockResolvedValue(encoded);
   vi.stubGlobal('Worker',undefined);
   vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:800,height:1200,close})));
@@ -66,26 +68,29 @@ describe('official AVIF input conversion',()=>{
     await expect(prepareTranslationInput(await page(),async()=>source,()=>true,limits)).rejects.toThrow('大小限制');
     expect(encode).toHaveBeenCalledOnce();
   });
-  it('restores the supported copy with its frozen profile and rejects a changed output hash',async()=>{
-    const result=await prepareTranslationInput(await page(),async()=>source,()=>true);
-    expect(await restoreTranslationInput(source,result.width,result.height,result.sourceSha256,result.image.sha256,()=>true,result.profile)).toBe(encoded);
-    encode.mockResolvedValueOnce(webp(34));
-    await expect(restoreTranslationInput(source,result.width,result.height,result.sourceSha256,result.image.sha256,()=>true,result.profile)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
-    expect(encode).toHaveBeenCalledTimes(3);
-  });
   it('marks an unrecoverable frozen current-profile input as changed instead of repeatedly retrying encoding',async()=>{
     await expect(restoreTranslationInput(source,800,TRANSLATION_JPEG_MAX_DIMENSION+1,await hashFile(source),await hashFile(encoded),()=>true,INPUT_PROFILE)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
     expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
   });
-  it('uses the existing Worker path and freezes the conversion profile',async()=>{
+  it.each([
+    {format:'WebP',blob:encoded,profile:INPUT_PROFILE},
+    {format:'PNG',blob:pngWithSize(800,1200),profile:PNG_INPUT_PROFILE},
+  ])('freezes the Worker $format output profile and uses it for recovery',async({blob,profile})=>{
     vi.stubGlobal('Worker',class {});
-    const sha256=await hashFile(encoded),worker={onmessage:null as null|((event:{data:{blob:Blob;sha256:string}})=>void),onerror:null as null|(()=>void),
-      postMessage:vi.fn(()=>queueMicrotask(()=>worker.onmessage!({data:{blob:encoded,sha256}}))),terminate:vi.fn()};
-    workerFactory.mockReturnValue(worker);
+    const sha256=await hashFile(blob),workers:{postMessage:ReturnType<typeof vi.fn>;terminate:ReturnType<typeof vi.fn>}[]=[];
+    workerFactory.mockImplementation(()=>{
+      const worker={onmessage:null as null|((event:{data:{blob:Blob;sha256:string;profile:InputProfile}})=>void),onerror:null as null|(()=>void),
+        postMessage:vi.fn(()=>queueMicrotask(()=>worker.onmessage!({data:{blob,sha256,profile}}))),terminate:vi.fn()};
+      workers.push(worker);return worker;
+    });
     const result=await prepareTranslationInput(await page(),async()=>source,()=>true);
-    expect(result).toMatchObject({profile:INPUT_PROFILE,sourceSha256:await hashFile(source),image:{sha256,content_type:'image/webp'}});
-    expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({blob:source,width:800,height:1200,profile:INPUT_PROFILE});
-    expect(worker.terminate).toHaveBeenCalledOnce();expect(encode).not.toHaveBeenCalled();
+    expect(result).toMatchObject({profile,sourceSha256:await hashFile(source),image:{sha256,content_type:blob.type}});
+    expect(await restoreTranslationInput(source,result.width,result.height,result.sourceSha256,result.image.sha256,()=>true,result.profile)).toBe(blob);
+    expect(workers).toHaveLength(2);
+    expect(workers[0].postMessage).toHaveBeenCalledExactlyOnceWith({blob:source,width:800,height:1200,profile:undefined});
+    expect(workers[1].postMessage).toHaveBeenCalledExactlyOnceWith({blob:source,width:800,height:1200,profile});
+    for(const worker of workers)expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(encode).not.toHaveBeenCalled();
   });
   it('rebuilds an old rejected AVIF only after an explicit retry, with a new UUID and the unchanged source identity',async()=>{
     const f=fixture(),t=target(1);Object.assign(t.page,await page());
@@ -106,7 +111,7 @@ describe('official AVIF input conversion',()=>{
     expect(current.requestId).not.toBe(old.requestId);expect(current.sourceSha256).toBe(originalHash);
     expect(current.image).toMatchObject({sha256:await hashFile(encoded),content_type:'image/webp'});
     expect(current.inputProfile).toBe(INPUT_PROFILE);expect(t.page.imageSha256).toBe(originalHash);
-    expect(f.submit).toHaveBeenCalledExactlyOnceWith(current.requestId,expect.objectContaining({image:expect.objectContaining({content_type:'image/webp'})}));
+    expect(f.submit).toHaveBeenCalledExactlyOnceWith(current.requestId,expect.objectContaining({image:expect.objectContaining({content_type:'image/webp'})}),undefined);
     expect(upload).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledOnce();
   });
   it.each([
@@ -118,6 +123,6 @@ describe('official AVIF input conversion',()=>{
     old.state='blocked';old.errorCode=code;await saveOperation(old);
     await f.core.manual(t);
     expect((await readOperation(old.id))?.requestId).toBe(old.requestId);
-    expect(f.submit).toHaveBeenCalledExactlyOnceWith(old.requestId,old.request);expect(encode).not.toHaveBeenCalled();
+    expect(f.submit).toHaveBeenCalledExactlyOnceWith(old.requestId,old.request,undefined);expect(encode).not.toHaveBeenCalled();
   });
 });

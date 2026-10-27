@@ -2,7 +2,7 @@ import type {PageReference} from '../../../../comics/pages/identity';
 import {hashFile,Sha256} from '../../../../importers/hash';
 import {msg} from '../../../../i18n/runtime';
 import {Api,ApiError} from '../../../../api';
-import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
+import {abortable,assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
 import {pageTranslation} from '../../../../reader/presentation';
 import type {Capabilities,Entitlements,Job,TranslationSnapshot,TranslationBatch} from '../../../../types';
 import type {ReadingTarget} from '../../../automatic';
@@ -15,7 +15,7 @@ import {cacheInput} from '../../../input/cache';
 import {loadTranslationInput} from '../../../input/load';
 import {translationSize} from '../../../input/limits';
 
-interface Options {api:Api;userId:string;language:string;modelId?:string;fontId?:string;canSubmit?:(target:ReadingTarget)=>boolean;onModelRejected?:()=>Promise<void>;getBlob:(key:string)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;prepareInput?:(target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
+interface Options {api:Api;userId:string;language:string;modelId?:string;fontId?:string;canSubmit?:(target:ReadingTarget)=>boolean;onModelRejected?:()=>Promise<void>;getBlob:(key:string,signal?:AbortSignal)=>Promise<Blob|undefined>;readOriginal?:(ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;prepareInput?:(target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'],signal?:AbortSignal)=>Promise<PreparedInput>;limits?:()=>Capabilities['limits'];tiles?:()=>boolean;rights:()=>Entitlements|undefined;onJobs:(jobs:Job[])=>Promise<void>;onChange:()=>void;}
 const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!r.result&&['needs_input','queued','running','needs_attention'].includes(r.result.state);
 const policyKey=(rights:Entitlements|undefined)=>rights?new Sha256().update(new TextEncoder().encode(JSON.stringify(rights))).digest():undefined;
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
@@ -28,6 +28,7 @@ export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperati
 export class TranslationCoordinator {
   readonly scope:string;state:SyncState;records:LocalOperation[]=[];
   private initializing?:Promise<void>;private uploads=new Map<string,Promise<void>>();private uploadPool=new RequestPool(UPLOAD_CONCURRENCY);
+  private preparing=new Map<string,{promise:Promise<void>;signal?:AbortSignal}>();
   private wanted=new Set<string>();private refreshed=new Set<string>();
   private missingAdmission=false;
   private historyKey='';
@@ -36,13 +37,13 @@ export class TranslationCoordinator {
   private legacy:LegacyRequestGuard;
   constructor(readonly options:Options){this.scope=translationScope(new URL(options.api.base).origin,options.userId);this.state={id:this.scope};this.imageLimit=options.rights()?.image_rate_limit.limit;this.rightsKey=policyKey(options.rights());this.legacy=new LegacyRequestGuard(options.api,options.userId,options.language);}
   async init(){return this.initializing??=(async()=>{this.state=await readSync(this.scope)??this.state;})();}
-  private async createOperation(target:ReadingTarget,current:()=>boolean,action?:{retry_of:string}|{regenerate_of:string},previous?:LocalOperation){
+  private async createOperation(target:ReadingTarget,current:()=>boolean,action?:{retry_of:string}|{regenerate_of:string},previous?:LocalOperation,signal?:AbortSignal){
     // retry_of/regenerate_of inherit the server's frozen image, including requests made before resizing.
     const previousSize=previous?.result?.result??previous?.inputSize;
-    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previousSize?.width??target.page.width,height:previousSize?.height??target.page.height,profile:previous.inputProfile}:this.options.prepareInput?await this.options.prepareInput(target,current,this.options.limits?.()):await prepareTranslationInput(target.page,async()=>{
+    const prepared:PreparedInput=action&&previous?{image:previous.image,sourceSha256:previous.sourceSha256??previous.image.sha256,width:previousSize?.width??target.page.width,height:previousSize?.height??target.page.height,profile:previous.inputProfile}:this.options.prepareInput?await abortable(this.options.prepareInput(target,current,this.options.limits?.(),signal),signal):await prepareTranslationInput(target.page,async()=>{
       const ref=target.page.blobKey;
-      return ref?this.options.getBlob(ref):undefined;
-    },current,this.options.limits?.(),!!action||!!this.options.tiles?.());
+      return ref?this.options.getBlob(ref,signal):undefined;
+    },current,this.options.limits?.(),!!action||!!this.options.tiles?.(),signal);
     if(action&&previous&&target.page.imageSha256&&prepared.sourceSha256!==target.page.imageSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     if(!action&&Math.max(prepared.width,prepared.height)>16383){
       if(!this.options.tiles?.())throw new ApiError(msg('翻译服务暂不可用'),'RESULT_FORMAT_UNAVAILABLE',503);
@@ -150,42 +151,66 @@ export class TranslationCoordinator {
       if(!this.hasPending)this.stopWatching();return true;
     }catch(error){if(this.stream===stream)this.stopWatching();await this.backpressure(error);throw error;}
   }
-  private async recover(){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&r.result.state!=='succeeded'&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32));}
-  async submit(targets:ReadingTarget[],requestCurrent:(target:ReadingTarget)=>boolean=()=>true){
-    await this.init();const window=targets.slice(0,MAX_READING_TARGETS),previous=[...this.wanted].join(',');
+  private async recover(signal?:AbortSignal){if(this.controlDelay)return;const records=this.records.filter(r=>!this.uploads.has(r.requestId)&&(r.state==='uncertain'||r.result&&r.result.state!=='succeeded'&&!this.refreshed.has(r.requestId))&&this.recordDelay(r)<=0);for(let n=0;n<records.length;n+=32)await this.snapshots(records.slice(n,n+32),signal);}
+  async submit(targets:ReadingTarget[],requestCurrent:(target:ReadingTarget)=>boolean=()=>true,signal?:AbortSignal){
+    const current=(target:ReadingTarget)=>!signal?.aborted&&requestCurrent(target);
+    signal?.throwIfAborted();
+    await this.init();signal?.throwIfAborted();const window=targets.slice(0,MAX_READING_TARGETS);
     const ids=await Promise.all(window.map(async target=>(await this.pageOperation(target))?.id??operationId(this.scope,this.options.language,target,this.options.modelId,this.options.fontId)));
-    this.wanted=new Set(ids);if(previous!==[...this.wanted].join(','))this.options.onChange();this.state=await readSync(this.scope)??this.state;
+    const [state,records]=await Promise.all([readSync(this.scope),readOperations(ids)]);
+    signal?.throwIfAborted();
+    if(window.length&&window.every(target=>!current(target)))return;
+    const changed=[...this.wanted].join(',')!==ids.join(',');
+    this.wanted=new Set(ids);this.state=state??this.state;
     for(const record of this.records)if(!this.wanted.has(record.id)){this.refreshed.delete(record.requestId);this.monotonic.delete('retry:'+record.requestId);}
-    this.records=(await readOperations([...this.wanted])).filter(record=>this.wanted.has(record.id));
-    await this.restoreHistory(window);
+    this.records=records;if(changed)this.options.onChange();
+    await this.restoreHistory(window);signal?.throwIfAborted();
     this.missingAdmission=window.some((target,index)=>!this.records.some(record=>record.id===ids[index])&&!pageTranslation(target.page,target.mode,this.options.language,this.scope).latest);
     if(this.controlDelay)return;
-    await this.recover();
-    for(const [index,target] of window.entries()){
-      if(this.controlDelay)break;
-      if(!requestCurrent(target))continue;
-      try{await withTranslationLock(operationId(this.scope,this.options.language,target),async()=>{
-        let record=await this.pageOperation(target);
-        if(!record){
-          if(this.remaining('imageRetryAt')>0||this.options.canSubmit?.(target)===false)return;
-          // A previously delivered job without a local intent stays visible until explicit retranslation.
-          if(pageTranslation(target.page,target.mode,this.options.language,this.scope).latest)return;
-          await this.legacy.check(target);record=await this.createOperation(target,()=>requestCurrent(target)&&this.options.api.isCurrent());
-        }
-        if(record.id!==ids[index]){this.wanted.delete(ids[index]);this.wanted.add(record.id);}
-        this.remember(record);
-        await this.restorePolicy(record);
-        this.state=await readSync(this.scope)??this.state;
-        // Image admission backpressure covers every new page in this scope, including a new window.
-        // Accepted requests can be recovered and supplied with their original bytes.
-        if(record.state==='blocked'||record.state==='accepted'||record.state==='uncertain'||this.recordDelay(record)>0||this.remaining('imageRetryAt')>0)return;
-        if(!requestCurrent(target)||this.options.canSubmit?.(target)===false)return;
-        record.state='uncertain';await this.save(record);
-        try{const result=await this.options.api.translate(record.requestId,record.request);if(this.wanted.has(record.id))this.refreshed.add(record.requestId);await this.receive(record,result);}
-        catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500||['TRANSLATION_MODEL_UNAVAILABLE','TRANSLATION_FONT_UNAVAILABLE'].includes(e.code);record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;if(quotaErrors.has(e.code))record.deniedPolicy=this.rightsKey;if(e.code==='IMAGE_RATE_LIMITED')record.deniedImageLimit=this.imageLimit;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);if(['TRANSLATION_MODEL_NOT_ALLOWED','TRANSLATION_MODEL_INVALID','TRANSLATION_MODEL_UNAVAILABLE','TRANSLATION_FONT_INVALID','TRANSLATION_FONT_LANGUAGE_UNSUPPORTED','TRANSLATION_FONT_UNAVAILABLE','DAILY_QUOTA_EXHAUSTED'].includes(e.code))await this.options.onModelRejected?.().catch(()=>undefined);
-        }
-      });}catch(error){if(!this.options.api.isCurrent())throw error;if(!requestCurrent(target))continue;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
-    }
+    const recovery=this.recover(signal),admissions=new RequestPool(1);
+    // Prepare at most the existing five targets independently. Only admission is serial,
+    // so a slow source cannot hold ready neighbours or bypass shared rate backpressure.
+    const work=window.map((target,index)=>{
+      const key=operationId(this.scope,this.options.language,target),previous=this.preparing.get(key);
+      if(previous&&!previous.signal?.aborted)return previous.promise;
+      const promise=(async()=>{
+        if(this.controlDelay||!current(target))return;
+        try{await withTranslationLock(operationId(this.scope,this.options.language,target),async()=>{
+          if(!current(target))return;
+          if(this.records.some(record=>record.id===ids[index]))await recovery;
+          let record=await this.pageOperation(target);
+          if(!record){
+            if(this.remaining('imageRetryAt')>0||this.options.canSubmit?.(target)===false)return;
+            // A previously delivered job without a local intent stays visible until explicit retranslation.
+            if(pageTranslation(target.page,target.mode,this.options.language,this.scope).latest)return;
+            await this.legacy.check(target);record=await this.createOperation(target,()=>current(target)&&this.options.api.isCurrent(),undefined,undefined,signal);
+          }
+          if(!current(target)||!this.wanted.has(ids[index]))return;
+          const prepared=record;
+          await admissions.run(async()=>{
+            if(!current(target))return;
+            const record=prepared;
+            if(record.id!==ids[index]){this.wanted.delete(ids[index]);this.wanted.add(record.id);}
+            this.remember(record);
+            await this.restorePolicy(record);
+            this.state=await readSync(this.scope)??this.state;
+            // Image admission backpressure covers every new page in this scope, including a new window.
+            // Accepted requests can be recovered and supplied with their original bytes.
+            if(record.state==='blocked'||record.state==='accepted'||record.state==='uncertain'||this.recordDelay(record)>0||this.remaining('imageRetryAt')>0)return;
+            if(this.controlDelay||!current(target)||this.options.canSubmit?.(target)===false)return;
+            record.state='uncertain';await this.save(record);
+            try{const result=await abortable(this.options.api.translate(record.requestId,record.request,signal),signal);if(this.wanted.has(record.id))this.refreshed.add(record.requestId);await this.receive(record,result);}
+            catch(error){this.current();const e=error instanceof ApiError?error:new ApiError((error as Error).message);await this.backpressure(e);const definitive=e.status>=400&&e.status<500||['TRANSLATION_MODEL_UNAVAILABLE','TRANSLATION_FONT_UNAVAILABLE'].includes(e.code);record.state=e.status===429?'deferred':definitive?'blocked':'uncertain';record.error=e.message;record.errorCode=e.code;if(quotaErrors.has(e.code))record.deniedPolicy=this.rightsKey;if(e.code==='IMAGE_RATE_LIMITED')record.deniedImageLimit=this.imageLimit;record.retryAt=record.state==='blocked'?undefined:Date.now()+(e.retryAfterSeconds??2)*1000;await this.save(record);if(['TRANSLATION_MODEL_NOT_ALLOWED','TRANSLATION_MODEL_INVALID','TRANSLATION_MODEL_UNAVAILABLE','TRANSLATION_FONT_INVALID','TRANSLATION_FONT_LANGUAGE_UNSUPPORTED','TRANSLATION_FONT_UNAVAILABLE','DAILY_QUOTA_EXHAUSTED'].includes(e.code))await this.options.onModelRejected?.().catch(()=>undefined);
+            }
+          });
+        });}catch(error){if(!this.options.api.isCurrent())throw error;if(!current(target))return;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
+      })();
+      const pending={promise,signal};this.preparing.set(key,pending);
+      void promise.finally(()=>{if(this.preparing.get(key)===pending)this.preparing.delete(key);}).catch(()=>{});
+      return promise;
+    });
+    const results=await abortable(Promise.allSettled([recovery,...work]),signal);
+    for(const result of results)if(result.status==='rejected')throw result.reason;
   }
   async manual(target:ReadingTarget,requestCurrent=()=>true){
     await this.init();const id=operationId(this.scope,this.options.language,target);

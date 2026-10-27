@@ -4,7 +4,7 @@ import type {ReadingEntry} from '../src/types';
 import type {ReadingView} from '../src/reader/view';
 
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
-const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
+const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],layoutEffects:[] as (()=>void|(()=>void))[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
 const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn()}));
 const swipe=vi.hoisted(()=>({options:undefined as Parameters<typeof import('../src/reader/usePagedSwipe').usePagedSwipe>[0]|undefined}));
@@ -20,7 +20,9 @@ vi.mock('react',async original=>({
   if(!(index in hooks.states))hooks.states[index]=typeof initial==='function'?(initial as ()=>T)():initial;
   return [hooks.states[index],(next:T|((value:T)=>T))=>{hooks.states[index]=typeof next==='function'?(next as (value:T)=>T)(hooks.states[index] as T):next;}];
  },
- useRef:(current:unknown)=>({current}),useMemo:(compute:()=>unknown)=>compute(),useEffect:(effect:()=>void|(()=>void))=>{hooks.effects.push(effect);},useLayoutEffect:()=>{},
+ useRef:(current:unknown)=>({current}),useMemo:(compute:()=>unknown)=>compute(),
+ useEffect:(effect:()=>void|(()=>void))=>{hooks.effects.push(effect);},
+ useLayoutEffect:(effect:()=>void|(()=>void))=>{hooks.layoutEffects.push(effect);},
 }));
 vi.mock('../src/shortcuts/react',()=>({useShortcuts:(handlers:typeof hooks.handlers,options:{enabled:boolean})=>{hooks.handlers=handlers;hooks.enabled=options.enabled;}}));
 vi.mock('../src/reader/useReaderAnalytics',()=>({useReaderAnalytics:()=>({requestTranslation:actions.requestTranslation})}));
@@ -53,8 +55,9 @@ function fixture(extra:Partial<Props>={}){
  props.setSettings=vi.fn(next=>{props.settings=typeof next==='function'?next(props.settings):next;});
  return props;
 }
-function render(props:Props){hooks.cursor=0;hooks.effects=[];return Reader(props);}
-function flushEffects(){for(const effect of hooks.effects)effect();}
+function render(props:Props){hooks.cursor=0;hooks.layoutEffects=[];hooks.effects=[];return Reader(props);}
+function flushLayoutEffects(){for(const effect of hooks.layoutEffects.splice(0))effect();}
+function flushEffects(){flushLayoutEffects();for(const effect of hooks.effects.splice(0))effect();}
 function view(){return hooks.states.find((value):value is ReadingView=>!!value&&typeof value==='object'&&'zoom' in value)!;}
 function nodes(node:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(node))return node.flatMap(nodes);
@@ -311,10 +314,10 @@ describe('reader shortcut action integration',()=>{
   vi.stubGlobal('window',{matchMedia:(query:string)=>({matches:query==='(pointer: coarse), (hover: none)'||query.includes('max-device-width')?touch:compact}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
   render(fixture());expect(view()).toEqual({mode:'classic',preference:'original',fit:compact&&touch?'window':'width',zoom:touch?100:50});
  });
- it('saves the opening zoom before phone images load and preserves it through global changes and long-image detection',()=>{
+ it('saves the opening zoom and fits a newly identified long phone page before passive effects',()=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:true}),addEventListener:vi.fn(),removeEventListener:vi.fn()});
-  const stored=new Map<string,string>(),setItem=vi.fn((key:string,value:string)=>stored.set(key,value));
-  vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem});
+  const stored=new Map<string,string>();
+  vi.stubGlobal('localStorage',{getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>stored.set(key,value)});
   const props=fixture({settings:{...defaults,readerZoom:130},copy:{...copy,pages:[]}});render(props);flushEffects();
   const opening={mode:'classic',preference:'original',fit:'window',zoom:130};
   expect(JSON.parse(stored.get('fixture')!)).toEqual(opening);
@@ -322,9 +325,11 @@ describe('reader shortcut action integration',()=>{
   props.copy={...copy,pages:copy.pages.map(page=>({...page,width:900,height:1300,imageSha256:undefined}))};
   render(props);flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual(opening);
   props.copy={...props.copy,pages:props.copy.pages.map(page=>({...page,width:800,height:24000,imageSha256:`real-${page.id}`}))};
-  render(props);flushEffects();expect(view()).toEqual({...opening,fit:'width'});
+  render(props);flushLayoutEffects();expect(view()).toEqual({...opening,fit:'width'});
   expect(actions.preserve).toHaveBeenCalledOnce();
-  render(props);flushEffects();expect(setItem).toHaveBeenCalledWith('fixture',JSON.stringify(view()));
+  const fitted=render(props);
+  expect((nodes(fitted).find(node=>node.props.className==='nc-manga-page')!.props.style as {width:number}).width).toBe(900*1.3);
+  flushEffects();expect(JSON.parse(stored.get('fixture')!)).toEqual({...opening,fit:'width'});
  });
  it.each([false,true])('keeps the opening zoom across global changes, chapters and reopening; only another unread comic uses the new value (touch: %s)',touch=>{
   vi.stubGlobal('window',{matchMedia:()=>({matches:touch}),addEventListener:vi.fn(),removeEventListener:vi.fn()});

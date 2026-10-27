@@ -202,7 +202,7 @@ describe('channel configuration and connection',()=>{
   it('does not prompt, log in or save a profile when browser host access is revoked',async()=>{
     permission.mockResolvedValue(false);const {connectChannel,listChannels}=await import('../src/translation/channels');
     await expect(connectChannel('fixture','Denied',input())).rejects.toThrow('访问权限');
-    expect(permission).toHaveBeenCalledWith({origins:['http://127.0.0.1:8000/*']});expect(protocol.connect).not.toHaveBeenCalled();
+    expect(permission).toHaveBeenCalledWith({origins:['http://127.0.0.1/*']});expect(protocol.connect).not.toHaveBeenCalled();
     expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect((await listChannels()).profiles.map(profile=>profile.id)).toEqual(['nodelane']);expect(metadata).toEqual({});
   });

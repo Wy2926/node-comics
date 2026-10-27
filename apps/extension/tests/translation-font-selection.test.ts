@@ -33,7 +33,7 @@ describe('translation font selection',()=>{
     const core=new TranslationCoordinator({...f.core.options,fontId});
     await core.submit([page]);
     expect(f.api.translations).toHaveBeenCalledWith([original.requestId],expect.anything());
-    expect(f.submit).toHaveBeenCalledWith(original.requestId,original.request);
+    expect(f.submit).toHaveBeenCalledWith(original.requestId,original.request,undefined);
     expect(await readOperation(operationId(core.scope,'zh-Hans',page,undefined,fontId))).toBeUndefined();
     await expect(core.manual(page)).rejects.toThrow('待核实');expect(f.submit).toHaveBeenCalledOnce();
   });
@@ -94,7 +94,7 @@ describe('translation font selection',()=>{
     const resumed=new TranslationCoordinator({...f.core.options,fontId:'lxgw-wenkai-light'});
     await resumed.submit([page]);
     expect(f.api.translations).toHaveBeenCalledWith([retry.requestId],expect.anything());
-    expect(f.submit).toHaveBeenCalledWith(retry.requestId,{retry_of:original.requestId});
+    expect(f.submit).toHaveBeenCalledWith(retry.requestId,{retry_of:original.requestId},undefined);
     expect((await readOperation(retry.id))?.requestId).toBe(retry.requestId);
   });
   it('takes a retry font from the frozen snapshot when the legacy local identity omitted it',async()=>{

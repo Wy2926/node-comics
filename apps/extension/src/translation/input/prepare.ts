@@ -1,5 +1,5 @@
 import {msg} from '../../i18n/runtime';
-import {assertCurrent} from '../../concurrency';
+import {abortable,assertCurrent} from '../../concurrency';
 import type {Capabilities,Page,TranslationImage} from '../../types';
 import {hashFile} from '../../importers/hash';
 import {probeImageMetadata} from '../../comics/pages/image-metadata';
@@ -13,12 +13,13 @@ export class InputChangedError extends Error {
   readonly code='SOURCE_CHANGED';
   constructor(){super(msg('原图内容已变化，请重新加载后翻译。'));}
 }
-function resized(blob:Blob,width:number,height:number,profile?:InputProfile):Promise<{blob:Blob;sha256:string;profile?:InputProfile}> {
+function resized(blob:Blob,width:number,height:number,profile?:InputProfile,signal?:AbortSignal):Promise<{blob:Blob;sha256:string;profile?:InputProfile}> {
   // An extension service worker is already off the UI thread and has no Worker constructor.
   if(typeof Worker==='undefined')return resizeInput(blob,width,height,profile);
   return new Promise((resolve,reject)=>{
     const worker=new ResizeWorker();
-    const finish=()=>{clearTimeout(timer);worker.terminate();};
+    const finish=()=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);worker.terminate();};
+    const cancel=()=>{finish();reject(signal!.reason);};
     const fail=()=>{finish();reject(Error(msg('{0} 无法解码，请检查图片是否损坏。',{'0':msg('原图')})));};
     const timer=setTimeout(fail,120000);
     worker.onerror=fail;
@@ -27,7 +28,8 @@ function resized(blob:Blob,width:number,height:number,profile?:InputProfile):Pro
       if(!event.data.blob||!event.data.sha256){fail();return;}
       finish();resolve({blob:event.data.blob,sha256:event.data.sha256,profile:event.data.profile});
     };
-    worker.postMessage({blob,width,height,profile});
+    signal?.addEventListener('abort',cancel,{once:true});
+    if(signal?.aborted)cancel();else worker.postMessage({blob,width,height,profile});
   });
 }
 /** Recovery never trusts re-encoding determinism: only the frozen uploaded hash is accepted. */
@@ -42,7 +44,8 @@ export async function restoreTranslationInput(source:Blob,width:number,height:nu
     return result.blob;
   });
 }
-export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits'],supportsLong=true):Promise<PreparedInput> {
+export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits'],supportsLong=true,signal?:AbortSignal):Promise<PreparedInput> {
+  signal?.throwIfAborted();
   function plan(width:number,height:number,mime?:string){
     const size=translationSize(width,height);
     if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||!Number.isSafeInteger(width*height)
@@ -63,9 +66,12 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     assertCurrent(current);
     return {...known.size,sourceSha256:page.imageSha256,image:{sha256:page.imageSha256,byte_size:page.imageByteSize,content_type:page.imageMime||'image/png',normalization_version:1}};
   }
-  return imageWork(async()=>{
-    assertCurrent(current);const source=await read();assertCurrent(current);
-    if(!source)throw Error(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
+  // Source recovery can itself normalize pixels. Never hold the pixel queue while reading it.
+  assertCurrent(current);let pendingSource=await abortable(read(),signal);assertCurrent(current);
+  if(!pendingSource)throw Error(msg('原图不可用，请恢复所属来源或本地原图缓存。'));
+  try{return await abortable(imageWork(async()=>{
+    signal?.throwIfAborted();assertCurrent(current);
+    const source=pendingSource!;
     let resolved=known;
     if(!resolved){
       const metadata=await probeImageMetadata(source);
@@ -83,7 +89,7 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     if(page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     let encoded:Awaited<ReturnType<typeof resized>>|undefined;
     if(encodable&&(required||source.size>TRANSLATION_REENCODE_BYTES)){
-      try{encoded=await resized(source,size.width,size.height);}
+      try{encoded=await resized(source,size.width,size.height,undefined,signal);}
       catch(error){
         // Only optional same-size compression may keep the already normalized source.
         if(required||source.size>maxBytes||!(error instanceof ImageOutputTooLargeError))throw error;
@@ -96,5 +102,8 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     if(result.blob.size>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
     return {...size,sourceSha256,profile:prepared?encoded?.profile??INPUT_PROFILE:undefined,blob:prepared?result.blob:undefined,
       image:{sha256:result.sha256,byte_size:result.blob.size,content_type:result.blob.type,normalization_version:1}};
-  });
+  }),signal);}finally{
+    // Cancelled queue entries must not retain old windows' compressed originals.
+    pendingSource=undefined;
+  }
 }

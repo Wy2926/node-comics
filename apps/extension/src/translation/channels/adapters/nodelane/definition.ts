@@ -122,11 +122,12 @@ export const definition:ChannelDefinition={
         const runtime:ChannelRuntime={
           async init(){assertCurrent(current);await core?.init();},
           async restore(targets){await requireCore().restore(targets);},
-          async submit(targets,requestCurrent=()=>true){
+          async submit(targets,requestCurrent=()=>true,signal){
             const official=requireCore();
             // A completed local result is usable without a network policy read.
             if(!rights&&targets.some(target=>!pageTranslation(target.page,target.mode,options.language,scope.key).latest))await runtime.refresh();
-            await official.submit(targets,target=>current()&&requestCurrent(target));
+            signal?.throwIfAborted();
+            await official.submit(targets,target=>current()&&requestCurrent(target),signal);
           },
           async manual(target){await runtime.refresh();await requireCore().manual(target,current);},
           async wait(signal){if(!core)return false;return core.wait(signal);},

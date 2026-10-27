@@ -15,7 +15,7 @@ import {ApiError} from '../src/api';
 import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
 import * as png from '../../../backend/shared/translation-images/png';
 import {fixture,target,snapshot,originalInput,originalBytes} from './translation-fixture';
-import {jpegWithSize} from './image-encoding-fixture';
+import {jpegWithSize,pngWithSize} from './image-encoding-fixture';
 
 const encoded=new Blob(['RIFF',new Uint8Array([14,0,0,0]),'WEBPVP8 ',new Uint8Array([2,0,0,0]),'ok'],{type:'image/webp'}),close=vi.fn(),draw=vi.fn(),encode=vi.fn(async()=>encoded);
 const inputs=new ByteCache({name:'translation-inputs-v1',budgetBytes:INPUT_BUDGET_BYTES});
@@ -28,11 +28,6 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();await setTranslationCacheLimitMb(1024);});
 const large=()=>{const t=target(1);t.page.width=2400;t.page.height=4800;return t;};
-function pngHeader(width:number,height:number){
-  const bytes=new Uint8Array(24),view=new DataView(bytes.buffer);
-  bytes.set([137,80,78,71,13,10,26,10]);view.setUint32(8,13);bytes.set([73,72,68,82],12);
-  view.setUint32(16,width);view.setUint32(20,height);return new Blob([bytes],{type:'image/png'});
-}
 
 it('shrinks the short edge once, preserves ratio and never upscales',()=>{
   expect(translationSize(2400,12000)).toEqual({width:1800,height:9000});
@@ -71,7 +66,7 @@ it.each([false,true])('negotiates actual unmaterialized long-image dimensions wi
   const core=new TranslationCoordinator({...f.core.options,tiles:()=>tiles,getBlob:async()=>source});
   await core.submit([{...t,page}]);
   if(tiles){
-    expect(f.submit).toHaveBeenCalledExactlyOnceWith(expect.any(String),expect.objectContaining({result_format:'overlay-tiles-v1',image:expect.objectContaining({content_type:'image/jpeg'})}));
+    expect(f.submit).toHaveBeenCalledExactlyOnceWith(expect.any(String),expect.objectContaining({result_format:'overlay-tiles-v1',image:expect.objectContaining({content_type:'image/jpeg'})}),undefined);
     expect(encode).toHaveBeenCalledOnce();
   }else{
     expect(page.translationError).toBe('翻译服务暂不可用');expect(f.submit).not.toHaveBeenCalled();
@@ -104,7 +99,7 @@ it('keeps source identity separate and encodes only once',async()=>{
   await f.core.submit([t]);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/webp',quality:.9});expect(close).toHaveBeenCalledOnce();
 });
 it('freezes Safari PNG fallback bytes and profile once without creating another request on recovery',async()=>{
-  const output=pngHeader(1800,3600);encode.mockResolvedValue(output);
+  const output=pngWithSize(1800,3600);encode.mockResolvedValue(output);
   const f=fixture(),t=large();await f.core.submit([t]);
   const record=(await readOperation(operationId(f.core.scope,'zh-Hans',t)))!;
   expect(record).toMatchObject({inputProfile:PNG_INPUT_PROFILE,inputSize:{width:1800,height:3600},image:{content_type:'image/png',sha256:await hashFile(output)}});
@@ -113,17 +108,17 @@ it('freezes Safari PNG fallback bytes and profile once without creating another 
   expect(f.submit).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/webp',quality:.9});
 });
 it('restores a frozen PNG input with PNG directly and still rejects different bytes',async()=>{
-  const source=originalBytes(1),output=pngHeader(1800,3600);encode.mockResolvedValue(output);
+  const source=originalBytes(1),output=pngWithSize(1800,3600);encode.mockResolvedValue(output);
   const restored=await restoreTranslationInput(source,1800,3600,await hashFile(source),await hashFile(output),()=>true,PNG_INPUT_PROFILE);
   expect(restored).toBe(output);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/png'});
   await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),'0'.repeat(64),()=>true,PNG_INPUT_PROFILE)).rejects.toThrow('原图内容已变化');
 });
 it.each([INPUT_PROFILE,LEGACY_INPUT_PROFILE])('does not change frozen WebP profile %s to PNG during recovery',async profile=>{
-  const source=originalBytes(1);encode.mockResolvedValue(pngHeader(1800,3600));
+  const source=originalBytes(1);encode.mockResolvedValue(pngWithSize(1800,3600));
   await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),await hashFile(encoded),()=>true,profile)).rejects.toThrow('WebP encoder unavailable');
   expect(encode).toHaveBeenCalledOnce();
 });
-it.each([new Blob(['invalid'],{type:'image/png'}),pngHeader(1799,3600)])('rejects malformed or resized PNG fallback before submission',async output=>{
+it.each([new Blob(['invalid'],{type:'image/png'}),pngWithSize(1799,3600)])('rejects malformed or resized PNG fallback before submission',async output=>{
   encode.mockResolvedValue(output);const f=fixture();await f.core.submit([large()]);
   expect(f.submit).not.toHaveBeenCalled();expect(encode).toHaveBeenCalledOnce();
 });
@@ -304,7 +299,7 @@ it('evicts old input at capacity without blocking a new request when result cach
   expect(await readInput(f.core.scope,await hashFile(encoded))).toBeDefined();
   expect((await inputs.usage()).bytes).toBe(encoded.size);
 });
-it('discards obsolete queued image work before reading or decoding another large page',async()=>{
+it('discards obsolete queued pixel work after independent source acquisition',async()=>{
   let release!:()=>void,current=true;
   encode.mockImplementationOnce(()=>new Promise(resolve=>{release=()=>resolve(encoded);}));
   const t=large(),f=fixture(),first=prepareTranslationInput(t.page,()=>f.core.options.getBlob(t.page.blobKey!),()=>true);
@@ -312,7 +307,7 @@ it('discards obsolete queued image work before reading or decoding another large
   const read=vi.fn(),second=prepareTranslationInput(t.page,read,()=>current);
   const rejected=expect(second).rejects.toThrow();current=false;release();
   await first;await rejected;
-  expect(read).not.toHaveBeenCalled();expect(createImageBitmap).toHaveBeenCalledOnce();
+  expect(read).toHaveBeenCalledOnce();expect(createImageBitmap).toHaveBeenCalledOnce();
 });
 it.each([false,true])('reopens the frozen UUID after input cache eviction=%s',async evicted=>{
   const f=fixture(),t=large();await f.core.submit([t]);const record=(await readOperation(operationId(f.core.scope,'zh-Hans',t)))!;
@@ -369,7 +364,7 @@ it.each([true,false])('rebuilds a mis-sized no-text upload only on explicit retr
   const next=(await readOperation(previous.id))!;
   expect(next.requestId).not.toBe(previous.requestId);expect(next.sourceSha256).toBe(sha);
   expect(next.inputSize).toEqual({width:800,height:20687});expect(next.image.sha256).not.toBe(previous.image.sha256);
-  expect(f.submit).toHaveBeenCalledExactlyOnceWith(next.requestId,expect.objectContaining({image:next.image,result_format:'overlay-tiles-v1'}));
+  expect(f.submit).toHaveBeenCalledExactlyOnceWith(next.requestId,expect.objectContaining({image:next.image,result_format:'overlay-tiles-v1'}),undefined);
   expect(next.request).not.toHaveProperty('regenerate_of');expect(upload).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledOnce();
   expect(next.image).toMatchObject({byte_size:output.size,content_type:'image/jpeg'});
   if(stored)expect((await readJobs(core.scope,[sha])).map(job=>job.id)).toContain(previous.requestId);

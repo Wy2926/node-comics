@@ -20,21 +20,21 @@ export interface RuntimeOptions {
   language: string;
   modelId?: string;
   fontId?: string;
-  getBlob: (key:string)=>Promise<Blob|undefined>;
+  getBlob: (key:string,signal?:AbortSignal)=>Promise<Blob|undefined>;
   readOriginal?: (ref:PageReference)=>Promise<{blob:Blob;release:()=>void}>;
   onJobs: (jobs:Job[])=>Promise<void>;
   onChange: ()=>void;
   onInputConsumed?: (blobKey:string)=>Promise<void>;
   isCurrent: ()=>boolean;
   /** Screenshot callers durably prepare bytes before admission; never encode those bytes twice. */
-  prepareInput?: (target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'])=>Promise<PreparedInput>;
+  prepareInput?: (target:ReadingTarget,current:()=>boolean,limits?:Capabilities['limits'],signal?:AbortSignal)=>Promise<PreparedInput>;
 }
 /** submit updates a reading window; it must not await an entire image translation. */
 export interface ChannelRuntime {
   init():Promise<void>;
   /** Hydrate local receipts only; never waits for policy, admission or remote verification. */
   restore(targets:ReadingTarget[]):Promise<void>;
-  submit(targets:ReadingTarget[],isCurrent?:(target:ReadingTarget)=>boolean):Promise<void>;
+  submit(targets:ReadingTarget[],isCurrent?:(target:ReadingTarget)=>boolean,signal?:AbortSignal):Promise<void>;
   manual(target:ReadingTarget):Promise<void>;
   wait(signal:AbortSignal):Promise<boolean>;
   readonly hasPending:boolean;

@@ -154,7 +154,7 @@ async function createContext(tabId:number,navigationId:string,activity:RequestAc
   const processingVersion=processingGeneration,processingSettings=await readProcessingSettings();
   assertCurrent(activity.current);assertCurrent(current);
   if(processingVersion===processingGeneration){ctx.processing=activeProcessingProfile(processingSettings);ctx.processingKey=processingIdentity(processingSettings);}
-  if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:key=>originals.read(key),isCurrent:current,onJobs:attach,onChange:()=>{if(ctx)publish(ctx);},onInputConsumed:key=>originals.uploaded(key)});
+  if(channel.available)ctx.core=channel.createRuntime({language:settings.language,getBlob:(key,signal)=>originals.read(key,signal),isCurrent:current,onJobs:attach,onChange:()=>{if(ctx)publish(ctx);},onInputConsumed:key=>originals.uploaded(key)});
   await ctx.core?.init();assertCurrent(activity.current);assertCurrent(current);return ctx;
   }catch(error){
     if(ctx){if(contexts.get(tabId)===ctx)contexts.delete(tabId);disposeContext(ctx);}else channel.dispose();

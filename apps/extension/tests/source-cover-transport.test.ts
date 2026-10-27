@@ -12,7 +12,7 @@ describe('catalog artwork transport',()=>{
     const snapshot=source(),signal=new AbortController().signal;
     expect(await (await readSourceCover(snapshot,signal)).text()).toBe('cover');
     expect(mocks.permission).toHaveBeenCalledWith([snapshot.cover!.url]);
-    expect(mocks.fetch).toHaveBeenCalledWith(snapshot.cover!.url,signal,{referer:'https://www.dm5.com/'},{pageUrl:snapshot.url});
+    expect(mocks.fetch).toHaveBeenCalledWith(snapshot.cover!.url,signal,{referer:'https://www.dm5.com/'},{pageUrl:snapshot.url,safariTransport:'public-native'});
   });
   it('rejects forged catalogs and local/page resources before network access',async()=>{
     for(const snapshot of [{...source(),sourceId:'naver'},{...source(),url:'https://www.dm5.com.evil.test/manhua-fixture/'},

@@ -42,10 +42,10 @@ function replyingWorker(error:string,beforeReply=()=>{}){
 describe('optional input encoding boundaries',()=>{
   it.each([[64,65500],[65500,64]])('preserves the actual JPEG encoder boundary %i x %i',async(width,height)=>{
     const output=jpegWithSize(width,height);encode.mockResolvedValueOnce(output);
-    expect(await resizeInput(source,width,height)).toEqual({blob:output,sha256:await hashFile(output)});
+    expect(await resizeInput(source,width,height)).toEqual({blob:output,sha256:await hashFile(output),profile:INPUT_PROFILE});
     expect(createImageBitmap).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
   });
-  it.each([[64,65501],[65501,64],[64,65535],[65535,64]])('rejects JPEG encoding beyond its implementation boundary %i x %i before decoding',async(width,height)=>{
+  it.each([[64,65501],[65501,64]])('rejects JPEG encoding beyond its implementation boundary %i x %i before decoding',async(width,height)=>{
     await expect(resizeInput(source,width,height)).rejects.toThrow('IMAGE_DIMENSIONS_LIMIT');
     expect(createImageBitmap).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
   });

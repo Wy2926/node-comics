@@ -1,4 +1,5 @@
 import {MAX_READING_TARGETS} from '../reading-window';
+import {abortable} from '../concurrency';
 import {readMaterializedResult} from '../storage/translations/results';
 
 /** Warm complete result bytes without mounting images or retaining a second cache. */
@@ -25,7 +26,7 @@ export class TranslationResultPrefetch {
   }
 
   private async load(pending:NonNullable<TranslationResultPrefetch['pending']>){
-    try{await this.read(pending.key,pending.controller.signal);}
+    try{await abortable(this.read(pending.key,pending.controller.signal),pending.controller.signal);}
     catch{/* Speculative failures do not change successful jobs; display can retry the same result. */}
     finally{this.pending=undefined;this.start();}
   }

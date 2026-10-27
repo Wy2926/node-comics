@@ -6,6 +6,14 @@ import type {Authorization} from './auth/session';
 import {cachedRequest,cacheValue,peekCached} from './api-cache';
 import {serverEvents} from './sse';
 export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
+/** Bound connection setup and gaps between result chunks, not the total transfer time. */
+function transferDeadline(signal?:AbortSignal){
+  const controller=new AbortController();
+  let timer:ReturnType<typeof setTimeout>;
+  const reset=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(new DOMException(msg('暂时连接不到服务。请检查网络连接，原图仍可继续阅读。'),'TimeoutError')),30000);};
+  reset();
+  return {signal:AbortSignal.any([controller.signal,...(signal?[signal]:[])]),reset,clear:()=>clearTimeout(timer)};
+}
 export interface ComicTitleTranslation {name:string|null;target_language:string|null}
 function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
@@ -85,9 +93,9 @@ export class Api {
     if(Api.snapshots.size>128)Api.snapshots.delete(Api.snapshots.keys().next().value!);
     return snapshot;
   }
-  async translate(id:string,body:TranslationInput){
+  async translate(id:string,body:TranslationInput,signal?:AbortSignal){
     if('image' in body&&body.mode!=='classic')throw new ApiError(msg('翻译服务暂不可用'),'TRANSLATION_MODE_UNAVAILABLE',410);
-    return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body)}));
+    return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(body),signal}));
   }
   async translation(id:string,signal?:AbortSignal){return this.remember(await this.request<TranslationSnapshot>(`/v1/translations/${encodeURIComponent(id)}`,{signal}));}
   async translations(ids:string[],options:{etag?:string;signal?:AbortSignal}={}){
@@ -104,9 +112,14 @@ export class Api {
   }
   async *translationEvents(ids:string[],signal:AbortSignal):AsyncGenerator<TranslationBatch>{
     if(!ids.length||ids.length>32)throw new ApiError('每次读取需提供 1–32 个翻译编号。','INVALID_TRANSLATION_COUNT');
-    const response=await this.authorizedFetch(this.base+'/v1/translations/events?'+new URLSearchParams({ids:ids.join(',')}),{signal,cache:'no-store',headers:{Accept:'text/event-stream'}});
-    if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??raw.detail??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
-    if(!response.body||!response.headers.get('Content-Type')?.startsWith('text/event-stream')){await response.body?.cancel();throw new ApiError(msg('翻译服务暂不可用'),'INVALID_EVENT_STREAM');}
+    const deadline=transferDeadline(signal);
+    let response:Response;
+    try{
+      response=await this.authorizedFetch(this.base+'/v1/translations/events?'+new URLSearchParams({ids:ids.join(',')}),{signal:deadline.signal,cache:'no-store',headers:{Accept:'text/event-stream'}});
+      deadline.signal.throwIfAborted();
+      if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??raw.detail??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
+      if(!response.body||!response.headers.get('Content-Type')?.startsWith('text/event-stream')){await response.body?.cancel();throw new ApiError(msg('翻译服务暂不可用'),'INVALID_EVENT_STREAM');}
+    }finally{deadline.clear();}
     let ended=false;
     for await(const frame of serverEvents(response.body,signal)){
       await this.assertAuthorized();signal.throwIfAborted();
@@ -130,8 +143,29 @@ export class Api {
     if(artifact.path!==expected)throw new ApiError(msg('图片访问地址无效。'),'INVALID_ASSET_ORIGIN');
     const url=new URL(artifact.path,this.base);
     if(url.origin!==new URL(this.base).origin||url.username||url.password)throw new ApiError(msg('图片访问地址无效。'),'INVALID_ASSET_ORIGIN');
-    const response=await this.authorizedFetch(url,{credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',redirect:'follow',signal});
-    if(!response.ok)throw new ApiError(msg('图片已过期或无法访问，请保留本地副本或重新上传。'),'ASSET_DOWNLOAD_FAILED',response.status);
-    const blob=await response.blob();await this.assertAuthorized();signal?.throwIfAborted();return blob;
+    const deadline=transferDeadline(signal);
+    try{
+      const response=await this.authorizedFetch(url,{credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',redirect:'follow',signal:deadline.signal});
+      if(!response.ok){void response.body?.cancel();throw new ApiError(msg('图片已过期或无法访问，请保留本地副本或重新上传。'),'ASSET_DOWNLOAD_FAILED',response.status);}
+      deadline.signal.throwIfAborted();deadline.reset();
+      const chunks:BlobPart[]=[],reader=response.body?.getReader();
+      let size=0;
+      if(reader){
+        const cancel=()=>{void reader.cancel().catch(()=>{});};
+        deadline.signal.addEventListener('abort',cancel,{once:true});
+        try{
+          for(;;){
+            deadline.signal.throwIfAborted();const chunk=await reader.read();deadline.signal.throwIfAborted();
+            if(chunk.done)break;
+            if(!chunk.value.byteLength)continue;
+            size+=chunk.value.byteLength;
+            if(size>artifact.byte_size)throw new ApiError(msg('翻译文件校验失败，请重新加载。'),'INVALID_ARTIFACT');
+            chunks.push(chunk.value as Uint8Array<ArrayBuffer>);deadline.reset();
+          }
+        }finally{deadline.signal.removeEventListener('abort',cancel);cancel();reader.releaseLock();}
+      }
+      await this.assertAuthorized();deadline.signal.throwIfAborted();
+      return new Blob(chunks,{type:response.headers.get('Content-Type')??artifact.mime});
+    }finally{deadline.clear();}
   }
 }
