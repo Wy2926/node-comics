@@ -33,7 +33,7 @@ const brand=dictionaries[locale].ui.brandName;
     <LanguageNotice locale={locale} enabled={false}/>
     <header class="receipt-header">
       <a class="brand" href={localPath('/',locale)} aria-label={brand}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={brand} width={240} loading="eager" /></a>
-      <details class="language-menu"><summary aria-label={`${dictionaries[locale].ui.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale}/><span>{languageNames[locale]}</span></summary><nav aria-label={dictionaries[locale].ui.language}>{locales.map(language=><a href={localPath('/payment/success/',language)} lang={language} aria-current={locale===language?'true':undefined}><LanguageFlag locale={language}/><span>{languageNames[language]}</span></a>)}</nav></details>
+      <details class="language-menu"><summary aria-label={`${dictionaries[locale].ui.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale} loading="eager"/><span>{languageNames[locale]}</span></summary><nav aria-label={dictionaries[locale].ui.language}>{locales.map(language=><a href={localPath('/payment/success/',language)} lang={language} aria-current={locale===language?'true':undefined}><LanguageFlag locale={language}/><span>{languageNames[language]}</span></a>)}</nav></details>
     </header>
     <main>
       <section class="receipt" aria-labelledby="success-title">

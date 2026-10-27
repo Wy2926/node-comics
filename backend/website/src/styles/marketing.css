@@ -82,6 +82,6 @@ body[data-site-theme='midnight'] .page-intro h1 { font-family: Georgia, 'Noto Se
   body[data-site-theme='midnight'] .header-tools { display: flex; margin-left: auto; gap: 4px; }
   body[data-site-theme='midnight'] .language-menu summary { padding-inline: 6px; }
   body[data-site-theme='midnight'] .language-menu summary > span { display: none; }
-  body[data-site-theme='midnight'] .language-menu nav { left: auto; right: 0; }
+  body[data-site-theme='midnight'] .language-menu nav { inset-inline-start: auto; inset-inline-end: 0; }
   body[data-site-theme='midnight'] .mobile-nav nav { top: 100%; }
 }

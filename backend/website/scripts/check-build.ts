@@ -20,6 +20,8 @@ const titles = new Set<string>();
 const descriptions = new Set<string>();
 const indexedRoutes = new Set<string>();
 const pages = new Map<string, ReturnType<typeof load>>();
+const sharedFlags = new Map<string, string>();
+const checkedFlags = new Set<string>();
 type HomePicture = { src: string; srcset: string; full: string; width: number; height: number };
 const homeImageMetadata = new Map<string, ReturnType<ReturnType<typeof sharp>['metadata']>>();
 async function checkHomePicture(picture: HomePicture, label: string, widths: number[]) {
@@ -81,6 +83,23 @@ for (const file of htmlFiles) {
   if ($('footer .directory-badges, footer .directory-track').length) errors.push(label + ': removed directory links remain');
   if ($('html').attr('dir') !== (locale === 'ar' ? 'rtl' : 'ltr')) errors.push(label + ': wrong text direction');
   if ($('html').attr('lang') !== locale) errors.push(`${label}: wrong language`);
+  if ($('.language-menu').length) {
+    if ($('.language-menu summary .language-flag[loading="eager"]').length !== 1
+      || $('.language-menu nav .language-flag[loading="lazy"]').length !== locales.length)
+      errors.push(`${label}: only the selected language flag should load before the menu opens`);
+    for (const node of $('.language-flag').toArray()) {
+      const flag = $(node), src = flag.attr('src') ?? '';
+      if (!/^\/_astro\/[a-z]{2}\.[\w-]+\.svg$/.test(src)) { errors.push(`${label}: flag must be an independently cached hashed SVG`); continue; }
+      if (!checkedFlags.has(src)) {
+        const original = await readFile(join('src/assets/flags', src.split('/').at(-1)!.split('.')[0] + '.svg'));
+        if (!original.equals(await readFile(join(root, src)))) errors.push(`${label}: original flag artwork changed`);
+        checkedFlags.add(src);
+      }
+      const language = flag.closest('a').attr('lang') ?? locale;
+      if (sharedFlags.has(language) && sharedFlags.get(language) !== src) errors.push(`${label}: flag URL must be shared across routes`);
+      sharedFlags.set(language, src);
+    }
+  }
   if (!noindex) {
     indexedRoutes.add(route);
     if (!publicPaths.includes(basePath(route))) errors.push(`${label}: unexpected indexed page`);
@@ -260,13 +279,20 @@ for (const file of htmlFiles) {
     const expected = mobilePlatform.id === 'android' ? 3 : 0;
     if ($('.guide-screenshot img').length !== expected || $('.screenshot-placeholder').length !== 0)
       errors.push(`${label}: incorrect Android screenshots or premature iOS screenshots`);
-    $('.guide-screenshot img').each((index, element) => {
+    for (const [index, element] of $('.guide-screenshot img').toArray().entries()) {
       const image = $(element);
       const language = locale.startsWith('zh') ? 'zh-CN' : 'en';
-      const expectedSrc = `/guides/firefox/${language}/${['01-firefox-open', '02-add-extension', '03-read-sample'][index]}.png`;
-      if (image.attr('src') !== expectedSrc || image.attr('width') !== '1080' || image.attr('height') !== '2400' || image.attr('loading') !== 'lazy')
+      const source = join('src/assets/guides/firefox', language, ['01-firefox-open', '02-add-extension', '03-read-sample'][index] + '.png');
+      const full = image.parent('a').attr('href') ?? '';
+      if (!full.startsWith('/_astro/') || !(await readFile(source)).equals(await readFile(join(root, full)))) errors.push(`${label}: original mobile screenshot or language changed`);
+      if (image.attr('width') !== '720' || image.attr('height') !== '1600' || image.attr('loading') !== 'lazy' || image.attr('sizes') !== '252px')
         errors.push(`${label}: incorrect screenshot language, dimensions or loading`);
-    });
+      await checkHomePicture({src: image.attr('src') ?? '', srcset: image.attr('srcset') ?? '', full, width:1080, height:2400}, `${label}/mobile-${index}`, [320,540,720]);
+      for (const candidate of (image.attr('srcset') ?? '').split(',')) {
+        const url = candidate.trim().split(/\s+/)[0];
+        if (!url.endsWith('.webp') || (await stat(join(root, url))).size > 200_000) errors.push(`${label}: mobile preview exceeds its 200 kB WebP budget`);
+      }
+    }
     if (mobilePlatform.id === 'ios' && !$('h1').text().includes(mobileCopy[locale].iosStatus))
       errors.push(`${label}: missing iOS compatibility status`);
     if ($('.mobile-platform[aria-current=page]').length !== 1 || !$(`a[href="${mobilePlatform.sourceUrl}"]`).length)
@@ -352,5 +378,6 @@ for (const node of xml('url').toArray()) {
 for(const path of publicPaths) for(const locale of locales) if(!sitemap.includes(`<loc>${site.url}${localPath(path,locale)}</loc>`)) errors.push(`sitemap missing ${localPath(path,locale)}`);
 for (const forbidden of ['/account/','/auth/','/payment/','/uninstall/','/manga-translator/','/404','/v1/']) if (sitemap.includes(forbidden)) errors.push(`sitemap includes ${forbidden}`);
 for (const file of [...locales.flatMap(locale=>['/account/','/auth/callback/','/payment/success/','/uninstall/'].map(path=>`${localPath(path,locale)}index.html`)),'404.html']) if (!(await readFile(join(root,file),'utf8')).includes('noindex')) errors.push(`${file}: missing noindex`);
+if (checkedFlags.size !== locales.length || sharedFlags.size !== locales.length) errors.push('expected one shared SVG for each supported language');
 if (errors.length) throw Error(errors.join('\n'));
 console.log(`Validated ${htmlFiles.length} static pages and ${locations.length} indexable URLs: unique metadata, reciprocal languages, FAQ content/schema, browser entrances, published PLUS/Pro pricing, links/anchors, images and index boundaries.`);

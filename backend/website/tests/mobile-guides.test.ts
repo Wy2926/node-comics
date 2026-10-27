@@ -47,7 +47,7 @@ test('all locales provide Android screenshots and an honest iOS compatibility st
         assert.equal(shot.label, copy.placeholder);
         const language = locale.startsWith('zh') ? 'zh-CN' : 'en';
         assert.equal(shot.src, `/guides/firefox/${language}/${['01-firefox-open', '02-add-extension', '03-read-sample'][i]}.png`);
-        const png = readFileSync(new URL(`../public${shot.src}`, import.meta.url));
+        const png = readFileSync(new URL(`../src/assets${shot.src}`, import.meta.url));
         assert.equal(png.subarray(1, 4).toString(), 'PNG');
         assert.equal(png.readUInt32BE(16), 1080);
         assert.equal(png.readUInt32BE(20), 2400);

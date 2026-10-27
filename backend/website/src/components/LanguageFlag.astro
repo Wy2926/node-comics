@@ -1,35 +1,36 @@
 ---
-import fr from '../assets/flags/fr.svg?raw';
-import es from '../assets/flags/es.svg?raw';
-import ptBR from '../assets/flags/br.svg?raw';
-import de from '../assets/flags/de.svg?raw';
-import it from '../assets/flags/it.svg?raw';
-import ru from '../assets/flags/ru.svg?raw';
-import pl from '../assets/flags/pl.svg?raw';
-import uk from '../assets/flags/ua.svg?raw';
-import tr from '../assets/flags/tr.svg?raw';
-import vi from '../assets/flags/vn.svg?raw';
-import id from '../assets/flags/id.svg?raw';
+import fr from '../assets/flags/fr.svg?url&no-inline';
+import es from '../assets/flags/es.svg?url&no-inline';
+import ptBR from '../assets/flags/br.svg?url&no-inline';
+import de from '../assets/flags/de.svg?url&no-inline';
+import it from '../assets/flags/it.svg?url&no-inline';
+import ru from '../assets/flags/ru.svg?url&no-inline';
+import pl from '../assets/flags/pl.svg?url&no-inline';
+import uk from '../assets/flags/ua.svg?url&no-inline';
+import tr from '../assets/flags/tr.svg?url&no-inline';
+import vi from '../assets/flags/vn.svg?url&no-inline';
+import id from '../assets/flags/id.svg?url&no-inline';
 import type {Locale} from '../i18n';
-import china from '../assets/flags/cn.svg?raw';
-import taiwan from '../assets/flags/tw.svg?raw';
-import unitedStates from '../assets/flags/us.svg?raw';
-import japan from '../assets/flags/jp.svg?raw';
-import southKorea from '../assets/flags/kr.svg?raw';
-import saudiArabia from '../assets/flags/sa.svg?raw';
+import china from '../assets/flags/cn.svg?url&no-inline';
+import taiwan from '../assets/flags/tw.svg?url&no-inline';
+import unitedStates from '../assets/flags/us.svg?url&no-inline';
+import japan from '../assets/flags/jp.svg?url&no-inline';
+import southKorea from '../assets/flags/kr.svg?url&no-inline';
+import saudiArabia from '../assets/flags/sa.svg?url&no-inline';
 
-interface Props { locale: Locale }
-const {locale} = Astro.props;
+interface Props { locale: Locale; loading?: 'eager' | 'lazy' }
+const {locale, loading = 'lazy'} = Astro.props;
 const flags: Record<Locale, string> = {
   'zh-CN': china, 'zh-TW': taiwan, en: unitedStates, ja: japan, ko: southKorea,
   'fr':fr, 'es':es, 'pt-BR':ptBR, 'de':de, 'it':it, 'ru':ru, 'pl':pl, 'uk':uk, 'tr':tr, 'vi':vi, 'id':id, ar: saudiArabia,
 };
 // Local flag-icons 7.5.0 artwork (MIT).
 // License: /licenses/flag-icons.txt.
-// Data URLs keep each flag's internal SVG references isolated without image requests.
-const source = `data:image/svg+xml,${encodeURIComponent(flags[locale])}`;
+// Separate hashed SVGs isolate internal references and share a cache across pages.
+// Only the current language loads eagerly; closed menu entries use native lazy loading.
+const source = flags[locale];
 ---
-<img class="language-flag" src={source} width="20" height="15" alt="" aria-hidden="true" draggable="false" decoding="async" />
+<img class="language-flag" src={source} width="20" height="15" alt="" aria-hidden="true" draggable="false" loading={loading} decoding="async" />
 <style>
   .language-flag { display: block; width: 20px; height: 15px; flex: none; object-fit: contain; border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); background: var(--surface); }
   :global(.language-menu nav) .language-flag { margin-inline-end: var(--comic-control-gap); }
