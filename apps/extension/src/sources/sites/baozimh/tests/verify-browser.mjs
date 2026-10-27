@@ -22,7 +22,7 @@ const context = await chromium.launchPersistentContext(path.join(out, 'profile')
   locale: 'zh-CN', viewport: {width: 1440, height: 1000}, reducedMotion: 'reduce',
   args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension]});
 context.setDefaultTimeout(30000);
-const errors = [], checks = []; let reader, activeEntry, imageBytes, failCatalog = false, failSearch = false, count = 27;
+const errors = [], checks = [], sourceFailures = []; let reader, activeEntry, imageBytes, failCatalog = false, failSearch = false, count = 27;
 context.on('page', page => page.on('pageerror', error => {if (page.url().startsWith('chrome-extension:')) errors.push(error.message);}));
 await context.route('https://**.nodelane.net/**', route => route.fulfill({status: 503, body: '{}', contentType: 'application/json'}));
 if (!live) {
@@ -61,7 +61,11 @@ try {
     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
-  for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('包子漫画'));
+  const scope = search.locator('.nc-search-scope'), all = scope.getByRole('button', {name: '全选', exact: true});
+  if (!await all.isDisabled()) await all.click();
+  await scope.getByRole('button', {name: '反选', exact: true}).click();
+  await scope.locator('.nc-search-site-option').filter({hasText: '包子漫画'}).locator('input').setChecked(true);
+  await scope.getByRole('status').filter({hasText: '已选 1 个网站'}).waitFor();
   const input = search.getByPlaceholder('输入漫画名称或别名');
   if (!live) {
     failSearch = true; await input.fill('blocked'); await input.press('Enter');
@@ -72,20 +76,26 @@ try {
   if (live) {
     await input.fill('斗破'); await input.press('Enter');
     await search.getByRole('heading', {name: '斗破苍穹', exact: true}).waitFor({timeout: 60000});
-    await search.locator('.nc-search-status').click(); await search.getByRole('button', {name: '加载更多', exact: true}).click();
-    await reader.waitForFunction(() => document.querySelectorAll('.nc-search-result').length > 50);
+    await search.locator('.nc-search-status').click();
+    const more = search.getByRole('button', {name: '加载更多', exact: true});
+    if (await more.isVisible()) {
+      const before = await search.locator('.nc-search-result').count();
+      await more.click();
+      await reader.waitForFunction(before => document.querySelectorAll('.nc-search-result').length > before, before);
+      checks.push('Live search follows its optional next page');
+    }
     await search.getByRole('heading', {name: '斗破苍穹', exact: true}).scrollIntoViewIfNeeded();
     await reader.screenshot({path: path.join(out, 'doupo-search.png')});
-    checks.push('斗破 search renders real candidates and loads the next result page despite unavailable covers');
+    checks.push('斗破 search renders real candidates despite unavailable covers');
   }
   await input.fill(live ? '芙莉莲' : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? '葬送者芙莉莲' : 'Bao fixture & work', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
   const imported = await state(); assert.equal(imported.comics.length, 1); assert(imported.entries.length >= (live ? 100 : 27));
-  const active = imported.entries.find(e => e.indexState === 'ready'); assert(active); activeEntry = active.id; await waitImage();
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '3'); await waitImage(3);
+  const active = imported.entries.find(e => e.id === imported.comics[0].startEntryId); assert(active); activeEntry = active.id; await waitImage();
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), '3'); await waitImage(3);
   await reader.waitForFunction(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')); const row = await catalog.get('entries', entry);
     const pages = await catalog.listPages(row.contentId), position = await catalog.get('positions', entry); return position?.pageId === pages[2]?.pageId;}, activeEntry);
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Search -> complete hidden catalog -> full HTTP pages -> page 3 without source tab');
@@ -95,11 +105,15 @@ try {
   await reader.getByRole('button', {name: '关闭面板', exact: true}).click();
   await reader.getByRole('button', {name: '返回搜索', exact: true}).click();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '我的漫画', exact: true}).click();
-  await reader.locator('.nc-book .nc-thumbnail img').evaluate(img => img.decode());
+  if (live) {
+    await reader.waitForFunction(() => document.querySelector('.nc-book .nc-thumbnail img')?.naturalWidth > 0 || document.querySelector('.nc-book .nc-cover-retry'));
+    if (await reader.locator('.nc-book .nc-cover-retry').count()) sourceFailures.push('Source cover failed; retry remains available and reading continues');
+    else checks.push('Real source cover loaded');
+  } else await reader.locator('.nc-book .nc-thumbnail img').evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
-  await reader.getByRole('button', {name: '继续阅读', exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
-  checks.push('Cover, reopen and complete refresh preserve page 3');
+  await reader.getByRole('button', {name: '打开漫画 ' + imported.comics[0].title, exact: true}).click(); await waitImage(3);
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
+  checks.push('Reopen and complete refresh preserve page 3');
   if (!live) {
     const before = await state(); failCatalog = true; await assert.rejects(refresh()); assert.deepEqual((await state()).entries, before.entries);
     failCatalog = false; count++; await refresh(); await refresh(); assert.equal((await state()).comics[0].catalogUpdates.count, 1);
@@ -119,17 +133,18 @@ try {
     await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.getByRole('button', {name: '漫画网站', exact: true}).click();
     await reader.getByLabel('通过链接添加漫画').fill(volume.sourceUrl.replace('.html', '_2.html'));
     await reader.getByRole('button', {name: '添加到书架', exact: true}).click(); activeEntry = volume.id; await waitImage();
-    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '55'); await waitImage(55);
+    await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), '55'); await waitImage(55);
     const pageCount = await reader.evaluate(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
       const row = await catalog.get('entries', entry); return (await catalog.listPages(row.contentId, {limit: 1500})).length;}, volume.id);
     assert(pageCount > 100); assert.equal((await state()).comics.length, 1);
     await reader.screenshot({path: path.join(out, 'volume-continuation.png')});
     checks.push('Real volume continuation imports its existing chapter and reads page 55 of all three source parts');
   }
-  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', live, entries: imported.entries.length, checks, errors, models: false}, null, 2));
+  assert.deepEqual(sourceFailures, [], 'Source failures are reported separately from reader checks');
+  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'passed', live, entries: imported.entries.length, checks, errors, sourceFailures, models: false}, null, 2));
   console.log(JSON.stringify({out, live, checks}, null, 2));
 } catch (error) {
-  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'failed', live, checks, errors, error: error.message}, null, 2));
+  await writeFile(path.join(out, 'result.json'), JSON.stringify({status: 'failed', live, checks, errors, sourceFailures, error: error.message, models: false}, null, 2));
   if (reader && !reader.isClosed()) {await reader.screenshot({path: path.join(out, 'failure.png')}); console.log((await reader.locator('body').innerText()).slice(-2500));}
   console.log(JSON.stringify({out, errors})); throw error;
 } finally {await context.close();}

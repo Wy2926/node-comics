@@ -81,6 +81,7 @@ async function request(context: SourceNetworkContext, url: string) {
   return html;
 }
 export const network = {
+  pageTransport: ['catalog'],
   search,
   async catalog(url, context) {
     const loc = location(url);

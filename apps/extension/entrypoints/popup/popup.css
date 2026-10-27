@@ -277,14 +277,14 @@ html,body,#root {
     transition: none;
   }
 }
-/* iPad uses an intrinsically sized popover too. A percentage root width makes
-   its initial viewport collapse; only phone sheets provide their own width. */
+/* iPad uses an intrinsically sized popover. Percentage root width or viewport
+   height limits can collapse its initial size; only phone sheets size themselves. */
 @media (max-device-width: 700px) and (pointer: coarse), (max-device-width: 700px) and (hover: none) {
   html, body, #root { width: 100%; }
+  .nc-app.nc-popup { max-height: 100dvh; }
 }
 @media (max-device-width: 1000px) and (pointer: coarse), (max-device-width: 1000px) and (hover: none) {
   :root { background: var(--surface); }
-  .nc-app.nc-popup { max-height: 100dvh; }
   .nc-popup-header { gap: 10px; padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); }
   .nc-popup-scroll { padding: 12px max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
   .nc-popup-brand { min-height: 44px; min-width: 0; }

@@ -29,21 +29,27 @@ try {
   assert(doupo.items.some(hit => hit.title === '斗破苍穹'));
   const doupoMore = doupo.nextCursor ? await network.search({siteId: 'baozimh', query: '斗破', cursor: doupo.nextCursor}, {request}) : {items: []};
   const hit = hits.items.find(row => row.title === '葬送者芙莉莲'); assert(hit);
-  assert(hits.nextCursor); const more = await network.search({...query, cursor: hits.nextCursor}, {request}); assert(more.items.length);
+  // Live result counts change; only request a next page when the source supplies one.
+  const more = hits.nextCursor ? await network.search({...query, cursor: hits.nextCursor}, {request}) : {items: []};
+  if (hits.nextCursor) assert(more.items.length);
   const catalog = await network.catalog(hit.catalogUrl, {request}); assert(catalog.complete && catalog.entries.length > 100);
   const short = await network.catalog('https://cn.baozimh.com/comic/2026bianfurilianggeshijiedebianfuxia-dccomics', {request});
   assert(short.complete && short.entries.length > 0 && short.entries.length <= 24);
   const shortPages = await network.pages(short.entries[0].url, {request}); assert(shortPages.discoveryComplete && shortPages.items.length);
   const volume = catalog.entries.find(row => row.title === '第01卷'); assert(volume);
   const pages = await network.pages(volume.url, {request}); assert(pages.discoveryComplete && pages.items.length > 100);
-  const bytes = [];
-  for (const url of [catalog.cover.url, pages.items[0].resource.url]) {
+  const bytes = [], images = [];
+  for (const [kind, url] of [['cover', catalog.cover.url], ['page', pages.items[0].resource.url], ['short-page', shortPages.items[0].resource.url]]) {
     const response = await fetch(url, {signal: AbortSignal.timeout(30000)});
-    assert(response.ok && response.headers.get('content-type').startsWith('image/')); bytes.push((await response.arrayBuffer()).byteLength);
+    const size = (await response.arrayBuffer()).byteLength;
+    const ok = response.ok && !!response.headers.get('content-type')?.startsWith('image/');
+    images.push({kind, host: new URL(url).hostname, status: response.status, contentType: response.headers.get('content-type'), size, ok});
+    bytes.push(size);
   }
   // The site's fuzzy search can return real suggestions even for an unrelated query.
   await network.search({siteId: 'baozimh', query: 'zzqv987654nonexistent'}, {request});
-  const result = {status: 'passed', requests, search: hits.items.length + more.items.length, doupoSearch: doupo.items.length + doupoMore.items.length, entries: catalog.entries.length, shortEntries: short.entries.length, shortPages: shortPages.items.length,
-    pages: pages.items.length, uniqueImages: new Set(pages.items.map(p => p.resource.url)).size, bytes};
+  const result = {status: images.every(image => image.ok) ? 'passed' : 'failed', catalogUrl: catalog.url, volumeUrl: volume.url, requests, search: hits.items.length + more.items.length, doupoSearch: doupo.items.length + doupoMore.items.length, entries: catalog.entries.length, shortEntries: short.entries.length, shortPages: shortPages.items.length,
+    pages: pages.items.length, uniqueImages: new Set(pages.items.map(p => p.resource.url)).size, bytes, images};
   await writeFile(path.join(out, 'result.json'), JSON.stringify(result, null, 2)); console.log(JSON.stringify({out, ...result}));
+  assert(images.every(image => image.ok), 'One or more source images failed; see result.json');
 } finally {await browser?.close();}

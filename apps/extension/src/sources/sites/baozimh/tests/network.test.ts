@@ -4,13 +4,24 @@ import {definition, chapterUrl, chapterKey, catalogKey} from '../definition';
 import {network, parseCatalog, parsePart} from '../network';
 import {validateSourceCatalog, sourceFor} from '../../../index';
 import {readSourceCatalog} from '../../../runtime/catalog-reader';
+import {withPageNetworkContext} from '../../../runtime/page-network';
 import {importCatalog} from '../../../../comics/application/import-service';
 import {applyCatalogRefresh} from '../../../../comics/application/catalog-service';
 import {catalog} from '../../../../comics/repositories';
 import {catalogHtml, loc, url, reader, readerHtml, image} from './fixtures';
 
-afterEach(() => vi.unstubAllGlobals());
+vi.mock('../../../runtime/page-network', () => ({withPageNetworkContext: vi.fn()}));
+afterEach(() => {vi.unstubAllGlobals(); vi.mocked(withPageNetworkContext).mockReset();});
 describe('Baozi complete HTTP adapter', () => {
+  it('reads a verified source-page catalog when extension HTTP would return 403', async () => {
+    const direct = vi.fn().mockResolvedValue(new Response('Verification required', {status: 403}));
+    vi.stubGlobal('fetch', direct);
+    const request = vi.fn().mockResolvedValue(catalogHtml());
+    vi.mocked(withPageNetworkContext).mockImplementation(async (_url, signal, read) => read({signal, request}));
+    expect((await readSourceCatalog(url)).entries).toHaveLength(27);
+    expect(request).toHaveBeenCalledWith(url);
+    expect(direct).not.toHaveBeenCalled();
+  });
   it('unifies catalog entry, redirected chapter and continuation identities without claiming other hosts', () => {
     const direct = `https://cn.baozimh.com/user/page_direct?chapter_slot=0&section_slot=0&comic_id=${loc.comic}`;
     for (const address of [reader, chapterUrl(loc, 2), direct]) {
@@ -91,8 +102,9 @@ describe('Baozi complete HTTP adapter', () => {
   it('does not replace an imported catalog on failure and applies new chapters idempotently', async () => {
     const original = parseCatalog(catalogHtml(), url), imported = await importCatalog(original);
     const before = await catalog.list('entries', {index: 'comicId', range: imported.id});
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(catalogHtml().replace('查看全部27', '查看全部28'))));
-    await expect(readSourceCatalog(url)).rejects.toThrow();
+    vi.mocked(withPageNetworkContext).mockImplementation(async (_url, signal, read) => read({signal,
+      request: async () => catalogHtml().replace('查看全部27', '查看全部28')}));
+    await expect(readSourceCatalog(url)).rejects.toThrow('包子漫画页面不完整或结构已变化');
     expect(await catalog.list('entries', {index: 'comicId', range: imported.id})).toEqual(before);
     const comic = await catalog.get('comics', imported.id), updated = parseCatalog(catalogHtml(28), url);
     await applyCatalogRefresh(imported.id, comic!.source.generation, updated);

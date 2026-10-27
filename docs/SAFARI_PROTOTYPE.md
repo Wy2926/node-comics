@@ -62,7 +62,7 @@ Safari 构建移除 iOS 不支持的 `identity`、`webRequest` 和 `contextMenus
 
 Safari 网站权限模式不接受端口号；权限模式按协议与主机生成，实际网络 URL 保留原端口。消息目标使用 `documentId`（可用时）或主框架 `frameId: 0`，不同时传两者；接收端仍核对文档和导航身份。
 
-iOS 文件选择器使用通用文件类型打开，避免未注册的 CBZ／CBR／MOBI 扩展名变灰；实际格式与内容仍由导入器校验。iPhone 扩展弹窗随系统面板宽度布局，iPad 保留 420px 固有宽度，避免自动尺寸浮窗塌缩。通用弹窗按 visual viewport 定位，软件键盘弹出后仍可滚动正文并操作关闭和底部按钮。PDF 与 EPUB 的资源及隔离规则见[导入格式与缓存](IMPORT_FORMATS_AND_CACHE.md)。
+iOS 文件选择器使用通用文件类型打开，避免未注册的 CBZ／CBR／MOBI 扩展名变灰；实际格式与内容仍由导入器校验。iPhone 扩展弹窗随系统面板宽度和视口高度布局；iPad 保留 420px 固有宽度与 600px 高度上限，由内容决定高度，避免浮窗初始视口反向约束内容导致塌缩。通用弹窗按 visual viewport 定位，软件键盘弹出后仍可滚动正文并操作关闭和底部按钮。PDF 与 EPUB 的资源及隔离规则见[导入格式与缓存](IMPORT_FORMATS_AND_CACHE.md)。
 
 书架卡片的长按由应用菜单处理，禁用卡片内的原生图片呼出菜单与文本选择，避免 Safari 菜单盖住导出等操作；阅读正文不受此限制。
 
