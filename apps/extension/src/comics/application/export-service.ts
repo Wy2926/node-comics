@@ -1,6 +1,7 @@
 import type {Job} from '../../types';
 import type {TranslationScope} from '../../translation/channels/contracts';
 import {msg} from '../../i18n/runtime';
+import {isSafariExtension} from '../../platform';
 import {catalog} from '../repositories';
 import {acquirePage} from '../pages/service';
 import {openContainer} from '../../storage/containers';
@@ -127,7 +128,13 @@ export async function chooseExportDestination(name:string):Promise<WritableStrea
   if(!picker)return undefined;
   const handle=await picker.call(window,{suggestedName:name});return handle.createWritable();
 }
-export function saveBufferedExport(result:ExportResult){
+/** Safari cannot download extension Blob URLs. Return a file for a fresh Save gesture. */
+export function saveBufferedExport(result:ExportResult):File|undefined{
   if(!result.blob)return;
+  if(isSafariExtension()){
+    const file=new File([result.blob],result.name,{type:result.blob.type});
+    if(typeof navigator.share!=='function'||!navigator.canShare?.({files:[file]}))throw Error(msg('此浏览器无法保存此文件，请更新浏览器后重试。'));
+    return file;
+  }
   const url=URL.createObjectURL(result.blob),link=document.createElement('a');link.href=url;link.download=result.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60_000);
 }

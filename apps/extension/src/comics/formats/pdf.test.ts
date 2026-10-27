@@ -1,11 +1,11 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-const pdf=vi.hoisted(()=>({options:undefined as unknown as {disableAutoFetch:boolean;disableStream:boolean;range:{requestDataRange(begin:number,end:number):void}},open:vi.fn(),getPage:vi.fn(),destroy:vi.fn(),render:vi.fn(),cleanup:vi.fn()}));
-vi.mock('pdfjs-dist/legacy/build/pdf.mjs',()=>({GlobalWorkerOptions:{},PDFDataRangeTransport:class{constructor(public length:number,public initial:Uint8Array){}onDataRange(){}},getDocument:(options:typeof pdf.options)=>{pdf.options=options;return {promise:pdf.open(),destroy:pdf.destroy};}}));
+const pdf=vi.hoisted(()=>({options:undefined as unknown as {worker:{port:unknown};disableAutoFetch:boolean;disableStream:boolean;range:{requestDataRange(begin:number,end:number):void}},open:vi.fn(),getPage:vi.fn(),destroy:vi.fn(),workerDestroy:vi.fn(),workerStart:vi.fn(),terminate:vi.fn(),render:vi.fn(),cleanup:vi.fn()}));
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs',()=>({PDFWorker:class{static create(options:{port:unknown}){return new this(options);}port:unknown;constructor({port}:{port:unknown}){this.port=port;}destroy=pdf.workerDestroy;},PDFDataRangeTransport:class{constructor(public length:number,public initial:Uint8Array){}onDataRange(){}},getDocument:(options:typeof pdf.options)=>{pdf.options=options;return {promise:pdf.open(),destroy:pdf.destroy};}}));
 import {openPdfDocument} from './pdf';
-import {GlobalWorkerOptions} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {RandomAccessSource} from './contracts';
 beforeEach(()=>{
   vi.clearAllMocks();vi.stubGlobal('location',{origin:'chrome-extension://fixture'});
+  vi.stubGlobal('Worker',class{constructor(url:string,options:WorkerOptions){pdf.workerStart(url,options);}terminate=pdf.terminate;});
   pdf.open.mockResolvedValue({numPages:3,getPage:pdf.getPage});
   pdf.destroy.mockResolvedValue(undefined);pdf.render.mockImplementation(()=>({promise:Promise.resolve(),cancel:vi.fn()}));
   pdf.getPage.mockImplementation(async()=>({getViewport:({scale}:{scale:number})=>({width:300*scale,height:500*scale}),render:pdf.render,cleanup:pdf.cleanup}));
@@ -17,9 +17,20 @@ describe('PDF range and page-render contract',()=>{
   it('indexes page numbers without rendering and disables automatic whole-document fetching',async()=>{
     const {value,readAt}=source(),session=await openPdfDocument(value);
     try{expect(await session.index()).toHaveLength(3);expect(pdf.getPage).not.toHaveBeenCalled();expect(readAt).toHaveBeenCalledTimes(1);expect(readAt.mock.calls[0].slice(0,2)).toEqual([0,65536]);expect(pdf.options).toMatchObject({disableAutoFetch:true,disableStream:true});
-      expect(GlobalWorkerOptions.workerSrc).toBe('chrome-extension://fixture/import-assets/pdf/pdf.worker.mjs');
+      expect(pdf.workerStart).toHaveBeenCalledExactlyOnceWith('chrome-extension://fixture/import-assets/pdf/pdf.worker.mjs',{type:'module'});
+      expect(pdf.options.worker.port).toBeInstanceOf(Worker);
       const pages=await session.index(),blob=await session.materialize(pages[2]);expect(blob.type).toBe('image/png');expect(pdf.getPage).toHaveBeenCalledExactlyOnceWith(3);expect(pdf.cleanup).toHaveBeenCalledOnce();
     }finally{await session.close();}
+  });
+  it('preserves Safari runtime resource URLs and releases the dedicated worker on close or failure',async()=>{
+    vi.stubGlobal('location',{origin:'safari-web-extension://lowercase'});
+    vi.stubGlobal('chrome',{runtime:{getURL:(path:string)=>'safari-web-extension://UPPERCASE/'+path}});
+    const session=await openPdfDocument(source().value);
+    expect(pdf.workerStart).toHaveBeenCalledWith('safari-web-extension://UPPERCASE/import-assets/pdf/pdf.worker.mjs',{type:'module'});
+    await session.close();expect(pdf.workerDestroy).toHaveBeenCalledTimes(1);expect(pdf.terminate).toHaveBeenCalledTimes(1);
+    pdf.open.mockRejectedValue(new Error('invalid document'));
+    await expect(openPdfDocument(source().value)).rejects.toThrow('invalid document');
+    expect(pdf.workerDestroy).toHaveBeenCalledTimes(2);expect(pdf.terminate).toHaveBeenCalledTimes(2);
   });
   it('stops an excessive range request instead of falling back to the complete source',async()=>{
     const {value,readAt}=source(),session=await openPdfDocument(value);

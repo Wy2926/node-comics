@@ -11,6 +11,7 @@ import { RequestPool, UPLOAD_CONCURRENCY } from './concurrency';
 import { msg } from './i18n/runtime';
 import { Icon } from './icons';
 import { COMIC_ACCEPT } from './comics/formats/limits';
+import {isSafariExtension} from './platform';
 import { LocalImportQueue } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
 import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, getComic, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, coverReference, setSourceLanguagePreference, type Comic, type ReadingDirectory } from './comics/application/library-service';
@@ -375,7 +376,9 @@ export function App(){
   <div style={{display:'contents'}} inert={searchOpen||undefined}>
   <DownloadLanguagesPopover controller={downloads}/>
   <FileDownloadPrompt controller={downloads}/>
-  <input aria-label={msg('选择漫画文件')} type="file" multiple accept={COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
+  {/* iOS cannot map CBZ/CBR/MOBI extensions to picker types. Generic data keeps
+      the document picker usable; imports still validate supported formats. */}
+  <input aria-label={msg('选择漫画文件')} type="file" multiple accept={isSafariExtension()?'application/octet-stream':COMIC_ACCEPT} ref={input} className="hidden-input" onChange={e=>chooseFiles(Array.from(e.target.files??[]))}/>
   {!current&&<header className="nc-app-header">
    <button className="nc-brand" aria-label={msg('返回我的漫画')} onClick={()=>nav('library')}><BrandLogo/></button>
    <nav aria-label={msg('主导航')}>

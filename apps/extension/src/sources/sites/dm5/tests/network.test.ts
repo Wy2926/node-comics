@@ -60,6 +60,21 @@ describe('DM5 HTTP adapter', () => {
     expect(definition.identify(new URL('https://www.dm5.com/m1836194/#nodelane-dm5=bad%2Fpath'))?.kind).toBe('other');
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });
+  it('recognizes Safari mobile redirects without changing comic or chapter identity', () => {
+    expect(definition.identify(new URL(url.replace('www.', 'm.')))).toMatchObject({pageKey:'dm5:fixture',kind:'catalog',catalog:{key:'dm5:fixture',url}});
+    expect(definition.identify(new URL(reader(true).replace('www.', 'm.')))).toMatchObject({pageKey:'dm5:chapter:1836194',kind:'reader',catalog:{key:'dm5:fixture',url}});
+    expect(definition.installation.optionalContentMatches).toContain('https://m.dm5.com/*');
+    for(const target of ['https://m.dm5.com.evil.test/manhua-fixture/','https://u@m.dm5.com/manhua-fixture/','https://m.dm5.com:8443/manhua-fixture/','http://m.dm5.com/manhua-fixture/'])expect(definition.identify(new URL(target))).toBeNull();
+  });
+  it('reads mobile links through the existing desktop protocol and verifies chapter ownership', async () => {
+    const read=vi.fn(async(target:string)=>target.includes('/manhua-')?html():readerHtml);
+    expect(await network.catalog!(url.replace('www.','m.'),{request:read})).toMatchObject({id:'dm5:fixture',url});
+    expect(read).toHaveBeenCalledExactlyOnceWith(url,{desktop:true});
+    read.mockClear();
+    expect(await network.resolveCatalog!(reader(true).replace('www.','m.'),{request:read})).toBe(url);
+    expect(read).toHaveBeenCalledExactlyOnceWith(reader(false),{desktop:true});
+    await expect(network.resolveCatalog!(reader(true).replace('www.','m.').replace('=fixture','=foreign'),{request:read})).rejects.toThrow('不属于');
+  });
   it('checks advertised counts and preserves source groups and ascending reading order', () => {
     const source = validateSourceCatalog(parseCatalog(html([1836195, 1836194], 2), url));
     expect(source.entries.map(e => e.remoteId)).toEqual(['1836194', '1836195']);

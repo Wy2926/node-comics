@@ -4,7 +4,7 @@ import icon from './icon.svg?inline';
 
 export const origin = 'https://www.dm5.com';
 export function dm5Location(url: URL) {
-  if (url.protocol !== 'https:' || !['www.dm5.com', 'dm5.com'].includes(url.hostname) || url.port || url.username || url.password) return null;
+  if (url.protocol !== 'https:' || !['www.dm5.com', 'dm5.com', 'm.dm5.com'].includes(url.hostname) || url.port || url.username || url.password) return null;
   const catalog = /^\/manhua-([a-z0-9-]+)\/$/.exec(url.pathname);
   if (catalog) return {slug: catalog[1], chapterId: undefined};
   const chapter = /^\/m([1-9]\d*)(?:-p[1-9]\d*)?\/$/.exec(url.pathname);
@@ -24,7 +24,7 @@ export const definition: SourceDefinition = {
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {
-    if (url.protocol !== 'https:' || !['www.dm5.com', 'dm5.com'].includes(url.hostname) || url.port || url.username || url.password) return null;
+    if (url.protocol !== 'https:' || !['www.dm5.com', 'dm5.com', 'm.dm5.com'].includes(url.hostname) || url.port || url.username || url.password) return null;
     const loc = dm5Location(url);
     if (!loc) return {sourceId: this.id, pageKey: 'dm5:' + url.href, kind: 'other', url: url.href};
     return {sourceId: this.id, pageKey: loc.chapterId ? 'dm5:chapter:' + loc.chapterId : 'dm5:' + loc.slug,

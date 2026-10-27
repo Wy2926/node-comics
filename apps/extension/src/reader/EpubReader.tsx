@@ -327,10 +327,14 @@ export function EpubReader({
           new KeyboardEvent("keyup", { key: event.key, code: event.code }),
         ),
       );
-      view.on('click', (event: MouseEvent) => {
-        const target = event.target as Element | null;
-        if (event.defaultPrevented || target?.closest('a,button,input,select,textarea,[role="button"],[contenteditable]') || target?.ownerDocument.getSelection()?.toString()) return;
-        latest.current.toggleControls();
+      view.hooks.content.register((contents: import('epubjs/types/contents').default) => {
+        // iOS synthesizes clicks for descendants when their body has a click
+        // listener; a document-only listener misses taps on plain text/images.
+        contents.document.body.addEventListener('click', (event: MouseEvent) => {
+          const target = event.target as Element | null;
+          if (event.defaultPrevented || target?.closest('a,button,input,select,textarea,[role="button"],[contenteditable]') || target?.ownerDocument.getSelection()?.toString()) return;
+          latest.current.toggleControls();
+        });
       });
       await view.started;
       current.signal?.throwIfAborted();

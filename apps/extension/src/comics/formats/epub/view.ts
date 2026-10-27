@@ -19,7 +19,10 @@ export function epubView(unload: (view: IframeView) => void) {
   return class EpubView extends IframeView {
     private pendingDisplay?: Promise<unknown>;
     constructor(...args: ConstructorParameters<typeof IframeView>) {
-      super(args[0], {...args[1], method: 'blobUrl', allowScriptedContent: false});
+      // WebKit blocks even parent-owned event callbacks without allow-scripts.
+      // Resources sanitizes every chapter and prepends script-src 'none'; that
+      // policy still forbids book scripts, while reader tap/link handlers work.
+      super(args[0], {...args[1], method: 'blobUrl', allowScriptedContent: true});
     }
     override expand(force?: boolean) {
       if (this.contents && this.layout.name === 'pre-paginated' && this.layout.divisor === 1)

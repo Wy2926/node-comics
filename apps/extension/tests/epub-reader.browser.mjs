@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createRequire} from 'node:module';
-import {mkdir} from 'node:fs/promises';
+import {mkdir, mkdtemp, rm} from 'node:fs/promises';
 import path from 'node:path';
 
 const playwright = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -83,7 +83,7 @@ async function mobileGeometry(page) {
     return {top: box('.nc-reader-rail.left'), bottom: box('.nc-reader-rail.right'), canvas: box('.nc-epub-stage'), overflow: document.documentElement.scrollWidth > innerWidth + 1};
   });
   assert.equal(geometry.overflow, false);
-  assert(geometry.canvas.top === 0 && geometry.canvas.bottom === page.viewportSize().height, 'Immersive tools must overlay a full-height EPUB canvas');
+  assert(Math.abs(geometry.canvas.top) < 1 && Math.abs(geometry.canvas.bottom - page.viewportSize().height) < 1, 'Immersive tools must overlay a full-height EPUB canvas');
   for (const name of ['关闭阅读器', '打开目录', '阅读设置']) await reachable(page, name);
   await (await reachable(page, '打开目录')).click();
   await (await reachable(page, '关闭面板')).click();
@@ -92,9 +92,12 @@ async function mobileGeometry(page) {
 for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').split(',')) {
   for (const scenario of ['navigation-and-reopen', 'close-while-loading', 'single-image-failure', 'original-enhancement-failure', 'prefetched-enhancement-failure']) {
     test(`${engine}: mobile EPUB ${scenario}`, {timeout: 180_000}, async t => {
-      const browser = await playwright[engine].launch({headless: true,
-        ...(engine === 'chromium' && process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {})});
-      const context = await browser.newContext({viewport: {width: 390, height: 844}, hasTouch: true,
+      // macOS WebKit's ephemeral data store rejects IndexedDB Blob writes.
+      // Use a fresh on-disk profile, as native Safari does, for durable image receipts.
+      const profile = await mkdtemp(path.join(output, `${engine}-profile-`));
+      const context = await playwright[engine].launchPersistentContext(profile, {headless: true,
+        ...(engine === 'chromium' && process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}),
+        viewport: {width: 390, height: 844}, hasTouch: true,
         ...(engine === 'firefox' ? {} : {isMobile: true}), locale: 'zh-CN', reducedMotion: 'reduce'});
       const errors = [], external = [];
       await context.route(/^https?:\/\//, route => {
@@ -112,6 +115,24 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
         await ready(page);
         await showTools(page);
         if (scenario === 'navigation-and-reopen') {
+          await t.test('chapter CSP blocks book scripts while parent reader events remain available', async () => {
+            await page.evaluate(async () => {
+              const frame = document.querySelector('.nc-epub-viewport iframe'), doc = frame.contentDocument;
+              const policy = doc.querySelector('meta[http-equiv="Content-Security-Policy"]');
+              if (!policy?.content.includes("script-src 'none'")) throw Error('Missing chapter script policy');
+              window.epubScriptExecuted = false;
+              const script = doc.createElement('script'); script.textContent = 'parent.epubScriptExecuted = true'; doc.body.append(script);
+              const external = doc.createElement('script'); external.src = URL.createObjectURL(new Blob(['parent.epubScriptExecuted = true'], {type:'text/javascript'}));
+              const blocked = new Promise(resolve => {external.onload = () => resolve(false); external.onerror = () => resolve(true);});
+              doc.body.append(external);
+              const button = doc.createElement('button'); button.textContent = 'Untrusted event'; button.setAttribute('onclick','parent.epubScriptExecuted = true'); doc.body.append(button); button.click();
+              if (!await blocked) throw Error('Chapter loaded an external script');
+              button.remove();
+              script.remove(); external.remove(); URL.revokeObjectURL(external.src);
+            });
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            assert.equal(await page.evaluate(() => window.epubScriptExecuted), false, 'EPUB content must never run script');
+          });
           await t.test('default immersive toolbar toggles from iframe taps without resizing or moving the text', async () => {
             assert(await page.locator('.nc-reader').evaluate(element => element.classList.contains('is-immersive')));
             await page.waitForFunction(() => document.querySelector('.nc-reader').classList.contains('controls-hidden'));
@@ -314,7 +335,7 @@ for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').spl
         await page.screenshot({path: path.join(output, `${engine}-${scenario}-failed.png`)}).catch(() => {});
         if (errors.length) console.error(errors);
         throw error;
-      } finally {await browser.close();}
+      } finally {await context.close(); await rm(profile, {recursive: true, force: true});}
     });
   }
 }

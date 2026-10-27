@@ -1171,5 +1171,7 @@
   "仿真翻页": "Virar folha",
   "左右滑动": "Deslizar",
   "淡入淡出": "Esmaecer",
-  "无动画": "Nenhuma"
+  "无动画": "Nenhuma",
+  "此浏览器无法保存此文件，请更新浏览器后重试。": "Este navegador não pode salvar o arquivo. Atualize-o e tente novamente.",
+  "文件已准备好，请点击“保存”选择位置。": "O arquivo está pronto. Selecione “Salvar” para escolher um local."
 }

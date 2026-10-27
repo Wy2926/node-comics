@@ -135,6 +135,10 @@
 /* Responsive geometry stays separate from the shared color, radius and shadow tokens. */
 .nc-app fieldset { min-inline-size: 0; min-width: 0; }
 .nc-app dialog.modal.nc-viewport-dialog, .nc-app dialog.nc-shortcut-panel.nc-viewport-dialog {
+  position: fixed;
+  inset: calc(var(--nc-viewport-top, 0px) + var(--nc-viewport-height, 100dvh) / 2) auto auto calc(var(--nc-viewport-left, 0px) + var(--nc-viewport-width, 100vw) / 2);
+  transform: translate(-50%, -50%);
+  margin: 0;
   max-width: calc(var(--nc-viewport-width, 100vw) - 32px);
   max-height: calc(var(--nc-viewport-height, 100dvh) - 32px);
 }

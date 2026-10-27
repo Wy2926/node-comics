@@ -24,6 +24,7 @@
     .nc-app .nc-app-header .nc-header-actions .nc-icon { width: 22px; height: 22px; }
     .nc-app .nc-app-header>nav { gap: 2px; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
     .nc-app .nc-app-header>nav>button { gap: 2px; padding: 0; }
+    .nc-app .nc-app-header>nav>button>span { line-height: 1.5; }
     .nc-app .nc-app-header>nav>button>.nc-icon { width: 20px; height: 20px; }
     .nc-app .nc-main {
       padding: 12px max(var(--nc-phone-gutter), env(safe-area-inset-right, 0px)) 20px max(var(--nc-phone-gutter), env(safe-area-inset-left, 0px));

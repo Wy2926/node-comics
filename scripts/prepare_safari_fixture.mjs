@@ -23,6 +23,18 @@ async function withRule(url,header,operation,value,read,scope=true){const id=700
 (async()=>{
  await report('runtime',{origin:chrome.runtime.getURL(''),identity:!!chrome.identity,webRequest:!!chrome.webRequest,webNavigation:!!chrome.webNavigation,locks:!!navigator.locks,dnr:!!chrome.declarativeNetRequest,tabs:!!chrome.tabs,scripting:!!chrome.scripting,storageAccess:typeof chrome.storage?.local?.setAccessLevel});
  await probe('permissions',()=>chrome.permissions.contains({origins:['http://*/*','https://*/*']}));
+ await probe('file-share',()=>({available:typeof navigator.share==='function',formats:Object.fromEntries(['pdf','zip','cbz','epub','mobi','cbr','rar'].map(extension=>[extension,navigator.canShare?.({files:[new File(['synthetic'],'sample.'+extension,{type:'application/octet-stream'})]})??false]))}));
+ const save=document.createElement('button');save.textContent='Save test file / 保存测试文件';save.style.cssText='padding:12px;margin:12px';output.before(save);
+ save.onclick=()=>{void probe('file-share-save',()=>navigator.share({files:[new File(['Safari original export probe'],'safari-export-probe.txt',{type:'text/plain'})]}));};
+ await probe('indexeddb-blob',async()=>{
+  const name='nodelane-safari-isolated-blob-probe';
+  const database=await new Promise((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('data');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  try{
+   await new Promise((resolve,reject)=>{const tx=database.transaction('data','readwrite');tx.objectStore('data').put(new Blob(['synthetic'],{type:'text/plain'}),'sample');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
+   const blob=await new Promise((resolve,reject)=>{const request=database.transaction('data').objectStore('data').get('sample');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+   return {stored:await blob.text()==='synthetic'};
+  }finally{database.close();indexedDB.deleteDatabase(name);}
+ });
  await probe('token-origin',()=>withRule(api+'/probe-origin','Origin','remove',null,async()=>{const r=await fetch(api+'/probe-origin',{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',body:'synthetic'});return r.json();}));
  await probe('source-referer',()=>withRule(api+'/source.png','Referer','set','http://localhost:4737/',async()=>{const r=await fetch(api+'/source.png',{referrerPolicy:'no-referrer'});const bytes=await r.arrayBuffer();return {status:r.status,bytes:bytes.byteLength};}));
  await probe('origin-without-initiator',()=>withRule(api+'/probe-origin','Origin','remove',null,async()=>{const r=await fetch(api+'/probe-origin',{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',body:'synthetic'});return r.json();},false));

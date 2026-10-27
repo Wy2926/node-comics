@@ -18,6 +18,8 @@
 
 EPUB 正文不建立图片页身份，不执行图片规范化，也不提供文字翻译；包内位图按[来源架构](COMIC_SOURCE_ARCHITECTURE.md#元数据与身份)接入既有逐图翻译。格式层用有界 zip.js 读取原包，EPUB.js 解析目录和原生文字排版；只为当前章节解析并持有包内样式、图片与字体，离章释放衍生 URL。脚本、表单、音视频和远程资源不运行／加载，不能将带外链的电子书视为允许联网的网页。完整原包可离线读取，来源断开仍按来源状态拒绝继续显示。位置保存 CFI 和相对包内 href，章节内比例与全书比例分开，不受字体变化产生的屏幕页数影响。
 
+章节先清理内容，再在 head 首位加入 `script-src 'none'` 等 CSP。iframe 允许宿主阅读器注册事件所需的脚本能力，以兼容 WebKit；书内脚本、事件属性和外部脚本仍由清理与 CSP 禁止。正文点按监听注册在 body，保证 iOS Safari 能为文字和图片生成点击事件。
+
 ## 结果与缓存
 
 完整本地文件、显式下载原图、自动页缓存、分段、缩略图和译图分别管理。清理普通缓存不删除完整源文件、主动下载资料和阅读进度。
@@ -41,6 +43,8 @@ EPUB 正文不建立图片页身份，不执行图片规范化，也不提供文
 RAR 的 Emscripten 动态命名和 Embind 参数转换函数由 [unrar-csp.ts](../apps/extension/unrar-csp.ts)替换为静态闭包，保留参数转换、析构顺序和原 WASM。升级时构建检查会要求重新审阅。MV3 只增加本地 WASM 所需的 `wasm-unsafe-eval`，未允许 JavaScript `unsafe-eval`。Worker、字体、WASM 均随扩展发布，无运行时 CDN 依赖。
 
 PDF.js 的主模块与 Worker 由 [pdfjs-csp.ts](../apps/extension/pdfjs-csp.ts)将 core-js 的旧 IE／WSH `Object.create` 回退替换为受支持浏览器均具备的原生实现，移除 ActiveX、动态 iframe 和脚本字符串拼接；保留其余 legacy 兼容逻辑，不提高现有浏览器版本要求。原代码段摘要不匹配时构建失败，升级依赖必须复核。依赖清单记录上游文件摘要与此修改，Apache-2.0／MIT 许可继续随包保留。
+
+扩展内 PDF 资源地址由 `runtime.getURL` 生成并保留原大小写；每个文档持有独立模块 Worker，在关闭或打开失败时释放，避免 PDF.js 按 HTTP 来源判断 Safari 扩展地址并回退到错误的 Worker 路径。
 
 验证命令与产物位置见[脚本说明](../scripts/README.md#来源与阅读验收)。浏览器使用原创合成页，译图由隔离测试供应商产生，验证恢复及计费行为，不代表真实模型翻译效果。
 

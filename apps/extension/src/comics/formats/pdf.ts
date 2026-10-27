@@ -1,4 +1,4 @@
-import {getDocument, GlobalWorkerOptions, PDFDataRangeTransport} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {getDocument, PDFWorker, PDFDataRangeTransport} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {MAX_PAGES, MiB} from './limits';
 import {throwIfAborted, type DocumentSession, type IndexedPage, type RandomAccessSource} from './contracts';
 
@@ -25,11 +25,16 @@ export async function openPdfDocument(source: RandomAccessSource, signal?: Abort
     override abort() { lifetime.abort(); }
   }
   const range = new SourceRange(source.snapshot.size, initial, true);
-  const assets = new URL('import-assets/pdf/', location.origin + '/').href;
-  GlobalWorkerOptions.workerSrc = assets + 'pdf.worker.mjs';
-  const task = getDocument({range, disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
+  // Safari's serialized location origin can change the case of its extension ID.
+  // Keep runtime resource URLs intact and avoid PDF.js's HTTP-only origin wrapper.
+  const assets = typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('import-assets/pdf/') : new URL('import-assets/pdf/', location.origin + '/').href;
+  const port = new Worker(assets + 'pdf.worker.mjs', {type: 'module'});
+  const worker = PDFWorker.create({port});
+  const task = getDocument({worker, range, disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
     useSystemFonts: false, stopAtErrors: true, maxImageSize: -1,
     cMapUrl: assets + 'cmaps/', cMapPacked: true, standardFontDataUrl: assets + 'standard_fonts/', wasmUrl: assets + 'wasm/'});
+  const destroy = async () => { try { await task.destroy(); } finally { worker.destroy(); port.terminate(); } };
   const timer = setTimeout(() => { failure = new Error('PDF 打开超时。'); void task.destroy(); }, 60_000);
   const cancelOpening=()=>{failure=signal?.reason??new DOMException('PDF 打开已取消。','AbortError');lifetime.abort();void task.destroy();};
   signal?.addEventListener('abort',cancelOpening,{once:true});
@@ -66,8 +71,8 @@ export async function openPdfDocument(source: RandomAccessSource, signal?: Abort
         } catch (error) { throw failure ?? pdfDiagnostic(error); }
         finally { clearTimeout(timeout); signal?.removeEventListener('abort', cancelDocument); canvas.width = canvas.height = 1; page?.cleanup(); }
       },
-      async close() { lifetime.abort(); await task.destroy(); },
+      async close() { lifetime.abort(); await destroy(); },
     };
-  } catch (error) { await task.destroy(); throw failure ?? pdfDiagnostic(error); }
+  } catch (error) { await destroy(); throw failure ?? pdfDiagnostic(error); }
   finally { clearTimeout(timer); signal?.removeEventListener('abort',cancelOpening); }
 }

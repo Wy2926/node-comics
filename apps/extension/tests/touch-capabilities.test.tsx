@@ -63,7 +63,7 @@ it('keeps popup sizing independent of the auto-sized native viewport', () => {
   expect(desktop).toContain('max-height: 600px;');
   expect(desktop).not.toMatch(/\d(?:d|s|l)?v[wh]/);
   expect(cssQueries('entrypoints/popup/popup.css').filter(query => query.includes('pointer:coarse')))
-    .toEqual(['(max-device-width:1000px)and(pointer:coarse),(max-device-width:1000px)and(hover:none)']);
+    .toEqual(['(max-device-width:700px)and(pointer:coarse),(max-device-width:700px)and(hover:none)', '(max-device-width:1000px)and(pointer:coarse),(max-device-width:1000px)and(hover:none)']);
   expect(readFileSync(new URL('../src/ui/select.css', import.meta.url), 'utf8')).not.toContain('.nc-popup');
 });
 

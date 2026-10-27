@@ -1171,5 +1171,7 @@
   "仿真翻页": "Lật trang",
   "左右滑动": "Trượt ngang",
   "淡入淡出": "Mờ dần",
-  "无动画": "Không"
+  "无动画": "Không",
+  "此浏览器无法保存此文件，请更新浏览器后重试。": "Trình duyệt này không thể lưu tệp. Hãy cập nhật trình duyệt rồi thử lại.",
+  "文件已准备好，请点击“保存”选择位置。": "Tệp đã sẵn sàng. Chọn “Lưu” để chọn vị trí."
 }

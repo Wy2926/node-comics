@@ -84,7 +84,7 @@ node scripts/verify_simple_reading.mjs
 | `node --test apps/extension/tests/confirmation.browser.mjs` | 同一 Vite 5181 的操作弹窗夹具；真实合成文件导出、未完整发现提示、单项／批量移除、离线清理、文件重下载、断开／移除书库及失败重试；检查 16 语、320px 深色大字、固定底栏与焦点恢复。仅隔离数据和模拟来源，阻断外网，截图写入 `artifacts/confirmation-dialogs/` |
 | `verify_reader_scroll.mjs` | Vite 5181 的阅读窗口夹具；模拟翻译状态与译图更新，检查章节交界、双向滚动、窗口淘汰、失败与位置恢复 |
 | `verify_reader_performance.mjs` | 同一 Vite 5181 的隔离夹具；120／1000 页章节分别执行状态刷新、双向滚动及混合更新，检查最多 4 页向后窗口、跨页回跳及固定操作步数下的尺寸读取预算，另覆盖小数页高的第二章。尺寸计数仅覆盖固定页面描述下的更新，精确几何复用由 `reader-window.test.ts` 验证；Chromium 主线程／布局耗时仅作诊断。`READER_PERF_LABEL` 只区分产物，不跳过断言；沿用 `PLAYWRIGHT_MODULE`／`TEST_CHROMIUM`，结果和截图写入 `output/playwright/reader-performance/`。合成本地 PNG，不代表源站网络、大图峰值内存或真机帧率 |
-| `node --test apps/extension/tests/directory-export.browser.mjs` | 同一 Vite 5181 的整章节目录导出夹具；真实 CBZ／ZIP／PDF、未读章节索引、单话版本去重、串行取图、取消／失败重试、位置保持，以及 16 语、320px 深色大字和固定底栏。合成来源、阻断外网，产物写入 `artifacts/directory-export/` |
+| `node --test apps/extension/tests/directory-export.browser.mjs` | 同一 Vite 5181 的整章节目录导出夹具；默认 Chromium，`EXPORT_BROWSER=webkit` 可检查 WebKit；真实 CBZ／ZIP／PDF、未读章节索引、单话版本去重、串行取图、取消／失败重试、位置保持，以及 16 语、320px 深色大字和固定底栏。合成来源、阻断外网，产物写入 `artifacts/directory-export/` |
 | `verify_reader_preload.mjs` | 同一 Vite 5181 夹具的 `?highres=1` 样本；真实 4000×6000 原图的邻页加载、非当前可见页、并排／单页、失败隔离、位置恢复与图片 URL 释放，不访问源站或翻译服务 |
 | `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、增强缓存查询期间父图独立显示、已有增强字节跳过父图读取、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |

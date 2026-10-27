@@ -1171,5 +1171,7 @@
   "仿真翻页": "Balik halaman",
   "左右滑动": "Geser",
   "淡入淡出": "Pudar",
-  "无动画": "Tanpa animasi"
+  "无动画": "Tanpa animasi",
+  "此浏览器无法保存此文件，请更新浏览器后重试。": "Browser ini tidak dapat menyimpan file. Perbarui browser, lalu coba lagi.",
+  "文件已准备好，请点击“保存”选择位置。": "File sudah siap. Pilih “Simpan” untuk memilih lokasi."
 }

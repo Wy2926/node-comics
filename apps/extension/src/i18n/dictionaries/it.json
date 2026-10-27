@@ -1171,5 +1171,7 @@
   "仿真翻页": "Sfoglia",
   "左右滑动": "Scorrimento",
   "淡入淡出": "Dissolvenza",
-  "无动画": "Nessuna"
+  "无动画": "Nessuna",
+  "此浏览器无法保存此文件，请更新浏览器后重试。": "Questo browser non può salvare il file. Aggiornalo e riprova.",
+  "文件已准备好，请点击“保存”选择位置。": "Il file è pronto. Seleziona “Salva” per scegliere una posizione."
 }

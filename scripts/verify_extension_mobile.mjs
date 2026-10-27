@@ -60,10 +60,13 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         if(name==='漫画网站'){
           const rows=await page.locator('.nc-site-card').evaluateAll(cards=>cards.map(card=>{
             const box=card.getBoundingClientRect(),icon=card.querySelector('.nc-site-monogram').getBoundingClientRect(),title=card.querySelector('h3').getBoundingClientRect();
-            return {x:box.x,y:box.y,width:box.width,height:box.height,iconRight:icon.right,titleLeft:title.left};
+            const footer=card.querySelector('.nc-site-card-footer').getBoundingClientRect();
+            return {title:card.querySelector('h3').textContent,x:box.x,y:box.y,width:box.width,height:box.height,iconRight:icon.right,titleLeft:title.left,contentFits:card.scrollHeight<=card.clientHeight+1&&footer.bottom<=box.bottom};
           }));
           assert(rows.length>2&&rows[1].y>=rows[0].y+rows[0].height,'Phone sites must be full-width horizontal rows, not a desktop card grid');
-          assert(rows.every(row=>row.iconRight<=row.titleLeft&&row.width>width*.8&&row.height<=154),'Phone site rows must keep icon beside readable metadata');
+          // Long names, language badges and touch-sized actions may wrap. Check
+          // readable, unclipped content instead of a fixed card height.
+          assert(rows.every(row=>row.iconRight<=row.titleLeft&&row.width>width*.8&&row.contentFits),`Phone site rows must keep icon beside readable metadata: ${JSON.stringify(rows.filter(row=>row.iconRight>row.titleLeft||row.width<=width*.8||!row.contentFits).slice(0,3))}`);
         }
         if(name==='搜索漫画'){
           const input=await page.getByRole('textbox',{name:'搜索名称',exact:true}).boundingBox(),submit=await page.getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
@@ -185,7 +188,7 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
       await page.setViewportSize({width,height});await hidden(page);await settle();
       await viewport.evaluate(el=>{el.scrollTop=220;});await settle();
       const before=await canvas();
-      assert(before.y===0&&before.height===height,`Hidden phone tools reserve space at ${width}x${height}: ${JSON.stringify(before)}`);
+      assert(Math.abs(before.y)<1&&Math.abs(before.height-height)<1,`Hidden phone tools reserve space at ${width}x${height}: ${JSON.stringify(before)}`);
       await shot(`reader-immersive-hidden-${width}`);
       await page.touchscreen.tap(width/2,height/2);await visible(page);await settle();
       assert.deepEqual(await canvas(),before,'Revealing tools must not resize or move the page');
@@ -220,6 +223,10 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     check(`immersive recovers ${844-reserved.height}px of vertical canvas at 390px; disabled mode retains its toolbar space`);
     // Remaining geometry/translation checks intentionally keep tools pinned.
     await viewport.evaluate(el=>{el.scrollTop=0;});await settle();
+    await page.waitForFunction(()=>{
+      const pages=[...document.querySelectorAll('.nc-manga-page')].slice(0,3);
+      return pages.length===3&&pages.every(page=>page.querySelector('.nc-page-image')?.naturalWidth>0);
+    });
     const pageGeometry=await page.locator('.nc-manga-page').evaluateAll(pages=>pages.slice(0,3).map(page=>{
       const box=page.getBoundingClientRect(),image=page.querySelector('.nc-page-image'),picture=page.querySelector('.nc-page-picture').getBoundingClientRect();
       return {index:Number(page.dataset.pageIndex),top:box.top,bottom:box.bottom,height:picture.height,expectedHeight:picture.width*image.naturalHeight/image.naturalWidth};
@@ -268,16 +275,16 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     // thousands of image pages or changing the reader's real eight-page session.
     for(const width of [320,360,390,844]){
       await page.setViewportSize({width,height:width===844?390:844});
-      const geometry=await jump.evaluate(input=>{
-        const root=document.documentElement,oldFont=root.style.fontSize,oldValue=input.value,total=input.nextElementSibling,oldTotal=total.textContent;
+      const geometry=await position.evaluate(label=>{
+        const root=document.documentElement,oldFont=root.style.fontSize,current=label.querySelector('strong'),total=current.nextElementSibling;
+        const oldValue=current.textContent,oldTotal=total.textContent,oldLong=label.dataset.long;
         try{
-          root.style.fontSize='20px';input.value='9999';total.textContent='/ 9999';
-          const style=getComputedStyle(input),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-          const box=input.getBoundingClientRect(),label=input.parentElement.getBoundingClientRect();
-          return {inputWidth:box.width,needed:ctx.measureText(input.value).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)+4,totalRight:total.getBoundingClientRect().right,labelRight:label.right,sliderWidth:document.querySelector('.nc-reader-progress').getBoundingClientRect().width};
-        }finally{root.style.fontSize=oldFont;input.value=oldValue;total.textContent=oldTotal;}
+          root.style.fontSize='20px';current.textContent='9999';total.textContent='/ 9999';label.dataset.long='true';
+          const box=label.getBoundingClientRect(),first=current.getBoundingClientRect(),last=total.getBoundingClientRect();
+          return {currentLeft:first.left,currentRight:first.right,totalLeft:last.left,totalRight:last.right,labelLeft:box.left,labelRight:box.right,sliderWidth:document.querySelector('.nc-reader-progress').getBoundingClientRect().width};
+        }finally{root.style.fontSize=oldFont;current.textContent=oldValue;total.textContent=oldTotal;label.dataset.long=oldLong;}
       });
-      assert(geometry.inputWidth>=geometry.needed&&geometry.totalRight<=geometry.labelRight+1&&geometry.sliderWidth>=44,`Reader clips large four-digit page controls at ${width}px: ${JSON.stringify(geometry)}`);
+      assert(geometry.currentLeft>=geometry.labelLeft-1&&geometry.currentRight<=geometry.totalLeft&&geometry.totalRight<=geometry.labelRight+1&&geometry.sliderWidth>=44,`Reader clips large four-digit page controls at ${width}px: ${JSON.stringify(geometry)}`);
       await inViewport(page.getByRole('button',{name:'下一页',exact:true}));
     }
     await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'返回我的漫画',exact:true}).click();
@@ -377,6 +384,33 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
     assert.equal((await close.boundingBox()).y,closeBefore.y);assert.equal((await footer.boundingBox()).y,footerBefore.y);
     await shot('keyboard-dialog');await close.click();
     check('simulated keyboard keeps modal close and fixed actions in the visual viewport');
+    const tablet=await browser.newContext({viewport:{width:1194,height:834},screen:{width:834,height:1194},hasTouch:true,locale:'zh-CN'});
+    try{
+      const tab=await tablet.newPage();
+      await tab.goto(`${origin}/tests/modal-fixture.html`);
+      await tab.locator('#open-import').click();
+      await tab.evaluate(()=>{
+        for(const [key,value] of Object.entries({height:310,offsetTop:64}))Object.defineProperty(visualViewport,key,{configurable:true,value});
+        visualViewport.dispatchEvent(new Event('resize'));
+      });
+      for(const control of [tab.getByRole('dialog').locator('.modal-close'),tab.locator('.nc-modal-actions')]){
+        const box=await control.boundingBox();assert(box.y>=64&&box.y+box.height<=375,`Tablet modal control behind simulated keyboard: ${JSON.stringify(box)}`);
+      }
+      await tab.screenshot({path:path.join(out,`${engine}-tablet-keyboard-dialog.png`)});
+      // A Safari popover negotiates its initial width; preserve the tablet screen
+      // while creating a deliberately narrow viewport (resizing resets WebKit's screen).
+      const popover=await browser.newContext({viewport:{width:200,height:600},screen:{width:834,height:1194},hasTouch:true,locale:'zh-CN'});
+      try{
+        await popover.addInitScript(()=>{window.chrome={runtime:{getURL:path=>location.origin+path,sendMessage:async()=>({}),openOptionsPage:async()=>{}},tabs:{query:async()=>[{id:1,url:'https://mobile-fixture.test/comic',title:'Tablet fixture'}]}};});
+        const popup=await popover.newPage();
+        await popup.goto(`${origin}/entrypoints/popup/index.html`);
+        await popup.locator('.nc-popup').waitFor();
+        assert.equal(await popup.evaluate(()=>screen.width),834);
+        assert.equal((await popup.locator('html').boundingBox()).width,420,'A narrow initial tablet popover must request its full intrinsic width');
+        await popup.screenshot({path:path.join(out,`${engine}-tablet-popup.png`)});
+      }finally{await popover.close();}
+      check('tablet keyboard keeps modal actions visible and popup retains intrinsic width');
+    }finally{await tablet.close();}
     await page.addInitScript(()=>{
       window.chrome={runtime:{getURL:path=>location.origin+path,sendMessage:async()=>({}),openOptionsPage:async()=>{}},tabs:{query:async()=>[{id:1,url:'https://mobile-fixture.test/comic',title:'Mobile fixture'}]}};
     });
