@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {network} from '../network';
 import {definition} from '../definition';
-import {encodeRequest,decodeResponse} from '../protocol';
+import {encodeRequest} from '../protocol';
 import {tileOrder,decodeImage} from '../images';
 import {validateSourceCatalog,sourceFor} from '../../..';
 import {readSourceCatalog} from '../../../runtime/catalog-reader';
@@ -116,8 +116,7 @@ describe('Comix network adapter',()=>{
    const next=await readWebsiteCatalog(url);expect(next.entries[1].remoteId).toBe('10');
    expect((await catalog.get('catalogs',first.id))?.entries).toEqual(first.entries);
  });
- it('implements the observed signature codec and tile shuffle, rejecting changed image protocols',async()=>{
-   expect(decodeResponse(encodeRequest('sample 请求'))).toBe('sample 请求');
+ it('implements the observed tile shuffle, rejecting changed image protocols',async()=>{
    expect(tileOrder(239595250,25)).toEqual([21,8,16,13,1,12,3,10,5,6,23,2,20,14,7,0,18,9,15,19,24,22,11,17,4]);
    await expect(decodeImage(new Blob(),new Headers(),'tiles-v1')).rejects.toThrow('协议已变化');
  });

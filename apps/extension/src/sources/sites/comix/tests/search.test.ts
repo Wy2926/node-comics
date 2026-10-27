@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {parseSearch, search} from '../search';
 import {definition} from '../definition';
-import {encodeRequest, decodeResponse} from '../protocol';
+import vectors from './protocol-vectors.json';
 import {validateSearchPage} from '../../../core/search';
 
 const request = {siteId: 'comix', query: '海 & One Piece + %'};
@@ -17,10 +17,10 @@ describe('Comix search', () => {
         const url = new URL(target);
         expect(url.origin + url.pathname).toBe('https://comix.to/api/v1/manga');
         expect(url.searchParams.get('keyword')).toBe(request.query);
-        expect(decodeResponse(url.searchParams.get('_')!)).toBe('/manga?keyword=' + request.query + '&limit=12&order[relevance]=desc&page=1');
+        expect(url.searchParams.get('_')).toBe('qo4.-hT5Zz1TXo4KBWgR');
         expect([...url.searchParams.keys()].sort()).toEqual(['_', 'keyword', 'limit', 'order[relevance]', 'page']);
         const body = {status: 'ok', result: result()};
-        return JSON.stringify(encrypted ? {e: encodeRequest(JSON.stringify(body))} : body);
+        return JSON.stringify(encrypted ? {e: vectors.search} : body);
       });
       const page = await search(request, {request: read});
       expect(read).toHaveBeenCalledTimes(1);

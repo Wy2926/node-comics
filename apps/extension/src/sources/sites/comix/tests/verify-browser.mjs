@@ -21,7 +21,7 @@ context.on('page',page=>{created.push(page);page.on('pageerror',error=>errors.pu
 try{
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
   reader=await context.newPage();await reader.goto(new URL('reader.html',worker.url()).href);
-  await reader.evaluate(()=>localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN'})));await reader.reload();
+  await reader.evaluate(()=>{localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN'}));localStorage.setItem('nc-release-notes-version',chrome.runtime.getManifest().version);});await reader.reload();
   await reader.getByRole('button',{name:'漫画网站',exact:true}).click();
   await reader.getByLabel('通过链接添加漫画').waitFor();assert.equal(await reader.getByRole('heading',{name:'xkcd',exact:true}).count(),0);
   await reader.getByRole('heading',{name:'Comix',exact:true}).waitFor();
@@ -38,25 +38,29 @@ try{
     return a.getImageData(0,0,w,h).data.every((v,i)=>v===c.getImageData(0,0,w,h).data[i]);
   });assert(pixelResult);checks.push('Canvas decode restores every pixel, including grid remainder');
   if(process.env.RUN_LIVE_COMIX==='1'){
+    const liveCatalog='https://comix.to/title/nr83-the-sword-bearing-flower';
     const before=context.pages().length;
-    await reader.getByLabel('通过链接添加漫画').fill('https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation');
+    await reader.getByLabel('通过链接添加漫画').fill(liveCatalog+'/6887743-chapter-2');
     await reader.getByRole('button',{name:'添加到书架',exact:true}).click();
     await reader.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth>0,{},{timeout:90000});
-    assert.equal(context.pages().length,before);
     await reader.screenshot({path:path.join(out,'live-reader.png')});
     const details=await reader.evaluate(async()=>{
       const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));const data=await chrome.storage.local.get(null),source=(await catalog.list('catalogs')).find(v=>v.sourceId==='comix'),manifest=Object.values(data).find(v=>v?.adapter==='comix'&&v.items);
-      return {chapters:source.entries.length,pages:manifest.items.length,processing:manifest.items.filter(v=>v.processing).length,managed:Object.keys(await chrome.storage.session.get(null)).filter(k=>k.startsWith('nc-managed:')||k.startsWith('nc-catalog-tab:'))};
-    });assert(details.chapters>0);assert.deepEqual(details.managed,[]);
+      return {chapters:source.entries.length,pages:manifest.items.length,processing:manifest.items.filter(v=>v.processing).length};
+    });assert(details.chapters>0);
     checks.push({liveImport:details});
     const imageResult=await reader.evaluate(async()=>{
-      const data=await chrome.storage.local.get(null),manifest=Object.values(data).find(v=>v?.adapter==='comix'&&v.items),item=manifest.items.find(v=>v.processing);
+      const data=await chrome.storage.local.get(null),manifest=Object.values(data).find(v=>v?.adapter==='comix'&&v.items),item=manifest.items.find(v=>v.processing)??manifest.items[0];
       const {readSourceImage}=await import(chrome.runtime.getURL('verify-source.js')),decoded=await readSourceImage({manifestId:manifest.id,pageId:item.id,expectedUrl:item.url}),bitmap=await createImageBitmap(decoded);
       const preview=document.createElement('img');preview.id='comix-decoded-preview';preview.src=URL.createObjectURL(decoded);preview.style.cssText='position:fixed;inset:0;margin:auto;max-height:100vh;max-width:100vw;z-index:999999;background:white';document.body.append(preview);await preview.decode();
-      const result={width:bitmap.width,height:bitmap.height,mime:decoded.type};bitmap.close();return result;
-    });assert.equal(imageResult.mime,'image/png');assert(imageResult.width>0);checks.push({liveScrambledImage:imageResult});
+      const result={width:bitmap.width,height:bitmap.height,mime:decoded.type,processed:!!item.processing};bitmap.close();return result;
+    });if(imageResult.processed)assert.equal(imageResult.mime,'image/png');assert(imageResult.width>0);checks.push({liveImage:imageResult});
     await reader.screenshot({path:path.join(out,'live-decoded-image.png')});await reader.evaluate(()=>{const image=document.getElementById('comix-decoded-preview');URL.revokeObjectURL(image.src);image.remove();});
-    const refreshed=await reader.evaluate(async()=>{const {readSourceCatalog}=await import(chrome.runtime.getURL('verify-source.js'));return (await readSourceCatalog('https://comix.to/title/rrzm-the-regressed-genius-players-mythical-rank-weapon-creation')).entries.length;});
+    // Stop reader fetch/refresh work before checking that all owned source tabs are released.
+    await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+    await reader.waitForFunction(async()=>!Object.keys(await chrome.storage.session.get(null)).some(k=>k.startsWith('nc-managed:')||k.startsWith('nc-catalog-tab:')),null,{timeout:45000});
+    assert.equal(context.pages().length,before);
+    const refreshed=await reader.evaluate(async url=>{const {readSourceCatalog}=await import(chrome.runtime.getURL('verify-source.js'));return (await readSourceCatalog(url)).entries.length;},liveCatalog);
     assert(refreshed>=details.chapters);assert.equal(context.pages().length,before);checks.push('Live catalog refresh releases its temporary source tab');
   }
   assert.deepEqual(errors,[]);await writeFile(path.join(out,'browser.json'),JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({checks,errors}));

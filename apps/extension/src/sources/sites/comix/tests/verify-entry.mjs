@@ -50,8 +50,8 @@ try{
  const waitImage=page=>page.waitForFunction(()=>document.querySelector('img.nc-page-image')?.naturalWidth>0,null,{timeout:30000});
  let opened=context.waitForEvent('page');await button.click();let reader=await opened;await waitImage(reader);
  await reader.screenshot({path:path.join(out,'imported-reader.png')});checks.push('Granted host auto-registers the entry; first click after SPA navigation imports and renders the comic');
- await setReaderProgress(reader.getByLabel('阅读进度'), '2');await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
- await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitImage(reader);assert.equal(await reader.getByLabel('阅读进度').inputValue(),'2');await reader.close();
+ await setReaderProgress(reader.getByRole('slider',{name:'阅读进度',exact:true}), '2');await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+ await reader.getByRole('button',{name:'打开漫画 Comix embedded entry fixture',exact:true}).click();await waitImage(reader);assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'2');await reader.close();
  checks.push('Imported comic reopens at its saved page');
  await source.getByRole('button',{name:'Replace actions',exact:true}).click();await button.waitFor();assert.equal(await button.count(),1);
  await source.getByRole('button',{name:'Leave comic',exact:true}).click();await button.waitFor({state:'detached'});
@@ -61,8 +61,8 @@ try{
  opened=context.waitForEvent('page');await button.click();reader=await opened;await waitImage(reader);
  await reader.getByRole('button',{name:'打开目录',exact:true}).click();assert.equal(await reader.locator('.nc-chapter-entry[aria-current="true"] b').innerText(),'Chapter 2');await reader.close();
  checks.push('Chapter entry imports the currently selected chapter through the HTTP adapter');
- await source.goto('https://comix.to/title/failed-fixture');await button.waitFor();failCatalog=true;await button.click();
- await source.getByRole('status').filter({hasText:/失败|稍后|重试/}).waitFor();assert(await button.isEnabled());await source.screenshot({path:path.join(out,'import-failure.png')});
+ await source.goto('https://comix.to/title/failed-fixture');await button.waitFor();failCatalog=true;opened=context.waitForEvent('page');await button.click();reader=await opened;
+ await reader.getByRole('alert').filter({hasText:/HTTP 503/}).waitFor();assert(await button.isEnabled());await reader.screenshot({path:path.join(out,'import-failure.png')});await reader.close();
  failCatalog=false;await source.goto('https://comix.to'+catalogPath);await button.waitFor();opened=context.waitForEvent('page');await button.click();reader=await opened;await waitImage(reader);
  checks.push('An import failure is visible and the next import succeeds');
  assert.deepEqual(errors,[]);
