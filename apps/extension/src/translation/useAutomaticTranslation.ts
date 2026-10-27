@@ -10,7 +10,7 @@ import {resultBlobKey,registerResultReader,assertResult} from '../storage/transl
 import {applyChannelJobs} from './sync';
 import type {ChannelConnection,ChannelRuntime} from './channels/contracts';
 import {targetKey,type ReadingTarget,type TranslationState} from './automatic';
-import {ReadingWindow} from '../reading-window';
+import {ReadingWindow,MAX_READER_TARGETS} from '../reading-window';
 import {TranslationResultPrefetch} from './result-prefetch';
 
 interface Options {
@@ -20,7 +20,7 @@ interface Options {
 export function useAutomaticTranslation({channel,connectionError='',copies,updateEntry,language,currentId}:Options){
   const [,render]=useState(0),[error,setError]=useState('');
   const copyRef=useRef(copies);copyRef.current=copies;
-  const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode))),visible=useRef<Page[]>([]);
+  const jobs=useRef<Job[]>([]),windowRef=useRef(new ReadingWindow<ReadingTarget>(t=>targetKey(t.entryId,t.page,t.mode),MAX_READER_TARGETS)),visible=useRef<Page[]>([]);
   const runtime=useRef<ChannelRuntime|undefined>(undefined),wake=useRef<(windowChanged?:boolean)=>void>(()=>{}),stamp=useRef(0);
   const resultReaders=useRef(new Map<string,()=>void>());
   const commit=useCallback((copy:ReadingEntry)=>{copyRef.current=copyRef.current.map(c=>c.id===copy.id?copy:c);updateEntry(copy);},[updateEntry]);
@@ -107,10 +107,10 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
       try{
         const window=windowRef.current,now=performance.now();
         if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
-        const targets=window.ready().map(t=>({...t,page:copyRef.current.find(c=>c.id===t.entryId)?.pages.find(p=>p.id===t.page.id)??t.page}));
+        const targets=window.ready(now).map(t=>({...t,page:copyRef.current.find(c=>c.id===t.entryId)?.pages.find(p=>p.id===t.page.id)??t.page}));
         const caps=channel!.capabilities;
-        // Warmup must expire even while the first page is still reading its source.
-        if(window.delay()>0)schedule(window.delay());
+        // Use the selection clock: crossing the deadline here must not lose the tail tick.
+        const delay=window.delay(now);if(delay>0)schedule(delay);
         await abortable(core.submit(targets.filter(t=>caps.modes.some(m=>m.id===t.mode&&m.enabled)&&supportsLanguage(caps,t.mode,language)),()=>live()&&!document.hidden&&!signal.aborted,signal),signal);
         if(version!==tickVersion||signal.aborted)return;
         setError('');retry=0;void prepareResults();

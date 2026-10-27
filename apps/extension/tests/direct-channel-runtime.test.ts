@@ -44,6 +44,19 @@ function setup(scope = {key: crypto.randomUUID()}, options: Partial<Pick<Runtime
   runtimes.push(runtime); return {runtime, jobs, scope, driver, consumed};
 }
 
+it('retains two current pages plus five successors, skips a failed source and keeps MTU transfers serial', async () => {
+  const first=Promise.withResolvers<Response>(),fetcher=vi.fn(async()=>new Response(new Blob(['translated'],{type:'image/png'}))).mockImplementationOnce(()=>first.promise);
+  vi.stubGlobal('fetch',fetcher);
+  const {runtime,driver,scope}=setup(undefined,{getBlob:async key=>key==='original-2'?undefined:new Blob([key])});
+  await runtime.submit(Array.from({length:8},(_,n)=>target(String(n))));
+  await vi.waitFor(()=>expect(driver.start).toHaveBeenCalledTimes(1));
+  await runtime.refresh();expect(driver.start).toHaveBeenCalledTimes(1);
+  first.resolve(new Response(new Blob(['translated'],{type:'image/png'})));
+  await vi.waitFor(async()=>{await runtime.refresh();expect(driver.start).toHaveBeenCalledTimes(6);});
+  expect(await Promise.all(driver.start.mock.calls.map(([,blob])=>blob.text()))).toEqual([0,1,3,4,5,6].map(n=>`original-${n}`));
+  expect((await readDirectOperations(scope.key)).find(record=>record.pageId==='2')?.job.status).toBe('failed');
+});
+
 it('stops an invalidated unsubmitted tail, keeps its accepted request, and resumes the remaining pages', async () => {
   const firstResponse = Promise.withResolvers<Response>();
   const fetcher = vi.fn(async () => new Response(new Blob(['translated'], {type: 'image/png'})))

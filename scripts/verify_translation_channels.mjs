@@ -14,7 +14,7 @@ let readingWindow;
 page.on('pageerror',error=>errors.push(error.message));
 const check=message=>{checks.push(message);console.log('PASS '+message);};
 const read=()=>page.evaluate(async()=>({requests:window.channelFixture.requests,official:window.channelFixture.officialTranslations,auth:!!(await window.channelFixture.readAuth()).session,channels:await window.channelFixture.listChannels(),pageReads:window.channelFixture.pageReads,chapterContentIds:window.channelFixture.chapterContentIds}));
-async function openBook(){await page.getByRole('button',{name:/^打开漫画 /}).click();await page.getByLabel('阅读进度',{exact:true}).waitFor();}
+async function openBook(){await page.getByRole('button',{name:/^打开漫画 /}).click();await page.getByRole('slider',{name:'阅读进度',exact:true}).waitFor();}
 const guideUrl='https://comics.nodelane.net/guides/local-translation/';
 const channelSettings=()=>page.locator('.nc-channel-settings');
 const channelCard=name=>page.locator('.nc-channel-card').filter({has:page.getByRole('radio',{name,exact:true})});
@@ -69,30 +69,44 @@ try{
   await assertGuide(channelCard('我的本机 MTU'));
   await page.screenshot({path:path.join(out,'channel-settings.png'),fullPage:true});
   check('connects local service without official login and keeps token/password out of channel metadata');
-  await page.evaluate(()=>{location.hash='library';});await openBook();
+  await page.evaluate(()=>{location.hash='library';});await page.locator('.nc-release-notes[open] .nc-release-close').click();await openBook();
   readingWindow=await page.evaluate(()=>{const viewport=document.querySelector('.nc-reading-viewport'),picture=document.querySelector('.nc-manga-page[data-page-index="0"] .nc-page-picture');return {viewportHeight:viewport.clientHeight,pageHeight:picture.getBoundingClientRect().height,pageTop:picture.getBoundingClientRect().top-viewport.getBoundingClientRect().top};});
-  // Fit-window pages are shorter than the viewport. ReadingProgress expands them at their top.
+  // Translation selects five successors independently of fit or scroll progress.
   assert(readingWindow.pageHeight<=readingWindow.viewportHeight&&readingWindow.pageTop<readingWindow.viewportHeight,JSON.stringify(readingWindow));
   await page.getByRole('button',{name:'翻译',exact:true}).click();
-  await page.waitForFunction(()=>window.channelFixture.requests.length===5);
+  await page.waitForFunction(()=>window.channelFixture.requests.length===6);
   await page.waitForFunction(()=>document.querySelector('.nc-reading-viewport img')?.getAttribute('src')?.startsWith('blob:'));
   await page.waitForTimeout(1600);
-  let current=await read();const initialRequests=5;assert.equal(current.official,0);assert.equal(current.requests.length,initialRequests);
+  let current=await read();assert.equal(current.official,0);assert.equal(current.requests.length,6);
   assert(current.requests.every(r=>r.language==='CHS'&&r.token&&r.hasImage));
   assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
   await page.screenshot({path:path.join(out,'local-reading.png')});
-  check('a fit-window short page expands the current window to exactly 5 local requests with image/config/token and no official calls');
+  check('the current page and five successors produce exactly 6 local requests with image/config/token and no official calls');
+  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await page.getByRole('button',{name:'双页',exact:true}).click();
+  await page.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await setReaderProgress(page.getByRole('slider',{name:'阅读进度',exact:true}),'3');
+  await page.waitForFunction(()=>window.channelFixture.requests.length===8);
+  await page.waitForTimeout(1200);
+  assert.equal((await read()).requests.length,8);
+  assert.deepEqual(await page.locator('.nc-reading-surface .nc-manga-page').evaluateAll(cells=>cells.map(cell=>Number(cell.dataset.pageIndex))),[1,2]);
+  check('MTU double-page reading reuses pages 2–6 and fills successors through page 8, with exactly seven active target positions');
+  await setReaderProgress(page.getByRole('slider',{name:'阅读进度',exact:true}),'1');
+  await page.getByRole('button',{name:'阅读设置',exact:true}).click();
+  await page.getByRole('button',{name:'连续',exact:true}).click();
+  await page.getByRole('button',{name:'关闭面板',exact:true}).click();
+  const initialRequests=8;
   const localId=current.channels.activeId;
   await page.evaluate(()=>{window.channelFixture.pageReads.length=0;});
   await page.evaluate(()=>window.channelFixture.selectChannel('nodelane'));
   await page.getByRole('button',{name:'登录后翻译',exact:true}).first().waitFor();
   assert.equal(await page.getByRole('button',{name:'AI 重绘',exact:true}).count(),0);
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   await page.evaluate(id=>window.channelFixture.selectChannel(id),localId);
   await page.waitForTimeout(1200);
   assert.equal(await page.getByRole('button',{name:'翻译',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal((await read()).requests.length,initialRequests);
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   check('switching channels preserves reading position, isolates official login, and reuses local results');
   current=await read();
   assert.equal(current.chapterContentIds.length,100);
@@ -108,27 +122,29 @@ try{
   await page.locator('.setting-row').filter({has:page.locator('b',{hasText:/^译图缓存$/})}).getByRole('button',{name:'清理',exact:true}).click();
   await page.waitForTimeout(400);
   await page.evaluate(()=>{location.hash='library';});await openBook();
-  const missingResult=page.getByTitle('本地译图缓存已清理，请手动重新翻译。',{exact:true}).first().getByRole('button',{name:'翻译失败 · 重新翻译',exact:true});
-  await missingResult.waitFor();
+  await page.getByText('本地译图缓存已清理，请手动重新翻译。',{exact:true}).first().waitFor();
   assert.equal((await read()).requests.length,initialRequests);
-  await missingResult.click();
+  // Image-load retry only reloads bytes. Explicit retranslation is a reader action.
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'原图',exact:true}).click();
+  await page.getByRole('button',{name:'重新翻译此页',exact:true}).click();
   await page.waitForFunction(count=>window.channelFixture.requests.length===count,initialRequests+1);
   await page.waitForTimeout(1200);
   assert.equal((await read()).requests.length,initialRequests+1);
   check('clearing local images does not submit requests; explicit retranslation submits once');
   await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false}));
-  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '10');
+  await setReaderProgress(page.getByRole('slider',{name:'阅读进度',exact:true}), '10');
 
-  await page.waitForFunction(count=>window.channelFixture.requests.length===count,initialRequests+6);
+  await page.waitForFunction(count=>window.channelFixture.requests.length===count,initialRequests+7);
   await page.waitForTimeout(1200);
-  assert.equal((await read()).requests.length,initialRequests+6);
+  assert.equal((await read()).requests.length,initialRequests+7);
   check('an Internet-offline status does not block an accessible local translation service');
   await page.getByRole('button',{name:'原图',exact:true}).click();
   await page.getByRole('button',{name:'打开目录',exact:true}).click();
   await page.getByRole('button').filter({hasText:'合成章节 100'}).click();
   await page.waitForFunction(()=>window.channelFixture.pageReads.includes(window.channelFixture.chapterContentIds[99]));
   await page.waitForFunction(()=>{const image=document.querySelector('.nc-stream-chapter[data-copy-id$=":chapter:99"] img.nc-page-image');return image?.complete&&image.naturalWidth>0;});
-  assert.equal(await page.getByLabel('阅读进度',{exact:true}).inputValue(),'1');
+  assert.equal(await page.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'1');
   await page.screenshot({path:path.join(out,'distant-chapter.png')});
   check('an unloaded distant chapter remains readable when explicitly opened');
 

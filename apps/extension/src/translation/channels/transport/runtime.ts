@@ -6,7 +6,7 @@ import {LocalResultUnavailableError, saveResultBlob} from '../../../storage/tran
 import {translationCache} from '../../../storage/translations';
 import type {Job, Mode} from '../../../types';
 import {targetKey, type ReadingTarget, type TranslationState} from '../../automatic';
-import {MAX_READING_TARGETS} from '../../../reading-window';
+import {MAX_READER_TARGETS} from '../../../reading-window';
 import type {ChannelRuntime, RuntimeOptions, TranslationScope} from '../contracts';
 import {interruptAbandonedTransfer} from '../../../image-transfer/client';
 import {discardUnstartedDirectOperation, readDirectOperation, readDirectOperations, saveDirectOperation, updateDirectOperation, type DirectOperation} from './operations';
@@ -128,7 +128,7 @@ export class DirectImageRuntime implements ChannelRuntime {
     if (!this.current()) return;
     // Only the unstarted tail is replaced. An already submitted image retains its receipt.
     this.requestCurrent = isCurrent;
-    this.targets = targets.slice(0, MAX_READING_TARGETS).filter(isCurrent); this.runtimeError = undefined;
+    this.targets = targets.slice(0, MAX_READER_TARGETS).filter(isCurrent); this.runtimeError = undefined;
     void this.pump();
   }
   private async pump() {

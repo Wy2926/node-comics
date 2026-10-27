@@ -1,4 +1,4 @@
-import {MAX_READING_TARGETS} from '../reading-window';
+import {MAX_READER_TARGETS} from '../reading-window';
 import {abortable} from '../concurrency';
 import {readMaterializedResult} from '../storage/translations/results';
 
@@ -11,7 +11,7 @@ export class TranslationResultPrefetch {
   constructor(private readonly read=readMaterializedResult){}
 
   update(keys:readonly string[]){
-    this.keys=[...new Set(keys)].slice(0,MAX_READING_TARGETS);
+    this.keys=[...new Set(keys)].slice(0,MAX_READER_TARGETS);
     for(const key of this.attempted)if(!this.keys.includes(key))this.attempted.delete(key);
     if(this.pending&&!this.keys.includes(this.pending.key))this.pending.controller.abort();
     this.start();

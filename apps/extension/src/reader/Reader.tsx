@@ -19,6 +19,7 @@ import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,
 import {pageFrame} from './geometry';
 import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
 import {ORIGINAL_PREFETCH_PAGES} from '../image-resources';
+import {READER_PREFETCH_PAGES} from '../reading-window';
 import {pageSpreads,spreadAt,spreadFrames,pageTurnIndex} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
@@ -58,7 +59,7 @@ const [savedView,setView]=useState<ReadingView|undefined>(()=>{
 const view=savedView??{...readingViewDefaults(),zoom:initialSizing.readerZoom};
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
 const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
-const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
+const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,processingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
@@ -133,19 +134,20 @@ const windowPages=useMemo(()=>windows.filter(({copy:chapter})=>resources.ready(c
 const decodedSet=useMemo(()=>new Set(windows.filter(({copy:chapter})=>resources.ready(chapter)).flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).map(p=>pageKey(chapter,p.id)))),[windows,resourceVersion]);
 const processingSettings=useProcessingSettings(),processingProfile=activeProcessingProfile(processingSettings),enhancementVisible=useEnhancementVisible();
 const readingTargets=useMemo(()=>{
- const start=stream.findIndex(chapter=>chapter.id===copy.id),targets:(ReadingTarget&{key:string})[]=[];
- if(start<0||!resources.ready(stream[start])||!stream[start].pages[spread?.start??index])return targets;
- for(let n=start;n<stream.length&&targets.length<readingAhead;n++){
-  const chapter=stream[n];if(!resources.ready(chapter))continue;
-  const from=n===start?spread?.start??index:0;
-  for(const page of chapter.pages.slice(from,from+readingAhead-targets.length))targets.push({page,key:pageKey(chapter,page.id),entryId:chapter.id,mode});
+ const start=spread?.start??index,end=spread?.end??index+1,limit=end-start+READER_PREFETCH_PAGES,targets:(ReadingTarget&{key:string})[]=[];
+ if(!resources.ready(copy)||!copy.pages[start])return targets;
+ for(const chapter of next&&completeManifest(copy)?[copy,next]:[copy]){
+  if(!resources.ready(chapter))break;
+  const from=chapter.id===copy.id?start:0;
+  for(const page of chapter.pages.slice(from,from+limit-targets.length))targets.push({page,key:pageKey(chapter,page.id),entryId:chapter.id,mode});
+  if(targets.length===limit)break;
  }
  return targets;
-},[stream,resourceVersion,copy.id,spread,index,readingAhead,mode]);
-const processingTargets=useMemo(()=>readingTargets.map(({key,entryId,page})=>{
+},[copy,next,resourceVersion,spread,index,mode]);
+const processingTargets=useMemo(()=>readingTargets.slice(0,processingAhead).map(({key,entryId,page})=>{
  const translated=preference!=='original',image=readingImage(page,mode,translated,settings.language,translationScope);
  return {id:key,sourceKey:page.blobKey,input:image.key&&(!translated||image.job||image.originalResult)?processingInput(image.key,entryId,page.blobKey):undefined};
-}),[readingTargets,preference,mode,settings.language,translationScope]);
+}),[readingTargets,processingAhead,preference,mode,settings.language,translationScope]);
 const enhancedImages=useProcessingWindow(processingTargets,enhancementVisible?processingProfile:undefined,processingSettings.cacheRevision,navigationReason.current==='direct');
 geometry.current=new Map(windows.map(window=>[window.copy.id,window]));
 const contentWidth=spread?spreadPages.reduce((width,page)=>width+frame(page).width,0)
@@ -157,7 +159,7 @@ const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layo
 });
 const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)>0||!!previous:(spread?.end??indexRef.current+1)<copy.pages.length||!!next);
 const imageWindows=useMemo(()=>windows.filter(({copy:chapter,start,end})=>end>start&&resources.ready(chapter)),[windows,resourceVersion]);
-// The chosen next chapter is metadata only in paged layouts, never a hidden reading/translation window.
+// Next-chapter originals may be prefetched without mounting hidden pages.
 const aheadChapter=next&&resources.ready(next)&&imageWindows.at(-1)?.copy.id===copy.id?next:undefined;
 const aheadPages=useMemo(()=>nextImagePages(imageWindows,aheadChapter),[imageWindows,aheadChapter]);
 const windowReady=!!imageWindows.length&&imageWindows.every(({copy:chapter,start,end})=>chapter.pages.slice(start,end).every(p=>{

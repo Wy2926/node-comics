@@ -15,7 +15,7 @@
 | `channels/adapters/manga-translator-ui/` | MTU 登录、语言映射、表单与错误映射 |
 | `channels/transport/` | 直传翻译的本地排程、操作记录与运行器 |
 | `image-transfer/` | 翻译与增强共用的图片 HTTP 执行、执行回执与长请求宿主，不依赖翻译领域 |
-| `translation/automatic.ts`、`useAutomaticTranslation.ts` | 页内进度驱动的最多五页窗口、渠道运行器调用及显示更新 |
+| `translation/automatic.ts`、`useAutomaticTranslation.ts` | 当前阅读页组加后续五页的翻译窗口（最多七页）、渠道运行器调用及显示更新 |
 | `translation/input/` | 准备送译字节；上传与结果读取共用缓存读取、缺失重建和摘要校验，不管理任务状态或来源资源释放 |
 | `storage/translations/` | 按渠道作用域持久缓存完整译图，首次加载校验，后续直接读取并保留有限内存缓存 |
 | `translation/materialize.ts` | 官方结果验证及原生尺寸覆盖合成，供阅读器、原位、导出共用 |

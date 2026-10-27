@@ -4,7 +4,7 @@ import type {ReadingEntry} from '../src/types';
 import type {ReadingView} from '../src/reader/view';
 
 // Exercise the actual reader command callbacks without images, browser layout, or a translation service.
-const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],layoutEffects:[] as (()=>void|(()=>void))[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,readingAhead:4,index:2,previous:undefined as ReadingEntry|undefined}));
+const hooks=vi.hoisted(()=>({cursor:0,states:[] as unknown[],layoutEffects:[] as (()=>void|(()=>void))[],effects:[] as (()=>void|(()=>void))[],handlers:{} as Record<string,()=>void|boolean>,enabled:true,stream:undefined as ReadingEntry[]|undefined,index:2,previous:undefined as ReadingEntry|undefined}));
 const actions=vi.hoisted(()=>({preserve:vi.fn(),persist:vi.fn(),restore:vi.fn(),jump:vi.fn(),requestTranslation:vi.fn(),track:vi.fn()}));
 const spreadZoom=vi.hoisted(()=>({zoom:100,zoomed:false,change:vi.fn(),reset:vi.fn()}));
 const swipe=vi.hoisted(()=>({options:undefined as Parameters<typeof import('../src/reader/usePagedSwipe').usePagedSwipe>[0]|undefined}));
@@ -30,8 +30,8 @@ vi.mock('../src/analytics',()=>({track:actions.track}));
 vi.mock('../src/reader/useChapterStream',()=>({
  pageKey:(copy:ReadingEntry,pageId:string)=>`${copy.id}:${pageId}`,completeManifest:()=>true,
  useChapterStream:({copy}:{copy:ReadingEntry})=>({
-  index:hooks.index,indexRef:{current:hooks.index},anchor:{current:{entryId:copy.id,pageId:copy.pages[hooks.index]?.id??copy.pageId,relativeOffset:copy.relativeOffset}},readingAhead:hooks.readingAhead,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
-  stream:hooks.stream??[copy],previous:hooks.previous,next:undefined,nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
+  index:hooks.index,indexRef:{current:hooks.index},anchor:{current:{entryId:copy.id,pageId:copy.pages[hooks.index]?.id??copy.pageId,relativeOffset:copy.relativeOffset}},processingAhead:4,viewport:{current:null},cells:{current:new Map()},ends:{current:new Map()},stacks:{current:new Map()},geometry:{current:new Map()},
+  stream:hooks.stream??[copy],previous:hooks.previous,next:hooks.stream?.[1],nextOf:()=>undefined,...actions,scroll:()=>{},navigationReason:{current:'direct'},pageShown:()=>{},resources:{ready:()=>true},resourceVersion:0,
  }),
 }));
 import {Reader} from '../src/reader/Reader';
@@ -70,7 +70,7 @@ function click(tree:ReactElement,match:(node:ReactElement<Record<string,unknown>
  const node=nodes(tree).find(match);expect(node).toBeDefined();(node!.props.onClick as ()=>void)();
 }
 beforeEach(()=>{
- hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;hooks.stream=undefined;hooks.readingAhead=4;hooks.index=2;hooks.previous=undefined;
+ hooks.states=[];hooks.cursor=0;hooks.handlers={};hooks.enabled=true;hooks.stream=undefined;hooks.index=2;hooks.previous=undefined;
  for(const action of Object.values(actions))action.mockClear();
  spreadZoom.change.mockClear();spreadZoom.reset.mockClear();
  installDictionary('zh-CN',{});
@@ -235,6 +235,22 @@ describe('reader shortcut action integration',()=>{
   expect(targets.map(target=>target.page.id)).toEqual(['page-1','page-2','page-3','page-4']);
   expect(visible.map(page=>page.id)).toEqual(['page-1','page-2']);
  });
+ it.each(['single','double','continuous'] as const)('translates five extra pages beyond the current reading page or spread in %s',layout=>{
+  const chapter={...copy,pages:Array.from({length:12},(_,index)=>({...copy.pages[0],id:`page-${index}`}))};
+  const props=fixture({copy:chapter,sequence:[chapter],settings:{...defaults,layout}});
+  render(props);hooks.handlers['reader.translation']();render(props);flushEffects();
+  const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
+  expect(targets.map(target=>target.page.id)).toEqual(Array.from({length:layout==='double'?7:6},(_,n)=>`page-${n+(layout==='double'?1:2)}`));
+  expect(visible).toHaveLength(layout==='double'?2:layout==='single'?1:4);
+ });
+ it.each([0,3])('uses one current target plus five successors for a double-layout cover or landscape at index %i',index=>{
+  hooks.index=index;
+  const chapter={...copy,pages:Array.from({length:12},(_,n)=>({...copy.pages[0],id:`page-${n}`,...(n===3?{width:1600,height:1000}:{} )}))};
+  const props=fixture({copy:chapter,sequence:[chapter],settings:{...defaults,layout:'double'}});
+  render(props);hooks.handlers['reader.translation']();render(props);flushEffects();
+  const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
+  expect(targets.map(target=>target.page.id)).toEqual(Array.from({length:6},(_,n)=>`page-${index+n}`));expect(visible).toHaveLength(1);
+ });
  it('does not translate the next ready chapter while the current ready chapter is empty',()=>{
   const empty={...copy,pages:[]},next={...copy,id:'next-chapter',pages:copy.pages.map(page=>({...page,id:`next-${page.id}`}))};
   hooks.stream=[empty,next];
@@ -243,15 +259,15 @@ describe('reader shortcut action integration',()=>{
   expect(view().preference).toBe('translation');
   expect(vi.mocked(props.onReadingWindow).mock.calls.at(-1)![0]).toEqual([]);
  });
- it.each([4,5])('keeps a %i-page translation window bounded when continuing into the next ready chapter',readingAhead=>{
+ it.each(['continuous','single','double'] as const)('fills five successors from the next ready chapter without mounting them in %s',layout=>{
   const next={...copy,id:'next-chapter',pages:Array.from({length:20},(_,index)=>({...copy.pages[0],id:`next-${index}`}))};
-  hooks.stream=[copy,next];hooks.readingAhead=readingAhead;
+  hooks.stream=[copy,next];
   vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({mode:'classic',preference:'translation',fit:'width',zoom:100}),setItem:vi.fn()});
-  const props=fixture({sequence:hooks.stream});render(props);flushEffects();
+  const props=fixture({sequence:hooks.stream,settings:{...defaults,layout}});render(props);flushEffects();
   const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
-  expect(targets.map(target=>target.page.id)).toEqual(['page-2','page-3','page-4',...next.pages.slice(0,readingAhead-3).map(page=>page.id)]);
-  expect(targets.slice(3).every(target=>target.entryId===next.id)).toBe(true);
-  expect(visible.map(page=>page.id)).toEqual(['page-2','page-3','page-4','next-0']);
+  expect(targets.map(target=>target.page.id)).toEqual([...(layout==='double'?['page-1']:[]),'page-2','page-3','page-4','next-0','next-1','next-2']);
+  expect(targets.slice(-3).every(target=>target.entryId===next.id)).toBe(true);
+  expect(visible.map(page=>page.id)).toEqual(layout==='continuous'?['page-2','page-3','page-4','next-0']:layout==='double'?['page-1','page-2']:['page-2']);
  });
  it.each(['single','double'] as const)('does not render footer content in %s mode and disables next when its last spread is shown',layout=>{
   const props=fixture({settings:{...defaults,layout},copy:{...copy,pages:copy.pages.slice(0,3)}}),tree=render(props);

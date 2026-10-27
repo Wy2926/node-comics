@@ -85,7 +85,7 @@ async function assertCurrentOnly(number, visible) {
   const state = await snapshot('chapter-state'), window = await snapshot('reading-window');
   assert.equal(state.active, 'window-fixture-0');
   assert.deepEqual(window.visible, visible.map(number => pageId(number)));
-  assert(window.targets.every(id => id.startsWith('window-page-0-')), 'Next-chapter metadata never expands the current translation window');
+  assert(window.targets.length <= visible.length+5, 'Only the current reading group and five successors are translation targets');
   assert.deepEqual(await snapshot('marked-read'), [], 'Speculative work is not read evidence');
   assert.equal(await cells().count(), visible.length);
   assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), visible.length);
@@ -96,7 +96,7 @@ async function assertCurrentOnly(number, visible) {
 
 for (const layout of ['single', 'double']) {
   const group = number => layout === 'single' ? [number] : number === 14 ? [13, 14] : [15, 16];
-  test(`${layout}: near-end metadata and last-group next-cover bytes are prepared without navigating or expanding image/translation windows`, async () => {
+  test(`${layout}: near-end metadata fills five extra original and translation targets without navigating or mounting hidden pages`, async () => {
     await reader({layout, hold: [2]});
     await page.waitForTimeout(250);
     assert.deepEqual(await manifestEvents(), [], 'The opening pages do not discover next-chapter metadata');
@@ -121,8 +121,7 @@ for (const layout of ['single', 'double']) {
     await page.getByRole('button', {name: '翻译', exact: true}).click(); await shown(16, group(16));
     await assertCurrentOnly(16, group(16));
     const translatedWindow = await snapshot('reading-window');
-    assert(translatedWindow.targets.length > 0 && translatedWindow.targets.every(id => id.startsWith('window-page-0-')));
-    assert(!(await readEvents()).some(event => event.key.startsWith('inline-original:pagination-fixture-result-window-page-1-')), 'Next-chapter byte preparation does not download or compose translated results');
+    assert.deepEqual(translatedWindow.targets,[...group(16).map(number=>pageId(number)),...Array.from({length:5},(_,n)=>pageId(n+1,1))]);
     await page.getByRole('button', {name: '原图', exact: true}).click(); await shown(16, group(16));
     await page.screenshot({path: resolve(artifacts, `${layout}-last-page-next-cover-prefetched.png`)});
 

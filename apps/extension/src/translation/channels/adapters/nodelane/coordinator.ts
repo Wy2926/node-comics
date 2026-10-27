@@ -6,7 +6,7 @@ import {abortable,assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../.
 import {pageTranslation} from '../../../../reader/presentation';
 import type {Capabilities,Entitlements,Job,TranslationSnapshot,TranslationBatch} from '../../../../types';
 import type {ReadingTarget} from '../../../automatic';
-import {MAX_READING_TARGETS} from '../../../../reading-window';
+import {MAX_READER_TARGETS} from '../../../../reading-window';
 import {makeOperation,operationId,quotaErrors} from './operations';
 import {readOperation,readOperations,readPageOperations,readJobs,readSync,saveOperation,updateOperation,saveReceipt,saveSync,translationScope,withTranslationLock,type LocalOperation,type SyncState} from './store';
 import {LegacyRequestGuard} from './legacy-requests';
@@ -24,11 +24,12 @@ export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperati
   const result=snapshot.state==='succeeded'&&snapshot.result&&!unavailable?{key:snapshot.result.artifact?.sha256??snapshot.id,recoverable:true}:undefined;
   return {id:snapshot.id,result,delivery:snapshot.result??undefined,model:snapshot.model,requested_model_id:snapshot.requested_model_id??record?.modelId,font_id:snapshot.font_id===undefined?record?.fontId:snapshot.font_id,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,source_image_sha256:record?.sourceSha256,input_profile:record?.inputProfile,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
 }
-/** Current plus three pages is local scheduling, never a server reading session. */
+/** Bounded reading lookahead is local scheduling, never a server reading session. */
 export class TranslationCoordinator {
   readonly scope:string;state:SyncState;records:LocalOperation[]=[];
   private initializing?:Promise<void>;private uploads=new Map<string,Promise<void>>();private uploadPool=new RequestPool(UPLOAD_CONCURRENCY);
   private preparing=new Map<string,{promise:Promise<void>;signal?:AbortSignal}>();
+  private preparationPool=new RequestPool(5);
   private wanted=new Set<string>();private refreshed=new Set<string>();
   private missingAdmission=false;
   private historyKey='';
@@ -155,7 +156,7 @@ export class TranslationCoordinator {
   async submit(targets:ReadingTarget[],requestCurrent:(target:ReadingTarget)=>boolean=()=>true,signal?:AbortSignal){
     const current=(target:ReadingTarget)=>!signal?.aborted&&requestCurrent(target);
     signal?.throwIfAborted();
-    await this.init();signal?.throwIfAborted();const window=targets.slice(0,MAX_READING_TARGETS);
+    await this.init();signal?.throwIfAborted();const window=targets.slice(0,MAX_READER_TARGETS);
     const ids=await Promise.all(window.map(async target=>(await this.pageOperation(target))?.id??operationId(this.scope,this.options.language,target,this.options.modelId,this.options.fontId)));
     const [state,records]=await Promise.all([readSync(this.scope),readOperations(ids)]);
     signal?.throwIfAborted();
@@ -168,12 +169,12 @@ export class TranslationCoordinator {
     this.missingAdmission=window.some((target,index)=>!this.records.some(record=>record.id===ids[index])&&!pageTranslation(target.page,target.mode,this.options.language,this.scope).latest);
     if(this.controlDelay)return;
     const recovery=this.recover(signal),admissions=new RequestPool(1);
-    // Prepare at most the existing five targets independently. Only admission is serial,
-    // so a slow source cannot hold ready neighbours or bypass shared rate backpressure.
+    // Keep five active preparations while retaining the full current-plus-five window.
+    // Ready neighbours submit serially; slow sources do not block the queued tail.
     const work=window.map((target,index)=>{
       const key=operationId(this.scope,this.options.language,target),previous=this.preparing.get(key);
       if(previous&&!previous.signal?.aborted)return previous.promise;
-      const promise=(async()=>{
+      const promise=this.preparationPool.run(()=>abortable((async()=>{
         if(this.controlDelay||!current(target))return;
         try{await withTranslationLock(operationId(this.scope,this.options.language,target),async()=>{
           if(!current(target))return;
@@ -204,7 +205,7 @@ export class TranslationCoordinator {
             }
           });
         });}catch(error){if(!this.options.api.isCurrent())throw error;if(!current(target))return;const message=(error as Error).message;if(target.page.translationError!==message){target.page.translationError=message;this.options.onChange();}}
-      })();
+      })(),signal));
       const pending={promise,signal};this.preparing.set(key,pending);
       void promise.finally(()=>{if(this.preparing.get(key)===pending)this.preparing.delete(key);}).catch(()=>{});
       return promise;

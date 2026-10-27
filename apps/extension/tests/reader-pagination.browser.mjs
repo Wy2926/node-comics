@@ -451,7 +451,7 @@ test('double touch pan suppresses its synthetic tap and minimum zoom restores sw
   await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await shown(5, [5, 6]);
 });
 
-test('both spread pages are translation targets and four comparison images still fit the window', async () => {
+test('both spread pages plus five successors are translation targets and four comparison images still fit the window', async () => {
   await reader(); await layout('双页'); await jump(3); await shown(3, [2, 3]);
   await page.getByRole('button', {name: '完成模拟翻译', exact: true}).click();
   await page.getByRole('button', {name: '翻译', exact: true}).click(); await shown(3, [2, 3]);
@@ -460,6 +460,7 @@ test('both spread pages are translation targets and four comparison images still
     return value.targets?.[0] === 'window-page-0-1' && value.targets?.[1] === 'window-page-0-2';
   });
   const window = await snapshot('reading-window');
+  assert.deepEqual(window.targets,Array.from({length:7},(_,n)=>pageId(n+2)));
   assert.deepEqual(window.visible, [pageId(2), pageId(3)]);
   assert.equal(window.immediate, true);
   await page.waitForFunction(() => {

@@ -184,6 +184,6 @@ export function useChapterStream({copy,sequence,layout,previewEntry,motion,updat
   resources.prepare(resourceChapters,onLoadEntry,()=>setResourceVersion(value=>value+1),resourceChapters.filter(chapter=>chapter.id!==copy.id).map(chapter=>chapter.id));
  },[resourceChapters,copy.id,onLoadEntry,resources]);
  useEffect(()=>()=>{resources.clear();clearTimeout(saveTimer.current);if(restoreFrame.current!==undefined)cancelAnimationFrame(restoreFrame.current);},[]);
- const readingAhead=ahead.key===pageKey(copy,copy.pages[index]?.id??'')?ahead.count:READING_TARGETS;
- return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,settleMotion,resources,resourceVersion,readingAhead};
+ const processingAhead=ahead.key===pageKey(copy,copy.pages[index]?.id??'')?ahead.count:READING_TARGETS;
+ return {index,indexRef,copyRef,anchor,suppressScroll,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump,navigationReason,pageShown,settleMotion,resources,resourceVersion,processingAhead};
 }

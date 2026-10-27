@@ -5,7 +5,7 @@ import type {ChannelDefinition, ChannelField} from '../../contracts';
 import {startImageTransfer} from '../../../../image-transfer/client';
 import {DirectImageRuntime} from '../../transport/runtime';
 import {ImageTransferError} from '../../../../image-transfer/types';
-import {MAX_READING_TARGETS} from '../../../../reading-window';
+import {MAX_READER_TARGETS} from '../../../../reading-window';
 import {assertCurrent} from '../../../../concurrency';
 import {languages, login, safeError, serviceBase, translationRequest} from './protocol';
 
@@ -13,7 +13,7 @@ function capabilities(): Capabilities {
   return {modes: [{id: 'classic', label: msg('翻译'), enabled: true, languages: Object.keys(languages)}],
     languages: fallbackLanguages.filter(language => language.id in languages),
     // The adapter only preflights upload bytes; decoded dimensions have no fixed client ceiling.
-    limits: {max_bytes: 32 * 1024 * 1024, max_pixels: Number.MAX_SAFE_INTEGER, max_dimension: Number.MAX_SAFE_INTEGER, max_translation_ids: MAX_READING_TARGETS},
+    limits: {max_bytes: 32 * 1024 * 1024, max_pixels: Number.MAX_SAFE_INTEGER, max_dimension: Number.MAX_SAFE_INTEGER, max_translation_ids: MAX_READER_TARGETS},
     entitlements: null};
 }
 

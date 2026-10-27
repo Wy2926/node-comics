@@ -300,26 +300,46 @@ async function schedulingFixture(prepare:(page:number,signal?:AbortSignal)=>Prom
 }
 
 describe('automatic translation scheduling',()=>{
+  it('does not lose the successor tick when the warmup deadline passes between selecting targets and scheduling',async()=>{
+    const f=await schedulingFixture(async n=>originalInput(n),[0,1,2,3,4,5,6]);
+    expect(f.submitted()).toEqual([0]);
+    vi.spyOn(performance,'now').mockReturnValueOnce(149.8).mockReturnValueOnce(149.9).mockReturnValue(150);
+    await f.advance(150);await f.advance(1);
+    expect(f.submitted()).toEqual([0,1,2,3,4,5,6]);
+  });
+
   it('observes submitted pages while another source is slow or failed, then advances without waiting for the old window',async()=>{
     const held=Promise.withResolvers<PreparedInput>();
-    const f=await schedulingFixture(async n=>{if(n===1)return held.promise;if(n===2)throw Error('Source unavailable');return originalInput(n);});
+    const f=await schedulingFixture(async n=>{if(n===1)return held.promise;if(n===2)throw Error('Source unavailable');return originalInput(n);},[0,1,2,3,4,5,6]);
     expect(f.submitted()).toEqual([0]);expect([...f.streams].some(stream=>stream.ids.includes(f.submit.mock.calls[0][0]))).toBe(true);
-    await f.advance(150);expect(f.submitted()).toEqual([0,3]);expect(f.copy.pages[2].translationError).toBe('Source unavailable');
+    await f.advance(150);expect(f.submitted()).toEqual([0,3,4,5,6]);expect(f.copy.pages[2].translationError).toBe('Source unavailable');
     const [id,body]=f.submit.mock.calls[0],stream=[...f.streams].find(stream=>stream.ids.includes(id))!;
     stream.deliver({items:[snapshot(id,body,{state:'running'})],missing_ids:[]});await f.settle();
     expect(f.copy.pages[0].jobs[0].status).toBe('running');
-    f.window([6]);await f.advance(80);expect(f.submitted()).toEqual([0,3,6]);
+    f.window([7]);await f.advance(150);expect(f.submitted()).toEqual([0,3,4,5,6,7]);
     expect(f.preparation.mock.calls.find(([n])=>n===1)![1]?.aborted).toBe(true);
-    held.resolve(originalInput(1));await f.settle();expect(f.submitted()).toEqual([0,3,6]);
+    held.resolve(originalInput(1));await f.settle();expect(f.submitted()).toEqual([0,3,4,5,6,7]);
     expect([...f.streams].every(stream=>stream.ids.includes(f.submit.mock.calls.at(-1)![0]))).toBe(true);
   });
 
-  it('expires warmup while the first page is slow, coalesces its preparation and never admits a sixth target',async()=>{
-    const held=Promise.withResolvers<PreparedInput>(),f=await schedulingFixture(async n=>n===0?held.promise:originalInput(n),[0,1,2,3,4,5]);
+  it('expires warmup while the first page is slow, retains both current pages and five successors, and never admits an eighth target',async()=>{
+    const held=Promise.withResolvers<PreparedInput>(),f=await schedulingFixture(async n=>n===0?held.promise:originalInput(n),[0,1,2,3,4,5,6,7]);
     expect(f.submitted()).toEqual([]);await f.advance(150);
-    expect(f.submitted()).toEqual([1,2,3,4]);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4]);
-    held.resolve(originalInput(0));await f.settle();expect(f.submitted()).toEqual([1,2,3,4,0]);
-    expect(f.copy.pages[5].jobs).toEqual([]);expect(f.copy.pages[6].jobs).toEqual([]);
+    expect(f.submitted()).toEqual([1,2,3,4,5,6]);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4,5,6]);
+    held.resolve(originalInput(0));await f.settle();expect(f.submitted()).toEqual([1,2,3,4,5,6,0]);
+    expect(f.copy.pages[7].jobs).toEqual([]);
+  });
+
+  it('limits preparation to five active pages and cancels the queued old tail when the window changes',async()=>{
+    const held=Array.from({length:7},()=>Promise.withResolvers<PreparedInput>());
+    const f=await schedulingFixture(async n=>held[n]?.promise??originalInput(n),[0,1,2,3,4,5,6]);
+    await f.advance(150);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4]);
+    held[1].resolve(originalInput(1));await f.settle();
+    expect(f.submitted()).toEqual([1]);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4,5]);
+    f.window([7]);await f.advance(150);
+    expect(f.submitted()).toEqual([1,7]);expect(f.preparation.mock.calls.map(([n])=>n)).toEqual([0,1,2,3,4,5,7]);
+    for(const [n,signal] of f.preparation.mock.calls)if(n<7)expect(signal?.aborted).toBe(true);
+    held.forEach((value,n)=>value.resolve(originalInput(n)));await f.settle();expect(f.submitted()).toEqual([1,7]);
   });
 
   it('stays idle after admission instead of resubmitting on coordinator notifications',async()=>{

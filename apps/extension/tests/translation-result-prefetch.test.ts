@@ -4,17 +4,17 @@ import {TranslationResultPrefetch} from '../src/translation/result-prefetch';
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
 
 describe('translation result prefetch',()=>{
-  it('warms at most five unique results serially and keeps overlapping work',async()=>{
+  it('warms both current results and five successors serially and keeps overlapping work',async()=>{
     const first=Promise.withResolvers<Blob>(),read=vi.fn(async(_key:string,_signal?:AbortSignal)=>new Blob(['result']));
     read.mockImplementationOnce(()=>first.promise);
     const prefetch=new TranslationResultPrefetch(read);
-    prefetch.update(['a','a','b','c','d','e','f']);await flush();
+    prefetch.update(['a','a','b','c','d','e','f','g','h']);await flush();
     expect(read.mock.calls.map(([key])=>key)).toEqual(['a']);
-    prefetch.update(['a','b','c','d','e']);
+    prefetch.update(['a','b','c','d','e','f','g','h']);
     first.resolve(new Blob(['a']));await flush();
-    expect(read.mock.calls.map(([key])=>key)).toEqual(['a','b','c','d','e']);
-    prefetch.update(['b','c','d','e','f']);await flush();
-    expect(read.mock.calls.map(([key])=>key)).toEqual(['a','b','c','d','e','f']);
+    expect(read.mock.calls.map(([key])=>key)).toEqual(['a','b','c','d','e','f','g']);
+    prefetch.update(['b','c','d','e','f','g','h']);await flush();
+    expect(read.mock.calls.map(([key])=>key)).toEqual(['a','b','c','d','e','f','g','h']);
     prefetch.dispose();
   });
 

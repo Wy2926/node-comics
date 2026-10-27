@@ -68,6 +68,8 @@ try {
   assert.equal(await card.getByRole('checkbox',{name:'同时清理处理记录',exact:true}).isChecked(),true);
   await card.getByText('已占用 0.0 MB',{exact:true}).waitFor();
   await page.evaluate(()=>{location.hash='library';});
+  // Release notes open on the first library visit, after the settings route has loaded.
+  await page.locator('.nc-release-notes[open] .nc-release-close').click();
   await page.getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'阅读设置',exact:true}).click();
   await openMore();
@@ -106,7 +108,7 @@ try {
   await page.evaluate(()=>{location.hash='library';});
   await page.getByRole('button',{name:/^打开漫画 /}).click();
   await page.getByRole('button',{name:'翻译',exact:true}).click();
-  await page.waitForFunction(()=>window.channelFixture.requests.length===5);
+  await page.waitForFunction(()=>window.channelFixture.requests.length===6);
   await page.waitForFunction(()=>{const image=document.querySelector('.nc-manga-page[data-page-index="0"] img.nc-page-image');return image?.dataset.resultJob!=='original'&&image?.naturalWidth>0;});
   const baseWidth=await first().locator('img.nc-page-image').evaluate(image=>image.naturalWidth),before=await geometry();
   assert.equal((await read()).enhancement.length,0);
@@ -115,12 +117,12 @@ try {
   await page.waitForFunction(()=>window.channelFixture.enhancements.length===5);
   await page.waitForTimeout(1000);
   let value=await read();
-  assert.equal(value.enhancement.length,5);assert.equal(value.translation,5);assert.equal(value.official,0);
+  assert.equal(value.enhancement.length,5);assert.equal(value.translation,6);assert.equal(value.official,0);
   assert(value.enhancement.every(item=>item.sha256===value.expected));
   for(let i=1;i<value.enhancement.length;i++)assert(value.enhancement[i].startedAt>=value.enhancement[i-1].startedAt+value.enhancement[i-1].duration-2,'A larger reading window must not overlap service calls');
   assert.deepEqual(value.enhancement[0].fields,{style:'art',noise:'-1',scale:'2',format:'0'});
   assert.deepEqual(await geometry(),before);
-  check('the same five-page translation window is enhanced; uploaded bytes equal complete MTU output, not source or overlay; position unchanged');
+  check('the independent five-page enhancement window stays bounded while translation includes five successors; uploaded bytes equal complete MTU output, not source or overlay; position unchanged');
   await page.screenshot({path:path.join(out,'enhanced-reader.png')});
   const shownUrl=await first().locator('img.nc-page-image').last().getAttribute('src');
   await page.evaluate(()=>window.channelFixture.updateProcessingSettings(value=>({...value,cacheLimitMb:128,
@@ -164,20 +166,21 @@ try {
   check('a held enhancement cache lookup leaves originals and available translations readable without another processing POST');
   await waitWidth(baseWidth*2);
   await page.waitForFunction(({jobs,width})=>jobs.every(id=>[...document.querySelectorAll('img.nc-page-image')].some(image=>image.dataset.resultJob===id&&image.naturalWidth===width)),{jobs:cachedJobs,width:baseWidth*2});
-  const warm=await page.evaluate(()=>({parents:window.channelFixture.parentReads,sourceKeys:window.channelFixture.parentSourceKeys,reads:window.enhancementCacheProbe.reads,displays:window.enhancementCacheProbe.displays}));
+  const warm=await page.evaluate(()=>({parents:window.channelFixture.parentReads,sourceKeys:window.channelFixture.parentSourceKeys,reads:window.enhancementCacheProbe.reads,displays:window.enhancementCacheProbe.displays,
+    visibleJobs:[...document.querySelectorAll('.nc-manga-page img.nc-page-image')].map(image=>image.dataset.resultJob)}));
   const isParent=key=>warm.sourceKeys.includes(key)||key.startsWith('result:');
   // A pending cache lookup must not hold ordinary pixels. Those independent reads may
-  // start, but each selected result is acquired once and unavailable parents cannot
-  // prevent the cached enhancement from displaying or trigger another processing POST.
-  assert.equal(new Set(warm.parents).size,warm.parents.length,'Reopening must not repeat a selected result read');
-  for(const id of cachedJobs)assert(warm.parents.filter(parent=>parent===id).length<=1);
+  // start alongside one result prefetch. The channel hook counts consumers before
+  // cache/in-flight coalescing, not downloads; pixel preparation and POSTs stay unique.
+  assert.equal(new Set(warm.parents).size,6,'Only the current page and five translation successors are read');
+  for(const id of new Set(warm.parents))assert(warm.parents.filter(parent=>parent===id).length<=(warm.visibleJobs.includes(id)?2:1),'At most one prefetch and one displayed consumer per result');
   const preparedParents=warm.displays.filter(isParent);
   assert.equal(new Set(preparedParents).size,preparedParents.length,'Ordinary fallback preparation is not duplicated');
   assert(preparedParents.some(key=>key.startsWith('result:')),'The held lookup exercises translated parent preparation');
   assert(!warm.displays.some(key=>key.startsWith('result:')&&cachedJobs.includes(JSON.parse(key.slice(7))[1])),'Unavailable translated parents never display');
   assert(warm.displays.some(key=>key.startsWith('enhanced:')),'Existing enhancement bytes are displayed');
   for(const index of [0,1])assert.equal(await first(page,index).locator('.nc-image-failure').count(),0);
-  assert.equal((await read()).enhancement.length,5);assert.equal((await read()).translation,5);
+  assert.equal((await read()).enhancement.length,5);assert.equal((await read()).translation,6);
   assert.deepEqual(await geometry(),before);
   await page.evaluate(()=>{window.channelFixture.blockedParentJobs=[];});
   check('reopening cached enhancements tolerates unavailable translated parents, performs no duplicate parent preparation or POST, and preserves position');
@@ -191,7 +194,7 @@ try {
   await page.screenshot({path:path.join(out,'failure-keeps-translation.png')});
   await page.evaluate(()=>{window.channelFixture.enhancementFail=false;});
   await first().getByRole('button',{name:'重试增强'}).click();await waitWidth(baseWidth*2);
-  value=await read();assert.equal(value.enhancement.length,7);assert.equal(value.translation,5);
+  value=await read();assert.equal(value.enhancement.length,7);assert.equal(value.translation,6);
   assert.deepEqual(await geometry(),before);
   check('cache clear never reprocesses automatically; failure retains translation; manual retry changes enhancement only');
   await readerSettings(); await openMore();
@@ -215,7 +218,7 @@ try {
   await toggle();
   await page.waitForFunction(()=>document.querySelector('.nc-manga-page[data-page-index="0"] img.nc-page-image')?.naturalWidth===640);
   const count=(await read()).enhancement.length;
-  await setReaderProgress(page.getByLabel('阅读进度',{exact:true}), '10');
+  await setReaderProgress(page.getByRole('slider',{name:'阅读进度',exact:true}), '10');
 
   await page.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='10');
   await page.waitForTimeout(1200);assert.equal((await read()).enhancement.length,count);
@@ -270,12 +273,13 @@ try {
     });
     await waiting.getByRole('button',{name:/^打开漫画 /}).click();
     await waiting.getByRole('button',{name:'翻译',exact:true}).click();
-    await waiting.waitForFunction(()=>window.channelFixture.requests.length===5);
+    await waiting.waitForFunction(()=>window.channelFixture.requests.length===6);
     await waitWidth(baseWidth,waiting);
     await waiting.getByRole('button',{name:'阅读设置',exact:true}).click();
     await waiting.getByRole('button',{name:'单页',exact:true}).click();
     await waiting.getByRole('button',{name:'阅读设置',exact:true}).click();
     const preparedPages=await waiting.evaluate(async()=>1+(await import('/src/reading-window.ts')).MAX_READING_TARGETS);
+    const translationPages=await waiting.evaluate(async()=>2+(await import('/src/reading-window.ts')).READER_PREFETCH_PAGES);
     const expandWindow=()=>waiting.locator('.nc-reading-viewport').evaluate(view=>{
       view.scrollTop=view.scrollHeight;view.dispatchEvent(new Event('scroll'));
     });
@@ -287,11 +291,11 @@ try {
       const {readEntryDirectOperations}=await import('/src/translation/channels/transport/operations.ts');
       const operations=await readEntryDirectOperations(document.querySelector('.nc-stream-chapter').dataset.copyId);
       return window.channelFixture.requests.length===count&&operations.length===count&&operations.every(({job})=>job.status==='succeeded');
-    },preparedPages);
+    },translationPages);
     await waiting.getByRole('button',{name:'上一页',exact:true}).click();
     await waitWidth(baseWidth,waiting);
     const beforeWaiting=await geometry(waiting),translations=(await read(waiting)).translation;
-    assert.equal(translations,preparedPages,'Both reading windows must finish translation before enhancement starts');
+    assert.equal(translations,translationPages,'Both reading windows must finish translation before enhancement starts');
     await waiting.evaluate(()=>{window.channelFixture.holdEnhancements=true;});
     await toggle(waiting);
     await waiting.waitForFunction(()=>window.channelFixture.heldEnhancements===1);
@@ -369,13 +373,14 @@ try {
     await single.waitForFunction(()=>document.querySelector('.nc-manga-page[data-page-index="1"] img.nc-page-image')?.naturalWidth===1280);
     await single.waitForFunction(()=>window.readerFixture.enhancements.length===5);
     assert.deepEqual(await ordinals(),[0,1,2,3,4]);
+    await single.waitForFunction(()=>(document.querySelector('.nc-reading-viewport')?.dataset.swipePhase||'idle')==='idle'&&!document.querySelector('[data-swipe-snapshot]'));
     await single.locator('.nc-reading-viewport').evaluate(view=>{
       const height=view.querySelector('.nc-page-picture').getBoundingClientRect().height;
       view.scrollTop=Math.max(0,Math.min(height/3,height-view.clientHeight))+2;
     });
     await single.waitForFunction(()=>window.readerFixture.enhancements.length===6);
     assert.deepEqual(await ordinals(),[0,1,2,3,4,5]);
-    assert.equal(await single.getByLabel('阅读进度',{exact:true}).inputValue(),'2');
+    assert.equal(await single.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'2');
     assert.equal(await single.locator('.nc-manga-page').count(),1);
     assert.equal(await single.evaluate(()=>window.readerFixture.translationRequests.length),0);
     check('single-page mode prefetches the next three without mounting them, reuses the next result, and expands once at the shared scroll threshold');
@@ -391,7 +396,7 @@ try {
       await resultPage.getByRole('button',{name:/^打开漫画 /}).click();
       const image=first(resultPage);
       await resultPage.getByRole('button',{name:'翻译',exact:true}).click();
-      await resultPage.waitForFunction(()=>window.readerFixture.submitted.length>=4);
+      await resultPage.waitForFunction(()=>window.readerFixture.submitted.length===6);
       await toggle(resultPage);
       assert.equal(await resultPage.evaluate(()=>window.readerFixture.enhancements.length),0);
       const beforeOriginal=await geometry(resultPage);

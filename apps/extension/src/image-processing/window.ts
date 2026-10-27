@@ -41,11 +41,12 @@ export class ProcessingWindow {
 
   private flush = () => {
     clearTimeout(this.timer);
-    for (const target of this.window.ready()) {
+    const now=performance.now();
+    for (const target of this.window.ready(now)) {
       const work = this.work.get(target.id);
       if (work && !work.controller) this.start(work);
     }
-    const delay = this.window.delay();
+    const delay = this.window.delay(now);
     if (this.work.size && delay > 0) this.timer = setTimeout(this.flush, delay);
   };
 

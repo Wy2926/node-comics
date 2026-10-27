@@ -131,7 +131,7 @@ export class EpubImageWindow {
   private apply() {
     if (this.closed) return;
     clearTimeout(this.timer);
-    const ready = new Set(this.reading.ready()), delay = this.reading.delay();
+    const now=performance.now(),ready = new Set(this.reading.ready(now)), delay = this.reading.delay(now);
     if (this.profile && delay > 0) this.timer = setTimeout(() => this.apply(), delay);
     const wanted = new Map(this.window.flatMap(href => {
       const key = this.desired.get(epubImageId(href));
