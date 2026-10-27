@@ -92,12 +92,13 @@ describe('reader byte-only prefetch window', () => {
     await advance(1); expect(f.acquire).toHaveBeenCalledOnce();
   });
 
-  it('deduplicates, excludes visible and translated keys, and only reads the next two originals', async () => {
+  it('deduplicates, excludes visible and translated keys, and reads exactly five extra originals', async () => {
     const f = fixture();
-    f.update({next: ['', 'one', 'result:translated', 'two', 'two', 'three', 'four']});
-    await advance(150); f.calls[0].resolve(lease()); await advance();
-    f.calls[1].resolve(lease()); await advance(1000);
-    expect(f.calls.map(call => call.key)).toEqual(['two', 'three']);
+    f.update({next: ['', 'one', 'result:translated', 'two', 'two', 'three', 'four', 'five', 'six', 'seven']});
+    await advance(150);
+    for(let n=0;n<5;n++){expect(f.calls).toHaveLength(n+1);f.calls[n].resolve(lease());await advance();}
+    await advance(1000);
+    expect(f.calls.map(call => call.key)).toEqual(['two', 'three', 'four', 'five', 'six']);
   });
 
   it('keeps at most one speculative request in flight', async () => {
@@ -132,19 +133,31 @@ describe('reader byte-only prefetch window', () => {
     await advance(1); expect(f.calls[2].key).toBe('four');
   });
 
-  it('uses the same bounded handoff for an eleven-page continuous display window', async () => {
+  it('hands off the four-page forward continuous window while retaining five extra originals', async () => {
     const f = fixture();
-    const current = Object.freeze(Array.from({length: 11}, (_, index) => `page-${index + 1}`));
-    f.update({current, next: Object.freeze(['page-11', 'page-12', 'page-13', 'page-14'])}); await advance(150);
-    const first = lease(), second = lease();
-    f.calls[0].resolve(first); await advance(); f.calls[1].resolve(second); await advance();
-    expect(f.calls.map(call => call.key)).toEqual(['page-12', 'page-13']);
-    f.update({current: Array.from({length: 11}, (_, index) => `page-${index + 3}`), next: ['page-14', 'page-15'], ready: false});
+    const current = Object.freeze(Array.from({length: 4}, (_, index) => `page-${index + 1}`));
+    f.update({current, next: Object.freeze(['page-4', 'page-5', 'page-6', 'page-7', 'page-8', 'page-9', 'page-10'])}); await advance(150);
+    const retained=Array.from({length:5},()=>lease()),[first,second]=retained;
+    for(let n=0;n<5;n++){f.calls[n].resolve(retained[n]);await advance();}
+    expect(f.calls.map(call => call.key)).toEqual(['page-5', 'page-6', 'page-7', 'page-8', 'page-9']);
+    f.update({current: Array.from({length: 4}, (_, index) => `page-${index + 3}`), next: ['page-7', 'page-8', 'page-9', 'page-10', 'page-11'], ready: false});
     expect(first.release).not.toHaveBeenCalled(); expect(second.release).not.toHaveBeenCalled();
-    await advance(1000); expect(f.calls).toHaveLength(2);
+    await advance(1000); expect(f.calls).toHaveLength(5);
     f.update({ready: true});
     expect(first.release).toHaveBeenCalledOnce(); expect(second.release).toHaveBeenCalledOnce();
-    await advance(150); expect(f.calls[2].key).toBe('page-14'); expect(current).toHaveLength(11);
+    for(const held of retained.slice(2))expect(held.release).not.toHaveBeenCalled();
+    await advance(150); expect(f.calls[5].key).toBe('page-10'); expect(current).toHaveLength(4);
+  });
+
+  it('continues through a failed middle page and invalidates the fifth page identity', async () => {
+    const f=fixture(),next=['two','three','four','five','six'];
+    f.update({next,identities:new Map(next.map(key=>[key,key+'/1']))});await advance(150);
+    const retained=next.map(()=>lease());
+    for(let n=0;n<5;n++){if(n===2)f.calls[n].reject(Error('failed middle page'));else f.calls[n].resolve(retained[n]);await advance();}
+    expect(f.calls.map(call=>call.key)).toEqual(next);
+    f.update({identities:new Map(next.map(key=>[key,key+(key==='six'?'/2':'/1')]))});await advance(150);
+    expect(retained[4].release).toHaveBeenCalledOnce();expect(f.calls[5].key).toBe('six');
+    expect(retained[0].release).not.toHaveBeenCalled();expect(retained[3].release).not.toHaveBeenCalled();
   });
 
   it('lets foreground acquisition share bytes and still validate its own access with disk cache disabled', async () => {

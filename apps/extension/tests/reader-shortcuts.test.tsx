@@ -251,7 +251,7 @@ describe('reader shortcut action integration',()=>{
   const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;
   expect(targets.map(target=>target.page.id)).toEqual(['page-2','page-3','page-4',...next.pages.slice(0,readingAhead-3).map(page=>page.id)]);
   expect(targets.slice(3).every(target=>target.entryId===next.id)).toBe(true);
-  expect(visible).toHaveLength(11);
+  expect(visible.map(page=>page.id)).toEqual(['page-2','page-3','page-4','next-0']);
  });
  it.each(['single','double'] as const)('does not render footer content in %s mode and disables next when its last spread is shown',layout=>{
   const props=fixture({settings:{...defaults,layout},copy:{...copy,pages:copy.pages.slice(0,3)}}),tree=render(props);

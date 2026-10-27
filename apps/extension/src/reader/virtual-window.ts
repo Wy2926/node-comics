@@ -1,6 +1,5 @@
 import type {Page, ReadingEntry, Settings} from '../types';
-import {DECODED_PAGE_WINDOW} from '../image-resources';
-import {spreadStartingAt} from './pagination';
+import {CONTINUOUS_LOOKAHEAD_PAGES,ORIGINAL_PREFETCH_PAGES} from '../image-resources';
 import {completePageList} from './model';
 
 export interface ChapterWindow {
@@ -40,7 +39,8 @@ export function chapterWindow(sequence: ReadingEntry[], current: ReadingEntry): 
 /** Paged layouts prepare only the selected next chapter, close to a confirmed chapter end. */
 export function chapterResources(stream:ReadingEntry[],current:ReadingEntry,index:number,next:ReadingEntry|undefined,layout:Settings['layout']):ReadingEntry[]{
   if(layout==='continuous')return stream;
-  return next&&completePageList(current)&&index>=current.pages.length-3?[current,next]:[current];
+  const visible=layout==='double'?2:1;
+  return next&&completePageList(current)&&index+visible+ORIGINAL_PREFETCH_PAGES>current.pages.length?[current,next]:[current];
 }
 export function pageWindow(chapters: readonly ChapterGeometry[], entryId: string, index: number): ChapterWindow[] {
   let active = 0, count = 0;
@@ -48,8 +48,8 @@ export function pageWindow(chapters: readonly ChapterGeometry[], entryId: string
     if (copy.id === entryId) active = count + Math.max(0, Math.min(index, copy.pages.length - 1));
     count += copy.pages.length;
   }
-  const start = Math.max(0, Math.min(active - Math.floor(DECODED_PAGE_WINDOW / 2), count - DECODED_PAGE_WINDOW));
-  const end = Math.min(count, start + DECODED_PAGE_WINDOW);
+  const start = active;
+  const end = Math.min(count, active + CONTINUOUS_LOOKAHEAD_PAGES + 1);
   let cursor = 0;
   return chapters.map(({copy, offsets}) => {
     const from = Math.max(0, Math.min(copy.pages.length, start - cursor));
@@ -66,15 +66,13 @@ export function pageAtHeight(offsets: number[], y: number): number {
   return lo;
 }
 
-/** Layouts choose a range; all use the same bounded byte-prefetch pipeline outside the mounted window. */
-export function nextImagePages(windows:readonly ChapterWindow[],layout:Settings['layout'],next?:ReadingEntry):Page[]{
+/** Every layout reads five originals beyond its mounted window, across at most one chapter boundary. */
+export function nextImagePages(windows:readonly ChapterWindow[],next?:ReadingEntry):Page[]{
   const tail=[...windows].reverse().find(window=>window.end>window.start);
   if(!tail)return [];
   const {copy,end:start}=tail;
-  const end=layout==='double'?spreadStartingAt(copy.pages,start)?.end??start:start+(layout==='single'?1:2);
-  const pages=copy.pages.slice(start,end),limit=layout==='single'?1:2;
-  // Never skip an unfinished manifest, mix two chapters into a spread, or recurse through the catalog.
-  if(!next||next.id===copy.id||!completePageList(copy)||pages.length>=limit||layout==='double'&&pages.length)return pages;
-  const opening=layout==='double'?spreadStartingAt(next.pages,0)?.end??0:limit-pages.length;
-  return [...pages,...next.pages.slice(0,opening)];
+  const pages=copy.pages.slice(start,start+ORIGINAL_PREFETCH_PAGES);
+  // Bytes do not form display spreads. Never skip an unfinished manifest or recurse through the catalog.
+  if(!next||next.id===copy.id||!completePageList(copy)||pages.length>=ORIGINAL_PREFETCH_PAGES)return pages;
+  return [...pages,...next.pages.slice(0,ORIGINAL_PREFETCH_PAGES-pages.length)];
 }

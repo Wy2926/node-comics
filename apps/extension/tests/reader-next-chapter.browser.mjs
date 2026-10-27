@@ -100,22 +100,22 @@ for (const layout of ['single', 'double']) {
     await reader({layout, hold: [2]});
     await page.waitForTimeout(250);
     assert.deepEqual(await manifestEvents(), [], 'The opening pages do not discover next-chapter metadata');
-    await jump(13); await shown(13, layout === 'single' ? [13] : [13, 14]);
+    await jump(10); await shown(10, layout === 'single' ? [10] : [9, 10]);
     await page.waitForTimeout(250);
-    assert.deepEqual(await manifestEvents(), [], 'Four remaining pages are outside the metadata lookahead');
+    assert.deepEqual(await manifestEvents(), [], 'Five following pages still fit in this chapter');
     await jump(14); await shown(14, group(14)); await manifest(2, 'start');
     const request = (await manifestEvents()).find(event => event.phase === 'start');
     assert.equal(request.speculative, true); assert.equal(request.hasSignal, true);
     assert.equal((await snapshot('chapter-state')).chapters[1].pages, 0);
     assert.deepEqual(await chapterReads(1), [], 'Bytes cannot be requested before a descriptor exists');
-    await releaseManifest(2); await manifest(2, 'ready'); await page.waitForTimeout(250);
+    await releaseManifest(2); await manifest(2, 'ready'); await read(1, 3); await page.waitForTimeout(250);
     assert.equal((await snapshot('chapter-state')).chapters[1].pages, 16);
-    assert.deepEqual(await chapterReads(1), [], 'The remaining current-chapter pages still take byte-prefetch priority');
+    assert.deepEqual(await chapterReads(1), Array.from({length:3},(_,n)=>`inline-original:pagination-fixture-1-${n}`), 'Two current-chapter successors and three next-chapter pages fill the five extra slots');
     await assertCurrentOnly(14, group(14)); await assertNoThirdChapter();
 
-    await jump(16); await shown(16, group(16)); await read(1, 1); await page.waitForTimeout(250);
+    await jump(16); await shown(16, group(16)); await read(1, 5); await page.waitForTimeout(250);
     await assertCurrentOnly(16, group(16));
-    assert.deepEqual(await chapterReads(1), ['inline-original:pagination-fixture-1-0'], 'Only the next chapter cover is byte-prefetched');
+    assert.deepEqual(await chapterReads(1), Array.from({length:5},(_,n)=>`inline-original:pagination-fixture-1-${n}`), 'Five next-chapter originals are prefetched without extra display pages');
     await assertNoThirdChapter();
     await page.getByRole('button', {name: '完成模拟翻译', exact: true}).click();
     await page.getByRole('button', {name: '翻译', exact: true}).click(); await shown(16, group(16));
@@ -198,19 +198,19 @@ test('entering the next chapter while its manifest is still loading promotes the
   assert.deepEqual(await snapshot('marked-read'), []); await assertNoThirdChapter();
 });
 
-test('continuous reading prepares the next chapter before reaching it while decoded DOM stays within eleven pages', async () => {
-  await reader({layout: 'continuous', pages: 8}); await manifest(2, 'ready'); await read(1, 1);
+test('continuous reading prepares the next chapter before reaching it while decoded DOM stays within four forward pages', async () => {
+  await reader({layout: 'continuous', pages: 8}); await manifest(2, 'ready'); await jump(6); await read(1, 1);
   await page.waitForFunction(() => {
     const viewport = document.querySelector('.nc-reading-viewport'), images = [...viewport.querySelectorAll('img.nc-page-image')];
-    return viewport.querySelectorAll('.nc-manga-page').length === 11 && images.length === 11 && images.every(image => image.complete && image.naturalWidth > 0);
+    return viewport.querySelectorAll('.nc-manga-page').length === 4 && images.length === 4 && images.every(image => image.complete && image.naturalWidth > 0);
   });
-  await read(1, 5); await page.waitForTimeout(250);
+  await read(1, 6); await page.waitForTimeout(250);
   const state = await snapshot('chapter-state');
-  assert.equal(state.active, 'window-fixture-0'); assert.equal(await pageNumber().inputValue(), '1');
+  assert.equal(state.active, 'window-fixture-0'); assert.equal(await pageNumber().inputValue(), '6');
   assert.equal(state.chapters[1].pages, 8); assert.equal(state.chapters[2].pages, 0);
-  assert.equal(await cells().count(), 11); assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), 11);
-  assert.equal(await page.evaluate(() => window.__chapterUrls.active.size), 11);
-  assert.deepEqual(await chapterReads(1), Array.from({length: 5}, (_, index) => `inline-original:pagination-fixture-1-${index}`), 'Three next-chapter decoded pages plus two byte-only successors share the same bounded window');
+  assert.equal(await cells().count(), 4); assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), 4);
+  assert.equal(await page.evaluate(() => window.__chapterUrls.active.size), 4);
+  assert.deepEqual(await chapterReads(1), Array.from({length: 6}, (_, index) => `inline-original:pagination-fixture-1-${index}`), 'One next-chapter decoded page plus five byte-only successors share the bounded window');
   assert.deepEqual(await snapshot('marked-read'), []); await assertNoThirdChapter();
   await page.screenshot({path: resolve(artifacts, 'continuous-cross-chapter-bounded-window.png')});
   await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();

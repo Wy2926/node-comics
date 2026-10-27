@@ -312,7 +312,7 @@ async function assertNormalZoom(layout, number, zoom, mounted) {
   assert.equal(await mounted.evaluate(element => element === document.querySelector('.nc-reading-viewport')), true, 'Recovery does not remount the reader');
   const saved = await comicView('A');
   assert.equal(saved.zoom, zoom); assert.equal(saved.fit, 'width');
-  const limit = layout === 'continuous' ? 11 : 1;
+  const limit = layout === 'continuous' ? 4 : 1;
   assert(metrics.pages <= limit && metrics.images <= limit && metrics.urls <= limit, `${layout}: decoded pages and active images stay bounded`);
   return metrics;
 }

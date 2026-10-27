@@ -1,4 +1,4 @@
-import { DECODED_PAGE_WINDOW } from '../image-resources';
+import { INLINE_DISPLAY_WINDOW } from '../image-resources';
 import { MAX_READING_TARGETS } from '../reading-window';
 
 type Positioned = { rect: { top: number; bottom: number; left: number; right: number } };
@@ -27,9 +27,9 @@ export function readingImages<T extends Positioned>(items: T[], width: number, h
 export function retainedImages<T extends Positioned>(items: T[], width: number, height: number) {
   const visible = items.filter(i => visibleImage(i, width, height));
   const retained = new Set(visible);
-  if (visible.length >= DECODED_PAGE_WINDOW) return retained;
+  if (visible.length >= INLINE_DISPLAY_WINDOW) return retained;
   const nearby = items.filter(i => !retained.has(i)).sort((a, b) => distance(a, width, height) - distance(b, width, height));
-  for (const item of nearby.slice(0, DECODED_PAGE_WINDOW - visible.length)) retained.add(item);
+  for (const item of nearby.slice(0, INLINE_DISPLAY_WINDOW - visible.length)) retained.add(item);
   return retained;
 }
 

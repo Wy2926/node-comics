@@ -55,7 +55,7 @@ function previewProgress(report:(message:string)=>void){
  });
 }
 const fractionalDimensions=performanceFixture&&query.get('fractional')==='1';
-const width=highResolution?4000:fractionalDimensions?817:800,height=highResolution?6000:fractionalDimensions?1203:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:performanceFixture?3:30,pageCount=pagination?(query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:performanceFixture&&query.get('pages')==='1000'?1000:120;
+const width=highResolution?4000:fractionalDimensions?817:800,height=highResolution?6000:fractionalDimensions?1203:1200,chapterCount=pagination?(query.get('chapters')==='3'?3:query.get('chapters')==='2'?2:1):highResolution?1:performanceFixture?3:30,pageCount=pagination?(query.get('pages')==='32'?32:query.get('pages')==='16'?16:query.get('long')==='1'?9:8):highResolution?24:performanceFixture&&query.get('pages')==='1000'?1000:120;
 // Opt-in geometry-read counts belong to this fixture, not the production reader.
 let dimensionReads=0;
 if(performanceFixture)Object.assign(window,{__readerFixturePerformance:{

@@ -1,3 +1,5 @@
+import {ORIGINAL_PREFETCH_PAGES} from '../image-resources';
+
 export interface ReaderPrefetchOptions {
   scope: string;
   current: readonly string[];
@@ -17,7 +19,7 @@ const budget = 64 * 1024 * 1024;
 const keys = (values: readonly string[]) => [...new Set(values.filter(key => key && !key.startsWith('result:')))];
 const equal = (left: readonly string[], right: readonly string[]) => left.length === right.length && left.every((key, index) => key === right[index]);
 
-/** A two-page byte window. Displayed images still acquire and validate their own leases. */
+/** Five extra originals, without display pixels. Each displayed image validates its own lease. */
 export class ReaderImagePrefetch {
   private window?: Window;
   private held = new Map<string, PrefetchLease>();
@@ -33,7 +35,7 @@ export class ReaderImagePrefetch {
     if (!options.enabled) {this.dispose(); return;}
     if (this.window?.scope !== options.scope) this.dispose();
     const current = keys(options.current);
-    const next = keys(options.next).filter(key => !current.includes(key)).slice(0, 2);
+    const next = keys(options.next).filter(key => !current.includes(key)).slice(0, ORIGINAL_PREFETCH_PAGES);
     // Own a bounded snapshot so a caller reusing its map cannot hide an identity change.
     const identities = new Map<string, string>();
     for (const key of [...current, ...next]) {

@@ -18,6 +18,7 @@ import {processingInput} from '../comics/application/image-access';
 import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
 import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
+import {ORIGINAL_PREFETCH_PAGES} from '../image-resources';
 import {pageSpreads,spreadAt,spreadFrames,pageTurnIndex} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
@@ -158,15 +159,15 @@ const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)
 const imageWindows=useMemo(()=>windows.filter(({copy:chapter,start,end})=>end>start&&resources.ready(chapter)),[windows,resourceVersion]);
 // The chosen next chapter is metadata only in paged layouts, never a hidden reading/translation window.
 const aheadChapter=next&&resources.ready(next)&&imageWindows.at(-1)?.copy.id===copy.id?next:undefined;
-const aheadPages=useMemo(()=>nextImagePages(imageWindows,settings.layout,aheadChapter),[imageWindows,settings.layout,aheadChapter]);
+const aheadPages=useMemo(()=>nextImagePages(imageWindows,aheadChapter),[imageWindows,aheadChapter]);
 const windowReady=!!imageWindows.length&&imageWindows.every(({copy:chapter,start,end})=>chapter.pages.slice(start,end).every(p=>{
  const key=pageKey(chapter,p.id),identity=scope(p,chapter),target=readingImage(p,mode,preference!=='original',settings.language,translationScope);
  const original=loads[`${key}:compare`];
  return imagePrefetchReady(identity,actual[key],imageLoad(chapter,p,target.key))&&(!compare||original?.key===p.blobKey&&imagePrefetchReady(`${identity}:compare`,undefined,original));
 }));
 const prefetchIdentities=new Map<string,string>();
-for(const {copy:chapter,start,end} of imageWindows)for(const p of chapter.pages.slice(start,end+2))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,chapter));
-if(aheadChapter)for(const p of aheadChapter.pages.slice(0,2))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,aheadChapter));
+for(const {copy:chapter,start,end} of imageWindows)for(const p of chapter.pages.slice(start,end+ORIGINAL_PREFETCH_PAGES))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,chapter));
+if(aheadChapter)for(const p of aheadChapter.pages.slice(0,ORIGINAL_PREFETCH_PAGES))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,aheadChapter));
 useReaderPrefetch({scope:JSON.stringify([viewKey,scopeBase]),identities:prefetchIdentities,
  current:imageWindows.flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).flatMap(p=>p.blobKey?[p.blobKey]:[])),
  next:aheadPages.flatMap(p=>p.blobKey?[p.blobKey]:[]),enabled:resources.ready(copy),ready:windowReady&&!moving,

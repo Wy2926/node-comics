@@ -123,7 +123,7 @@ const trace = () => page.evaluate(() => window.__swipeTrace);
 const idle = () => page.waitForFunction(() => !document.querySelector('.nc-reading-viewport')?.hasAttribute('data-swipe-phase'));
 
 async function reader({failure = false, long = false, chapters = false, controlled = false, pages, holdPages = [], holdResults = [], failResults = []} = {}) {
-  await page.goto(`${origin}/tests/reader-window-fixture.html?pagination=1${failure ? '&failure=1' : ''}${long ? '&long=1' : ''}${chapters ? '&chapters=2' : ''}${pages === 16 ? '&pages=16' : ''}${controlled ? `&controlledReads=1&holdPages=${holdPages.join(',')}&holdResults=${holdResults.join(',')}&failResults=${failResults.join(',')}` : ''}`);
+  await page.goto(`${origin}/tests/reader-window-fixture.html?pagination=1${failure ? '&failure=1' : ''}${long ? '&long=1' : ''}${chapters ? '&chapters=2' : ''}${pages ? `&pages=${pages}` : ''}${controlled ? `&controlledReads=1&holdPages=${holdPages.join(',')}&holdResults=${holdResults.join(',')}&failResults=${failResults.join(',')}` : ''}`);
   await viewport().waitFor();
   await page.waitForFunction(async () => (await import('/src/shortcuts/store.ts')).getShortcutSnapshot().ready);
   await shown(1, [1]);
@@ -778,16 +778,16 @@ test('closing during a held read disposes the snapshot and late bytes cannot rec
   await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(2, [2]);
 });
 
-test('single-page lookahead reads only next-page bytes without extra idle image DOM or URLs', async () => {
+test('single-page lookahead reads five extra originals without extra idle image DOM or URLs', async () => {
   await reader({controlled: true});
-  await page.waitForFunction(() => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(2) && event.phase === 'ready'));
+  await page.waitForFunction(() => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(6) && event.phase === 'ready'));
   await page.waitForTimeout(150);
   await shown(1, [1]);
   assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 1);
   assert.equal(await oldLayer().count(), 0);
   assert.deepEqual(await page.locator('[data-testid="reading-window"]').textContent().then(JSON.parse), {targets: [], visible: [pageId(1)], immediate: true});
   const reads = await page.evaluate(() => window.__readerFixtureReads.events.filter(event => event.phase === 'start').map(event => event.key));
-  assert.deepEqual([...new Set(reads)].sort(), ['inline-original:pagination-fixture-0-0', 'inline-original:pagination-fixture-0-1']);
+  assert.deepEqual([...new Set(reads)].sort(), Array.from({length:6},(_,n)=>`inline-original:pagination-fixture-0-${n}`));
   await page.getByRole('button', {name: '下一页', exact: true}).click(); await shown(2, [2]);
   // Fixture inline keys do not use the production acquirePage lease-sharing path:
   // a foreground IndexedDB get is allowed here and is not a duplicate source-network request.
@@ -800,29 +800,30 @@ test('single-page lookahead reads only next-page bytes without extra idle image 
   assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 0);
 });
 
-test('double-page byte lookahead stays within the next spread and creates no speculative image URLs', async () => {
-  await reader({controlled: true}); await direction('从右向左'); await layout('双页'); await jump(5); await shown(5, [5, 6]);
-  await page.waitForFunction(() => [7, 8].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
-  await page.waitForTimeout(150); await shown(5, [5, 6]);
+test('double-page byte lookahead spans five extra pages across spread boundaries and creates no speculative image URLs', async () => {
+  await reader({controlled: true}); await direction('从右向左'); await layout('双页'); await jump(2); await shown(2, [2, 3]);
+  await page.waitForFunction(() => [4, 5, 6, 7, 8].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
+  await page.waitForTimeout(150); await shown(2, [2, 3]);
   assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 2);
   assert.equal(await oldLayer().count(), 0);
-  assert.deepEqual((await page.locator('[data-testid="reading-window"]').textContent().then(JSON.parse)).visible, [pageId(5), pageId(6)]);
+  assert.deepEqual((await page.locator('[data-testid="reading-window"]').textContent().then(JSON.parse)).visible, [pageId(2), pageId(3)]);
+  await jump(5); await shown(5, [5, 6]);
   await resetTrace(); await page.keyboard.press('PageDown'); await shown(7, [7, 8]); await assertAnimation(1);
   assert((await trace()).every(frame => frame.urls <= 4), 'Old/new spread overlap has a four-URL ceiling');
   await page.waitForTimeout(250);
   assert.equal(await page.evaluate(() => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(9))), false, 'A final spread does not invent another prefetch target');
 });
 
-test('continuous layout uses the same bounded byte lookahead after its eleven decoded pages', async () => {
+test('continuous layout uses the same bounded byte lookahead after the current page and its next three neighbours', async () => {
   await reader({controlled: true, pages: 16}); await layout('连续');
-  await shown(1, Array.from({length: 11}, (_, index) => index + 1));
-  await page.waitForFunction(() => [12, 13].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
+  await shown(1, Array.from({length: 4}, (_, index) => index + 1));
+  await page.waitForFunction(() => [5, 6, 7, 8, 9].every(number => window.__readerFixtureReads.events.some(event => event.key === window.__readerFixtureReads.keyFor(number) && event.phase === 'ready')));
   await page.waitForTimeout(200);
   const readKeys = await page.evaluate(() => [...new Set(window.__readerFixtureReads.events.filter(event => event.phase === 'start').map(event => event.key))].sort());
-  assert.deepEqual(readKeys, Array.from({length: 13}, (_, index) => `inline-original:pagination-fixture-0-${index}`).sort(), 'Only the eleven rendered pages and two immediate byte successors may be read');
-  assert.equal(await cells().count(), 11);
-  assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), 11);
-  assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 11);
+  assert.deepEqual(readKeys, Array.from({length: 9}, (_, index) => `inline-original:pagination-fixture-0-${index}`).sort(), 'Only the four rendered opening pages and five extra originals may be read');
+  assert.equal(await cells().count(), 4);
+  assert.equal(Number(await viewport().getAttribute('data-decoded-pages')), 4);
+  assert.equal(await page.evaluate(() => window.__swipeUrls.active.size), 4);
   assert.equal(await oldLayer().count(), 0);
   await layout('单页'); await shown(1, [1]);
   await page.waitForFunction(() => window.__swipeUrls.active.size === 1);
@@ -830,10 +831,27 @@ test('continuous layout uses the same bounded byte lookahead after its eleven de
   await page.waitForFunction(() => window.__swipeUrls.active.size === 0);
 });
 
+test('continuous far jumps read only the current and eight following originals, including on backward navigation', async () => {
+  await reader({controlled: true, pages: 32}); await layout('连续');
+  await shown(1, [1, 2, 3, 4]); await readyOriginals([5, 6, 7, 8, 9]);
+  for(const number of [20, 10]){
+    await page.evaluate(()=>{window.__readerFixtureReads.events.length=0;});
+    await jump(number); await shown(number, [number, number+1, number+2, number+3]);
+    await readyOriginals([number+4, number+5, number+6, number+7, number+8]);
+    const reads=await page.evaluate(()=>[...new Set(window.__readerFixtureReads.events.filter(event=>event.phase==='start').map(event=>event.key))].sort());
+    assert.deepEqual(reads,Array.from({length:9},(_,n)=>`inline-original:pagination-fixture-0-${number-1+n}`).sort(),'No earlier page is read or retained in the forward window');
+    assert.equal(await page.evaluate(()=>window.__swipeUrls.active.size),4);
+    assert.equal(await cells().count(),4);
+  }
+  await page.screenshot({path:resolve(artifacts,'continuous-forward-only-window.png')});
+  await page.getByRole('button',{name:'关闭并保存位置',exact:true}).click();
+  await page.waitForFunction(()=>window.__swipeUrls.active.size===0);
+});
+
 const originalFirstLayouts = [
-  {name: 'single', label: '单页', number: 2, visible: [2], next: [3]},
-  {name: 'double', label: '双页', number: 5, visible: [5, 6], next: [7, 8]},
-  {name: 'continuous', label: '连续', number: 1, visible: Array.from({length: 11}, (_, index) => index + 1), next: [12, 13]}
+  {name: 'single', label: '单页', number: 2, visible: [2], next: [3, 4, 5, 6, 7]},
+  {name: 'double', label: '双页', number: 5, visible: [5, 6], next: [7, 8, 9, 10, 11]},
+  {name: 'continuous', label: '连续', number: 1, visible: Array.from({length: 4}, (_, index) => index + 1), next: [5, 6, 7, 8, 9]}
 ];
 const primaryImage = number => surface().locator(`[data-page-id="${pageId(number)}"] .nc-comparison-pane:last-child img.nc-page-image`);
 async function pixels(number, result = false) {

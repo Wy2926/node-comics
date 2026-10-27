@@ -96,7 +96,7 @@ Xcode 27.1、iOS 27.1 的 iPhone Duo 模拟器，配合上述本机合成服务�
 | 样本 | 结果 |
 | --- | --- |
 | [Pixiv 公开漫画目录](https://www.pixiv.net/users/25786514/manga) | 51 个条目；首作品原图从 403 修复为可读，6,543,216 字节、4299 × 6071 |
-| [DM5 公开短篇](https://www.dm5.com/manhua-zuixihuanxuejiedetudingmen/) | 桌面目录及图片地址接口均通过，完整解析 30 页；阅读器显示前 11 页，滚动至第 3 页及返回无取图错误 |
+| [DM5 公开短篇](https://www.dm5.com/manhua-zuixihuanxuejiedetudingmen/) | 桌面目录及图片地址接口均通过，完整解析 30 页；阅读器滚动至第 3 页及返回无取图错误 |
 | [NAVER 公开作品](https://comic.naver.com/webtoon/list?titleId=758037) | 270 个目录条目，首话解析 137 页；浏览器通道读取首图 690 × 1600，无需启用原生图片读取 |
 | [Comic PASH 公开章节入口](https://comicpash.jp/episodes/60cfe4785e2af) | 解析所属作品的 44 个条目、首可读章节的 50 页；首图从 403 修复为可读并完成拼图解码，720 × 1024 |
 | 原生回环边界 | 严格 Referer、手动重定向、Cookie 不保存／不回传、challenge 拦截、已声明及无 Content-Length 的超限拒绝、取消中止与临时文件清理通过；三个请求实测最多两个同时传输 |

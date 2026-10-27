@@ -17,7 +17,7 @@ const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(
 async function readyWindow(page){
  await page.waitForFunction(()=>{
   const cells=[...document.querySelectorAll('[data-page-index]')];
-  return cells.length===11&&cells.every(cell=>{const image=cell.querySelector('.nc-page-image');return image?.complete&&image.naturalWidth>0;});
+  return cells.length>0&&cells.length<=4&&cells.every(cell=>{const image=cell.querySelector('.nc-page-image');return image?.complete&&image.naturalWidth>0;});
  });
  await settle(page);
 }
@@ -72,8 +72,8 @@ try{
    },phase);
    const after=await metrics(session),result={pages,phase,...samples,cdp:difference(before,after)};
    results.push(result);console.log(JSON.stringify(result));
-   if(result.maxMounted>11)violations.push(`${pages}/${phase}: mounted page window grew to ${result.maxMounted}`);
-   if(result.maxImages>11)violations.push(`${pages}/${phase}: image window grew to ${result.maxImages}`);
+   if(result.maxMounted>4)violations.push(`${pages}/${phase}: mounted page window grew to ${result.maxMounted}`);
+   if(result.maxImages>4)violations.push(`${pages}/${phase}: image window grew to ${result.maxImages}`);
    if(result.maxJump>=1)violations.push(`${pages}/${phase}: translation commit moved the scroll position by ${result.maxJump}px`);
    if(Math.abs(result.final-result.initial)>=1)violations.push(`${pages}/${phase} did not return to its original position`);
    // Budget fixed input steps, not React commits: extra rerenders must not make
@@ -112,7 +112,7 @@ try{
   supplemental.push(result);console.log(JSON.stringify(result));
   if(result.stackTop<=0||Number.isInteger(result.pageHeight))violations.push('fractional scenario must have a non-zero chapter origin and fractional page height');
   if(result.maxJump>=1||Math.abs(result.final-result.initial)>=1)violations.push('fractional second chapter moved during mixed scrolling and translation status updates');
-  if(result.maxMounted>11)violations.push('fractional second chapter exceeded the mounted page window');
+  if(result.maxMounted>4)violations.push('fractional second chapter exceeded the mounted page window');
   await page.screenshot({path:path.join(out,`${label}-fractional-second-chapter.png`)});await context.close();currentPage=undefined;
  }
  assert.deepEqual(errors,[]);
