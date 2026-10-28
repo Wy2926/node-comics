@@ -4,6 +4,8 @@ import {definition} from '../definition';
 import vectors from './protocol-vectors.json';
 import {validateSearchPage} from '../../../core/search';
 
+vi.mock('../protocol-loader',async()=>({getProtocol:vi.fn(async()=>(await import('./protocol-fixture')).fixtureProtocol)}));
+
 const request = {siteId: 'comix', query: '海 & One Piece + %'};
 const row = (id = 'sample') => ({hid: id, url: '/title/' + id + '-work', title: '作品', originalLanguage: 'ja',
   poster: {large: 'https://static.comix.to/cover.jpg'}, latestChapter: 1.5});

@@ -1,4 +1,5 @@
 import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
+import {fixtureSource,protocolAssetPath,protocolHtml} from './protocol-fixture.ts';
 // Built MV3 extension, isolated profile and synthetic Comix routes; no translation calls.
 import {createRequire} from 'node:module';
 import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
@@ -21,6 +22,7 @@ try{
   if(url.protocol==='chrome-extension:')return route.continue();
   if(url.hostname==='images.wowpic1.store')return route.fulfill({contentType:'image/png',body:sample});
   if(url.hostname!=='comix.to')return route.abort();
+  if(url.pathname===protocolAssetPath)return route.fulfill({contentType:'text/javascript',body:route.request().resourceType()==='script'?'':fixtureSource()});
   const detail=/^\/api\/v1\/manga\/([a-z0-9]+)$/.exec(url.pathname);
   if(detail)return route.fulfill({status:failCatalog?503:200,json:{status:'ok',result:{id:1,hid:detail[1],url:'/title/'+detail[1]+'-fixture',title:'Comix embedded entry fixture'}}});
   if(url.pathname.includes('/manga/')){const fresh=url.pathname.includes('/fresh/'),base=fresh?chapterCatalog:catalogPath,offset=fresh?119:19;return route.fulfill({status:failCatalog?503:200,json:{status:'ok',result:{items:[1,2].map(n=>({id:offset+n,number:n,mangaId:1,language:'en',isOfficial:true,url:base+'/'+(offset+n)+'-chapter-'+n})),meta:{page:1,lastPage:1,total:2,hasNext:false}}}});}
@@ -33,7 +35,7 @@ try{
    <button onclick="history.pushState({},'', '/browse')">Leave comic</button>
    <div id="anchor" class="${url.pathname===catalogPath||hid==='failed'?'mpage__actions':''}"></div>
    ${url.pathname.includes('-chapter-')?'<div class="rpage-floatctl" role="toolbar" style="position:fixed;right:12px;top:12px;z-index:50;display:flex;flex-direction:column;align-items:flex-end"><button>Reader controls</button></div><main class="rpage-main" style="position:absolute;inset:0;height:100%">Reader image area</main>':''}
-   <script type="application/json" id="initial-data">${initial}</script></body></html>`});
+   ${protocolHtml}<script type="application/json" id="initial-data">${initial}</script></body></html>`});
  });
  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
  const bootstrap=await context.newPage();await bootstrap.goto(new URL('reader.html',worker.url()).href);

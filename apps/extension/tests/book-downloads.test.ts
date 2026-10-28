@@ -5,6 +5,7 @@ import type {Comic,Entry} from '../src/comics/domain';
 import type {SourceCatalog} from '../src/comics/application/types';
 import {downloadKey,downloadStore} from '../src/storage/downloads';
 import {sourceDatabaseName} from '../src/storage/database';
+import {SourceProtocolError} from '../src/sources/contracts/network';
 const mocks=vi.hoisted(()=>({acquire:vi.fn(),discover:vi.fn(),directory:vi.fn(),track:vi.fn()}));
 vi.mock('../src/analytics',()=>({track:mocks.track}));
 vi.mock('../src/comics/pages/service',()=>({acquirePage:mocks.acquire}));
@@ -302,6 +303,29 @@ describe('whole comic retained downloads',()=>{
     await cycle();expect((await readBookPlan(a.comic.id))?.reason).toBe('source');expect((await readBookPlan(b.comic.id))?.status).toBe('paused');
     expect(mocks.acquire).toHaveBeenCalledTimes(1);
     await expect(startBookDownload(a.comic.id)).rejects.toThrow('限制请求');await cycle();expect((await view(other.comic.id)).status).toBe('complete');
+  });
+  it('pauses a changed protocol across the same source, retains saved pages and resumes only missing pages',async()=>{
+    const a=await fixture(2),b=await fixture(1),other=await fixture(1);
+    await catalog.patch('comics',b.comic.id,{source:{...b.comic.source,connectionId:a.comic.source.connectionId}});
+    mocks.acquire.mockImplementation(async(request:{entryId:string,pageId:string})=>{
+      if(request.pageId===a.entries[0].id+':page:1')throw new SourceProtocolError('Source protocol changed');
+      return {blob:new Blob(['original']),release:vi.fn(),identity:{}};
+    });
+    for(const [order,f] of [a,b,other].entries()){
+      await startBookDownload(f.comic.id);await catalog.patch('metadata',bookDownloadId(f.comic.id),{createdAt:order+1});
+    }
+    await cycle();
+    expect(await readBookPlan(a.comic.id)).toMatchObject({status:'paused',reason:'source',error:'Source protocol changed'});
+    expect(await readBookPlan(b.comic.id)).toMatchObject({status:'paused',reason:'source'});
+    expect(mocks.acquire).toHaveBeenCalledTimes(2);
+    expect(await downloadStore.get(downloadKey(a.entries[0].contentId,a.entries[0].id+':page:0'))).toBeDefined();
+    await cycle();expect((await view(other.comic.id)).status).toBe('complete');
+    const calls=mocks.acquire.mock.calls.length;
+    mocks.acquire.mockImplementation(async()=>({blob:new Blob(['original']),release:vi.fn(),identity:{}}));
+    await startBookDownload(a.comic.id);await cycle();
+    expect(mocks.acquire).toHaveBeenCalledTimes(calls+3);
+    expect((await view(a.comic.id)).status).toBe('complete');
+    expect((await readBookPlan(b.comic.id))?.status).toBe('paused');
   });
   it('stops all queued books when retained storage is full',async()=>{
     const a=await fixture(1),b=await fixture(1);await startBookDownload(a.comic.id);await startBookDownload(b.comic.id);

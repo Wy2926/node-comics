@@ -6,8 +6,9 @@ export const downloadErrorMessage = (error: unknown) =>
   (error instanceof Error ? error.message : '下载失败，请重试。').replace(/https?:\/\/\S+/g, '[来源地址]');
 
 export function blockingReason(error: unknown): DownloadTask['reason'] {
-  if (error instanceof ImagePermissionsRequired || (error as { kind?: string })?.kind === 'permission-required') return 'permission';
-  if ((error as {kind?: string})?.kind === 'verification-required') return 'source';
+  const kind = (error as {kind?: string})?.kind;
+  if (error instanceof ImagePermissionsRequired || kind === 'permission-required') return 'permission';
+  if (kind === 'verification-required' || kind === 'protocol-changed') return 'source';
   if (error instanceof DOMException && error.name === 'QuotaExceededError') return 'space';
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'network';
   if (error instanceof Error && (error.name === 'TimeoutError' || error.cause instanceof TypeError) || error instanceof TypeError) return 'network';

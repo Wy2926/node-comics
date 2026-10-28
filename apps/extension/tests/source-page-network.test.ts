@@ -3,6 +3,7 @@ import { withPageNetworkContext } from '../src/sources/runtime/page-network';
 import { requestInSourcePage, type PageNetworkResponse } from '../src/sources/runtime/page-request';
 import { readSourceCatalog } from '../src/sources/runtime/catalog-reader';
 import { readNetworkPages } from '../src/sources/runtime/network';
+import {fixtureSource, protocolAssetPath, protocolHtml} from '../src/sources/sites/comix/tests/protocol-fixture';
 const url = 'https://comix.to/title/fixture-book', target = 'https://comix.to/api/v1/manga/fixture';
 const event = () => ({ addListener: vi.fn(), removeListener: vi.fn() });
 let records: Record<string, unknown>, tab: {
@@ -212,40 +213,51 @@ describe('opt-in source-page catalog transport', () => {
     response.body = 'x'.repeat(8 * 1024 * 1024 + 1);
     await expect(read()).rejects.toMatchObject({ kind: 'invalid-response' });
   });
-  it('runs the real Comix catalog parser through the page request path without HTML or extension fetch', async () => {
+  it('loads Comix protocol material once for the complete directory and cacheable chapter, then rejects denied manifests without HTTP fallback', async () => {
+    const chapter = url + '/20-chapter-1';
     const paths: string[] = [];
     inject.mockImplementation(async (options: any) => {
       if (options.func !== requestInSourcePage)
         return [{ frameId: 0, documentId: 'document-1', result: url }];
       const path = new URL(options.args[0].url).pathname;
       paths.push(path);
-      const result = path === '/api/v1/manga/fixture' ? { id: 1, hid: 'fixture', title: 'Fixture', url: '/title/fixture-book' } :
-        { items: [{ id: 20, mangaId: 1, number: 1, language: 'en', isOfficial: true, url: '/title/fixture-book/20-chapter-1' }], meta: { total: 1, lastPage: 1, page: 1, hasNext: false } };
-      return [{ frameId: 0, documentId: 'document-1', result: { ...response, body: JSON.stringify({ status: 'ok', result }) } }];
+      let body: string;
+      if (path === '/title/fixture-book') body = protocolHtml;
+      else if (path === protocolAssetPath) body = fixtureSource();
+      else if (path === '/api/v1/manga/fixture') body = JSON.stringify({status: 'ok', result: {id: 1, hid: 'fixture', title: 'Fixture', url}});
+      else if (path === '/api/v1/manga/fixture/chapters') body = JSON.stringify({status: 'ok', result: {
+        items: [{id: 20, mangaId: 1, number: 1, language: 'en', isOfficial: true, url: chapter}],
+        meta: {total: 1, lastPage: 1, page: 1, hasNext: false},
+      }});
+      else {
+        expect(path).toBe('/api/v1/chapters/20');
+        body = response.body;
+      }
+      return [{ frameId: 0, documentId: 'document-1', result: {...response, body} }];
     });
     const catalog = await readSourceCatalog(url);
     expect(catalog).toMatchObject({ id: 'comix:fixture', title: 'Fixture', complete: true });
     expect(catalog.entries).toHaveLength(1);
-    expect(paths).toEqual(['/api/v1/manga/fixture', '/api/v1/manga/fixture/chapters']);
-    expect(fetch).not.toHaveBeenCalled();
-  });
-  it('loads the chapter manifest in the same page transport, opening only the work landing page', async () => {
-    const chapter = url + '/20-chapter-1';
+    expect(paths).toEqual(['/title/fixture-book', protocolAssetPath, '/api/v1/manga/fixture', '/api/v1/manga/fixture/chapters']);
     response.body = JSON.stringify({ status: 'ok', result: { id: 20, number: 1, url: chapter, pages: { items: [{ url: 'https://images.test/page.webp', width: 800, height: 1200, s: 1 }] } } });
     const manifest = await readNetworkPages(chapter);
     expect(manifest).toMatchObject({ adapter: 'comix', url: chapter, discoveryComplete: true, knownTotal: 1 });
     expect(manifest.items[0]).toMatchObject({ url: 'https://images.test/page.webp', processing: 'tiles-v1' });
-    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({ url, active: false });
-    expect(inject.mock.calls[1][0].args[0].url).toContain('/api/v1/chapters/20?');
+    expect(paths.slice(4)).toEqual(['/api/v1/chapters/20']);
+    expect(chrome.tabs.create).toHaveBeenCalledTimes(2);
+    expect(chrome.tabs.create).toHaveBeenNthCalledWith(1, {url, active: false});
+    expect(chrome.tabs.create).toHaveBeenNthCalledWith(2, {url, active: false});
     expect(chrome.storage.session.get).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
-    expect(chrome.tabs.remove).toHaveBeenCalledOnce();
-  });
-  it('rejects a denied chapter without registering an empty manifest or using HTTP fallback', async () => {
+    expect(chrome.tabs.remove).toHaveBeenCalledTimes(2);
+    vi.mocked(chrome.storage.local.set).mockClear();
     response.status = 403;
-    await expect(readNetworkPages(url + '/20-chapter-1')).rejects.toThrow('403');
+    response.body = '{}';
+    await expect(readNetworkPages(chapter)).rejects.toMatchObject({kind:'protocol-changed'});
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(chrome.tabs.remove).toHaveBeenCalledTimes(3);
+    expect(records).toEqual({});
     expect(fetch).not.toHaveBeenCalled();
+    expect(Reflect.get(globalThis, '__comixRemoteCodeExecuted')).toBeUndefined();
   });
 });
 describe('serialized source-page request function', () => {

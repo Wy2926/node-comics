@@ -20,14 +20,14 @@ export const network={
   search,
   async catalog(url,context){
     const loc=location(url);if(loc.chapterId)throw Error('请使用 Comix 漫画详情页链接。');
-    const detail=await api('/manga/'+loc.hid,context);
+    const detail=await api('/manga/'+loc.hid,context,{},url);
     if(detail.hid!==loc.hid)throw Error('Comix 漫画归属已变化。');
     const mangaId=integer(detail.id),canonical=new URL(text(detail.url),'https://comix.to').href;
     if(location(canonical).hid!==loc.hid||location(canonical).chapterId)throw Error('Comix 目录地址无效。');
     const rows:Chapter[]=[],ids=new Set<number>();let total:number|undefined,lastPage:number|undefined;
     for(let page=1;page<=100;page++){
       context.signal?.throwIfAborted();
-      const result=await api('/manga/'+loc.hid+'/chapters',context,{limit:'100','order[number]':'asc',page:String(page)}),meta=object(result.meta);
+      const result=await api('/manga/'+loc.hid+'/chapters',context,{limit:'100','order[number]':'asc',page:String(page)},url),meta=object(result.meta);
       const count=integer(meta.total),last=integer(meta.lastPage);
       if(count>10000||last<1||last>100||integer(meta.page)!==page||total!==undefined&&total!==count||lastPage!==undefined&&lastPage!==last||!Array.isArray(result.items))throw Error('Comix 目录分页已变化，请重试。');
       total=count;lastPage=last;
@@ -55,7 +55,7 @@ export const network={
   },
   async pages(url,context){
     const loc=location(url);if(!loc.chapterId)throw Error('Comix 章节地址无效。');
-    const result=await api('/chapters/'+loc.chapterId,context);
+    const result=await api('/chapters/'+loc.chapterId,context,{},url);
     const returned=location(new URL(text(result.url),'https://comix.to').href);
     if(integer(result.id)!==Number(loc.chapterId)||returned.hid!==loc.hid||returned.chapterId!==loc.chapterId||Number(result.number)!==Number(loc.number)||Number(returned.number)!==Number(loc.number))throw Error('Comix 章节归属已变化。');
     const pages=object(result.pages),base=typeof pages.baseUrl==='string'?pages.baseUrl:'';
