@@ -93,7 +93,7 @@ async function waitProbe(predicate, argument) {
   throw Error('Timed out waiting for an IndexedDB verification condition');
 }
 async function jump(page) {
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page)); await waitImage(page);
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(page)); await waitImage(page);
   await waitProbe(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
     const data = await catalog.get('entries', entry), pages = await catalog.listPages(data.contentId), position = await catalog.get('positions', entry);
     return position?.pageId === pages[page - 1]?.pageId;}, {entry: activeEntry, page});
@@ -112,7 +112,7 @@ async function importLongFixture(nextTitleId, name, behavior) {
   titleId = nextTitleId; fixtureName = name; longCatalog = true; listingBehavior = behavior; listingRequests.clear();
   await reader.getByLabel('通过链接添加漫画').fill('https://mangaball.com/title-detail/' + titleId);
   await reader.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 60000});
   const data = await state(), comic = data.comics.find(row => row.sourceUrl === 'https://mangaball.com/title-detail/' + titleId); assert(comic);
   const activeId = await reader.locator('.nc-stream-chapter').first().getAttribute('data-copy-id');
   const active = data.entries.find(row => row.comicId === comic.id && row.id === activeId);
@@ -126,6 +126,8 @@ try {
     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
+  const expand = search.locator('.nc-search-scope-expand');
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
   for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('MangaBall'));
   const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? 'About Teddy Bear' : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? 'About Teddy Bear' : 'MangaBall fixture', exact: true})});
@@ -136,7 +138,7 @@ try {
   checks.push('Search cover is fetched through the MV3 source image transport and decoded');
   await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
   const imported = await state(); assert.equal(imported.comics.length, 1); assert.equal(imported.comics[0].sourceUrl, catalogUrl);
   const activeId = await reader.locator('.nc-stream-chapter').first().getAttribute('data-copy-id');
   const active = imported.entries.find(row => row.id === activeId); assert(active); activeEntry = active.id;
@@ -152,7 +154,7 @@ try {
   checks.push('Library cover is fetched through the MV3 source image transport and decoded');
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.getByRole('button', {name: live ? '打开漫画 About Teddy Bear' : '打开漫画 MangaBall fixture', exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
   assert.equal(await refresh(), imported.entries.length);
   checks.push('Reopening the reader and a complete refresh retain the selected release and page 3');
   if (!live) {
@@ -181,14 +183,14 @@ try {
     page2Gate.resolve(); await waitCatalogComplete();
     const completed = await state(); assert.equal(completed.catalogs.find(row => row.comicId === early.comic.id).entries.length, 103);
     assert.equal(completed.entries.find(row => row.id === activeEntry).contentId, early.active.contentId);
-    await waitImage(3); assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+    await waitImage(3); assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
     await reader.getByText('正在获取全部章节…', {exact: true}).waitFor({state: 'hidden'});
     checks.push('A verified 100-group prefix opens and decodes page 3 before gated page 2; completing 103 releases preserves content and position');
     listingBehavior = 'retry-once'; listingRequests.clear();
     assert.equal(await refresh(early.comic.id), 103);
     assert.equal(listingRequests.get(1), 1); assert.equal(listingRequests.get(2), 2);
     assert.equal((await state()).entries.find(row => row.id === activeEntry).contentId, early.active.contentId);
-    assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+    assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
     checks.push('429 on catalog page 2 respects Retry-After and resumes that page without requesting page 1 again');
     const interrupted = await importLongFixture('98abcdef0123456701234567', 'MangaBall interrupted fixture', 'fail');
     await reader.getByRole('button', {name: '打开目录', exact: true}).click();
@@ -198,14 +200,14 @@ try {
     await reader.screenshot({path: path.join(out, 'partial-catalog-failure.png')});
     await reader.close(); reader = await context.newPage(); await reader.goto(home);
     await reader.getByRole('button', {name: '打开漫画 MangaBall interrupted fixture', exact: true}).click(); await waitImage(3);
-    assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+    assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
     await reader.getByRole('button', {name: '打开目录', exact: true}).click();
     listingBehavior = 'normal'; listingRequests.clear();
     await reader.getByRole('button', {name: '继续加载目录', exact: true}).click(); await waitCatalogComplete();
     const resumed = await state(); assert.equal(resumed.catalogs.find(row => row.comicId === interrupted.comic.id).entries.length, 103);
     assert.equal(resumed.entries.find(row => row.id === activeEntry).contentId, interrupted.active.contentId);
     assert.equal(resumed.comics.filter(row => row.sourceUrl === interrupted.comic.sourceUrl).length, 1);
-    await waitImage(3); assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+    await waitImage(3); assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
     checks.push('An interrupted partial catalog remains readable after reopening and Continue catalog completes the same book without resetting page 3');
   }
   assert(sourcePages.every(page => !page.url().startsWith('https://mangaball.com'))); assert.deepEqual(errors, []);

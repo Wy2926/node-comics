@@ -3,7 +3,7 @@ import type {SourceCatalogSnapshot, SourceEntry, SourceSnapshot} from '../../con
 import {api, catalogUrl, chapterUrl, mangaBallLocation} from './definition';
 import {createCatalogRequest} from './catalog-request';
 import {chapterNumber, count, cover, entity, id, imageUrl, language, list, object, pagination, response, text, type JsonObject} from './protocol';
-import {search} from './search';
+import {search, searchUrl} from './search';
 
 const limit = 100;
 // Match the public catalog budget before retaining batches or requesting another page.
@@ -86,6 +86,7 @@ async function readChapter(url: string, context: SourceNetworkContext) {
 }
 export const network = {
   search,
+  searchPage: request => searchUrl(request).url,
   async catalog(url, context) {
     const loc = location(url);
     if (!loc.titleId || loc.chapterId) throw Error('请使用 MangaBall 作品详情页链接。');

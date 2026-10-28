@@ -43,9 +43,13 @@ export function parseSearch(html: string, request: SourceSearchRequest): SourceS
     if (textContent(byClass(pager, 'li', 'active')) !== String(page)) throw invalid();
     for (const link of tags(pager, 'a')) {
       if (link.href === '#') continue;
-      const url = new URL(text(link.href), origin), path = /^\/list-manga(?:\/([1-9]\d{0,3}))?$/.exec(url.pathname);
-      if (!isOrigin(url) || url.hash || !path || [...url.searchParams.keys()].length !== 1 || url.searchParams.get('search') !== request.query ||
-          Number(path[1] ?? 1) !== Number(link['data-ci-pagination-page'])) throw invalid();
+      const url = new URL(text(link.href), origin), path = /^\/list-manga(?:\/([1-9]\d{0,3}))?\/?$/.exec(url.pathname);
+      const targetPage = Number(path?.[1] ?? 1);
+      // The source omits the query on its first-page prev/start links. We never
+      // follow those links; forward cursors must still retain the exact query.
+      const unfilteredStart = page > 1 && targetPage === 1 && ['prev', 'start'].includes(link.rel) && !url.search;
+      if (!isOrigin(url) || url.hash || !path || targetPage !== Number(link['data-ci-pagination-page']) ||
+          !unfilteredStart && ([...url.searchParams.keys()].length !== 1 || url.searchParams.get('search') !== request.query)) throw invalid();
       if (link.rel === 'next') {
         if (next || Number(path[1]) !== page + 1) throw invalid();
         next = true;

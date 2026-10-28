@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withPageNetworkContext } from '../src/sources/runtime/page-network';
+import { withPageNetworkContext, withSearchNetworkContext } from '../src/sources/runtime/page-network';
 import { requestInSourcePage, type PageNetworkResponse } from '../src/sources/runtime/page-request';
 import { readSourceCatalog } from '../src/sources/runtime/catalog-reader';
 import { readNetworkPages } from '../src/sources/runtime/network';
@@ -29,6 +29,56 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const read = (signal = new AbortController().signal) => withPageNetworkContext(url, signal, context => context.request(target));
+describe('opt-in search page transport', () => {
+  const search = (signal = new AbortController().signal) => withSearchNetworkContext(target, signal, context => context.request(target));
+  it('reuses any ready same-origin work page without navigating, opening, closing or using extension HTTP', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementation(async () => [tab as chrome.tabs.Tab]);
+    expect(await search()).toBe('source');
+    expect(inject).toHaveBeenCalledTimes(2);
+    expect(chrome.tabs.create).not.toHaveBeenCalled(); expect(chrome.tabs.remove).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled(); expect(records).toEqual({});
+    expect(navigator.locks.request).toHaveBeenCalledWith('nc-source-page-network:https://comix.to', expect.any(Object), expect.any(Function));
+  });
+  it('uses one direct request without taking the document lock when no ready tab exists', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('direct')));
+    for (const tabs of [[], [{...tab, status: 'loading'}], [{...tab, url: 'https://comix.to.evil.test/'}], [{...tab, pendingUrl: url}]]) {
+      vi.mocked(chrome.tabs.query).mockImplementation(async () => tabs as chrome.tabs.Tab[]);
+      expect(await search()).toBe('direct');
+    }
+    expect(fetch).toHaveBeenCalledTimes(4); expect(navigator.locks.request).not.toHaveBeenCalled();
+    expect(chrome.tabs.create).not.toHaveBeenCalled(); expect(inject).not.toHaveBeenCalled();
+  });
+  it('does not replace a selected tab when it navigates or closes before acquiring the lock', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementation(async () => [tab as chrome.tabs.Tab]);
+    vi.mocked(navigator.locks.request).mockImplementationOnce(async (_name: any, _options: any, run: any) => {
+      tab.url = 'https://elsewhere.test/'; return run();
+    });
+    await expect(search()).rejects.toMatchObject({kind: 'http'});
+    expect(chrome.tabs.create).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled(); expect(inject).not.toHaveBeenCalled();
+  });
+  it('keeps verification errors on the selected page and does not retry through direct HTTP', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementation(async () => [tab as chrome.tabs.Tab]);
+    response.challenge = true;
+    await expect(search()).rejects.toMatchObject({kind: 'verification-required'});
+    expect(inject).toHaveBeenCalledTimes(2); expect(fetch).not.toHaveBeenCalled();
+    expect(chrome.tabs.remove).not.toHaveBeenCalled();
+  });
+  it('reuses the still-open document on later searches without a local clearance expiry', async () => {
+    vi.useFakeTimers(); vi.mocked(chrome.tabs.query).mockImplementation(async () => [tab as chrome.tabs.Tab]);
+    expect(await search()).toBe('source'); await vi.advanceTimersByTimeAsync(11 * 60_000);
+    expect(await search()).toBe('source');
+    expect(inject).toHaveBeenCalledTimes(4); expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(chrome.storage.session.set).not.toHaveBeenCalled();
+  });
+  it('rechecks permission inside the lock before injecting into a user page', async () => {
+    vi.useFakeTimers(); vi.mocked(chrome.tabs.query).mockImplementation(async () => [tab as chrome.tabs.Tab]);
+    vi.mocked(navigator.locks.request).mockImplementationOnce(async (_name: any, _options: any, run: any) => {
+      vi.mocked(chrome.permissions.contains).mockImplementation(async () => false); return run();
+    });
+    await expect(search()).rejects.toMatchObject({kind: 'permission-required'});
+    expect(inject).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  });
+});
 describe('opt-in source-page catalog transport', () => {
   it('creates one background tab, pins the document and performs all requests there', async () => {
     expect(await withPageNetworkContext(url, new AbortController().signal, async (context) => {

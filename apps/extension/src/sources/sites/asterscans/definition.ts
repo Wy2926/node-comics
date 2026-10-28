@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'asterscans', name: 'Aster Scans', installation,
   sites: [{id: 'asterscans', name: 'Aster Scans', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

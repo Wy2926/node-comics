@@ -19,7 +19,7 @@ export const chapterUrl = (loc: WebtoonLocation) => `${catalogUrl(loc.slug)}${lo
 export const definition: SourceDefinition = {
   id: 'webtoonscan', name: 'WebtoonScan', installation,
   sites: [{id: 'webtoonscan', name: 'WebtoonScan', url: origin + '/', icon, adaptedOn: '2026-10-12',
-    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: false, primaryLanguages: ['en', 'ko'], search: true}],
+    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: false, isAdult: false, primaryLanguages: ['en', 'ko'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

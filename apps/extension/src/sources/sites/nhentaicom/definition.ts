@@ -22,7 +22,7 @@ export const readerUrl = (loc: ComicLocation) => `${catalogUrl(loc)}/reader`;
 export const definition: SourceDefinition = {
   id: 'nhentaicom', name: 'nHentai.com', installation,
   sites: [{id: 'nhentaicom', name: 'nHentai.com', url: origin + '/en/hentai-comics', icon,
-    adaptedOn: '2026-10-14', pricing: 'free', isRaw: false,
+    adaptedOn: '2026-10-14', pricing: 'free', isRaw: false, isAdult: true,
     contentTags: ['manga', 'doujin'], primaryLanguages: ['ja', 'en', 'zh']}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

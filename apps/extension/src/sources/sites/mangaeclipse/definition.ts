@@ -20,7 +20,7 @@ export const chapterUrl = (loc: EclipseLocation) => `${catalogUrl(loc.slug)}${lo
 export const definition: SourceDefinition = {
   id: 'mangaeclipse', name: 'Manga Eclipse', installation,
   sites: [{id: 'mangaeclipse', name: 'Manga Eclipse', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manhua'], isRaw: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manhua'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -106,7 +106,7 @@ describe('WeLoMa', () => {
     const request = vi.fn(async () => searchHtml()); await network.search(query, {request});
     expect(request).toHaveBeenCalledExactlyOnceWith(origin + '/l/0OYCn?name=a+%26+%E6%97%A5%E6%9C%AC%E8%AA%9E');
   });
-  it.each(['host', 'binding', 'duplicate', 'artwork', 'current', 'pagination', 'verification', 'empty-page'])('rejects invalid %s search', kind => {
+  it.each(['host', 'binding', 'duplicate', 'artwork', 'current', 'pagination', 'verification', 'empty-page', 'truncated-database-error'])('rejects invalid %s search', kind => {
     const input = {siteId: 'weloma', query: 'sample'}; let html = searchHtml(1, 1, true);
     if (kind === 'host') html = html.replaceAll('/m/' + work + '0', 'https://evil.test/m/' + work + '0');
     if (kind === 'binding') html = html.replace('href="/m/' + work + '0"', 'href="/m/Other"');
@@ -115,6 +115,7 @@ describe('WeLoMa', () => {
     if (kind === 'current') html = html.replace('class="active">1', 'class="active">3');
     if (kind === 'pagination') html = html.replace('/l/0Next', 'https://evil.test/l/0Next');
     if (kind === 'verification') html = '<title>Just a moment...</title>';
+    if (kind === 'truncated-database-error') html = '<div class="container list"><div class="btn-group"><button>Page 1 of 2</button><a href="Duplicate entry for key source_table';
     if (kind === 'empty-page') html = searchHtml(0).replace('</ul>', '<a href="/l/0Next">2</a></ul>');
     expect(() => parseSearch(html, input)).toThrow();
   });

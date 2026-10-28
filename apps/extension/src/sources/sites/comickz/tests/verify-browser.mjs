@@ -53,7 +53,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = browser.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
   details = await reader.evaluate(async chapter => {
     const p = await import(chrome.runtime.getURL('verify-source.js')), comic = (await p.catalog.list('comics')).find(c => c.source.connectionId === 'website:comickz');
     const entries = await p.catalog.listEntries(comic.id, {limit: 10000}), entry = entries.find(e => e.sourceEntryId === p.sourceLocation(chapter).pageKey);
@@ -65,14 +65,14 @@ try {
     return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
   }, {id: details.entryId, index: page - 1}, {timeout: 60000});
   for (let page = 1; page <= details.pages; page++) {
-    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page));
+    await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(page));
 
     await waitPage(page);
   }
   checks.push(`Chapter import reads ${details.chapters} releases and decodes all ${details.pages} original pages`);
   const targetPage = Math.min(5, details.pages);
-  await reader.getByLabel('阅读进度', {exact: true}).evaluate(input => input.blur()); await reader.keyboard.press('Home');
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(targetPage));
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).evaluate(input => input.blur()); await reader.keyboard.press('Home');
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(targetPage));
 
   const position = async () => reader.evaluate(async ({entryId, comicId}) => {
     const p = await import(chrome.runtime.getURL('verify-source.js'));
@@ -87,8 +87,8 @@ try {
   await reader.screenshot({path: path.join(out, 'reader.png')});
   const route = reader.url(); await reader.close(); reader = await browser.newPage(); await reader.goto(route);
   await reader.getByRole('button', {name: '打开漫画 ' + details.title, exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor();
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(targetPage));
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor();
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(targetPage));
   await waitPage(targetPage);
   await reader.screenshot({path: path.join(out, 'reopened.png')}); checks.push(`Close/reopen restores page ${targetPage}`);
   await site.close(); const tabCount = browser.pages().length;
@@ -119,8 +119,8 @@ try {
   await setup.screenshot({path: path.join(out, 'shelf.png')});
   await setup.getByRole('button', {name: '漫画网站', exact: true}).click();
   await setup.getByLabel('通过链接添加漫画').fill(details.catalogUrl); await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.getByLabel('阅读进度', {exact: true}).waitFor();
-  assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), String(targetPage));
+  await setup.getByRole('slider', {name: '阅读进度', exact: true}).waitFor();
+  assert.equal(await setup.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(targetPage));
   assert.equal(await setup.evaluate(async () => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length), 1);
   checks.push('Dedicated shelf cover and duplicate catalog import preserve one comic and its position');
   assert.deepEqual(errors, []);

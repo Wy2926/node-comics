@@ -11,5 +11,6 @@ export const {parseCatalog, parsePages, parseSearch, searchUrl} = shared;
 export const network = {
   ...shared.network,
   search: shared.network.search!,
+  searchPage: shared.searchUrl,
   pageTransport: ['catalog', 'pages'],
 } satisfies SourceNetwork;

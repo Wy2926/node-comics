@@ -3,7 +3,7 @@ import type {SourceCatalogSnapshot, SourceEntry, SourceGroup, SourceSnapshot} fr
 import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
 import {catalogKey, catalogUrl, chapterKey, chapterUrl, origin, type MangapillLocation} from './definition';
 import {coverUrl, imageUrl, location, one, readerWork, region, regions, text} from './html';
-import {resolveQuickCatalog, search} from './search';
+import {resolveQuickCatalog, search, searchUrl} from './search';
 
 export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const loc = location(url);
@@ -70,6 +70,7 @@ function chapterRequestUrl(loc: MangapillLocation) {
 }
 export const network = {
   search,
+  searchPage: request => searchUrl(request).url,
   async resolveCatalog(url, context) {
     const loc = location(url), html = await request(chapterRequestUrl(loc), context), work = readerWork(html, loc);
     const quick = new URL('/quick-search', origin); quick.searchParams.set('q', work.title);

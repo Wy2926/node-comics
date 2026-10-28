@@ -3,7 +3,7 @@ import type {SourceCatalogSnapshot, SourceSnapshot} from '../../contracts/source
 import {hasClass, inertHtml, tags, textContent} from '../../shared/html';
 import {catalogKey, catalogUrl, chapterKey, chapterUrl, origin} from './definition';
 import {coverUrl, imageUrl, location, one, regions, text} from './html';
-import {search} from './search';
+import {search, searchUrl} from './search';
 
 export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const loc = location(url);
@@ -66,6 +66,7 @@ async function request(url: string, context: SourceNetworkContext) {
 }
 export const network = {
   pageTransport: ['catalog', 'pages'], search,
+  searchPage: searchUrl,
   async catalog(url, context) {
     const loc = location(url);
     if (loc.chapter) throw Error('请使用 Hachiraw 作品详情页读取目录。');

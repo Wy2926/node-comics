@@ -65,7 +65,7 @@ async function waitImage(page = 1) {
     {entry: activeEntry, page}, {timeout: 60000});
 }
 async function jump(page) {
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(page)); await waitImage(page);
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(page)); await waitImage(page);
   await reader.waitForFunction(async ({entry, page}) => {const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const data = await catalog.get('entries', entry), pages = await catalog.listPages(data.contentId), position = await catalog.get('positions', entry);
     return position?.pageId === pages[page - 1]?.pageId;}, {entry: activeEntry, page});
@@ -101,6 +101,8 @@ try {
     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
+  const expand = search.locator('.nc-search-scope-expand');
+  if (await expand.count() && await expand.getAttribute('aria-expanded') === 'false') await expand.click();
   for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('MangaDot'));
   const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? 'Haimiya' : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? 'Haimiya-senpai wa Kowakute Kawaii' : 'MangaDot multilingual fixture', exact: true})});
@@ -108,7 +110,7 @@ try {
   assert.match(await hit.locator('.nc-search-result-chapter').innerText(), /^Ch\. -?\d+(?:\.\d+)?$/);
   await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 60000});
   const imported = await state(); assert.equal(imported.comics.length, 1);
   const en = imported.entries.find(e => e.sourceEntryId === (live ? 'mangadot:scraper:chapter:286652' : 'mangadot:scraper:chapter:1'));
   assert(en); activeEntry = en.id; await waitImage(); await jump(3);
@@ -124,7 +126,7 @@ try {
   const cover = reader.locator('.nc-book .nc-thumbnail img'); await cover.waitFor(); await cover.evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
   await reader.getByRole('button', {name: '打开漫画 ' + imported.comics[0].title, exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
   assert.equal(await refresh(), imported.entries.length);
   checks.push('Dedicated cover, reader reopen and full refresh preserve the selected release and page 3');
   if (!live) {

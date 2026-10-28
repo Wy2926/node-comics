@@ -18,7 +18,7 @@ export function kimicomiLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'kimicomi', name: 'KimiComi / キミコミ', installation,
   sites: [{id: 'kimicomi', name: 'KimiComi / キミコミ', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'freemium', isRaw: true, contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
+    pricing: 'freemium', isRaw: true, isAdult: false, contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720},
   identify(url) {

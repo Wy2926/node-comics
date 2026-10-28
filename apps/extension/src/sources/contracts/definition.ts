@@ -22,10 +22,13 @@ export interface SourceSite {
   pricing: SourceSitePricing;
   /** Primarily untranslated Japanese/Korean originals, not inferred from the UI language. */
   isRaw: boolean;
+  /** Explicit adult-site designation; adult categories or individual works do not imply this flag. */
+  isAdult: boolean;
   /** Confirmed reading conditions affecting at least part of the site's comics; not account extras. */
   accessTags?: readonly SourceSiteAccessTag[];
   /** Confirmed main content types; independent of pricing, language and reading conditions. */
   contentTags: readonly SourceSiteContentTag[];
+  /** Implemented name-search protocol; public search additionally requires isAdult === false. */
   search?: true;
   /** Verified source page size when it exceeds the default search result budget; hard capped by the runtime. */
   searchPageSize?: number;

@@ -71,7 +71,11 @@ describe('comic website directory presentation', () => {
     expect(html).toContain('Mostly raw');
     expect(html).toContain('Western comics');
     expect(html).toContain('Clear filters');
+    expect(html).toContain('Seasons');
     expect(html).toContain('RawOtaku');
+    expect(html).toContain('MangaDex');
+    expect(html).toContain('pixiv');
+    expect(html).not.toContain('nHentai.com');
     expect(html).not.toContain('收费待确认');
     expect(html).toContain('Favorite website');
     expect(html).toContain('Search website names or domains');

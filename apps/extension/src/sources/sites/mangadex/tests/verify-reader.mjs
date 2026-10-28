@@ -91,7 +91,7 @@ async function waitEntry(remote,page){
   const entry=await entryFor(remote);activeEntryId=entry.id;
   await reader.waitForFunction(title=>document.querySelector('[aria-label="打开目录"]')?.title.includes(title),entry.title);
   if(page!==undefined)await reader.waitForFunction(page=>document.querySelector('[aria-label="阅读进度"]')?.value===String(page),page);
-  await image((page??Number(await reader.getByLabel('阅读进度',{exact:true}).inputValue()))-1);
+  await image((page??Number(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue()))-1);
 }
 async function slotFor(remote){
   const entry=await entryFor(remote),chapter=(await directory()).chapters.find(chapter=>chapter.entryIds.includes(entry.id));assert(chapter,'Missing logical chapter');
@@ -136,15 +136,16 @@ async function scrollToRelease(remote){
   await reader.mouse.wheel(0,diagnostic.before.target.top-viewport.y-40||1);diagnostic.after=await readingGeometry(entry.id);
   try{await waitEntry(remote);diagnostic.selected=await readingGeometry(entry.id);}catch(error){diagnostic.failed=await readingGeometry(entry.id);throw error;}
 }
-async function jump(number,remote){await setReaderProgress(reader.getByLabel('阅读进度',{exact:true}), String(number));await image(number-1);
+async function jump(number,remote){await setReaderProgress(reader.getByRole('slider',{name:'阅读进度',exact:true}), String(number));await image(number-1);
   await reader.waitForFunction(async({remote,ordinal})=>{const {catalog}=await import(chrome.runtime.getURL('verify-source.js'));const entry=(await catalog.list('entries',{limit:10000})).find(item=>item.sourceEntryId==='mangadex:chapter:'+remote);if(!entry)return false;const position=await catalog.get('positions',entry.id),pages=await catalog.listPages(entry.contentId);return position?.pageId===pages[ordinal]?.pageId;},{remote,ordinal:number-1});}
 async function refresh(){return reader.evaluate(async()=>{const p=await import(chrome.runtime.getURL('verify-source.js')),comic=(await p.catalog.list('comics'))[0];const snapshot=await p.readWebsiteCatalog(comic.sourceUrl);await p.applyCatalogRefresh(comic.id,comic.source.generation,snapshot);return snapshot.entries.length;});}
 try{
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),home=new URL('reader.html',worker.url()).href;
-  reader=await context.newPage();await reader.goto(home);await reader.evaluate(async()=>{const settings={uiLanguage:'zh-CN',language:'zh-Hans',layout:'continuous',fit:'window'};localStorage.setItem('nc-settings',JSON.stringify(settings));await chrome.storage.local.set({'nc-reader-settings':settings});});await reader.reload();
+  // Keep source regression controls visible; immersive idle behavior has separate coverage.
+  reader=await context.newPage();await reader.goto(home);await reader.evaluate(async()=>{const settings={uiLanguage:'zh-CN',language:'zh-Hans',layout:'continuous',fit:'window',readerImmersive:false};localStorage.setItem('nc-settings',JSON.stringify(settings));await chrome.storage.local.set({'nc-reader-settings':settings});});await reader.reload();
   await reader.getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('heading',{name:'MangaDex',exact:true}).waitFor();
   await reader.getByLabel('通过链接添加漫画').fill(`https://mangadex.org/title/${manga}`);await reader.getByRole('button',{name:'添加到书架',exact:true}).click();
-  await reader.getByLabel('阅读进度',{exact:true}).waitFor({timeout:60000});
+  await reader.getByRole('slider',{name:'阅读进度',exact:true}).waitFor({timeout:60000});
   const imported=await state();assert.equal(imported.comics.length,1);assert.equal(imported.entries.length,live?84:8);
   assert.equal(await reader.getByRole('region',{name:'选择开始阅读的位置'}).count(),0);
   checks.push('Title import immediately opens the first readable chapter, keeps one comic and imports every release without a start-position screen');
@@ -164,7 +165,7 @@ try{
     checks.push('The directory merges 84 releases into 47 chapters; expanding one chapter switches language and restores each release position');
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
     const cover=reader.locator('.nc-book .nc-thumbnail img');await cover.waitFor();await cover.evaluate(img=>img.decode());assert(await cover.evaluate(img=>img.naturalWidth>0));
-    await reader.close();reader=await context.newPage();await reader.goto(home);await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitEntry(remote,3);
+    await reader.close();reader=await context.newPage();await reader.goto(home);await reader.getByRole('button',{name:'打开漫画 '+imported.comics[0].title,exact:true}).click();await waitEntry(remote,3);
     assert.equal(await refresh(),imported.entries.length);checks.push('Dedicated cover, reader reopen, and full catalog refresh work without a source website tab');
   }else{
     await waitEntry(ids.en1,1);await jump(3,ids.en1);
@@ -172,7 +173,7 @@ try{
     await openDirectory();assert.equal((await directory()).chapters.length,5);assert.equal(await reader.locator('[data-reading-slot]').count(),5);
     const first=await slotFor(ids.en1),collapse=first.slot.getByRole('button',{name:'收起章节选项',exact:true});if(await collapse.isVisible())await collapse.click();
     assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),0);await first.slot.getByRole('button',{name:'展开章节选项',exact:true}).click();
-    assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),2);assert.equal(await reader.getByLabel('阅读进度').inputValue(),'3');
+    assert.equal(await first.slot.locator('[data-release-choice="true"]').count(),2);assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'3');
     await reader.screenshot({path:path.join(out,'merged-directory.png')});
     checks.push('The compact directory contains five logical chapters for eight releases and expands language choices without changing the current page');
     await chooseRelease(ids.zh1,1);await jump(4,ids.zh1);await chooseRelease(ids.en1,3);
@@ -193,7 +194,7 @@ try{
     const before=await state(),chosenPosition=before.positions.find(position=>position.entryId===chosen.id),chosenIdentity=pageIdentity(before,chosen),beforeCachedOpen=apiCounts(ids.en2b);
     server='second-fixture.mangadex.network';failChapterApi=true;
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
-    const openedAt=Date.now();await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitEntry(ids.en2b,3);
+    const openedAt=Date.now();await reader.getByRole('button',{name:'打开漫画 '+imported.comics[0].title,exact:true}).click();await waitEntry(ids.en2b,3);
     const elapsedMs=Date.now()-openedAt,reopened=await state();assert(elapsedMs<5000,`Cached reopen took ${elapsedMs}ms`);
     assert.deepEqual(apiCounts(ids.en2b),beforeCachedOpen,'A cached shelf reopen must not request chapter metadata or an at-home server');
     assert.deepEqual(pageIdentity(reopened,chosen),chosenIdentity);assert.equal(reopened.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
@@ -209,7 +210,7 @@ try{
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
     await reader.evaluate(async id=>{const {sourcePageCache}=await import(chrome.runtime.getURL('verify-source.js'));await sourcePageCache.deleteOwner(id);if((await sourcePageCache.inventory([id],true)).length)throw Error('Selected chapter cache was not cleared');},chosen.id);
     failChapterApi=false;blockedImageHosts.add('first-fixture.mangadex.network');const beforeExpiredOpen=apiCounts(ids.en2b),imageReadStart=imageReads.length;
-    await reader.getByRole('button',{name:'继续阅读',exact:true}).click();await waitEntry(ids.en2b,3);
+    await reader.getByRole('button',{name:'打开漫画 '+imported.comics[0].title,exact:true}).click();await waitEntry(ids.en2b,3);
     await reader.waitForFunction(async({id,count})=>{const {sourcePageCache}=await import(chrome.runtime.getURL('verify-source.js'));return (await sourcePageCache.inventory([id],true)).length===count;},{id:chosen.id,count:chosen.pageCount});
     assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeExpiredOpen.chapter+1,atHome:beforeExpiredOpen.atHome+1},'Concurrent missing pages must share one manifest refresh after the old image node fails');
     const recovered=await state(),retriedImages=imageReads.slice(imageReadStart).filter(item=>item.path.includes(ids.en2b));
@@ -222,9 +223,9 @@ try{
     await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();await reader.close();reader=await context.newPage();await reader.goto(home);
     await reader.evaluate(async({entryId,contentId,pageId})=>{const {sourcePageCache,pageReference,RENDER_PROFILE}=await import(chrome.runtime.getURL('verify-source.js'));await sourcePageCache.delete(pageReference({entryId,contentId,pageId,renderProfileId:RENDER_PROFILE}));},{entryId:chosen.id,contentId:chosen.contentId,pageId:chosenPosition.pageId});
     blockedImageHosts.add(server);server='third-fixture.mangadex.network';failChapterApi='at-home';const beforeFailedRefresh=apiCounts(ids.en2b);
-    await reader.getByRole('button',{name:'继续阅读',exact:true}).click();
+    await reader.getByRole('button',{name:'打开漫画 '+imported.comics[0].title,exact:true}).click();
     const failedPage=reader.locator(`[data-copy-id="${chosen.id}"] [data-page-index="2"] .nc-image-failure`);await failedPage.waitFor();
-    assert.equal(await reader.getByLabel('阅读进度',{exact:true}).inputValue(),'3');await image(0);
+    assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'3');await image(0);
     assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeFailedRefresh.chapter+1,atHome:beforeFailedRefresh.atHome+1},'A failed at-home refresh must not loop');
     const failedRefresh=await state();assert.deepEqual(pageIdentity(failedRefresh,chosen),chosenIdentity);assert.equal(failedRefresh.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
     await reader.screenshot({path:path.join(out,'expired-node-refresh-failure.png')});

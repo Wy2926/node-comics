@@ -31,6 +31,8 @@ export interface SourceNetworkContext {
 export interface SourceNetwork {
   /** Operations that need a real source-page session; omitted operations retain direct HTTP. */
   pageTransport?: readonly ('catalog'|'pages')[];
+  /** Reuse an already open same-origin page for search; never create or navigate a tab. */
+  searchPage?(request: SourceSearchRequest): string;
   search?(request: SourceSearchRequest, context: SourceNetworkContext): Promise<SourceSearchPage>;
   /** Resolve missing parent identity from HTTP data; catalog/page transports remain independent. */
   resolveCatalog?(url:string, context:SourceNetworkContext):Promise<string>;

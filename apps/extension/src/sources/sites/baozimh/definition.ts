@@ -28,7 +28,7 @@ export const chapterKey = (loc: BaoLocation) => `${catalogKey(loc.comic)}:${loc.
 export const chapterUrl = (loc: BaoLocation, part = 1) => `${readerOrigin}/comic/chapter/${loc.comic}/${loc.section}_${loc.chapter}${part > 1 ? '_' + part : ''}.html`;
 export const definition: SourceDefinition = {
   id: 'baozimh', name: '包子漫画', installation,
-  sites: [{id: 'baozimh', name: '包子漫画', url: origin + '/', icon, adaptedOn: '2026-09-27', pricing: 'free', isRaw: false, contentTags: ['manhua', 'manga', 'manhwa', 'webtoon'], primaryLanguages: ['zh-Hans'],
+  sites: [{id: 'baozimh', name: '包子漫画', url: origin + '/', icon, adaptedOn: '2026-09-27', pricing: 'free', isRaw: false, isAdult: false, contentTags: ['manhua', 'manga', 'manhwa', 'webtoon'], primaryLanguages: ['zh-Hans'],
     search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},

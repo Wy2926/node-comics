@@ -1,11 +1,11 @@
 import type { SourceNetworkContext } from '../contracts/network';
 import { resolveSource } from '../core/resolve';
 import { definitions } from '../registry/definitions';
-import { authorizeSourceRequest, SourceHttpError, sourceRetryAfter, sourceVerificationError } from './http';
+import { authorizeSourceRequest, createSourceNetworkContext, SourceHttpError, sourceRetryAfter, sourceVerificationError } from './http';
 import { requestInSourcePage } from './page-request';
-import { withPageDocument } from './page-document';
+import { withPageDocument, type PageDocument } from './page-document';
 import { msg } from '../../i18n/runtime';
-/** One bounded source-page session at a time across extension pages; no HTTP-failure fallback. */
+/** One bounded source-page session per origin across extension pages; no HTTP-failure fallback. */
 export async function withPageNetworkContext<T>(url: string, signal: AbortSignal, read: (context: SourceNetworkContext) => Promise<T>): Promise<T> {
   await authorizeSourceRequest(url, undefined, signal);
   const source = resolveSource(url, definitions).location, origin = new URL(url).origin;
@@ -24,7 +24,30 @@ export async function withPageNetworkContext<T>(url: string, signal: AbortSignal
     }
   };
   const authorize = (signal: AbortSignal) => authorizeSourceRequest(pageSource, undefined, signal);
-  return withPageDocument({ url: pageSource, matches, authorize }, signal, page => read({
+  return withPageDocument({ url: pageSource, matches, authorize }, signal, page => read(pageNetworkContext(page)));
+}
+
+/** Select the transport before requesting anything. No retry/fallback after a page failure. */
+export async function withSearchNetworkContext<T>(url: string, signal: AbortSignal, read: (context: SourceNetworkContext) => Promise<T>): Promise<T> {
+  await authorizeSourceRequest(url, undefined, signal);
+  if (typeof chrome === 'undefined' || !chrome.runtime?.id) return read(createSourceNetworkContext(signal));
+  const origin = new URL(url).origin;
+  const matches = (value: string | undefined) => {
+    try { const target = new URL(value!); return target.origin === origin && !target.username && !target.password; }
+    catch { return false; }
+  };
+  const existing = (await chrome.tabs.query({url: origin + '/*'})).find(tab =>
+    tab.id !== undefined && tab.status === 'complete' && matches(tab.url) && !tab.pendingUrl);
+  signal.throwIfAborted();
+  // Ordinary HTTP stays concurrent and avoids acquiring the page-session lock.
+  if (!existing) return read(createSourceNetworkContext(signal));
+  return withPageDocument({url, matches, existingTabId: existing.id,
+    authorize: signal => authorizeSourceRequest(url, undefined, signal)}, signal, page => read(pageNetworkContext(page)));
+}
+
+function pageNetworkContext(page: PageDocument): SourceNetworkContext {
+  const origin = new URL(page.url).origin;
+  return {
     signal: page.signal, async request(target, options) {
       const body = await authorizeSourceRequest(target, options, page.signal);
       // Page-context fetch is bound to its document origin, not an adapter host allowlist.
@@ -51,5 +74,5 @@ export async function withPageNetworkContext<T>(url: string, signal: AbortSignal
         throw new SourceHttpError('http', '来源网络请求失败或超时，请稍后重试。');
       return result.body;
     }
-  }));
+  };
 }

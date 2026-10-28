@@ -19,7 +19,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'hunlightcomics', name: 'Hunlight Comics', installation,
   sites: [{id: 'hunlightcomics', name: 'Hunlight Comics', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'free', contentTags: ['manga'], isRaw: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manga'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

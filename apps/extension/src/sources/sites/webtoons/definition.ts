@@ -20,7 +20,7 @@ export const definition: SourceDefinition = {
   id: 'webtoons', name: 'WEBTOON', installation,
   sites: Object.entries(languages).map(([locale, language]) => ({id: 'webtoons-' + locale,
     name: 'WEBTOON · ' + ({en: 'English', 'zh-hant': '繁體中文', th: 'ภาษาไทย', id: 'Indonesia', es: 'Español', fr: 'Français', de: 'Deutsch'}[locale]),
-    url: `${origin}/${locale}/`, icon, adaptedOn: '2026-09-27', pricing: 'freemium', isRaw: false, accessTags: ['login-required', 'partial-web'], contentTags: ['webtoon'], primaryLanguages: [language], search: true})),
+    url: `${origin}/${locale}/`, icon, adaptedOn: '2026-09-27', pricing: 'freemium', isRaw: false, isAdult: false, accessTags: ['login-required', 'partial-web'], contentTags: ['webtoon'], primaryLanguages: [language], search: true})),
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {

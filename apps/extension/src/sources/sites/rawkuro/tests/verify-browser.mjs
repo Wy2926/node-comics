@@ -61,7 +61,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = context.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   details = await reader.evaluate(async chapter => {
     const {catalog, sourceLocation} = await import(chrome.runtime.getURL('verify-source.js'));
@@ -78,7 +78,7 @@ try {
     return {position: (await catalog.get('positions', entryId)) ?? null, lastEntryId: comic.lastEntryId};
   }, details);
   for (let number = 1; number <= details.total; number++) {
-    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(number));
+    await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(number));
 
     await reader.waitForFunction(({id, index}) => {
       const image = document.querySelector(`[data-copy-id="${id}"] [data-page-index="${index}"] img.nc-page-image`);
@@ -88,7 +88,7 @@ try {
   }
   checks.push(`Floating chapter import binds the complete ${details.chapters}-entry catalog and decodes all ${details.total} original pages`);
   const restorePage = Math.min(10, details.total), restoreIndex = restorePage - 1;
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(restorePage));
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(restorePage));
 
   const restoreImage = `[data-copy-id="${details.entryId}"] [data-page-index="${restoreIndex}"] img.nc-page-image`;
   await reader.waitForFunction(selector => {
@@ -115,7 +115,7 @@ try {
     const image = document.querySelector(selector), viewport = document.querySelector('.nc-reading-viewport');
     return image?.complete && image.naturalWidth > 0 && viewport && Math.abs(viewport.scrollTop - top) < 2;
   }, {selector: restoreImage, top: savedScroll}, {timeout: 60000});
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(restorePage));
   assert.equal((await readingState()).lastEntryId, details.entryId);
   await reader.screenshot({path: path.join(out, 'reopened-position.png')});
   checks.push(`Reader close/reopen restores chapter, page ${restorePage} and scroll position`);
@@ -157,9 +157,9 @@ try {
   mirror.hostname = mirror.hostname === 'rawkuro.net' ? 'raw1001.net' : 'rawkuro.net';
   await setup.getByLabel('通过链接添加漫画').fill(mirror.href);
   await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-  await setup.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  await setup.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 60000});
   await setup.waitForFunction(top => Math.abs(document.querySelector('.nc-reading-viewport')?.scrollTop - top) < 2, savedScroll, {timeout: 60000});
-  assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
+  assert.equal(await setup.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(restorePage));
   assert.equal(await setup.evaluate(async () => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).length), 1);
   checks.push('Mirror catalog link reimport keeps one comic, selected chapter/page and in-page reading offset');
   assert.deepEqual(errors, []);

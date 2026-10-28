@@ -14,7 +14,7 @@ export interface SearchSeed {
 export type SearchPhase='idle'|'resolving-name'|'needs-query'|'searching'|'settled'|'stopped';
 export type SearchSiteStatus='idle'|'queued'|'running'|'ready'|'empty'|'error'|'stopped';
 export type SearchFailureKind='login'|'rate-limit'|'verification'|'permission'|'timeout'|'invalid'|'unavailable';
-export interface SearchFailure {kind:SearchFailureKind;message:string;retryAt?:number}
+export interface SearchFailure {kind:SearchFailureKind;message:string;retryAt?:number;sourceUrl?:string}
 export interface SearchCandidate extends SourceSearchResult {
   /** Original runtime-issued hit when a verified mirror fills a missing cover. */
   coverHit?:SourceSearchResult;

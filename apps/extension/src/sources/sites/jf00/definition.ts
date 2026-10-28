@@ -17,7 +17,7 @@ export const chapterKey = ({comic, chapter}: JfLocation) => `${catalogKey(comic)
 export const chapterUrl = ({comic, chapter}: JfLocation) => `${origin}/chapter_${comic}_${chapter}.html`;
 export const definition: SourceDefinition = {
   id: 'jf00', name: '漫画猫 (00jf)', installation,
-  sites: [{id: 'jf00', name: '漫画猫 (00jf)', url: origin + '/', icon, adaptedOn: '2026-10-02', pricing: 'free', isRaw: false, contentTags: ['manhua', 'manhwa', 'manga', 'webtoon'], primaryLanguages: ['zh-Hans'],
+  sites: [{id: 'jf00', name: '漫画猫 (00jf)', url: origin + '/', icon, adaptedOn: '2026-10-02', pricing: 'free', isRaw: false, isAdult: false, contentTags: ['manhua', 'manhwa', 'manga', 'webtoon'], primaryLanguages: ['zh-Hans'],
     search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},

@@ -18,7 +18,7 @@ export function location(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'comicfuz', name: 'COMIC FUZ', installation,
-  sites: [{id: 'comicfuz', name: 'COMIC FUZ', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'freemium', isRaw: true,
+  sites: [{id: 'comicfuz', name: 'COMIC FUZ', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'freemium', isRaw: true, isAdult: false,
     primaryLanguages: ['ja'], contentTags: ['manga'], accessTags: ['login-required'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

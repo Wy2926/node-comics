@@ -19,7 +19,7 @@ describe('Read Comics Online identities and static catalogs', () => {
     for (const suffix of ['', '/2', '/45/?utm_source=reader#top'])
       expect(definition.identify(new URL(readerUrl + suffix))).toMatchObject({kind: 'reader', pageKey: 'readcomicsonline:test-comic-2026:1',
         catalog: {key: 'readcomicsonline:test-comic-2026', url: workUrl}});
-    for (const chapter of ['1.1', 'annual2026', 'halloween-annual-2026'])
+    for (const chapter of ['1.1', 'annual2026', 'halloween-annual-2026', 'Annual2025', 'Annual-2025'])
       expect(comicLocation(new URL(workUrl + '/' + chapter))?.chapter).toBe(chapter);
     for (const base of [origin + '.evil.test', origin + ':444', origin.replace('https:', 'http:'), origin.replace('://', '://user@'), 'https://www.readcomicsonline.ru'])
       expect(definition.identify(new URL(base + '/comic/test-comic-2026'))).toBeNull();
@@ -36,6 +36,14 @@ describe('Read Comics Online identities and static catalogs', () => {
     expect(result.groups[0].entryIds).toEqual(result.entries.map(e => e.id));
     expect(result.entries.every(e => e.sequenceId === result.id && e.catalogId === result.id && !e.contentLanguage)).toBe(true);
     expect(result.defaultEntryId).toBe(result.entries[0].id);
+  });
+  it('imports the 2000-ad annual identifiers without lowercasing or merging them', () => {
+    const html = catalog.replace(row('annual2026', 'Annual 2026'), row('Annual2025') + row('Annual-2025'))
+      .replaceAll('test-comic-2026', '2000-ad');
+    const result = validateCatalog(parseCatalog(html, origin + '/comic/2000-ad'), [definition]);
+    expect(result.entries.map(entry => entry.remoteId)).toEqual(['1', '1.1', '2', 'Annual-2025', 'Annual2025']);
+    expect(new Set(result.entries.map(entry => entry.id)).size).toBe(5);
+    expect(result.entries.at(-1)?.url).toBe(origin + '/comic/2000-ad/Annual2025');
   });
   it.each([
     (s: string) => s.replace('rel="canonical"', 'rel="other"'),
@@ -55,6 +63,14 @@ describe('Read Comics Online identities and static catalogs', () => {
 });
 
 describe('Read Comics Online complete page lists', () => {
+  it('reports source-declared empty chapters without invalidating their address or returning an empty success', () => {
+    const url = origin + '/comic/2000-ad/Annual2025';
+    const html = `<link rel="canonical" href="${url}"><main><h1>No pages uploaded yet</h1>
+      <p>2000 AD — Chapter #Annual 2025 exists but no page images have been added yet.</p></main>`;
+    expect(() => parsePages(html, url)).toThrow('此章节尚未上传图片');
+    expect(() => parsePages(html, url.replace('Annual2025', 'Annual-2025'))).toThrow('页面归属错误');
+    expect(() => parsePages(html.replace('No pages uploaded yet', 'Changed'), url)).toThrow('页面结构缺失');
+  });
   it('uses the whole strip, checks declared page slots, and preserves duplicate images', () => {
     const url = readerUrl + '/2', result = validatePages(parsePages(pages, url), definition.identify(new URL(url))!);
     expect(result).toMatchObject({url, title: title + ' #1', discoveryComplete: true, knownTotal: 2, direction: 'ltr'});

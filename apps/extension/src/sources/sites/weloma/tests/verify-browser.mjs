@@ -51,7 +51,7 @@ try {
   await site.screenshot({path: path.join(out, 'chapter-entry.png')});
   const opened = context.waitForEvent('page'); await button.click(); reader = await opened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 60000});
   await reader.waitForFunction(() => document.querySelector('img.nc-page-image')?.naturalWidth > 0, {}, {timeout: 60000});
   details = await reader.evaluate(async chapter => {
     const p = await import(chrome.runtime.getURL('verify-source.js'));
@@ -62,7 +62,7 @@ try {
   assert(details.chapters > 0 && details.pages > 1 && details.pages <= 100);
   const imageSelector = index => `[data-copy-id="${details.entryId}"] [data-page-index="${index}"] img.nc-page-image`;
   const jump = async number => {
-    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(number));
+    await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(number));
 
     await reader.waitForFunction(selector => {
       const img = document.querySelector(selector); return img?.complete && img.naturalWidth > 0 && img.naturalHeight > 0;

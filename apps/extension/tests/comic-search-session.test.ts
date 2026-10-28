@@ -8,7 +8,7 @@ import type {SourceSearchResult,SourceSearchResults,SourceSearchSite} from '../s
 
 const flush=async()=>{for(let index=0;index<12;index++)await Promise.resolve();};
 const deferred=<T>()=>{let resolve!:(value:T)=>void,reject!:(reason?:unknown)=>void;const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
-const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adaptedOn:'2026-09-23',contentTags:['manga'],pricing:'unknown',isRaw:false,adapterId:id,key:id+':'+id,search: true});
+const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adaptedOn:'2026-09-23',contentTags:['manga'],pricing:'unknown',isRaw:false,isAdult:false,adapterId:id,key:id+':'+id,search: true});
 const hit=(id:string,name=id):SourceSearchResult=>({sourceId:id,siteId:id,key:JSON.stringify([id,name]),catalogId:name,catalogUrl:`https://${id}.example/comic/${name}`,title:name});
 const page=(id:string,name=id):SourceSearchResults=>({items:[hit(id,name)]});
 function setup(options:Partial<ComicSearchDependencies>={},sites=[site('a'),site('b')],selection:Record<string,boolean>={}){
@@ -20,6 +20,22 @@ beforeEach(()=>analytics.track.mockClear());
 afterEach(()=>{sessions.splice(0).forEach(session=>session.dispose());vi.useRealTimers();});
 
 describe('comic search session',()=>{
+  it.each([
+    ['SOURCE_SEARCH_VERIFICATION_REQUIRED','verification','保持网页打开'],
+    ['SOURCE_SEARCH_LOGIN_REQUIRED','login','要求登录'],
+    ['SOURCE_SEARCH_FORBIDDEN','unavailable','HTTP 403'],
+    ['SOURCE_SEARCH_INVALID','invalid','结构已变化'],
+  ])('presents %s separately and links to the actual search origin',async(code,kind,message)=>{
+    const sourceUrl='https://api.a.example/search?q=Example';
+    const {session}=setup({search:async()=>{throw {code,sourceUrl};}},[site('a')]);
+    session.searchManual('Example');await flush();
+    expect(session.getSnapshot().sites[0].error).toMatchObject({kind,sourceUrl,message:expect.stringContaining(message)});
+  });
+  it.each(['javascript:alert(1)','https://user:password@a.example/search'])('rejects unsafe source action %s',async(sourceUrl)=>{
+    const {session}=setup({search:async()=>{throw {code:'SOURCE_SEARCH_VERIFICATION_REQUIRED',sourceUrl};}},[site('a')]);
+    session.searchManual('Example');await flush();
+    expect(session.getSnapshot().sites[0].error?.sourceUrl).toBeUndefined();
+  });
   it('accepts 120 source title code points and rejects 121 without another request',async()=>{
     const {session,deps}=setup();const title='𠮷'.repeat(120);
     session.setSourceTitle(` ${title} `);await session.searchWithTranslatedTitle();

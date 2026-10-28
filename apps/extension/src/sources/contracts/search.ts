@@ -44,9 +44,10 @@ export type SourceSearchErrorCode =
   | 'SOURCE_SEARCH_UNSUPPORTED' | 'SOURCE_SEARCH_INVALID' | 'SOURCE_SEARCH_CURSOR_EXPIRED'
   | 'SOURCE_SEARCH_PERMISSION_REQUIRED'
   | 'SOURCE_SEARCH_REQUEST_DENIED' | 'SOURCE_SEARCH_TIMEOUT' | 'SOURCE_SEARCH_HTTP_ERROR'
-  | 'SOURCE_SEARCH_RATE_LIMITED' | 'SOURCE_SEARCH_VERIFICATION_REQUIRED';
+  | 'SOURCE_SEARCH_RATE_LIMITED' | 'SOURCE_SEARCH_VERIFICATION_REQUIRED'
+  | 'SOURCE_SEARCH_LOGIN_REQUIRED' | 'SOURCE_SEARCH_FORBIDDEN';
 export class SourceSearchError extends Error {
-  constructor(readonly code: SourceSearchErrorCode, readonly retryAfter?: number) {
+  constructor(readonly code: SourceSearchErrorCode, readonly retryAfter?: number, readonly sourceUrl?: string) {
     super(code);
     this.name = 'SourceSearchError';
   }

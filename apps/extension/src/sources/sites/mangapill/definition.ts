@@ -21,7 +21,7 @@ export const chapterUrl = (loc: MangapillLocation, catalogSlug?: string) =>
   `${origin}/chapters/${loc.work}-${loc.chapter}${loc.slug ? '/' + loc.slug : ''}${catalogSlug ? '#nodelane-mangapill=' + catalogSlug : ''}`;
 export const definition: SourceDefinition = {
   id: 'mangapill', name: 'MangaPill', installation,
-  sites: [{id: 'mangapill', name: 'MangaPill', url: origin + '/', icon, adaptedOn: '2026-10-03', pricing: 'free', isRaw: false, contentTags: ['manga'], primaryLanguages: ['en'],
+  sites: [{id: 'mangapill', name: 'MangaPill', url: origin + '/', icon, adaptedOn: '2026-10-03', pricing: 'free', isRaw: false, isAdult: false, contentTags: ['manga'], primaryLanguages: ['en'],
     search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720},

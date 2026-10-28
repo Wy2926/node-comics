@@ -18,7 +18,7 @@ export const episodeUrl = (id: string, series?: string) => `${origin}/episodes/$
 export const definition: SourceDefinition = {
   id: 'comicpash',
   name: 'Comic PASH!',
-  sites: [{ id: 'comicpash', name: 'Comic PASH!', url: 'https://comicpash.jp/', icon: '/site-icons/comicpash.svg', adaptedOn: '2026-09-22', pricing: 'freemium', isRaw: true, accessTags: ['login-required'], contentTags: ['manga'], primaryLanguages: ['ja'], search: true }],
+  sites: [{ id: 'comicpash', name: 'Comic PASH!', url: 'https://comicpash.jp/', icon: '/site-icons/comicpash.svg', adaptedOn: '2026-09-22', pricing: 'freemium', isRaw: true, isAdult: false, accessTags: ['login-required'], contentTags: ['manga'], primaryLanguages: ['ja'], search: true }],
   capabilities: { importable: true, pages: true, inline: true, catalog: true, completePageList: true },
   catalogSync: {intervalMinutes: 720},
   installation,

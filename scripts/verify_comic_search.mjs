@@ -16,7 +16,8 @@ assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const source=path.join(root,'apps/extension/src').replaceAll('\\','/'),probe=path.join(extension,'probe.js');
 await writeFile(probe,`export {catalog} from '${source}/comics/repositories/index.ts';
 export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';
-export {listSearchSites} from '${source}/sources/index.ts';
+export {listSearchSites,listSupportedSites,searchSource} from '${source}/sources/index.ts';
+export {definitions} from '${source}/sources/registry/definitions.ts';
 export {importCatalog} from '${source}/comics/application/import-service.ts';
 export {catalogHtml as guaziCatalogHtml,readerHtml as guaziReaderHtml} from '${source}/sources/sites/guazimanhua/tests/fixtures.ts';`);
 const {build}=createRequire(path.join(root,'apps/extension/package.json'))('vite');
@@ -27,7 +28,7 @@ context.setDefaultTimeout(20_000);
 const permissionRequests=[];
 await context.exposeBinding('__fixturePermissionRequest',(_,request)=>{permissionRequests.push(request);});
 await context.addInitScript(()=>{if(location.protocol==='chrome-extension:'){chrome.permissions.request=request=>{void window.__fixturePermissionRequest(request);throw Error('Unexpected permission request with required host access');};localStorage.setItem('nc-release-notes-version',chrome.runtime.getManifest().version);if(!localStorage.getItem('nc-settings'))localStorage.setItem('nc-settings',JSON.stringify({uiLanguage:'zh-CN',layout:'single',fit:'window',appearance:'light',language:'en'}));if(!localStorage.getItem('nc-search-language'))localStorage.setItem('nc-search-language','zh-Hans');}});
-const errors=[],checks=[],requests=[];let titleMode='english',copyFail=true,slow=false,slowImport=false,emptyReader=false,guaziCatalog='',guaziReader='';
+const errors=[],checks=[],requests=[];let titleMode='english',lagoonFail=true,slow=false,slowImport=false,emptyReader=false,guaziCatalog='',guaziReader='';
 let groupedResults=false,verificationStatus=403,dm5PageFail=false;
 let releaseImport;
 const check=message=>{checks.push(message);console.log(message);};
@@ -48,9 +49,12 @@ function dm5Search(url){
   const href=n=>'/search?'+new URLSearchParams({title:query,page:String(n)});
   return `<a id="btnSearch" href="${escape(href(1))}">搜索</a><h1>相近搜索结果（${empty?0:1}）</h1><ul class="mh-list col7">${empty?'':`<li><div class="mh-item"><p class="mh-cover" style="background-image:url(https://images.cdndm5.com/search-cover.png)"></p><h2 class="title"><a href="/manhua-searchfixture${page===1?'':'-extra'}/">星光书店${page===1?' · 同名候选':' · 番外'}</a></h2><p class="subtitle"><a>星野葵</a></p><p class="chapter">更新至第 18 话</p></div></li>`}</ul><div class="page-pagination"><a class="active" href="${escape(href(page))}">${page}</a>${!empty&&page===1?`<a href="${escape(href(2))}">2</a>`:''}</div>`;
 }
-function mangaDexSearch(url){
-  const rows=url.searchParams.get('title')==='nothing'?[]:[{id:'42f40118-dff5-4f23-acbf-e54e89f026bd',type:'manga',attributes:{title:{ja:'星あかりの本屋'},originalLanguage:'ja',availableTranslatedLanguages:['en','zh-hk']},relationships:[]}];
-  return {result:'ok',response:'collection',data:rows,total:rows.length,limit:12,offset:0};
+function webtoonSearch(url){
+  return `<a href="${escape(url.href)}" aria-current="page">Originals</a>`+(url.searchParams.get('keyword')==='nothing'?'':`<a class="_card_item" data-title-no="7" href="https://www.webtoons.com/en/fantasy/searchfixture/list?title_no=7"><img src="https://webtoon-phinf.pstatic.net/cover.png"><strong class="title">星あかりの本屋</strong><div class="author">星野葵</div></a>`);
+}
+function themesiaSearch(url){
+  const empty=url.searchParams.get('s')==='nothing',title=url.hostname==='lagoonscans.com'?'星光書店':'星光書店 · 另一来源';
+  return `<html><body><div class="postbody"><div class="bixbox"><div class="releases"><h1>Search '${escape(url.searchParams.get('s'))}'</h1></div><div class="listupd">${empty?'<center><h3>Not Found</h3></center>':`<div class="bs"><div class="bsx"><a href="${url.origin}/manga/searchfixture/" title="${title}"><img src="https://images.cdndm5.com/search-cover.png"><div class="tt">${title}</div></a></div></div>`}</div>${empty?'':'<div class="pagination"><span class="page-numbers current" aria-current="page">1</span></div>'}</div></div></body></html>`;
 }
 function guaziSearch(url){
   const query=url.searchParams.get('keyword'),rows=groupedResults||query==='nothing'?[]:[{id:'123',title:'星光书店'},{id:'456',title:'星光书店 新来源'}];
@@ -64,14 +68,14 @@ await context.route(/https?:\/\//,async route=>{
   }
   if(url.hostname==='www.dm5.com'&&url.pathname==='/search'){assert(!url.search.includes('+'),'DM5 must use URI encoding for spaces');requests.push({kind:'search',site:'dm5',query:url.searchParams.get('title'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:100);return (dm5PageFail&&url.searchParams.get('page')==='2'?route.fulfill({status:503,body:'Fixture page unavailable'}):route.fulfill({contentType:'text/html; charset=utf-8',body:dm5Search(url)})).catch(()=>{});}
   if(url.hostname==='www.guazimanhua.com'&&url.pathname==='/category.php'){requests.push({kind:'search',site:'guazi',query:url.searchParams.get('keyword'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:900);return route.fulfill({contentType:'text/html; charset=utf-8',body:guaziSearch(url)}).catch(()=>{});}
-  if(['www.copy4000.com','www.mangacopy.com'].includes(url.hostname)&&url.pathname.startsWith('/api/')){
-    requests.push({kind:'search',site:url.hostname,query:url.searchParams.get('q'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:250);
-    if(groupedResults&&url.hostname==='www.mangacopy.com')return route.fulfill({status:verificationStatus,body:'Fixture login or verification required'}).catch(()=>{});
-    return copyFail?route.fulfill({status:503,body:'Fixture unavailable'}).catch(()=>{}):route.fulfill({json:{code:200,results:{offset:0,limit:12,total:1,list:[{path_word:'searchfixture',name:'星光書店',author:[{name:'星野葵'}],cover:'https://sg.mangafunb.fun/cover.png'}]}}}).catch(()=>{});
+  if(['lagoonscans.com','asterscans.com'].includes(url.hostname)&&url.searchParams.has('s')){
+    requests.push({kind:'search',site:url.hostname,query:url.searchParams.get('s'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:250);
+    if(groupedResults&&url.hostname==='asterscans.com')return route.fulfill({status:verificationStatus,headers:verificationStatus===403?{'cf-mitigated':'challenge'}:{},body:'Fixture login or verification required'}).catch(()=>{});
+    return lagoonFail?route.fulfill({status:503,body:'Fixture unavailable'}).catch(()=>{}):route.fulfill({contentType:'text/html',body:themesiaSearch(url)}).catch(()=>{});
   }
-  if(url.hostname==='api.mangadex.org'&&url.pathname==='/manga'){
-    requests.push({kind:'search',site:'mangadex',query:url.searchParams.get('title'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:400);
-    return route.fulfill({json:mangaDexSearch(url)}).catch(()=>{});
+  if(url.hostname==='www.webtoons.com'&&url.pathname.startsWith('/en/search/')){
+    requests.push({kind:'search',site:'webtoons-en',query:url.searchParams.get('keyword'),parameters:[...url.searchParams.keys()]});await pause(slow?2_500:400);
+    return route.fulfill({contentType:'text/html',body:webtoonSearch(url)}).catch(()=>{});
   }
   if(url.hostname==='comic.naver.com'){
     if(url.pathname.endsWith('/info'))return route.fulfill({json:{titleId:123,webtoonLevelCode:'WEBTOON',titleName:'星あかりの本屋',posterThumbnailUrl:'https://image-comic.pstatic.net/cover.png'}});
@@ -86,7 +90,7 @@ await context.route(/https?:\/\//,async route=>{
     if(fresh)body=body.replaceAll('id=123','id=456').replaceAll('id=11','id=21').replaceAll('星光书店','星光书店 新来源');
     return route.fulfill({contentType:'text/html; charset=utf-8',body});
   }
-  if(['image-comic.pstatic.net','img.guazicdn.com','images.cdndm5.com','sg.mangafunb.fun'].includes(url.hostname))return route.fulfill({contentType:'image/png',body:image});
+  if(['image-comic.pstatic.net','img.guazicdn.com','images.cdndm5.com','webtoon-phinf.pstatic.net'].includes(url.hostname))return route.fulfill({contentType:'image/png',body:image});
   if(url.pathname.startsWith('/v1/'))return route.fulfill({status:503,json:{error:{code:'FIXTURE_OFFLINE',message:'Isolated fixture'}}});
   return route.abort();
 });
@@ -97,6 +101,24 @@ try{
   await waitUntil(()=>worker.evaluate(()=>typeof chrome.permissions?.request==='function'));
   await worker.evaluate(()=>{globalThis.__fixturePermissionRequests=0;chrome.permissions.request=()=>{globalThis.__fixturePermissionRequests++;throw Error('Unexpected background permission request with required host access');};});
   reader=await context.newPage();await reader.goto(home);await reader.locator('.nc-library').waitFor();
+  const adultAudit=await reader.evaluate(async()=>{
+    const probe=await import(chrome.runtime.getURL('verify-search.js'));
+    const adult=probe.definitions.flatMap(adapter=>(adapter.sites??[]).filter(site=>site.isAdult).map(site=>({adapterId:adapter.id,...site})));
+    const visible=new Set([...probe.listSupportedSites(),...probe.listSearchSites()].map(site=>site.key));
+    const rejected=[];
+    for(const site of adult){try{await probe.searchSource(site.adapterId,{siteId:site.id,query:'fixture'},{sessionId:'adult-policy'});rejected.push('allowed');}catch(error){rejected.push(error.code);}}
+    localStorage.setItem('nc-site-favorites',JSON.stringify(adult.map(site=>site.adapterId+':'+site.id)));
+    localStorage.setItem('nc-search-sites',JSON.stringify(Object.fromEntries(adult.map(site=>[site.adapterId+':'+site.id,true]))));
+    return {keys:adult.map(site=>site.adapterId+':'+site.id),count:adult.length,exposed:adult.filter(site=>visible.has(site.adapterId+':'+site.id)).length,rejected,
+      publicKeys:probe.listSupportedSites().map(site=>site.key).sort()};
+  });
+  assert.deepEqual(adultAudit.keys,['nhentaicom:nhentaicom']);assert.equal(adultAudit.exposed,0);assert(adultAudit.rejected.every(code=>code==='SOURCE_SEARCH_UNSUPPORTED'));assert.equal(requests.length,0);
+  await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();
+  assert.equal(await reader.locator('[data-site-key="nhentaicom:nhentaicom"]').count(),0);
+  assert.equal(await reader.locator('[data-site-key="mangacopy:copy4000"],[data-site-key="pixiv:pixiv"],[data-site-key="mangadex:mangadex"]').count(),3);
+  assert.deepEqual((await reader.locator('[data-site-key]').evaluateAll(cards=>cards.map(card=>card.dataset.siteKey))).sort(),adultAudit.publicKeys);
+  await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'我的漫画',exact:true}).click();
+  check(`${adultAudit.count} adult entries are absent from both registries; direct requests fail before transport and stale favorites stay hidden`);
   const fixtures=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));return {catalog:probe.guaziCatalogHtml(['11']).replaceAll('Fixture comic','星光书店').replace('<script>throw Error(\'never execute\')</script>',''),reader:probe.guaziReaderHtml()};});
   guaziCatalog=fixtures.catalog;guaziReader=fixtures.reader;
   const imported=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));const rows=[];for(const url of ['https://comic.naver.com/webtoon/list?titleId=123','https://www.guazimanhua.com/comic.php?id=123']){const comic=await probe.importCatalog(await probe.readSourceCatalog(url));rows.push({id:comic.id,title:comic.title});}return rows;});
@@ -175,10 +197,10 @@ try{
   assert(languageBounds.width>=120&&languageBounds.x+languageBounds.width<=translateBounds.x);
   assert(Math.abs(languageBounds.y+languageBounds.height-translateBounds.y-translateBounds.height)<1,'Target language and search action share the left-column row');
   // Keep this suite's fixed HTTP fixtures independent of newly discovered search adapters.
-  const fixtureSites=new Set(['动漫屋 DM5','瓜子漫画','拷贝漫画','MangaCopy','MangaDex']);
+  const fixtureSites=new Set(['动漫屋 DM5','瓜子漫画','Lagoon Scans','Aster Scans','WEBTOON · English']);
   await scope.getByRole('button',{name:'反选',exact:true}).click();
   for(const name of fixtureSites)await scope.getByRole('checkbox',{name,exact:true}).check();
-  const mirrorOption=panel().locator('.nc-search-site-option').filter({hasText:'MangaCopy'});await mirrorOption.locator('input').uncheck();
+  const excludedOption=panel().locator('.nc-search-site-option').filter({hasText:'Aster Scans'});await excludedOption.locator('input').uncheck();
   await collapseScope(panel());
 
   await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();
@@ -188,17 +210,17 @@ try{
   await panel().locator('.nc-search-status.is-error').waitFor({state:'attached'});await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===4);
   assert.equal(requests.filter(request=>request.kind==='search'&&request.site==='guazi').length,1);await guaziOption.check();await collapseScope(panel());check('Editing the next search scope during requests keeps this round running and its arrived results visible');
   await panel().locator('.nc-search-result-cover img').first().waitFor();check('English title fallback only changes the search name; first site is visible before slower sites and covers load independently');
-  const mangaDexResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await mangaDexResult.getByRole('img',{name:'English',exact:true}).count(),1);assert.equal(await mangaDexResult.locator('.nc-search-result-languages [role=img]').count(),2);const noLanguageResults=panel().locator('.nc-search-result').filter({hasNot:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);assert.equal(await panel().getByRole('checkbox',{name:'只看语言已确认',exact:true}).count(),0);assert.equal(await panel().getByText('语言待确认',{exact:true}).count(),0);check('Site-supplied languages use accessible flag icons; unknown languages have no placeholder or confirmed-language filter');
-  const dexFilter=panel().locator('.nc-search-status').filter({hasText:'MangaDex'}),beforeFilter=requests.length;
-  await dexFilter.click();assert.equal(await dexFilter.getAttribute('aria-pressed'),'true');assert.equal(await panel().locator('.nc-search-result').count(),1);assert(await mangaDexResult.isVisible());
-  await dexFilter.press('Enter');assert.equal(await dexFilter.getAttribute('aria-pressed'),'false');assert.equal(await panel().locator('.nc-search-result').count(),4);assert.equal(requests.length,beforeFilter);check('Site click filters immediately; pressing Enter on the same site restores all candidates without network requests');
-  const failed=panel().locator('.nc-search-status').filter({hasText:'拷贝漫画'});await expandGroup(panel(),'failed');await failed.click();assert.equal(await panel().locator('.nc-search-result').count(),0);
+  const webtoonResult=panel().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await webtoonResult.getByRole('img',{name:'English',exact:true}).count(),1);assert.equal(await webtoonResult.locator('.nc-search-result-languages [role=img]').count(),1);const noLanguageResults=panel().locator('.nc-search-result').filter({hasNot:reader.getByRole('heading',{name:'星あかりの本屋',exact:true})});assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);assert.equal(await panel().getByRole('checkbox',{name:'只看语言已确认',exact:true}).count(),0);assert.equal(await panel().getByText('语言待确认',{exact:true}).count(),0);check('Site-supplied languages use accessible flag icons; unknown languages have no placeholder or confirmed-language filter');
+  const webtoonFilter=panel().locator('.nc-search-status').filter({hasText:'WEBTOON · English'}),beforeFilter=requests.length;
+  await webtoonFilter.click();assert.equal(await webtoonFilter.getAttribute('aria-pressed'),'true');assert.equal(await panel().locator('.nc-search-result').count(),1);assert(await webtoonResult.isVisible());
+  await webtoonFilter.press('Enter');assert.equal(await webtoonFilter.getAttribute('aria-pressed'),'false');assert.equal(await panel().locator('.nc-search-result').count(),4);assert.equal(requests.length,beforeFilter);check('Site click filters immediately; pressing Enter on the same site restores all candidates without network requests');
+  const failed=panel().locator('.nc-search-status').filter({hasText:'Lagoon Scans'});await expandGroup(panel(),'failed');await failed.click();assert.equal(await panel().locator('.nc-search-result').count(),0);
   const siteDetails=panel().locator('.nc-search-status-detail'),retry=siteDetails.getByRole('button',{name:'重试此网站',exact:true});
   assert.equal(await panel().getByRole('button',{name:'显示全部网站',exact:true}).count(),0);assert.equal(await panel().locator('.nc-search-empty,.nc-search-match-note').count(),0);
-  assert.equal(await siteDetails.getByRole('heading',{name:'拷贝漫画',exact:true}).count(),1);assert.equal(await siteDetails.getByRole('link',{name:'打开来源',exact:true}).count(),1);
+  assert.equal(await siteDetails.getByRole('heading',{name:'Lagoon Scans',exact:true}).count(),1);assert.equal(await siteDetails.getByRole('link',{name:'打开来源',exact:true}).count(),1);
   const summaryBounds=await siteDetails.locator('.nc-search-detail-summary').boundingBox(),actionsBounds=await siteDetails.locator('.nc-search-detail-actions').boundingBox(),retryBounds=await retry.boundingBox();assert(actionsBounds.x>=summaryBounds.x+summaryBounds.width);assert(retryBounds.height>=40);
   await panel().locator('.nc-search-results').screenshot({path:path.join(out,'site-retry-light.png')});await reader.evaluate(()=>{document.documentElement.dataset.appearance='dark';});await panel().locator('.nc-search-results').screenshot({path:path.join(out,'site-retry-dark.png')});await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
-  copyFail=false;slow=true;const titleCalls=requests.filter(request=>request.kind==='title').length;await retry.click();
+  lagoonFail=false;slow=true;const titleCalls=requests.filter(request=>request.kind==='title').length;await retry.click();
   const working=siteDetails.getByRole('button',{name:'搜索中',exact:true});await working.waitFor();assert(await working.isDisabled());const workingBounds=await working.boundingBox();assert(Math.abs(workingBounds.x-retryBounds.x)<1);assert.equal(await siteDetails.getByRole('button',{name:'加载更多',exact:true}).count(),0);
   await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===1);slow=false;await failed.click();assert.equal(await panel().locator('.nc-search-result').count(),5);assert.equal(await siteDetails.count(),0);assert.equal(requests.filter(request=>request.kind==='title').length,titleCalls);
   check('Selected-site actions stay grouped at the right, retry shows progress in place, and toggling the site clears the filter without a redundant all-sites button or empty panel');
@@ -221,8 +243,8 @@ try{
   await reader.evaluate(()=>{document.documentElement.dataset.appearance='dark';});await panel().screenshot({path:path.join(out,'search-dark.png')});await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
   check('Wide bottom sheet, inline site options, inline progress and two-column results render in both themes');
   const beforeClose=requests.length,savedScroll=await panel().locator('.nc-search-body').evaluate(element=>{element.scrollTop=240;return element.scrollTop;});await panel().getByRole('button',{name:'关闭查找面板',exact:true}).click();await openShelf();assert.equal(await panel().locator('.nc-search-result').count(),6);assert.equal(await panel().locator('.nc-search-body').evaluate(element=>element.scrollTop),savedScroll);assert.equal(requests.length,beforeClose);assert.match(await panel().locator('.nc-search-progress>span').first().getAttribute('title'),/上次查找/);check('Closing/reopening retains grouped results, scroll position and last-search time without new search traffic');
-  await expandScope(panel());assert(!await mirrorOption.locator('input').isChecked());
-  await language.click();await panel().locator('[role=option][data-value=ja]').click();for(const option of await panel().locator('.nc-search-site-option').all())assert(!await option.locator('input').isDisabled());assert(await panel().locator('.nc-search-site-option').filter({hasText:'MangaDex'}).locator('input').isChecked());await collapseScope(panel());const originalNameCalls=requests.filter(request=>request.kind==='title').length;await panel().getByRole('button',{name:'使用原名搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===5);assert.equal(requests.filter(request=>request.kind==='title').length,originalNameCalls);assert(await mangaDexResult.isVisible());assert(requests.some(request=>request.site==='mangadex'&&request.query==='星あかりの本屋'));assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);for(const request of requests.filter(request=>request.kind==='search'))assert(!(request.parameters??[]).some(key=>/language/i.test(key)),request.site+' must search by name without a language parameter');check('Japanese-name search includes MangaDex English/Traditional-Chinese releases and every selected site without request language filters');await mangaDexResult.scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'name-only-search.png')});
+  await expandScope(panel());assert(!await excludedOption.locator('input').isChecked());
+  await language.click();await panel().locator('[role=option][data-value=ja]').click();for(const option of await panel().locator('.nc-search-site-option').all())assert(!await option.locator('input').isDisabled());assert(await panel().locator('.nc-search-site-option').filter({hasText:'WEBTOON · English'}).locator('input').isChecked());await collapseScope(panel());const originalNameCalls=requests.filter(request=>request.kind==='title').length;await panel().getByRole('button',{name:'使用原名搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-result').length===5);assert.equal(requests.filter(request=>request.kind==='title').length,originalNameCalls);assert(await webtoonResult.isVisible());assert(requests.some(request=>request.site==='webtoons-en'&&request.query==='星あかりの本屋'));assert.equal(await noLanguageResults.locator('.nc-search-result-languages').count(),0);for(const request of requests.filter(request=>request.kind==='search'))assert(!(request.parameters??[]).some(key=>/language/i.test(key)),request.site+' must search by name without a language parameter');check('Japanese-name search includes WEBTOON English releases and every selected site without request language filters');await webtoonResult.scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'name-only-search.png')});
   slow=true;await panel().getByRole('button',{name:'重新搜索',exact:true}).click();await panel().getByRole('button',{name:'停止查找',exact:true}).click();await pause(2_700);assert.equal(await panel().locator('.nc-search-result').count(),0);assert.match(await panel().locator('.nc-search-progress').innerText(),/已停止/);
   await panel().getByRole('button',{name:'重新搜索',exact:true}).click();await language.click();await panel().locator('[role=option][data-value=en]').click();await pause(2_700);assert.equal(await panel().locator('.nc-search-result').count(),0);assert.equal(await panel().locator('.nc-search-progress').count(),0);check('Stopped and language-replaced requests never publish delayed fixture results');slow=false;
   await language.click();await panel().locator('[role=option][data-value=zh-Hans]').click();titleMode='null';await panel().getByPlaceholder('请输入漫画作品名称').fill('星あかりの本屋 別題');await panel().getByRole('button',{name:'翻译名称并搜索',exact:true}).click();await panel().getByText('未找到常用简体中文名称，请手动输入或明确使用原名搜索。',{exact:true}).waitFor();assert.equal(await panel().locator('.nc-search-result').count(),0);
@@ -289,20 +311,20 @@ try{
   }
   await reader.setViewportSize({width:1560,height:1120});
   check('Search page removes its banner; desktop controls and scope share two columns, narrow screens stack them and both name modes stay within 480px across five viewport sizes');
-  await expandScope(searchPage());const pageMirror=searchPage().locator('.nc-search-site-option').filter({hasText:'MangaCopy'}).locator('input');assert(!await pageMirror.isChecked());await pageMirror.check();await collapseScope(searchPage());assert.equal(requests.length,beforePage);check('The standalone page restores the scope saved by the other-language sheet without making requests');
+  await expandScope(searchPage());const pageExcluded=searchPage().locator('.nc-search-site-option').filter({hasText:'Aster Scans'}).locator('input');assert(!await pageExcluded.isChecked());await pageExcluded.check();await collapseScope(searchPage());assert.equal(requests.length,beforePage);check('The standalone page restores the scope saved by the other-language sheet without making requests');
   await reader.screenshot({path:path.join(out,'search-page-empty.png')});
   const pageTitleCalls=requests.filter(request=>request.kind==='title').length;
   await searchPage().getByPlaceholder('输入漫画名称或别名').fill('星光书店');await searchPage().getByPlaceholder('输入漫画名称或别名').press('Enter');
-  await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(requests.filter(request=>request.kind==='title').length,pageTitleCalls);
+  await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);assert.equal(await searchPage().locator('.nc-search-result').count(),6);assert.equal(requests.filter(request=>request.kind==='title').length,pageTitleCalls);
   await reader.waitForFunction(()=>[...document.querySelectorAll('.nc-search-page .nc-search-result-cover img')].some(image=>image.naturalWidth>0));
   const beforeScopeFilter=requests.length;
-  await openFilters(searchPage());await filterPopover(searchPage()).getByRole('button',{name:'免费',exact:true}).click();await filterPopover(searchPage()).getByRole('button',{name:'同人',exact:true}).click();
-  await filterPopover(searchPage()).getByRole('button',{name:'更多筛选',exact:true}).click();await filterPopover(searchPage()).getByRole('button',{name:'需要登录',exact:true}).click();
-  assert.match(await searchPage().locator('.nc-search-scope-heading>span').innerText(),/已选 1 个网站/);assert.equal(requests.length,beforeScopeFilter);assert.equal(await searchPage().locator('.nc-search-result').count(),5);
+  await openFilters(searchPage());await filterPopover(searchPage()).getByRole('button',{name:'部分收费',exact:true}).click();await filterPopover(searchPage()).getByRole('button',{name:'条漫',exact:true}).click();
+  await filterPopover(searchPage()).getByRole('button',{name:'更多筛选',exact:true}).click();await filterPopover(searchPage()).getByRole('button',{name:'网页只开放部分',exact:true}).click();
+  assert.match(await searchPage().locator('.nc-search-scope-heading>span').innerText(),/已选 1 个网站/);assert.equal(requests.length,beforeScopeFilter);assert.equal(await searchPage().locator('.nc-search-result').count(),6);
   await closeFilters(searchPage());await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();
   await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===1);
   assert.equal(await searchPage().locator('.nc-search-status').count(),1);assert.equal(await searchPage().locator('.nc-search-result').count(),1);
-  assert.deepEqual(requests.slice(beforeScopeFilter).filter(request=>request.kind==='search').map(request=>request.site),['mangadex']);
+  assert.deepEqual(requests.slice(beforeScopeFilter).filter(request=>request.kind==='search').map(request=>request.site),['webtoons-en']);
   await openFilters(searchPage());await filterPopover(searchPage()).getByRole('button',{name:'清空筛选',exact:true}).click();await closeFilters(searchPage());await expandScope(searchPage());
   assert.equal(await searchPage().locator('.nc-search-site-option input:checked').count(),5);assert.equal(await searchPage().locator('.nc-search-result').count(),1);
   await collapseScope(searchPage());await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-status.is-ready').length===5);
@@ -323,10 +345,10 @@ try{
   await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
   check('Compact search controls, result cards and action buttons share navigation stroke and shadow tokens in light and dark themes');
   const beforePageReturn=requests.length;
-  await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).click();assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(requests.length,beforePageReturn);check('Navigation opens a full search page; direct Enter search skips translation; leaving and returning retains its independent results');
-  await searchPage().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await reader.locator('.nc-reader').waitFor();await reader.getByRole('button',{name:'返回搜索',exact:true}).click();await searchPage().waitFor();assert.equal(await searchPage().locator('.nc-search-result').count(),5);check('Full-page search opens the real reader and returns to its retained result grid');
+  await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'搜索漫画',exact:true}).click();assert.equal(await searchPage().locator('.nc-search-result').count(),6);assert.equal(requests.length,beforePageReturn);check('Navigation opens a full search page; direct Enter search skips translation; leaving and returning retains its independent results');
+  await searchPage().locator('.nc-search-result').filter({has:reader.getByRole('heading',{name:'星光书店',exact:true})}).getByRole('button',{name:'继续阅读',exact:true}).click();await reader.locator('.nc-reader').waitFor();await reader.getByRole('button',{name:'返回搜索',exact:true}).click();await searchPage().waitFor();assert.equal(await searchPage().locator('.nc-search-result').count(),6);check('Full-page search opens the real reader and returns to its retained result grid');
   const group=key=>searchPage().locator('.nc-search-status-group.is-'+key);
-  groupedResults=true;copyFail=true;slow=true;
+  groupedResults=true;lagoonFail=true;slow=true;
   await searchPage().getByRole('button',{name:'重新搜索',exact:true}).click();
   assert.equal(await group('pending').locator('.nc-search-status').count(),5);assert.equal(await searchPage().locator('.nc-search-status-group').count(),1);
   await searchPage().getByRole('button',{name:'停止查找',exact:true}).click();
@@ -348,13 +370,13 @@ try{
   await searchPage().locator('.nc-search-status-groups').scrollIntoViewIfNeeded();await reader.screenshot({path:path.join(out,'search-groups-mobile.png')});
   await reader.setViewportSize({width:1560,height:1120});await reader.evaluate(()=>{document.documentElement.dataset.appearance='light';});
   check('Result sites form four counted groups; only found sites expand by default, pending/stopped stay separate, login is not a failed/empty search, and desktop/mobile themes fit');
-  const groupedDetails=searchPage().locator('.nc-search-status-detail'),loginSite=searchPage().locator('.nc-search-status').filter({hasText:'MangaCopy'}),beforeGroupFilter=requests.length;
+  const groupedDetails=searchPage().locator('.nc-search-status-detail'),loginSite=searchPage().locator('.nc-search-status').filter({hasText:'Aster Scans'}),beforeGroupFilter=requests.length;
   const loginToggle=group('login').locator('.nc-search-group-toggle');await loginToggle.press('Enter');assert.equal(await loginToggle.getAttribute('aria-expanded'),'true');
-  await loginSite.click();assert.match(await groupedDetails.innerText(),/请打开来源网站完成登录或验证/);assert.equal(await searchPage().locator('.nc-search-result').count(),0);assert.equal(await searchPage().locator('.nc-search-empty').count(),0);
+  await loginSite.click();assert.match(await groupedDetails.innerText(),/保持网页打开后重试/);assert.equal(await searchPage().locator('.nc-search-result').count(),0);assert.equal(await searchPage().locator('.nc-search-empty').count(),0);
   await loginToggle.press('Space');assert.equal(await group('login').locator('.nc-search-status-list').isVisible(),false);assert.equal(await groupedDetails.count(),0);assert.equal(await searchPage().locator('.nc-search-result').count(),2);assert.equal(requests.length,beforeGroupFilter);
   await expandGroup(searchPage(),'login');
   verificationStatus=401;await loginSite.click();await groupedDetails.getByRole('button',{name:'重试此网站',exact:true}).click();await group('login').locator('.nc-search-status').waitFor();assert.equal(await loginSite.getAttribute('aria-pressed'),'true');await loginSite.click();
-  const recoverable=searchPage().locator('.nc-search-status').filter({hasText:'拷贝漫画'});await expandGroup(searchPage(),'failed');await recoverable.click();copyFail=false;slow=true;
+  const recoverable=searchPage().locator('.nc-search-status').filter({hasText:'Lagoon Scans'});await expandGroup(searchPage(),'failed');await recoverable.click();lagoonFail=false;slow=true;
   await groupedDetails.getByRole('button',{name:'重试此网站',exact:true}).click();assert.equal(await group('pending').locator('.nc-search-status[aria-pressed=true]').count(),1);
   await group('found').locator('.nc-search-status[aria-pressed=true]').waitFor();slow=false;
   assert.equal(await group('failed').count(),0);assert.equal(await searchPage().locator('.nc-search-result').count(),1);await recoverable.click();
@@ -372,7 +394,7 @@ try{
   const deepLink=await context.newPage();await deepLink.goto(home+'#search');await deepLink.locator('.nc-search-page').waitFor();assert.equal(new URL(deepLink.url()).hash,'#search');assert.equal(await deepLink.locator('dialog[open]').count(),0);
   await expandScope(deepLink);const freshDm5=deepLink.locator('.nc-search-site-option').filter({hasText:'动漫屋 DM5'}).locator('input');await freshDm5.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();await expandScope(deepLink);assert(!await freshDm5.isChecked());assert.equal(await deepLink.locator('.nc-search-result').count(),0);
   await expandScope(deepLink);for(const input of await deepLink.locator('.nc-search-site-option input').all())if(await input.isChecked())await input.uncheck();await deepLink.reload();await deepLink.locator('.nc-search-page').waitFor();assert.equal(await deepLink.locator('.nc-search-site-option input:checked').count(),0);
-  await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-site-option input:checked').length===0);assert.equal(await searchPage().locator('.nc-search-result').count(),5);assert.equal(await searchPage().locator('.nc-search-status').count(),5);
+  await reader.waitForFunction(()=>document.querySelectorAll('.nc-search-page .nc-search-site-option input:checked').length===0);assert.equal(await searchPage().locator('.nc-search-result').count(),6);assert.equal(await searchPage().locator('.nc-search-status').count(),5);
   await deepLink.locator('.nc-search-scope').getByRole('button',{name:'全选',exact:true}).click();await deepLink.close();check('Fresh tabs and reloads restore saved and entirely deselected scopes; cross-tab preference updates leave existing results intact');
   assert.deepEqual(permissionRequests,[]);assert.equal(await worker.evaluate(()=>globalThis.__fixturePermissionRequests),0);check('The unchanged built manifest grants HTTP/HTTPS access; normal searches, website entry and imports never request extra permissions');
   assert.deepEqual(errors,[]);

@@ -18,7 +18,7 @@ export function location(url: URL) {
 export const definition: SourceDefinition = {
   id: 'mangataro', name: 'MangaTaro', installation,
   sites: [{id: 'mangataro', name: 'MangaTaro', url: origin + '/home', icon, adaptedOn: '2026-10-12',
-    pricing: 'free', isRaw: false, primaryLanguages: ['en'], contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], search: true}],
+    pricing: 'free', isRaw: false, isAdult: false, primaryLanguages: ['en'], contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -5,6 +5,8 @@ import {definitions} from '../registry/definitions';
 import {sourceNetworks} from '../registry/networks';
 import {createSourceNetworkContext, SourceHttpError} from './http';
 import {readSourceArtwork} from './source-image';
+import {withSearchNetworkContext} from './page-network';
+import type {SourceNetworkContext} from '../contracts/network';
 
 const lifetimeMs = 10 * 60_000;
 const cursors = new Map<string, {binding: string; value: string; sessionId: string; expires: number}>();
@@ -20,12 +22,12 @@ function prune() {
 function authority(sourceId: string, siteId: string) {
   const definition = definitions.find(value => value.id === sourceId), site = definition?.sites?.find(value => value.id === siteId);
   const operation = sourceNetworks[sourceId]?.search;
-  if (!definition || !site?.search || !operation) throw new SourceSearchError('SOURCE_SEARCH_UNSUPPORTED');
-  return {definition, site, operation, capability: validateSearchCapability(definition, site)};
+  if (!definition || !site?.search || site.isAdult !== false || !operation) throw new SourceSearchError('SOURCE_SEARCH_UNSUPPORTED');
+  return {definition, site, operation, searchPage: sourceNetworks[sourceId]?.searchPage, capability: validateSearchCapability(definition, site)};
 }
 export function listSearchSites(): SourceSearchSite[] {
   return definitions.flatMap(definition => (definition.sites ?? []).flatMap(site => {
-    if (!site.search) return [];
+    if (!site.search || site.isAdult !== false) return [];
     const {capability} = authority(definition.id, site.id);
     return [{...site, adapterId: definition.id, key: `${definition.id}:${site.id}`, search: capability}];
   }));
@@ -47,7 +49,7 @@ function abortable<T>(value: Promise<T>, signal: AbortSignal): Promise<T> {
 export async function searchSource(sourceId: string, input: SourceSearchRequest, options: SourceSearchOptions): Promise<SourceSearchResults> {
   options.signal?.throwIfAborted();
   if (typeof options.sessionId !== 'string' || !options.sessionId || options.sessionId.length > 200) throw new SourceSearchError('SOURCE_SEARCH_INVALID');
-  const request = normalizeSourceSearchRequest(input), {definition, site, operation} = authority(sourceId, request.siteId);
+  const request = normalizeSourceSearchRequest(input), {definition, site, operation, searchPage} = authority(sourceId, request.siteId);
   prune();
   const binding = JSON.stringify([options.sessionId, sourceId, site.id, request.query]);
   let cursor: string | undefined;
@@ -61,8 +63,30 @@ export async function searchSource(sourceId: string, input: SourceSearchRequest,
   controllers.add(controller); pending.set(options.sessionId, controllers);
   const timer = setTimeout(() => controller.abort(new SourceSearchError('SOURCE_SEARCH_TIMEOUT')), sourceSearchLimits.pageTimeoutMs);
   const signal = AbortSignal.any([controller.signal, ...(options.signal ? [options.signal] : [])]);
+  let sourceUrl: string | undefined;
   try {
-    const raw = await abortable(operation({...request, cursor}, createSourceNetworkContext(signal)), signal);
+    const adapterRequest = {...request, cursor};
+    sourceUrl = searchPage?.(adapterRequest);
+    const read = async (context: SourceNetworkContext) => {
+      const transport = async <T>(request: () => Promise<T>) => {
+        try { return await request(); }
+        catch (error) {
+          if (signal.aborted || error instanceof SourceHttpError) throw error;
+          throw new SourceHttpError('http', 'Source search transport failed');
+        }
+      };
+      try { return await operation(adapterRequest, {...context,
+        request: (...args) => transport(() => context.request(...args)),
+        ...(context.requestBytes ? {requestBytes: (...args: Parameters<NonNullable<SourceNetworkContext['requestBytes']>>) => transport(() => context.requestBytes!(...args))} : {}),
+      }); }
+      catch (error) {
+        if (signal.aborted || error instanceof SourceSearchError || error instanceof SourceHttpError) throw error;
+        // A successful response whose packaged parser rejects it is not a network outage.
+        throw new SourceSearchError('SOURCE_SEARCH_INVALID');
+      }
+    };
+    const raw = await abortable(sourceUrl ? withSearchNetworkContext(sourceUrl, signal, read)
+      : read(createSourceNetworkContext(signal)), signal);
     signal.throwIfAborted();
     const page = validateSearchPage(raw, definition, site, definitions);
     signal.throwIfAborted();
@@ -76,7 +100,7 @@ export async function searchSource(sourceId: string, input: SourceSearchRequest,
     return {items: page.items, ...(nextCursor ? {nextCursor} : {})};
   } catch (error) {
     if (signal.aborted) throw signal.reason;
-    if (error instanceof SourceSearchError) throw error;
+    if (error instanceof SourceSearchError) throw sourceUrl ? new SourceSearchError(error.code, error.retryAfter, sourceUrl) : error;
     if (error instanceof SourceHttpError) {
       const {status, retryAfter} = error.details;
       throw new SourceSearchError(error.kind === 'request-denied' ? 'SOURCE_SEARCH_REQUEST_DENIED' :
@@ -84,7 +108,8 @@ export async function searchSource(sourceId: string, input: SourceSearchRequest,
         error.kind === 'verification-required' ? 'SOURCE_SEARCH_VERIFICATION_REQUIRED' :
         error.kind === 'invalid-response' ? 'SOURCE_SEARCH_INVALID' :
         status === 429 ? 'SOURCE_SEARCH_RATE_LIMITED' :
-        status === 401 || status === 403 ? 'SOURCE_SEARCH_VERIFICATION_REQUIRED' : 'SOURCE_SEARCH_HTTP_ERROR', retryAfter);
+        status === 401 ? 'SOURCE_SEARCH_LOGIN_REQUIRED' :
+        status === 403 ? 'SOURCE_SEARCH_FORBIDDEN' : 'SOURCE_SEARCH_HTTP_ERROR', retryAfter, sourceUrl);
     }
     throw new SourceSearchError('SOURCE_SEARCH_HTTP_ERROR');
   } finally {

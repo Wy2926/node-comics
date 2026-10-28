@@ -9,8 +9,8 @@ export function hachiLocation(url: URL): HachiLocation | null {
   if (!isOrigin(url) || url.search || url.hash) return null;
   let path: string;
   try {path = decodeURIComponent(url.pathname);} catch {return null;}
-  // Chapter suffixes are opaque source IDs, including corrected releases such as 92-fix.
-  const match = /^\/manga\/([^/]+)(?:\/(chapter-\d+(?:-[a-z0-9]+)*))?\/?$/.exec(path);
+  // Keep source release IDs intact, including corrected chapters and legacy 250-raw links.
+  const match = /^\/manga\/([^/]+)(?:\/(chapter-\d+(?:-[a-z0-9]+)*|\d+-raw))?\/?$/.exec(path);
   if (!match || match[1].length > 512 || /[\u0000-\u0020\u007f/%?#\\]/u.test(match[1]) || (match[2]?.length ?? 0) > 80) return null;
   return {slug: match[1], ...(match[2] ? {chapter: match[2]} : {})};
 }
@@ -20,7 +20,7 @@ export const chapterKey = (loc: HachiLocation) => `${catalogKey(loc.slug)}:${loc
 export const chapterUrl = (loc: HachiLocation) => `${catalogUrl(loc.slug)}/${loc.chapter}`;
 export const definition: SourceDefinition = {
   id: 'hachiraw', name: 'Hachiraw', installation,
-  sites: [{id: 'hachiraw', name: 'Hachiraw', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'free', isRaw: true,
+  sites: [{id: 'hachiraw', name: 'Hachiraw', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'free', isRaw: true, isAdult: false,
     contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

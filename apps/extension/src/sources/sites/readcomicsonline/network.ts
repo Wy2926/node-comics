@@ -3,7 +3,7 @@ import type {SourceCatalogSnapshot, SourceEntry, SourceSnapshot} from '../../con
 import {hasClass, tags, textContent} from '../../shared/html';
 import {catalogKey, catalogUrl, chapterKey, chapterUrl} from './definition';
 import {checkedHtml, coverUrl, imageUrl, location, one, readerWork, region, regions, sameChapter, text} from './html';
-import {search} from './search';
+import {search, searchUrl} from './search';
 
 export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
   const loc = location(url);
@@ -40,7 +40,10 @@ export function parseCatalog(html: string, url: string): SourceCatalogSnapshot {
 export function parsePages(html: string, url: string): SourceSnapshot {
   const loc = location(url);
   if (!loc.chapter) throw Error('Read Comics Online 章节地址无效。');
-  const safe = region(checkedHtml(html, loc), 'main', () => true), work = readerWork(safe, loc);
+  const safe = region(checkedHtml(html, loc), 'main', () => true);
+  if (regions(safe, 'h1', () => true).some(heading => textContent(heading.body) === 'No pages uploaded yet'))
+    throw Error('Read Comics Online 此章节尚未上传图片，请稍后回源检查。');
+  const work = readerWork(safe, loc);
   const pager = region(safe, 'select', a => a.id === 'page-list'), slots = regions(pager, 'option', () => true);
   const strip = region(safe, 'div', a => a.id === 'reader-all'), images = tags(strip, 'img');
   if (!slots.length || slots.length > 1500 || slots.length !== tags(pager, 'option').length || images.length !== slots.length)
@@ -59,6 +62,7 @@ export function parsePages(html: string, url: string): SourceSnapshot {
 }
 export const network = {
   pageTransport: ['catalog', 'pages'], search,
+  searchPage: request => searchUrl(request).url,
   async catalog(url, context) {
     const loc = location(url);
     if (loc.chapter) throw Error('请使用 Read Comics Online 作品地址读取目录。');

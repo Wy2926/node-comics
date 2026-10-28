@@ -1,10 +1,11 @@
 import type { SourceDefinition, SourceSite, SourceSiteAccessTag, SourceSiteContentTag, SourceSitePricing } from '../contracts/definition';
 import { definitions } from './definitions';
 
-/** Each adapter owns zero or more directory entries; the UI has no site-specific branches. */
+/** Public discovery only: importable, explicitly non-adult entries; no UI-specific site rules. */
 export function listSupportedSites(registry: readonly SourceDefinition[] = definitions) {
   return sortSupportedSites(registry.filter(adapter => adapter.capabilities.importable).flatMap(adapter =>
-    (adapter.sites ?? []).map(site => ({ ...site, adapterId: adapter.id, key: `${adapter.id}:${site.id}` })),
+    (adapter.sites ?? []).filter(site => site.isAdult === false)
+      .map(site => ({ ...site, adapterId: adapter.id, key: `${adapter.id}:${site.id}` })),
   ));
 }
 

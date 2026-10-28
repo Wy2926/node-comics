@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createSourceService, pollSourceDiscovery, sameSourcePage, sourceFor, sourceInstallation, sourcePageIdentity, validateSourceCatalog, type SourceCatalogSnapshot, type SourceDefinition, type SourceSnapshot, } from '../src/sources';
+  createSourceService, listSearchSites, pollSourceDiscovery, sameSourcePage, sourceFor, sourceInstallation, sourcePageIdentity, validateSourceCatalog, type SourceCatalogSnapshot, type SourceDefinition, type SourceSnapshot, } from '../src/sources';
 import { validateCatalog } from '../src/sources/core/catalog';
 import { SourceNavigation } from '../src/sources/core/navigation';
 import { validatePages } from '../src/sources/core/pages';
@@ -53,6 +53,16 @@ const testCatalog: SourceCatalogSnapshot = {
   ],
 };
 describe('source composition and identity', () => {
+  it('only exposes non-adult search sites while retaining adult link identity and reading capabilities', () => {
+    const expected = definitions.filter(definition => definition.capabilities.importable && definition.capabilities.catalog)
+      .flatMap(definition => (definition.sites ?? []).filter(site => site.search && site.isAdult === false)
+        .map(site => `${definition.id}:${site.id}`));
+    expect(listSearchSites().map(site => site.key).sort()).toEqual(expected.sort());
+    const {definition, location} = sourceFor('https://nhentai.com/en/comic/fixture/reader');
+    expect(definition.sites!.every(site => site.isAdult)).toBe(true);
+    expect(definition.capabilities).toMatchObject({importable: true, pages: true, catalog: true});
+    expect(location.kind).toBe('reader');
+  });
   it('aligns optional search implementations and importable site capabilities', () => {
     for (const definition of definitions) {
       const searchable = (definition.sites ?? []).filter(site => site.search);

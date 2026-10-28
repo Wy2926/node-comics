@@ -21,13 +21,13 @@ describe('Hachiraw', () => {
   it.each(['http://hachiraw.net', 'https://hachiraw.net.evil.test', 'https://hachiraw.net:444', 'https://user:pass@hachiraw.net', 'ftp://hachiraw.net'])('rejects forged origin %s', host => {
     expect(definition.identify(new URL(host + '/manga/sample'))).toBeNull();
   });
-  it.each(['chapter-92-fix', 'chapter-3-2', 'chapter-92-fix2'])('keeps the complete chapter identifier %s', chapter => {
+  it.each(['chapter-92-fix', 'chapter-3-2', 'chapter-92-fix2', '250-raw'])('keeps the complete chapter identifier %s', chapter => {
     const slug = 'tensei-shitara-slime-datta-ken', catalog = origin + '/manga/' + slug;
     expect(definition.identify(new URL(catalog))).toMatchObject({kind: 'catalog'});
     expect(definition.identify(new URL(catalog + '/' + chapter))).toMatchObject({kind: 'reader',
       pageKey: chapterKey({slug, chapter}), catalog: {key: catalogKey(slug), url: catalog}});
   });
-  it.each(['chapter-fix', 'chapter-92-', 'chapter-92--fix', 'chapter-92-fix/extra', 'chapter-92%2ffix', 'chapter-92%252ffix', 'chapter-92-fix?token=x', 'chapter-92-fix#x'])('rejects malformed chapter identifiers: %s', chapter => {
+  it.each(['chapter-fix', 'chapter-92-', 'chapter-92--fix', 'chapter-92-fix/extra', 'chapter-92%2ffix', 'chapter-92%252ffix', 'chapter-92-fix?token=x', 'chapter-92-fix#x', '250', '250-other', 'raw', '250-raw/extra'])('rejects malformed chapter identifiers: %s', chapter => {
     expect(definition.identify(new URL(url + '/' + chapter))?.kind).toBe('other');
   });
   it.each(['/manga/work%2fother', '/manga/work%252fother', '/manga/%FF', '/manga/work%5cother', '/manga/work?token=x', '/manga/work#x', '/manga/work/chapter-x', '/list-manga'])('does not import unsupported URL %s', path => {
@@ -54,6 +54,19 @@ describe('Hachiraw', () => {
     const request = vi.fn().mockResolvedValueOnce(html).mockResolvedValueOnce(body);
     await network.catalog(catalog, {request}); await network.pages(corrected, {request});
     expect(request.mock.calls).toEqual([[catalog], [corrected]]);
+  });
+  it('imports a catalog containing a legacy raw release without merging or rewriting its chapter URL', () => {
+    const catalog = origin + '/manga/jujutsu-kaisen', raw = catalog + '/250-raw';
+    const html = catalogHtml().replace(chapter('2-5') + chapter('1', true),
+      chapter('269') + chapter('250-raw').replace('/chapter-250-raw', '/250-raw') + chapter('250'))
+      .replaceAll(work, 'jujutsu-kaisen');
+    const result = validateCatalog(parseCatalog(html, catalog), [definition]);
+    expect(result.entries.map(entry => entry.remoteId)).toEqual(['chapter-250', '250-raw', 'chapter-269']);
+    expect(result.entries[1].url).toBe(raw);
+    expect(new Set(result.entries.map(entry => entry.id)).size).toBe(3);
+    const body = readerHtml().replaceAll(work, 'jujutsu-kaisen').replaceAll('/chapter-1', '/250-raw');
+    expect(validatePages(parsePages(body, raw), definition.identify(new URL(raw))!)).toMatchObject({knownTotal: 2});
+    expect(() => parsePages(body, catalog + '/chapter-250')).toThrow('当前章节归属错误');
   });
   it.each(['duplicate', 'foreign', 'cover', 'truncated', 'empty', 'pagination'])('rejects %s catalog', kind => {
     let html = catalogHtml();
@@ -110,6 +123,15 @@ describe('Hachiraw', () => {
     expect((await network.search(query, {request})).items[0]).toMatchObject({title: 'Sample & Book 0'});
     expect(request).toHaveBeenCalledExactlyOnceWith(origin + '/list-manga?search=sample');
     expect(searchUrl({...query, query: 'a & b', cursor: 'page:2'})).toBe(origin + '/list-manga/2?search=a+%26+b');
+  });
+  it('accepts native query-less first-page navigation without weakening forward cursor validation', () => {
+    const input = {siteId: 'hachiraw', query: 'sample', cursor: 'page:2'};
+    const html = searchHtml(45, 2).replace('<ul class="pagination">', '<ul class="pagination"><li><a href="/list-manga/" data-ci-pagination-page="1" rel="prev">←</a></li><li><a href="/list-manga/" data-ci-pagination-page="1" rel="start">1</a></li>');
+    expect(parseSearch(html, input)).toMatchObject({nextCursor: 'page:3'});
+    expect(parseSearch(html, input).items).toHaveLength(20);
+    expect(() => parseSearch(html.replace('search=sample', 'search=other'), input)).toThrow();
+    expect(() => parseSearch(html.replace('/list-manga/3?search=sample', '/list-manga/3'), input)).toThrow();
+    expect(() => parseSearch(html.replace('href="/list-manga/"', 'href="https://evil.test/list-manga/"'), input)).toThrow();
   });
   it.each(['count', 'owner', 'cover', 'cursor', 'query', 'verification'])('rejects invalid %s search', kind => {
     const request = {siteId: 'hachiraw', query: 'sample', cursor: undefined as string | undefined};

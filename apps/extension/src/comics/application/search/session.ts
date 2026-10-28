@@ -24,12 +24,17 @@ function interleaveResults(results:readonly SearchCandidate[]):SearchCandidate[]
 }
 
 function siteFailure(error:unknown,now:number):SearchFailure {
-  const detail=error as {code?:string;retryAfter?:number;retryAfterSeconds?:number;status?:number};
+  const detail=error as {code?:string;retryAfter?:number;retryAfterSeconds?:number;status?:number;sourceUrl?:string};
+  let sourceUrl:string|undefined;
+  try {const url=new URL(detail?.sourceUrl??'');if(['https:','http:'].includes(url.protocol)&&!url.username&&!url.password)sourceUrl=url.href;}catch{}
   const seconds=detail?.retryAfter??detail?.retryAfterSeconds;
   const retryAt=typeof seconds==='number'&&seconds>0?now+seconds*1000:undefined;
   if(detail?.code==='SOURCE_SEARCH_PERMISSION_REQUIRED')return {kind:'permission',message:msg('网站访问权限已被浏览器关闭，请在扩展设置中允许访问所有网站后重试。')};
   if(detail?.code==='SOURCE_SEARCH_RATE_LIMITED'||detail?.status===429)return {kind:'rate-limit',message:msg('此网站暂时限制请求，请稍后重试。'),retryAt};
-  if(detail?.code==='SOURCE_SEARCH_VERIFICATION_REQUIRED')return {kind:'verification',message:msg('请打开来源网站完成登录或验证，然后重试。')};
+  if(detail?.code==='SOURCE_SEARCH_VERIFICATION_REQUIRED')return {kind:'verification',message:msg('请在同一浏览器打开来源并完成验证，保持网页打开后重试。'),sourceUrl};
+  if(detail?.code==='SOURCE_SEARCH_LOGIN_REQUIRED')return {kind:'login',message:msg('来源要求登录，请打开来源登录后重试。'),sourceUrl};
+  if(detail?.code==='SOURCE_SEARCH_FORBIDDEN')return {kind:'unavailable',message:msg('来源拒绝了搜索请求（HTTP 403），不一定是登录或验证问题。'),sourceUrl};
+  if(detail?.code==='SOURCE_SEARCH_INVALID')return {kind:'invalid',message:msg('来源返回的搜索内容无效或结构已变化，请打开来源核实。'),sourceUrl};
   if(detail?.code==='SOURCE_SEARCH_TIMEOUT')return {kind:'timeout',message:msg('此网站搜索超时，可以单独重试。')};
   if(detail?.code==='SOURCE_SEARCH_CURSOR_EXPIRED')return {kind:'invalid',message:msg('更多结果已过期，请重新查找。')};
   return {kind:'unavailable',message:msg('此网站暂时无法搜索，可以单独重试。'),retryAt};

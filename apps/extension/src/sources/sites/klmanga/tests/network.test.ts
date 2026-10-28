@@ -17,15 +17,15 @@ describe('KLManga source contract', () => {
     expect(definition.inlineRecognition).toBe('generic'); expect(definition.embeddedEntry).toBe('floating');
     expect(definition.catalogSync).toEqual({intervalMinutes: 720});
     expect(definition.sites![0].primaryLanguages).toEqual(['ja']);
-    expect(definition.installation.optionalContentMatches).toEqual([origin + '/*', 'https://klmanga.zone/*']);
+    expect(definition.installation.optionalContentMatches).toEqual([origin + '/*', 'https://klmanga.toys/*', 'https://klmanga.zone/*']);
     expect(definition.sites![0].search).toBe(true);
   });
-  it('lists only the new domain and preserves identities for legacy links', async () => {
-    expect(origin).toBe('https://klmanga.toys');
+  it.each(['https://klmanga.toys', 'https://klmanga.zone'])('preserves identities and requests the new host directly for %s links', async legacyOrigin => {
+    expect(origin).toBe('https://klmanga.works');
     expect(definition.sites).toHaveLength(1);
     expect(definition.sites![0]).toMatchObject({id: 'klmanga', url: origin + '/'});
-    const legacyUrl = url.replace(origin, 'https://klmanga.zone');
-    const legacyReader = reader.replace(origin, 'https://klmanga.zone');
+    const legacyUrl = url.replace(origin, legacyOrigin);
+    const legacyReader = reader.replace(origin, legacyOrigin);
     expect(definition.identify(new URL(legacyUrl))?.catalog).toEqual({key: catalogKey(slug), url});
     expect(definition.identify(new URL(legacyReader))?.pageKey).toBe(definition.identify(new URL(reader))?.pageKey);
     const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(readerHtml()).mockResolvedValueOnce(batch());

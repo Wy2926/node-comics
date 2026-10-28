@@ -155,7 +155,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
           </div></div>
           <div className="nc-search-detail-actions">
             {(siteRetry||siteBusy||filteredSite.nextCursor)&&<button className="button primary small nc-search-site-action" disabled={siteBusy||siteWait>0} onClick={()=>siteRetry?session.retrySite(filteredSite.site.key):session.loadMore(filteredSite.site.key)}>{siteBusy?<span className="spinner"/>:<Icon name={siteRetry?'refresh':'plus'} size={16}/>}<span>{siteBusy?stateLabel(filteredSite):siteWait?msg('{0} 秒后重试',{'0':siteWait}):siteRetry?msg('重试此网站'):msg('加载更多')}</span></button>}
-            <a className="button secondary small" href={filteredSite.site.url} target="_blank" rel="noopener noreferrer">{msg('打开来源')}<Icon name="external" size={15}/></a>
+            <a className="button secondary small" href={filteredSite.error?.sourceUrl??filteredSite.site.url} target="_blank" rel="noopener noreferrer">{msg('打开来源')}<Icon name="external" size={15}/></a>
           </div>
         </section>}
         <div className="nc-search-result-list">{results.map(hit=>{const sourceKey=comicSearchSourceKey(hit.sourceId,hit.catalogId),site=snapshot.sites.find(state=>state.site.adapterId===hit.sourceId&&state.site.id===hit.siteId);return <SearchResultCard key={hit.key} hit={hit} site={site?.site} cache={coverCache.current} current={!!currentIdentity&&sourceKey===comicSearchSourceKey(currentIdentity.sourceId,currentIdentity.catalogId)} existing={existingSourceKeys?.has(sourceKey)} importing={importing} error={importErrors[hit.key]} onImport={()=>importHit(hit)}/>;})}</div>

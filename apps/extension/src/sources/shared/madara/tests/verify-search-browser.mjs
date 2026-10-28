@@ -147,9 +147,10 @@ try {
   // Read-only metadata and repository inspection. The copied production UI submits every search.
   await writeFile(probe, `import {catalog} from '${source}/comics/repositories/index.ts';
 import {definitions} from '${source}/sources/registry/definitions.ts';
+import {listSearchSites} from '${source}/sources/runtime/search.ts';
 import {resolveSource} from '${source}/sources/core/resolve.ts';
 export {API_ORIGIN as serviceOrigin} from '${source}/service.ts';
-export function sites(){return definitions.flatMap(definition=>(definition.sites??[]).filter(site=>site.search).map(site=>({id:site.id,key:definition.id+':'+site.id,adapterId:definition.id,name:site.name,url:site.url})));}
+export function sites(){return listSearchSites();}
 export async function counts(){return {comics:(await catalog.list('comics',{limit:1})).length,catalogs:(await catalog.list('catalogs',{limit:1})).length,entries:(await catalog.list('entries',{limit:1})).length};}
 export function owners(urls:string[]){return urls.map(url=>{const {definition,location}=resolveSource(url,definitions);return {adapter:definition.id,kind:location.kind,catalogId:location.catalog?.key};});}
 export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {definition,location}=resolveSource(url,definitions);return definition.id!=='generic'&&['catalog','reader'].includes(location.kind)?[{adapter:definition.id,kind:location.kind,url:location.url}]:[];}catch{return [];}});}
@@ -214,7 +215,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
     return {serviceOrigin:probe.serviceOrigin,sites:probe.sites()};
   }, manifest.version);
   serviceOrigin = setup.serviceOrigin;
-  const matches = setup.sites.filter(site => site.id === siteId); assert.equal(matches.length, 1, 'siteId must identify exactly one registered searchable site');
+  const matches = setup.sites.filter(site => site.id === siteId); assert.equal(matches.length, 1, 'siteId must identify exactly one eligible non-adult search site');
   target = matches[0]; origin = new URL(target.url).origin; knownSourceOrigins = setup.sites.map(site => new URL(site.url).origin);
   searchableSiteCount = setup.sites.length;
   assert.notEqual(origin, serviceOrigin);

@@ -20,7 +20,7 @@ const definition = (): SourceDefinition => ({id: 'fixture', name: 'Fixture',
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: false},
   installation: {autoContentMatches: []},
   sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'unknown', isRaw: false,
-    search: true}],
+    search: true, isAdult: false}],
   identify(url) {
     if (!['fixture.test', 'mirror.test'].includes(url.hostname)) return null;
     const id = /^\/book\/([a-z]+)$/.exec(url.pathname)?.[1];
@@ -105,6 +105,29 @@ describe('name-only search and candidate authority', () => {
 });
 
 describe('single-site search runtime', () => {
+  it.each([true, undefined])('blocks adult or unclassified sites (%s) before any search transport', async isAdult => {
+    Object.assign(site(), {isAdult});
+    const searchPage = vi.fn(() => 'https://fixture.test/search');
+    fixture.networks.fixture.searchPage = searchPage;
+    expect(listSearchSites()).toEqual([]);
+    await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_UNSUPPORTED'});
+    expect(fixture.networks.fixture.search).not.toHaveBeenCalled();
+    expect(searchPage).not.toHaveBeenCalled();
+    expect(chrome.permissions.contains).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('keeps non-adult entries of a mixed adapter searchable and rejects old adult cursors and covers', async () => {
+    fixture.networks.fixture.search = vi.fn(async () => ({items: [hit({cover: {url: 'https://fixture.test/cover.jpg'}})], nextCursor: 'next'}));
+    const first = await searchSource('fixture', query(), {sessionId: 'session'});
+    fixture.definitions[0].sites = [site(), {...site(), id: 'general'}];
+    site().isAdult = true;
+    expect(listSearchSites().map(site => site.id)).toEqual(['general']);
+    await expect(searchSource('fixture', {...query(), cursor: first.nextCursor}, {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_UNSUPPORTED'});
+    await expect(readSearchCover(first.items[0])).rejects.toMatchObject({code: 'SOURCE_SEARCH_UNSUPPORTED'});
+    expect(fixture.networks.fixture.search).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await searchSource('fixture', {...query(), siteId: 'general'}, {sessionId: 'session'})).items).toHaveLength(1);
+  });
   it('binds cursors to the session, site and query without exposing the adapter cursor', async () => {
     const operation = vi.fn<NonNullable<SourceNetwork['search']>>(async () => ({items: [hit()], nextCursor: 'adapter-page-2'}));
     fixture.networks.fixture.search = operation;
@@ -153,8 +176,8 @@ describe('single-site search runtime', () => {
     expect(fetch).toHaveBeenCalledWith('https://fixture.test/api', expect.objectContaining({credentials: 'include'}));
   });
   it.each([
-    [429, 'SOURCE_SEARCH_RATE_LIMITED'], [401, 'SOURCE_SEARCH_VERIFICATION_REQUIRED'],
-    [403, 'SOURCE_SEARCH_VERIFICATION_REQUIRED'], [503, 'SOURCE_SEARCH_HTTP_ERROR'],
+    [429, 'SOURCE_SEARCH_RATE_LIMITED'], [401, 'SOURCE_SEARCH_LOGIN_REQUIRED'],
+    [403, 'SOURCE_SEARCH_FORBIDDEN'], [503, 'SOURCE_SEARCH_HTTP_ERROR'],
   ])('maps HTTP %i to %s at the search boundary and keeps retry-after', async (status, code) => {
     vi.mocked(fetch).mockResolvedValue(new Response('', {status, headers: {'retry-after': '23'}}));
     fixture.networks.fixture.search = async (_request, context) => {await context.request('https://fixture.test/api'); return {items: []};};
@@ -166,6 +189,26 @@ describe('single-site search runtime', () => {
     await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_HTTP_ERROR'});
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new Uint8Array(8 * 1024 * 1024 + 1)));
     await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_INVALID'});
+  });
+  it('distinguishes parser failures from transport failures, without exposing source bodies', async () => {
+    fixture.networks.fixture.search = async (_request, context) => {JSON.parse(await context.request('https://fixture.test/search')); return {items: []};};
+    for (const body of ['<html>Redirected to another site</html>', 'Duplicate entry query for key source_table']) {
+      vi.mocked(fetch).mockResolvedValueOnce(new Response(body));
+      await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_INVALID', message: 'SOURCE_SEARCH_INVALID'});
+    }
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('fetch failed'));
+    await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_HTTP_ERROR'});
+  });
+  it('uses the declared API search origin for verification, not the catalog homepage, and never creates a tab', async () => {
+    const sourceUrl = 'https://api.fixture.test/search?q=Example';
+    fixture.networks.fixture.searchPage = () => sourceUrl;
+    fixture.networks.fixture.search = async (_request, context) => {await context.request(sourceUrl); return {items: []};};
+    const queryTabs = vi.fn(async () => []), create = vi.fn();
+    Object.assign(chrome, {tabs: {query: queryTabs, create}});
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('challenge', {status: 403, headers: {'cf-mitigated': 'challenge'}}));
+    await expect(searchSource('fixture', query(), {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_VERIFICATION_REQUIRED', sourceUrl});
+    expect(queryTabs).toHaveBeenCalledExactlyOnceWith({url: 'https://api.fixture.test/*'});
+    expect(fetch).toHaveBeenCalledOnce(); expect(create).not.toHaveBeenCalled();
   });
   it('enforces the deadline even when an adapter ignores its signal', async () => {
     vi.useFakeTimers();

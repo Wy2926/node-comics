@@ -57,7 +57,7 @@ try {
   await detail.screenshot({path: path.join(out, 'detail-entry.png')});
   const detailOpened = browser.waitForEvent('page'); await detailButton.click(); reader = await detailOpened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
   const detailImport = await reader.evaluate(async url => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const matches = (await catalog.list('comics')).filter(comic => comic.sourceUrl === url);
@@ -68,7 +68,7 @@ try {
   assert.equal(detailImport.title, 'Nano Machine'); assert(detailImport.entries > 0);
   await reader.waitForFunction(() => [...document.querySelectorAll('img.nc-page-image')].some(img => img.complete && img.naturalWidth > 0));
   await reader.screenshot({path: path.join(out, 'detail-import-reader.png')});
-  await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '3');
+  await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), '3');
   await reader.waitForFunction(async entryId => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
     const entry = await catalog.get('entries', entryId), pages = await catalog.listPages(entry.contentId), position = await catalog.get('positions', entryId);
@@ -77,8 +77,8 @@ try {
   await reader.close();
   const detailReopened = browser.waitForEvent('page'); await detailButton.click(); reader = await detailReopened;
   await reader.waitForURL('**/reader.html?catalog=*');
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3');
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3');
   assert.equal(await reader.evaluate(async url => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).filter(comic => comic.sourceUrl === url).length, detailUrl), 1);
   assert.equal(await detailButton.count(), 1);
   await reader.close(); await detail.close();
@@ -95,7 +95,7 @@ try {
     await button.waitFor(); await site.screenshot({path: path.join(out, `entry-${samples.length}.png`)});
     const opened = browser.waitForEvent('page'); await button.click(); reader = await opened;
     await reader.waitForURL('**/reader.html?catalog=*');
-    await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 90000});
+    await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 90000});
     const details = await reader.evaluate(async chapter => {
       const {catalog, sourceLocation} = await import(chrome.runtime.getURL('verify-source.js'));
       const location = sourceLocation(chapter), comic = (await catalog.list('comics')).find(c => c.sourceUrl === location.catalog.url);
@@ -106,16 +106,16 @@ try {
     assert(details.chapters > 0 && details.total > 0);
     samples.push(details);
     for (let index = 0; index < details.total; index++) {
-      await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(index + 1));
+      await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(index + 1));
       await reader.waitForFunction(({id, index}) => {
         const image = document.querySelector(`[data-copy-id="${id}"] [data-page-index="${index}"] img.nc-page-image`);
         return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
       }, {id: details.entryId, index}, {timeout: 60000});
     }
     const restorePage = Math.min(10, details.total), selector = `[data-copy-id="${details.entryId}"] [data-page-index="${restorePage - 1}"] img.nc-page-image`;
-    await reader.getByLabel('阅读进度', {exact: true}).evaluate(input => input.blur());
+    await reader.getByRole('slider', {name: '阅读进度', exact: true}).evaluate(input => input.blur());
     await reader.keyboard.press('Home');
-    await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), String(restorePage));
+    await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), String(restorePage));
     await reader.waitForFunction(selector => document.querySelector(selector)?.naturalWidth > 0, selector);
     const position = () => reader.evaluate(async entryId => (await import(chrome.runtime.getURL('verify-source.js'))).catalog.get('positions', entryId), details.entryId);
     await reader.waitForFunction(async ({entryId, index}) => {
@@ -127,7 +127,7 @@ try {
     const route = reader.url(); await reader.close(); reader = await browser.newPage(); await reader.goto(route);
     await reader.getByRole('button', {name: '打开漫画 ' + details.title, exact: true}).click();
     await reader.waitForFunction(selector => document.querySelector(selector)?.naturalWidth > 0, selector);
-    assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
+    assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(restorePage));
     await reader.screenshot({path: path.join(out, `restored-${samples.length}.png`)});
     await site.close();
     const before = await position(), pageCount = browser.pages().length;
@@ -153,8 +153,8 @@ try {
     assert.deepEqual(await position(), before);
     await setup.getByLabel('通过链接添加漫画').fill(details.catalogUrl);
     await setup.getByRole('button', {name: '添加到书架', exact: true}).click();
-    await setup.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 60000});
-    assert.equal(await setup.getByLabel('阅读进度', {exact: true}).inputValue(), String(restorePage));
+    await setup.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 60000});
+    assert.equal(await setup.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), String(restorePage));
     const duplicates = await setup.evaluate(async url => (await (await import(chrome.runtime.getURL('verify-source.js'))).catalog.list('comics')).filter(c => c.sourceUrl === url).length, details.catalogUrl);
     assert.equal(duplicates, 1);
     checks.push(`${details.title}: live import, ${details.total} originals decode, page ${restorePage} restores, repeat import/refresh and simulated failure preserve progress`);

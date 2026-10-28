@@ -9,7 +9,7 @@ export interface PageRequestInput {
   cancelEvent: string;
 }
 
-interface PageDocument {
+export interface PageDocument {
   url: string;
   signal: AbortSignal;
   request<I extends PageRequestInput, R>(
@@ -24,6 +24,8 @@ interface PageTarget {
   authorize: (signal: AbortSignal, url?: string) => Promise<unknown>;
   exact?: true;
   followRedirects?: true;
+  /** Pin a user-owned search tab. If it disappears, fail instead of opening another. */
+  existingTabId?: number;
 }
 
 function abortable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -56,18 +58,23 @@ export async function withPageDocument<T>(
   signal: AbortSignal,
   read: (page: PageDocument) => Promise<T>,
 ): Promise<T> {
-  return navigator.locks.request('nc-source-page-network', { signal }, async () => {
+  // Requests on different sources must not consume one another's search deadline.
+  return navigator.locks.request('nc-source-page-network:' + new URL(target.url).origin, { signal }, async () => {
     signal.throwIfAborted();
     // Permissions can be revoked while another source session holds the lock.
     await target.authorize(signal);
     signal.throwIfAborted();
     const { url, matches } = target;
     const origin = new URL(url).origin;
-    const existing = (await chrome.tabs.query({ url: origin + '/*' })).find(tab =>
+    const candidates = target.existingTabId === undefined ? await chrome.tabs.query({ url: origin + '/*' })
+      : [await chrome.tabs.get(target.existingTabId)];
+    const existing = candidates.find(tab =>
       tab.id !== undefined && tab.status === 'complete' && matches(tab.url) &&
       (!tab.pendingUrl || matches(tab.pendingUrl)),
     );
     signal.throwIfAborted();
+    if (target.existingTabId !== undefined && !existing)
+      throw new SourceHttpError('http', msg('来源页面已变化，请重新发现。'));
     // Observe native navigation redirects, not arbitrary user navigation. Register
     // before creating the tab so even a cached redirect belongs to this chain.
     let navigationTabId: number | undefined;
