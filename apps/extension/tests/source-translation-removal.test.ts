@@ -100,7 +100,7 @@ it('reads large entry and image history using bounded indexes and keeps other en
   const storeReads=vi.spyOn(IDBObjectStore.prototype,'getAll');
   await m.blockSourceTranslationEntry('removed');const refs=await m.inspectSourceTranslationEntry('removed');expect(refs).toHaveLength(410);
   await m.removeSourceTranslationEntry('removed');
-  expect(queries.length).toBeGreaterThan(10);expect(queries.every(value=>['entryId','scopeImageJob'].includes(value.name)&&value.limit===100)).toBe(true);
+  expect(queries.length).toBeGreaterThan(10);expect(queries.every(value=>['entryId','scopeImageJob','entry'].includes(value.name)&&value.limit===100)).toBe(true);
   expect(storeReads).not.toHaveBeenCalled();expect(await m.readDirectOperation('unrelated')).toBeDefined();expect(await m.readOperation('unrelated')).toBeDefined();
 });
 

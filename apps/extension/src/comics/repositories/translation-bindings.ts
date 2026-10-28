@@ -22,6 +22,13 @@ export async function readImageTranslationBindings(imageSha256:string):Promise<T
     tx.oncomplete=()=>resolve(rows.result);tx.onabort=tx.onerror=()=>reject(tx.error);
   });
 }
+/** Exact channel/image lookup, independent of source catalogs and reader hydration. */
+export async function readImageTranslationBinding(scope:string,imageSha256:string):Promise<TranslationBinding|undefined>{
+  const database=await openTranslationBindings();return new Promise((resolve,reject)=>{
+    const tx=database.transaction('translationBindings'),row=tx.objectStore('translationBindings').get(JSON.stringify([scope,imageSha256]));
+    tx.oncomplete=()=>resolve(row.result);tx.onabort=tx.onerror=()=>reject(tx.error);
+  });
+}
 /** Call only after all referenced result bytes in this page have been reclaimed. */
 export async function removeImageTranslationBindings(imageSha256:string,ids:readonly string[]):Promise<void>{
   const database=await openTranslationBindings();await new Promise<void>((resolve,reject)=>{

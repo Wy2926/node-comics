@@ -1,6 +1,12 @@
-.nc-font-picker{display:grid;gap:10px;min-width:0;margin-top:16px}
-.nc-font-picker .field{margin:0}
+.nc-font-picker{display:grid;gap:var(--settings-description-gap);min-width:0;margin-top:var(--settings-field-gap)}
 .nc-font-picker .nc-select{width:100%}
-.nc-font-picker>.nc-muted{margin:0;font-size:var(--text-small);line-height:1.6}
 .nc-font-picker>[role=status]{margin:0;color:var(--muted);font-size:var(--text-small);line-height:1.6}
 .nc-font-picker>[role=alert]{margin:0;color:var(--warning);font-size:var(--text-small)}
+.nc-font-downloads {gap:6px;}
+.nc-font-download-item {min-width:0;}
+.nc-font-download-item .nc-picker-choice:disabled {opacity:1;}
+.nc-font-download-action {display:flex;align-items:center;gap:5px;flex:none;margin-inline-end:8px;padding:8px;border:0;border-radius:var(--comic-control-radius);font:inherit;font-size:var(--text-caption);color:var(--accent);background:var(--accent-soft);cursor:pointer;}
+.nc-font-download-action:disabled {color:var(--muted);background:transparent;cursor:default;}
+.nc-font-download-item progress {display:block;width:calc(100% - 18px);height:4px;margin:0 9px 8px;}
+.nc-font-download-item>p {font-size:var(--text-caption);margin:6px 9px 10px;}
+.nc-font-picker [data-ready=true] {color:var(--success);}

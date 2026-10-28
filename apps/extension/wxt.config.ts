@@ -1,3 +1,4 @@
+import {shinobuAssets} from './shinobu-assets';
 import { defineConfig } from 'wxt';
 import { fileURLToPath } from 'node:url';
 import { importAssets } from './import-assets';
@@ -12,10 +13,10 @@ export default defineConfig({
   zip: {
     // Preserve relative imports to shared image and model code in review sources.
     sourcesRoot: fileURLToPath(new URL('../../', import.meta.url)),
-    includeSources: ['apps/extension/{entrypoints,public,scripts,src}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'backend/shared/translation-fonts.{ts,json}', 'LICENSE'],
+    includeSources: ['apps/extension/{entrypoints,public,scripts,src,third_party}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'backend/shared/translation-fonts.{ts,json}', 'LICENSE'],
   },
   vite:()=>({
-    plugins:[importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()],
+    plugins:[shinobuAssets(),importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()],
     optimizeDeps:{exclude:['node-unrar-js','pdfjs-dist','@gullabs/flipbook-core']},
     // Reviewable extension code, including Vite-bundled workers.
     build:{minify:false},

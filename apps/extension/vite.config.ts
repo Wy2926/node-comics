@@ -1,3 +1,4 @@
+import {shinobuAssets} from './shinobu-assets';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import {importAssets} from './import-assets';
@@ -6,4 +7,4 @@ import {writeStoreLocales} from './store-locales';
 import {pdfjsCsp} from './pdfjs-csp';
 import {flipbookClip} from './flipbook-clip';
 writeStoreLocales();
-export default defineConfig({ plugins: [react(),importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()], optimizeDeps:{exclude:['node-unrar-js','pdfjs-dist','@gullabs/flipbook-core'],include:['@zip.js/zip.js/index-native.js']}, worker:{format:'es',plugins:()=>[unrarCsp()]}, build: { outDir: 'dist-web' } });
+export default defineConfig({ plugins: [react(),shinobuAssets(),importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()], optimizeDeps:{exclude:['node-unrar-js','pdfjs-dist','@gullabs/flipbook-core'],include:['@zip.js/zip.js/index-native.js']}, worker:{format:'es',plugins:()=>[unrarCsp()]}, build: { outDir: 'dist-web' } });

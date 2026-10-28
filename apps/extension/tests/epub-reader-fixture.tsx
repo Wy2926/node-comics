@@ -160,7 +160,7 @@ function Fixture() {
     <Scrollbars/>
     {mounted ? <EpubReader copy={copy} settings={settings} setSettings={setSettings} update={update} viewKey={localSample ? 'epub-local-' + localSample : 'epub-artwork-ui-fixture'}
       progressStatus={status} backLabel="关闭阅读器" backText="书架" onBack={() => setMounted(false)} onOpenShortcuts={() => setNotice('已打开快捷键入口')}
-      notify={setNotice} caps={channel.capabilities} channelLabel={channel.label} translationScope={channel.scope.key} onReadingWindow={onWindow}
+      notify={setNotice} caps={channel.capabilities} translationScope={channel.scope.key} onReadingWindow={onWindow}
       translationState={translation.stateFor} onRetry={(page, mode) => translation.retry(copy.id, page, mode)} onLogin={() => {}} onUpgrade={() => {}}/>
       : <button className="button primary" onClick={() => {void loadEntry(copy.id, channel.scope).then(next => {setCopy(next); setMounted(true);});}}>重开阅读器</button>}
     <details style={{position: 'fixed', bottom: 8, left: 104, zIndex: 90, background: 'var(--surface)', padding: 8}}>

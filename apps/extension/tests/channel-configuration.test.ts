@@ -2,12 +2,13 @@ import {IDBFactory,IDBKeyRange} from 'fake-indexeddb';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ChannelConnectionInput,ChannelConnectionResult} from '../src/translation/channels/contracts';
 
-const protocol=vi.hoisted(()=>({connect:vi.fn(),open:vi.fn()}));
+const protocol=vi.hoisted(()=>({connect:vi.fn(),open:vi.fn(),builtinEnabled:false}));
 vi.mock('../src/translation/channels/registry',()=>{
   const local={id:'fixture',label:'Fixture service',configurable:true,fields:[{key:'password',type:'password',required:true}],connect:protocol.connect,open:protocol.open,
     permissionOrigins:(input:ChannelConnectionInput)=>[new URL(input.settings.baseUrl).origin+'/*']};
   const official={id:'nodelane',label:'NodeLane',configurable:false,fields:[],open:vi.fn()};
-  return {channelDefinitions:()=>[official,local],channelDefinition:(id:string)=>id==='nodelane'?official:local};
+  const builtin={id:'builtin-local',label:'Built-in local',configurable:false,fields:[],defaultSettings:{backend:'auto'},open:protocol.open};
+  return {channelDefinitions:()=>[official,...(protocol.builtinEnabled?[builtin]:[]),local],channelDefinition:(id:string)=>id==='nodelane'?official:id===builtin.id?builtin:local};
 });
 
 let metadata:Record<string,unknown>;
@@ -29,7 +30,7 @@ function result(value:ChannelConnectionInput):ChannelConnectionResult{
 function deferred<T>(){let resolve!:(value:T)=>void;const promise=new Promise<T>(done=>{resolve=done;});return {promise,resolve};}
 
 beforeEach(()=>{
-  vi.resetModules();protocol.connect.mockReset().mockImplementation(async(value:ChannelConnectionInput)=>result(value));protocol.open.mockReset();
+  vi.resetModules();protocol.connect.mockReset().mockImplementation(async(value:ChannelConnectionInput)=>result(value));protocol.open.mockReset();protocol.builtinEnabled=false;
   vi.stubGlobal('indexedDB',new IDBFactory());vi.stubGlobal('IDBKeyRange',IDBKeyRange);
   metadata={};changes=new Set();permission=vi.fn(async()=>true);installLocks(true);
   vi.stubGlobal('chrome',{runtime:{id:'test-extension'},permissions:{contains:permission,request:vi.fn(async()=>true)},storage:{local:{
@@ -44,6 +45,45 @@ beforeEach(()=>{
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('channel configuration and connection',()=>{
+  it('keeps built-ins permanent, defaults to NodeLane and preserves options across switches',async()=>{
+    protocol.builtinEnabled=true;
+    const {listChannels,availableChannelProtocols,connectChannel,removeChannel,selectChannel,openActiveChannel}=await import('../src/translation/channels');
+    const {readChannelCredentials}=await import('../src/translation/channels/configuration');
+    const initial=await listChannels();
+    expect(initial.activeId).toBe('nodelane');
+    expect(initial.profiles.map(profile=>profile.id)).toEqual(['nodelane','builtin-local']);
+    expect(availableChannelProtocols().filter(item=>item.configurable).map(item=>item.id)).toEqual(['fixture']);
+    await expect(connectChannel('builtin-local','Duplicate',input())).rejects.toThrow('无需配置');
+    await expect(connectChannel('fixture','Replacement',input(),'builtin-local')).rejects.toThrow('无需配置');
+    await expect(removeChannel('builtin-local')).rejects.toThrow('不能移除');
+    expect(metadata).toEqual({});expect(protocol.connect).not.toHaveBeenCalled();
+    await selectChannel('builtin-local');
+    const credentials=await readChannelCredentials('builtin-local');
+    expect(credentials).toMatchObject({profile:{id:'builtin-local',adapterId:'builtin-local',revision:1,settings:{backend:'auto'}},secrets:{}});
+    const current=()=>true;await openActiveChannel(current);
+    expect(protocol.open).toHaveBeenLastCalledWith(credentials.profile,{},current,undefined);
+    const {updateChannelSettings,readChannelSettings}=await import('../src/translation/channels/configuration');
+    await updateChannelSettings(value=>({...value,profiles:value.profiles.map(profile=>({...profile,revision:2,settings:{backend:'cpu'}})),fontPreferences:{'local-fonts:builtin-local':{'zh-Hans':'lxgw-wenkai'}}}));
+    await selectChannel('nodelane');await selectChannel('builtin-local');await selectChannel('builtin-local');
+    const stored=await readChannelSettings();
+    expect(stored.profiles).toEqual([{id:'builtin-local',adapterId:'builtin-local',name:'Built-in local',revision:2,settings:{backend:'cpu'}}]);
+    expect(stored.fontPreferences).toEqual({'local-fonts:builtin-local':{'zh-Hans':'lxgw-wenkai'}});
+    expect((await listChannels()).profiles).toHaveLength(2);
+  });
+  it('restores a built-in profile identity and protects its settings and credentials from removal or replacement',async()=>{
+    protocol.builtinEnabled=true;
+    const {listChannels,removeChannel,connectChannel}=await import('../src/translation/channels');
+    const {writeChannelSettings,writeChannelSecrets,readChannelCredentials}=await import('../src/translation/channels/configuration');
+    const profile={id:crypto.randomUUID(),adapterId:'builtin-local',name:'Saved name',revision:4,settings:{backend:'cpu'}};
+    await writeChannelSettings({activeId:profile.id,profiles:[profile]});
+    await writeChannelSecrets(profile.id,{token:'saved-local-token'},profile);
+    const before=structuredClone(metadata),listed=await listChannels();
+    expect(listed).toMatchObject({activeId:profile.id,profiles:[{id:'nodelane'},{...profile,name:'Built-in local'}]});
+    await expect(removeChannel(profile.id)).rejects.toThrow('不能移除');
+    await expect(connectChannel('fixture','Replacement',input(),profile.id)).rejects.toThrow('无需配置');
+    expect(protocol.connect).not.toHaveBeenCalled();expect(metadata).toEqual(before);
+    expect(await readChannelCredentials(profile.id)).toEqual({profile,secrets:{token:'saved-local-token'}});
+  });
   it.each([true,false])('keeps both concurrent additions with Web Locks=%s',async enabled=>{
     const locks=installLocks(enabled),{connectChannel,listChannels}=await import('../src/translation/channels');
     const {readChannelSecrets,channelSettingsKey}=await import('../src/translation/channels/configuration');

@@ -15,7 +15,7 @@ export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'de
   children?: ReactNode;
   /** Custom button content; option labels still drive selection and type-ahead. */
   trigger?: ReactNode;
-  placement?: 'auto' | 'left';
+  placement?: 'auto' | 'left' | 'end';
   menuWidth?: number;
 };
 type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode};

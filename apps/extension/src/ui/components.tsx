@@ -53,10 +53,11 @@ export function Stat({ label, value, suffix }: {
 }) {
   return <div className="stat-card"><span>{label}</span><b>{value}<small>{suffix}</small></b><Icon name="spark" size={32} /></div>;
 }
-export function SettingRow({ title, description, children }: {
-  title: string;
+export function SettingRow({ title, description, descriptionId, children }: {
+  title: ReactNode;
   description: string;
+  descriptionId?: string;
   children?: ReactNode;
 }) {
-  return <div className="setting-row"><div><b>{title}</b><p>{description}</p></div>{children}</div>;
+  return <div className="setting-row"><div><b>{title}</b><p id={descriptionId}>{description}</p></div>{children}</div>;
 }

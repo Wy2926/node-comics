@@ -2,6 +2,7 @@ import {useId, useLayoutEffect, useRef, useState, type KeyboardEvent} from 'reac
 import {getLocale, msg} from '../i18n/runtime';
 import {pricingUrl} from '../billing';
 import {Icon} from '../icons';
+import {SettingRow} from './components';
 import type {ModelSelection} from '../translation/channels/contracts';
 import {selectedModelAvailable, translationModelChoices} from '../../../../backend/shared/translation-models';
 import {menuPosition, visibleViewport} from './visual-viewport';
@@ -49,7 +50,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
       const viewport = visibleViewport(),
         rect = button.getBoundingClientRect();
       panel.style.width = `${Math.max(0, Math.min(rect.width, viewport.width - 16))}px`;
-      const bounds = menuPosition(rect, viewport, rect.width, Math.min(panel.scrollHeight + 4, 480));
+      const bounds = menuPosition(rect, viewport, rect.width, Math.min(panel.scrollHeight + 4, 480), 'end');
       for (const [key, value] of Object.entries(bounds))
         panel.style[key as 'left' | 'top' | 'width' | 'maxHeight'] = `${value}px`;
     };
@@ -110,12 +111,14 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
   }
   return (
     <div className="nc-model-picker">
-      <span id={id + '-label'}>{msg('翻译模型')}</span>
+      <SettingRow title={<span id={id + '-label'}>{msg('翻译模型')}</span>}
+        description={msg('更换模型仅影响新任务；已有译图需手动重新翻译。')} descriptionId={id+'-note'}>
       <button
         ref={trigger}
         type="button"
         className="nc-select nc-model-trigger"
         aria-label={msg('翻译模型')}
+        aria-describedby={id+'-note'}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
@@ -133,6 +136,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
         <small data-available={available}>{available ? msg('可用') : msg('不可用')}</small>
         <Icon name="chevron" size={16} className="nc-select-chevron" />
       </button>
+      </SettingRow>
       <div
         ref={menu}
         id={id}

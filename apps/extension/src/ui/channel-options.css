@@ -1,0 +1,68 @@
+.nc-channel-options {display:grid;gap:var(--settings-field-gap);min-width:0;margin-top:var(--settings-field-gap);}
+.nc-channel-options form,.nc-service-form,.nc-config-fields {display:grid;gap:var(--settings-field-gap);min-width:0;}
+.nc-config-row {display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,1.65fr);gap:var(--settings-field-gap);align-items:center;min-width:0;margin:0;}
+.nc-config-row>:is(span,label) {font-size:var(--settings-label-size);font-weight:550;line-height:1.5;overflow-wrap:anywhere;}
+.nc-config-row :is(input,button.nc-select) {width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:44px;font-size:var(--text-body);}
+.nc-config-help {font-size:var(--settings-description-size);line-height:1.6;margin:var(--settings-description-gap) 0 0;}
+.nc-config-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.nc-config-advanced {border-block:1px solid var(--line);padding:var(--settings-field-gap) 0;min-width:0;}
+.nc-config-advanced>summary {font-size:var(--settings-label-size);font-weight:550;line-height:1.5;cursor:pointer;}
+.nc-config-advanced>form,.nc-config-advanced>.nc-config-fields {margin-top:var(--settings-field-gap);}
+.nc-channel-services-panel {display:grid;gap:var(--settings-description-gap);min-width:0;}
+.nc-app .modal.nc-resources-dialog {width:720px;height:min(760px,calc(var(--nc-viewport-height,100dvh) - 32px));}
+.nc-resources-dialog>.nc-modal-body {display:flex;flex:1;flex-direction:column;overflow:hidden;padding-bottom:var(--settings-field-gap);}
+.nc-resources-dialog>.nc-modal-body>h2 {flex:none;margin:0 0 var(--settings-field-gap);font-size:var(--text-title);}
+.nc-resources-overview {display:flex;flex:none;justify-content:space-between;align-items:center;gap:var(--settings-field-gap);padding:var(--settings-field-gap);border:var(--comic-border);border-radius:var(--comic-card-radius);}
+.nc-resources-overview p {margin:var(--settings-description-gap) 0 0;font-size:var(--text-small);line-height:1.6;}
+.nc-resources-overview strong {font-size:var(--text-body);}
+.nc-resources-overview button {flex:none;}
+.nc-resource-categories {display:flex;flex:none;gap:var(--settings-description-gap);margin-top:var(--settings-field-gap);border-bottom:var(--comic-perforation);padding-bottom:var(--settings-field-gap);}
+.nc-resource-categories>button {display:flex;flex:1;flex-direction:column;gap:4px;min-width:0;padding:10px 12px;white-space:normal;}
+.nc-app .nc-resource-categories>button[aria-pressed=true] {background:var(--accent);color:var(--accent-on);}
+.nc-app .nc-resource-categories>button.button[aria-pressed=true]:hover:not(:disabled) {background:var(--accent-hover);color:var(--accent-on);}
+.nc-resource-categories span {font-size:var(--text-caption);font-weight:400;}
+.nc-resource-description {flex:none;margin:var(--settings-field-gap) 0;font-size:var(--text-small);line-height:1.6;}
+.nc-resource-list {display:grid;flex:1;min-height:0;gap:var(--settings-field-gap);align-content:start;overflow:auto;overscroll-behavior:contain;padding:2px 6px 6px 2px;}
+.nc-resource-list:focus-visible {outline:2px solid var(--accent);outline-offset:2px;}
+.nc-resource-card {padding:var(--settings-field-gap);border:var(--comic-border);border-radius:var(--comic-card-radius);box-shadow:var(--comic-shadow-small);background:var(--surface);min-width:0;}
+.nc-resource-identity {display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.nc-resource-identity>strong {font-size:var(--text-body);overflow-wrap:anywhere;}
+.nc-resource-badge {flex:none;font-size:var(--text-caption);color:var(--muted);}
+.nc-resource-badge[data-ready] {color:var(--success);}
+.nc-resource-badge[data-state=error] {color:var(--danger);background:var(--danger-soft);}
+.nc-resource-badge:is([data-state=downloading],[data-state=verifying]) {color:var(--accent);background:var(--accent-soft);}
+.nc-resource-card p {margin:var(--settings-description-gap) 0;font-size:var(--text-small);line-height:1.6;overflow-wrap:anywhere;}
+.nc-resource-meta {display:flex;gap:14px;color:var(--muted);font-size:var(--text-caption);}
+.nc-resource-footer {display:flex;justify-content:space-between;align-items:flex-start;gap:var(--settings-field-gap);margin-top:var(--settings-field-gap);font-size:var(--text-caption);}
+.nc-resource-footer details {min-width:0;}
+.nc-resource-footer summary {cursor:pointer;color:var(--muted);}
+.nc-resource-footer .text-link {font-size:var(--text-small);}
+.nc-resource-list progress {display:block;width:100%;height:8px;margin:12px 0 6px;accent-color:var(--accent);}
+.nc-resources-notice {padding-top:var(--settings-field-gap);border-top:var(--comic-perforation);}
+.nc-resource-note {margin:0;font-size:var(--text-small);line-height:1.6;}
+.nc-resources-notice .error {margin:8px 0 0;font-size:var(--text-small);color:var(--danger);}
+.nc-reader-translation-settings {display:grid;gap:var(--settings-field-gap);min-width:0;}
+.nc-reader-translation-settings .nc-channel-options {margin-top:0;}
+.nc-app .nc-reader-translation-settings .setting-row {padding:0;border:0;gap:var(--settings-field-gap);}
+.nc-app .nc-reader-translation-settings .setting-row>.button {flex:none;}
+.nc-reader-translation-settings .nc-font-picker {margin-top:0;}
+.nc-reader-translation-settings :is(.nc-model-picker,.nc-font-picker,.nc-channel-services-panel)>.setting-row {display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,1.65fr);align-items:center;gap:var(--settings-field-gap);}
+.nc-reader-translation-settings :is(.nc-model-picker,.nc-font-picker,.nc-channel-services-panel)>.setting-row>div:first-child>p {display:none;}
+.nc-reader-translation-settings .nc-select {min-width:0;width:100%;}
+.nc-preferences .nc-channel-options {display:block;margin:0;}
+.nc-preferences .nc-channel-options>:is(.nc-channel-services-panel,.nc-config-advanced) {padding-block:var(--settings-row-padding);border:0;border-bottom:1px solid var(--line);}
+.nc-preferences .nc-channel-options>.nc-config-advanced .nc-config-row {grid-template-columns:minmax(0,1fr) minmax(0,40%);gap:var(--settings-row-gap);}
+.nc-preferences .nc-channel-options>.nc-config-advanced .nc-config-row>:is(input,.nc-select) {max-width:20rem;justify-self:end;}
+@media (min-width:701px) {
+  .nc-app .nc-reader .nc-translation-popover {width:440px;}
+}
+@media (max-width:520px) {
+  .nc-config-row,.nc-reader-translation-settings :is(.nc-model-picker,.nc-font-picker,.nc-channel-services-panel)>.setting-row {grid-template-columns:minmax(90px,.85fr) minmax(0,1.2fr);gap:10px;}
+  .nc-resources-overview {flex-wrap:wrap;}
+  .nc-resource-categories {gap:6px;}
+  .nc-resource-categories>button {padding:8px 4px;font-size:var(--text-small);}
+}
+@media (max-height:600px) {
+  .nc-resources-dialog>.nc-modal-body {overflow:auto;}
+  .nc-resources-dialog .nc-resource-list {flex:none;overflow:visible;}
+}

@@ -1,0 +1,17 @@
+{
+  "onnxruntime-web": {
+    "version": "1.27.0",
+    "source": "https://github.com/microsoft/onnxruntime/tree/v1.27.0",
+    "license": "MIT",
+    "notice_url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.27.0/LICENSE",
+    "notice_sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "notice": "LICENSE-onnxruntime.txt"
+  },
+  "comlink": {
+    "version": "4.4.2",
+    "source": "https://github.com/GoogleChromeLabs/comlink/tree/v4.4.2",
+    "license": "Apache-2.0",
+    "notice_sha256": "bcf29b4fd3ec2cb5f9d40a0866da446f6da62170d2ccedf4aeca9cf9406dd20c",
+    "notice": "LICENSE-comlink.txt"
+  }
+}

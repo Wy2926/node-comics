@@ -1,0 +1,476 @@
+import type { TextRegion } from "../../types";
+
+// ---------------------------------------------------------------------------
+// CJK Maps
+// ---------------------------------------------------------------------------
+
+/**
+ * CJK horizontal-to-vertical punctuation substitution map.
+ * Ported from manga-image-translator's CJK_H2V table.
+ */
+export const CJK_H2V = new Map<string, string>([
+  ["‥", "︰"],
+  ["_", "︳"],
+  ["(", "︵"],
+  [")", "︶"],
+  ["（", "︵"],
+  ["）", "︶"],
+  ["{", "︷"],
+  ["}", "︸"],
+  ["〔", "︹"],
+  ["〕", "︺"],
+  ["【", "︻"],
+  ["】", "︼"],
+  ["《", "︽"],
+  ["》", "︾"],
+  ["〈", "︿"],
+  ["〉", "﹀"],
+  ["⟨", "︿"],
+  ["⟩", "﹀"],
+  ["「", "﹁"],
+  ["」", "﹂"],
+  ["『", "﹃"],
+  ["』", "﹄"],
+  ["[", "﹇"],
+  ["]", "﹈"],
+  ["…", "⋮"],
+  ["⋯", "︙"],
+  ["“", "﹁"], // LEFT DOUBLE QUOTATION MARK
+  ["”", "﹂"], // RIGHT DOUBLE QUOTATION MARK
+  ["‘", "﹁"], // LEFT SINGLE QUOTATION MARK
+  ["’", "﹂"], // RIGHT SINGLE QUOTATION MARK
+  ["!", "︕"],
+  ["?", "︖"],
+  [".", "︒"],
+  ["。", "︒"],
+  [";", "︔"],
+  ["；", "︔"],
+  [":", "︓"],
+  ["：", "︓"],
+  [",", "︐"],
+  ["，", "︐"],
+  ["・", "·"],
+]);
+
+/**
+ * Characters that should NOT appear at the start of a line (kinsoku shori).
+ * Closing brackets, punctuation marks, etc.
+ */
+export const KINSOKU_NSTART = new Set([
+  "。", "，", "、", "！", "？", "；", "：",
+  "）", "」", "』", "】", "》", "〉", "﹀",
+  "﹂", "﹄", "﹈", "︶", "︸", "︺", "︼",
+  "︾", "︒", "︕", "︖", "︐", "︔", "︓",
+  ")", "]", "}", ".", ",", "!", "?", ";", ":",
+  "⋮", "︙",
+]);
+
+/**
+ * Characters that should NOT appear at the end of a line (kinsoku shori).
+ * Opening brackets, etc.
+ */
+export const KINSOKU_NEND = new Set([
+  "（", "「", "『", "【", "《", "〈",
+  "﹁", "﹃", "﹇", "︵", "︷", "︹", "︻", "︽", "︿",
+  "(", "[", "{",
+]);
+
+// ---------------------------------------------------------------------------
+// Text length counting (ported from manga-image-translator)
+// ---------------------------------------------------------------------------
+
+/**
+ * Small kana that count as half-width when measuring text length.
+ * Ported from manga-image-translator's count_text_length().
+ */
+export const halfWidthKana = new Set(["っ", "ッ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]);
+
+/**
+ * Count text length where small kana characters count as 0.5 and all others
+ * count as 1.0. Used for comparing source vs translated text length.
+ */
+export function countTextLength(text: string): number {
+  let length = 0;
+  for (const ch of text.trim()) {
+    length += halfWidthKana.has(ch) ? 0.5 : 1;
+  }
+  return length;
+}
+
+export function countTextGlyphs(text: string): number {
+  return [...text.replace(/\s+/g, "")].length;
+}
+
+export function charLength(ch: string): number {
+  return halfWidthKana.has(ch) ? 0.5 : 1;
+}
+
+// ---------------------------------------------------------------------------
+// Column types
+// ---------------------------------------------------------------------------
+
+export type ColumnSegmentSource = 'model' | 'split';
+
+export type PreferredColumnSegment = {
+  text: string;
+  source: ColumnSegmentSource;
+};
+
+// ---------------------------------------------------------------------------
+// Column splitting
+// ---------------------------------------------------------------------------
+
+export function splitColumns(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+const strongSplitBoundaryChars = new Set([
+  "。", "！", "？", "!", "?", "；", ";",
+]);
+
+const softSplitBoundaryChars = new Set([
+  "，", "、", ",", "：", ":", "…", "⋮", "︙",
+]);
+
+const conversationalPauseChars = new Set([
+  "啊", "呀", "吧", "呢", "吗", "啦", "哦", "喔", "嘛", "了", "呐", "哟",
+]);
+
+type SplitCandidate = {
+  index: number;
+  consumed: number;
+  score: number;
+};
+
+function naturalSplitScore(ch: string): number {
+  if (strongSplitBoundaryChars.has(ch)) {
+    return 3;
+  }
+  if (softSplitBoundaryChars.has(ch)) {
+    return 2;
+  }
+  if (conversationalPauseChars.has(ch)) {
+    return 1;
+  }
+  return 0;
+}
+
+function findNaturalSplitIndex(chars: string[], maxLength: number): number | null {
+  let consumed = 0;
+  let best: SplitCandidate | null = null;
+
+  for (let i = 0; i < chars.length; i++) {
+    consumed += charLength(chars[i]);
+    if (consumed > maxLength) {
+      break;
+    }
+
+    const splitIndex = i + 1;
+    if (splitIndex >= chars.length) {
+      continue;
+    }
+
+    const ch = chars[i];
+    const next = chars[splitIndex];
+    if (KINSOKU_NEND.has(ch) || KINSOKU_NSTART.has(next)) {
+      continue;
+    }
+
+    const score = naturalSplitScore(ch);
+    if (score === 0) {
+      continue;
+    }
+
+    if (!best || score > best.score || (score === best.score && consumed > best.consumed)) {
+      best = {
+        index: splitIndex,
+        consumed,
+        score,
+      };
+    }
+  }
+
+  return best?.index ?? null;
+}
+
+export function splitByTextLength(text: string, maxLength: number): { kept: string; overflow: string } {
+  const chars = [...text];
+  let consumed = 0;
+  let splitIndex = chars.length;
+
+  for (let i = 0; i < chars.length; i++) {
+    const next = consumed + charLength(chars[i]);
+    if (next > maxLength) {
+      splitIndex = i;
+      break;
+    }
+    consumed = next;
+  }
+
+  if (splitIndex < chars.length) {
+    splitIndex = findNaturalSplitIndex(chars, maxLength) ?? splitIndex;
+  }
+
+  return {
+    kept: chars.slice(0, splitIndex).join(''),
+    overflow: chars.slice(splitIndex).join(''),
+  };
+}
+
+export function resolveSourceColumns(region: TextRegion): string[] {
+  const fromText = splitColumns(region.sourceText);
+  if (fromText.length > 0) {
+    return fromText;
+  }
+  const fallback = region.sourceText.trim();
+  return fallback ? [fallback] : [];
+}
+
+export function resolveTranslatedColumns(region: TextRegion, translatedText: string): PreferredColumnSegment[] {
+  if (region.translatedColumns && region.translatedColumns.length > 0) {
+    return region.translatedColumns
+      .map((column) => column.trim())
+      .filter(Boolean)
+      .map((text) => ({ text, source: 'model' as const }));
+  }
+  const fromText = splitColumns(translatedText);
+  if (fromText.length > 0) {
+    return fromText.map((text) => ({ text, source: 'model' as const }));
+  }
+  const fallback = translatedText.trim();
+  return fallback ? [{ text: fallback, source: 'model' }] : [];
+}
+
+// ---------------------------------------------------------------------------
+// Column rebalancing
+// ---------------------------------------------------------------------------
+
+export function rebalanceVerticalColumns(
+  sourceColumns: string[],
+  translatedColumns: PreferredColumnSegment[],
+): {
+  columns: PreferredColumnSegment[];
+  sourceColumnLengths: number[];
+  singleColumnMaxLength: number | null;
+} {
+  const sourceLengths = sourceColumns.map((column) => countTextLength(column));
+  const baselineLength = Math.max(1, ...sourceLengths);
+  const normalizedTranslated = translatedColumns
+    .map((column) => ({ text: column.text.trim(), source: column.source }))
+    .filter((column) => column.text.length > 0);
+
+  if (normalizedTranslated.length === 0) {
+    return {
+      columns: [],
+      sourceColumnLengths: sourceLengths,
+      singleColumnMaxLength: sourceLengths.length > 0 ? baselineLength : null,
+    };
+  }
+
+  const targetColumns = Math.max(sourceLengths.length, normalizedTranslated.length, 1);
+  const output: PreferredColumnSegment[] = [];
+  let carry = '';
+  let carrySource: ColumnSegmentSource = 'split';
+  let columnIndex = 0;
+
+  while (columnIndex < targetColumns || carry.trim()) {
+    const translatedItem = normalizedTranslated[columnIndex];
+    const hadCarry = carry.trim().length > 0;
+    const current = `${carry}${translatedItem?.text ?? ''}`.trim();
+    const currentSource: ColumnSegmentSource = hadCarry
+      ? 'split'
+      : translatedItem?.source ?? carrySource;
+    carry = '';
+
+    if (!current) {
+      output.push({ text: '', source: currentSource });
+      columnIndex += 1;
+      continue;
+    }
+
+    const sourceLength = sourceLengths[columnIndex]
+      ?? sourceLengths[sourceLengths.length - 1]
+      ?? baselineLength;
+    const currentLength = countTextLength(current);
+
+    if (currentLength <= sourceLength) {
+      output.push({ text: current, source: currentSource });
+      columnIndex += 1;
+      continue;
+    }
+
+    if (currentLength <= baselineLength) {
+      output.push({ text: current, source: currentSource });
+      columnIndex += 1;
+      continue;
+    }
+
+    if (columnIndex >= targetColumns - 1) {
+      output.push({ text: current, source: currentSource });
+      carry = '';
+      columnIndex += 1;
+      continue;
+    }
+
+    const { kept, overflow } = splitByTextLength(current, baselineLength);
+    output.push({ text: kept || current, source: currentSource });
+    carry = overflow;
+    carrySource = 'split';
+    columnIndex += 1;
+  }
+
+  return {
+    columns: output.filter((column) => column.text.trim().length > 0),
+    sourceColumnLengths: sourceLengths,
+    singleColumnMaxLength: sourceLengths.length > 0 ? baselineLength : null,
+  };
+}
+
+export type VerticalPreferredColumnsResult = {
+  columns: PreferredColumnSegment[];
+  sourceColumns: string[];
+  sourceColumnLengths: number[];
+  singleColumnMaxLength: number | null;
+};
+
+export function resolveVerticalPreferredColumns(region: TextRegion, translatedText: string): VerticalPreferredColumnsResult {
+  const sourceColumns = resolveSourceColumns(region);
+  const translatedColumns = resolveTranslatedColumns(region, translatedText);
+  if (translatedColumns.length === 0) {
+    return {
+      columns: [],
+      sourceColumns,
+      sourceColumnLengths: sourceColumns.map((column) => countTextLength(column)),
+      singleColumnMaxLength: sourceColumns.length > 0
+        ? Math.max(...sourceColumns.map((column) => countTextLength(column)))
+        : null,
+    };
+  }
+  const balanced = rebalanceVerticalColumns(sourceColumns, translatedColumns);
+  return {
+    columns: balanced.columns,
+    sourceColumns,
+    sourceColumnLengths: balanced.sourceColumnLengths,
+    singleColumnMaxLength: balanced.singleColumnMaxLength,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Horizontal line rebalancing
+// ---------------------------------------------------------------------------
+
+export function rebalanceHorizontalLines(
+  sourceLines: string[],
+  translatedSegments: PreferredColumnSegment[],
+): {
+  lines: PreferredColumnSegment[];
+  sourceLineLengths: number[];
+  singleLineMaxLength: number | null;
+} {
+  const sourceLengths = sourceLines.map((line) => countTextLength(line));
+  const totalSourceLength = sourceLengths.reduce((sum, len) => sum + len, 0);
+  const baselineLength = sourceLengths.length > 0
+    ? Math.max(1, totalSourceLength / sourceLengths.length)
+    : 1;
+  const normalizedTranslated = translatedSegments
+    .map((segment) => ({ text: segment.text.trim(), source: segment.source }))
+    .filter((segment) => segment.text.length > 0);
+
+  if (normalizedTranslated.length === 0) {
+    return {
+      lines: [],
+      sourceLineLengths: sourceLengths,
+      singleLineMaxLength: sourceLengths.length > 0 ? Math.max(...sourceLengths) : null,
+    };
+  }
+
+  const targetLines = Math.max(sourceLengths.length, normalizedTranslated.length, 1);
+  const output: PreferredColumnSegment[] = [];
+  let carry = '';
+  let carrySource: ColumnSegmentSource = 'split';
+  let lineIndex = 0;
+
+  while (lineIndex < targetLines || carry.trim()) {
+    const translatedItem = normalizedTranslated[lineIndex];
+    const hadCarry = carry.trim().length > 0;
+    const current = `${carry}${translatedItem?.text ?? ''}`.trim();
+    const currentSource: ColumnSegmentSource = hadCarry
+      ? 'split'
+      : translatedItem?.source ?? carrySource;
+    carry = '';
+
+    if (!current) {
+      output.push({ text: '', source: currentSource });
+      lineIndex += 1;
+      continue;
+    }
+
+    const sourceLength = sourceLengths[lineIndex]
+      ?? sourceLengths[sourceLengths.length - 1]
+      ?? baselineLength;
+    const currentLength = countTextLength(current);
+
+    if (currentLength <= sourceLength) {
+      output.push({ text: current, source: currentSource });
+      lineIndex += 1;
+      continue;
+    }
+
+    if (currentLength <= baselineLength) {
+      output.push({ text: current, source: currentSource });
+      lineIndex += 1;
+      continue;
+    }
+
+    if (lineIndex >= targetLines - 1) {
+      output.push({ text: current, source: currentSource });
+      carry = '';
+      lineIndex += 1;
+      continue;
+    }
+
+    const { kept, overflow } = splitByTextLength(current, baselineLength);
+    output.push({ text: kept || current, source: currentSource });
+    carry = overflow;
+    carrySource = 'split';
+    lineIndex += 1;
+  }
+
+  return {
+    lines: output.filter((line) => line.text.trim().length > 0),
+    sourceLineLengths: sourceLengths,
+    singleLineMaxLength: sourceLengths.length > 0 ? Math.max(...sourceLengths) : null,
+  };
+}
+
+export type HorizontalPreferredLinesResult = {
+  lines: PreferredColumnSegment[];
+  sourceLines: string[];
+  sourceLineLengths: number[];
+  singleLineMaxLength: number | null;
+};
+
+export function resolveHorizontalPreferredLines(region: TextRegion, translatedText: string): HorizontalPreferredLinesResult {
+  const sourceLines = resolveSourceColumns(region);
+  const translatedSegments = resolveTranslatedColumns(region, translatedText);
+  if (translatedSegments.length === 0) {
+    return {
+      lines: [],
+      sourceLines,
+      sourceLineLengths: sourceLines.map((line) => countTextLength(line)),
+      singleLineMaxLength: sourceLines.length > 0
+        ? Math.max(...sourceLines.map((line) => countTextLength(line)))
+        : null,
+    };
+  }
+  const balanced = rebalanceHorizontalLines(sourceLines, translatedSegments);
+  return {
+    lines: balanced.lines,
+    sourceLines,
+    sourceLineLengths: balanced.sourceLineLengths,
+    singleLineMaxLength: balanced.singleLineMaxLength,
+  };
+}

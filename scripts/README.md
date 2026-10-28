@@ -146,7 +146,9 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 
 ## 辅助工具
 
-`prepare_translation_font_previews.py` 从[计算节点字体清单](../services/compute-node/assets.json)中已下载的完整字体和原始许可生成插件离线 WOFF2 样例，只包含[目标语言字体名与固定对照示例](../backend/shared/translation-fonts.json)的字形。先校验来源 SHA-256、每种语言默认字体及名称、示例的字形覆盖，派生子集重命名为 `Node Comics Preview …` 并保留原版权和 OFL 声明；`sources.json` 记录原字体版本、来源和原始／派生摘要，并同步后端、引擎独立部署包中的字体目录与默认映射 JSON。使用 `uv run --no-project --with "fonttools[woff]==4.59.1" python scripts/prepare_translation_font_previews.py --source <字体与许可目录>` 重建，默认覆盖 `apps/extension/public/fonts/translation/` 中同名生成文件。完整字体只由计算节点准备和分发，不打入插件；预览资源由插件设置按需加载，不从外部字体服务获取。
+`prepare_translation_font_previews.py` 从[计算节点字体清单](../services/compute-node/assets.json)中已下载的完整字体和原始许可生成插件离线 WOFF2 样例，只包含[目标语言字体名与固定对照示例](../backend/shared/translation-fonts.json)的字形。先校验来源 SHA-256、每种语言默认字体及名称、示例的字形覆盖，派生子集重命名为 `Node Comics Preview …` 并保留原版权和 OFL 声明；`sources.json` 记录原字体版本、来源和原始／派生摘要，并同步后端、引擎独立部署包中的字体目录与默认映射 JSON。使用 `uv run --no-project --with "fonttools[woff]==4.59.1" python scripts/prepare_translation_font_previews.py --source <字体与许可目录>` 重建，默认覆盖 `apps/extension/public/fonts/translation/` 中同名生成文件。完整字体不打入插件；计算节点使用完整字体，Shinobu 本机渠道按固定清单手动下载。预览资源由插件设置按需加载，不从外部字体服务获取。
+
+`prepare_local_translation_fonts.py --source <完整字体目录>` 使用 `fonttools==4.59.1` 从同一清单生成 Shinobu 的完整字体描述和 Unicode 覆盖表，校验字体与已随插件发布的许可摘要，保留真实字重和版本，不复制完整字体字节。输出为 `apps/extension/src/translation/font-resources.json` 与 `font-coverage.json`；运行规则见 [Shinobu 本机翻译](../docs/SHINOBU_TRANSLATION_DESIGN.md)。
 
 `node scripts/preview_translation_fonts.mjs [输出目录]` 使用上述真实 WOFF2 生成可离线打开的字体对照页，以及全部 17 个目标语言的同句、同字号气泡 PNG；默认输出 `artifacts/translation-fonts/preview/`，使用 `PLAYWRIGHT_MODULE` 与 `TEST_CHROMIUM` 指定浏览器依赖，不访问网络。预览不模拟特定漫画页的最终自动字号与排版。
 

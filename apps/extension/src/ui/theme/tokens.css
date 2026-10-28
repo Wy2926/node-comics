@@ -7,6 +7,13 @@
   --text-small: calc(var(--text-base) * .875);
   --text-body: var(--text-base);
   --text-title: calc(var(--text-base) * 1.25);
+  --settings-heading-size: var(--text-title);
+  --settings-label-size: var(--text-body);
+  --settings-description-size: var(--text-small);
+  --settings-row-padding: 22px;
+  --settings-row-gap: 24px;
+  --settings-field-gap: 16px;
+  --settings-description-gap: 8px;
   --canvas: #f6f8fc;
   --surface: #fff;
   --surface-soft: #f0f3f8;

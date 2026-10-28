@@ -4,7 +4,9 @@ import {msg} from '../i18n/runtime';
 import type {FontSelection} from '../translation/channels/contracts';
 import {availableTranslationFonts,effectiveTranslationFont} from '../translation/fonts';
 import {Select,SelectOption} from './Select';
+import {FontDownloadMenu} from './FontDownloadMenu';
 import './translation-fonts.css';
+import {SettingRow} from './components';
 
 // Fetch only the selected face or the open language list; the shipped catalog bounds this cache.
 const loadedFaces=new Map<string,{promise:Promise<FontFace>;loaded:boolean}>();
@@ -56,21 +58,22 @@ export function TranslationFontPicker({selection,language}:{selection?:FontSelec
   }
   async function choose(next:string){
     if(!selection||saving||!choices.some(font=>font.id===next))return;
-    restoreFocus.current=document.activeElement===document.getElementById(id)?{language,value:next}:undefined;
+    restoreFocus.current=document.activeElement===document.getElementById(id)||document.getElementById(id+'-menu')?.contains(document.activeElement)?{language,value:next}:undefined;
     setSaving(true);setError('');
-    try{await selection.select(language,next);}catch(error){restoreFocus.current=undefined;setError((error as Error).message);}finally{setSaving(false);}
+    try{await selection.select(language,next);return true;}catch(error){restoreFocus.current=undefined;setError((error as Error).message);return false;}finally{setSaving(false);}
   }
   if(!selection||!choices.length)return null;
   return <div className="nc-font-picker">
-    <label className="field" htmlFor={id}><span>{msg('翻译字体')}</span>
+    <SettingRow title={<label htmlFor={id}>{selection.downloads?msg('本地翻译字体'):msg('翻译字体')}</label>}
+      description={selection.description??msg('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。')} descriptionId={id+'-note'}>
       {/* Keep keyboard focus while saving; native disabled would blur the trigger. */}
-      <Select id={id} aria-label={msg('翻译字体')} aria-describedby={id+'-note'} value={value??''} aria-disabled={saving||undefined} aria-busy={saving||undefined}
+      {selection.downloads?<FontDownloadMenu id={id} downloads={selection.downloads} choices={choices} value={value} language={language} saving={saving} fontStyle={fontStyle} onChoose={choose} onOpenChange={setExpanded}/>:
+      <Select id={id} placement="end" aria-label={msg('翻译字体')} aria-describedby={id+'-note'} value={value??''} aria-disabled={saving||undefined} aria-busy={saving||undefined}
         onClick={event=>{if(saving)event.preventDefault();}} onKeyDown={event=>{if(saving&&!['Tab','Escape'].includes(event.key)){event.preventDefault();event.stopPropagation();}}}
         onOpenChange={setExpanded} onChange={event=>void choose(event.target.value)}>
         {choices.map(font=><SelectOption key={font.id} value={font.id} style={fontStyle(font.id)} lang={language} dir={language==='ar'?'rtl':'ltr'}>{translationFontName(font,language)}</SelectOption>)}
-      </Select>
-    </label>
-    <p id={id+'-note'} className="nc-muted">{msg('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。')}</p>
+      </Select>}
+    </SettingRow>
     {failed&&<p role="status">{msg('字体预览加载失败，重新展开列表可重试，不影响翻译设置。')}</p>}
     {error&&<p role="alert">{error}</p>}
   </div>;

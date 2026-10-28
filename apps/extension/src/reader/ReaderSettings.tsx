@@ -1,3 +1,5 @@
+import {ChannelOptionsPanel} from '../ui/ChannelOptions';
+import {ChannelPicker} from '../ui/ChannelPicker';
 import type {ReactNode} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
@@ -11,26 +13,27 @@ import {EnhancementToggle} from '../ui/EnhancementSettings';
 import {ReaderDisplaySettings} from './ReaderOptions';
 export {ReaderChoice, ReaderScale} from './ReaderOptions';
 
-export function ReaderTranslationSettings({settings, setSettings, caps, channelLabel, modelSelection, fontSelection, note}: {
+export function ReaderTranslationSettings({settings, setSettings, caps, modelSelection, fontSelection, channelOptions, note}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   caps?: Capabilities;
-  channelLabel?: string;
   modelSelection?: ModelSelection;
   fontSelection?: FontSelection;
+  channelOptions?: import('../translation/channels/contracts').ChannelOptions;
   note: string;
 }) {
   const languages = caps?.languages ?? fallbackLanguages;
-  return <>
-    {channelLabel && <p className="nc-muted">{channelLabel}</p>}
-    <label className="field">{msg('目标语言')}<Select aria-label={msg('翻译目标语言')} value={settings.language}
+  return <div className="nc-reader-translation-settings">
+    <ChannelPicker/>
+    <label className="nc-config-row"><span>{msg('目标语言')}</span><Select aria-label={msg('翻译目标语言')} value={settings.language}
         onChange={event => setSettings(value => ({...value, language: event.target.value}))}>
         {languages.map(language => <SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}
       </Select></label>
     <TranslationModelPicker selection={modelSelection}/>
     <TranslationFontPicker selection={fontSelection} language={settings.language}/>
+    <ChannelOptionsPanel options={channelOptions}/>
     <p className="nc-muted nc-default-mode-note">{note}</p>
-  </>;
+  </div>;
 }
 
 /** Format-specific sizing and actions are slots, not a second settings implementation. */

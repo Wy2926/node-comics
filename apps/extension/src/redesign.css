@@ -1099,7 +1099,7 @@ a {
   font-size: 1rem;
   color: var(--ink);
 }
-.nc-app .setting-row p {
+.nc-app .setting-row>div:first-child>p {
   font-size: .875rem;
   line-height: 1.75;
   color: var(--muted);

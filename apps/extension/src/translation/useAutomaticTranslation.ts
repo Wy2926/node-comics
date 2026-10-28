@@ -17,6 +17,9 @@ interface Options {
   channel?:ChannelConnection;connectionError?:string;copies:ReadingEntry[];
   updateEntry:(copy:ReadingEntry)=>void;language:string;currentId?:string;
 }
+// Reloading stored channel bindings can clear display references without changing the original.
+// Observe only delivered identities, so unchanged status snapshots do not restart the reading clock.
+const visibleImageSignature=(pages:Page[])=>JSON.stringify(pages.map(p=>[p.id,p.blobKey,p.translationScope,latestResults(p.jobs).map(job=>[job.id,job.result?.key,job.result_expired,job.result_available,p.outputBlobs[job.id]])]));
 export function useAutomaticTranslation({channel,connectionError='',copies,updateEntry,language,currentId}:Options){
   const [,render]=useState(0),[error,setError]=useState('');
   const copyRef=useRef(copies);copyRef.current=copies;
@@ -148,7 +151,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
   },[channel,language,attach,commit,prepareResult]);
   useEffect(()=>{if(!channel)return;for(const copy of copies){const changed=applyChannelJobs(copy,jobs.current,channel.scope);if(changed!==copy)commit(changed);}},[copies,channel,commit]);
   const onReadingWindow=useCallback((targets:ReadingTarget[],visiblePages:Page[],immediate=false)=>{
-    const changed=windowRef.current.update(targets,performance.now(),immediate),imagesChanged=JSON.stringify(visible.current.map(p=>[p.id,p.blobKey]))!==JSON.stringify(visiblePages.map(p=>[p.id,p.blobKey]));
+    const changed=windowRef.current.update(targets,performance.now(),immediate),imagesChanged=visibleImageSignature(visible.current)!==visibleImageSignature(visiblePages);
     visible.current=visiblePages;if(changed||imagesChanged){stamp.current++;render(n=>n+1);wake.current(changed);}
   },[]);
   const retry=useCallback(async(entryId:string,page:Page,mode:Mode)=>{

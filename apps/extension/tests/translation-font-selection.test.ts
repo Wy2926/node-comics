@@ -150,9 +150,7 @@ describe('translation font selection',()=>{
     expect(markup).toContain('字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。');
     const note=markup.match(/aria-describedby="([^"]+)"/)?.[1];
     expect(note).toBeTruthy();
-    expect(markup).toContain(`<p id="${note}" class="nc-muted">`);
-    expect(markup).toContain('<span>翻译字体</span>');
-    expect(markup).toContain('data-value="comic-relief"');
+    expect(markup).toContain(`id="${note}"`);
   });
   it.each(['zh-Hans','ja','ko','ar'])('uses target-language names and hides fonts on legacy services: %s',language=>{
     const font=TRANSLATION_FONTS.find(font=>font.languages.includes(language))!;

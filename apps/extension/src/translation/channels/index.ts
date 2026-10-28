@@ -58,21 +58,47 @@ export function availableChannelProtocols(){
     id,label,description,guideUrl,configurable,fields,
   }));
 }
-export async function listChannels(){const settings=await readChannelSettings();return {...settings,profiles:[defaultChannel,...settings.profiles]};}
+function channelProfiles(saved:ChannelProfile[]):ChannelProfile[]{
+  const builtins=channelDefinitions().filter(definition=>!definition.configurable).map(definition=>{
+    const previous=saved.find(profile=>profile.adapterId===definition.id);
+    return {id:previous?.id??definition.id,adapterId:definition.id,name:definition.label,revision:previous?.revision??1,settings:previous?.settings??{...definition.defaultSettings}};
+  });
+  return [...builtins,...saved.filter(profile=>!builtins.some(builtin=>builtin.id===profile.id||builtin.adapterId===profile.adapterId))];
+}
+export async function listChannels(){
+  const settings=await readChannelSettings(),profiles=channelProfiles(settings.profiles);
+  return {...settings,profiles,activeId:profiles.some(profile=>profile.id===settings.activeId)?settings.activeId:defaultChannel.id};
+}
 export async function savedChannelSecretFields(id:string){
   return Object.keys((await readChannelCredentials(id)).secrets);
 }
-export async function selectChannel(id:string){await updateChannelSettings(value=>{if(id!==defaultChannel.id&&!value.profiles.some(p=>p.id===id))throw Error(msg('翻译渠道已移除'));return {...value,activeId:id};});}
-export async function removeChannel(id:string){if(id===defaultChannel.id)throw Error(msg('内置渠道不能移除'));await updateChannelSettings(async value=>{await deleteChannelSecrets(id);return {...value,activeId:value.activeId===id?defaultChannel.id:value.activeId,profiles:value.profiles.filter(p=>p.id!==id)};});}
+export async function selectChannel(id:string){
+  await updateChannelSettings(value=>{
+    const profile=channelProfiles(value.profiles).find(profile=>profile.id===id);
+    if(!profile)throw Error(msg('翻译渠道已移除'));
+    // Persist an editable built-in before its adapter can save options or start work.
+    const stored=id===defaultChannel.id||value.profiles.some(item=>item.id===id&&item.adapterId===profile.adapterId);
+    return {...value,activeId:id,profiles:stored?value.profiles:[...value.profiles.filter(item=>item.id!==id),profile]};
+  });
+}
+export async function removeChannel(id:string){
+  await updateChannelSettings(async value=>{
+    const profile=value.profiles.find(item=>item.id===id);
+    if(channelDefinitions().some(definition=>!definition.configurable&&(definition.id===id||definition.id===profile?.adapterId)))throw Error(msg('内置渠道不能移除'));
+    await deleteChannelSecrets(id);
+    return {...value,activeId:value.activeId===id?defaultChannel.id:value.activeId,profiles:value.profiles.filter(p=>p.id!==id)};
+  });
+}
 export async function connectChannel(adapterId:string,name:string,input:ChannelConnectionInput,id?:string):Promise<ChannelProfile>{
   const definition=channelDefinition(adapterId);
-  if(!definition.configurable||!definition.connect)throw Error(msg('此渠道无需配置'));
+  if(!definition.configurable||!definition.connect||id&&channelDefinitions().some(item=>!item.configurable&&item.id===id))throw Error(msg('此渠道无需配置'));
   const origins=definition.permissionOrigins?.(input)??[];
   if(origins.length)await requireHostAccess(origins);
   let credentials=input;
   if(id){
     const {profile,secrets}=await readChannelCredentials(id);
     if(!profile)throw Error(msg('翻译渠道已移除'));
+    if(channelDefinitions().some(item=>!item.configurable&&item.id===profile.adapterId))throw Error(msg('此渠道无需配置'));
     // Bind saved passwords to the original destination before any network call.
     const unchanged=profile.adapterId===adapterId
       &&Object.keys(profile.settings).length===Object.keys(input.settings).length

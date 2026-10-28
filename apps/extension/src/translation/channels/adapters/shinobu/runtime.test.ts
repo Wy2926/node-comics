@@ -1,0 +1,43 @@
+import 'fake-indexeddb/auto';
+import {afterEach,expect,it,vi} from 'vitest';
+import {emptyPage} from '../../../../reader/model';
+import {ShinobuRuntime} from './runtime';
+import {parseConfig} from './config';
+import {entryOperations,saveOperation} from './operations';
+import {openTranslationBindings} from '../../../../comics/repositories/translation-bindings';
+import type {Job} from '../../../../types';
+
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
+it('publishes only status changes and polls through the caller wait, without its own timer',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!(null)}});
+  const onJobs=vi.fn(async()=>{}),onChange=vi.fn(),getBlob=vi.fn(async()=>undefined);
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'unavailable'}};
+  await runtime.manual(target);
+  expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);
+  for(let i=0;i<5;i++)await runtime.restore([target]);
+  expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);expect(getBlob).toHaveBeenCalledTimes(1);
+  const [record]=await entryOperations(target.entryId);
+  await saveOperation({...record,job:{...record.job,status:'running'}},true);
+  await runtime.submit([target]);expect(runtime.hasPending).toBe(true);
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+  await saveOperation({...record,job:{...record.job,status:'no_text',updated_at:new Date().toISOString()}});
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(runtime.hasPending).toBe(true);expect(onJobs).toHaveBeenCalledTimes(2);
+  const waiting=runtime.wait(new AbortController().signal);
+  await vi.advanceTimersByTimeAsync(750);expect(await waiting).toBe(false);
+  expect(onJobs).toHaveBeenCalledTimes(3);expect(getBlob).toHaveBeenCalledTimes(1);
+  runtime.dispose();
+});
+it('restores a shared image binding before admission while the reader still holds another channel',async()=>{
+  const scope={key:crypto.randomUUID()},hash='a'.repeat(64),job:Job={id:crypto.randomUUID(),image_sha256:hash,mode:'classic',target_language:'zh-Hans',status:'succeeded',phase:'succeeded',created_at:new Date().toISOString(),version:1,quota_pages:0,cache_hit:false,result:{key:'cached',recoverable:false}};
+  const database=await openTranslationBindings();
+  await new Promise<void>((resolve,reject)=>{const tx=database.transaction('translationBindings','readwrite');tx.objectStore('translationBindings').put({id:JSON.stringify([scope.key,hash]),scope:scope.key,imageSha256:hash,payload:{jobs:[job]},updatedAt:Date.now()});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});
+  const onJobs=vi.fn(async()=>{}),onChange=vi.fn(),getBlob=vi.fn(async()=>undefined);
+  const runtime=new ShinobuRuntime(scope,{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('same-image.png',900,1200),imageSha256:hash,translationScope:'another-channel',jobs:[]}};
+  await runtime.submit([target]);expect(onJobs).toHaveBeenCalledExactlyOnceWith([job]);expect(runtime.hasPending).toBe(false);
+  await runtime.submit([target]);expect(onJobs).toHaveBeenCalledTimes(1);expect(getBlob).not.toHaveBeenCalled();runtime.dispose();
+  const other=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  await other.restore([target]);expect(onJobs).toHaveBeenCalledTimes(1);other.dispose();
+});

@@ -13,7 +13,34 @@ export interface ChannelProfile {
   revision: number;
   settings: Record<string, string>;
 }
-export interface ChannelField {key:string;label:string;type:'text'|'url'|'password';required?:boolean;placeholder?:string;}
+export interface ChannelField {key:string;label:string;type:'text'|'url'|'password'|'number'|'select';required?:boolean;placeholder?:string;defaultValue?:string;options?:readonly {value:string;label:string}[];help?:string;advanced?:boolean;}
+export interface ChannelResource {id:string;label:string;description?:string;category?:{id:string;label:string;description:string};required?:boolean;selected?:boolean;bytes:number;downloaded:number;state:'missing'|'downloading'|'paused'|'verifying'|'ready'|'blocked'|'error';detail?:string;license:string;source:string;}
+export interface ChannelResources {
+  read():Promise<ChannelResource[]>;
+  subscribe(listener:()=>void):()=>void;
+  act(action:'download'|'pause'|'remove'|'verify',id?:string):Promise<void>;
+}
+export interface ChannelOptions {
+  fields:readonly ChannelField[];
+  values:Record<string,string>;
+  settingsLabel?:string;
+  save(values:Record<string,string>):Promise<void>;
+  resources?:ChannelResources;
+  services?:ChannelServiceSelection;
+}
+/** Adapter-owned named text services; the UI never reads or stores their credentials. */
+export interface ChannelServiceSelection {
+  label:string;
+  description:string;
+  addLabel:string;
+  selectedId:string;
+  items:readonly {id:string;label:string;description?:string;values?:Record<string,string>;savedSecrets?:readonly string[]}[];
+  fields:readonly ChannelField[];
+  select(id:string):Promise<void>;
+  save(values:Record<string,string>,id?:string):Promise<void>;
+  remove(id:string):Promise<void>;
+}
+export interface ChannelLocalHost {dispatch(message:unknown):Promise<unknown>;dispose():Promise<void>;}
 export interface ChannelConnectionInput {settings:Record<string,string>;secrets:Record<string,string>;signal?:AbortSignal;}
 export interface ChannelConnectionResult {settings:Record<string,string>;secrets:Record<string,string>;}
 export interface RuntimeOptions {
@@ -52,9 +79,19 @@ export interface ModelSelection {
 export interface FontSelection {
   value(language:string):string|undefined;
   fonts?:TranslationFontChoice[];
+  description?:string;
+  downloads?:FontDownloads;
   select(language:string,value?:string):Promise<void>;
 }
+export type FontDownload=Pick<ChannelResource,'id'|'bytes'|'downloaded'|'state'|'detail'>;
+/** Only locally installable fonts expose downloads; remote channel font menus stay independent. */
+export interface FontDownloads {
+  read():Promise<FontDownload[]>;
+  subscribe(listener:()=>void):()=>void;
+  download(id:string):Promise<void>;
+}
 export interface ChannelConnection {
+  readonly options?:ChannelOptions;
   readonly modelSelection?:ModelSelection;
   readonly fontSelection?:FontSelection;
   /** Low-cardinality product category; never a profile name, URL or protocol ID. */
@@ -81,11 +118,14 @@ export interface ChannelDefinition {
   description?:string;
   guideUrl?:string;
   configurable:boolean;
+  /** Non-configurable adapters have one permanent profile, initialized on first selection. */
+  defaultSettings?:Record<string,string>;
   fields:readonly ChannelField[];
   permissionOrigins?(input:ChannelConnectionInput):string[];
   connect?(input:ChannelConnectionInput):Promise<ChannelConnectionResult>;
   open(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean,options?:{deferPolicy?:boolean}):Promise<ChannelConnection>;
   subscribe?(listener:()=>void):()=>void;
+  startLocalHost?(changed:(busy:boolean)=>void):Promise<ChannelLocalHost>;
   /** Local source removal only; neither method may contact the translation service. */
   inspectLocalEntry?(entryId:string):Promise<LocalTranslationResultReference[]>;
   blockLocalEntry?(entryId:string):Promise<void>;

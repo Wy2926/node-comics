@@ -1,3 +1,4 @@
+import {ChannelOptionsPanel} from './ChannelOptions';
 import {Select} from './Select';
 import {msg} from '../i18n/runtime';
 import { type Dispatch, type SetStateAction, type ReactNode } from 'react';
@@ -22,10 +23,11 @@ type Props = {
   caps?: Capabilities;
   modelSelection?: ModelSelection;
   fontSelection?: FontSelection;
+  channelOptions?: import('../translation/channels/contracts').ChannelOptions;
   children?: ReactNode;
   onOpenShortcuts?: () => void;
 };
-export function Preferences({ settings, setSettings, caps, modelSelection, fontSelection, children, onOpenShortcuts }: Props) {
+export function Preferences({ settings, setSettings, caps, modelSelection, fontSelection, channelOptions, children, onOpenShortcuts }: Props) {
   return <div className="nc-preferences" role="region" aria-label={msg('外观与偏好')}>
     <AppearanceSettings settings={settings} onChange={setSettings}>
       <InterfaceLanguage value={settings.uiLanguage} onChange={uiLanguage=>setSettings(s=>({...s,uiLanguage}))}/>
@@ -55,6 +57,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, fontS
       </SettingRow>
       <TranslationModelPicker selection={modelSelection}/>
       <TranslationFontPicker selection={fontSelection} language={settings.language}/>
+    <ChannelOptionsPanel options={channelOptions}/>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <div className="setting-row">
         <div><b>{msg('翻译书名与简介')}</b></div>

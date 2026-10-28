@@ -1,0 +1,24 @@
+.nc-picker-trigger-value {display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1;min-width:0;}
+.nc-picker-trigger-value>span:first-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nc-picker-trigger-value small {flex:none;font-size:var(--text-caption);font-weight:400;color:var(--muted);}
+.nc-picker-menu {padding:6px;}
+.nc-picker-items {display:grid;gap:4px;}
+.nc-picker-item {display:flex;align-items:center;gap:4px;border-radius:var(--comic-control-radius);}
+.nc-picker-item[data-selected=true] {background:var(--accent-soft);}
+button.nc-picker-choice {flex:1;min-width:0;text-align:start;}
+.nc-picker-choice>span {display:grid;gap:4px;min-width:0;}
+.nc-picker-choice strong {font-weight:500;overflow-wrap:anywhere;}
+.nc-picker-choice small {font-size:var(--text-caption);font-weight:400;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
+.nc-picker-choice>svg {flex:none;color:var(--accent);}
+.nc-picker-item-actions {display:flex;gap:2px;padding-inline-end:4px;flex:none;}
+.nc-picker-item-actions button {display:grid;place-items:center;min-width:34px;min-height:36px;padding:7px;border:0;background:transparent;color:var(--muted);border-radius:var(--comic-control-radius);cursor:pointer;}
+.nc-picker-item-actions button:hover,.nc-picker-item-actions button:focus-visible {background:var(--surface-soft);color:var(--accent);}
+.nc-picker-item-actions button[data-danger]:hover {color:var(--danger);}
+.nc-picker-footer {border-top:1px solid var(--line);margin-top:6px;padding-top:6px;}
+.nc-picker-footer>button {width:100%;justify-content:flex-start;color:var(--accent);}
+.nc-picker-menu [role=alert] {margin:10px;font-size:var(--text-small);line-height:1.6;color:var(--danger);}
+.nc-picker-editor {padding:10px;}
+.nc-picker-editor h4 {margin:0 0 16px;font-size:var(--text-body);}
+.nc-picker-editor .nc-config-row {grid-template-columns:minmax(80px,.7fr) minmax(0,1.5fr);gap:12px;}
+.nc-picker-editor .nc-config-actions {justify-content:flex-end;}
+.nc-picker-editor .nc-config-advanced {padding-block:12px;}

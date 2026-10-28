@@ -4,6 +4,7 @@ import {availableChannelProtocols,connectChannel,listChannels,removeChannel,save
 import {Icon} from '../icons';
 import {Modal} from './components';
 import './translation-channels.css';
+import {ChannelFields} from './ChannelFields';
 
 export function ChannelGuide({url}:{url?:string}){
   if(!url)return null;
@@ -78,7 +79,7 @@ export function TranslationChannels({children}:{children?:ReactNode}){
     setError('');
     const settings:Record<string,string>={},secrets:Record<string,string>={};
     for(const field of definition.fields){
-      (field.type==='password'?secrets:settings)[field.key]=values[field.key]??'';
+      (field.type==='password'?secrets:settings)[field.key]=values[field.key]??field.defaultValue??'';
     }
     try{
       const profile=await connectChannel(protocol,name,{settings,secrets},editing?.id);
@@ -194,25 +195,16 @@ export function TranslationChannels({children}:{children?:ReactNode}){
         {definition?.guideUrl&&<div className="nc-channel-form-guide">
           <ChannelGuide url={definition.guideUrl}/>
         </div>}
-        <label className="field">
-          {msg('名称')}
+        <label className="nc-config-row">
+          <span>{msg('名称')}</span>
           <input value={name} disabled={busy} maxLength={80} placeholder={definition?.label}
             onChange={e=>setName(e.target.value)}/>
         </label>
-        {definition?.fields.map(field=>{
-          const saved=field.type==='password'&&canReuse&&savedFields.includes(field.key);
-          return <label className="field" key={field.key}>
-            {field.label}
-            <input type={field.type} required={field.required&&!saved} value={values[field.key]??''}
-              placeholder={saved?msg('已保存，留空继续使用'):field.placeholder} disabled={busy}
-              autoComplete={field.type==='password'?'new-password':'off'}
-              onChange={e=>setValues({...values,[field.key]:e.target.value})}/>
-          </label>;
-        })}
-        <p className="nc-channel-credential-note">
+        {definition&&<ChannelFields fields={definition.fields} values={values} onChange={setValues} disabled={busy} saved={canReuse?savedFields:[]}/>}
+        {definition?.fields.some(field=>field.type==='password')&&<p className="nc-channel-credential-note">
           <Icon name="shield" size={16}/>
           {msg('账号凭据保存在本机；修改服务地址或用户名时需重新输入密码。')}
-        </p>
+        </p>}
         {error&&<p role="alert" className="error">{error}</p>}
       </form>
     </Modal>}

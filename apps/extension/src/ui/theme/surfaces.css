@@ -91,16 +91,26 @@
 .nc-app :is(.settings-card, .nc-purchases) { border: var(--comic-border); border-radius: var(--comic-panel-radius); box-shadow: var(--comic-shadow); padding: var(--comic-panel-padding); background: var(--surface); }
 .nc-app .settings-card { margin-bottom: 24px; }
 .nc-preferences>.settings-card { counter-increment: preference; }
-.nc-preferences>.settings-card>h3 { padding-bottom: 18px; border-bottom: var(--comic-perforation); font-size: 1.0625rem; font-weight: 800; }
-.nc-preferences>.settings-card>h3::after { content: '0' counter(preference); margin-left: auto; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; border: 1px solid var(--ink); padding: 3px 7px; transform: rotate(4deg); }
-.nc-app .setting-row { gap: 24px; }
+.nc-preferences>.settings-card>:is(h3,.nc-channel-heading) { margin: 0; padding-bottom: var(--settings-field-gap); border-bottom: var(--comic-perforation); }
+.nc-app .nc-preferences>.settings-card>h3,
+.nc-app .nc-preferences>.settings-card>.nc-channel-heading>h3 { font-size: var(--settings-heading-size); font-weight: 800; line-height: 1.4; }
+.nc-preferences>.settings-card>h3::after { content: '0' counter(preference); margin-left: auto; color: var(--muted); font-size: var(--text-caption); font-variant-numeric: tabular-nums; border: var(--comic-badge-border); padding: 3px 7px; transform: rotate(4deg); }
+.nc-app .setting-row { gap: var(--settings-row-gap); padding-block: var(--settings-row-padding); }
 .nc-app .setting-row>div:first-child { min-width: 0; }
-.nc-app .setting-row p { max-width: 42em; }
-.nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker, .nc-font-picker .field) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: center; gap: 24px; }
-.nc-preferences :is(.setting-row, .nc-model-picker, .nc-font-picker .field) > :is(.nc-select, div:has(> .nc-select)) { width: 100%; min-width: 0; max-width: 20rem; justify-self: end; }
+.nc-app .setting-row :is(.nc-select,input,select) { font-size: var(--text-body); }
+.nc-app .setting-row b,
+.nc-preferences :is(.nc-auto-tabs-row b,.nc-reader-option b) { font-size: var(--settings-label-size); font-weight: 550; line-height: 1.5; color: var(--ink); }
+.nc-app .setting-row>div:first-child>p,
+.nc-preferences :is(.nc-auto-tabs p,.nc-reader-option p) { margin: var(--settings-description-gap) 0 0; font-size: var(--settings-description-size); line-height: 1.6; color: var(--muted); max-width: 42em; }
+.nc-preferences :is(.nc-auto-tabs,.nc-reader-option) { padding-block: var(--settings-row-padding); }
+.nc-preferences :is(.nc-model-picker,.nc-font-picker)+.nc-auto-tabs { border-top: 0; }
+.nc-preferences :is(.nc-auto-tabs-row,.nc-reader-option) { gap: var(--settings-row-gap); }
+.nc-preferences .nc-auto-tabs .nc-auto-tabs-error { color: var(--danger); }
+.nc-preferences .setting-row:where(:has(> .nc-select, > div > .nc-select)) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: center; gap: var(--settings-row-gap); }
+.nc-preferences .setting-row > :is(.nc-select, div:has(> .nc-select)) { width: 100%; min-width: 0; max-width: 20rem; justify-self: end; }
 .nc-preferences .setting-row > div > .nc-select { width: 100%; min-width: 0; }
-.nc-preferences :is(.nc-model-picker, .nc-font-picker) { margin: 0; padding-block: 22px; border-bottom: 1px solid var(--line); }
-.nc-preferences :is(.nc-model-picker > span, .nc-font-picker .field > span) { font-size: 1rem; font-weight: 550; }
+.nc-preferences :is(.nc-model-picker, .nc-font-picker) { margin: 0; padding-block: var(--settings-row-padding); border-bottom: 1px solid var(--line); }
+.nc-app :is(.nc-model-picker,.nc-font-picker,.nc-channel-services-panel)>.setting-row { padding: 0; border: 0; }
 .nc-app .nc-theme-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .nc-app .nc-theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .nc-app .nc-theme-options button { min-width: 0; justify-content: flex-start; text-align: start; overflow-wrap: anywhere; }
@@ -158,22 +168,19 @@
   }
 }
 @media (max-width: 700px) {
+  .nc-preferences { --settings-heading-size: var(--text-body); --settings-label-size: var(--text-small); --settings-row-padding: 14px; --settings-row-gap: 10px; --settings-description-gap: 5px; }
   .nc-app .nc-account-page > .page-title { padding: 0; margin-bottom: 16px; border: 0; background: none; box-shadow: none; }
   .nc-app .nc-account-page > .page-title :is(.eyebrow, p, .nc-heading-star) { display: none; }
   .nc-app .nc-account-page > .page-title h1 { font-size: 1.25rem; margin: 0; line-height: 1.4; }
   .nc-app :is(.settings-card, .nc-purchases) { padding: 16px; min-width: 0; }
   .nc-app .settings-card { margin-bottom: 16px; }
-  .nc-preferences > .settings-card > h3 { gap: 8px; padding-bottom: 12px; font-size: 1rem; overflow-wrap: anywhere; }
+  .nc-preferences > .settings-card > :is(h3,.nc-channel-heading) { gap: 8px; padding-bottom: 12px; overflow-wrap: anywhere; }
   .nc-preferences > .settings-card > h3::after { display: none; }
-  .nc-app .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 14px; }
-  .nc-app .setting-row b { font-size: var(--text-small); }
-  .nc-app .setting-row p { margin-top: 5px; line-height: 1.55; }
+  .nc-app .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--settings-row-gap); padding-block: var(--settings-row-padding); }
   .nc-app .setting-row:has(> .switch) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .nc-app .setting-row > :is(.nc-select, .api-input, .button) { width: 100%; min-width: 0; max-width: 100%; }
-  .nc-preferences :is(.setting-row:where(:has(> .nc-select, > div > .nc-select)), .nc-model-picker, .nc-font-picker .field) { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .nc-preferences :is(.setting-row, .nc-model-picker, .nc-font-picker .field) > :is(.nc-select, div:has(> .nc-select)) { max-width: 100%; }
-  .nc-preferences :is(.nc-model-picker, .nc-font-picker) { padding-block: 14px; }
-  .nc-preferences :is(.nc-model-picker > span, .nc-font-picker .field > span) { font-size: var(--text-small); }
+  .nc-preferences .setting-row:where(:has(> .nc-select, > div > .nc-select)) { grid-template-columns: minmax(0, 1fr); gap: var(--settings-row-gap); }
+  .nc-preferences .setting-row > :is(.nc-select, div:has(> .nc-select)) { max-width: 100%; }
   .nc-app .nc-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
   .nc-app .nc-theme-options button { min-width: 0; min-height: 44px; justify-content: flex-start; text-align: start; overflow-wrap: anywhere; }
   .nc-app .privacy-note { padding: 14px; min-width: 0; }

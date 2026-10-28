@@ -46,8 +46,7 @@ interface Props {
   controlsBlocked?: boolean;
   onOpenShortcuts(): void;
   notify(message: string): void;
-  caps?: Capabilities; modelSelection?:import('../translation/channels/contracts').ModelSelection; fontSelection?:import('../translation/channels/contracts').FontSelection;
-  channelLabel?: string;
+  caps?: Capabilities; modelSelection?:import('../translation/channels/contracts').ModelSelection; fontSelection?:import('../translation/channels/contracts').FontSelection;channelOptions?:import('../translation/channels/contracts').ChannelOptions;
   translationScope?: string;
   onReadingWindow(targets: ReadingTarget[], visible: Page[], immediate?: boolean): void;
   translationState(entryId: string, page: Page, mode: Mode): TranslationState | undefined;
@@ -90,8 +89,7 @@ export function EpubReader({
   controlsBlocked = false,
   onOpenShortcuts,
   notify,
-  caps, modelSelection, fontSelection,
-  channelLabel,
+  caps, modelSelection, fontSelection, channelOptions,
   translationScope,
   onReadingWindow,
   translationState,
@@ -483,7 +481,7 @@ export function EpubReader({
       {panel==='bookmarks'?<BookmarkList bookmarks={bookmarks}/>:panel === 'directory' && copy.document ? <EpubDirectory title={copy.title} index={copy.document}
         href={tocHref ?? position?.start.href ?? copy.documentLocation?.href} select={href => {run(() => rendition.current!.display(`/${href}`)); closePanel();}}/>
         : <div className="nc-drawer-content">{panel === 'translation'
-          ? <ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} channelLabel={channelLabel} modelSelection={modelSelection} fontSelection={fontSelection}
+          ? <ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} modelSelection={modelSelection} fontSelection={fontSelection} channelOptions={channelOptions}
             note={msg('仅翻译 EPUB 内的图片，正文文字保持原文。选择译图后，随读翻译可见图片与最多三张后续图片。')}/>
           : <ReaderSettings settings={globalSettings} setSettings={setSettings} layout={view.layout} direction={settings.direction} onLayout={changeLayout} onDirection={changeDirection}
             sizing={fixedLayout ? null : <ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}

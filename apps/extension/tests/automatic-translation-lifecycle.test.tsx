@@ -109,10 +109,21 @@ async function fixture(){
   };
   const unmount=()=>{if(!mounted)return;mounted=false;picture.unmount();parent.unmount();};unmounts.push(unmount);
   render();translation!.onReadingWindow([{entryId:copy.id,page,mode:'classic'}],[page]);await show();
-  return {...connection,en,ja,key,failures,show,settle,unmount,get copy(){return copy;},get translation(){return translation;},get load(){return load;},switchLanguage(value:string){language=value;render();},replaceChannel(value:ChannelConnection){channel=value;render();}};
+  return {...connection,en,ja,key,failures,show,settle,unmount,get copy(){return copy;},get translation(){return translation;},get load(){return load;},switchLanguage(value:string){language=value;render();},replaceChannel(value:ChannelConnection){channel=value;render();},reloadStoredBindings(){
+    translation.onReadingWindow([{entryId:copy.id,page:copy.pages[0],mode:'classic'}],copy.pages);
+    copy={...copy,pages:copy.pages.map(page=>({...page,outputBlobs:{}}))};render();
+    translation.onReadingWindow([{entryId:copy.id,page:copy.pages[0],mode:'classic'}],copy.pages);
+  }};
 }
 
 describe('automatic translation result-reader lifecycle',()=>{
+  it('rebinds a cached result after asynchronous same-scope storage hydration without a new request',async()=>{
+    const f=await fixture();expect(f.copy.pages[0].outputBlobs[f.en.id]).toBe(f.key('en'));
+    f.reloadStoredBindings();await f.settle();
+    expect(f.copy.pages[0].outputBlobs[f.en.id]).toBe(f.key('en'));
+    expect(f.download).not.toHaveBeenCalled();expect(f.translate).not.toHaveBeenCalled();
+    expect(await(await readMaterializedResult(f.key('en'))).text()).toBe('cached en');
+  });
   it('switches en -> ja -> en -> ja from cached results without failures, downloads or regeneration',async()=>{
     const f=await fixture();
     for(const language of ['ja','en','ja']){f.switchLanguage(language);await f.show();await vi.advanceTimersByTimeAsync(0);await f.settle();}

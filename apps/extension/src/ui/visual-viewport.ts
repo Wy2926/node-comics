@@ -14,21 +14,22 @@ export function visibleViewport(): ViewportBounds {
   };
 }
 
-export function menuPosition(anchor: Anchor, viewport: ViewportBounds, desiredWidth: number, contentHeight: number, placement: 'auto' | 'left' = 'auto') {
+export function menuPosition(anchor: Anchor, viewport: ViewportBounds, desiredWidth: number, contentHeight: number, placement: 'auto' | 'left' | 'end' = 'auto', heightLimit = 320) {
   const gap = 6, margin = 8, left = viewport.left + margin, top = viewport.top + margin;
   const right = viewport.left + viewport.width - margin, bottom = viewport.top + viewport.height - margin;
   const width = Math.max(0, Math.min(Math.max(anchor.width, desiredWidth), right - left));
   // A reader's side menu becomes an ordinary anchored menu when the phone has no side gutter.
   if (placement === 'left' && anchor.left - gap - width >= left) {
-    const maxHeight = Math.max(0, Math.min(320, bottom - top));
+    const maxHeight = Math.max(0, Math.min(heightLimit, bottom - top));
     const height = Math.min(contentHeight, maxHeight);
     return {left: anchor.left - gap - width, top: Math.max(top, Math.min(anchor.top + (anchor.height - height) / 2, bottom - height)), width, maxHeight};
   }
   const below = bottom - anchor.bottom - gap, above = anchor.top - gap - top;
-  const upwards = below < Math.min(contentHeight, 320) && above > below;
-  const maxHeight = Math.max(0, Math.min(320, upwards ? above : below, bottom - top));
+  const upwards = below < Math.min(contentHeight, heightLimit) && above > below;
+  const maxHeight = Math.max(0, Math.min(heightLimit, upwards ? above : below, bottom - top));
   const height = Math.min(contentHeight, maxHeight);
-  return {left: Math.max(left, Math.min(anchor.left, right - width)), top: Math.max(top, Math.min(upwards ? anchor.top - gap - height : anchor.bottom + gap, bottom - height)), width, maxHeight};
+  const alignedLeft = placement === 'end' ? anchor.right - width : anchor.left;
+  return {left: Math.max(left, Math.min(alignedLeft, right - width)), top: Math.max(top, Math.min(upwards ? anchor.top - gap - height : anchor.bottom + gap, bottom - height)), width, maxHeight};
 }
 
 /** Observe only while a dialog is mounted; keyboard/browser bars must not hide its close control. */

@@ -1,0 +1,95 @@
+[
+  {
+    "id": "lxgw-wenkai-light",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja"
+    ],
+    "name": "LXGWWenKai-Light.ttf",
+    "url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Light.ttf",
+    "sha256": "a347c7161ec38677646e361b5280ddb621671bbb97ecfd829ec9dd4e326f6081",
+    "license": "SIL Open Font License 1.1",
+    "notice": "LXGWWenKai-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/OFL.txt",
+    "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0",
+    "bytes": 28625516,
+    "weight": 300,
+    "source_version": "Version 1.530; October 13, 2026"
+  },
+  {
+    "name": "NotoSansCJKsc-Regular.otf",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+    "sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+    "license": "SIL Open Font License 1.1",
+    "notice": "NotoSansCJK-LICENSE",
+    "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+    "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+    "id": "noto-sans-cjk",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "bytes": 16437364,
+    "weight": 400,
+    "source_version": "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603"
+  },
+  {
+    "id": "lxgw-wenkai",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja"
+    ],
+    "name": "LXGWWenKai-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/fonts/TTF/LXGWWenKai-Regular.ttf",
+    "sha256": "bf73f995c05f3f7baf7840b9d76d8d9678c8b150a020946a394ca63c67ed1350",
+    "license": "SIL Open Font License 1.1",
+    "notice": "LXGWWenKai-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/2e4e84269ef1ce3194563dbe0842c5885766c7ea/OFL.txt",
+    "notice_sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0",
+    "bytes": 25928940,
+    "weight": 400,
+    "source_version": "Version 1.530; October 13, 2026"
+  },
+  {
+    "id": "noto-sans-cjk-light",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "name": "NotoSansCJKsc-Light.otf",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Light.otf",
+    "sha256": "e78bbbe1573bbb006156c1198f5c8cd6329470cb6e0b6702c7a3c83913db4abf",
+    "license": "SIL Open Font License 1.1",
+    "notice": "NotoSansCJK-LICENSE",
+    "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+    "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+    "bytes": 16329648,
+    "weight": 300,
+    "source_version": "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603"
+  },
+  {
+    "id": "noto-serif-cjk",
+    "languages": [
+      "zh-Hans",
+      "zh-Hant",
+      "ja",
+      "ko"
+    ],
+    "name": "NotoSerifCJKsc-Regular.otf",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf",
+    "sha256": "18e4072f01dad3965a72ae8afee7d6dac447c4eb6d454e0084ed5c9c1fc0091f",
+    "license": "SIL Open Font License 1.1",
+    "notice": "NotoSansCJK-LICENSE",
+    "notice_url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+    "notice_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+    "bytes": 24429984,
+    "weight": 400,
+    "source_version": "Version 2.001;hotconv 1.1.0;makeotfexe 2.6.0"
+  }
+]

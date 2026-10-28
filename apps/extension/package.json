@@ -24,15 +24,19 @@
   "dependencies": {
     "@gullabs/flipbook-core": "3.2.2",
     "@zip.js/zip.js": "2.15.0",
+    "comlink": "4.4.2",
     "epubjs": "0.3.93",
     "node-unrar-js": "2.0.2",
+    "onnxruntime-web": "1.27.0",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.3.289",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "overrides": {
-    "epubjs": { "@xmldom/xmldom": "0.9.12" }
+    "epubjs": {
+      "@xmldom/xmldom": "0.9.12"
+    }
   },
   "devDependencies": {
     "@types/chrome": "^0.1.6",
@@ -40,6 +44,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "@webgpu/types": "0.1.74",
     "@wxt-dev/module-react": "1.2.2",
     "@xmldom/xmldom": "0.9.12",
     "fake-indexeddb": "^6.2.4",
