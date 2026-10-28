@@ -1173,5 +1173,7 @@
   "淡入淡出": "Fundido",
   "无动画": "Ninguna",
   "此浏览器无法保存此文件，请更新浏览器后重试。": "Este navegador no puede guardar el archivo. Actualízalo e inténtalo de nuevo.",
-  "文件已准备好，请点击“保存”选择位置。": "El archivo está listo. Selecciona «Guardar» para elegir una ubicación."
+  "文件已准备好，请点击“保存”选择位置。": "El archivo está listo. Selecciona «Guardar» para elegir una ubicación.",
+  "需登录或验证": "Iniciar sesión o verificar",
+  "已找到": "Encontrado"
 }

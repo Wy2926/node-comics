@@ -1173,5 +1173,7 @@
   "淡入淡出": "Überblenden",
   "无动画": "Keine",
   "此浏览器无法保存此文件，请更新浏览器后重试。": "Dieser Browser kann die Datei nicht speichern. Aktualisieren Sie ihn und versuchen Sie es erneut.",
-  "文件已准备好，请点击“保存”选择位置。": "Die Datei ist bereit. Wählen Sie „Speichern“, um einen Speicherort auszuwählen."
+  "文件已准备好，请点击“保存”选择位置。": "Die Datei ist bereit. Wählen Sie „Speichern“, um einen Speicherort auszuwählen.",
+  "需登录或验证": "Anmeldung / Verifizierung",
+  "已找到": "Gefunden"
 }

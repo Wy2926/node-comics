@@ -1173,5 +1173,7 @@
   "淡入淡出": "Fade",
   "无动画": "None",
   "此浏览器无法保存此文件，请更新浏览器后重试。": "This browser cannot save this file. Update your browser and try again.",
-  "文件已准备好，请点击“保存”选择位置。": "Your file is ready. Select “Save” to choose a location."
+  "文件已准备好，请点击“保存”选择位置。": "Your file is ready. Select “Save” to choose a location.",
+  "需登录或验证": "Login or verification required",
+  "已找到": "Found"
 }

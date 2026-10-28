@@ -97,18 +97,40 @@
 .nc-search-progress { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-wrap:wrap; font-size:.75rem; color:var(--muted); line-height:1.7; text-align:right; font-variant-numeric:tabular-nums; }
 .nc-search-candidate-count { padding:3px 9px; border:var(--comic-badge-border); border-radius:var(--comic-badge-radius); color:var(--ink); background:var(--accent-soft); font-weight:750; }
 .nc-search-failed-count { color:var(--warning); }
-.nc-search-status-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; align-items:start; }
-.nc-search-status { display:grid; grid-template-columns:calc(2rem + 5px) minmax(0,1fr); align-items:center; column-gap:10px; row-gap:5px; min-width:0; padding:12px; border:var(--comic-border); border-radius:var(--comic-card-radius); box-shadow:var(--comic-shadow-small); color:var(--ink); background:var(--surface); text-align:left; cursor:pointer; }
+.nc-search-status-groups { display:flex; flex-wrap:wrap; gap:12px; }
+.nc-search-status-group { min-width:0; max-width:100%; }
+.nc-search-status-group[data-expanded=true] { display:grid; grid-template-columns:160px minmax(0,1fr); align-items:start; gap:12px 16px; flex:0 0 100%; }
+.nc-search-status-group>h3 { margin:0; font-size:.8125rem; line-height:1.6; color:var(--muted); }
+.nc-search-group-toggle { display:flex; align-items:center; gap:8px; min-height:44px; max-width:100%; padding:8px 10px; border:var(--comic-badge-border); border-radius:var(--comic-control-radius); background:var(--surface); color:inherit; font:inherit; text-align:start; cursor:pointer; }
+.nc-search-group-toggle:hover { border-color:var(--accent); }
+.nc-search-group-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.nc-search-group-toggle>.nc-icon { flex:none; }
+.nc-search-group-toggle[aria-expanded=true]>.nc-icon { transform:rotate(90deg); }
+.nc-search-group-name { min-width:0; overflow-wrap:anywhere; }
+.nc-search-status-group.is-found>h3 { color:var(--success); }
+.nc-search-status-group.is-login>h3 { color:var(--warning); }
+.nc-search-status-group.is-failed>h3 { color:var(--danger); }
+.nc-search-status-group.is-pending>h3 { color:var(--accent); }
+.nc-search-group-count { flex:none; min-width:22px; padding:1px 6px; border-radius:var(--comic-badge-radius); background:var(--surface-soft); color:var(--ink); font-size:.6875rem; text-align:center; font-variant-numeric:tabular-nums; }
+.nc-search-group-sites { min-width:0; }
+.nc-search-group-sites[hidden] { display:none; }
+.nc-search-status-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(176px,100%),1fr)); gap:8px; align-items:stretch; min-width:0; }
+.nc-search-status { display:grid; grid-template-columns:22px minmax(0,1fr) auto; align-items:center; gap:8px; min-width:0; min-height:44px; padding:8px 10px; border:var(--comic-badge-border); border-radius:var(--comic-control-radius); color:var(--ink); background:var(--surface); text-align:start; cursor:pointer; }
 .nc-search-status:hover { border-color:var(--accent); background:var(--accent-soft); }
-.nc-search-status[aria-pressed=true] { border-color:var(--accent); background:var(--accent-soft); box-shadow:var(--comic-shadow); }
-.nc-search-status>.nc-search-site-icon { grid-row:span 2; width:100%; height:100%; }
-.nc-search-status>.nc-search-site-icon>svg { width:70%; height:70%; }
-.nc-search-status b { font-size:.75rem; font-weight:750; line-height:1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nc-search-status[aria-pressed=true] { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+.nc-search-status:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.nc-search-status b { min-width:0; font-size:.75rem; font-weight:650; line-height:1.35; overflow-wrap:anywhere; white-space:normal; }
 .nc-search-site-state { display:flex; align-items:center; gap:5px; font-size:.6875rem; color:var(--muted); line-height:1rem; white-space:nowrap; }
+.nc-search-site-count { min-width:22px; padding:2px 5px; border-radius:var(--comic-badge-radius); background:var(--surface-soft); color:var(--ink); text-align:center; font-variant-numeric:tabular-nums; }
+.nc-search-status[aria-pressed=true] .nc-search-site-count { background:var(--accent); color:var(--accent-on); }
+.nc-search-sites-summary { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 16px; margin-top:8px; color:var(--muted); font-size:var(--text-caption); }
+.nc-search-sites-expand { display:inline-flex; align-items:center; gap:6px; min-height:32px; margin-inline-start:auto; }
+.nc-search-sites-expand>.nc-icon { transform:rotate(90deg); }
+.nc-search-sites-expand[aria-expanded=true]>.nc-icon { transform:rotate(-90deg); }
 .nc-search-status-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); flex:none; }
 .nc-search-status.is-running .nc-search-status-dot,.nc-search-status.is-queued .nc-search-status-dot { background:var(--accent); animation:nc-search-pulse 1.3s infinite; }
-.nc-search-status.is-ready .nc-search-status-dot,.nc-search-status.is-empty .nc-search-status-dot { background:var(--success); }
 .nc-search-status.is-error .nc-search-status-dot { background:var(--warning); }
+.nc-search-status-group.is-failed .nc-search-status-dot { background:var(--danger); }
 .nc-search-status-detail { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:24px; min-height:88px; padding:18px 20px; margin-top:20px; border:var(--comic-border); border-radius:var(--comic-card-radius); box-shadow:var(--comic-shadow-small); background:var(--surface); }
 .nc-search-detail-summary { display:flex; align-items:center; gap:14px; min-width:0; }
 .nc-search-detail-summary>.nc-search-site-icon { width:36px; height:36px; border:var(--comic-badge-border); }
@@ -202,7 +224,6 @@
   .nc-search-result-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
-  .nc-search-result-list { grid-template-columns: minmax(0, 1fr); }
   .nc-search-sheet {
     inset: var(--nc-viewport-top, 0px) auto auto var(--nc-viewport-left, 0px);
     width: var(--nc-viewport-width, 100%);
@@ -235,14 +256,13 @@
   .nc-search-site-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nc-search-site-option { min-height: 48px; padding: 10px 8px; gap: 6px; }
   .nc-search-site-option input { width: 18px; height: 18px; }
-  .nc-search-site-option b { font-size: .75rem; }
   .nc-search-query form { flex-wrap: wrap; }
   .nc-search-query form>.button { width: 100%; }
   .nc-search-text-button { min-height: 44px; }
   .nc-search-result-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .nc-search-progress { justify-content: flex-start; text-align: start; gap: 8px; }
-  .nc-search-status-list { display: flex; gap: 10px; overflow-x: auto; padding: 2px 4px 8px 2px; scroll-snap-type: x proximity; }
-  .nc-search-status { flex: 0 0 160px; scroll-snap-align: start; }
+  .nc-search-status-group[data-expanded=true] { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .nc-search-status-list { grid-template-columns:repeat(auto-fill,minmax(min(10rem,100%),1fr)); }
   .nc-search-status-detail { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
   .nc-search-detail-actions { flex-wrap: wrap; }
   .nc-search-detail-actions>.button { flex: 1; }

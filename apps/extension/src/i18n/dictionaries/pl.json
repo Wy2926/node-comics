@@ -1173,5 +1173,7 @@
   "淡入淡出": "Przenikanie",
   "无动画": "Brak",
   "此浏览器无法保存此文件，请更新浏览器后重试。": "Ta przeglądarka nie może zapisać pliku. Zaktualizuj ją i spróbuj ponownie.",
-  "文件已准备好，请点击“保存”选择位置。": "Plik jest gotowy. Wybierz „Zapisz”, aby wskazać lokalizację."
+  "文件已准备好，请点击“保存”选择位置。": "Plik jest gotowy. Wybierz „Zapisz”, aby wskazać lokalizację.",
+  "需登录或验证": "Logowanie / weryfikacja",
+  "已找到": "Znaleziono"
 }

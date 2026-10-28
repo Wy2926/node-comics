@@ -7,12 +7,13 @@ import {Thumbnail} from '../../reader/Images';
 import {listSearchSites,matchesSiteFilters,releaseSourceSearchSession,searchSource,type SiteFilters,type SourceSearchResult} from '../../sources';
 import {ComicSearchSession,comicSearchSourceKey} from '../../comics/application/search/session';
 import {readSearchSiteSelection,saveSearchSiteSelection} from '../../comics/application/preferences';
-import type {SearchSeed,SearchSiteState} from '../../comics/application/search/types';
+import type {SearchSeed} from '../../comics/application/search/types';
 import {Select,SelectOption} from '../Select';
 import {LanguageFlag} from '../LanguageFlag';
 import {searchResultCoverKey} from './SearchResultCover';
 import {SearchResultCard} from './SearchResultCard';
 import {SearchSiteIcon} from './SearchSiteIcon';
+import {SearchSiteGroups,needsSiteLogin,searchSiteGroup,searchSiteStateLabel as stateLabel,type SearchSiteGroup} from './SearchSiteGroups';
 import {SearchScopeSettings} from './SearchScopeSettings';
 import {emptySiteFilters} from '../SiteFilterControls';
 import {useDialogViewport} from '../visual-viewport';
@@ -33,17 +34,6 @@ export interface ComicSearchPanelProps {
   onLanguageChange?:(language:string)=>void;
 }
 const waitSeconds=(until:number|undefined,now:number)=>until?Math.max(0,Math.ceil((until-now)/1000)):0;
-function stateLabel(state:SearchSiteState){
-  switch(state.status){
-    case 'queued':return msg('等待搜索');
-    case 'running':return msg('搜索中');
-    case 'ready':return msg('{0} 个候选',{'0':state.resultCount});
-    case 'empty':return msg('未找到');
-    case 'error':return state.error?.kind==='rate-limit'?msg('请求受限'):state.error?.kind==='timeout'?msg('搜索超时'):msg('搜索失败');
-    case 'stopped':return msg('已停止');
-    default:return msg('尚未搜索');
-  }
-}
 
 /** All presentations share one search workflow. Keep mounted while hidden to retain local results. */
 export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLanguage,onClose,onLogin,onImportHit,existingSourceKeys,currentIdentity,onLanguageChange}:ComicSearchPanelProps){
@@ -54,6 +44,8 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const [scopeFilters,setScopeFilters]=useState<SiteFilters>(emptySiteFilters);
   const [query,setQuery]=useState(presentation==='embedded'?seed.title:snapshot.query),[mode,setMode]=useState<'direct'|'translate'>(presentation==='sheet'?'translate':'direct');
   const [siteFilter,setSiteFilter]=useState(''),[reopened,setReopened]=useState(false),[importing,setImporting]=useState<string>(),[importErrors,setImportErrors]=useState<Record<string,string>>({});
+  const [expandedGroups,setExpandedGroups]=useState<Record<string,boolean>>({found:true});
+  const [expandedSiteLists,setExpandedSiteLists]=useState<Record<string,boolean>>({});
   const filteredSite=snapshot.sites.find(state=>state.status!=='idle'&&state.site.key===siteFilter);
   const titleDeadline=mode==='translate'||snapshot.titleError?snapshot.titleRetryAt:undefined;
   const clock=useRetryClock(open?Math.max(titleDeadline??0,filteredSite?.error?.retryAt??0):0);
@@ -79,7 +71,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
     wasOpened.current=true;
     return()=>{
       session.stop();
-      if(sheet){scrollPosition.current=scroller?.scrollTop??0;element?.close();queueMicrotask(()=>{if(previous?.isConnected&&!previous.closest('[inert]'))previous.focus({preventScroll:true});});}
+      if(sheet){element?.close();queueMicrotask(()=>{if(previous?.isConnected&&!previous.closest('[inert]'))previous.focus({preventScroll:true});});}
     };
   },[open,session,sheet]);
   useEffect(()=>{setSiteFilter('');setImportErrors({});},[snapshot.requestedTitleLanguage,snapshot.sourceTitle]);
@@ -89,15 +81,21 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
   const selected=scopeSites.filter(state=>state.selected),resultSites=snapshot.sites.filter(state=>state.status!=='idle');
   const siteWait=waitSeconds(filteredSite?.error?.retryAt,clock),titleWait=waitSeconds(snapshot.titleRetryAt,clock);
   const siteBusy=filteredSite?.status==='running'||filteredSite?.status==='queued',siteRetry=filteredSite?.status==='error'||filteredSite?.status==='stopped';
-  const returned=resultSites.filter(state=>state.status==='ready'||state.status==='empty').length,failed=resultSites.filter(state=>state.status==='error').length;
+  const returned=resultSites.filter(state=>state.status==='ready'||state.status==='empty'||state.status==='error').length,failed=resultSites.filter(state=>state.status==='error'&&!needsSiteLogin(state)).length;
+  const hasErrors=resultSites.some(state=>state.status==='error');
   const permissionError=resultSites.find(state=>state.error?.kind==='permission')?.error;
   const active=snapshot.phase==='searching'||snapshot.phase==='resolving-name',translating=mode==='translate';
   const results=snapshot.results.filter(hit=>!filteredSite||filteredSite.resultKeys.includes(hit.key));
   const showResolved=translating&&(snapshot.titleState==='resolved'||snapshot.titleState==='missing'||snapshot.titleState==='error'||snapshot.titleState==='manual');
   const sourceCover=seed.cover?.url&&/^(?:blob:|data:image\/|chrome-extension:|moz-extension:)/.test(seed.cover.url)?seed.cover.url:undefined;
   const close=()=>{session.stop();onClose?.();};
-  const submitManual=(value=query)=>{setReopened(false);setSiteFilter('');session.searchManual(value,selected.map(state=>state.site.key));};
-  const automatic=()=>{setReopened(false);setSiteFilter('');void session.searchWithTranslatedTitle(selected.map(state=>state.site.key));};
+  const resetResultView=()=>{setReopened(false);setSiteFilter('');setExpandedGroups({found:true});setExpandedSiteLists({});};
+  const submitManual=(value=query)=>{resetResultView();session.searchManual(value,selected.map(state=>state.site.key));};
+  const automatic=()=>{resetResultView();void session.searchWithTranslatedTitle(selected.map(state=>state.site.key));};
+  const toggleGroup=(group:SearchSiteGroup)=>{
+    const expanded=!expandedGroups[group];setExpandedGroups(value=>({...value,[group]:expanded}));
+    if(!expanded&&filteredSite&&searchSiteGroup(filteredSite)===group)setSiteFilter('');
+  };
   const useOriginal=()=>{setQuery(snapshot.sourceTitle);submitManual(snapshot.sourceTitle);};
   const changeMode=(next:'direct'|'translate')=>{if(next===mode)return;session.stop();if(next==='translate'&&!snapshot.sourceTitle&&query)session.setSourceTitle(query);if(next==='direct'&&!query)setQuery(snapshot.sourceTitle);setMode(next);};
   const importHit=(hit:SourceSearchResult)=>{
@@ -119,7 +117,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
       <h1 id={titleId}>{msg('寻找其他语言')}</h1>
       <div className="nc-search-header-context">{seed.title&&<div className="nc-search-origin"><div className="nc-search-origin-cover">{seed.coverKey?<Thumbnail blobKey={seed.coverKey}/>:sourceCover?<img src={sourceCover} alt=""/>:<Icon name="book" size={20}/>}</div><div><small>{seed.sourceName??msg('当前作品')}</small><b title={seed.title}>{seed.title}</b></div></div>}{sheet&&<button ref={closeRef} className="icon-button" aria-label={msg('关闭查找面板')} onClick={close}><Icon name="close"/></button>}</div>
     </header>}
-    <div ref={scrollRef} className="nc-search-body" data-search-scroll={sheet?'true':undefined}>
+    <div ref={scrollRef} className="nc-search-body" data-search-scroll={sheet?'true':undefined} onScroll={sheet?event=>{scrollPosition.current=event.currentTarget.scrollTop;}:undefined}>
         <div className="nc-search-composer">
           <div className="nc-search-controls">
           <div className="nc-search-toolbar">
@@ -149,7 +147,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
         </div>
       {snapshot.searchedAt?<section className="nc-search-results">
         <div className="nc-search-result-heading"><h2>{msg('搜索结果')}</h2><div className="nc-search-progress" role="status"><span title={reopened?msg('上次查找：{0}',{'0':formatDate(snapshot.searchedAt,true)}):undefined}>{snapshot.phase==='stopped'?msg('已停止'):msg('{0}/{1} 个网站已返回',{'0':returned,'1':resultSites.length})}</span>{failed>0&&<span className="nc-search-failed-count">{msg('{0} 个网站失败',{'0':failed})}</span>}<span className="nc-search-candidate-count">{msg('{0} 个候选',{'0':results.length})}</span>{active&&<button className="nc-search-text-button" onClick={()=>session.stop()}>{msg('停止查找')}</button>}</div></div>
-        <div className="nc-search-status-list">{resultSites.map(state=><button type="button" key={state.site.key} className={'nc-search-status is-'+state.status} aria-pressed={filteredSite?.site.key===state.site.key} title={state.site.name+' · '+msg('查看此网站结果')} onClick={()=>setSiteFilter(value=>value===state.site.key?'':state.site.key)}><SearchSiteIcon icon={state.site.icon}/><b>{state.site.name}</b><span className="nc-search-site-state"><i className="nc-search-status-dot"/>{stateLabel(state)}</span></button>)}</div>
+        <SearchSiteGroups sites={resultSites} selectedSiteKey={filteredSite?.site.key} expandedGroups={expandedGroups} expandedLists={expandedSiteLists} onToggleGroup={toggleGroup} onToggleList={group=>setExpandedSiteLists(value=>({...value,[group]:!value[group]}))} onSelectSite={key=>setSiteFilter(value=>value===key?'':key)}/>
         {filteredSite&&<section className={'nc-search-status-detail is-'+filteredSite.status} aria-label={filteredSite.site.name}>
           <div className="nc-search-detail-summary"><SearchSiteIcon icon={filteredSite.site.icon}/><div className="nc-search-detail-copy" aria-live="polite">
             <div className="nc-search-detail-title"><h3>{filteredSite.site.name}</h3><span className="nc-search-detail-state">{stateLabel(filteredSite)}</span></div>
@@ -161,7 +159,7 @@ export function ComicSearchPanel({open,presentation='sheet',seed,api,defaultLang
           </div>
         </section>}
         <div className="nc-search-result-list">{results.map(hit=>{const sourceKey=comicSearchSourceKey(hit.sourceId,hit.catalogId),site=snapshot.sites.find(state=>state.site.adapterId===hit.sourceId&&state.site.id===hit.siteId);return <SearchResultCard key={hit.key} hit={hit} site={site?.site} cache={coverCache.current} current={!!currentIdentity&&sourceKey===comicSearchSourceKey(currentIdentity.sourceId,currentIdentity.catalogId)} existing={existingSourceKeys?.has(sourceKey)} importing={importing} error={importErrors[hit.key]} onImport={()=>importHit(hit)}/>;})}</div>
-        {!results.length&&!filteredSite&&<div className="nc-search-empty"><Icon name={active?'clock':'comic-search'} size={36}/><h2>{active?msg('各网站正在独立查找'):failed?msg('尚未获得搜索结果'):snapshot.phase==='stopped'?msg('搜索已停止'):msg('本轮未找到符合条件的候选')}</h2><p>{active?msg('有结果就会显示，不必等待全部完成。'):failed?msg('可以单独重试网站，其他结果会保留。'):msg('试试原名、其他译名，或调整搜索网站。')}</p></div>}
+        {!results.length&&!filteredSite&&<div className="nc-search-empty"><Icon name={active?'clock':'comic-search'} size={36}/><h2>{active?msg('各网站正在独立查找'):hasErrors?msg('尚未获得搜索结果'):snapshot.phase==='stopped'?msg('搜索已停止'):msg('本轮未找到符合条件的候选')}</h2><p>{active?msg('有结果就会显示，不必等待全部完成。'):hasErrors?msg('可以单独重试网站，其他结果会保留。'):msg('试试原名、其他译名，或调整搜索网站。')}</p></div>}
         {!!results.length&&<p className="nc-search-match-note"><Icon name="info" size={15}/>{msg('以下是搜索候选，请核对封面与作者。')}</p>}
       </section>:<div className="nc-search-empty nc-search-intro"><span className="nc-search-intro-icon"><Icon name="comic-search" size={32}/></span><h2>{msg('按名称发现更多来源')}</h2><p>{msg('获取漫画名后，同时搜索所选网站；有结果就会立即显示。')}</p></div>}
     </div>
