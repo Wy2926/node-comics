@@ -1,8 +1,8 @@
-import {boundedJson,TextError,type TextBatch} from './protocol';
-export async function googleTranslate(batch:TextBatch,language:string,signal:AbortSignal,fetcher:typeof fetch=fetch):Promise<TextBatch>{
-  const result:TextBatch=Object.create(null);
+import {boundedJson,TextError,type RegionTexts} from './protocol';
+export async function googleTranslate(input:RegionTexts,language:string,signal:AbortSignal,fetcher:typeof fetch=fetch):Promise<RegionTexts>{
+  const result:RegionTexts=Object.create(null);
   // Preserve boundaries without relying on delimiters that the service may translate or remove.
-  for(const [id,text] of Object.entries(batch)){
+  for(const [id,text] of Object.entries(input)){
     if(!text.trim()){result[id]='';continue;}
     const body=new URLSearchParams({client:'gtx',sl:'ja',tl:language==='zh-Hant'?'zh-TW':'zh-CN',dt:'t',q:text});
     let response:Response;

@@ -3,7 +3,7 @@ import type {ChannelResource,ChannelResources as ResourceManager} from '../trans
 import {msg} from '../i18n/runtime';
 import {Modal,SettingRow} from './components';
 
-const resourceState=(state:ChannelResource['state'])=>({missing:msg('未下载'),downloading:msg('下载中'),paused:msg('已暂停'),verifying:msg('正在校验'),ready:msg('已就绪'),blocked:msg('暂不可下载'),error:msg('下载失败')})[state];
+const resourceState=(state:ChannelResource['state'])=>({missing:msg('未下载'),downloading:msg('下载中'),paused:msg('已暂停'),verifying:msg('正在校验'),ready:msg('已就绪'),error:msg('下载失败')})[state];
 const size=(bytes:number)=>bytes<1024*1024?Math.ceil(bytes/1024)+' KB':(bytes/1024/1024).toFixed(1)+' MB';
 export function ChannelResources({manager}:{manager:ResourceManager}){
   const [open,setOpen]=useState(false),[resources,setResources]=useState<ChannelResource[]>([]),[category,setCategory]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
@@ -32,7 +32,7 @@ export function ChannelResources({manager}:{manager:ResourceManager}){
         <div><strong>{loading?msg('正在读取资源…'):msg('必需资源 {0} / {1} 已就绪',{'0':ready,'1':required.length})}</strong>
           <p className="nc-muted">{msg('已占用 {0}；资源保存在当前浏览器。',{'0':size(resources.reduce((total,item)=>total+item.downloaded,0))})}</p>
         </div>
-        <button type="button" className="button primary small" disabled={busy||loading||!required.length||ready===required.length||required.some(resource=>resource.state==='blocked')} onClick={()=>void act('download')}>{msg('下载缺少的必需资源')}</button>
+        <button type="button" className="button primary small" disabled={busy||loading||!required.length||ready===required.length} onClick={()=>void act('download')}>{msg('下载缺少的必需资源')}</button>
       </div>
       <div className="nc-resource-categories" role="group" aria-label={msg('资源分类')}>{categories.map(item=><button key={item.id} className="button secondary small" type="button" aria-pressed={current?.id===item.id} onClick={()=>setCategory(item.id)}>{item.label}<span>{resources.filter(resource=>resource.category?.id===item.id&&resource.state==='ready').length} / {resources.filter(resource=>resource.category?.id===item.id).length}</span></button>)}</div>
       {current&&<p className="nc-muted nc-resource-description">{current.description}</p>}
@@ -41,7 +41,6 @@ export function ChannelResources({manager}:{manager:ResourceManager}){
         <p className="nc-muted">{resource.description}</p>
         <div className="nc-resource-meta"><span>{size(resource.bytes)}</span><span>{resource.selected?msg('当前所选字体'):resource.required?msg('翻译必需'):msg('按需下载')}</span></div>
         {['downloading','paused','verifying'].includes(resource.state)&&<><progress max={resource.bytes} value={resource.downloaded} aria-label={resource.label}/><small>{size(resource.downloaded)} / {size(resource.bytes)}</small></>}
-        {resource.state==='blocked'&&<p className="nc-muted">{msg('上游发布材料尚未齐全，此资源暂不开放安装。')}</p>}
         {resource.state==='error'&&resource.detail&&<p role="alert" className="error">{resource.detail}</p>}
         <div className="nc-resource-footer"><details><summary>{msg('来源与许可')}</summary><p>{resource.license}</p><a href={resource.source} target="_blank" rel="noopener noreferrer">{msg('查看来源说明')}</a></details>
           <div className="nc-config-actions">

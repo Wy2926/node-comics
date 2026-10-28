@@ -1,7 +1,7 @@
 import {openSourceDatabase} from '../database';
 import {Sha256} from '../../importers/hash';
 
-export interface LocalAsset {id:string;url:string;bytes:number;sha256:string;license:string;source:string;label:string;blocked?:boolean;}
+export interface LocalAsset {id:string;url:string;bytes:number;sha256:string;license:string;source:string;label:string;}
 export type AssetState='missing'|'downloading'|'paused'|'verifying'|'ready'|'error';
 export interface AssetRecord {id:string;offset:number;state:AssetState;etag?:string;error?:string;updatedAt:number;}
 const CHUNK=1024*1024;
@@ -72,10 +72,6 @@ export async function downloadAsset(asset:LocalAsset,signal:AbortSignal,changed:
     const notify=()=>{record.updatedAt=Date.now();changed();};
     if(record.state==='ready')return;
     try{
-      if(asset.blocked)throw Error('ASSET_PUBLICATION_BLOCKED');
-      const estimate=await navigator.storage?.estimate?.();
-      const remaining=asset.bytes-record.offset;
-      if(estimate?.quota&&estimate.usage!==undefined&&estimate.quota-estimate.usage<remaining+Math.max(32*CHUNK,remaining*.2))throw Error('ASSET_STORAGE_FULL');
       if(record.offset===asset.bytes){
         await verifyAsset(asset);record.state='ready';await save(record);notify();return;
       }

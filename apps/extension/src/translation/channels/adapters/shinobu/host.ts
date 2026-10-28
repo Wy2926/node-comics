@@ -25,10 +25,10 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
   return {
     async dispatch(message){
       if(!message||typeof message!=='object')throw Error('INVALID_HOST_MESSAGE');
-      const {action,id,fontIds}=message as {action:string;id?:string;fontIds?:string[]};
+      const {action,id,fontIds,token}=message as {action:string;id?:string;fontIds?:string[];token?:string};
       if(action==='stop'){active?.abort();downloads=[];downloader?.postMessage({action:'pause'});await disposeEngine();return;}
       if(action==='start'){
-        if(!id||!/^[a-f0-9]{64}$/.test(id))throw Error('INVALID_OPERATION');
+        if(!id||!/^[a-f0-9]{64}$/.test(id)||token!==undefined&&typeof token!=='string')throw Error('INVALID_OPERATION');
         return new Promise<void>((resolve,reject)=>{
           let accepted=false;
           void navigator.locks.request(executionLock,{ifAvailable:true},async lock=>{
@@ -38,7 +38,7 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
               const controller=new AbortController();active=controller;notify();accepted=true;resolve();
               try{
                 const source=await readInput(record.job.id);if(!source)throw Error('SOURCE_MISSING');
-                const output=await runImage(record,source,controller.signal);
+                const output=await runImage(record,source,controller.signal,token??'');
                 const now=new Date().toISOString(),job={...record.job,status:output.status==='no-translatable-text'?'no_text' as const:'succeeded' as const,phase:'succeeded',updated_at:now,completed_at:now,result_available:output.status!=='no-translatable-text',...(output.status==='no-translatable-text'?{}:{result:{key:record.job.id,recoverable:false}})};
                 if(job.status==='succeeded')await saveResultBlob({scope:{key:record.scope},job,blob:output.image,cacheToken:record.cacheToken,isCurrent:()=>!controller.signal.aborted});
                 record={...record,job};await saveOperation(record);await clearCheckpoint(record.job.id);
@@ -54,7 +54,7 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
       if(action==='download'){
         const fonts=Array.isArray(fontIds)&&fontIds.length?fontIds.slice(0,5):[defaultTranslationFont('zh-Hans')!.id];
         const requested=asset?[asset]:id?[]:[...modelAssets,...[...new Set(fonts)].map(fullFont)];
-        if(!requested.length||requested.some(item=>item.blocked))throw Error('MODEL_PUBLICATION_BLOCKED');
+        if(!requested.length)throw Error('ASSET_UNKNOWN');
         for(const item of requested)if(currentDownload!==item.id&&!downloads.some(value=>value.id===item.id))downloads.push(item);
         void navigator.storage.persist?.();downloadNext();return;
       }

@@ -6,12 +6,26 @@ import {parseConfig} from './config';
 import {entryOperations,saveOperation} from './operations';
 import {openTranslationBindings} from '../../../../comics/repositories/translation-bindings';
 import type {Job} from '../../../../types';
+import {localHostRequest} from '../../host-client';
+vi.mock('../../host-client',()=>({localHostRequest:vi.fn(async()=>{})}));
 
-afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.clearAllMocks();});
+it('admits large image metadata and passes the task token without persisting it',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
+  const header=new Uint8Array(33);header.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
+  const view=new DataView(header.buffer);view.setUint32(16,1000);view.setUint32(20,13000);
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob:async()=>new Blob([header],{type:'image/png'}),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('long.png',1000,13000),blobKey:'fixture-long-image'}};
+  await runtime.manual(target);
+  const [record]=await entryOperations(target.entryId);
+  expect(record.job.status).toBe('running');
+  expect(localHostRequest).toHaveBeenCalledExactlyOnceWith('shinobu',{action:'start',id:record.id,token:'task-fixture-token'});
+  expect(JSON.stringify(record)).not.toContain('task-fixture-token');runtime.dispose();
+});
 it('publishes only status changes and polls through the caller wait, without its own timer',async()=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!(null)}});
   const onJobs=vi.fn(async()=>{}),onChange=vi.fn(),getBlob=vi.fn(async()=>undefined);
-  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'unavailable'}};
   await runtime.manual(target);
   expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);
@@ -34,10 +48,10 @@ it('restores a shared image binding before admission while the reader still hold
   const database=await openTranslationBindings();
   await new Promise<void>((resolve,reject)=>{const tx=database.transaction('translationBindings','readwrite');tx.objectStore('translationBindings').put({id:JSON.stringify([scope.key,hash]),scope:scope.key,imageSha256:hash,payload:{jobs:[job]},updatedAt:Date.now()});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});
   const onJobs=vi.fn(async()=>{}),onChange=vi.fn(),getBlob=vi.fn(async()=>undefined);
-  const runtime=new ShinobuRuntime(scope,{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  const runtime=new ShinobuRuntime(scope,{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('same-image.png',900,1200),imageSha256:hash,translationScope:'another-channel',jobs:[]}};
   await runtime.submit([target]);expect(onJobs).toHaveBeenCalledExactlyOnceWith([job]);expect(runtime.hasPending).toBe(false);
   await runtime.submit([target]);expect(onJobs).toHaveBeenCalledTimes(1);expect(getBlob).not.toHaveBeenCalled();runtime.dispose();
-  const other=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'profile',1,'noto-sans-cjk');
+  const other=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs,onChange,isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
   await other.restore([target]);expect(onJobs).toHaveBeenCalledTimes(1);other.dispose();
 });

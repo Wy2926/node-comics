@@ -22,7 +22,7 @@ export class ShinobuRuntime implements ChannelRuntime{
   private admissionError?:string;private resources?:BroadcastChannel;
   private records=new Map<string,LocalOperation>();private targets:ReadingTarget[]=[];private stopped=false;private pumping=false;private check:(target:ReadingTarget)=>boolean=()=>true;
   private delivered=new Map<string,Job>();
-  constructor(readonly scope:TranslationScope,private options:RuntimeOptions,private config:ShinobuConfig,private profileId:string,private profileRevision:number,private fontId:string){}
+  constructor(readonly scope:TranslationScope,private options:RuntimeOptions,private config:ShinobuConfig,private fontId:string,private token=''){}
   private current=()=>!this.stopped&&this.options.isCurrent();
   private id=(target:ReadingTarget)=>digest([this.scope.key,this.options.language,targetKey(target.entryId,target.page,target.mode)]);
   private changed=()=>{if(this.current())this.options.onChange();};
@@ -76,7 +76,6 @@ export class ShinobuRuntime implements ChannelRuntime{
       const target=this.targets.find(this.needs);if(!target)return;
       const assets=[...modelAssets,fullFont(this.fontId)];
       if(!['zh-Hans','zh-Hant'].includes(this.options.language))this.admissionError='TEXT_CONFIG_INVALID';
-      else if(assets.some(asset=>asset.blocked))this.admissionError='MODEL_PUBLICATION_BLOCKED';
       else if((await Promise.all(assets.map(assetRecord))).some(record=>record?.state!=='ready'))this.admissionError='ASSET_MISSING';
       if(this.admissionError){this.changed();return;}
       await navigator.locks.request('nc-shinobu-admission',{ifAvailable:true},async lock=>{
@@ -87,12 +86,12 @@ export class ShinobuRuntime implements ChannelRuntime{
     }catch{this.changed();}finally{this.pumping=false;}
   }
   private async begin(target:ReadingTarget,previous?:LocalOperation){
-    const id=this.id(target),font=fullFont(this.fontId),fingerprint=digest([ENGINE_REVISION,TEXT_PROTOCOL_REVISION,this.config,this.options.language,font.sha256,this.profileRevision]);
+    const id=this.id(target),font=fullFont(this.fontId),fingerprint=digest([ENGINE_REVISION,TEXT_PROTOCOL_REVISION,this.config,this.options.language,font.sha256]);
     await navigator.locks.request(launchLock(id),async()=>{
       let dispatched=false;
       let lease:{blob:Blob;release:()=>void}|undefined;
       const now=new Date().toISOString();
-      let record:LocalOperation={id,scope:this.scope.key,entryId:target.entryId,pageId:target.page.id,profileId:this.profileId,profileRevision:this.profileRevision,config:this.config,fontId:this.fontId,fingerprint,cacheToken:await translationCache.token(this.scope.key),previousResult:previous?.job.status==='succeeded'?previous.job:previous?.previousResult??this.delivered.get(id),
+      let record:LocalOperation={id,scope:this.scope.key,entryId:target.entryId,pageId:target.page.id,config:this.config,fontId:this.fontId,fingerprint,cacheToken:await translationCache.token(this.scope.key),previousResult:previous?.job.status==='succeeded'?previous.job:previous?.previousResult??this.delivered.get(id),
         job:{id:crypto.randomUUID(),mode:target.mode,target_language:this.options.language,font_id:this.fontId,status:'running',phase:'detecting',created_at:now,updated_at:now,version:1,quota_pages:0,cache_hit:false}};
       try{
         if(!['zh-Hans','zh-Hant'].includes(this.options.language))throw Error('TEXT_CONFIG_INVALID');
@@ -103,17 +102,16 @@ export class ShinobuRuntime implements ChannelRuntime{
         if(!this.current()||!this.check(target))return;
         const metadata=await probeImageMetadata(source);
         if(!metadata)throw Error('SOURCE_CHANGED');
-        if(metadata.width>8192||metadata.height>8192||metadata.width*metadata.height>12_000_000)throw Error('IMAGE_TOO_LARGE');
         const sha=await hashFile(source);if(target.page.imageSha256&&target.page.imageSha256!==sha)throw Error('SOURCE_CHANGED');
         if(!this.current()||!this.check(target))return;
         record.job.image_sha256=sha;record.fingerprint=digest([fingerprint,sha]);
         if(previous?.fingerprint===record.fingerprint){
           const checkpoint=await readCheckpoint(previous.job.id);
-          if(checkpoint&&checkpoint.updatedAt>Date.now()-86400000)await saveCheckpoint({...checkpoint,id:record.job.id,batches:checkpoint.batches.map(batch=>batch.state==='succeeded'?batch:{state:'pending'})});
+          if(checkpoint?.state==='succeeded'&&checkpoint.updatedAt>Date.now()-86400000)await saveCheckpoint({...checkpoint,id:record.job.id});
         }
         await saveOperation(record,true,source);await this.adopt(record);
         dispatched=true;
-        await localHostRequest('shinobu',{action:'start',id});
+        await localHostRequest('shinobu',{action:'start',id,token:this.token});
         if(target.page.blobKey)await this.options.onInputConsumed?.(target.page.blobKey).catch(()=>{});
       }catch(error){
         // A missing ACK cannot overwrite work already accepted by the independent host.

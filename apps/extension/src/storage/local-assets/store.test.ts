@@ -3,7 +3,7 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {Sha256} from '../../importers/hash';
 import {assetLock,assetRecord,downloadAsset,readAsset,removeAsset,type LocalAsset} from './store';
 const held=new Set<string>();
-beforeEach(()=>{held.clear();vi.stubGlobal('navigator',{storage:{estimate:async()=>({quota:1024**3,usage:0})},locks:{request:async(name:string,options:unknown,callback?:(value:unknown)=>Promise<unknown>)=>{
+beforeEach(()=>{held.clear();vi.stubGlobal('navigator',{storage:{estimate:async()=>({quota:1,usage:0})},locks:{request:async(name:string,options:unknown,callback?:(value:unknown)=>Promise<unknown>)=>{
   const run=typeof options==='function'?options:callback!;
   if(held.has(name))return run(null);held.add(name);try{return await run({name});}finally{held.delete(name);}
 }}});});
@@ -26,12 +26,6 @@ describe('streamed local asset storage',()=>{
   });
   it('does not remove resources leased by an inference session',async()=>{
     const asset=descriptor(new Uint8Array([9]));held.add(assetLock(asset));await expect(removeAsset(asset)).rejects.toThrow('ASSET_BUSY');
-  });
-  it('makes insufficient space visible without issuing a network request',async()=>{
-    Object.assign(navigator.storage,{estimate:async()=>({quota:1,usage:0})});
-    const asset=descriptor(new Uint8Array([8])),fetcher=vi.fn();
-    await expect(downloadAsset(asset,new AbortController().signal,()=>{},fetcher)).rejects.toThrow('ASSET_STORAGE_FULL');
-    expect(await assetRecord(asset)).toMatchObject({state:'error',error:'ASSET_STORAGE_FULL'});expect(fetcher).not.toHaveBeenCalled();
   });
   it('does not accept a range response for different bytes',async()=>{
     const asset=descriptor(new Uint8Array([3,9,7]));

@@ -7,18 +7,17 @@ import {msg} from '../../../../i18n/runtime';
 import {translationFontName,defaultTranslationFont} from '../../../../../../../backend/shared/translation-fonts';
 const resourceError=(code:string)=>code==='ASSET_BUSY'?msg('资源正在使用，请停止任务或稍后再试。'):code==='ASSET_STORAGE_FULL'?msg('空间不足'):code==='ASSET_CORRUPT'?msg('资源校验失败，请重新下载。'):msg('资源操作失败；请检查空间、网络或正在运行的任务。');
 const source='https://github.com/DonutShinobu/ShinobuTranslator/releases/download/models-v0.8.3/';
-// Explicit local development builds only. Store/normal builds retain upstream publication blocks.
-export const developmentModels=import.meta.env.VITE_SHINOBU_LOCAL_MODELS==='1'&&import.meta.env.MODE!=='production';
+const modelLicenses:Record<string,string>={detector:'GPL-3.0',inpaint:'GPL-3.0',bubble:'Apache-2.0 / AGPL-3.0','paddleocr-v6-medium':'Apache-2.0','paddleocr-v6-dictionary':'Apache-2.0'};
 export const modelAssets:LocalAsset[]=manifest.assets.map(asset=>({id:asset.id,label:asset.path,url:source+asset.path,bytes:asset.size,sha256:asset.sha256,
   source:'https://github.com/DonutShinobu/ShinobuTranslator/blob/c4239a2c653c68f66283b990f96936234c8d7294/packages/model-manifest/publication-policy.json',
-  license:asset.id.startsWith('paddleocr')?'Apache-2.0':'Pending upstream publication review',blocked:!asset.id.startsWith('paddleocr')&&!developmentModels}));
+  license:modelLicenses[asset.id]}));
 export const resourceAssets=()=>[...modelAssets,...localFonts.map(font=>fullFont(font.id))];
 export const resourceEvents='nc-local-assets-changed';
 async function readAssetState(asset:LocalAsset):Promise<FontDownload>{
   const saved=await assetRecord(asset),downloading=saved?.state==='downloading'||saved?.state==='verifying';
   const locks=downloading?await navigator.locks.query():undefined;
   const live=locks?.held?.some(lock=>lock.name==='nc-local-asset:'+asset.sha256);
-  return {id:asset.id,bytes:asset.bytes,downloaded:saved?.offset??0,state:asset.blocked?'blocked':downloading&&!live?'paused':saved?.state??'missing',detail:saved?.error?resourceError(saved.error):undefined};
+  return {id:asset.id,bytes:asset.bytes,downloaded:saved?.offset??0,state:downloading&&!live?'paused':saved?.state??'missing',detail:saved?.error?resourceError(saved.error):undefined};
 }
 function subscribeResources(listener:()=>void){const channel=new BroadcastChannel(resourceEvents);channel.onmessage=listener;return()=>channel.close();}
 export const fontDownloads:FontDownloads={

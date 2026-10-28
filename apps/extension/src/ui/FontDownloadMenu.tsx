@@ -6,7 +6,7 @@ import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
 import {PickerMenu} from './PickerMenu';
 
-const status=(font?:FontDownload)=>font?({missing:msg('未下载'),ready:msg('已下载'),downloading:msg('下载中'),verifying:msg('正在校验'),paused:msg('已暂停'),error:msg('下载失败'),blocked:msg('暂不可下载')})[font.state]:msg('正在读取资源…');
+const status=(font?:FontDownload)=>font?({missing:msg('未下载'),ready:msg('已下载'),downloading:msg('下载中'),verifying:msg('正在校验'),paused:msg('已暂停'),error:msg('下载失败')})[font.state]:msg('正在读取资源…');
 const size=(bytes:number)=>(bytes/1024/1024).toFixed(1)+' MB';
 export function FontDownloadMenu({id,downloads,choices,value,language,saving,fontStyle,onChoose,onOpenChange}:{
   id:string;downloads:FontDownloads;choices:ReturnType<typeof availableTranslationFonts>;value?:string;language:string;saving:boolean;
@@ -53,7 +53,7 @@ export function FontDownloadMenu({id,downloads,choices,value,language,saving,fon
               <span><strong style={fontStyle(font.id)} lang={language}>{name}</strong><small data-ready={ready||undefined}>{waiting&&resource?.state==='missing'?msg('等待下载'):status(resource)}{resource&&' · '+size(resource.bytes)}</small></span>
               {value===font.id&&<Icon name="check" size={16}/>}
             </button>
-            {resource&&!ready&&resource.state!=='blocked'&&<button type="button" className="nc-font-download-action" disabled={working} aria-label={msg('下载')+' · '+name} onClick={()=>void download(resource)}>
+            {resource&&!ready&&<button type="button" className="nc-font-download-action" disabled={working} aria-label={msg('下载')+' · '+name} onClick={()=>void download(resource)}>
               <Icon name="download" size={16}/><span>{working?resource.state==='verifying'?msg('正在校验'):msg('下载中'):resource.state==='paused'?msg('继续下载'):resource.state==='error'?msg('重试下载'):msg('下载')}</span>
             </button>}
           </div>

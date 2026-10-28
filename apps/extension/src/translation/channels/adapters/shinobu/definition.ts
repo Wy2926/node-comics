@@ -6,14 +6,14 @@ import {loadResultBlob,resultBlobKey} from '../../../../storage/translations/res
 import {readChannelSettings,updateChannelSettings} from '../../configuration';
 import type {ChannelDefinition} from '../../contracts';
 import {configFields,needsInternet} from './config';
-import {fontPreferenceKey,serviceScope,serviceSelection,saveCommonSettings,localSettings,profileConfig} from './services';
+import {fontPreferenceKey,serviceScope,serviceToken,serviceSelection,saveCommonSettings,localSettings,profileConfig} from './services';
 import {resourceManager,fontDownloads} from './resources';
 import {localFonts} from '../../../font-resources';
 import {effectiveTranslationFont} from '../../../fonts';
 import {ShinobuRuntime} from './runtime';
 import {entryOperations,blockEntry,removeEntry} from './operations';
 import {errorMessage} from './errors';
-const capabilities=():Capabilities=>({modes:[{id:'classic',label:msg('翻译'),enabled:true,languages:['zh-Hans','zh-Hant']}],languages:fallbackLanguages.filter(language=>['zh-Hans','zh-Hant'].includes(language.id)),limits:{max_bytes:Number.MAX_SAFE_INTEGER,max_pixels:12_000_000,max_dimension:8192,max_translation_ids:MAX_READER_TARGETS},entitlements:null,translation_fonts:localFonts});
+const capabilities=():Capabilities=>({modes:[{id:'classic',label:msg('翻译'),enabled:true,languages:['zh-Hans','zh-Hant']}],languages:fallbackLanguages.filter(language=>['zh-Hans','zh-Hant'].includes(language.id)),limits:{max_bytes:Number.MAX_SAFE_INTEGER,max_pixels:Number.MAX_SAFE_INTEGER,max_dimension:Number.MAX_SAFE_INTEGER,max_translation_ids:MAX_READER_TARGETS},entitlements:null,translation_fonts:localFonts});
 export const definition:ChannelDefinition={
   id:'shinobu',get label(){return msg('浏览器本地翻译');},configurable:false,
   get description(){return msg('本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。');},
@@ -30,7 +30,7 @@ export const definition:ChannelDefinition={
       }},
       options:{fields:configFields(),values:{backend:config.backend,ocrFilter:config.ocrFilter},settingsLabel:msg('本机识别设置'),services:serviceSelection(profile,secrets,current),resources:resourceManager(Object.values(fonts).filter((id):id is string=>!!id)),
         save:values=>saveCommonSettings(profile,values,current)},
-      createRuntime(options){return new ShinobuRuntime(scope,{...options,isCurrent:()=>current()&&options.isCurrent()},config,profile.id,profile.revision,effectiveTranslationFont(localFonts,options.language,options.fontId??fonts[options.language])??localFonts[0].id);},
+      createRuntime(options){return new ShinobuRuntime(scope,{...options,isCurrent:()=>current()&&options.isCurrent()},config,effectiveTranslationFont(localFonts,options.language,options.fontId??fonts[options.language])??localFonts[0].id,serviceToken(profile,secrets));},
       async validateResult(){assertCurrent(current);},
       readResult(job,signal){signal?.throwIfAborted();return loadResultBlob({scope,job,isCurrent:current});},
       dispose(){disposed=true;},

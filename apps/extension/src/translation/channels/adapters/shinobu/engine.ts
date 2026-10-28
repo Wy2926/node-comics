@@ -24,7 +24,7 @@ export async function disposeEngine(){
 async function ready(operation:LocalOperation):Promise<Context>{
   const font=fullFont(operation.fontId),key=font.sha256+':'+operation.config.backend;
   clearTimeout(idle);if(context?.key===key)return context;
-  await disposeEngine();if(modelAssets.some(asset=>asset.blocked))throw Error('MODEL_PUBLICATION_BLOCKED');
+  await disposeEngine();
   let release!:()=>void;
   const retained=new Promise<void>(resolve=>{release=resolve;});
   let initialized!:(value:Context)=>void,failed!:(error:unknown)=>void;
@@ -48,7 +48,7 @@ async function ready(operation:LocalOperation):Promise<Context>{
   context=await result;return context;
 }
 /** One warm runtime; verify assets once per host/font/backend generation. */
-export async function runImage(operation:LocalOperation,source:Blob,signal:AbortSignal){
+export async function runImage(operation:LocalOperation,source:Blob,signal:AbortSignal,token:string){
   const current=await ready(operation),worker=current.worker,font=fullFont(operation.fontId);
   const start:PipelineStart={type:'run',source,config:operation.config,language:operation.job.target_language,modelUrls:current.urls,manifestUrl:current.manifestUrl,fontUrl:current.fontUrl,fontWeight:font.weight,fontCoverage:current.fontCoverage,workerUrl:onnxWorkerUrl,ortPath:chrome.runtime.getURL('local-runtime/')};
   try{
@@ -58,7 +58,7 @@ export async function runImage(operation:LocalOperation,source:Blob,signal:Abort
       const finish=(value?:{status:string;image:Blob},error?:Error)=>{signal.removeEventListener('abort',abort);value?resolve(value):reject(error);};
       worker.onerror=()=>finish(undefined,Error('PIPELINE_FAILED'));
       worker.onmessage=({data}:{data:{type:string;code?:string;status:string;image:Blob;regions:TextRegion[]}})=>{
-        if(data.type==='text')void translateText(operation,data.regions,signal).then(result=>{if(context===current)worker.postMessage({type:'text',result});},error=>{
+        if(data.type==='text')void translateText(operation,data.regions,signal,token).then(result=>{if(context===current)worker.postMessage({type:'text',result});},error=>{
           textError=error instanceof Error&&/^(TEXT_|FONT_)/.test(error.message)?error.message:'TEXT_OUTCOME_UNKNOWN';if(context===current)worker.postMessage({type:'text-error',code:textError});
         });
         else if(data.type==='result')finish({status:data.status,image:data.image});

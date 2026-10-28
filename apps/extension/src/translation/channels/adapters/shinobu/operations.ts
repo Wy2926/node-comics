@@ -2,12 +2,12 @@ import {openSourceDatabase} from '../../../../storage/database';
 import type {CacheToken} from '../../../../storage/cache';
 import type {Job} from '../../../../types';
 import type {ShinobuConfig} from './config';
-import type {TextBatch} from './text/protocol';
+import type {RegionTexts} from './text/protocol';
 export interface LocalOperation {
-  id:string;scope:string;entryId:string;pageId:string;profileId:string;profileRevision:number;
+  id:string;scope:string;entryId:string;pageId:string;
   fingerprint:string;config:ShinobuConfig;fontId:string;job:Job;previousResult?:Job;cacheToken:CacheToken;
 }
-export interface TextCheckpoint {id:string;entryId:string;fingerprint:string;plan:TextBatch[];batches:{state:'pending'|'sending'|'succeeded';result?:TextBatch}[];updatedAt:number;bytes:number;}
+export type TextCheckpoint={id:string;entryId:string;fingerprint:string;input:RegionTexts;updatedAt:number;bytes:number;} & ({state:'sending'}|{state:'succeeded';result:RegionTexts});
 let database:Promise<IDBDatabase>|undefined;
 const db=()=>database??=openSourceDatabase('shinobu-operations',{
   operations:{keyPath:'id',indexes:[{name:'entry',keyPath:['entryId','id']}]},

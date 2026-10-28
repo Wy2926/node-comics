@@ -17,7 +17,7 @@ const textValues=(values:Record<string,string>)=>{
 export function readServices(profile:ChannelProfile):Services{
     try{
       const items:TextService[]=JSON.parse(profile.settings.textServices);
-      if(!Array.isArray(items)||items.length>20||new Set(items.map(item=>item.id)).size!==items.length)throw Error();
+      if(!Array.isArray(items)||new Set(items.map(item=>item.id)).size!==items.length)throw Error();
       for(const item of items){
         if(!item||!/^[-\w]{1,64}$/.test(item.id)||item.id==='google'||!item.name||item.name.length>80||typeof item.scope!=='string'||!item.values)throw Error();
         item.values=textValues(item.values);
@@ -30,6 +30,10 @@ export function readServices(profile:ChannelProfile):Services{
 export function serviceScope(profile:ChannelProfile){
   const services=readServices(profile);
   return services.selectedId==='google'?JSON.stringify([profile.id,'google']):services.items.find(item=>item.id===services.selectedId)!.scope;
+}
+export function serviceToken(profile:ChannelProfile,secrets:Record<string,string>){
+  const {selectedId}=readServices(profile);
+  return selectedId==='google'?'':secrets[secretKey(selectedId)]??'';
 }
 export function profileConfig(profile:ChannelProfile){
   const state=readServices(profile),selected=state.items.find(item=>item.id===state.selectedId);
@@ -49,8 +53,6 @@ async function mutate(profile:ChannelProfile,isCurrent:()=>boolean,change:(state
   const state=readServices(profile),secrets=providerSecrets(saved.secrets);
   change(state,secrets);
   const settings=localSettings({...profile.settings,...common},state);
-  const activeToken=state.selectedId==='google'?'':secrets[secretKey(state.selectedId)];
-  if(activeToken)secrets.token=activeToken;
   await updateChannelSettings(async value=>{
     assertCurrent(isCurrent);
     const existing=value.profiles.find(item=>item.id===profile.id);
@@ -80,7 +82,6 @@ export function serviceSelection(profile:ChannelProfile,secrets:Record<string,st
       let config:Record<string,string>;try{config=textValues(values);}catch{throw Error(errorMessage('TEXT_CONFIG_INVALID'));}
       const previous=id?state.items.find(item=>item.id===id):undefined;
       if(id&&!previous)throw Error(errorMessage('TEXT_CONFIG_CHANGED'));
-      if(!id&&state.items.length>=20)throw Error(msg('最多保存 20 个 LLM 供应商。'));
       await requireHostAccess([new URL(config.baseUrl).origin+'/*']);
       await mutate(profile,isCurrent,(next,credentials)=>{
         const key=id??crypto.randomUUID(),changed=previous?.values.baseUrl!==config.baseUrl||!!values.token;

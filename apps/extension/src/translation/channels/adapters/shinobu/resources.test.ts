@@ -2,13 +2,19 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {assetRecord} from '../../../../storage/local-assets/store';
 import {localHostRequest} from '../../host-client';
 import {fullFont,localFonts} from '../../../font-resources';
-import {fontDownloads} from './resources';
+import {fontDownloads,resourceManager} from './resources';
 
 vi.mock('../../../../storage/local-assets/store',()=>({assetRecord:vi.fn(async()=>undefined)}));
 vi.mock('../../host-client',()=>({localHostRequest:vi.fn(async()=>{})}));
 afterEach(()=>{vi.clearAllMocks();vi.unstubAllGlobals();});
 
 describe('local font download capability',()=>{
+  it('offers every model for download in ordinary builds',async()=>{
+    const manager=resourceManager(),models=(await manager.read()).filter(item=>item.category?.id!=='fonts');
+    expect(models).toHaveLength(5);expect(models.every(item=>item.state==='missing')).toBe(true);
+    for(const model of models)await manager.act('download',model.id);
+    expect(localHostRequest).toHaveBeenCalledTimes(5);
+  });
   it('limits reads and download actions to fonts and distinguishes interrupted from live work',async()=>{
     const active=localFonts[0],paused=localFonts[1];
     vi.mocked(assetRecord).mockImplementation(async asset=>asset.id==='font:'+active.id||asset.id==='font:'+paused.id?{

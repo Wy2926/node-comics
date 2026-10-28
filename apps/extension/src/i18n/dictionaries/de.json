@@ -1179,7 +1179,6 @@
   "文件已准备好，请点击“保存”选择位置。": "Die Datei ist bereit. Wählen Sie „Speichern“, um einen Speicherort auszuwählen.",
   "需登录或验证": "Anmeldung / Verifizierung",
   "已找到": "Gefunden",
-  "上游发布材料尚未齐全，此资源暂不开放安装。": "Upstream publication requirements are incomplete. This resource is not available for installation.",
   "下载": "Download",
   "下载中": "Downloading",
   "下载失败": "Download failed",
@@ -1189,8 +1188,6 @@
   "基础聊天接口": "Basic chat API",
   "已就绪": "Ready",
   "平衡": "Balanced",
-  "所选字体无法完整显示译文，请更换字体。": "The selected font cannot display all translated characters. Choose another font.",
-  "暂不可下载": "Download unavailable",
   "最大输出 Token": "Maximum output tokens",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Local models or fonts are not ready. Download or repair them in resource management.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Local inference failed. Check the device and model resources, then retry manually.",
@@ -1200,8 +1197,6 @@
   "正文服务暂时限流，请稍后手动重试。": "The text service is rate limited. Retry manually later.",
   "正文服务鉴权失败，请检查网关访问令牌。": "Text service authentication failed. Check the gateway access token.",
   "正文翻译服务": "Text translation service",
-  "正文翻译未完成或响应无效；已成功批次保留，请检查服务后重试。": "Text translation failed or returned an invalid response. Completed batches are retained; check the service before retrying.",
-  "此图片超过本机处理上限，请选择其他翻译渠道。": "This image exceeds local processing limits. Choose another translation channel.",
   "留空使用服务默认值。": "Leave blank to use the service default.",
   "管理模型与字体": "Manage models and fonts",
   "自动": "Automatic",
@@ -1241,7 +1236,6 @@
   "文字识别引擎": "Text recognition engine",
   "文字识别过滤": "Recognition filter",
   "无需配置，使用 Google Translate 翻译正文。": "Translate text with Google Translate. No setup required.",
-  "最多保存 20 个 LLM 供应商。": "You can save up to 20 LLM providers.",
   "未下载": "Not downloaded",
   "本机识别设置": "Local recognition settings",
   "查看来源说明": "View source details",
@@ -1274,5 +1268,6 @@
   "谷歌翻译暂时无法连接或限制访问，请稍后手动重试，或切换正文翻译服务。": "Google Translate is unavailable or restricting access. Retry manually later, or choose another text translation service.",
   "本地翻译字体": "Local translation font",
   "已下载": "Downloaded",
-  "等待下载": "Queued"
+  "等待下载": "Queued",
+  "正文翻译未完成或响应无效，请检查服务后重试。": "Text translation failed or returned an invalid response. Check the service before retrying."
 }

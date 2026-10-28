@@ -2,7 +2,7 @@ export const LOCAL_HOST_MESSAGE='NC_LOCAL_TRANSLATION_HOST';
 const hostPath='/local-translation-host.html';
 const extension=()=>typeof chrome!=='undefined'&&!!chrome.runtime?.id;
 
-/** Only dispatches bounded metadata. Source bytes and credentials remain in extension storage. */
+/** Source bytes stay in storage; task credentials travel only between trusted extension contexts. */
 export async function localHostRequest(adapterId:string,message:unknown):Promise<unknown>{
   if(!extension())throw Error('LOCAL_HOST_EXTENSION_REQUIRED');
   const ping=()=>chrome.runtime.sendMessage({type:LOCAL_HOST_MESSAGE,action:'ping'}).then(reply=>reply?.ready===true).catch(()=>false);

@@ -54,11 +54,28 @@ while(pending.length){
   content=content.replace('constructor(readonly reason: PipelineCancellationReason)', 'constructor(override readonly reason: PipelineCancellationReason)').replace('    readonly failure: PipelineFailureEnvelope,','    override readonly failure: PipelineFailureEnvelope,');
   if(file.endsWith('pipeline/detect/index.ts'))content=content.replace("| { kind: 'heuristic-only' }","| { kind: 'strict' }\n  | { kind: 'heuristic-only' }").replace('} catch (error) {','} catch (error) {\n    if (fallbackStrategy.kind === \'strict\') throw error;');
   if(file.endsWith('pipeline/image.ts'))content=content.replace(/\(globalThis as \{ __shinobuColdStartImageBlobUrl\?: boolean \}\)\.__shinobuColdStartImageBlobUrl === true\s*&& /,'');
+  if(file.endsWith('typeset/drawTypeset.ts'))content=content
+    .replace('import { formatTypesetFont, resolveTypesetFontFamily }', 'import { formatTypesetFont, resolveTypesetFontFamily, supportedTypesetText }')
+    .replace('const translatedRaw = inputRegion.translatedText;', 'const translatedRaw = supportedTypesetText(inputRegion.translatedText);\n    inputRegion.translatedText = translatedRaw;\n    if (!translatedRaw.trim()) continue;');
   if(file.endsWith('typeset/fontRuntime.ts'))content=`import type {PlatformProvider} from '../../runtime/platform';
 // One selected, verified font per isolated pipeline Worker, shared by measurement and rendering.
 export let TYPESET_FONT_WEIGHT=400;
 let selectedFamily='';
-export function configureTypesetFont(family:string,weight:number){selectedFamily=family;TYPESET_FONT_WEIGHT=weight;}
+let coverage:number[][]=[];
+export function configureTypesetFont(family:string,weight:number,ranges:number[][]){selectedFamily=family;TYPESET_FONT_WEIGHT=weight;coverage=ranges;}
+export function supportedTypesetText(text:string):string {
+  let supported='';
+  for(const character of text){
+    if(/\\s/u.test(character)){supported+=character;continue;}
+    const point=character.codePointAt(0)!;
+    let low=0,high=coverage.length-1;
+    while(low<=high){
+      const mid=(low+high)>>>1,[start,end]=coverage[mid];
+      if(point<start)high=mid-1;else if(point>end)low=mid+1;else{supported+=character;break;}
+    }
+  }
+  return supported;
+}
 export function resolveTypesetFontFamily(_targetLang?:string):string {
   if(!selectedFamily)throw Error('Font not configured');
   return JSON.stringify(selectedFamily);

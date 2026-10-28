@@ -20,7 +20,7 @@ import {
 } from "./horizontalLayout";
 import type { RegionTypesetDebug } from "./fontMetrics";
 import type { CompositeTransform } from "./geometry";
-import { formatTypesetFont, resolveTypesetFontFamily } from "./fontRuntime";
+import { formatTypesetFont, resolveTypesetFontFamily, supportedTypesetText } from "./fontRuntime";
 import type { EditableTextGlyph, LayerTransform, TypesetLayerCanvas } from '../../editor/types';
 // ---------------------------------------------------------------------------
 // Main entry point
@@ -72,7 +72,9 @@ export async function drawTypeset(
 
   for (let regionIndex = 0; regionIndex < renderRegions.length; regionIndex += 1) {
     const inputRegion = renderRegions[regionIndex];
-    const translatedRaw = inputRegion.translatedText;
+    const translatedRaw = supportedTypesetText(inputRegion.translatedText);
+    inputRegion.translatedText = translatedRaw;
+    if (!translatedRaw.trim()) continue;
     const isVerticalInput = inputRegion.direction === "v";
 
     let offCanvas: PipelineCanvas | null = null;
