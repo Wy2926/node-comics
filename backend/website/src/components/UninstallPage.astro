@@ -30,7 +30,7 @@ const t = uninstallCopy[locale];
     <main class="uninstall-shell">
       <div class="uninstall-language">
         <details class="language-menu">
-          <summary aria-label={`${dictionaries[locale].ui.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale}/><span>{languageNames[locale]}</span><span aria-hidden="true">⌄</span></summary>
+          <summary aria-label={`${dictionaries[locale].ui.language}: ${languageNames[locale]}`}><LanguageFlag locale={locale} loading="eager"/><span>{languageNames[locale]}</span><span aria-hidden="true">⌄</span></summary>
           <nav aria-label={dictionaries[locale].ui.language}>{locales.map(language => <a href={localPath('/uninstall/', language)} lang={language} aria-current={locale === language ? 'true' : undefined}><LanguageFlag locale={language}/><span>{languageNames[language]}</span></a>)}</nav>
         </details>
       </div>

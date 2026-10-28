@@ -265,7 +265,14 @@ async function verify(){
     assert.equal(await page.locator('html').getAttribute('lang'),locale);
     assert.equal(await page.locator('[data-language-notice]').isVisible(),false);
     assert.equal(await page.locator('.language-menu a').count(),languages.length);
+    await page.locator('.language-menu summary .language-flag').evaluate(image=>image.decode());
+    await page.locator('.language-menu summary').click();
+    for(const flag of await page.locator('.language-menu nav .language-flag').all()){
+      await flag.scrollIntoViewIfNeeded();
+      await flag.evaluate(image=>image.decode());
+    }
     assert.equal(await page.locator('.language-flag').evaluateAll(items=>items.every(item=>item.complete&&item.naturalWidth>0)),true);
+    await page.keyboard.press('Escape');
     await noOverflow(page);
     await page.setViewportSize({width:320,height:740});
     await noOverflow(page);

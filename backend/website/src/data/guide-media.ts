@@ -7,6 +7,13 @@ export const screenshotNames = ['library', 'reader-directory', 'reader-settings'
 export type GuideImage = typeof screenshotNames[number];
 
 const images = import.meta.glob<{ default: ImageMetadata }>('../assets/guides/*/*.webp', { eager: true });
+const mobileImages = import.meta.glob<{ default: ImageMetadata }>('../assets/guides/firefox/*/*.png', { eager: true });
+
+export function mobileGuideImage(source: string): ImageMetadata {
+  const image = mobileImages[`../assets${source}`]?.default;
+  if (!image) throw new Error(`Missing mobile tutorial screenshot: ${source}`);
+  return image;
+}
 
 export function screenshotLocale(locale: Locale): ScreenshotLocale {
   return locale.startsWith('zh') ? 'zh-CN' : locale === 'ja' || locale === 'ko' ? locale : 'en';

@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets';
 import { dictionaries, localPath, type Locale } from '../i18n';
-import { featuredGuides, guideCovers, guideImage } from '../data/guide-media';
+import { featuredGuides, guideCovers, guideImage, mobileGuideImage } from '../data/guide-media';
 import { guidePresentation } from '../i18n/guide-presentation';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
@@ -18,7 +18,7 @@ const reference = guides.filter(guide => !featuredGuides.includes(guide.slug));
       const mobile = guide.sections.find(section => section.screenshot?.src)?.screenshot;
       return <a class="workflow-card" href={localPath(`/guides/${guide.slug}/`, locale)}>
         <div class:list={['workflow-image', { 'phone-image': !!mobile }]}>
-          {imageName ? <Image src={guideImage(imageName, locale)} alt="" aria-hidden="true" widths={[480, 720]} sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 420px" format="webp" quality={78} loading="lazy" /> : mobile && <img src={mobile.src} alt="" aria-hidden="true" width="1080" height="2400" loading="lazy" decoding="async" />}
+          {imageName ? <Image src={guideImage(imageName, locale)} alt="" aria-hidden="true" widths={[480, 720]} sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 420px" format="webp" quality={78} loading="lazy" /> : mobile?.src && <Image src={mobileGuideImage(mobile.src)} alt="" aria-hidden="true" width={720} widths={[320, 540, 720]} sizes="(max-width: 700px) 28vw, (max-width: 1100px) 14vw, 120px" format="webp" quality={85} loading="lazy" decoding="async" />}
           <span class="workflow-number" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
         </div>
         <div class="workflow-copy"><span class="workflow-meta">{guide.category} · {guide.minutes} {ui.minutes}</span><h3>{guide.title}</h3><p>{guide.description}</p><span class="workflow-action">{ui.readGuide}<span aria-hidden="true">↗</span></span></div>

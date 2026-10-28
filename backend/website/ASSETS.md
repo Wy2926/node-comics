@@ -32,7 +32,7 @@
 
 保留的教程素材同样来自上述真实产品截图，不冒充视频截帧；视频链接统一维护在 `src/data/site.ts`。官网不嵌入播放器或加载远程视频缩略图，首页不再展开教程卡片。
 
-漫画星芒、隐私盾牌和播放标识由 [ComicSymbol.astro](src/components/ComicSymbol.astro) 绘制为静态 SVG，线条与颜色复用官网令牌中的漫画图标调色板；无外部素材、字体、运行脚本或网络请求。语言菜单的国旗由 [LanguageFlag.astro](src/components/LanguageFlag.astro) 复用插件已有的 [flag-icons 7.5.0](https://github.com/lipis/flag-icons/tree/v7.5.0/flags/4x3) 原始 SVG，复制至官网自身素材目录；保留原始轮廓，以内联 data URL 显示，不产生外部或额外图片请求。[MIT 许可](public/licenses/flag-icons.txt)随官网静态产物分发，图标只作装饰，语言名称保留为文本。
+漫画星芒、隐私盾牌和播放标识由 [ComicSymbol.astro](src/components/ComicSymbol.astro) 绘制为静态 SVG，线条与颜色复用官网令牌中的漫画图标调色板；无外部素材、字体、运行脚本或网络请求。语言菜单的国旗由 [LanguageFlag.astro](src/components/LanguageFlag.astro) 复用插件已有的 [flag-icons 7.5.0](https://github.com/lipis/flag-icons/tree/v7.5.0/flags/4x3) 原始 SVG，复制至官网自身素材目录；保留原始 SVG 字节，构建为带内容哈希的独立同源资源，跨页面复用缓存；当前语言优先加载，菜单项使用原生懒加载，不请求外部站点。[MIT 许可](public/licenses/flag-icons.txt)随官网静态产物分发，图标只作装饰，语言名称保留为文本。
 
 | 国旗素材 | 对应语言 | 上游 SVG SHA-256 |
 | --- | --- | --- |
@@ -129,18 +129,18 @@ Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simp
 
 ## Android Firefox 教程截图
 
-六张原始 PNG 来自专用 Android 14 模拟器、实际 Firefox 157.0.1，尺寸均为 1080×2400（9:20）。01 是 Firefox 欢迎页，02 是实际 AMO 页面及添加按钮，03 是原图模式的真实阅读器（1/1 页）。截图保留浏览器操作区、提示与 AMO 安全提醒，未经拼接或改写。简繁中文共用 zh-CN，其余语言使用 en；图注随页面本地化。
+六张原始 PNG 来自专用 Android 14 模拟器、实际 Firefox 157.0.1，尺寸均为 1080×2400（9:20）。01 是 Firefox 欢迎页，02 是实际 AMO 页面及添加按钮，03 是原图模式的真实阅读器（1/1 页）。截图保留浏览器操作区、提示与 AMO 安全提醒，未经拼接或改写。简繁中文共用 zh-CN，其余语言使用 en；图注随页面本地化。原图保存在 `src/assets/guides/firefox`，页面与目录共用宽度 320／540／720 的 WebP（质量 85），按显示尺寸及像素密度选择、懒加载；正文保留可点击的原始 PNG，不改写原图或截图文字。
 
 阅读器使用 AMO 同版、Mozilla 签名的 NodeLane Comics 0.10.3 XPI，经官方 web-ext 临时加载。模拟器上的商店／文件永久安装未确认；这些图片不表示实体手机商店安装全流程通过。试读使用项目原创 `samples/starlight-bookshop.png` 制成单页 CBZ，经真实文件选择器导入；两版只切换界面语言，漫画仍是英文原图，不是翻译或授权登录证明，未进行账号登录或付费翻译。第三方浏览器／商店 UI 与商标归各自权利人，不重新授权为本站原创素材。
 
 | 文件 | SHA-256 |
 | --- | --- |
-| [public/guides/firefox/en/01-firefox-open.png](public/guides/firefox/en/01-firefox-open.png) | `f98f47e4ad2d0648fa037e19d8cec11ec0593d0b58a8a802a31a0516af6bbd4e` |
-| [public/guides/firefox/en/02-add-extension.png](public/guides/firefox/en/02-add-extension.png) | `71dfd5fc7cfe70eb032e567f839ad6bd86dbf12ed095815ee0080a5fab9fa611` |
-| [public/guides/firefox/en/03-read-sample.png](public/guides/firefox/en/03-read-sample.png) | `a9795962763b18ff3125f754ccfcd01b03810205363307aa49a1fab89a3e5a00` |
-| [public/guides/firefox/zh-CN/01-firefox-open.png](public/guides/firefox/zh-CN/01-firefox-open.png) | `f29fa8988f3682deb1fec1685154c58591b3f8c542cffedfe16314167813f64c` |
-| [public/guides/firefox/zh-CN/02-add-extension.png](public/guides/firefox/zh-CN/02-add-extension.png) | `8889c35b628c21f1f6b729c282016a463e96dc516df45e8429bfb08c2029c471` |
-| [public/guides/firefox/zh-CN/03-read-sample.png](public/guides/firefox/zh-CN/03-read-sample.png) | `e9f28f00d417149c8cd741c05a3cacbe7f65c205506aeadbdebd27d41eba1624` |
+| [src/assets/guides/firefox/en/01-firefox-open.png](src/assets/guides/firefox/en/01-firefox-open.png) | `f98f47e4ad2d0648fa037e19d8cec11ec0593d0b58a8a802a31a0516af6bbd4e` |
+| [src/assets/guides/firefox/en/02-add-extension.png](src/assets/guides/firefox/en/02-add-extension.png) | `71dfd5fc7cfe70eb032e567f839ad6bd86dbf12ed095815ee0080a5fab9fa611` |
+| [src/assets/guides/firefox/en/03-read-sample.png](src/assets/guides/firefox/en/03-read-sample.png) | `a9795962763b18ff3125f754ccfcd01b03810205363307aa49a1fab89a3e5a00` |
+| [src/assets/guides/firefox/zh-CN/01-firefox-open.png](src/assets/guides/firefox/zh-CN/01-firefox-open.png) | `f29fa8988f3682deb1fec1685154c58591b3f8c542cffedfe16314167813f64c` |
+| [src/assets/guides/firefox/zh-CN/02-add-extension.png](src/assets/guides/firefox/zh-CN/02-add-extension.png) | `8889c35b628c21f1f6b729c282016a463e96dc516df45e8429bfb08c2029c471` |
+| [src/assets/guides/firefox/zh-CN/03-read-sample.png](src/assets/guides/firefox/zh-CN/03-read-sample.png) | `e9f28f00d417149c8cd741c05a3cacbe7f65c205506aeadbdebd27d41eba1624` |
 
 ## 浏览器与平台标识摘要
 

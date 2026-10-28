@@ -96,6 +96,7 @@ try {
       await page.locator('.home-sites-heading a').focus();
       // Move into the stationary viewport first: hovering pauses the moving links.
       await page.locator('.sites-marquee').hover({ position: { x: 10, y: 50 } });
+      await page.waitForFunction(() => document.querySelector('[data-sites-carousel]')?.dataset.moving === 'true' && document.querySelector('.sites-track')?.getAnimations().length > 0);
       await page.evaluate(() => {
         const row = document.querySelector('.sites-row'); row.scrollLeft = 0;
         const animation = row.querySelector('.sites-track').getAnimations()[0];
