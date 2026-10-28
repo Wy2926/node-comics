@@ -4,6 +4,7 @@ import {cp,mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {fixtureSource,protocolAssetPath,protocolHtml} from './protocol-fixture.ts';
 const root=process.cwd(),base=path.join(root,'artifacts/source-boundaries');await mkdir(base,{recursive:true});
 const out=await mkdtemp(path.join(base,'run-')),extension=path.join(out,'extension');
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -29,10 +30,11 @@ context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
 await context.route('https://*.nodelane.net/**',route=>route.fulfill({status:503,body:'Isolated source acceptance'}));
 await context.route('https://comix.to/**',route=>{
   const url=new URL(route.request().url()),chapter='/title/review-fixture/20-chapter-1';
+  if(url.pathname===protocolAssetPath)return route.fulfill({contentType:'text/javascript',body:route.request().resourceType()==='script'?'':fixtureSource()});
   if(url.pathname==='/api/v1/manga/review')return route.fulfill({json:{status:'ok',result:{id:1,hid:'review',url:'/title/review-fixture',title:'来源边界测试'}}});
   if(url.pathname.includes('/manga/'))return route.fulfill({json:{status:'ok',result:{items:[{id:20,number:1,mangaId:1,language:'en',isOfficial:true,url:chapter}],meta:{page:1,lastPage:1,total:1,hasNext:false}}}});
   if(url.pathname.includes('/chapters/'))return route.fulfill({json:{status:'ok',result:{id:20,number:1,url:chapter,pages:{items:[{url:'https://images.wowpic1.store/page.png',width:800,height:1200}]}}}});
-  return route.fulfill({contentType:'text/html',body:'<script id="initial-data">'+JSON.stringify({queries:{'["manga","detail","review"]':{id:1,hid:'review',url:'/title/review-fixture',title:'来源边界测试'}}})+'</script>'});
+  return route.fulfill({contentType:'text/html',body:protocolHtml+'<script id="initial-data">'+JSON.stringify({queries:{'["manga","detail","review"]':{id:1,hid:'review',url:'/title/review-fixture',title:'来源边界测试'}}})+'</script>'});
 });
 // The adapter requires HTTPS; the local HTTP server separately verifies actual DNR headers.
 await context.route('https://images.wowpic1.store/page.png',route=>route.fulfill({contentType:'image/png',body:png}));

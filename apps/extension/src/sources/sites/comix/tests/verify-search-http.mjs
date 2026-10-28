@@ -16,15 +16,15 @@ await build({configFile: false, root: path.join(root, 'apps/extension'), logLeve
 const {network} = await import(pathToFileURL(path.join(temporary, 'network.mjs')).href);
 const requests = [], results = [];
 for (const query of ['One Piece', 'zzzznodelanesearchzzzz']) {
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
-  const context = {signal: controller.signal, request: async target => {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
+  const context = {signal: controller.signal, request: async (target,options) => {
     const url = new URL(target);
     assert.equal(url.origin, 'https://comix.to');
-    assert.equal(url.pathname, '/api/v1/manga');
+    assert(url.pathname === '/api/v1/manga' || url.pathname === '/browse' || /^\/assets\/(?:build\/[a-z0-9]+\/dist|t3\/dist)\/(?:main|apicore)-[\w-]+\.js$/.test(url.pathname));
 
     requests.push({origin: url.origin, path: url.pathname});
     const response = await fetch(target, {signal: controller.signal});
-    assert(response.ok, 'Public source HTTP ' + response.status);
+    assert(response.ok || options?.acceptStatuses?.includes(response.status), 'Public source HTTP ' + response.status);
     return response.text();
   }};
   try {

@@ -10,9 +10,12 @@ import {discoverEntry,discoverPage} from '../../../runtime/client';
 import {PageImageRegistry} from '../../../core/resources';
 import {catalog} from '../../../../comics/repositories';
 import {importCatalog,importManifest} from '../../../../comics/application/import-service';
-import {applyCatalogRefresh} from '../../../../comics/application/catalog-service';
+import {applyCatalogRefresh,applyCatalogImportProgress,catalogSyncPolicy} from '../../../../comics/application/catalog-service';
+import {fixtureProtocol} from './protocol-fixture';
 import {readWebsiteCatalog} from '../../../../comics/application/website-catalog';
 import {withPageNetworkContext} from '../../../runtime/page-network';
+
+vi.mock('../protocol-loader',async()=>({getProtocol:vi.fn(async()=>(await import('./protocol-fixture')).fixtureProtocol)}));
 
 // Parser/runtime routing coverage; real tab lifecycle is exercised by source-page-network.test.ts.
 vi.mock('../../../runtime/page-network',async()=>{
@@ -27,12 +30,12 @@ function fixture(rows=[row(20,0),row(30,1),row(10,1,true),row(40,1.5)],mutate?:(
    const u=new URL(target);
    if(!u.pathname.startsWith('/api/'))throw Error('Catalog must not fetch or parse the HTML document');
    if(u.pathname==='/api/v1/manga/rrzm'){
-     expect(u.searchParams.get('_')).toBe(encodeRequest('/manga/rrzm'));
+     expect(u.searchParams.get('_')).toBe(encodeRequest('/manga/rrzm',fixtureProtocol));
      return JSON.stringify({status:'ok',result:{id:2188,hid:'rrzm',url:'/title/rrzm-sample',title:'Fixture'}});
    }
    if(u.pathname.includes('/chapters/'))return JSON.stringify({status:'ok',result:{id:20,mangaId:2188,number:0,url:'/title/rrzm-sample/20-chapter-0',pages:{baseUrl:'',items:[{url:'https://images.example/0.png',width:800,height:1200,s:1}]}}});
    const page=Number(u.searchParams.get('page')),items=rows.slice((page-1)*2,page*2),lastPage=Math.ceil(rows.length/2);
-   expect(u.searchParams.get('_')).toBe(encodeRequest(`/manga/rrzm/chapters?limit=100&order[number]=asc&page=${page}`));
+   expect(u.searchParams.get('_')).toBe(encodeRequest(`/manga/rrzm/chapters?limit=100&order[number]=asc&page=${page}`,fixtureProtocol));
    const data={status:'ok',result:{items,meta:{total:rows.length,lastPage,page,hasNext:page<lastPage}}};mutate?.(data,page);return JSON.stringify(data);
  });return {request};
 }
@@ -81,14 +84,17 @@ describe('Comix network adapter',()=>{
    const context=fixture(undefined,(d,page)=>{if(page!==2)return;if(mode==='partial')d.result.items.pop();if(mode==='repeat')d.result.items[0]=row(20,0);if(mode==='foreign')d.result.items[0].mangaId=999;if(mode==='changed-total')d.result.meta.total++;if(mode==='invalid-url')d.result.items[0].url='https://evil.test/title/rrzm/10-chapter-1';});
    await expect(network.catalog(url,context)).rejects.toThrow();
  });
- it('retains upload selection, reading positions and caches while notifying only new chapter numbers',async()=>{
+ it('disables scheduled updates but keeps explicit imports, upload selection, positions and caches',async()=>{
    const first=await network.catalog(url,fixture()),comic=await importCatalog(first);
    const page=await network.pages(first.entries[0].url,fixture());
    const imported=await importManifest({...new PageImageRegistry().register(page,[]),id:'fixture',revision:1});
    const entry=(await catalog.get('entries',imported.id))!,pages=await catalog.listPages(entry.contentId);
    const position={id:entry.id,entryId:entry.id,comicId:comic.id,contentId:entry.contentId,pageId:pages[0].pageId,relativeOffset:.4,updatedAt:1};await catalog.savePosition(position);
    const next=await network.catalog(url,{...fixture([row(20,0),row(10,1,true),row(40,1.5),row(9,1,true),row(50,2)]),previous:first});
-   await applyCatalogRefresh(comic.id,1,next);await applyCatalogRefresh(comic.id,1,next);
+   expect(catalogSyncPolicy(comic)).toBeUndefined();
+   await applyCatalogRefresh(comic.id,1,next);
+   expect((await catalog.get('catalogs',first.id))?.entries).toEqual(first.entries);
+   await applyCatalogImportProgress(comic.id,1,next);await applyCatalogImportProgress(comic.id,1,next);
    expect((await catalog.get('comics',comic.id))?.catalogUpdates?.count).toBe(1);
    expect(await catalog.get('positions',entry.id)).toEqual(position);expect(await catalog.listPages(entry.contentId)).toEqual(pages);
  });

@@ -1,6 +1,12 @@
 import type {SourceSnapshot, SourceCatalogSnapshot} from './source';
 import type {SourceSearchPage, SourceSearchRequest} from './search';
 
+/** Protocol-wide failure: stop source acquisition rather than retrying every chapter. */
+export class SourceProtocolError extends Error {
+  readonly kind = 'protocol-changed';
+  constructor(message: string) { super(message); this.name = 'SourceProtocolError'; }
+}
+
 export interface SourceRequestOptions {
   referer?:string;
   acceptStatuses?:readonly number[];
