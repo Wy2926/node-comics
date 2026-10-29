@@ -7,36 +7,28 @@
 
 [简体中文](README.md) | **English**
 
-**Discover, organize, and read comics in your browser. Pick up where you left off.**
+**Read and translate comics in your browser. Pick up where you left off.**
 
 [![Website and downloads](https://img.shields.io/badge/Website-Download-1769B3?style=for-the-badge)](https://comics.nodelane.net/)
-[![Developer documentation](https://img.shields.io/badge/Docs-Development-334155?style=for-the-badge)](#development)
 [![Report an issue](https://img.shields.io/badge/Feedback-GitHub_Issues-6855A3?style=for-the-badge)](https://github.com/Wy2926/node-comics/issues)
 [![Telegram community](https://img.shields.io/badge/Telegram-Join_community-229ED9?style=for-the-badge)](https://t.me/+pPyxB0Sxocw0MDc1)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square)](apps/extension/package.json)
-[![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square)](apps/extension/package.json)
-[![WXT](https://img.shields.io/badge/Extension-WXT-475569?style=flat-square)](apps/extension/README.md)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square)](backend/README.md)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-4169E1?style=flat-square)](backend/README.md)
 [![License](https://img.shields.io/badge/License-GPL--3.0--only-64748B?style=flat-square)](LICENSE)
 
 </div>
 
-A comic reading and library extension for Chrome, Edge, and Firefox. Bring comics from local files, Google Drive, and supported websites into your library, find your next read, and cache chapters for offline reading.
+For Chrome, Edge, and Firefox. Bring comics from local files, Google Drive, and supported websites into your bookshelf, translate as you read, and compare with the original.
 
-When you need translation, enable translation and compare with the original. You can also connect to a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
+Choose browser-local translation (Beta) in Settings and download its models and fonts to get started, without setting up a server. Images stay on your device; recognized text goes to your chosen translation service. You can also use official translation or connect a self-hosted [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) service.
 
 ## Features
 
-- **Import and read**: Open CBZ / ZIP, CBR / RAR, PDF, and DRM-free MOBI / EPUB files, or import from Google Drive and supported websites.
-- **Remote libraries**: Connect multiple OPDS catalogs and browse or read on demand, without importing the entire catalog. Supported resources can be saved offline.
-- **Discover and search**: Browse trending, popular, top-rated, and new manga on AniList, then search supported websites by title, alternative title, or translated title.
-- **Read offline**: Cache every directory and chapter of a website comic, select multiple source languages, track progress, pause and resume, and retry missing pages.
-- **Read your way**: Choose continuous scrolling, single-page reading, or manga-style two-page spreads, with reading direction, zoom, and a separate reading background.
-- **Translate when needed**: Switch between originals and translations, compare them side by side, and restore your reading position.
-- **Choose your translation service**: Use the official service or connect to a local manga-translator-ui instance. Local services do not require a NodeLane account.
-- **Personalize the interface**: Choose from 16 interface languages, six accent colors, light and dark modes, and adjustable text sizes.
+- **Import and read**: Open common comic and ebook files, connect Google Drive or OPDS libraries, or import from supported websites.
+- **Find your next read**: Browse charts and search supported sites by title. The website directory includes an adult category and 18+ badges.
+- **Read your way**: Scroll or turn single pages or spreads. Choose the direction, zoom, and background, and bookmark your favorite pages.
+- **Translate as you read**: Translate images in the reader or on a webpage, compare with originals, and keep your reading position.
+- **Continue offline**: Cache supported website comics in advance, pause and resume, or retry missing pages.
+- **Make it yours**: Choose from 16 interface languages, six accent colors, light and dark modes, and adjustable text sizes.
 
 ### My comics
 
@@ -87,6 +79,9 @@ Join the [Telegram community](https://t.me/+pPyxB0Sxocw0MDc1) to discuss the ext
 
 ## Development
 
+<details>
+<summary>Module guides and technical documentation</summary>
+
 The module guides and technical documents linked below are currently in Chinese.
 
 | Module | Purpose and entry point |
@@ -100,7 +95,7 @@ The module guides and technical documents linked below are currently in Chinese.
 
 Each module README lists its requirements and run commands. See the [scripts guide](scripts/README.md) for validation tools.
 
-## Development guidelines
+### Development guidelines
 
 | Topic | Documentation |
 | --- | --- |
@@ -112,6 +107,8 @@ Each module README lists its requirements and run commands. See the [scripts gui
 | Deployment and maintenance | [Deployment](docs/DEPLOYMENT.md), [Backup and recovery](docs/OPERATIONS.md), [Code standards](docs/CODE_QUALITY.md), [API contract](contracts/README.md) |
 
 See [AGENTS.md](AGENTS.md) for collaboration guidelines. Product rules are maintained in their topic documents rather than duplicated in this README.
+
+</details>
 
 ## Licenses
 

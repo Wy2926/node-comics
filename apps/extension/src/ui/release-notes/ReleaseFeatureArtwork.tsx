@@ -46,17 +46,3 @@ export function ReleaseFeatureArtwork() {
     <path d="m37 136-15-3m20 15-13 6m334-34 13-7m-17-7 5-12m-45 148 8 8m-19-6 1 12" stroke="var(--accent-on)" strokeWidth="3"/>
   </svg>;
 }
-
-export function ReleaseSpreadPreview() {
-  return <svg viewBox="0 0 300 100" aria-hidden="true" focusable="false" fill="none"
-    stroke="var(--comic-stroke)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M55 14h92v75H55Zm98 0h92v75h-92Z" fill="var(--surface)" transform="rotate(-3 150 50)"/>
-    <path d="M64 22h73v36H64Z" fill="var(--icon-comic-blue)"/>
-    <path d="m65 53 19-23 19 23 16-15 18 15M65 70h43m-43 8h61"/>
-    <path d="M164 22h70v58h-70Z" fill="var(--icon-comic-mint)"/>
-    <circle cx="185" cy="39" r="7" fill="var(--icon-comic-yellow)"/>
-    <path d="m165 73 21-24 18 17 14-14 15 20"/>
-    <path d="M36 51H15l8-8m-8 8 8 8m241-8h21l-8-8m8 8-8 8" stroke="var(--accent)" strokeWidth="3"/>
-    <path d="M150 7v88" strokeDasharray="3 4" opacity=".35"/>
-  </svg>;
-}

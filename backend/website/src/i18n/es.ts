@@ -654,6 +654,15 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.2.0",
+        "date": "2026-10-29",
+        "title": "1.2.0 · Traducción integrada y categoría 18+",
+        "items": [
+          "Traducción en el navegador (Beta): Descarga modelos y fuentes, sin instalar un servidor. Las imágenes quedan en tu dispositivo; el texto reconocido va al servicio elegido.",
+          "Nueva categoría 18+: Filtra sitios para adultos, identifica las etiquetas 18+ e importa enlaces de nHentai.to."
+        ]
+      },
+      {
         "id": "1.1.0",
         "date": "2026-10-27",
         "title": "1.1.0 · Lee con más comodidad.",

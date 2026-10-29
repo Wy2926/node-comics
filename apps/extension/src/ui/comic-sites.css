@@ -23,6 +23,7 @@
 .nc-site-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
 .nc-site-tags>span, .nc-site-access { padding: 2px 7px; border: var(--comic-badge-border); border-radius: var(--comic-badge-radius); background: var(--surface-soft); color: var(--ink); font-size: var(--text-caption); font-weight: 650; }
 .nc-site-tags>.nc-site-raw, .nc-site-access-partial-web { background: var(--accent-soft); color: var(--accent); }
+.nc-site-tags>.nc-site-adult { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
 .nc-site-supported { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .nc-site-domain { display: block; margin-top: 5px; color: var(--muted); font-size: .6875rem; overflow-wrap: anywhere; }
 .nc-site-card-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; margin-top: auto; padding: 8px 0; border-top: var(--comic-perforation); color: var(--accent); }

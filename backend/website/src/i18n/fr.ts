@@ -654,6 +654,15 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.2.0",
+        "date": "2026-10-29",
+        "title": "1.2.0 · Traduction intégrée et catégorie 18+",
+        "items": [
+          "Traduction dans le navigateur (Beta): Téléchargez modèles et polices, sans serveur à installer. Les images restent sur l’appareil ; le texte reconnu va au service choisi.",
+          "Nouvelle catégorie 18+: Filtrez les sites pour adultes, repérez les badges 18+ et importez des liens nHentai.to."
+        ]
+      },
+      {
         "id": "1.1.0",
         "date": "2026-10-27",
         "title": "1.1.0 · Lisez plus confortablement.",

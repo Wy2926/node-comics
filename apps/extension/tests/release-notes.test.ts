@@ -7,37 +7,35 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('release notes first use', () => {
-  it('ships 1.1.0 with one version and four concise localized highlights', async () => {
+  it('ships 1.2.0 with one version and two concise localized highlights', async () => {
     const {releaseNotes} = await import('../src/ui/release-notes/content');
-    expect(version).toBe('1.1.0');
+    expect(version).toBe('1.2.0');
     expect(releaseNotes.version).toBe(version);
     expect(lock.version).toBe(version);
     expect(lock.packages[''].version).toBe(version);
     expect(releaseNotes.highlights.map(item => item.title)).toEqual([
-      'releaseNotes.pageTurn.title', 'releaseNotes.bookmarks.title', 'releaseNotes.sources.title', 'releaseNotes.experience.title',
+      'releaseNotes.browserTranslation.title', 'releaseNotes.adultCategory.title',
     ]);
     for (const item of releaseNotes.highlights) expect(zh[item.description].trim()).not.toBe('');
     expect(zh['releaseNotes.kicker']).toBe('本次更新');
-    expect(zh['releaseNotes.pageTurn.description']).toContain('仿真翻页');
-    expect(zh['releaseNotes.bookmarks.description']).toContain('书签位置');
-    expect(zh['releaseNotes.sources.description']).toContain('收藏');
-    expect(zh['releaseNotes.experience.description']).toContain('跨章翻页');
+    expect(zh['releaseNotes.browserTranslation.description']).toContain('图片留在本机');
+    expect(zh['releaseNotes.adultCategory.description']).toContain('18+');
     const dictionaries = import.meta.glob<Record<string, string>>('../src/i18n/dictionaries/*.json', {eager: true, import: 'default'});
     expect(Object.keys(dictionaries)).toHaveLength(16);
     const keys = Object.keys(zh).filter(key => key.startsWith('releaseNotes.'));
-    expect(keys).toHaveLength(14);
+    expect(keys).toHaveLength(10);
     for (const dictionary of Object.values(dictionaries)) {
       expect(Object.keys(dictionary).filter(key => key.startsWith('releaseNotes.'))).toEqual(keys);
       for (const key of keys) expect(dictionary[key].trim(), key).not.toBe('');
       expect(dictionary['releaseNotes.trigger']).toContain('{version}');
       for (const item of releaseNotes.highlights) expect(dictionary[item.description].length).toBeLessThanOrEqual(160);
-      expect(Object.entries(dictionary).filter(([key]) => key.startsWith('releaseNotes.')).some(([, value]) => /0\.11\.3|0\.12\.0|1\.0\.0|nunif|waifu2x/.test(value))).toBe(false);
+      expect(Object.entries(dictionary).filter(([key]) => key.startsWith('releaseNotes.')).some(([, value]) => /0\.11\.3|0\.12\.0|1\.0\.0|1\.1\.0|nunif|waifu2x/.test(value))).toBe(false);
       expect(keys).not.toContain('releaseNotes.hint');
       expect(keys).not.toContain('releaseNotes.intro');
     }
   });
 
-  it.each([null, '0.11.3', '0.12.0', '1.0.0', `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
+  it.each([null, '0.11.3', '0.12.0', '1.0.0', '1.1.0', `${version}-previous`, 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
     const setItem = vi.fn();
     vi.stubGlobal('localStorage', {getItem: () => saved, setItem});
     const notes = await import('../src/ui/release-notes/content');

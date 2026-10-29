@@ -67,7 +67,7 @@ node apps/extension/src/sources/shared/madara/tests/verify-live-browser.mjs <sit
 
 `--source-entry` 可将第一次导入改为真实源站浮动按钮，随后关闭源站标签页；源站原生页面图标／广告单独限16张并计入总字节／请求预算，阅读器图片仍限24张，分别记录。`--max-pages=80` 可显式选择较长样本，硬上限100页且不提高阅读器图片请求预算。不存在的测试路径也可能在来源识别阶段被拒绝，应区分本地错误与真实 HTTP 失败。
 
-AJAX 搜索同样使用隔离 profile 和正式产品界面，仅接受符合成人属性契约的非成人入口；需先构建并配置上述浏览器环境变量：
+AJAX 搜索同样使用隔离 profile 和正式产品界面，仅接受已实现搜索能力的入口；需先构建并配置上述浏览器环境变量：
 
 ```powershell
 node apps/extension/src/sources/shared/madara/tests/verify-search-browser.mjs lhtranslation a NodeLaneNoSuchTitle987654 --max-pages=10

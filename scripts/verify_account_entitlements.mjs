@@ -48,7 +48,7 @@ async function checkRelease(){
       && [...dialog.querySelectorAll('.nc-release-highlights>li')].every(card=>card.scrollWidth<=card.clientWidth);
   }),'Release content must not overlap or overflow, and closing must stay accessible.');
   await page.goto(`${origin}/tests/account-fixture.html?scenario=member#account`);
-  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','1.0.0'));
+  await page.evaluate(()=>localStorage.setItem('nc-release-notes-version','1.1.0'));
   await page.reload();
   const dialog=page.getByRole('dialog'),trigger=page.getByRole('button',{name:`版本更新 · v${version}`,exact:true});
   const shotRelease=async name=>dialog.screenshot({path:path.join(output,`${name}.png`)});
@@ -57,15 +57,15 @@ async function checkRelease(){
   await page.getByRole('button',{name:'外观与设置',exact:true}).click();
   await page.locator('.settings-card').first().waitFor();
   assert.equal(await dialog.count(),0,'Opening settings must not prompt for release notes.');
-  assert.equal(await page.evaluate(()=>localStorage.getItem('nc-release-notes-version')),'1.0.0');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('nc-release-notes-version')),'1.1.0');
   await page.getByRole('button',{name:'我的漫画',exact:true}).click();
   await dialog.waitFor();
   assert.equal(await dialog.locator('.nc-release-version').innerText(),version);
-  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
-  for(const text of ['本次更新','仿真翻页','淡入淡出','书签','缩略图','收藏','跨章翻页'])
+  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),2);
+  for(const text of ['本次更新','浏览器内置翻译','Beta','图片留在本机','18+','nHentai.to'])
     assert((await dialog.innerText()).includes(text));
   assert(!/首个正式版|CBZ|ZIP|PDF|22|nunif|waifu2x|官网|版本入口/.test(await dialog.innerText()));
-  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),4);
+  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),2);
   await checkLayout();
   await shot(`release-${version}`);
   await shotRelease(`release-${version}-panel`);
@@ -125,8 +125,8 @@ async function checkRelease(){
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
     assert(!/0\.11\.3|0\.12\.0|1\.0\.0/.test(await dialog.innerText()));
     assert.equal(await dialog.locator('.nc-release-kicker').innerText(),dictionary['releaseNotes.kicker']);
-    assert.equal(await dialog.locator('.nc-release-highlights>li').last().locator('p').innerText(),dictionary['releaseNotes.experience.description']);
-    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').last().locator('p').innerText(),dictionary['releaseNotes.adultCategory.description']);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),2);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkLayout();
@@ -134,7 +134,7 @@ async function checkRelease(){
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push(`${version} presents four concise highlights for readers; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
+  checks.push(`${version} presents two concise highlights for readers; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
 }
 try{
   await checkRelease();

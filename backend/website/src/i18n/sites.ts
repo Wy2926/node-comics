@@ -14,6 +14,7 @@ interface SitesCopy {
   adapted: string;
   languages: string;
   raw: string;
+  adult: string;
   search: string;
   pricing: Record<SourceSitePricing, string>;
   content: Record<SourceSiteContentTag, string>;
@@ -30,6 +31,7 @@ interface SitesCopy {
 
 export const sitesCopy: Record<Locale, SitesCopy> = {
   'zh-CN': {
+    adult: '成人',
     nav: '支持网站', title: '支持的漫画网站与浏览器阅读插件',
     description: '查看 NodeLane 漫译支持的漫画网站、收费标签、内容语言与访问限制。将已适配网站的漫画添加到插件书架，直接阅读、按需翻译并继续上次进度。',
     heading: '常看的漫画网站，一个阅读器。',
@@ -47,6 +49,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: '这些漫画网站，已经接入。', carouselBody: '这些网站支持在插件内直接阅读。标签页阅读与翻译支持的网站不止于此。', all: '查看插件内阅读网站',
   },
   'zh-TW': {
+    adult: '成人',
     nav: '支援網站', title: '支援的漫畫網站與瀏覽器閱讀擴充功能',
     description: '查看 NodeLane 漫譯支援的漫畫網站、收費標籤、內容語言與存取限制。將已適配網站的漫畫加入擴充功能書架，直接閱讀、按需翻譯並接續進度。',
     heading: '常看的漫畫網站，一個閱讀器。', intro: '這裡列出的是支援在 NodeLane 擴充功能內直接閱讀的漫畫網站。分頁閱讀與翻譯還支援更多網站，不限於此清單，實際依頁面相容情況而定。',
@@ -63,6 +66,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: '這些漫畫網站，已經接入。', carouselBody: '這些網站支援在擴充功能內直接閱讀。分頁閱讀與翻譯支援的網站不只這些。', all: '查看擴充功能內閱讀網站',
   },
   en: {
+    adult: 'Adult',
     nav: 'Supported sites', title: 'Supported manga websites & comic reader extension',
     description: 'Explore the manga websites supported by NodeLane Comics, with pricing, language and access labels. Add supported comics to the extension to read, translate on demand and resume your progress.',
     heading: 'Your manga websites. One reader.', intro: 'These manga websites support reading directly inside the NodeLane extension. Reading and translation in browser tabs also work on other websites beyond this list, depending on page compatibility.',
@@ -79,6 +83,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Your next chapter starts here.', carouselBody: 'Read these websites directly inside the extension. Reading and translation in browser tabs support more websites than this list.', all: 'Explore in-extension reading sites',
   },
   ja: {
+    adult: '成人向け',
     nav: '対応サイト', title: '対応する漫画サイトとブラウザー漫画リーダー',
     description: 'NodeLane Comics が対応する漫画サイトを、料金・言語・閲覧条件のラベルで確認。拡張機能の本棚に追加して直接読み、必要に応じて翻訳し、続きから再開できます。',
     heading: 'いつもの漫画サイトを、ひとつのリーダーで。', intro: 'ここでは NodeLane 拡張機能内で直接読める漫画サイトを紹介しています。ブラウザーのタブ内での閲覧・翻訳は、この一覧以外のサイトにも対応しています。利用可否は各ページの互換性によります。',
@@ -95,6 +100,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'いつもの漫画サイトも、ここから。', carouselBody: 'これらのサイトは拡張機能内で直接読めます。タブ内の閲覧・翻訳に対応するサイトは、この一覧だけではありません。', all: '拡張機能内で読めるサイトを見る',
   },
   ko: {
+    adult: '성인',
     nav: '지원 사이트', title: '지원 만화 사이트와 브라우저 만화 리더',
     description: 'NodeLane Comics가 지원하는 만화 사이트의 요금, 언어, 접근 조건을 확인하세요. 확장 프로그램 서재에 추가해 바로 읽고, 필요할 때 번역하고, 읽던 곳부터 이어 보세요.',
     heading: '즐겨 찾는 만화 사이트를 하나의 리더로.', intro: '이 목록은 NodeLane 확장 프로그램 안에서 직접 읽을 수 있는 만화 사이트입니다. 브라우저 탭에서의 읽기와 번역은 이 목록 외의 사이트도 지원하며, 이용 가능 여부는 페이지 호환성에 따라 달라집니다.',
@@ -111,6 +117,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: '다음 만화도 여기서 이어 읽으세요.', carouselBody: '이 사이트들은 확장 프로그램 안에서 직접 읽을 수 있습니다. 탭 읽기와 번역은 이 목록 외의 사이트도 지원합니다.', all: '확장 프로그램 내 읽기 사이트 보기',
   },
   fr: {
+    adult: 'Adulte',
     nav: 'Sites pris en charge', title: 'Sites de mangas compatibles et extension de lecture',
     description: 'Découvrez les sites de mangas compatibles avec NodeLane Comics, leurs tarifs, langues et conditions d’accès. Ajoutez un manga à l’extension pour le lire, le traduire au besoin et reprendre votre lecture.',
     heading: 'Vos sites de mangas. Un seul lecteur.', intro: 'Ces sites de mangas permettent la lecture directement dans l’extension NodeLane. La lecture et la traduction dans les onglets du navigateur fonctionnent aussi sur d’autres sites, au-delà de cette liste, selon la compatibilité des pages.',
@@ -127,6 +134,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Votre prochain chapitre commence ici.', carouselBody: 'Lisez ces sites directement dans l’extension. La lecture et la traduction dans les onglets prennent aussi en charge d’autres sites.', all: 'Voir les sites à lire dans l’extension',
   },
   es: {
+    adult: 'Adultos',
     nav: 'Sitios compatibles', title: 'Sitios de manga compatibles y extensión de lectura',
     description: 'Consulta los sitios de manga compatibles con NodeLane Comics, sus precios, idiomas y restricciones. Añade mangas a la extensión para leer, traducir cuando lo necesites y continuar tu progreso.',
     heading: 'Tus sitios de manga. Un solo lector.', intro: 'Estos sitios de manga permiten leer directamente dentro de la extensión NodeLane. La lectura y la traducción en pestañas del navegador también admiten otros sitios fuera de esta lista, según la compatibilidad de cada página.',
@@ -143,6 +151,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Tu próximo capítulo empieza aquí.', carouselBody: 'Lee estos sitios directamente en la extensión. La lectura y la traducción en pestañas también admiten sitios fuera de esta lista.', all: 'Ver sitios para leer en la extensión',
   },
   'pt-BR': {
+    adult: 'Adulto',
     nav: 'Sites compatíveis', title: 'Sites de mangá compatíveis e extensão de leitura',
     description: 'Veja os sites de mangá compatíveis com o NodeLane Comics, preços, idiomas e restrições. Adicione mangás à extensão para ler, traduzir quando precisar e continuar de onde parou.',
     heading: 'Seus sites de mangá. Um único leitor.', intro: 'Estes sites de mangá permitem ler diretamente dentro da extensão NodeLane. A leitura e a tradução nas abas do navegador também funcionam em outros sites além desta lista, conforme a compatibilidade de cada página.',
@@ -159,6 +168,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Seu próximo capítulo começa aqui.', carouselBody: 'Leia estes sites diretamente na extensão. A leitura e a tradução em abas também oferecem suporte a sites fora desta lista.', all: 'Ver sites para ler na extensão',
   },
   de: {
+    adult: 'Erwachsene',
     nav: 'Unterstützte Seiten', title: 'Unterstützte Manga-Websites und Comic-Reader-Erweiterung',
     description: 'Entdecke die von NodeLane Comics unterstützten Manga-Websites mit Preis-, Sprach- und Zugriffshinweisen. Füge Comics zur Erweiterung hinzu, lies weiter und übersetze bei Bedarf.',
     heading: 'Deine Manga-Websites. Ein Reader.', intro: 'Auf diesen Manga-Websites kannst du direkt in der NodeLane-Erweiterung lesen. Lesen und Übersetzen in Browser-Tabs funktionieren auch auf weiteren Websites außerhalb dieser Liste, abhängig von der Seitenkompatibilität.',
@@ -175,6 +185,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Dein nächstes Kapitel beginnt hier.', carouselBody: 'Lies diese Websites direkt in der Erweiterung. Lesen und Übersetzen in Browser-Tabs unterstützen weitere Websites über diese Liste hinaus.', all: 'Seiten zum Lesen in der Erweiterung',
   },
   it: {
+    adult: 'Adulti',
     nav: 'Siti supportati', title: 'Siti manga supportati ed estensione di lettura fumetti',
     description: 'Scopri i siti manga supportati da NodeLane Comics, con prezzi, lingue e condizioni di accesso. Aggiungi fumetti all’estensione per leggere, tradurre quando serve e riprendere i progressi.',
     heading: 'I tuoi siti manga. Un solo lettore.', intro: 'Questi siti manga consentono di leggere direttamente nell’estensione NodeLane. La lettura e la traduzione nelle schede del browser funzionano anche su altri siti oltre a questo elenco, in base alla compatibilità della pagina.',
@@ -191,6 +202,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Il prossimo capitolo inizia qui.', carouselBody: 'Leggi questi siti direttamente nell’estensione. La lettura e la traduzione nelle schede supportano anche altri siti oltre a questo elenco.', all: 'Vedi i siti da leggere nell’estensione',
   },
   ru: {
+    adult: 'Для взрослых',
     nav: 'Поддерживаемые сайты', title: 'Сайты манги с поддержкой расширения для чтения',
     description: 'Посмотрите сайты манги, поддерживаемые NodeLane Comics: языки, оплата и ограничения доступа. Добавляйте комиксы в расширение, читайте, переводите при необходимости и продолжайте с прежнего места.',
     heading: 'Ваши сайты манги. Одна читалка.', intro: 'Здесь перечислены сайты манги, которые можно читать прямо внутри расширения NodeLane. Чтение и перевод во вкладках браузера также поддерживают другие сайты вне этого списка, в зависимости от совместимости страниц.',
@@ -207,6 +219,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Следующая глава начинается здесь.', carouselBody: 'Читайте эти сайты прямо в расширении. Чтение и перевод во вкладках поддерживают и другие сайты вне этого списка.', all: 'Сайты для чтения в расширении',
   },
   pl: {
+    adult: 'Dla dorosłych',
     nav: 'Obsługiwane strony', title: 'Obsługiwane strony z mangą i rozszerzenie czytnika',
     description: 'Sprawdź strony z mangą obsługiwane przez NodeLane Comics, opłaty, języki i warunki dostępu. Dodawaj komiksy do rozszerzenia, czytaj, tłumacz w razie potrzeby i wznawiaj postęp.',
     heading: 'Twoje strony z mangą. Jeden czytnik.', intro: 'Te strony z mangą umożliwiają czytanie bezpośrednio w rozszerzeniu NodeLane. Czytanie i tłumaczenie w kartach przeglądarki działa również na innych stronach spoza tej listy, zależnie od zgodności strony.',
@@ -223,6 +236,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Twój następny rozdział zaczyna się tutaj.', carouselBody: 'Czytaj te strony bezpośrednio w rozszerzeniu. Czytanie i tłumaczenie w kartach obsługuje też strony spoza tej listy.', all: 'Zobacz strony do czytania w rozszerzeniu',
   },
   uk: {
+    adult: 'Для дорослих',
     nav: 'Підтримувані сайти', title: 'Підтримувані сайти манґи та розширення для читання',
     description: 'Перегляньте сайти манґи, які підтримує NodeLane Comics: мови, оплату й обмеження доступу. Додавайте комікси в розширення, читайте, перекладайте за потреби та продовжуйте з попереднього місця.',
     heading: 'Ваші сайти манґи. Один читач.', intro: 'Тут наведено сайти манґи, які можна читати безпосередньо всередині розширення NodeLane. Читання й переклад у вкладках браузера також підтримують інші сайти поза цим списком, залежно від сумісності сторінок.',
@@ -239,6 +253,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Наступний розділ починається тут.', carouselBody: 'Читайте ці сайти безпосередньо в розширенні. Читання й переклад у вкладках підтримують також інші сайти поза цим списком.', all: 'Сайти для читання в розширенні',
   },
   tr: {
+    adult: 'Yetişkin',
     nav: 'Desteklenen siteler', title: 'Desteklenen manga siteleri ve çizgi roman okuyucu eklentisi',
     description: 'NodeLane Comics’in desteklediği manga sitelerini, ücretleri, dilleri ve erişim koşullarını inceleyin. Eklentiye ekleyip okuyun, gerektiğinde çevirin ve kaldığınız yerden devam edin.',
     heading: 'Manga siteleriniz. Tek okuyucu.', intro: 'Bu manga siteleri doğrudan NodeLane eklentisinin içinde okumayı destekler. Tarayıcı sekmelerinde okuma ve çeviri, sayfa uyumluluğuna bağlı olarak bu listenin dışındaki başka sitelerde de kullanılabilir.',
@@ -255,6 +270,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Sonraki bölümünüz burada başlıyor.', carouselBody: 'Bu siteleri doğrudan eklentinin içinde okuyun. Sekmelerde okuma ve çeviri bu listenin dışındaki siteleri de destekler.', all: 'Eklenti içinde okunabilen siteleri gör',
   },
   vi: {
+    adult: 'Người lớn',
     nav: 'Trang được hỗ trợ', title: 'Trang truyện tranh được hỗ trợ và tiện ích đọc truyện',
     description: 'Khám phá các trang truyện được NodeLane Comics hỗ trợ, cùng nhãn phí, ngôn ngữ và điều kiện truy cập. Thêm truyện vào tiện ích để đọc, dịch khi cần và tiếp tục tiến độ.',
     heading: 'Các trang truyện quen thuộc. Một trình đọc.', intro: 'Đây là các trang truyện hỗ trợ đọc trực tiếp bên trong tiện ích NodeLane. Đọc và dịch trong thẻ trình duyệt còn hỗ trợ các trang khác ngoài danh sách này, tùy khả năng tương thích của trang.',
@@ -271,6 +287,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Chương tiếp theo bắt đầu tại đây.', carouselBody: 'Đọc các trang này trực tiếp trong tiện ích. Đọc và dịch trong thẻ trình duyệt còn hỗ trợ các trang ngoài danh sách này.', all: 'Xem trang đọc trong tiện ích',
   },
   id: {
+    adult: 'Dewasa',
     nav: 'Situs didukung', title: 'Situs manga yang didukung dan ekstensi pembaca komik',
     description: 'Lihat situs manga yang didukung NodeLane Comics beserta biaya, bahasa, dan syarat aksesnya. Tambahkan komik ke ekstensi untuk membaca, menerjemahkan sesuai kebutuhan, dan melanjutkan progres.',
     heading: 'Situs manga Anda. Satu pembaca.', intro: 'Situs manga ini mendukung membaca langsung di dalam ekstensi NodeLane. Membaca dan menerjemahkan di tab browser juga mendukung situs lain di luar daftar ini, bergantung pada kompatibilitas halaman.',
@@ -287,6 +304,7 @@ export const sitesCopy: Record<Locale, SitesCopy> = {
     carousel: 'Bab berikutnya dimulai di sini.', carouselBody: 'Baca situs ini langsung di dalam ekstensi. Membaca dan menerjemahkan di tab juga mendukung situs lain di luar daftar ini.', all: 'Lihat situs untuk dibaca di ekstensi',
   },
   ar: {
+    adult: 'للبالغين',
     nav: 'المواقع المدعومة', title: 'مواقع المانغا المدعومة وإضافة قراءة القصص المصورة',
     description: 'تعرّف على مواقع المانغا التي يدعمها NodeLane Comics مع معلومات الأسعار واللغات وقيود الوصول. أضف القصص إلى الإضافة للقراءة والترجمة عند الحاجة ومتابعة تقدمك.',
     heading: 'مواقع المانغا المفضلة لديك. قارئ واحد.', intro: 'تتيح مواقع المانغا هذه القراءة مباشرة داخل إضافة NodeLane. وتدعم القراءة والترجمة في علامات تبويب المتصفح مواقع أخرى خارج هذه القائمة أيضًا، بحسب توافق الصفحة.',

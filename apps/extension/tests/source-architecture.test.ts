@@ -53,9 +53,9 @@ const testCatalog: SourceCatalogSnapshot = {
   ],
 };
 describe('source composition and identity', () => {
-  it('only exposes non-adult search sites while retaining adult link identity and reading capabilities', () => {
+  it('exposes implemented search sites regardless of adult labels and retains link identity and reading capabilities', () => {
     const expected = definitions.filter(definition => definition.capabilities.importable && definition.capabilities.catalog)
-      .flatMap(definition => (definition.sites ?? []).filter(site => site.search && site.isAdult === false)
+      .flatMap(definition => (definition.sites ?? []).filter(site => site.search)
         .map(site => `${definition.id}:${site.id}`));
     expect(listSearchSites().map(site => site.key).sort()).toEqual(expected.sort());
     const {definition, location} = sourceFor('https://nhentai.com/en/comic/fixture/reader');

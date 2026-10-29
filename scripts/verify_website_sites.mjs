@@ -39,6 +39,9 @@ try {
     count ??= await cards.count();
     assert.ok(count > 0);
     assert.equal(await cards.count(), count);
+    assert.equal(await cards.locator('.site-adult').count(), 2);
+    assert.match(await page.locator('[data-site-key="nhentaicom:nhentaicom"] .site-adult').innerText(), /^18\+/);
+    assert.match(await page.locator('[data-site-key="nhentaito:nhentaito"] .site-adult').innerText(), /^18\+/);
     assert.equal(await page.locator('main astro-island').count(), 0);
     assert.equal(await page.locator('main [data-install-extension], main a[href$="/download/"]').count(), 0);
     assert.equal(await page.locator('.header-download[data-install-extension]').count(), 1);
@@ -61,6 +64,7 @@ try {
 
     await page.goto(`${origin}/${prefix(locale)}`);
     assert.equal(await page.locator('.sites-group:not(.sites-clone) a').count(), count);
+    assert.equal(await page.locator('.sites-group:not(.sites-clone) .site-adult').count(), 2);
     assert.equal(await page.locator('.home-sites input, .sites-pause').count(), 0);
     for (const width of widths) { await page.setViewportSize({ width, height: 1050 }); await noOverflow(page); }
     await page.setViewportSize({ width: 1440, height: 1050 });

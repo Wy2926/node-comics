@@ -2,7 +2,7 @@ import {useCallback, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
-import {ReleaseFeatureArtwork, ReleaseSpreadPreview} from './ReleaseFeatureArtwork';
+import {ReleaseFeatureArtwork} from './ReleaseFeatureArtwork';
 import {hasUnseenReleaseNotes, markReleaseNotesSeen, releaseNotes, releaseNotesStorageKey} from './content';
 import {useDialogViewport} from '../visual-viewport';
 import './release-notes.css';
@@ -60,9 +60,8 @@ function ReleaseNotesDialog({id, onShown, onClose, trigger}: {id: string; onShow
       <div className="nc-release-cover-art"><ReleaseFeatureArtwork/></div>
     </header>
     <section className="nc-release-content" aria-label={msg('releaseNotes.highlights')} tabIndex={0}>
-      <ul className="nc-release-highlights">{releaseNotes.highlights.map((item, index) => <li key={item.title}>
-        <div className="nc-release-feature-icon" aria-hidden="true"><Icon name={item.icon} size={28}/><span>{String(index + 1).padStart(2, '0')}</span></div>
-        {index === 0 && <div className="nc-release-spread-preview"><ReleaseSpreadPreview/></div>}
+      <ul className="nc-release-highlights">{releaseNotes.highlights.map(item => <li key={item.title}>
+        <div className="nc-release-feature-icon" aria-hidden="true"><Icon name={item.icon} size={28}/></div>
         <div className="nc-release-feature-text"><h3>{msg(item.title)}</h3>
           <p>{msg(item.description)}</p>
         </div>

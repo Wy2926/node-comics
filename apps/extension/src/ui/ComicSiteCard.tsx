@@ -20,11 +20,11 @@ export const ComicSiteCard = memo(function ComicSiteCard({site, favorite, onTogg
   const {contentTagLabels, accessTagLabels, pricingLabels} = labels;
   const date = useMemo(() => formatDate(site.adaptedOn + 'T00:00:00'), [site.adaptedOn, locale]);
   return <li className="nc-site-card" data-site-key={site.key}>
-    <a className="nc-site-card-link" href={site.url} target="_blank" rel="noopener noreferrer" aria-label={`${site.name} · ${pricingLabels[site.pricing].label}${site.isRaw ? ' · ' + msg('生肉') : ''} · ${msg('在新标签页打开')}`}>
+    <a className="nc-site-card-link" href={site.url} target="_blank" rel="noopener noreferrer" aria-label={`${site.name} · ${pricingLabels[site.pricing].label}${site.isAdult ? ' · 18+ · ' + contentTagLabels.adult : ''}${site.isRaw ? ' · ' + msg('生肉') : ''} · ${msg('在新标签页打开')}`}>
       <span className={'nc-site-pricing-badge nc-site-pricing-' + site.pricing} role="img" title={pricingLabels[site.pricing].description} aria-label={pricingLabels[site.pricing].description}><PricingIcon pricing={site.pricing}/></span>
       <div className="nc-site-card-top"><span className="nc-site-monogram" aria-hidden="true"><img src={site.icon} alt="" width={44} height={44} loading="lazy" decoding="async" onError={event => {event.currentTarget.hidden = true;}}/><Icon name="globe" size={27}/></span><span className="nc-site-languages">{site.primaryLanguages.map(language => <span key={language} role="img" aria-label={languageLabel(language)} title={languageLabel(language)}><LanguageFlag language={language}/></span>)}</span></div>
       <h3>{site.name}</h3><span className="nc-site-domain">{site.domain}</span>
-      <div className="nc-site-tags">{site.isRaw && <span className="nc-site-raw" title={msg('以未翻译的日语或韩语原文内容为主')}>{msg('生肉')}</span>}{site.contentTags.map(tag => <span key={tag}>{contentTagLabels[tag]}</span>)}</div>
+      <div className="nc-site-tags">{site.isAdult && <span className="nc-site-adult"><bdi>18+</bdi> {contentTagLabels.adult}</span>}{site.isRaw && <span className="nc-site-raw" title={msg('以未翻译的日语或韩语原文内容为主')}>{msg('生肉')}</span>}{site.contentTags.map(tag => <span key={tag}>{contentTagLabels[tag]}</span>)}</div>
     </a>
     <div className="nc-site-card-footer"><span className="nc-site-adapted">
       <span><span className="nc-site-supported"><Icon name="check" size={15}/>{msg('已适配')}</span>{site.accessTags?.map(tag => <span key={tag} className={'nc-site-access nc-site-access-' + tag} title={accessTagLabels[tag].description} aria-label={accessTagLabels[tag].description}>{accessTagLabels[tag].label}</span>)}</span>

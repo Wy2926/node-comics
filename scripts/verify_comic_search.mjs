@@ -104,21 +104,22 @@ try{
   const adultAudit=await reader.evaluate(async()=>{
     const probe=await import(chrome.runtime.getURL('verify-search.js'));
     const adult=probe.definitions.flatMap(adapter=>(adapter.sites??[]).filter(site=>site.isAdult).map(site=>({adapterId:adapter.id,...site})));
-    const visible=new Set([...probe.listSupportedSites(),...probe.listSearchSites()].map(site=>site.key));
-    const rejected=[];
-    for(const site of adult){try{await probe.searchSource(site.adapterId,{siteId:site.id,query:'fixture'},{sessionId:'adult-policy'});rejected.push('allowed');}catch(error){rejected.push(error.code);}}
+    const visible=new Set(probe.listSupportedSites().map(site=>site.key));
     localStorage.setItem('nc-site-favorites',JSON.stringify(adult.map(site=>site.adapterId+':'+site.id)));
     localStorage.setItem('nc-search-sites',JSON.stringify(Object.fromEntries(adult.map(site=>[site.adapterId+':'+site.id,true]))));
-    return {keys:adult.map(site=>site.adapterId+':'+site.id),count:adult.length,exposed:adult.filter(site=>visible.has(site.adapterId+':'+site.id)).length,rejected,
+    return {keys:adult.map(site=>site.adapterId+':'+site.id),count:adult.length,exposed:adult.filter(site=>visible.has(site.adapterId+':'+site.id)).length,
+      searchKeys:probe.listSearchSites().map(site=>site.key).sort(),
+      capableKeys:probe.definitions.flatMap(adapter=>(adapter.sites??[]).filter(site=>site.search).map(site=>adapter.id+':'+site.id)).sort(),
       publicKeys:probe.listSupportedSites().map(site=>site.key).sort()};
   });
-  assert.deepEqual(adultAudit.keys,['nhentaicom:nhentaicom']);assert.equal(adultAudit.exposed,0);assert(adultAudit.rejected.every(code=>code==='SOURCE_SEARCH_UNSUPPORTED'));assert.equal(requests.length,0);
+  assert.deepEqual(adultAudit.keys.sort(),['nhentaicom:nhentaicom','nhentaito:nhentaito']);assert.equal(adultAudit.exposed,adultAudit.count);assert.deepEqual(adultAudit.searchKeys,adultAudit.capableKeys);assert.equal(requests.length,0);
   await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'漫画网站',exact:true}).click();
-  assert.equal(await reader.locator('[data-site-key="nhentaicom:nhentaicom"]').count(),0);
+  assert.equal(await reader.locator('[data-site-key="nhentaicom:nhentaicom"] .nc-site-adult').innerText(),'18+ 成人');
+  assert.equal(await reader.locator('[data-site-key]').first().getAttribute('data-site-key'),'nhentaito:nhentaito');
   assert.equal(await reader.locator('[data-site-key="mangacopy:copy4000"],[data-site-key="pixiv:pixiv"],[data-site-key="mangadex:mangadex"]').count(),3);
   assert.deepEqual((await reader.locator('[data-site-key]').evaluateAll(cards=>cards.map(card=>card.dataset.siteKey))).sort(),adultAudit.publicKeys);
   await reader.getByRole('navigation',{name:'主导航',exact:true}).getByRole('button',{name:'我的漫画',exact:true}).click();
-  check(`${adultAudit.count} adult entries are absent from both registries; direct requests fail before transport and stale favorites stay hidden`);
+  check(`${adultAudit.count} adult entries remain visible, labeled and favoritable; search scope follows implemented capabilities`);
   const fixtures=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));return {catalog:probe.guaziCatalogHtml(['11']).replaceAll('Fixture comic','星光书店').replace('<script>throw Error(\'never execute\')</script>',''),reader:probe.guaziReaderHtml()};});
   guaziCatalog=fixtures.catalog;guaziReader=fixtures.reader;
   const imported=await reader.evaluate(async()=>{const probe=await import(chrome.runtime.getURL('verify-search.js'));const rows=[];for(const url of ['https://comic.naver.com/webtoon/list?titleId=123','https://www.guazimanhua.com/comic.php?id=123']){const comic=await probe.importCatalog(await probe.readSourceCatalog(url));rows.push({id:comic.id,title:comic.title});}return rows;});

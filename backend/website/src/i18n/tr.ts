@@ -654,6 +654,15 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.2.0",
+        "date": "2026-10-29",
+        "title": "1.2.0 · Yerleşik çeviri ve 18+ kategorisi",
+        "items": [
+          "Tarayıcıda çeviri (Beta): Modelleri ve yazı tiplerini indirin; sunucu kurmanız gerekmez. Görseller cihazda kalır, tanınan metin seçtiğiniz çeviri hizmetine gönderilir.",
+          "Yeni 18+ kategorisi: Yetişkin sitelerini filtreleyin, 18+ etiketlerini görün ve nHentai.to bağlantılarını içe aktarın."
+        ]
+      },
+      {
         "id": "1.1.0",
         "date": "2026-10-27",
         "title": "1.1.0 · Daha rahat okuyun.",

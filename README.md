@@ -7,35 +7,27 @@
 
 **简体中文** | [English](README_EN.md)
 
-**在浏览器里发现、整理和阅读漫画，随时接着上次的进度看。**
+**在浏览器里读漫画、翻译图片，随时接着上次的进度看。**
 
 [![官网与下载](https://img.shields.io/badge/官网-下载插件-1769B3?style=for-the-badge)](https://comics.nodelane.net/)
-[![开发文档](https://img.shields.io/badge/文档-开始开发-334155?style=for-the-badge)](#开始开发)
 [![问题反馈](https://img.shields.io/badge/反馈-GitHub_Issues-6855A3?style=for-the-badge)](https://github.com/Wy2926/node-comics/issues)
 [![TG 交流群](https://img.shields.io/badge/Telegram-加入交流群-229ED9?style=for-the-badge)](https://t.me/+pPyxB0Sxocw0MDc1)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square)](apps/extension/package.json)
-[![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square)](apps/extension/package.json)
-[![WXT](https://img.shields.io/badge/Extension-WXT-475569?style=flat-square)](apps/extension/README.md)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square)](backend/README.md)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-4169E1?style=flat-square)](backend/README.md)
 [![许可证](https://img.shields.io/badge/License-GPL--3.0--only-64748B?style=flat-square)](LICENSE)
 
 </div>
 
-面向 Chrome、Edge、Firefox 的漫画阅读与整理插件。把本地漫画、Google Drive 和已适配网站中的漫画放进书架，查找想看的作品，缓存后离线阅读。
+适用于 Chrome、Edge、Firefox。把本地文件、Google Drive 和已适配网站的漫画放进书架，边看边译，随时对照原图。
 
-需要翻译时，可开启翻译，随时对照原图；也可连接本地部署的 [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui) 服务。
+在设置中选择「浏览器本地翻译（Beta）」，下载模型和字体后即可使用，无需部署服务。图片留在本机，识别文字发送到所选翻译服务；也可使用官方翻译或连接自建 [manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui)。
 
 ## 产品体验
 
-- **导入即读**：支持 CBZ / ZIP、CBR / RAR、PDF、无 DRM 的 MOBI / EPUB，以及 Google Drive 和已适配网站。
-- **远程书库**：配置多个 OPDS 书库的地址与授权，按需浏览和阅读，无需导入整个目录；支持的资源可离线保存。
-- **发现与搜索**：浏览 AniList 趋势、人气、高分和新作，使用作品名称、别名或翻译后的名称搜索已适配网站。
-- **整本离线**：缓存网站漫画的全部目录与章节，多选来源语言，查看进度、暂停继续及补齐失败页。
-- **按习惯阅读**：连续阅读、单页翻页、日漫式双页阅读、阅读方向、缩放与独立阅读背景。
-- **按需翻译**：支持原图／译图切换、并排对照与阅读位置恢复。
-- **自选翻译渠道**：使用官方服务或连接本地 manga-translator-ui；本地渠道无需 NodeLane 账号。
+- **导入即读**：打开常见漫画与电子书文件，也可连接 Google Drive、OPDS 书库或导入已适配网站。
+- **找漫画更方便**：浏览榜单、按名称搜索支持的网站；网站目录提供成人分类和 18+ 标签。
+- **按习惯阅读**：连续滚动、单页或双页翻页，自选方向、缩放和背景，用书签记住喜欢的页面。
+- **随读随译**：在阅读器或网页中翻译图片，切回原图或并排对照，保留阅读位置。
+- **离线续读**：提前缓存支持的网站漫画，随时暂停、继续或重试失败页。
 - **界面随你调整**：16 种界面语言、六种主题色、亮暗外观与文字大小。
 
 ### 我的漫画
@@ -87,6 +79,9 @@
 
 ## 开始开发
 
+<details>
+<summary>模块入口与开发文档</summary>
+
 | 模块 | 用途与入口 |
 | --- | --- |
 | [浏览器插件](apps/extension/README.md) | 阅读器、书架、网站适配与翻译交互 |
@@ -98,7 +93,7 @@
 
 各模块 README 提供环境要求和运行命令；验证工具见[脚本入口](scripts/README.md)。
 
-## 开发规范
+### 开发规范
 
 | 主题 | 文档 |
 | --- | --- |
@@ -110,6 +105,8 @@
 | 部署与维护 | [部署](docs/DEPLOYMENT.md)、[备份与恢复](docs/OPERATIONS.md)、[代码规范](docs/CODE_QUALITY.md)、[API 契约](contracts/README.md) |
 
 协作要求见 [AGENTS.md](AGENTS.md)。产品规则在所属专题维护，README 不重复定义。
+
+</details>
 
 ## 许可证
 

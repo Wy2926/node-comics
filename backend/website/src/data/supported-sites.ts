@@ -1,4 +1,4 @@
-// Build-time only: share the extension's ordering, importability and non-adult discovery policy.
+// Build-time only: share the extension's ordering, importability and site labels.
 import { listSupportedSites } from '../../../../apps/extension/src/sources/registry/sites';
 
 const packagedIcons = import.meta.glob<string>('../../../../apps/extension/public/site-icons/*.svg', {

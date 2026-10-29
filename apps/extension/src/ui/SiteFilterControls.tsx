@@ -1,14 +1,14 @@
 import {useId, useState, type ReactNode} from 'react';
 import {msg} from '../i18n/runtime';
 import {Icon} from '../icons';
-import type {SiteFilters, SourceSiteAccessTag, SourceSiteContentTag, SourceSitePricing} from '../sources';
+import type {SiteFilters, SourceSiteAccessTag, SourceSitePricing} from '../sources';
 import './site-filters.css';
 
 export const emptySiteFilters: SiteFilters = {content: [], pricing: [], raw: [], access: []};
 
 export function siteLabels() {
-  const contentTagLabels: Record<SourceSiteContentTag, string> = {
-    western: msg('欧美漫画'), manga: msg('日漫'), manhwa: msg('韩漫'), manhua: msg('国漫'), webtoon: msg('条漫'), doujin: msg('同人'), illustration: msg('插画'),
+  const contentTagLabels: Record<SiteFilters['content'][number], string> = {
+    western: msg('欧美漫画'), manga: msg('日漫'), manhwa: msg('韩漫'), manhua: msg('国漫'), webtoon: msg('条漫'), doujin: msg('同人'), illustration: msg('插画'), adult: msg('成人'),
   };
   const accessTagLabels: Record<SourceSiteAccessTag, {label: string; description: string}> = {
     'login-required': {label: msg('需要登录'), description: msg('部分漫画或章节需要登录账号才能阅读')},
@@ -54,7 +54,7 @@ export function SiteFilterControls({filters, onChange, visibleCount, totalCount,
   const hasFilters = Object.values(filters).some(values => values.length > 0);
   return <div className="nc-site-filters" role="group" aria-label={msg('筛选')}>
     <FilterGroup label={msg('收费类型')} options={Object.entries(pricingLabels).map(([value, entry]) => ({value: value as SourceSitePricing, label: entry.label, icon: <span className={'nc-site-pricing-color nc-site-pricing-' + value}><PricingIcon pricing={value as SourceSitePricing}/></span>}))} selected={filters.pricing} onChange={pricing => onChange({...filters, pricing})}/>
-    <FilterGroup label={msg('内容类型')} options={Object.entries(contentTagLabels).map(([value, label]) => ({value: value as SourceSiteContentTag, label}))} selected={filters.content} onChange={content => onChange({...filters, content})}/>
+    <FilterGroup label={msg('内容类型')} options={Object.entries(contentTagLabels).map(([value, label]) => ({value: value as SiteFilters['content'][number], label}))} selected={filters.content} onChange={content => onChange({...filters, content})}/>
     <div id={advancedId} hidden={!advanced}>
       <FilterGroup label={msg('内容版本')} options={[{value: true, label: msg('生肉为主')}, {value: false, label: msg('非生肉为主')}]} selected={filters.raw} onChange={raw => onChange({...filters, raw})}/>
       <FilterGroup label={msg('访问条件')} options={Object.entries(accessTagLabels).map(([value, entry]) => ({value: value as SourceSiteAccessTag, label: entry.label}))} selected={filters.access} onChange={access => onChange({...filters, access})}/>

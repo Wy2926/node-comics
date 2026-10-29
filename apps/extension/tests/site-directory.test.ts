@@ -88,19 +88,18 @@ describe('adapter-owned website directory', () => {
     expect(sites.find(site => site.adapterId === 'mangadot')?.contentTags).toContain('manhua');
     expect(sites.find(site => site.adapterId === 'pixiv')?.contentTags).toContain('illustration');
   });
-  it('excludes every adult entry from public discovery, including mixed adapters and unclassified entries', () => {
+  it('includes adult entries and mixed adapters without changing their classification or favorites', () => {
     const adult = declaredSites.filter(site => site.isAdult);
-    expect(adult.map(site => site.key)).toEqual(['nhentaicom:nhentaicom']);
+    expect(adult.map(site => site.key).sort()).toEqual(['nhentaicom:nhentaicom', 'nhentaito:nhentaito']);
     expect(listSupportedSites().map(site => site.key).sort()).toEqual(declaredSites
-      .filter(site => !site.isAdult && definitions.find(adapter => adapter.id === site.adapterId)!.capabilities.importable)
+      .filter(site => definitions.find(adapter => adapter.id === site.adapterId)!.capabilities.importable)
       .map(site => site.key).sort());
     const adapter = definitions.find(value => value.id === 'nhentaicom')!;
     const base = adapter.sites![0];
     const general = {...base, id: 'general', isAdult: false};
-    const unknown = Object.assign({...base, id: 'unclassified'}, {isAdult: undefined});
-    const sites = listSupportedSites([{...adapter, sites: [base, general, unknown]}]);
-    expect(sites.map(site => site.id)).toEqual(['general']);
-    expect(sortSupportedSites(sites, adult.map(site => site.key))).toEqual(sites);
+    const sites = listSupportedSites([{...adapter, sites: [general, base]}]);
+    expect(sites.map(site => site.id)).toEqual(['general', base.id]);
+    expect(sortSupportedSites(sites, adult.map(site => site.key)).map(site => site.id)).toEqual([base.id, 'general']);
     expect(adapter.sites![0].isAdult).toBe(true);
     expect(adapter.capabilities.importable).toBe(true);
   });
@@ -114,11 +113,16 @@ describe('website directory multi-select filters', () => {
   it('keeps every entry and priority order when no filters are selected', () => {
     expect(filter({})).toEqual(sites);
   });
-  it('keeps content filtering independent of the adult discovery restriction', () => {
+  it('filters adult sites by their explicit label and combines them with other content types', () => {
     const western = {...sites[0], contentTags: ['western'] as const};
     expect(matchesSiteFilters(western, {...empty, content: ['western']})).toBe(true);
     expect(matchesSiteFilters(western, {...empty, content: ['manga']})).toBe(false);
     expect(filter({content: ['western']}).map(site => site.adapterId)).toEqual(['readcomicsonline']);
+    expect(filter({content: ['adult']}).map(site => site.key)).toEqual(['nhentaito:nhentaito', 'nhentaicom:nhentaicom']);
+    expect(filter({content: ['adult', 'western']})).toEqual(sites.filter(site => site.isAdult || site.contentTags.includes('western')));
+    expect(filter({content: ['adult'], pricing: ['freemium']})).toEqual([]);
+    expect(matchesSiteFilters({...western, isAdult: false}, {...empty, content: ['adult']})).toBe(false);
+    expect(matchesSiteFilters({...western, isAdult: true}, {...empty, content: ['adult']})).toBe(true);
   });
   it('uses OR inside each group and AND between groups without duplicate cards', () => {
     const selected = filter({content: ['manga', 'webtoon'], pricing: ['free', 'freemium'], raw: [true]});

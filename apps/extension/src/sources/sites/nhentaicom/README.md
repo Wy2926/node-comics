@@ -1,6 +1,6 @@
 # nHentai.com
 
-成人属性：`isAdult: true`。依据[本站漫画目录](https://nhentai.com/hentai-comics)的 Hentai 内容定位和成人年龄声明，标记为成人网站；核对的是已适配 `.com`，不套用其他同名域名的信息。 判定及发现限制遵循[成人属性契约](../../../../../../docs/SITE_ADAPTERS.md#成人属性契约)。
+成人属性：`isAdult: true`。依据[本站漫画目录](https://nhentai.com/hentai-comics)的 Hentai 内容定位和成人年龄声明，标记为成人网站；核对的是已适配 `.com`，不套用其他同名域名的信息。判定、分类与标签遵循[成人属性契约](../../../../../../docs/SITE_ADAPTERS.md#成人属性契约)。
 
 适配 `nhentai.com`，不认领 `nhentai.net` 或其他同名域名。支持 `https://nhentai.com/<界面语言>/comic/<slug>` 详情页及其 `/reader`、`/reader/<页码>` 链接；界面语言包括 en、zh、id、fr、es、de、ru、hi、pt、ar。
 

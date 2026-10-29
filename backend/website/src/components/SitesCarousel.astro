@@ -3,6 +3,7 @@ import { supportedSites } from '../data/supported-sites';
 import { sitesCopy } from '../i18n/sites';
 import { localPath, type Locale } from '../i18n/locales';
 import SitePricing from './SitePricing.astro';
+import SiteAdult from './SiteAdult.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const c = sitesCopy[locale];
@@ -19,10 +20,10 @@ const rows = Array.from({ length: 3 }, (_, row) => supportedSites.filter((_, ind
       {rows.map((row, index) => <div class="sites-row" dir="ltr" style={`--sites-duration: ${65 + index * 10}s`}>
         <div class="sites-track">
           <ul class="sites-group" role="list">
-            {row.map(site => <li><a class="site-mini" href={`${path}#${site.anchor}`} dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi><SitePricing pricing={site.pricing} locale={locale} /></a></li>)}
+            {row.map(site => <li><a class="site-mini" href={`${path}#${site.anchor}`} dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi>{site.isAdult && <SiteAdult locale={locale} />}<SitePricing pricing={site.pricing} locale={locale} /></a></li>)}
           </ul>
           <div class="sites-group sites-clone" aria-hidden="true">
-            {row.map(site => <a class="site-mini" href={`${path}#${site.anchor}`} tabindex="-1" dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi><SitePricing pricing={site.pricing} locale={locale} /></a>)}
+            {row.map(site => <a class="site-mini" href={`${path}#${site.anchor}`} tabindex="-1" dir={locale === 'ar' ? 'rtl' : 'ltr'}><bdi>{site.name}</bdi>{site.isAdult && <SiteAdult locale={locale} />}<SitePricing pricing={site.pricing} locale={locale} /></a>)}
           </div>
         </div>
       </div>)}

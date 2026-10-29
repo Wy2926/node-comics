@@ -105,8 +105,8 @@ describe('name-only search and candidate authority', () => {
 });
 
 describe('single-site search runtime', () => {
-  it.each([true, undefined])('blocks adult or unclassified sites (%s) before any search transport', async isAdult => {
-    Object.assign(site(), {isAdult});
+  it('rejects a site without implemented search regardless of its adult label', async () => {
+    Object.assign(site(), {isAdult: true, search: undefined});
     const searchPage = vi.fn(() => 'https://fixture.test/search');
     fixture.networks.fixture.searchPage = searchPage;
     expect(listSearchSites()).toEqual([]);
@@ -116,16 +116,16 @@ describe('single-site search runtime', () => {
     expect(chrome.permissions.contains).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('keeps non-adult entries of a mixed adapter searchable and rejects old adult cursors and covers', async () => {
+  it('keeps adult entries searchable in mixed adapters, including pagination and observed covers', async () => {
     fixture.networks.fixture.search = vi.fn(async () => ({items: [hit({cover: {url: 'https://fixture.test/cover.jpg'}})], nextCursor: 'next'}));
     const first = await searchSource('fixture', query(), {sessionId: 'session'});
     fixture.definitions[0].sites = [site(), {...site(), id: 'general'}];
     site().isAdult = true;
-    expect(listSearchSites().map(site => site.id)).toEqual(['general']);
-    await expect(searchSource('fixture', {...query(), cursor: first.nextCursor}, {sessionId: 'session'})).rejects.toMatchObject({code: 'SOURCE_SEARCH_UNSUPPORTED'});
-    await expect(readSearchCover(first.items[0])).rejects.toMatchObject({code: 'SOURCE_SEARCH_UNSUPPORTED'});
-    expect(fixture.networks.fixture.search).toHaveBeenCalledOnce();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(listSearchSites().map(site => site.id)).toEqual(['main', 'general']);
+    expect((await searchSource('fixture', {...query(), cursor: first.nextCursor}, {sessionId: 'session'})).items).toHaveLength(1);
+    expect(await (await readSearchCover(first.items[0])).text()).toBe('fixture');
+    expect(fixture.networks.fixture.search).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledOnce();
     expect((await searchSource('fixture', {...query(), siteId: 'general'}, {sessionId: 'session'})).items).toHaveLength(1);
   });
   it('binds cursors to the session, site and query without exposing the adapter cursor', async () => {

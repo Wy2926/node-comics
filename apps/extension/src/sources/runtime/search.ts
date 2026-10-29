@@ -22,12 +22,12 @@ function prune() {
 function authority(sourceId: string, siteId: string) {
   const definition = definitions.find(value => value.id === sourceId), site = definition?.sites?.find(value => value.id === siteId);
   const operation = sourceNetworks[sourceId]?.search;
-  if (!definition || !site?.search || site.isAdult !== false || !operation) throw new SourceSearchError('SOURCE_SEARCH_UNSUPPORTED');
+  if (!definition || !site?.search || !operation) throw new SourceSearchError('SOURCE_SEARCH_UNSUPPORTED');
   return {definition, site, operation, searchPage: sourceNetworks[sourceId]?.searchPage, capability: validateSearchCapability(definition, site)};
 }
 export function listSearchSites(): SourceSearchSite[] {
   return definitions.flatMap(definition => (definition.sites ?? []).flatMap(site => {
-    if (!site.search || site.isAdult !== false) return [];
+    if (!site.search) return [];
     const {capability} = authority(definition.id, site.id);
     return [{...site, adapterId: definition.id, key: `${definition.id}:${site.id}`, search: capability}];
   }));

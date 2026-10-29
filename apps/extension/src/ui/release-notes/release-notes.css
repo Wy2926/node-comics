@@ -14,23 +14,13 @@
 .nc-release-cover-art svg { display: block; width: 100%; height: auto; }
 .nc-release-content { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 26px 28px 20px; }
 .nc-release-content:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.nc-release-highlights { display: grid; grid-template-columns: minmax(0,.95fr) minmax(0,1.15fr); gap: 0 26px; margin: 0; padding: 0; list-style: none; }
-.nc-release-highlights > li { --release-color: var(--icon-comic-yellow); position: relative; min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 14px; padding: 16px 0; }
-.nc-release-highlights > li + li + li { border-top: 1px solid var(--line); }
-.nc-release-highlights > li:nth-child(3) { --release-color: var(--icon-comic-mint); }
-.nc-release-highlights > li:nth-child(4) { --release-color: var(--icon-comic-purple); }
-.nc-release-highlights > li:first-child { grid-row: span 3; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; padding: 22px; border: var(--comic-border); border-radius: 5px 22px 5px 5px; box-shadow: var(--comic-shadow-small); background: var(--accent-soft) var(--comic-dot-pattern); background-size: var(--comic-dot-size); }
-.nc-release-feature-icon { position: relative; display: grid; place-items: center; width: 42px; height: 48px; }
+.nc-release-highlights { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 26px; margin: 0; padding: 0; list-style: none; }
+.nc-release-highlights > li { --release-color: var(--icon-comic-yellow); min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: start; gap: 14px; padding: 16px 0; }
+.nc-release-highlights > li:nth-child(2) { --release-color: var(--icon-comic-mint); }
+.nc-release-feature-icon { position: relative; display: grid; place-items: center; width: 42px; height: 38px; }
 .nc-release-feature-icon::before { content: ''; position: absolute; width: 34px; height: 32px; top: 2px; border-radius: 9px 3px 9px 3px; background: var(--release-color); transform: rotate(-8deg); }
 .nc-release-feature-icon > .nc-icon { position: relative; align-self: start; margin-top: 5px; }
-.nc-release-feature-icon > span { position: relative; align-self: end; color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
-.nc-release-highlights > li:first-child .nc-release-feature-icon { position: absolute; right: 14px; top: 12px; width: auto; height: auto; }
-.nc-release-highlights > li:first-child .nc-release-feature-icon::before,.nc-release-highlights > li:first-child .nc-release-feature-icon > .nc-icon { display: none; }
-.nc-release-highlights > li:first-child .nc-release-feature-icon > span { color: var(--accent); }
-.nc-release-spread-preview { margin: 0 -8px 6px; }
-.nc-release-spread-preview svg { display: block; width: 100%; height: auto; }
 .nc-release-highlights h3 { margin: 0; color: var(--ink); font-size: var(--text-body); font-weight: 850; line-height: 1.45; overflow-wrap: anywhere; }
-.nc-release-highlights > li:first-child h3 { font-size: var(--text-title); }
 .nc-release-feature-text p { margin: 6px 0 0; color: var(--muted); font-size: var(--text-small); line-height: 1.7; overflow-wrap: anywhere; }
 .nc-release-footer { display: flex; justify-content: flex-end; margin: 0 28px; padding: 14px 0 18px; border-top: var(--comic-perforation); flex: none; }
 .nc-release-footer .button { min-width: 148px; }
@@ -41,9 +31,7 @@
   .nc-release-cover-art { margin-top: 24px; }
   .nc-release-content { padding: 20px; }
   .nc-release-highlights { grid-template-columns: minmax(0,1fr); gap: 0; }
-  .nc-release-highlights > li:first-child { grid-row: auto; display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1fr); gap: 16px; padding: 18px; margin-bottom: 10px; }
-  .nc-release-spread-preview { margin: 0; }
-  .nc-release-highlights > li:first-child h3 { font-size: var(--text-body); }
+  .nc-release-highlights > li + li { border-top: 1px solid var(--line); }
   .nc-release-footer { margin: 0 20px; padding-block: 12px; }
   .nc-release-footer .button { width: 100%; }
 }
@@ -52,8 +40,6 @@
   .nc-release-version { font-size: 4rem; }
   .nc-release-cover-art { display: none; }
   .nc-release-content { padding: 16px; }
-  .nc-release-highlights > li:first-child { display: flex; gap: 8px; padding: 16px; }
-  .nc-release-spread-preview { width: 180px; max-width: 100%; align-self: center; margin-bottom: 0; }
   .nc-release-highlights > li { grid-template-columns: 38px minmax(0,1fr); gap: 10px; padding-block: 14px; }
   .nc-release-footer { margin-inline: 16px; }
 }

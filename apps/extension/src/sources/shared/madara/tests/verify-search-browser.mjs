@@ -215,7 +215,7 @@ export function sourcePages(urls:string[]){return urls.flatMap(url=>{try{const {
     return {serviceOrigin:probe.serviceOrigin,sites:probe.sites()};
   }, manifest.version);
   serviceOrigin = setup.serviceOrigin;
-  const matches = setup.sites.filter(site => site.id === siteId); assert.equal(matches.length, 1, 'siteId must identify exactly one eligible non-adult search site');
+  const matches = setup.sites.filter(site => site.id === siteId); assert.equal(matches.length, 1, 'siteId must identify exactly one search-capable site');
   target = matches[0]; origin = new URL(target.url).origin; knownSourceOrigins = setup.sites.map(site => new URL(site.url).origin);
   searchableSiteCount = setup.sites.length;
   assert.notEqual(origin, serviceOrigin);

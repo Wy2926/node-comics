@@ -654,6 +654,15 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.2.0",
+        "date": "2026-10-29",
+        "title": "1.2.0 · Terjemahan bawaan dan kategori 18+",
+        "items": [
+          "Terjemahan di browser (Beta): Unduh model dan font, tanpa menyiapkan server. Gambar tetap di perangkat; teks yang dikenali dikirim ke layanan terjemahan pilihanmu.",
+          "Kategori 18+ baru: Filter situs dewasa, lihat label 18+, dan impor tautan galeri nHentai.to."
+        ]
+      },
+      {
         "id": "1.1.0",
         "date": "2026-10-27",
         "title": "1.1.0 · Membaca makin nyaman.",

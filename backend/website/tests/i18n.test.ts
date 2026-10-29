@@ -64,14 +64,14 @@ test('localized releases have stable unique anchors and matching entries',()=>{
   }
 });
 
-test('1.1.0 leads every changelog with four concise user-facing highlights',()=>{
+test('1.2.0 leads every changelog with two concise user-facing highlights',()=>{
   for(const locale of locales){
     const release=dictionaries[locale].documents.releases[0];
-    assert.equal(release.id,'1.1.0',locale);
-    assert.equal(release.date,'2026-10-27',locale);
+    assert.equal(release.id,'1.2.0',locale);
+    assert.equal(release.date,'2026-10-29',locale);
     assert.ok(release.title.includes(release.id),locale);
-    assert.equal(release.items.length,4,locale);
-    assert.equal(new Set(release.items).size,4,locale);
+    assert.equal(release.items.length,2,locale);
+    assert.equal(new Set(release.items).size,2,locale);
     assert.ok(release.items.every(item=>item.trim().length>0 && item.length<=200),locale);
     assert.doesNotMatch([release.title,...release.items].join(' '),/待发布|待商店发布|pending (?:store )?release|AMO|SHA-256|manifest\.key|git commit/i,locale);
   }
