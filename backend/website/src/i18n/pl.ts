@@ -656,10 +656,9 @@ export default {
       {
         "id": "1.2.0",
         "date": "2026-10-29",
-        "title": "1.2.0 · Wbudowane tłumaczenie i kategoria 18+",
+        "title": "1.2.0 · Tłumaczenie w przeglądarce",
         "items": [
-          "Tłumaczenie w przeglądarce (Beta): Pobierz modele i czcionki, bez własnego serwera. Obrazy zostają na urządzeniu, a rozpoznany tekst trafia do wybranej usługi tłumaczenia.",
-          "Nowa kategoria 18+: Filtruj strony dla dorosłych, rozpoznawaj oznaczenia 18+ i importuj linki z nHentai.to."
+          "Tłumaczenie w przeglądarce (Beta): Pobierz modele i czcionki, bez własnego serwera. Obrazy zostają na urządzeniu, a rozpoznany tekst trafia do wybranej usługi tłumaczenia."
         ]
       },
       {

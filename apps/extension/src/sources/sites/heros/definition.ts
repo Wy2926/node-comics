@@ -17,7 +17,7 @@ export function herosLocation(url: URL) {
 }
 export const definition: SourceDefinition = {
   id: 'heros', name: "HERO'S Web", installation,
-  sites: [{id: 'heros', name: "HERO'S Web", url: origin + '/', icon, adaptedOn: '2026-10-09', pricing: 'freemium', isRaw: true, isAdult: false,
+  sites: [{id: 'heros', name: "HERO'S Web", url: origin + '/', icon, adaptedOn: '2026-10-09', pricing: 'freemium', isRaw: true,
     contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720},

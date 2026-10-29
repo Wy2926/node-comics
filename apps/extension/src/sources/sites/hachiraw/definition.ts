@@ -20,7 +20,7 @@ export const chapterKey = (loc: HachiLocation) => `${catalogKey(loc.slug)}:${loc
 export const chapterUrl = (loc: HachiLocation) => `${catalogUrl(loc.slug)}/${loc.chapter}`;
 export const definition: SourceDefinition = {
   id: 'hachiraw', name: 'Hachiraw', installation,
-  sites: [{id: 'hachiraw', name: 'Hachiraw', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'free', isRaw: true, isAdult: false,
+  sites: [{id: 'hachiraw', name: 'Hachiraw', url: origin + '/', icon, adaptedOn: '2026-10-12', pricing: 'free', isRaw: true,
     contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

@@ -28,6 +28,8 @@ await build({configFile:false,root:path.join(root,'apps/extension'),logLevel:'er
 const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.TEST_CHROMIUM,
   locale:'zh-CN',viewport:{width:1440,height:1000},args:['--disable-extensions-except='+extension,'--load-extension='+extension]});
 context.setDefaultTimeout(30000);context.setDefaultNavigationTimeout(30000);
+// Release-note behavior is covered by the shared UI verifier.
+await context.addInitScript(()=>{if(location.protocol==='chrome-extension:')localStorage.setItem('nc-release-notes-version',chrome.runtime.getManifest().version);});
 const errors=[],checks=[],created=[],chapterReads=[],chapterMetadataReads=[],imageReads=[],cacheDiagnostics=[],networkFailures=[],scrollDiagnostics=[];
 context.on('page',page=>{created.push(page);page.on('pageerror',error=>errors.push(error.message));});
 context.on('requestfailed',request=>networkFailures.push({host:new URL(request.url()).hostname,error:request.failure()?.errorText}));
@@ -41,7 +43,7 @@ function rows(){return [[ids.empty,'0','en',0,'Unavailable preface','Group Zero'
   [ids.en2a,'2','en',2,'English two A','Group A'],[ids.en2b,'2','en',4,'English two B','Group B'],[ids.en3,'3','en',2,'English three','Group Three'],
   [ids.zh3,'3','zh-hk',3,'中文第三话','中文组'],[ids.vi4,'4','vi',2,'Vietnamese four','Group Four']]
   .filter(([id])=>!removeChosen||id!==ids.en2b).map(([id,chapter,language,pages,title,group])=>({id,type:'chapter',attributes:{volume:'1',chapter,title,
-    translatedLanguage:language,pages,externalUrl:null,isUnavailable:false},relationships:[{id:manga,type:'manga'},{id:uuid(90),type:'scanlation_group',attributes:{name:group}}]}));}
+    translatedLanguage:language,pages,externalUrl:null,isUnavailable:false},relationships:[{id:manga,type:'manga',attributes:{contentRating:'safe'}},{id:uuid(90),type:'scanlation_group',attributes:{name:group}}]}));}
 function aggregate(){const chapters={};for(const row of rows()){const key=row.attributes.chapter;if(!chapters[key])chapters[key]={chapter:key,id:row.id,others:[],count:1};else {chapters[key].others.push(row.id);chapters[key].count++;}}
   return {result:'ok',volumes:{'1':{volume:'1',count:rows().length,chapters}}};}
 function png(){const crc=buffer=>{let value=0xffffffff;for(const byte of buffer){value^=byte;for(let i=0;i<8;i++)value=(value>>>1)^((value&1)?0xedb88320:0);}return(value^0xffffffff)>>>0;};
@@ -58,7 +60,7 @@ if(!live){
       const all=rows(),offset=Number(url.searchParams.get('offset')),limit=Number(url.searchParams.get('limit'));
       value={result:'ok',response:'collection',data:all.slice(offset,offset+limit),limit,offset,total:all.length};
     }else if(parts[1]==='manga'&&parts[3]==='aggregate')value=aggregate();
-    else if(parts[1]==='manga')value={result:'ok',response:'entity',data:{id:manga,type:'manga',attributes:{title:{en:'MangaDex multilingual fixture'},originalLanguage:'ja'},relationships:[{id:uuid(2),type:'cover_art',attributes:{fileName:'fixture-cover.png'}}]}};
+    else if(parts[1]==='manga')value={result:'ok',response:'entity',data:{id:manga,type:'manga',attributes:{title:{en:'MangaDex multilingual fixture'},originalLanguage:'ja',contentRating:'safe'},relationships:[{id:uuid(2),type:'cover_art',attributes:{fileName:'fixture-cover.png'}}]}};
     else if(parts[1]==='chapter'){chapterMetadataReads.push(parts[2]);if(failChapterApi===true)return route.fulfill({status:503,body:'Unavailable'});const chapter=rows().find(row=>row.id===parts[2]);value={result:'ok',response:'entity',data:chapter};}
     else if(parts[1]==='at-home'){chapterReads.push(parts[3]);if(failChapterApi)return route.fulfill({status:503,body:'Unavailable'});const chapter=rows().find(row=>row.id===parts[3]);value={result:'ok',baseUrl:'https://'+server,chapter:{hash:'a'.repeat(32),data:Array.from({length:chapter.attributes.pages},(_,n)=>`${chapter.id}-${n}.png`)}};}
     else throw Error('Unexpected fixture API route: '+url.pathname);
@@ -144,6 +146,7 @@ try{
   // Keep source regression controls visible; immersive idle behavior has separate coverage.
   reader=await context.newPage();await reader.goto(home);await reader.evaluate(async()=>{const settings={uiLanguage:'zh-CN',language:'zh-Hans',layout:'continuous',fit:'window',readerImmersive:false};localStorage.setItem('nc-settings',JSON.stringify(settings));await chrome.storage.local.set({'nc-reader-settings':settings});});await reader.reload();
   await reader.getByRole('button',{name:'漫画网站',exact:true}).click();await reader.getByRole('heading',{name:'MangaDex',exact:true}).waitFor();
+  await reader.screenshot({path:path.join(out,'site-directory.png')});
   await reader.getByLabel('通过链接添加漫画').fill(`https://mangadex.org/title/${manga}`);await reader.getByRole('button',{name:'添加到书架',exact:true}).click();
   await reader.getByRole('slider',{name:'阅读进度',exact:true}).waitFor({timeout:60000});
   const imported=await state();assert.equal(imported.comics.length,1);assert.equal(imported.entries.length,live?84:8);
@@ -225,7 +228,8 @@ try{
     blockedImageHosts.add(server);server='third-fixture.mangadex.network';failChapterApi='at-home';const beforeFailedRefresh=apiCounts(ids.en2b);
     await reader.getByRole('button',{name:'打开漫画 '+imported.comics[0].title,exact:true}).click();
     const failedPage=reader.locator(`[data-copy-id="${chosen.id}"] [data-page-index="2"] .nc-image-failure`);await failedPage.waitFor();
-    assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'3');await image(0);
+    // Check the cached adjacent page inside the reader's bounded image window.
+    assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'3');await image(3);
     assert.deepEqual(apiCounts(ids.en2b),{chapter:beforeFailedRefresh.chapter+1,atHome:beforeFailedRefresh.atHome+1},'A failed at-home refresh must not loop');
     const failedRefresh=await state();assert.deepEqual(pageIdentity(failedRefresh,chosen),chosenIdentity);assert.equal(failedRefresh.positions.find(position=>position.entryId===chosen.id).pageId,chosenPosition.pageId);
     await reader.screenshot({path:path.join(out,'expired-node-refresh-failure.png')});

@@ -7,23 +7,22 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('release notes first use', () => {
-  it('ships 1.2.0 with one version and two concise localized highlights', async () => {
+  it('ships 1.2.0 with one version and a concise localized highlight', async () => {
     const {releaseNotes} = await import('../src/ui/release-notes/content');
     expect(version).toBe('1.2.0');
     expect(releaseNotes.version).toBe(version);
     expect(lock.version).toBe(version);
     expect(lock.packages[''].version).toBe(version);
     expect(releaseNotes.highlights.map(item => item.title)).toEqual([
-      'releaseNotes.browserTranslation.title', 'releaseNotes.adultCategory.title',
+      'releaseNotes.browserTranslation.title',
     ]);
     for (const item of releaseNotes.highlights) expect(zh[item.description].trim()).not.toBe('');
     expect(zh['releaseNotes.kicker']).toBe('本次更新');
     expect(zh['releaseNotes.browserTranslation.description']).toContain('图片留在本机');
-    expect(zh['releaseNotes.adultCategory.description']).toContain('18+');
     const dictionaries = import.meta.glob<Record<string, string>>('../src/i18n/dictionaries/*.json', {eager: true, import: 'default'});
     expect(Object.keys(dictionaries)).toHaveLength(16);
     const keys = Object.keys(zh).filter(key => key.startsWith('releaseNotes.'));
-    expect(keys).toHaveLength(10);
+    expect(keys).toHaveLength(8);
     for (const dictionary of Object.values(dictionaries)) {
       expect(Object.keys(dictionary).filter(key => key.startsWith('releaseNotes.'))).toEqual(keys);
       for (const key of keys) expect(dictionary[key].trim(), key).not.toBe('');

@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'undertranslations', name: 'UnderTranslations', installation,
   sites: [{id: 'undertranslations', name: 'UnderTranslations', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manga'], isRaw: false, isAdult: false, primaryLanguages: ['es'], search: true}],
+    pricing: 'free', contentTags: ['manga'], isRaw: false, primaryLanguages: ['es'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

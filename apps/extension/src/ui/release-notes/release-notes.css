@@ -14,9 +14,8 @@
 .nc-release-cover-art svg { display: block; width: 100%; height: auto; }
 .nc-release-content { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 26px 28px 20px; }
 .nc-release-content:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.nc-release-highlights { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 26px; margin: 0; padding: 0; list-style: none; }
+.nc-release-highlights { margin: 0; padding: 0; list-style: none; }
 .nc-release-highlights > li { --release-color: var(--icon-comic-yellow); min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: start; gap: 14px; padding: 16px 0; }
-.nc-release-highlights > li:nth-child(2) { --release-color: var(--icon-comic-mint); }
 .nc-release-feature-icon { position: relative; display: grid; place-items: center; width: 42px; height: 38px; }
 .nc-release-feature-icon::before { content: ''; position: absolute; width: 34px; height: 32px; top: 2px; border-radius: 9px 3px 9px 3px; background: var(--release-color); transform: rotate(-8deg); }
 .nc-release-feature-icon > .nc-icon { position: relative; align-self: start; margin-top: 5px; }
@@ -30,8 +29,6 @@
   .nc-app .modal.nc-release-notes h2 { font-size: var(--text-title); }
   .nc-release-cover-art { margin-top: 24px; }
   .nc-release-content { padding: 20px; }
-  .nc-release-highlights { grid-template-columns: minmax(0,1fr); gap: 0; }
-  .nc-release-highlights > li + li { border-top: 1px solid var(--line); }
   .nc-release-footer { margin: 0 20px; padding-block: 12px; }
   .nc-release-footer .button { width: 100%; }
 }

@@ -20,7 +20,7 @@ const definition = (): SourceDefinition => ({id: 'fixture', name: 'Fixture',
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: false},
   installation: {autoContentMatches: []},
   sites: [{id: 'main', name: 'Fixture', url: 'https://fixture.test/', icon: '/fixture.svg', primaryLanguages: ['en'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'unknown', isRaw: false,
-    search: true, isAdult: false}],
+    search: true}],
   identify(url) {
     if (!['fixture.test', 'mirror.test'].includes(url.hostname)) return null;
     const id = /^\/book\/([a-z]+)$/.exec(url.pathname)?.[1];
@@ -105,8 +105,8 @@ describe('name-only search and candidate authority', () => {
 });
 
 describe('single-site search runtime', () => {
-  it('rejects a site without implemented search regardless of its adult label', async () => {
-    Object.assign(site(), {isAdult: true, search: undefined});
+  it('rejects a site without implemented search', async () => {
+    site().search = undefined;
     const searchPage = vi.fn(() => 'https://fixture.test/search');
     fixture.networks.fixture.searchPage = searchPage;
     expect(listSearchSites()).toEqual([]);
@@ -116,11 +116,10 @@ describe('single-site search runtime', () => {
     expect(chrome.permissions.contains).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('keeps adult entries searchable in mixed adapters, including pagination and observed covers', async () => {
+  it('supports multiple search sites per adapter, including pagination and observed covers', async () => {
     fixture.networks.fixture.search = vi.fn(async () => ({items: [hit({cover: {url: 'https://fixture.test/cover.jpg'}})], nextCursor: 'next'}));
     const first = await searchSource('fixture', query(), {sessionId: 'session'});
     fixture.definitions[0].sites = [site(), {...site(), id: 'general'}];
-    site().isAdult = true;
     expect(listSearchSites().map(site => site.id)).toEqual(['main', 'general']);
     expect((await searchSource('fixture', {...query(), cursor: first.nextCursor}, {sessionId: 'session'})).items).toHaveLength(1);
     expect(await (await readSearchCover(first.items[0])).text()).toBe('fixture');

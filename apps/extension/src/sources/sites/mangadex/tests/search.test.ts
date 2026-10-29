@@ -4,14 +4,21 @@ import {describeWork} from '../work';
 
 const mangaId = '42f40118-dff5-4f23-acbf-e54e89f026bd';
 const request = {siteId: 'mangadex', query: 'Okaeri & Love'};
-const row = {id: mangaId, type: 'manga', attributes: {title: {'ja-ro': 'Okaeri'}, originalLanguage: 'ja', availableTranslatedLanguages: ['en', 'zh-hk']}, relationships: []};
+const row = {id: mangaId, type: 'manga', attributes: {title: {'ja-ro': 'Okaeri'}, originalLanguage: 'ja', contentRating: 'safe', availableTranslatedLanguages: ['en', 'zh-hk']}, relationships: []};
 const body = (data: unknown[] = [row], extra = {}) => JSON.stringify({result: 'ok', response: 'collection', data, total: data.length, limit: 12, offset: 0, ...extra});
 describe('MangaDex search', () => {
-  it('encodes only the name search without content or original language filters', () => {
+  it('limits name searches to supported ratings without filtering chapter or original languages', () => {
     const url = new URL(searchUrl(request).url);
     expect(url.searchParams.get('title')).toBe(request.query);
+    expect(url.searchParams.getAll('contentRating[]')).toEqual(['safe', 'suggestive']);
     expect(url.searchParams.has('availableTranslatedLanguage[]')).toBe(false);
     expect(url.searchParams.has('originalLanguage[]')).toBe(false);
+  });
+  it('requires a supported rating in each result before exposing the page', () => {
+    for (const contentRating of ['safe', 'suggestive'])
+      expect(parseSearch(body([{...row, attributes: {...row.attributes, contentRating}}]), request).items).toHaveLength(1);
+    for (const contentRating of [undefined, null, '', 'unsupported'])
+      expect(() => parseSearch(body([{...row, attributes: {...row.attributes, contentRating}}]), request)).toThrow('内容分级');
   });
   it('takes body languages from available chapters rather than title/original language', () => {
     expect(parseSearch(body(), request).items[0]).toMatchObject({catalogId: 'mangadex:' + mangaId, title: 'Okaeri', contentLanguages: ['en', 'zh-HK']});

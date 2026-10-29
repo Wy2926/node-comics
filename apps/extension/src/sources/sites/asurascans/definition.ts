@@ -19,7 +19,7 @@ export function asuraLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'asurascans', name: 'Asura Scans', installation,
   sites: [{id: 'asurascans', name: 'Asura Scans', url: origin + '/', icon, adaptedOn: '2026-10-19',
-    pricing: 'freemium', isRaw: false, isAdult: false, contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'],
+    pricing: 'freemium', isRaw: false, contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'],
     primaryLanguages: ['en'], accessTags: ['login-required'], search: true}],
   capabilities: {importable: true, pages: true, catalog: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

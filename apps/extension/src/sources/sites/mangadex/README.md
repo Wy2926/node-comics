@@ -2,6 +2,8 @@
 
 支持 `https://mangadex.org/title/<manga UUID>[/slug]` 与 `https://mangadex.org/chapter/<chapter UUID>[/page]`。作品、完整分页目录、章节归属、专门封面及原始图片清单均读取公开 HTTP API；12 小时目录同步不打开源站标签页。原位图片翻译未声明支持。
 
+支持分级为 `safe`、`suggestive` 的作品；搜索与 feed 显式使用同一范围。作品元数据与搜索结果均校验分级，章节接口通过 `includes[]=manga` 在同一次请求中校验所属作品；分级缺失或不受支持时停止读取，不请求目录 feed 或图片服务器。
+
 一部作品使用一个漫画身份，各语言共用目录；一个章节 UUID 对应一个独立发布条目及阅读进度。章节 `translatedLanguage` 转为内容语言，作品 `originalLanguage` 不代替它。`es-la` 映射 `es-419`，`zh-hk` 映射 `zh-HK`，`zh` 映射 `zh-Hans`，罗马化日文／韩文／中文分别映射 `ja-Latn`／`ko-Latn`／`zh-Latn`。
 
 完整 feed 保留各语言、外链和不可用条目，不使用语言筛选。`includeEmptyPages`、`includeExternalUrl` 等三态筛选必须省略：传 `1` 会仅取对应子集。每页核对总数、偏移、数量及 UUID，聚合目录中的 UUID 再与 feed 的作品、卷、话核对；数量或归属不一致使刷新失败，交公共层保留旧目录。
@@ -12,7 +14,7 @@
 
 网站访问遵循[公共权限规则](../../../../../../docs/SITE_ADAPTERS.md#必须保持的约束)，不逐站申请。具备浏览器访问权限的网页会挂载一个页面级导入／管理入口，使用自有固定位置容器并随导航／销毁清理；该入口不依赖 MangaDex 的专属 DOM 选择器。真实页面布局与 SPA 中入口可见性须在源站网页单独验收，隔离页面测试不能替代。
 
-搜索只用公开 `/manga` 列表的 `title` 查询，每页 12 项，按相关度排序；不发送 `availableTranslatedLanguage[]`、`originalLanguage[]` 等语言筛选。结果有 `availableTranslatedLanguages` 时将其规范化为可选语言标签，缺失时不补齐；原作语言或书名语言不代替本站章节语言，也不影响作品是否返回。搜索采用 API 默认内容分级范围（`safe`、`suggestive`、`erotica`），源站分页上限为 10000 项。
+搜索使用公开 `/manga` 列表的 `title` 查询，每页 12 项，按相关度排序；不发送 `availableTranslatedLanguage[]`、`originalLanguage[]` 等语言筛选。结果有 `availableTranslatedLanguages` 时将其规范化为可选语言标签，缺失时不补齐；原作语言或书名语言不代替本站章节语言，也不影响作品是否返回。源站分页上限为 10000 项。
 
 网页种子要求作品页 `og:url` 与当前作品身份一致，再读取 `og:title` 的已知站点后缀；SPA 残留旧身份或章节页没有可靠作品名时不返回种子。OpenGraph 分享图不冒充作品封面。
 

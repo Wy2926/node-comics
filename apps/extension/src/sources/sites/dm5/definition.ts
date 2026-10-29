@@ -19,7 +19,7 @@ export const catalogUrl = (slug: string) => `${origin}/manhua-${slug}/`;
 export const chapterUrl = (id: string) => `${origin}/m${id}/`;
 export const definition: SourceDefinition = {
   id: 'dm5', name: '动漫屋 DM5',
-  sites: [{id: 'dm5', name: '动漫屋 DM5', url: origin + '/', icon, adaptedOn: '2026-09-23', pricing: 'freemium', isRaw: false, isAdult: false, accessTags: ['login-required'], contentTags: ['manga', 'manhua', 'manhwa', 'webtoon'], primaryLanguages: ['zh-Hans'],
+  sites: [{id: 'dm5', name: '动漫屋 DM5', url: origin + '/', icon, adaptedOn: '2026-09-23', pricing: 'freemium', isRaw: false, accessTags: ['login-required'], contentTags: ['manga', 'manhua', 'manhwa', 'webtoon'], primaryLanguages: ['zh-Hans'],
     search: true }],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,

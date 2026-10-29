@@ -19,7 +19,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'gakamangas', name: 'GakaMangas', installation,
   sites: [{id: 'gakamangas', name: 'GakaMangas', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'freemium', contentTags: ['doujin'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'freemium', contentTags: ['doujin'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

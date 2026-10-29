@@ -34,7 +34,7 @@ NodeLane 漫译帮助你在浏览器里阅读漫画、翻译页面，并继续�
 - 随读随译：翻译阅读器或网页中的图片，随时切回原图或并排对照。
 - 浏览器内置翻译（Beta）：下载模型和字体后即可使用，无需部署服务；图片留在本机，识别文字发送到所选翻译服务。
 - 集中阅读：导入本地文件和已适配网站，连接 Google Drive 或 OPDS 书库。
-- 找到想看的漫画：按名称搜索支持的网站，使用网站分类筛选和 18+ 标签。
+- 找到想看的漫画：按名称搜索支持的网站，使用网站分类筛选。
 - 离线续读：提前缓存支持的网站漫画，自动保存阅读进度。
 
 本地阅读和浏览器内置翻译无需 NodeLane 账号。内置翻译目前支持译为简繁中文、日语和韩语，也可选择官方翻译或连接自建服务。官方翻译需要联网和登录，提供免费额度及可选付费套餐；其他翻译服务的费用以所选服务为准。
@@ -52,7 +52,7 @@ NodeLane Comics helps you read comics in your browser, translate pages, and pick
 - Translate as you read: Translate images in the reader or on a webpage, then switch back to originals or compare them side by side.
 - Built-in browser translation (Beta): Download models and fonts without setting up a server. Images stay on your device; recognized text goes to your chosen translation service.
 - Read in one place: Import local files and supported websites, or connect Google Drive and OPDS libraries.
-- Find comics: Search supported sites by title and browse website categories with clear 18+ badges.
+- Find comics: Search supported sites by title and browse website categories.
 - Continue offline: Cache supported website comics in advance and keep your reading progress.
 
 Local reading and built-in browser translation do not require a NodeLane account. Built-in translation currently supports output in Simplified Chinese, Traditional Chinese, Japanese, and Korean. You can also use official translation or connect your own service. Official translation requires internet access and sign-in, with a free allowance and optional paid plans. Other services set their own fees.

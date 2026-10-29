@@ -17,7 +17,7 @@ export const chapterUrl = (loc: ComicLocation) => `${catalogUrl(loc.slug)}/${loc
 export const definition: SourceDefinition = {
   id: 'readcomicsonline', name: 'Read Comics Online', installation,
   sites: [{id: 'readcomicsonline', name: 'Read Comics Online', url: origin + '/', icon,
-    primaryLanguages: ['en'], adaptedOn: '2026-10-27', pricing: 'free', isRaw: false, isAdult: false, contentTags: ['western'],
+    primaryLanguages: ['en'], adaptedOn: '2026-10-27', pricing: 'free', isRaw: false, contentTags: ['western'],
     search: true, searchPageSize: 60}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},

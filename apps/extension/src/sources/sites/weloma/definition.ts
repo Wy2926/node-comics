@@ -21,7 +21,7 @@ export const chapterUrl = (chapter: string, work?: string) => `${origin}/c/${cha
 export const definition: SourceDefinition = {
   id: 'weloma', name: 'WeLoMa', installation,
   sites: [{id: 'weloma', name: 'WeLoMa', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manga'], isRaw: true, isAdult: false, primaryLanguages: ['ja'], search: true}],
+    pricing: 'free', contentTags: ['manga'], isRaw: true, primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -19,7 +19,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'mangasushi', name: 'Mangasushi', installation,
   sites: [{id: 'mangasushi', name: 'Mangasushi', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manga'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manga'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

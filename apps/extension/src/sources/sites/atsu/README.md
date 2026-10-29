@@ -18,7 +18,7 @@
 - `/api/manga/page?id=<id>` 提供作品、专用 `poster`、发布组和章节预览。`totalChapterCount` 是展示用的最高章节号，可以为小数，不是发布条目数，不能据此判断目录完整性。
 - `/api/manga/allChapters?mangaId=<id>` 是源站客户端使用的完整目录接口；条目身份、发布组引用及组内顺序不得重复，并须包含作品预览中已确认的全部章节及其发布组归属。预览包含关系仅用于发现遗漏或错属，完整性依据来自全量接口契约。
 - `/api/read/chapter?mangaId=<id>&chapterId=<id>` 是源站整章接口，返回 `readChapter.pages` 全列表；零起始 `number` 与页 ID 必须连续。该接口忽略 `mangaId`，图片仅允许 `cdn.atsu.moe/static/pages/<作品 id 或响应中的 scanlationMangaId>/<章节 id>/` 或 `cdn.atsu.moe/static/pages/<章节 id>/`。发布组和仅章节命名空间均额外读取作品元数据，确认响应中的发布组属于请求作品；作品命名空间图片直接核对作品路径。每章因此使用 1 或 2 次 HTTP 操作，不缓存独立目录状态。原位 DOM 没有发布组身份，按已识别章节路径校验。
-- `/collections/manga/documents/search` 是源站公开 Typesense 代理，按名称和别名查询，仅过滤漫画媒介与源站隐藏条目，不按语言或成人属性过滤。分页游标绑定原查询。
+- `/collections/manga/documents/search` 是源站公开 Typesense 代理，按名称和别名查询，仅过滤漫画媒介与源站隐藏条目，不按语言过滤。分页游标绑定原查询。
 - 封面仅接受 `cdn.atsu.moe/static/posters/`，HTTP 读取使用公共原图管线和源页面 Referer，无专用图片解码。
 
 ## 验证

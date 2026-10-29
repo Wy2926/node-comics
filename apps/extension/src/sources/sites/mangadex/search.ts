@@ -1,7 +1,7 @@
 import type {SourceNetworkContext} from '../../contracts/network';
 import {SourceSearchError, type SourceSearchPage, type SourceSearchRequest} from '../../contracts/search';
 import {apiOrigin, catalogUrl} from './definition';
-import {contentLanguage, id, list, object, relationships, response, text} from './protocol';
+import {contentLanguage, id, list, mangaAttributes, object, relationships, response, supportedRatings, text} from './protocol';
 
 const pageSize = 12;
 const invalid = () => new SourceSearchError('SOURCE_SEARCH_INVALID');
@@ -12,6 +12,7 @@ export function searchUrl(request: SourceSearchRequest) {
   const url = new URL('/manga', apiOrigin);
   url.search = new URLSearchParams({limit: String(pageSize), offset: String(offset), title: request.query, 'order[relevance]': 'desc'}).toString();
   for (const include of ['cover_art', 'author']) url.searchParams.append('includes[]', include);
+  for (const rating of supportedRatings) url.searchParams.append('contentRating[]', rating);
   return {url: url.href, offset};
 }
 export function parseSearch(body: string, request: SourceSearchRequest): SourceSearchPage {
@@ -20,7 +21,7 @@ export function parseSearch(body: string, request: SourceSearchRequest): SourceS
       !Number.isSafeInteger(total) || Number(total) < 0 || rows.length > pageSize || rows.length !== Math.min(pageSize, Math.max(0, Number(total) - offset))) throw invalid();
   const seen = new Set<string>();
   const items = rows.map(value => {
-    const row = object(value), mangaId = id(row.id), attributes = object(row.attributes), titles = object(attributes.title);
+    const row = object(value), mangaId = id(row.id), attributes = mangaAttributes(row), titles = object(attributes.title);
     if (row.type !== 'manga' || seen.has(mangaId)) throw invalid();
     seen.add(mangaId);
     const languages = attributes.availableTranslatedLanguages == null ? [] : list(attributes.availableTranslatedLanguages).map(contentLanguage);

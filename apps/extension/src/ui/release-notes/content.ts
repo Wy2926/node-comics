@@ -5,7 +5,6 @@ export const releaseNotes = {
   version,
   highlights: [
     {icon: 'translate', title: 'releaseNotes.browserTranslation.title', description: 'releaseNotes.browserTranslation.description'},
-    {icon: 'globe', title: 'releaseNotes.adultCategory.title', description: 'releaseNotes.adultCategory.description'},
   ],
 } as const;
 

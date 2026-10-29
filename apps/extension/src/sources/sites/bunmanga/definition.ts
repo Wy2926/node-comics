@@ -19,7 +19,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'bunmanga', name: 'Bun Manga', installation,
   sites: [{id: 'bunmanga', name: 'Bun Manga', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manhua', 'manhwa'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manhua', 'manhwa'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

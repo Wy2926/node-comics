@@ -7,7 +7,7 @@ export const identity = gigaViewerIdentity('comicseasons', 'https://comic-season
 export const definition: SourceDefinition = {
   id: identity.sourceId, name: 'Seasons', installation,
   sites: [{id: identity.sourceId, name: 'Seasons', url: identity.origin + '/', icon,
-    adaptedOn: '2026-10-25', pricing: 'free', isRaw: true, isAdult: false,
+    adaptedOn: '2026-10-25', pricing: 'free', isRaw: true,
     contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720}, identify: identity.identify,

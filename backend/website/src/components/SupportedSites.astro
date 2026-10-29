@@ -2,7 +2,6 @@
 import Base from '../layouts/Base.astro';
 import PageIntro from './PageIntro.astro';
 import SitePricing from './SitePricing.astro';
-import SiteAdult from './SiteAdult.astro';
 import { supportedSites } from '../data/supported-sites';
 import { absolute } from '../data/site';
 import { dictionaries, localPath, type Locale } from '../i18n';
@@ -36,7 +35,7 @@ const schema = [
       <ul class="supported-sites-grid" role="list">
         {supportedSites.map(site => <li>
           <article class="supported-site" id={site.anchor} data-site-key={site.key}>
-            <div class="site-card-top"><img src={site.icon} alt="" aria-hidden="true" width="40" height="40" loading="lazy" decoding="async" /><div class="site-card-labels">{site.isAdult && <SiteAdult locale={locale} />}<SitePricing pricing={site.pricing} locale={locale} /></div></div>
+            <div class="site-card-top"><img src={site.icon} alt="" aria-hidden="true" width="40" height="40" loading="lazy" decoding="async" /><SitePricing pricing={site.pricing} locale={locale} /></div>
             <h3><bdi>{site.name}</bdi></h3>
             <span class="site-domain" dir="ltr">{new URL(site.url).hostname.replace(/^www\./, '')}</span>
             <p class="site-reading">{c.readOn.replace('{site}', site.name)}</p>
@@ -78,7 +77,6 @@ const schema = [
   .supported-site:target { border-color: var(--accent); outline: var(--comic-focus-ring); outline-offset: 3px; }
   .site-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
   .site-card-top img { width: 40px; height: 40px; flex: none; object-fit: contain; border-radius: var(--comic-control-radius); }
-  .site-card-labels { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .supported-site h3 { margin: 0; font-size: 1.18rem; line-height: 1.4; }
   .site-domain { display: block; color: var(--muted); font-size: .75rem; margin-top: 5px; text-align: start; }
   .site-reading { margin-block: 18px 14px; font-size: .85rem; color: var(--muted); line-height: 1.7; }

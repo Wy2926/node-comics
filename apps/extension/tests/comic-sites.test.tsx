@@ -42,7 +42,7 @@ describe('comic website directory presentation', () => {
   it('defaults to two visible groups with advanced filters collapsed and a disabled reset', () => {
     const html = render();
     expect(html.match(/class="nc-site-filter-group"/g)).toHaveLength(4);
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(15 + listSupportedSites().length);
+    expect(html.match(/aria-pressed="false"/g)).toHaveLength(14 + listSupportedSites().length);
     expect(html).toContain(`显示 ${listSupportedSites().length} / ${listSupportedSites().length} 个网站`);
     expect(html).toContain('disabled="">清空筛选');
     expect(html).toContain('同组多选匹配任一项，不同组同时满足。');
@@ -62,8 +62,6 @@ describe('comic website directory presentation', () => {
     expect(html).not.toContain('nc-site-free');
     expect(html).not.toContain('nc-site-access-paid-content');
     expect(html.match(/class="nc-site-raw"/g)).toHaveLength(sites.filter(site => site.isRaw).length);
-    expect(html.match(/class="nc-site-adult"/g)).toHaveLength(sites.filter(site => site.isAdult).length);
-    expect(html).toContain('nHentai.com · 免费 · 18+ · 成人 · 在新标签页打开');
     expect(html.match(/target="_blank" rel="noopener noreferrer"/g)).toHaveLength(sites.length);
   });
   it('localizes filters, status and raw labels without translating source names', () => {
@@ -77,8 +75,6 @@ describe('comic website directory presentation', () => {
     expect(html).toContain('RawOtaku');
     expect(html).toContain('MangaDex');
     expect(html).toContain('pixiv');
-    expect(html).toContain('nHentai.com');
-    expect(html).toContain('<bdi>18+</bdi> Adult');
     expect(html).not.toContain('收费待确认');
     expect(html).toContain('Favorite website');
     expect(html).toContain('Search website names or domains');
@@ -87,8 +83,6 @@ describe('comic website directory presentation', () => {
     ['  ＳＥＡＳＯＮＳ   .COM  ', ['Seasons']],
     ['COMIC-SEASONS.COM', ['Seasons']],
     ['となりのヤングジャンプ', ['となりのヤングジャンプ']],
-    ['NHENTAI.COM', ['nHentai.com']],
-    ['NHENTAI.TO', ['nHentai.to']],
     ['seasons .org', []],
     ['no-such-fixture-site', []],
   ])('restores and matches a local name/domain query %j', (query, names) => {
@@ -99,12 +93,6 @@ describe('comic website directory presentation', () => {
     expect(html).toContain('收起筛选');
     expect(html).toContain('清除搜索');
     if (!expected.length) expect(html).toContain('没有符合条件的网站，请调整或清除筛选。');
-  });
-  it('restores the adult category with its special badge and a usable name search', () => {
-    const html = render({query: 'nhentai', filters: {...emptySiteFilters, content: ['adult']}, advanced: false, scrollTop: 250});
-    expect([...html.matchAll(/data-site-key="([^"]+)"/g)].map(match => match[1])).toEqual(['nhentaito:nhentaito', 'nhentaicom:nhentaicom']);
-    expect(html).toContain('aria-pressed="true">成人');
-    expect(html).toContain('<bdi>18+</bdi> 成人');
   });
   it('combines the restored query and grouped filters without exempting favorites', () => {
     const site = listSupportedSites().find(site => site.name === 'Seasons')!;

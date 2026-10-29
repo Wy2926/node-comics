@@ -24,7 +24,7 @@ Choose browser-local translation (Beta) in Settings and download its models and 
 ## Features
 
 - **Import and read**: Open common comic and ebook files, connect Google Drive or OPDS libraries, or import from supported websites.
-- **Find your next read**: Browse charts and search supported sites by title. The website directory includes an adult category and 18+ badges.
+- **Find your next read**: Browse charts and search supported sites by title. Browse website categories to narrow your choices.
 - **Read your way**: Scroll or turn single pages or spreads. Choose the direction, zoom, and background, and bookmark your favorite pages.
 - **Translate as you read**: Translate images in the reader or on a webpage, compare with originals, and keep your reading position.
 - **Continue offline**: Cache supported website comics in advance, pause and resume, or retry missing pages.

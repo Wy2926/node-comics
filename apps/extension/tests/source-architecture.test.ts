@@ -53,15 +53,11 @@ const testCatalog: SourceCatalogSnapshot = {
   ],
 };
 describe('source composition and identity', () => {
-  it('exposes implemented search sites regardless of adult labels and retains link identity and reading capabilities', () => {
+  it('exposes only implemented search sites with importable catalogs', () => {
     const expected = definitions.filter(definition => definition.capabilities.importable && definition.capabilities.catalog)
       .flatMap(definition => (definition.sites ?? []).filter(site => site.search)
         .map(site => `${definition.id}:${site.id}`));
     expect(listSearchSites().map(site => site.key).sort()).toEqual(expected.sort());
-    const {definition, location} = sourceFor('https://nhentai.com/en/comic/fixture/reader');
-    expect(definition.sites!.every(site => site.isAdult)).toBe(true);
-    expect(definition.capabilities).toMatchObject({importable: true, pages: true, catalog: true});
-    expect(location.kind).toBe('reader');
   });
   it('aligns optional search implementations and importable site capabilities', () => {
     for (const definition of definitions) {

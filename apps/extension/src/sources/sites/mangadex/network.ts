@@ -1,11 +1,10 @@
 import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network';
 import type {SourceCatalogSnapshot, SourceEntry, SourceSnapshot} from '../../contracts/source';
 import {apiOrigin, catalogUrl, chapterUrl, mangaDexLocation} from './definition';
-import {chapterData, chapterTitle, compareLabel, count, entity, id, list, object, relationships, response, text, type Chapter, type JsonObject} from './protocol';
+import {chapterData, chapterTitle, compareLabel, count, entity, id, list, mangaAttributes, object, relationships, response, supportedRatings, text, type Chapter, type JsonObject} from './protocol';
 import {search} from './search';
 
 const pageSize = 100;
-const ratings = ['safe', 'suggestive', 'erotica', 'pornographic'];
 function location(url: string) {
   const value = mangaDexLocation(new URL(url));
   if (!value) throw Error('MangaDex 来源地址无效，请使用作品或章节链接。');
@@ -21,7 +20,7 @@ export function feedUrl(mangaId: string, offset: number): string {
   const url = new URL(`${apiOrigin}/manga/${mangaId}/feed`);
   for (const [key, value] of Object.entries({limit: String(pageSize), offset: String(offset), 'order[volume]': 'asc', 'order[chapter]': 'asc',
     'order[createdAt]': 'asc', 'includes[]': 'scanlation_group', includeUnavailable: '1'})) url.searchParams.set(key, value);
-  for (const rating of ratings) url.searchParams.append('contentRating[]', rating);
+  for (const rating of supportedRatings) url.searchParams.append('contentRating[]', rating);
   // Omit language filters and tri-state external/empty/future filters: 1 selects ONLY those rows.
   return url.href;
 }
@@ -69,7 +68,7 @@ function cover(manga: JsonObject, mangaId: string) {
   return {url: `https://uploads.mangadex.org/covers/${mangaId}/${filename}.512.jpg`};
 }
 export function parseCatalog(mangaValue: unknown, rawChapters: unknown[], aggregateValue: unknown, mangaId: string): SourceCatalogSnapshot {
-  const manga = entity(mangaValue, 'manga', mangaId), attributes = object(manga.attributes), titles = object(attributes.title);
+  const manga = entity(mangaValue, 'manga', mangaId), attributes = mangaAttributes(manga), titles = object(attributes.title);
   const title = text(titles.en ?? titles[String(attributes.originalLanguage)] ?? Object.values(titles)[0]);
   const chapters = rawChapters.map(value => chapterData(value, mangaId)), seen = new Set(chapters.map(chapter => chapter.id));
   if (seen.size !== chapters.length) throw Error('MangaDex 分页目录包含重复章节，请重试。');
@@ -118,8 +117,10 @@ export function parsePages(value: unknown, chapter: Chapter, url: string): Sourc
 async function readChapter(url: string, context: SourceNetworkContext) {
   const loc = location(url);
   if (!loc.chapterId) throw Error('请使用 MangaDex 章节链接。');
-  const data = entity(await request(`${apiOrigin}/chapter/${loc.chapterId}?includes%5B%5D=scanlation_group`, context), 'chapter', loc.chapterId);
-  return chapterData(data, loc.mangaId);
+  const data = entity(await request(`${apiOrigin}/chapter/${loc.chapterId}?includes%5B%5D=scanlation_group&includes%5B%5D=manga`, context), 'chapter', loc.chapterId);
+  const chapter = chapterData(data, loc.mangaId);
+  mangaAttributes(relationships(data, 'manga')[0]);
+  return chapter;
 }
 export const network = {
   search,
@@ -127,7 +128,7 @@ export const network = {
     const loc = location(url);
     if (!loc.mangaId || loc.chapterId) throw Error('请使用 MangaDex 作品详情页链接。');
     const manga = await request(`${apiOrigin}/manga/${loc.mangaId}?includes%5B%5D=cover_art`, context);
-    entity(manga, 'manga', loc.mangaId);
+    mangaAttributes(entity(manga, 'manga', loc.mangaId));
     const rows: unknown[] = [];
     let total: number | undefined;
     do {

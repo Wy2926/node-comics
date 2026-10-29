@@ -61,11 +61,11 @@ async function checkRelease(){
   await page.getByRole('button',{name:'我的漫画',exact:true}).click();
   await dialog.waitFor();
   assert.equal(await dialog.locator('.nc-release-version').innerText(),version);
-  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),2);
-  for(const text of ['本次更新','浏览器内置翻译','Beta','图片留在本机','18+','nHentai.to'])
+  assert.equal(await dialog.locator('.nc-release-highlights>li').count(),1);
+  for(const text of ['本次更新','浏览器内置翻译','Beta','图片留在本机'])
     assert((await dialog.innerText()).includes(text));
   assert(!/首个正式版|CBZ|ZIP|PDF|22|nunif|waifu2x|官网|版本入口/.test(await dialog.innerText()));
-  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),2);
+  assert.equal(await dialog.locator('.nc-release-feature-text > p').count(),1);
   await checkLayout();
   await shot(`release-${version}`);
   await shotRelease(`release-${version}-panel`);
@@ -125,8 +125,8 @@ async function checkRelease(){
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
     assert(!/0\.11\.3|0\.12\.0|1\.0\.0/.test(await dialog.innerText()));
     assert.equal(await dialog.locator('.nc-release-kicker').innerText(),dictionary['releaseNotes.kicker']);
-    assert.equal(await dialog.locator('.nc-release-highlights>li').last().locator('p').innerText(),dictionary['releaseNotes.adultCategory.description']);
-    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),2);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').last().locator('p').innerText(),dictionary['releaseNotes.browserTranslation.description']);
+    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),1);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkLayout();
@@ -134,7 +134,7 @@ async function checkRelease(){
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push(`${version} presents two concise highlights for readers; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
+  checks.push(`${version} presents one concise highlight for readers; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
 }
 try{
   await checkRelease();

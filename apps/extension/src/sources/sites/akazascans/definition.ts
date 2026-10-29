@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'akazascans', name: 'Akaza Scans', installation,
   sites: [{id: 'akazascans', name: 'Akaza Scans', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'freemium', contentTags: ['manhwa', 'manhua', 'webtoon'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'freemium', contentTags: ['manhwa', 'manhua', 'webtoon'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -19,7 +19,7 @@ export function location(url: URL) {
 export const definition: SourceDefinition = {
   id: 'comicwalker', name: 'ComicWalker',
   sites: [{id: 'comicwalker', name: 'カドコミ · ComicWalker', url: origin + '/', icon,
-    adaptedOn: '2026-10-09', pricing: 'freemium', isRaw: true, isAdult: false, primaryLanguages: ['ja'], accessTags: ['partial-web'], contentTags: ['manga'], search: true}],
+    adaptedOn: '2026-10-09', pricing: 'freemium', isRaw: true, primaryLanguages: ['ja'], accessTags: ['partial-web'], contentTags: ['manga'], search: true}],
   capabilities: {pages: true, inline: true, catalog: true, completePageList: true, importable: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {

@@ -18,7 +18,7 @@ export const catalogUrl = (titleId: string, section: Section) => `${origin}/${se
 export const episodeUrl = (titleId: string, no: number, section: Section) => `${origin}/${section}/detail?titleId=${titleId}&no=${no}`;
 export const definition: SourceDefinition = {
   id: 'naver', name: 'NAVER Webtoon',
-  sites: [{id: 'naver', name: 'NAVER Webtoon', url: origin + '/', icon, adaptedOn: '2026-09-23', pricing: 'freemium', isRaw: true, isAdult: false, accessTags: ['login-required'], contentTags: ['manhwa', 'webtoon'], primaryLanguages: ['ko'], search: true }],
+  sites: [{id: 'naver', name: 'NAVER Webtoon', url: origin + '/', icon, adaptedOn: '2026-09-23', pricing: 'freemium', isRaw: true, accessTags: ['login-required'], contentTags: ['manhwa', 'webtoon'], primaryLanguages: ['ko'], search: true }],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   catalogSync: {intervalMinutes: 720}, installation,
   identify(url) {

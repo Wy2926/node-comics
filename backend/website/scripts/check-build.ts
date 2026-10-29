@@ -259,7 +259,7 @@ for (const file of htmlFiles) {
         errors.push(`${label}: static comparison image and full-size link must use the selected page language`);
     } catch { errors.push(`${label}: invalid homepage gallery manifest`); }
     const directory = pages.get(join(root, localPath('/sites/', locale), 'index.html'));
-    const entries = directory?.('.supported-site').toArray().map(node => ({ anchor: directory(node).attr('id'), name: directory(node).find('h3').text(), price: directory(node).find('[data-pricing]').text(), adult: directory(node).find('.site-adult').text() })) ?? [];
+    const entries = directory?.('.supported-site').toArray().map(node => ({ anchor: directory(node).attr('id'), name: directory(node).find('h3').text(), price: directory(node).find('[data-pricing]').text() })) ?? [];
     const minis = $('.sites-group:not(.sites-clone) a.site-mini');
     if ($('.home-sites .sites-row').length !== 3 || !entries.length || minis.length !== entries.length)
       errors.push(`${label}: homepage must contain three rows and every supported site`);
@@ -267,9 +267,9 @@ for (const file of htmlFiles) {
       errors.push(`${label}: carousel must explain support scope without a pause checkbox`);
     for (const entry of entries) {
       const mini = minis.filter(`[href="${localPath('/sites/',locale)}#${entry.anchor}"]`);
-      if (mini.length !== 1 || mini.children().length !== (entry.adult ? 3 : 2) || mini.children('bdi').text() !== entry.name
-        || mini.find('[data-pricing]').text() !== entry.price || mini.find('.site-adult').text() !== entry.adult)
-        errors.push(`${label}: mini card must match the source name, pricing and adult label ${entry.anchor}`);
+      if (mini.length !== 1 || mini.children().length !== 2 || mini.children('bdi').text() !== entry.name
+        || mini.find('[data-pricing]').text() !== entry.price)
+        errors.push(`${label}: mini card must match the source name and pricing ${entry.anchor}`);
     }
     if ($('.sites-clone:not([aria-hidden=true]), .sites-clone a:not([tabindex="-1"])').length) errors.push(`${label}: carousel copies must not duplicate keyboard/screen-reader navigation`);
     const carouselScript = scripts.find(text => text.includes('[data-sites-carousel]'));

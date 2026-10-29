@@ -22,7 +22,7 @@ export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.
 export const definition: SourceDefinition = {
   id: 'goodtoon', name: 'GoodToon', installation,
   sites: [{id: 'goodtoon', name: 'GoodToon', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: true, isAdult: false, primaryLanguages: ['ko'], search: true, searchPageSize: 63}],
+    pricing: 'free', contentTags: ['manhwa', 'webtoon'], isRaw: true, primaryLanguages: ['ko'], search: true, searchPageSize: 63}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

@@ -4,11 +4,11 @@ export const uuid = (n: number) => `00000000-0000-4000-8000-${n.toString().padSt
 export function chapter(n = 1, language = 'en', number: string | null = '1', volume: string | null = '1') {
   return {id: uuid(n), type: 'chapter', attributes: {title: 'Fixture chapter', volume, chapter: number,
     translatedLanguage: language, pages: 2, externalUrl: null as string | null, isUnavailable: false},
-    relationships: [{id: mangaId, type: 'manga'}, {id: uuid(800), type: 'scanlation_group', attributes: {name: 'Fixture group'}}]};
+    relationships: [{id: mangaId, type: 'manga', attributes: {contentRating: 'safe'}}, {id: uuid(800), type: 'scanlation_group', attributes: {name: 'Fixture group'}}]};
 }
 export function manga() {
   return {result: 'ok', response: 'entity', data: {id: mangaId, type: 'manga',
-    attributes: {title: {'ja-ro': 'Fixture manga'}, originalLanguage: 'ja'},
+    attributes: {title: {'ja-ro': 'Fixture manga'}, originalLanguage: 'ja', contentRating: 'safe'},
     relationships: [{id: uuid(900), type: 'cover_art', attributes: {fileName: uuid(901) + '.jpg'}}]}};
 }
 export function aggregate(chapters = [chapter()]) {

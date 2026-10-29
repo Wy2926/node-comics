@@ -656,10 +656,9 @@ export default {
       {
         "id": "1.2.0",
         "date": "2026-10-29",
-        "title": "1.2.0 · Built-in translation and an 18+ category",
+        "title": "1.2.0 · Browser translation",
         "items": [
-          "Browser translation (Beta): Download models and fonts; no server setup needed. Images stay on your device; recognized text goes to your chosen translation service.",
-          "New 18+ category: Filter adult sites in Comic Websites, see 18+ badges, and import nHentai.to gallery links."
+          "Browser translation (Beta): Download models and fonts; no server setup needed. Images stay on your device; recognized text goes to your chosen translation service."
         ]
       },
       {

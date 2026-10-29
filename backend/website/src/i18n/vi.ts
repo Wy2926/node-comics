@@ -656,10 +656,9 @@ export default {
       {
         "id": "1.2.0",
         "date": "2026-10-29",
-        "title": "1.2.0 · Dịch tích hợp và danh mục 18+",
+        "title": "1.2.0 · Dịch trong trình duyệt",
         "items": [
-          "Dịch trong trình duyệt (Beta): Tải mô hình và phông chữ, không cần cài máy chủ. Hình ảnh ở lại trên thiết bị; văn bản nhận dạng được gửi đến dịch vụ đã chọn.",
-          "Danh mục 18+ mới: Lọc trang truyện người lớn, nhận biết nhãn 18+ và nhập liên kết từ nHentai.to."
+          "Dịch trong trình duyệt (Beta): Tải mô hình và phông chữ, không cần cài máy chủ. Hình ảnh ở lại trên thiết bị; văn bản nhận dạng được gửi đến dịch vụ đã chọn."
         ]
       },
       {

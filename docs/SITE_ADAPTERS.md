@@ -83,17 +83,6 @@ HTTP 图片共用 `runtime/image-fetch.ts`：原位翻译由后台请求，阅�
 
 二进制只读 API 可使用可选 `context.requestBytes(url, {referer, body?, form?})`，仅在普通扩展 HTTP 通道提供，返回原始字节。无正文时为 GET，`body` 为二进制 POST，`form` 为 UTF-8 表单 POST，两者不可同时提供。与文本请求复用来源权限、Referer、取消、30 秒和 8 MiB 响应预算，请求体限 1 MiB；不进入 GET 交接缓存，不自动改用网页上下文。消息字段与协议语义留在站点目录，无站点语义的 wire 基础可复用 `shared/protobuf.ts`。
 
-## 成人属性契约
-
-每个 `SourceSite` 必须显式声明 `isAdult: boolean`。这是产品的成人网站分类标记，不是“是否收录过成人作品”的内容检测结果。当前已支持入口中，**nHentai.com（`nhentaicom:nhentaicom`）** 和 **nHentai.to（`nhentaito:nhentaito`）** 标记为 `true`，其他入口均为 `false`；不得因成人分类、个别作品、年龄开关或默认过滤设置自动扩大名单。变更名单须明确确认，并同步站点声明、本节名单与回归测试；站点 README 只记录必要例外，不重复公共规则。
-
-- `true`：明确列入成人网站名单，卡片展示醒目的「18+ 成人」标签。
-- `false`：不作成人网站判定，不显示成人标签；不是全年龄认证，也不保证网站没有成人作品。
-
-成人属性不隐藏插件“漫画网站”、官网支持网站目录与首页卡片，也不限制名称／域名查找、收藏或漫画搜索。插件“内容类型”提供独立的「成人」筛选项，直接匹配 `isAdult`；与其他内容类型同组多选取并集，与收费、内容版本、访问条件等组取交集。搜索网站范围复用此筛选，站点是否可搜索只取决于已声明和实现的搜索能力；未实现名称搜索的站点仍不进入搜索范围。搜索运行时、分页游标和候选封面均不以成人属性拒绝调用，原有会话、权限与来源身份校验保持有效。
-
-此属性不改变明确链接的导入、源站识别、已有书架漫画、目录同步、阅读位置、原位翻译或“寻找其他语言”的起点能力。分类和标签只读取随包元数据，不新增运行时请求、缓存或整站扫描；AniList 作品发现的内容范围仍遵循[漫画发现](DISCOVERY.md)。
-
 ## 上游协议与代码参考
 
 新增或修复站点时，可先核对 [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source) 等上游实现，复用已确认的协议知识；不直接加载其 Android／Kotlin 扩展，也不根据上游站点数量批量声明支持。参考或移植的来源、精确版本、文件 SHA-256、用途及许可留在对应共享引擎或站点目录，必要的第三方许可随插件分发；区分协议参考、实际移植和未实现的上游能力。
@@ -191,8 +180,6 @@ npm run build
 | [ComicWalker / カドコミ](../apps/extension/src/sources/sites/comicwalker/README.md) | HTTP 名称搜索、完整公开目录／正文／封面、图片还原与 12 小时同步；作品／章节导入、浮动入口及有限 canvas 下一页预翻 |
 | [Manga One](../apps/extension/src/sources/sites/mangaone/README.md) | 名称搜索、HTTP 完整分页目录／封面、公开免费正文还原与 12 小时同步；作品／章节浮动导入，标签页识图复用通用规则，不自动消耗体力、硬币或阅读券 |
 | [Pixiv](../apps/extension/src/sources/sites/pixiv/README.md) | 作者主页全集、插画、漫画、分类标签与单系列各按范围导入，每个作品一话；HTTP 完整目录与原图、系列源站排序、12 小时更新，网页翻译沿用通用识别 |
-| [nHentai.com](../apps/extension/src/sources/sites/nhentaicom/README.md) | 整本画廊目录、完整原图／封面、网页会话读取与 12 小时同步；详情／分页链接浮动导入，标签页识图沿用通用规则；暂不支持分章作品和名称搜索 |
-| [nHentai.to](../apps/extension/src/sources/sites/nhentaito/README.md) | HTTP 数字画廊／分页链接导入、完整原图／封面与 12 小时同步；整本单条目、浮动导入和通用原位识图；不提供名称搜索 |
 | [COMIC FUZ](../apps/extension/src/sources/sites/comicfuz/README.md) | 名称搜索、HTTP 完整连载目录／分卷／封面、免费正文图片还原与 12 小时更新；作品／章节浮动导入，内嵌阅读器和标签页翻译复用通用识别，不自动扣点或消耗阅读券 |
 | [Zebrack / ゼブラック](../apps/extension/src/sources/sites/zebrack/README.md) | 名称搜索、HTTP 完整分话目录／分卷／封面、公开免费正文图片还原与 12 小时更新；作品／章节浮动导入，标签页 Blob 识图复用通用逻辑，不自动购买或消耗点数及阅读券 |
 | [Anisa Scans](../apps/extension/src/sources/sites/anisascans/README.md) | 英语 Madara 名称搜索、完整 AJAX 目录、面包屑章节名绑定的公开正文／封面及 12 小时同步；作品／章节浮动导入和通用原位识图 |

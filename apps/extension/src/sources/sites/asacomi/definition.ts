@@ -18,7 +18,7 @@ export function asacomiLocation(url: URL) {
 export const definition: SourceDefinition = {
   id: 'asacomi', name: 'アサコミ', installation,
   sites: [{id: 'asacomi', name: 'アサコミ', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'freemium', isRaw: true, isAdult: false, contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
+    pricing: 'freemium', isRaw: true, contentTags: ['manga'], primaryLanguages: ['ja'], search: true}],
   capabilities: {importable: true, pages: true, inline: true, catalog: true, completePageList: true},
   embeddedEntry: 'floating', catalogSync: {intervalMinutes: 720},
   identify(url) {

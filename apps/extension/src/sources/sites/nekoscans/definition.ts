@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'nekoscans', name: 'NekoScans / Neko Manga', installation,
   sites: [{id: 'nekoscans', name: 'NekoScans / Neko Manga', url: origin + '/', icon, adaptedOn: '2026-10-23',
-    pricing: 'free', contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], isRaw: false, isAdult: false, primaryLanguages: ['es'], search: true}],
+    pricing: 'free', contentTags: ['manga', 'manhwa', 'manhua', 'webtoon'], isRaw: false, primaryLanguages: ['es'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {

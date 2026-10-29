@@ -98,7 +98,7 @@ describe('MangaDex API source', () => {
     expect(feeds.map(target => target.searchParams.get('offset'))).toEqual(['0', '100']);
     for (const feed of feeds) {
       expect(feed.searchParams.get('includeUnavailable')).toBe('1');
-      expect(feed.searchParams.getAll('contentRating[]')).toEqual(['safe', 'suggestive', 'erotica', 'pornographic']);
+      expect(feed.searchParams.getAll('contentRating[]')).toEqual(['safe', 'suggestive']);
       for (const key of ['translatedLanguage[]', 'includeExternalUrl', 'includeEmptyPages']) expect(feed.searchParams.has(key)).toBe(false);
     }
     expect(feedUrl(mangaId, 100)).toBe(feeds[1].href);
@@ -119,9 +119,29 @@ describe('MangaDex API source', () => {
   });
 
   it('resolves a bare chapter by verified API ownership and rejects a conflicting local parent binding', async () => {
-    expect(await network.resolveCatalog(chapterUrl(uuid(1)) + '/3', {request: requestFixture()})).toBe(url);
+    const request = vi.fn(requestFixture());
+    expect(await network.resolveCatalog(chapterUrl(uuid(1)) + '/3', {request})).toBe(url);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(new URL(request.mock.calls[0][0]).searchParams.getAll('includes[]')).toEqual(['scanlation_group', 'manga']);
     await expect(network.resolveCatalog(chapterUrl(uuid(1), otherMangaId), {request: requestFixture()})).rejects.toThrow('不属于');
     await expect(network.pages(chapterUrl(uuid(2)), {request: requestFixture()})).rejects.toThrow();
+  });
+
+  it.each([undefined, null, '', 'unsupported'])('rejects rating %s before reading a catalog or leasing chapter images', async contentRating => {
+    const metadata = manga();
+    const attributes = {...metadata.data.attributes, contentRating};
+    const unsupported = {...metadata, data: {...metadata.data, attributes}};
+    expect(() => parseCatalog(unsupported, [chapter()], aggregate(), mangaId)).toThrow('内容分级');
+    const request = vi.fn(async () => JSON.stringify(unsupported));
+    await expect(network.catalog(url, {request})).rejects.toThrow('内容分级');
+    expect(request).toHaveBeenCalledTimes(1);
+    const row = chapter();
+    const data = {...row, relationships: row.relationships.map(relation => relation.type === 'manga' ? {...relation, attributes: {contentRating}} : relation)};
+    for (const operation of ['resolveCatalog', 'pages'] as const) {
+      const request = vi.fn(async () => JSON.stringify({result: 'ok', response: 'entity', data}));
+      await expect(network[operation](reader, {request})).rejects.toThrow('内容分级');
+      expect(request).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('uses original image order, keeps duplicate URLs in separate page slots and stable content identity across leased hosts', () => {

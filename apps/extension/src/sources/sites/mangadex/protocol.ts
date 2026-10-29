@@ -1,6 +1,7 @@
 import {isUuid} from './definition';
 
 export type JsonObject = Record<string, unknown>;
+export const supportedRatings = ['safe', 'suggestive'];
 export function object(value: unknown): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('MangaDex 数据结构无效。');
   return value as JsonObject;
@@ -30,6 +31,11 @@ export function entity(value: unknown, type: string, expectedId: string): JsonOb
   const result = response(value), data = object(result.data);
   if (result.response !== 'entity' || data.type !== type || id(data.id) !== expectedId) throw Error('MangaDex 资源归属已变化。');
   return data;
+}
+export function mangaAttributes(data: JsonObject): JsonObject {
+  const attributes = object(data.attributes);
+  if (!supportedRatings.some(rating => rating === attributes.contentRating)) throw Error('MangaDex 此作品的内容分级不受支持。');
+  return attributes;
 }
 export function numberLabel(value: unknown): string | undefined {
   if (value === null || value === '') return;

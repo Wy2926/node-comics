@@ -43,8 +43,8 @@ node scripts/verify_simple_reading.mjs
 
 | 工具 | 检查范围 |
 | --- | --- |
-| `verify_comic_search.mjs` | 跨语言查找三入口、站点分组展开／筛选／重试、分页失败保留候选、成人网站展示、标签与收藏恢复、导入和位置恢复；使用已实现搜索的站点，网站／名称接口为隔离夹具，真实HTTP见各站README |
-| `apps/extension/tests/source-search-page.browser.mjs` | 从仓库根目录运行的隔离 MV3 搜索会话回归；使用 Read Comics Online 的实际非成人声明，检查已有同源网页复用、分页、取消、同 URL 重载、位置保留与跨源并发；不修改生产元数据，不代表真实 CF 验证通过或有效期；支持 `PLAYWRIGHT_MODULE`、`TEST_CHROMIUM` |
+| `verify_comic_search.mjs` | 跨语言查找三入口、站点分组展开／筛选／重试、分页失败保留候选、网站展示与收藏恢复、导入和位置恢复；使用已实现搜索的站点，网站／名称接口为隔离夹具，真实HTTP见各站README |
+| `apps/extension/tests/source-search-page.browser.mjs` | 从仓库根目录运行的隔离 MV3 搜索会话回归；使用 Read Comics Online 的实际站点声明，检查已有同源网页复用、分页、取消、同 URL 重载、位置保留与跨源并发；不修改生产元数据，不代表真实 CF 验证通过或有效期；支持 `PLAYWRIGHT_MODULE`、`TEST_CHROMIUM` |
 | `apps/extension/tests/search-workspace.html` | 插件目录运行 `npm run dev -- --port 5206` 后用 Chrome 打开；真实搜索工作区、合成名称限流及禁用外部请求；`?sites=20` 展示 20 个已找到站点及混合失败状态，`locale=en`／`locale=de` 切换样例语言。检查 PC 键盘、手机范围展开／收起与勾选保留、长站名、语言／亮暗、五秒倒计时及离开返回；“采样 10 秒”记录 React 提交数和累计渲染耗时，空闲或倒计时到期后应无周期提交。仅本地 UI 与开发模式采样，不验证真实网站、模型或手机扩展 API |
 | `node --test apps/extension/tests/search-sites.browser.mjs` | Vite 5206 搜索夹具；20 个站点默认前 10 项／展开全部、收起保留所选站点、键盘焦点与离开返回、完整长站名、中英德文及 320／390px 深色大字。沿用 `PLAYWRIGHT_MODULE`／`CHROMIUM_PATH`，阻断外网，截图与布局尺寸写入 `artifacts/search-sites/`；不代表真实网站搜索性能或模型效果 |
 | `verify_discovery.mjs` | 生产 MV3 发现／详情／来源导入、返回位置、分页失败／限流及主题的隔离 HTTP 夹具；含设置中的默认开启文字翻译开关及持久化、可见书名／简介自动翻译、并发与缓存、原文切换、简介控制同行与展开位置、限流重试和取消；`--text-only` 聚焦设置、文字交互与布局，`--detail-only` 检查关闭自动翻译后的手动入口、手机年份旁操作／长标题评分／长简介与别名自然展开、桌面固定底部操作及返回位置，`--live` 只检查真实 AniList 公共列表和详情。`DISCOVERY_OUTPUT` 可指定仓库外的验收产物目录 |

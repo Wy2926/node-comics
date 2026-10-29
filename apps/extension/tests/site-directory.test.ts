@@ -11,8 +11,8 @@ describe('adapter-owned website directory', () => {
   it('flattens multiple sites from one adapter without coupling the view to its id', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites = listSupportedSites([{...adapter, id: 'custom-adapter', sites: [
-      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg', primaryLanguages: ['en', 'ja'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'free', isRaw: false, isAdult: false},
-      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg', primaryLanguages: ['ko'], adaptedOn: '2026-09-23', contentTags: ['manhwa', 'webtoon'], pricing: 'freemium', isRaw: true, isAdult: false},
+      {id: 'one', name: 'One', url: 'https://one.example/', icon: '/one.svg', primaryLanguages: ['en', 'ja'], adaptedOn: '2026-09-23', contentTags: ['manga'], pricing: 'free', isRaw: false},
+      {id: 'two', name: 'Two', url: 'https://two.example/', icon: '/two.svg', primaryLanguages: ['ko'], adaptedOn: '2026-09-23', contentTags: ['manhwa', 'webtoon'], pricing: 'freemium', isRaw: true},
     ]}]);
     expect(sites.map(site => [site.key, site.name, site.icon])).toEqual([
       ['custom-adapter:one', 'One', '/one.svg'], ['custom-adapter:two', 'Two', '/two.svg'],
@@ -23,9 +23,9 @@ describe('adapter-owned website directory', () => {
   it('orders dates across adapters regardless of pricing without mutating declarations', () => {
     const adapter = definitions.find(value => value.id === 'mangacopy')!;
     const sites: SourceSite[] = [
-      {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', pricing: 'free', isAdult: false},
-      {...adapter.sites![0], id: 'new', adaptedOn: '2026-10-04', pricing: 'unknown', isAdult: false},
-      {...adapter.sites![0], id: 'same-day', adaptedOn: '2026-10-04', pricing: 'freemium', isAdult: false},
+      {...adapter.sites![0], id: 'old', adaptedOn: '2025-12-31', pricing: 'free'},
+      {...adapter.sites![0], id: 'new', adaptedOn: '2026-10-04', pricing: 'unknown'},
+      {...adapter.sites![0], id: 'same-day', adaptedOn: '2026-10-04', pricing: 'freemium'},
     ];
     const result = listSupportedSites([
       {...adapter, sites: sites.slice(0, 2)},
@@ -65,7 +65,6 @@ describe('adapter-owned website directory', () => {
       for (const tag of site.accessTags ?? []) expect(['login-required', 'partial-web']).toContain(tag);
       expect(['free', 'freemium'], site.key).toContain(site.pricing);
       expect(typeof site.isRaw).toBe('boolean');
-      expect(typeof site.isAdult, site.key).toBe('boolean');
       expect(site).not.toHaveProperty('isFree');
       if(site.icon.startsWith('data:image/svg+xml,')) {
         expect(decodeURIComponent(site.icon.slice('data:image/svg+xml,'.length))).toMatch(/^<svg\b/);
@@ -88,21 +87,6 @@ describe('adapter-owned website directory', () => {
     expect(sites.find(site => site.adapterId === 'mangadot')?.contentTags).toContain('manhua');
     expect(sites.find(site => site.adapterId === 'pixiv')?.contentTags).toContain('illustration');
   });
-  it('includes adult entries and mixed adapters without changing their classification or favorites', () => {
-    const adult = declaredSites.filter(site => site.isAdult);
-    expect(adult.map(site => site.key).sort()).toEqual(['nhentaicom:nhentaicom', 'nhentaito:nhentaito']);
-    expect(listSupportedSites().map(site => site.key).sort()).toEqual(declaredSites
-      .filter(site => definitions.find(adapter => adapter.id === site.adapterId)!.capabilities.importable)
-      .map(site => site.key).sort());
-    const adapter = definitions.find(value => value.id === 'nhentaicom')!;
-    const base = adapter.sites![0];
-    const general = {...base, id: 'general', isAdult: false};
-    const sites = listSupportedSites([{...adapter, sites: [general, base]}]);
-    expect(sites.map(site => site.id)).toEqual(['general', base.id]);
-    expect(sortSupportedSites(sites, adult.map(site => site.key)).map(site => site.id)).toEqual([base.id, 'general']);
-    expect(adapter.sites![0].isAdult).toBe(true);
-    expect(adapter.capabilities.importable).toBe(true);
-  });
 });
 
 describe('website directory multi-select filters', () => {
@@ -112,17 +96,6 @@ describe('website directory multi-select filters', () => {
 
   it('keeps every entry and priority order when no filters are selected', () => {
     expect(filter({})).toEqual(sites);
-  });
-  it('filters adult sites by their explicit label and combines them with other content types', () => {
-    const western = {...sites[0], contentTags: ['western'] as const};
-    expect(matchesSiteFilters(western, {...empty, content: ['western']})).toBe(true);
-    expect(matchesSiteFilters(western, {...empty, content: ['manga']})).toBe(false);
-    expect(filter({content: ['western']}).map(site => site.adapterId)).toEqual(['readcomicsonline']);
-    expect(filter({content: ['adult']}).map(site => site.key)).toEqual(['nhentaito:nhentaito', 'nhentaicom:nhentaicom']);
-    expect(filter({content: ['adult', 'western']})).toEqual(sites.filter(site => site.isAdult || site.contentTags.includes('western')));
-    expect(filter({content: ['adult'], pricing: ['freemium']})).toEqual([]);
-    expect(matchesSiteFilters({...western, isAdult: false}, {...empty, content: ['adult']})).toBe(false);
-    expect(matchesSiteFilters({...western, isAdult: true}, {...empty, content: ['adult']})).toBe(true);
   });
   it('uses OR inside each group and AND between groups without duplicate cards', () => {
     const selected = filter({content: ['manga', 'webtoon'], pricing: ['free', 'freemium'], raw: [true]});

@@ -30,7 +30,7 @@ export function location(url: URL): MangaThemesiaLocation | null {
 export const definition: SourceDefinition = {
   id: 'lagoonscans', name: 'Lagoon Scans', installation,
   sites: [{id: 'lagoonscans', name: 'Lagoon Scans', url: origin + '/', icon, adaptedOn: '2026-10-15',
-    pricing: 'free', contentTags: ['manga', 'manhwa', 'manhua'], isRaw: false, isAdult: false, primaryLanguages: ['en'], search: true}],
+    pricing: 'free', contentTags: ['manga', 'manhwa', 'manhua'], isRaw: false, primaryLanguages: ['en'], search: true}],
   capabilities: {importable: true, catalog: true, pages: true, inline: true, completePageList: true},
   embeddedEntry: 'floating', inlineRecognition: 'generic', catalogSync: {intervalMinutes: 720},
   identify(url) {
