@@ -43,8 +43,8 @@ export function ChannelResources({manager,language}:{manager:ResourceManager;lan
       </div>
       <div className="nc-resource-categories" role="group" aria-label={msg('资源分类')}>{categories.map(item=><button key={item.id} className="button secondary small" type="button" aria-pressed={current?.id===item.id} onClick={()=>setCategory(item.id)}>{item.label}<span>{resources.filter(resource=>resource.category?.id===item.id&&resource.state==='ready').length} / {resources.filter(resource=>resource.category?.id===item.id).length}</span></button>)}</div>
       {current&&<p className="nc-muted nc-resource-description">{current.description}</p>}
-      {selectedLanguage&&<label className="nc-config-row nc-resource-language"><span>{msg('字体语言')}</span><Select aria-label={msg('字体语言')} placement="end" value={selectedLanguage.id} onChange={event=>setResourceLanguage(event.target.value)}>
-        {current?.languages?.map(item=><SelectOption key={item.id} value={item.id} icon={<LanguageFlag language={item.id}/>}>{item.label+(item.supported?'':' · '+msg('待支持'))}</SelectOption>)}
+      {selectedLanguage&&<label className="nc-config-row nc-resource-language"><span>{msg('字体语言')}</span><Select aria-label={msg('字体语言')} placement="end" menuWidth={320} value={selectedLanguage.id} onChange={event=>setResourceLanguage(event.target.value)}>
+        {current?.languages?.map(item=><SelectOption key={item.id} value={item.id} icon={<LanguageFlag language={item.id}/>} status={item.supported?undefined:msg('待支持')}>{item.label}</SelectOption>)}
       </Select></label>}
       <div key={(current?.id??'')+(selectedLanguage?.id??'')} className="nc-resource-list" role="region" aria-label={current?.label??msg('模型与字体')} tabIndex={0}>
         {selectedLanguage&&!selectedLanguage.supported&&<p className="nc-muted" role="status">{msg('此语言的字体暂未开放，支持后可在这里下载和管理。')}</p>}

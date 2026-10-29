@@ -22,6 +22,7 @@ button.nc-select {
 .nc-select-icon > svg { width: 20px; height: 20px; }
 .nc-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nc-select-label { min-width: 0; overflow-wrap: anywhere; }
+.nc-select-status.nc-comic-tag { flex: none; margin-inline-start: auto; padding: 1px 6px; border-color: var(--line); color: var(--muted); background: var(--surface-soft); font-weight: 500; white-space: nowrap; }
 .nc-select-chevron { flex: none; transform: rotate(90deg); }
 .nc-select[aria-expanded=true] .nc-select-chevron { transform: rotate(270deg); }
 button.nc-select:hover:not(:disabled), button.nc-select[aria-expanded=true] { background: var(--accent-soft); }

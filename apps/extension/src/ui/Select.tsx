@@ -18,10 +18,10 @@ export type SelectProps = Omit<ComponentPropsWithoutRef<'button'>, 'value' | 'de
   placement?: 'auto' | 'left' | 'end';
   menuWidth?: number;
 };
-type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode};
-type Option = {value: string; label: string; disabled: boolean; icon?: ReactNode} & Pick<SelectOptionProps, 'style' | 'lang' | 'dir'>;
+type SelectOptionProps = ComponentPropsWithoutRef<'option'> & {icon?: ReactNode; status?: string};
+type Option = {value: string; label: string; disabled: boolean} & Pick<SelectOptionProps, 'icon' | 'status' | 'style' | 'lang' | 'dir'>;
 
-/** Declarative option for Select. Icons are decorative; labels stay plain text for type-ahead. */
+/** Icons are decorative; status is separate from the label used for type-ahead. */
 export function SelectOption(_props: SelectOptionProps) { return null; }
 
 function textContent(children: ReactNode): string {
@@ -35,7 +35,7 @@ function readOptions(children: ReactNode, disabled = false): Option[] {
     if (child.type === Fragment || child.type === 'optgroup') return readOptions(child.props.children, disabled || !!child.props.disabled);
     if ((child.type !== 'option' && child.type !== SelectOption) || child.props.hidden) return [];
     const label = child.props.label ?? textContent(child.props.children);
-    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled, icon: child.props.icon, style: child.props.style, lang: child.props.lang, dir: child.props.dir}];
+    return [{value: String(child.props.value ?? textContent(child.props.children)), label, disabled: disabled || !!child.props.disabled, icon: child.props.icon, status: child.props.status, style: child.props.style, lang: child.props.lang, dir: child.props.dir}];
   });
 }
 
@@ -188,6 +188,7 @@ export function Select({value, onChange, onOpenChange, children, trigger, placem
       onKeyDown={keyDown} onBlur={event => { if (!touchingList.current) close(); onBlur?.(event); }}
       onClick={event => { onClick?.(event); if (!event.defaultPrevented) { event.currentTarget.focus({preventScroll: true}); if (expanded) close(); else show(); } }}>
       {trigger ?? <><span className="nc-select-content">{options[selected]?.icon && <span className="nc-select-icon" aria-hidden="true">{options[selected].icon}</span>}<span className="nc-select-value" style={options[selected]?.style} lang={options[selected]?.lang} dir={options[selected]?.dir}>{options[selected]?.label ?? String(value)}</span></span>
+      {options[selected]?.status&&<span className="nc-comic-tag nc-select-status">{options[selected].status}</span>}
       <Icon name="chevron" size={16} className="nc-select-chevron"/></>}
     </button>
     {name && <input type="hidden" name={name} value={value} disabled={unavailable} form={props.form}/>}
@@ -203,10 +204,12 @@ export function Select({value, onChange, onOpenChange, children, trigger, placem
       }}>
       {options.map((option, index) => <span key={option.value} id={`${listId}-${index}`} role="option" data-value={option.value}
         aria-selected={index === selected} aria-disabled={option.disabled || undefined}
+        aria-label={option.status?`${option.label} · ${option.status}`:undefined}
         className="nc-select-option" data-active={expanded && index === activeIndex || undefined}
         onPointerMove={event => { if (event.pointerType !== 'touch' && !option.disabled) setActive(index); }}
         onClick={event => { event.preventDefault(); event.stopPropagation(); choose(index); }}>
-        <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label" style={option.style} lang={option.lang} dir={option.dir}>{option.label}</span></span><Icon name="check" size={16} className="nc-select-check"/>
+        <span className="nc-select-content">{option.icon && <span className="nc-select-icon" aria-hidden="true">{option.icon}</span>}<span className="nc-select-label" style={option.style} lang={option.lang} dir={option.dir}>{option.label}</span></span>
+        {option.status&&<span className="nc-comic-tag nc-select-status">{option.status}</span>}<Icon name="check" size={16} className="nc-select-check"/>
       </span>)}
     </span>
   </>;
