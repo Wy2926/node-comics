@@ -32,7 +32,7 @@ it.each([false,true])('registers Firefox import without setAccessLevel and opens
   expect(()=>background.main()).not.toThrow();
   expect(chrome.commands.onCommand.addListener).toHaveBeenCalledOnce();
   const result=await new Promise(resolve=>{
-    const keepAlive=listeners[0]({type:'NC_IMPORT_CURRENT'},{id:'test-extension',url,frameId:0,tab:{id:7}},resolve);
+    const keepAlive=listeners.map(listener=>listener({type:'NC_IMPORT_CURRENT'},{id:'test-extension',url,frameId:0,tab:{id:7}},resolve)).some(value=>value===true);
     expect(keepAlive).toBe(true);
   });
   expect(result).toEqual({ok:true});

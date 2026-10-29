@@ -1,7 +1,6 @@
-import {channelDefinition} from './registry';
 import {LOCAL_HOST_MESSAGE} from './host-client';
 import type {ChannelLocalHost} from './contracts';
-export function registerLocalHost(changed:(busy:boolean)=>void){
+export function registerLocalHost(close:()=>Promise<void>){
   const hosts=new Map<string,Promise<ChannelLocalHost>>();
   const active=new Set<string>();
   let closing=false,pendingRequests=0;
@@ -9,7 +8,10 @@ export function registerLocalHost(changed:(busy:boolean)=>void){
   const idle=()=>{
     clearTimeout(timer);
     if(active.size||pendingRequests||closing)return;
-    timer=setTimeout(()=>{closing=true;void Promise.allSettled([...hosts.values()].map(async pending=>(await pending).dispose())).then(()=>chrome.tabs.getCurrent()).then(tab=>tab?.id===undefined?undefined:chrome.tabs.remove(tab.id));},60_000);
+    timer=setTimeout(()=>{
+      closing=true;
+      void Promise.allSettled([...hosts.values()].map(async pending=>(await pending).dispose())).then(async()=>{hosts.clear();await close();}).finally(()=>{closing=false;});
+    },60_000);
   };
   chrome.runtime.onMessage.addListener((request,sender,reply)=>{
     if(request?.type!==LOCAL_HOST_MESSAGE||sender.id!==chrome.runtime.id||(sender.url?!sender.url.startsWith(chrome.runtime.getURL('/')):sender.tab!==undefined))return;
@@ -19,11 +21,12 @@ export function registerLocalHost(changed:(busy:boolean)=>void){
     pendingRequests++;
     clearTimeout(timer);
     void (async()=>{
+      const {channelDefinition}=await import('./registry');
       const definition=channelDefinition(request.adapterId);
       if(!definition.startLocalHost)throw Error('UNSUPPORTED_HOST');
       let pending=hosts.get(definition.id);
       if(!pending){
-        pending=definition.startLocalHost(busy=>{busy?active.add(definition.id):active.delete(definition.id);changed(active.size>0);idle();});
+        pending=definition.startLocalHost(busy=>{busy?active.add(definition.id):active.delete(definition.id);idle();});
         hosts.set(definition.id,pending);
         void pending.catch(()=>hosts.delete(definition.id));
       }
@@ -32,5 +35,4 @@ export function registerLocalHost(changed:(busy:boolean)=>void){
     return true;
   });
   idle();
-  return async()=>{for(const pending of hosts.values())await (await pending).dispatch({action:'stop'});};
 }

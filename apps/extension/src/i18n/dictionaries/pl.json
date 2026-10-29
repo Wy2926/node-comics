@@ -1204,7 +1204,6 @@
   "资源操作失败；请检查空间、网络或正在运行的任务。": "The resource operation failed. Check storage, network access and running tasks.",
   "资源状态读取失败，请重新打开。": "Could not read resource status. Close and reopen this panel.",
   "运行方式": "Compute backend",
-  "停止": "Stop",
   "资源正在使用，请停止任务或稍后再试。": "Resource is in use. Stop the task or try again shortly.",
   "资源校验失败，请重新下载。": "Resource verification failed. Download it again.",
   "一般无需修改。仅在服务要求特定参数时调整。": "Keep the defaults unless your service requires specific parameters.",
@@ -1269,5 +1268,6 @@
   "本地翻译字体": "Local translation font",
   "已下载": "Downloaded",
   "等待下载": "Queued",
-  "正文翻译未完成或响应无效，请检查服务后重试。": "Text translation failed or returned an invalid response. Check the service before retrying."
+  "正文翻译未完成或响应无效，请检查服务后重试。": "Text translation failed or returned an invalid response. Check the service before retrying.",
+  "停止本地任务": "Zatrzymaj zadania lokalne"
 }

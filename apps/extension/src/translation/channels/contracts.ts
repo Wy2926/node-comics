@@ -19,6 +19,7 @@ export interface ChannelResources {
   read():Promise<ChannelResource[]>;
   subscribe(listener:()=>void):()=>void;
   act(action:'download'|'pause'|'remove'|'verify',id?:string):Promise<void>;
+  stop?():Promise<void>;
 }
 export interface ChannelOptions {
   fields:readonly ChannelField[];

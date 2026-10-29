@@ -2,7 +2,7 @@
 
 插件提供内置 NodeLane、浏览器本地翻译渠道，以及可配置的 manga-translator-ui（MTU）。NodeLane 为初始默认渠道；两个内置渠道固定显示，不能手动创建、重新连接或移除。阅读器和网页原位翻译共用当前渠道；支持添加多个 MTU 服务配置，每次只选择一个。MTU 使用用户自己的服务与算力，无需 NodeLane 账号，不使用官方额度。
 
-浏览器本地翻译基于 Shinobu，在本机识别、去字和嵌字，正文支持 Google 与基础 LLM 协议；模型和完整字体由用户手动安装。运行规则、公开模型安装限制及验证范围见[本机翻译渠道](SHINOBU_TRANSLATION_DESIGN.md)。
+浏览器本地翻译基于 Shinobu，在本机识别、去字和嵌字，正文支持 Google 与基础 LLM 协议；模型和完整字体由用户手动安装。运行规则、模型来源及验证范围见[本机翻译渠道](SHINOBU_TRANSLATION_DESIGN.md)。
 
 设置以渠道卡片统一展示内置渠道与已添加的服务，单选当前渠道；远端服务渠道提供重新连接和移除；浏览器本地翻译在渠道专属设置中管理正文供应商。添加表单只列出可配置的服务类型，并按适配器声明的字段填写连接信息。内置渠道由适配器声明默认设置；首次选择时持久化配置，后续保留已保存的供应商、字体偏好和结果作用域。适配器可提供 `description` 与 `guideUrl`；教程入口随对应渠道显示于卡片及连接表单。MTU 使用[本地翻译教程](https://comics.nodelane.net/guides/local-translation/)。
 
@@ -16,7 +16,7 @@
 | `channels/adapters/nodelane/` | 官方登录、能力与权益、UUID 请求、补传、状态查询、恢复和结果下载 |
 | `channels/adapters/manga-translator-ui/` | MTU 登录、语言映射、表单与错误映射 |
 | `channels/adapters/shinobu/` | 本机图像流水线、正文协议、资源管理与独立执行回执 |
-| `channels/local-host.ts`、`entrypoints/local-translation-host/` | 通用本机宿主入口，只接受可信扩展消息 |
+| `channels/host-background.ts`、`channels/local-host.ts`、`entrypoints/local-translation-host/` | 通用隐藏本机宿主及生命周期管理，只接受可信扩展消息 |
 | `channels/transport/` | 直传翻译的本地排程、操作记录与运行器 |
 | `image-transfer/` | 翻译与增强共用的图片 HTTP 执行、执行回执与长请求宿主，不依赖翻译领域 |
 | `translation/automatic.ts`、`useAutomaticTranslation.ts` | 当前阅读页组加后续五页的翻译窗口（最多七页）、渠道运行器调用及显示更新 |
@@ -24,7 +24,7 @@
 | `storage/translations/` | 按渠道作用域持久缓存完整译图，首次加载校验，后续直接读取并保留有限内存缓存 |
 | `translation/materialize.ts` | 官方结果验证及原生尺寸覆盖合成，供阅读器、原位、导出共用 |
 
-来源读取、原图规范化与保存、译图接收和合成不设置单图字节、像素或边长上限。上传准入由各渠道的翻译入口负责：官方送译副本遵守服务 capabilities，本地 MTU 在发送前检查 32 MiB 上传预算；Shinobu 在解码前检查 12 MP / 8192 边长的本机准入上限。这些上传规则不传给来源、页面缓存或结果下载。图片格式、有效尺寸、内容摘要和协议描述仍须校验；窗口、并发、缓存总预算与格式整体防护保持独立。
+来源读取、原图规范化与保存、译图接收和合成不设置单图字节、像素或边长上限。上传准入由各渠道的翻译入口负责：官方送译副本遵守服务 capabilities，本地 MTU 在发送前检查 32 MiB 上传预算；浏览器本地翻译在解码前检查图片格式和有效尺寸，不设置独立的像素或边长上限。这些上传规则不传给来源、页面缓存或结果下载。图片格式、有效尺寸、内容摘要和协议描述仍须校验；窗口、并发、缓存总预算与格式整体防护保持独立。
 
 `ChannelDefinition` 声明配置字段并建立连接；`ChannelConnection` 提供能力、作用域、结果读取和运行器工厂；`ChannelRuntime` 提供 `init/restore/submit/manual/wait/stateFor/refresh/dispose`。`restore` 仅读取本地回执，不联网或创建任务；`submit` 更新阅读窗口并启动工作，不等待整张译图。网页原位入口以 `deferPolicy` 建立本地连接，新增翻译时才刷新远端能力／权益；阅读器正常打开仍加载完整渠道能力。官方查询与恢复留在官方运行器内，MTU 运行器只等待一次图片 HTTP 调用的结果。
 

@@ -14,9 +14,9 @@ export function ChannelResources({manager}:{manager:ResourceManager}){
     refresh();const stop=manager.subscribe(refresh),timer=setInterval(refresh,3000);
     return()=>{live=false;stop();clearInterval(timer);};
   },[open,manager]);
-  async function act(action:'download'|'pause'|'remove'|'verify',id?:string){
+  async function act(action:'download'|'pause'|'remove'|'verify'|'stop',id?:string){
     setError('');setBusy(true);
-    try{await manager.act(action,id);setResources(await manager.read());}catch(error){setError(error instanceof Error?error.message:msg('资源操作失败；请检查空间、网络或正在运行的任务。'));}finally{setBusy(false);}
+    try{if(action==='stop')await manager.stop?.();else await manager.act(action,id);setResources(await manager.read());}catch(error){setError(error instanceof Error?error.message:msg('资源操作失败；请检查空间、网络或正在运行的任务。'));}finally{setBusy(false);}
   }
   const categories=[...new Map(resources.flatMap(resource=>resource.category?[[resource.category.id,resource.category] as const]:[])).values()];
   const current=categories.find(item=>item.id===category)??categories[0],visible=resources.filter(resource=>!current||resource.category?.id===current.id),required=resources.filter(resource=>resource.required),ready=required.filter(resource=>resource.state==='ready').length;
@@ -25,6 +25,7 @@ export function ChannelResources({manager}:{manager:ResourceManager}){
       <button type="button" className="button secondary" onClick={()=>{setError('');setOpen(true);}}>{msg('管理模型与字体')}</button>
     </SettingRow>
     {open&&<Modal className="nc-resources-dialog" title={msg('模型与字体')} onClose={()=>setOpen(false)} footer={<div className="nc-resources-notice">
+      {manager.stop&&<div className="nc-config-actions"><button type="button" className="button secondary small" disabled={busy} onClick={()=>void act('stop')}>{msg('停止本地任务')}</button></div>}
       <p className="nc-muted nc-resource-note">{msg('删除模型或字体只释放本机空间，已有译图仍会保留。')}</p>
       {error&&<p className="error" role="alert">{error}</p>}
     </div>}>

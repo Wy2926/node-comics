@@ -38,7 +38,7 @@
 .nc-resource-footer summary {cursor:pointer;color:var(--muted);}
 .nc-resource-footer .text-link {font-size:var(--text-small);}
 .nc-resource-list progress {display:block;width:100%;height:8px;margin:12px 0 6px;accent-color:var(--accent);}
-.nc-resources-notice {padding-top:var(--settings-field-gap);border-top:var(--comic-perforation);}
+.nc-resources-notice {display:grid;gap:var(--settings-description-gap);padding-top:var(--settings-field-gap);border-top:var(--comic-perforation);}
 .nc-resource-note {margin:0;font-size:var(--text-small);line-height:1.6;}
 .nc-resources-notice .error {margin:8px 0 0;font-size:var(--text-small);color:var(--danger);}
 .nc-reader-translation-settings {display:grid;gap:var(--settings-field-gap);min-width:0;}

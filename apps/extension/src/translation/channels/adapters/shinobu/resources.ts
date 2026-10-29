@@ -48,6 +48,7 @@ export function resourceManager(fontIds:string[]=[]):ChannelResources{
       return {...await readAssetState(asset),...(font?{label:translationFontName(font,'zh-Hans'),description:msg('用于译图中的文字绘制，下载后可离线使用。'),category:fonts}:descriptions[asset.id]),required:!font||selected,selected,license:asset.license,source:asset.source};
     }));},
     subscribe:subscribeResources,
+    async stop(){await localHostRequest('shinobu',{action:'stop'});},
     async act(action,id){try{await localHostRequest('shinobu',{action,id,fontIds});}catch(error){throw Error(resourceError(error instanceof Error?error.message:''));}},
   };
 }

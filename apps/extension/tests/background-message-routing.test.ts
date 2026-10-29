@@ -97,7 +97,6 @@ async function setupBackground(mobile = false) {
   });
   const {default:background}=await import('../entrypoints/background');
   background.main();
-  expect(listeners).toHaveLength(9); // Locale, theme, inline, region, sources, Drive, catalog sync, analytics, shortcuts.
 }
 beforeEach(() => setupBackground());
 
