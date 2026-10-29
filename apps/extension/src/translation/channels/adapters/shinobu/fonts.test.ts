@@ -2,6 +2,21 @@ import {expect,it,vi} from 'vitest';
 import {configureTypesetFont,supportedTypesetText} from '../../../../../third_party/shinobu/packages/image-pipeline/src/pipeline/typeset/fontRuntime';
 import {drawTypeset} from '../../../../../third_party/shinobu/packages/image-pipeline/src/pipeline/typeset/drawTypeset';
 import type {PlatformProvider,PipelineCanvas} from '../../../../../third_party/shinobu/packages/image-pipeline/src/runtime/platform';
+import {localFonts} from '../../../font-resources';
+import coverage from '../../../font-coverage.json';
+import catalog from '../../../../../../../backend/shared/translation-fonts.json';
+
+it('has full-font coverage for every advertised language and localized specimen',()=>{
+  expect(localFonts).toHaveLength(10);
+  for(const font of localFonts){
+    const ranges=(coverage as Record<string,number[][]>)[font.id];
+    configureTypesetFont(font.id,400,ranges);
+    for(const language of font.languages){
+      const text=catalog.samples[language as keyof typeof catalog.samples]+font.names[language];
+      expect(supportedTypesetText(text),font.id+' · '+language).toBe(text);
+    }
+  }
+});
 
 it('skips only unsupported code points, preserving adjacent text and whitespace',()=>{
   configureTypesetFont('fixture',400,[[0x41,0x5a],[0x4e00,0x9fff],[0x20000,0x20000]]);

@@ -3,9 +3,8 @@ import {ChannelPicker} from '../ui/ChannelPicker';
 import type {ReactNode} from 'react';
 import {Icon} from '../icons';
 import {msg} from '../i18n/runtime';
-import {fallbackLanguages, type Capabilities, type Settings} from '../types';
-import {LanguageFlag} from '../ui/LanguageFlag';
-import {Select, SelectOption} from '../ui/Select';
+import {type Capabilities, type Settings} from '../types';
+import {TargetLanguage} from '../ui/TargetLanguage';
 import {TranslationModelPicker} from '../ui/TranslationModelPicker';
 import {TranslationFontPicker} from '../ui/TranslationFontPicker';
 import type {ModelSelection,FontSelection} from '../translation/channels/contracts';
@@ -22,16 +21,13 @@ export function ReaderTranslationSettings({settings, setSettings, caps, modelSel
   channelOptions?: import('../translation/channels/contracts').ChannelOptions;
   note: string;
 }) {
-  const languages = caps?.languages ?? fallbackLanguages;
   return <div className="nc-reader-translation-settings">
     <ChannelPicker/>
-    <label className="nc-config-row"><span>{msg('目标语言')}</span><Select aria-label={msg('翻译目标语言')} value={settings.language}
-        onChange={event => setSettings(value => ({...value, language: event.target.value}))}>
-        {languages.map(language => <SelectOption key={language.id} value={language.id} icon={<LanguageFlag language={language.id}/>}>{language.label}</SelectOption>)}
-      </Select></label>
+    <label className="nc-config-row"><span>{msg('目标语言')}</span><TargetLanguage label={msg('翻译目标语言')} value={settings.language} caps={caps}
+        onChange={language=>setSettings(value=>({...value,language}))}/></label>
     <TranslationModelPicker selection={modelSelection}/>
     <TranslationFontPicker selection={fontSelection} language={settings.language}/>
-    <ChannelOptionsPanel options={channelOptions}/>
+    <ChannelOptionsPanel options={channelOptions} language={settings.language}/>
     <p className="nc-muted nc-default-mode-note">{note}</p>
   </div>;
 }

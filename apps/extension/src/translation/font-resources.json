@@ -18,6 +18,22 @@
     "source_version": "Version 1.530; October 13, 2026"
   },
   {
+    "id": "gaegu",
+    "languages": [
+      "ko"
+    ],
+    "name": "Gaegu-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gaegu/Gaegu-Regular.ttf",
+    "sha256": "aa52c98336f7c62e2896fc8b12b56a75d5b476d88a2f104b0980f4f7ce0adfc3",
+    "license": "SIL Open Font License 1.1",
+    "notice": "gaegu-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gaegu/OFL.txt",
+    "notice_sha256": "53a9ce47085d9fef613c7ecb3730dc80d25962510bbea231b89564f58240f251",
+    "bytes": 3165816,
+    "weight": 400,
+    "source_version": "Version 1.00"
+  },
+  {
     "name": "NotoSansCJKsc-Regular.otf",
     "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
     "sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
@@ -91,5 +107,69 @@
     "bytes": 24429984,
     "weight": 400,
     "source_version": "Version 2.001;hotconv 1.1.0;makeotfexe 2.6.0"
+  },
+  {
+    "id": "klee-one",
+    "languages": [
+      "ja"
+    ],
+    "name": "KleeOne-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/kleeone/KleeOne-Regular.ttf",
+    "sha256": "bf4063f030cc2ae6adf0a11424a1888e5c0eb4438f1f6d02f52294af868e9b3a",
+    "license": "SIL Open Font License 1.1",
+    "notice": "kleeone-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/kleeone/OFL.txt",
+    "notice_sha256": "e376b0df8e8a2345a9533db6f0a5333a1107975569ad9d1973a7ee557161ca38",
+    "bytes": 8724204,
+    "weight": 400,
+    "source_version": "Version 1.100"
+  },
+  {
+    "id": "gowun-dodum",
+    "languages": [
+      "ko"
+    ],
+    "name": "GowunDodum-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowundodum/GowunDodum-Regular.ttf",
+    "sha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+    "license": "SIL Open Font License 1.1",
+    "notice": "gowundodum-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowundodum/OFL.txt",
+    "notice_sha256": "a7c73f9521cd646bbdfb6684c99a62311bbd7bce11898dc11ef0b3c69eda1aca",
+    "bytes": 7229088,
+    "weight": 400,
+    "source_version": "Version 2.000"
+  },
+  {
+    "id": "gowun-batang",
+    "languages": [
+      "ko"
+    ],
+    "name": "GowunBatang-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowunbatang/GowunBatang-Regular.ttf",
+    "sha256": "466c593e7147412e748af4856d5ad14709b5a860bdf62b9c2546f2c5874e9849",
+    "license": "SIL Open Font License 1.1",
+    "notice": "gowunbatang-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/gowunbatang/OFL.txt",
+    "notice_sha256": "49a57cc769fa9affd6eefb9070a61e3d3f6b757c97cafb15848bc6d1c81acc78",
+    "bytes": 8433296,
+    "weight": 400,
+    "source_version": "Version 2.000"
+  },
+  {
+    "id": "nanum-pen",
+    "languages": [
+      "ko"
+    ],
+    "name": "NanumPenScript-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/nanumpenscript/NanumPenScript-Regular.ttf",
+    "sha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+    "license": "SIL Open Font License 1.1",
+    "notice": "nanumpenscript-OFL.txt",
+    "notice_url": "https://raw.githubusercontent.com/google/fonts/3dd78844021e948ceb633d1dcee3f7885561b5d9/ofl/nanumpenscript/OFL.txt",
+    "notice_sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+    "bytes": 3201664,
+    "weight": 400,
+    "source_version": "Version 1.10"
   }
 ]

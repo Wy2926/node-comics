@@ -52,7 +52,7 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
       }
       const asset=id?resourceAssets().find(item=>item.id===id):undefined;
       if(action==='download'){
-        const fonts=Array.isArray(fontIds)&&fontIds.length?fontIds.slice(0,5):[defaultTranslationFont('zh-Hans')!.id];
+        const fonts=Array.isArray(fontIds)?fontIds:[defaultTranslationFont('zh-Hans')!.id];
         const requested=asset?[asset]:id?[]:[...modelAssets,...[...new Set(fonts)].map(fullFont)];
         if(!requested.length)throw Error('ASSET_UNKNOWN');
         for(const item of requested)if(currentDownload!==item.id&&!downloads.some(value=>value.id===item.id))downloads.push(item);

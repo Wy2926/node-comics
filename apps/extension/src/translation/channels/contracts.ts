@@ -14,11 +14,11 @@ export interface ChannelProfile {
   settings: Record<string, string>;
 }
 export interface ChannelField {key:string;label:string;type:'text'|'url'|'password'|'number'|'select';required?:boolean;placeholder?:string;defaultValue?:string;options?:readonly {value:string;label:string}[];help?:string;advanced?:boolean;}
-export interface ChannelResource {id:string;label:string;description?:string;category?:{id:string;label:string;description:string};required?:boolean;selected?:boolean;bytes:number;downloaded:number;state:'missing'|'downloading'|'paused'|'verifying'|'ready'|'error';detail?:string;license:string;source:string;}
+export interface ChannelResource {id:string;label:string;description?:string;category?:{id:string;label:string;description:string;languages?:readonly {id:string;label:string;supported:boolean}[]};languages?:Readonly<Record<string,{label:string;selected?:boolean}>>;required?:boolean;selected?:boolean;bytes:number;downloaded:number;state:'missing'|'downloading'|'paused'|'verifying'|'ready'|'error';detail?:string;license:string;source:string;}
 export interface ChannelResources {
-  read():Promise<ChannelResource[]>;
+  read(language?:string):Promise<ChannelResource[]>;
   subscribe(listener:()=>void):()=>void;
-  act(action:'download'|'pause'|'remove'|'verify',id?:string):Promise<void>;
+  act(action:'download'|'pause'|'remove'|'verify',id?:string,language?:string):Promise<void>;
   stop?():Promise<void>;
 }
 export interface ChannelOptions {

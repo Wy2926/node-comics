@@ -1288,5 +1288,9 @@
   "此模型不支持所选思考程度，请重新选择。": "This model does not support the selected reasoning effort. Choose another level.",
   "输出上限需大于思考预算，请调整高级协议设置。": "The output limit must exceed the reasoning budget. Adjust the advanced protocol settings.",
   "填写所选服务的 API Key 或网关访问令牌；无需鉴权可留空。": "Enter the API key or gateway token for this service. Leave blank if authentication is not required.",
-  "正文服务鉴权失败，请检查 API Key 或网关访问令牌。": "Text service authentication failed. Check the API key or gateway token."
+  "正文服务鉴权失败，请检查 API Key 或网关访问令牌。": "Text service authentication failed. Check the API key or gateway token.",
+  "待支持": "지원 예정",
+  "此语言待支持，未启动本地翻译。": "아직 지원하지 않는 언어입니다. 로컬 번역을 시작하지 않았습니다.",
+  "字体语言": "글꼴 언어",
+  "此语言的字体暂未开放，支持后可在这里下载和管理。": "이 언어의 글꼴은 아직 제공되지 않습니다. 지원이 추가되면 여기서 다운로드하고 관리할 수 있습니다."
 }

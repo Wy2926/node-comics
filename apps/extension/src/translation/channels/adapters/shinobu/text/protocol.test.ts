@@ -3,6 +3,7 @@ import {llmRequest,parseTranslation} from './protocol';
 import {parseConfig,needsInternet} from '../config';
 import {llmTranslate} from './openai-compatible';
 import {googleTranslate} from './google';
+import {anthropicRequest} from './anthropic';
 const config=parseConfig({provider:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'organization/a-long-model-name:Q4_K_M'});
 describe('Shinobu text boundary',()=>{
   it('supports basic Chat Completions with reasoning off and optional fields omitted',()=>{
@@ -42,6 +43,20 @@ describe('Shinobu text boundary',()=>{
     const fetcher=vi.fn().mockResolvedValue(new Response(JSON.stringify([[['你好','hello']]])));
     expect(await googleTranslate({a:'hello'},'zh-Hant',new AbortController().signal,fetcher)).toEqual({a:'你好'});
     expect(fetcher.mock.calls[0][0]).not.toContain('hello');expect(fetcher.mock.calls[0][1].body.get('q')).toBe('hello');expect(fetcher.mock.calls[0][1].body.get('tl')).toBe('zh-TW');
+  });
+  it.each([['ja','Japanese'],['ko','Korean']])('translates to %s consistently across Google and both LLM protocols',async(language,name)=>{
+    const fetcher=vi.fn(async()=>new Response(JSON.stringify([[['translated','original']]])));
+    await googleTranslate({a:'你好'},language,new AbortController().signal,fetcher);
+    const request=fetcher.mock.calls[0] as unknown as [string,{body:URLSearchParams}];
+    expect(request[1].body.get('tl')).toBe(language);expect(request[1].body.get('sl')).toBe('auto');
+    expect(llmRequest(config,{a:'你好'},language).messages[0].content).toContain('into '+name);
+    expect(anthropicRequest({...config,llmProvider:'claude',protocol:'anthropic',model:'claude-sonnet-4-6',maxTokens:16384},{a:'你好'},language).system).toContain('into '+name);
+  });
+  it('never sends unsupported targets to a text service or substitutes Chinese',async()=>{
+    const fetcher=vi.fn();
+    await expect(googleTranslate({a:'hello'},'en',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
+    await expect(llmTranslate(config,{a:'hello'},'en','',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it('reports Google network or access restrictions without replaying or asking for an LLM token',async()=>{
     for(const outcome of [()=>Promise.reject(new TypeError('Failed to fetch')),()=>Promise.resolve(new Response(null,{status:403}))]){

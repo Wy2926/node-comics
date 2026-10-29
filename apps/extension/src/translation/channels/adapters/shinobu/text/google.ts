@@ -1,10 +1,12 @@
 import {boundedJson,TextError,type RegionTexts} from './protocol';
+import {localLanguage} from '../languages';
 export async function googleTranslate(input:RegionTexts,language:string,signal:AbortSignal,fetcher:typeof fetch=fetch):Promise<RegionTexts>{
+  const target=localLanguage(language);
   const result:RegionTexts=Object.create(null);
   // Preserve boundaries without relying on delimiters that the service may translate or remove.
   for(const [id,text] of Object.entries(input)){
     if(!text.trim()){result[id]='';continue;}
-    const body=new URLSearchParams({client:'gtx',sl:'ja',tl:language==='zh-Hant'?'zh-TW':'zh-CN',dt:'t',q:text});
+    const body=new URLSearchParams({client:'gtx',sl:'auto',tl:target.google,dt:'t',q:text});
     let response:Response;
     try{response=await fetcher('https://translate.googleapis.com/translate_a/single',{method:'POST',body,signal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});}
     catch{signal.throwIfAborted();throw new TextError('TEXT_GOOGLE_UNAVAILABLE');}

@@ -4,7 +4,10 @@ import {fullFont,localFonts} from '../../../font-resources';
 import {localHostRequest} from '../../host-client';
 import type {ChannelResources,FontDownload,FontDownloads} from '../../contracts';
 import {msg} from '../../../../i18n/runtime';
-import {translationFontName,defaultTranslationFont} from '../../../../../../../backend/shared/translation-fonts';
+import {translationFontName} from '../../../../../../../backend/shared/translation-fonts';
+import {fallbackLanguages} from '../../../../types';
+import {effectiveTranslationFont} from '../../../fonts';
+import {localLanguages,supportsLocalLanguage} from './languages';
 const resourceError=(code:string)=>code==='ASSET_BUSY'?msg('资源正在使用，请停止任务或稍后再试。'):code==='ASSET_STORAGE_FULL'?msg('空间不足'):code==='ASSET_CORRUPT'?msg('资源校验失败，请重新下载。'):msg('资源操作失败；请检查空间、网络或正在运行的任务。');
 const source='https://github.com/DonutShinobu/ShinobuTranslator/releases/download/models-v0.8.3/';
 const modelLicenses:Record<string,string>={detector:'GPL-3.0',inpaint:'GPL-3.0',bubble:'Apache-2.0 / AGPL-3.0','paddleocr-v6-medium':'Apache-2.0','paddleocr-v6-dictionary':'Apache-2.0'};
@@ -28,12 +31,14 @@ export const fontDownloads:FontDownloads={
     try{await localHostRequest('shinobu',{action:'download',id:fullFont(id).id});}catch(error){throw Error(resourceError(error instanceof Error?error.message:''));}
   },
 };
-export function resourceManager(fontIds:string[]=[]):ChannelResources{
+export function resourceManager(preferences:Record<string,string|undefined>={}):ChannelResources{
+  const selectedFonts=Object.fromEntries(localLanguages.map(language=>[language,effectiveTranslationFont(localFonts,language,preferences[language])]));
+  const requiredFonts=(language=localLanguages[0])=>[...new Set(localLanguages.flatMap(id=>id===language||preferences[id]?[selectedFonts[id]]:[]).filter((id):id is string=>!!id))];
   return {
-    async read(){
+    async read(language){
       const recognition={id:'recognition',label:msg('文字识别'),description:msg('找到漫画中的文字，并识别为可翻译的内容。')};
       const painting={id:'painting',label:msg('画面处理'),description:msg('识别气泡、清除原文，让译文自然放回画面。')};
-      const fonts={id:'fonts',label:msg('翻译字体'),description:msg('只需下载你选择的字体；这里管理完整字库，字体选择仍在翻译设置中。')};
+      const fonts={id:'fonts',label:msg('翻译字体'),description:msg('只需下载你选择的字体；这里管理完整字库，字体选择仍在翻译设置中。'),languages:fallbackLanguages.map(language=>({...language,supported:supportsLocalLanguage(language.id)}))};
       const descriptions:Record<string,{label:string;description:string;category:typeof recognition}>={
         detector:{label:msg('文字位置检测'),description:msg('定位页面中的文字区域。'),category:recognition},
         'paddleocr-v6-medium':{label:msg('文字识别引擎'),description:msg('读取文字内容，用于后续翻译。'),category:recognition},
@@ -41,14 +46,13 @@ export function resourceManager(fontIds:string[]=[]):ChannelResources{
         inpaint:{label:msg('原文清除与背景修复'),description:msg('清除原文并修复底色，为译文腾出位置。'),category:painting},
         bubble:{label:msg('对话气泡识别'),description:msg('判断气泡边界，帮助安排译文位置。'),category:painting},
       };
-      const selectedFonts=fontIds.length?fontIds:[defaultTranslationFont('zh-Hans')!.id];
-      const assets=[...modelAssets,...localFonts.toSorted((a,b)=>Number(selectedFonts.includes(b.id))-Number(selectedFonts.includes(a.id))).map(font=>fullFont(font.id))];
+      const fontIds=requiredFonts(language),assets=[...modelAssets,...localFonts.toSorted((a,b)=>Number(fontIds.includes(b.id))-Number(fontIds.includes(a.id))).map(font=>fullFont(font.id))];
       return Promise.all(assets.map(async asset=>{
-      const font=localFonts.find(font=>'font:'+font.id===asset.id),selected=!!font&&selectedFonts.includes(font.id);
-      return {...await readAssetState(asset),...(font?{label:translationFontName(font,'zh-Hans'),description:msg('用于译图中的文字绘制，下载后可离线使用。'),category:fonts}:descriptions[asset.id]),required:!font||selected,selected,license:asset.license,source:asset.source};
+      const font=localFonts.find(font=>'font:'+font.id===asset.id),selected=!!font&&fontIds.includes(font.id);
+      return {...await readAssetState(asset),...(font?{label:font.name,languages:Object.fromEntries(font.languages.map(language=>[language,{label:translationFontName(font,language),selected:selectedFonts[language]===font.id}])),description:msg('用于译图中的文字绘制，下载后可离线使用。'),category:fonts}:descriptions[asset.id]),required:!font||selected,selected,license:asset.license,source:asset.source};
     }));},
     subscribe:subscribeResources,
     async stop(){await localHostRequest('shinobu',{action:'stop'});},
-    async act(action,id){try{await localHostRequest('shinobu',{action,id,fontIds});}catch(error){throw Error(resourceError(error instanceof Error?error.message:''));}},
+    async act(action,id,language){try{await localHostRequest('shinobu',{action,id,fontIds:requiredFonts(language)});}catch(error){throw Error(resourceError(error instanceof Error?error.message:''));}},
   };
 }

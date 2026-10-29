@@ -57,7 +57,7 @@ export function Preferences({ settings, setSettings, caps, modelSelection, fontS
       </SettingRow>
       <TranslationModelPicker selection={modelSelection}/>
       <TranslationFontPicker selection={fontSelection} language={settings.language}/>
-    <ChannelOptionsPanel options={channelOptions}/>
+    <ChannelOptionsPanel options={channelOptions} language={settings.language}/>
       <AutoTranslateTabs enabled={settings.autoTranslateTabs} onSaved={setSettings}/>
       <div className="setting-row">
         <div><b>{msg('翻译书名与简介')}</b></div>

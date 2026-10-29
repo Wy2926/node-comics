@@ -15,6 +15,7 @@ import {modelAssets,resourceEvents} from './resources';
 import {ENGINE_REVISION,type ShinobuConfig} from './config';
 import {TEXT_PROTOCOL_REVISION} from './text/protocol';
 import {errorMessage} from './errors';
+import {supportsLocalLanguage} from './languages';
 import {executionLock,launchLock,operationLock} from './locks';
 import {readOperation,saveOperation,readCheckpoint,saveCheckpoint,releaseInput,type LocalOperation} from './operations';
 const digest=(value:unknown)=>new Sha256().update(new TextEncoder().encode(JSON.stringify(value))).digest();
@@ -64,6 +65,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     }
   }
   async submit(targets:ReadingTarget[],isCurrent:(target:ReadingTarget)=>boolean=()=>true){
+    if(!supportsLocalLanguage(this.options.language))return;
     await this.init();
     this.check=isCurrent;this.targets=targets.filter(isCurrent).slice(0,MAX_READER_TARGETS);
     const retain=new Set(this.targets.map(this.id));for(const [id,record] of this.records)if(!retain.has(id)&&record.job.status!=='running')this.records.delete(id);
@@ -75,8 +77,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     try{
       const target=this.targets.find(this.needs);if(!target)return;
       const assets=[...modelAssets,fullFont(this.fontId)];
-      if(!['zh-Hans','zh-Hant'].includes(this.options.language))this.admissionError='TEXT_CONFIG_INVALID';
-      else if((await Promise.all(assets.map(assetRecord))).some(record=>record?.state!=='ready'))this.admissionError='ASSET_MISSING';
+      if((await Promise.all(assets.map(assetRecord))).some(record=>record?.state!=='ready'))this.admissionError='ASSET_MISSING';
       if(this.admissionError){this.changed();return;}
       await navigator.locks.request('nc-shinobu-admission',{ifAvailable:true},async lock=>{
         if(!lock||(await navigator.locks.query()).held?.some(l=>l.name===executionLock)||!this.current()||!this.check(target))return;
@@ -94,7 +95,6 @@ export class ShinobuRuntime implements ChannelRuntime{
       let record:LocalOperation={id,scope:this.scope.key,entryId:target.entryId,pageId:target.page.id,config:this.config,fontId:this.fontId,fingerprint,cacheToken:await translationCache.token(this.scope.key),previousResult:previous?.job.status==='succeeded'?previous.job:previous?.previousResult??this.delivered.get(id),
         job:{id:crypto.randomUUID(),mode:target.mode,target_language:this.options.language,font_id:this.fontId,status:'running',phase:'detecting',created_at:now,updated_at:now,version:1,quota_pages:0,cache_hit:false}};
       try{
-        if(!['zh-Hans','zh-Hant'].includes(this.options.language))throw Error('TEXT_CONFIG_INVALID');
         const reference=target.page.blobKey?parsePageReference(target.page.blobKey):undefined;
         if(reference)lease=await this.options.readOriginal?.(reference);
         const source=lease?.blob??(target.page.blobKey?await this.options.getBlob(target.page.blobKey):undefined);
@@ -122,6 +122,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     });
   }
   async manual(target:ReadingTarget){
+    if(!supportsLocalLanguage(this.options.language))throw Error(errorMessage('TEXT_LANGUAGE_UNSUPPORTED'));
     this.admissionError=undefined;
     await navigator.locks.request('nc-shinobu-admission',async()=>{
       if((await navigator.locks.query()).held?.some(l=>l.name===executionLock))throw Error(errorMessage('INTERRUPTED'));
@@ -139,6 +140,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     void this.pump();
   }
   stateFor(target:ReadingTarget,active:boolean,error?:string):TranslationState|undefined{
+    if(!supportsLocalLanguage(this.options.language))return active?{kind:'error',message:errorMessage('TEXT_LANGUAGE_UNSUPPORTED'),retryable:false}:undefined;
     const record=this.records.get(this.id(target)),displayed=pageTranslation(target.page,target.mode,this.options.language,this.scope.key);
     if(record?.job.status==='running')return {kind:'translating',message:msgTranslate()};
     if(record?.job.status==='failed')return {kind:'error',message:record.job.error?.message??errorMessage('PIPELINE_FAILED'),retryable:true,retryAction:'translate'};

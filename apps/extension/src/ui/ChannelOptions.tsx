@@ -6,7 +6,7 @@ import {ChannelServices} from './ChannelServices';
 import {ChannelResources} from './ChannelResources';
 import './channel-options.css';
 
-export function ChannelOptionsPanel({options}:{options?:ChannelOptions}){
+export function ChannelOptionsPanel({options,language}:{options?:ChannelOptions;language?:string}){
   const [values,setValues]=useState<Record<string,string>>({}),[saving,setSaving]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   const [expanded,setExpanded]=useState(false),current=useRef(options);
   current.current=options;
@@ -28,6 +28,6 @@ export function ChannelOptionsPanel({options}:{options?:ChannelOptions}){
   return <section className="nc-channel-options">
     {options.services&&<ChannelServices services={options.services}/>}
     {options.fields.length>0&&(options.settingsLabel?<details className="nc-config-advanced" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}><summary>{options.settingsLabel}</summary>{form}</details>:form)}
-    {options.resources&&<ChannelResources manager={options.resources}/>}
+    {options.resources&&<ChannelResources manager={options.resources} language={language}/>}
   </section>;
 }

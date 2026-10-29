@@ -1,5 +1,6 @@
 import {msg} from '../../../../i18n/runtime';
 export function errorMessage(code:string):string{
+  if(code==='TEXT_LANGUAGE_UNSUPPORTED')return msg('此语言待支持，未启动本地翻译。');
   if(code.startsWith('ASSET_'))return msg('本地模型或字体尚未就绪，请在资源管理中下载或修复。');
   if(code==='TEXT_CONFIG_INVALID'||code==='TEXT_CONFIG_CHANGED')return msg('请检查正文服务地址、模型与参数，然后保存设置。');
   if(code==='TEXT_THINKING_REQUIRED')return msg('此模型强制思考，请选择思考程度或更换模型。');

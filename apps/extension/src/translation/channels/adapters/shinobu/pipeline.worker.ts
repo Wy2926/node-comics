@@ -5,6 +5,7 @@ import {createOffscreenPlatform} from '../../../../../third_party/shinobu/apps/w
 import {Sha256} from '../../../../importers/hash';
 import type {ShinobuConfig} from './config';
 import type {TextRegion} from './text/protocol';
+import {localLanguage} from './languages';
 export interface PipelineStart {type:'run';source:Blob;config:ShinobuConfig;language:string;modelUrls:Record<string,string>;manifestUrl:string;fontUrl:string;fontWeight:number;fontCoverage:number[][];workerUrl:string;ortPath:string;}
 let pipeline:ImagePipeline|undefined;
 let runtime:ReturnType<typeof createBrowserModelRuntime>|undefined;
@@ -14,7 +15,7 @@ async function run(data:PipelineStart){
     const url=data.modelUrls[path];if(!url)throw Error('ASSET_MISSING');return url;
   }}});
   configureTypesetFont('NodeLane Selected Translation Font',data.fontWeight,data.fontCoverage);
-  const config:PipelineConfig={sourceLang:'ja',targetLang:data.language==='zh-Hant'?'zh-CHT':'zh',translator:data.config.provider==='google'?'google_web':'llm',llmProvider:'custom',llmAuthMode:'api_key',llmBaseUrl:'',llmModel:data.config.model||'local-text',typesetDebug:false,eraseDebug:false,collectDebugLog:false,ocrEngine:'paddleocr_v6_medium',ocrPostFilter:data.config.ocrFilter,processMode:'translate'};
+  const config:PipelineConfig={sourceLang:'auto',targetLang:localLanguage(data.language).pipeline,translator:data.config.provider==='google'?'google_web':'llm',llmProvider:'custom',llmAuthMode:'api_key',llmBaseUrl:'',llmModel:data.config.model||'local-text',typesetDebug:false,eraseDebug:false,collectDebugLog:false,ocrEngine:'paddleocr_v6_medium',ocrPostFilter:data.config.ocrFilter,processMode:'translate'};
   if(!pipeline)pipeline=createImagePipeline({platform:createOffscreenPlatform(),modelRuntime:{...runtime,getSession:(name,_preferred,options)=>runtime!.getSession(name,data.config.backend==='cpu'?['wasm']:['webgpu','wasm'],options)},detectionFallbackStrategy:{kind:'strict'},fontSource:()=>data.fontUrl});
     const task=pipeline.run({source:data.source,config,workingCopy:{strategy:'source-native'}},{textTranslator:{async translateRegions(request){
       // Upstream detection creates random IDs. Bind persistent text IDs to geometry and OCR, never UUIDs.

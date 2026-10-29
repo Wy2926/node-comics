@@ -10,17 +10,30 @@ import {localHostRequest} from '../../host-client';
 vi.mock('../../host-client',()=>({localHostRequest:vi.fn(async()=>{})}));
 
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.clearAllMocks();});
-it('admits large image metadata and passes the task token without persisting it',async()=>{
+it.each(['zh-Hans','zh-Hant','ja','ko'])('admits %s without persisting the task token',async language=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
   const header=new Uint8Array(33);header.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
   const view=new DataView(header.buffer);view.setUint32(16,1000);view.setUint32(20,13000);
-  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob:async()=>new Blob([header],{type:'image/png'}),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob:async()=>new Blob([header],{type:'image/png'}),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('long.png',1000,13000),blobKey:'fixture-long-image'}};
   await runtime.manual(target);
   const [record]=await entryOperations(target.entryId);
   expect(record.job.status).toBe('running');
   expect(localHostRequest).toHaveBeenCalledExactlyOnceWith('shinobu',{action:'start',id:record.id,token:'task-fixture-token'});
   expect(JSON.stringify(record)).not.toContain('task-fixture-token');runtime.dispose();
+});
+it('does not read images, create operations or dispatch automatic/manual work for pending languages',async()=>{
+  const getBlob=vi.fn(async()=>undefined),onJobs=vi.fn(async()=>{});
+  for(const language of ['en','fr','ar','unknown']){
+    const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob,onJobs,onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
+    const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'must-not-read'}};
+    await runtime.submit([target]);await runtime.refresh();
+    await expect(runtime.manual(target)).rejects.toThrow('此语言待支持');
+    expect(runtime.hasPending).toBe(false);expect(runtime.waitingIds).toEqual([]);
+    expect(runtime.stateFor(target,true)).toMatchObject({kind:'error',retryable:false,message:'此语言待支持，未启动本地翻译。'});
+    expect(await entryOperations(target.entryId)).toEqual([]);runtime.dispose();
+  }
+  expect(getBlob).not.toHaveBeenCalled();expect(onJobs).not.toHaveBeenCalled();expect(localHostRequest).not.toHaveBeenCalled();
 });
 it('publishes only status changes and polls through the caller wait, without its own timer',async()=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!(null)}});

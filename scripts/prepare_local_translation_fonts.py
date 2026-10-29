@@ -19,7 +19,8 @@ def digest(path):
 def prepare(source):
     assets = json.loads((ROOT / 'services/compute-node/assets.json').read_text())['fonts']
     catalog = json.loads((ROOT / 'backend/shared/translation-fonts.json').read_text())['fonts']
-    ids = {font['id'] for font in catalog if 'zh-Hans' in font['languages'] and 'zh-Hant' in font['languages']}
+    languages = {'zh-Hans', 'zh-Hant', 'ja', 'ko'}
+    ids = {font['id'] for font in catalog if languages.intersection(font['languages'])}
     resources, coverage = [], {}
     for asset in assets:
         if asset.get('id') not in ids:
@@ -37,11 +38,11 @@ def prepare(source):
             else:
                 ranges.append([point, point])
         coverage[asset['id']] = ranges
-        resources.append({**asset, 'bytes': path.stat().st_size, 'weight': font['OS/2'].usWeightClass,
+        resources.append({**asset, 'languages': [language for language in asset['languages'] if language in languages], 'bytes': path.stat().st_size, 'weight': font['OS/2'].usWeightClass,
                           'source_version': font['name'].getDebugName(5)})
         font.close()
     if len(resources) != len(ids):
-        raise ValueError('Incomplete Chinese font catalog')
+        raise ValueError('Incomplete local translation font catalog')
     output = ROOT / 'apps/extension/src/translation'
     (output / 'font-resources.json').write_text(json.dumps(resources, ensure_ascii=False, indent=2) + '\n')
     (output / 'font-coverage.json').write_text(json.dumps(coverage, separators=(',', ':')) + '\n')

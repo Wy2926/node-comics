@@ -8,6 +8,7 @@ import type {LocalOperation} from './operations';
 import type {PipelineStart} from './pipeline.worker';
 import {translateText} from './text/execute';
 import type {TextRegion} from './text/protocol';
+import {localLanguage} from './languages';
 interface Context {key:string;worker:Worker;urls:Record<string,string>;fontUrl:string;fontCoverage:number[][];manifestUrl:string;release:()=>void;closed:Promise<void>;}
 let context:Context|undefined,idle:ReturnType<typeof setTimeout>|undefined;
 async function leases<T>(assets:LocalAsset[],run:()=>Promise<T>):Promise<T>{
@@ -49,6 +50,7 @@ async function ready(operation:LocalOperation):Promise<Context>{
 }
 /** One warm runtime; verify assets once per host/font/backend generation. */
 export async function runImage(operation:LocalOperation,source:Blob,signal:AbortSignal,token:string){
+  localLanguage(operation.job.target_language);
   const current=await ready(operation),worker=current.worker,font=fullFont(operation.fontId);
   const start:PipelineStart={type:'run',source,config:operation.config,language:operation.job.target_language,modelUrls:current.urls,manifestUrl:current.manifestUrl,fontUrl:current.fontUrl,fontWeight:font.weight,fontCoverage:current.fontCoverage,workerUrl:onnxWorkerUrl,ortPath:chrome.runtime.getURL('local-runtime/')};
   try{

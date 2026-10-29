@@ -2,27 +2,33 @@ import {useEffect,useState} from 'react';
 import type {ChannelResource,ChannelResources as ResourceManager} from '../translation/channels/contracts';
 import {msg} from '../i18n/runtime';
 import {Modal,SettingRow} from './components';
+import {Select,SelectOption} from './Select';
+import {LanguageFlag} from './LanguageFlag';
 
 const resourceState=(state:ChannelResource['state'])=>({missing:msg('未下载'),downloading:msg('下载中'),paused:msg('已暂停'),verifying:msg('正在校验'),ready:msg('已就绪'),error:msg('下载失败')})[state];
 const size=(bytes:number)=>bytes<1024*1024?Math.ceil(bytes/1024)+' KB':(bytes/1024/1024).toFixed(1)+' MB';
-export function ChannelResources({manager}:{manager:ResourceManager}){
+export function ChannelResources({manager,language}:{manager:ResourceManager;language?:string}){
   const [open,setOpen]=useState(false),[resources,setResources]=useState<ChannelResource[]>([]),[category,setCategory]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
+  const [resourceLanguage,setResourceLanguage]=useState<string>();
   useEffect(()=>{
     if(!open)return;
     let live=true;setLoading(true);
-    const refresh=()=>void manager.read().then(value=>{if(live){setResources(value);setLoading(false);}}).catch(()=>{if(live){setError(msg('资源状态读取失败，请重新打开。'));setLoading(false);}});
+    const refresh=()=>void manager.read(language).then(value=>{if(live){setResources(value);setLoading(false);}}).catch(()=>{if(live){setError(msg('资源状态读取失败，请重新打开。'));setLoading(false);}});
     refresh();const stop=manager.subscribe(refresh),timer=setInterval(refresh,3000);
     return()=>{live=false;stop();clearInterval(timer);};
-  },[open,manager]);
+  },[open,manager,language]);
   async function act(action:'download'|'pause'|'remove'|'verify'|'stop',id?:string){
     setError('');setBusy(true);
-    try{if(action==='stop')await manager.stop?.();else await manager.act(action,id);setResources(await manager.read());}catch(error){setError(error instanceof Error?error.message:msg('资源操作失败；请检查空间、网络或正在运行的任务。'));}finally{setBusy(false);}
+    try{if(action==='stop')await manager.stop?.();else await manager.act(action,id,language);setResources(await manager.read(language));}catch(error){setError(error instanceof Error?error.message:msg('资源操作失败；请检查空间、网络或正在运行的任务。'));}finally{setBusy(false);}
   }
   const categories=[...new Map(resources.flatMap(resource=>resource.category?[[resource.category.id,resource.category] as const]:[])).values()];
-  const current=categories.find(item=>item.id===category)??categories[0],visible=resources.filter(resource=>!current||resource.category?.id===current.id),required=resources.filter(resource=>resource.required),ready=required.filter(resource=>resource.state==='ready').length;
+  const current=categories.find(item=>item.id===category)??categories[0],selectedLanguage=current?.languages?.find(item=>item.id===(resourceLanguage??language))??current?.languages?.[0];
+  const visible=resources.filter(resource=>(!current||resource.category?.id===current.id)&&(!selectedLanguage||selectedLanguage.supported&&resource.languages?.[selectedLanguage.id]))
+    .map(resource=>({...resource,...(selectedLanguage?resource.languages?.[selectedLanguage.id]:{})}));
+  const required=resources.filter(resource=>resource.required),ready=required.filter(resource=>resource.state==='ready').length;
   return <>
     <SettingRow title={msg('模型与字体')} description={msg('按需下载到浏览器，用于文字识别、画面处理和译文绘制。')}>
-      <button type="button" className="button secondary" onClick={()=>{setError('');setOpen(true);}}>{msg('管理模型与字体')}</button>
+      <button type="button" className="button secondary" onClick={()=>{setError('');setResourceLanguage(undefined);setOpen(true);}}>{msg('管理模型与字体')}</button>
     </SettingRow>
     {open&&<Modal className="nc-resources-dialog" title={msg('模型与字体')} onClose={()=>setOpen(false)} footer={<div className="nc-resources-notice">
       {manager.stop&&<div className="nc-config-actions"><button type="button" className="button secondary small" disabled={busy} onClick={()=>void act('stop')}>{msg('停止本地任务')}</button></div>}
@@ -37,7 +43,12 @@ export function ChannelResources({manager}:{manager:ResourceManager}){
       </div>
       <div className="nc-resource-categories" role="group" aria-label={msg('资源分类')}>{categories.map(item=><button key={item.id} className="button secondary small" type="button" aria-pressed={current?.id===item.id} onClick={()=>setCategory(item.id)}>{item.label}<span>{resources.filter(resource=>resource.category?.id===item.id&&resource.state==='ready').length} / {resources.filter(resource=>resource.category?.id===item.id).length}</span></button>)}</div>
       {current&&<p className="nc-muted nc-resource-description">{current.description}</p>}
-      <div key={current?.id} className="nc-resource-list" role="region" aria-label={current?.label??msg('模型与字体')} tabIndex={0}>{visible.map(resource=><article key={resource.id} className="nc-resource-card">
+      {selectedLanguage&&<label className="nc-config-row nc-resource-language"><span>{msg('字体语言')}</span><Select aria-label={msg('字体语言')} placement="end" value={selectedLanguage.id} onChange={event=>setResourceLanguage(event.target.value)}>
+        {current?.languages?.map(item=><SelectOption key={item.id} value={item.id} icon={<LanguageFlag language={item.id}/>}>{item.label+(item.supported?'':' · '+msg('待支持'))}</SelectOption>)}
+      </Select></label>}
+      <div key={(current?.id??'')+(selectedLanguage?.id??'')} className="nc-resource-list" role="region" aria-label={current?.label??msg('模型与字体')} tabIndex={0}>
+        {selectedLanguage&&!selectedLanguage.supported&&<p className="nc-muted" role="status">{msg('此语言的字体暂未开放，支持后可在这里下载和管理。')}</p>}
+        {visible.map(resource=><article key={resource.id} className="nc-resource-card">
         <div className="nc-resource-identity"><strong>{resource.label}</strong><span className="nc-resource-badge nc-comic-tag" data-state={resource.state} data-ready={resource.state==='ready'||undefined}>{resourceState(resource.state)}</span></div>
         <p className="nc-muted">{resource.description}</p>
         <div className="nc-resource-meta"><span>{size(resource.bytes)}</span><span>{resource.selected?msg('当前所选字体'):resource.required?msg('翻译必需'):msg('按需下载')}</span></div>
