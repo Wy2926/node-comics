@@ -29,7 +29,7 @@ export const needsInternet=(config:ShinobuConfig)=>config.provider==='google';
 export function configFields():ChannelField[]{
   return [
     {key:'backend',label:msg('运行方式'),type:'select',defaultValue:'auto',options:[{value:'auto',label:msg('自动')},{value:'cpu',label:msg('兼容模式（CPU）')}]},
-    {key:'ocrFilter',label:msg('文字识别过滤'),type:'select',defaultValue:'balanced',options:[{value:'balanced',label:msg('平衡')},{value:'off',label:msg('关闭')}]},
+    {key:'ocrFilter',label:msg('文字识别过滤'),type:'select',defaultValue:'balanced',options:[{value:'balanced',label:msg('平衡')},{value:'off',label:msg('不启用')}]},
   ];
 }
 export function changeServiceValues(previous:Record<string,string>,next:Record<string,string>):Record<string,string>{
@@ -46,7 +46,7 @@ export function serviceFields(values:Record<string,string>):ChannelField[]{
   const llmProvider=(values.llmProvider||'custom') as LlmProvider,protocol=llmProvider==='claude'?'anthropic':llmProvider==='custom'?(values.protocol||'openai') as LlmProtocol:'openai';
   const thinking=(values.thinking||'off') as Thinking,thinkingFormat=(values.thinkingFormat||'openai') as ThinkingFormat;
   const capability=thinkingCapability({llmProvider,protocol,thinkingFormat,model:values.model??''});
-  const levels:Record<Thinking,string>={off:msg('关闭'),on:msg('开启'),minimal:msg('极低'),low:msg('低'),medium:msg('中'),high:msg('高'),xhigh:msg('极高'),max:msg('最高')};
+  const levels:Record<Thinking,string>={off:msg('不启用'),on:msg('开启'),minimal:msg('极低'),low:msg('低'),medium:msg('中'),high:msg('高'),xhigh:msg('极高'),max:msg('最高')};
   return [
     {key:'llmProvider',label:msg('供应商类型'),type:'select',defaultValue:'custom',options:[...Object.entries(llmProviders).map(([value,item])=>({value,label:item.label})),{value:'custom',label:msg('自定义供应商')}]},
     {key:'name',label:msg('供应商名称'),type:'text',required:true,placeholder:msg('例如：家里的本地模型')},
@@ -58,7 +58,7 @@ export function serviceFields(values:Record<string,string>):ChannelField[]{
     {key:'thinking',label:msg('思考程度'),type:'select',defaultValue:'off',options:['off' as const,...capability.levels].map(value=>({value,label:levels[value]})),help:!capability.canDisable?msg('此模型强制思考，请选择思考程度或更换模型。'):capability.style==='none'?msg('此模式不发送思考参数，仅用于不需要思考控制的模型。'):capability.style==='budget'?msg('低、中、高分别使用 1024、4096、8192 个思考 Token；输出上限需大于思考预算。'):undefined},
     {key:'maxTokens',label:msg('最大输出 Token'),type:'number',advanced:true,required:protocol==='anthropic',help:protocol==='anthropic'?msg('Messages 接口要求填写输出上限，包含思考与正文 Token。'):msg('留空使用服务默认值。')},
     ...(protocol==='openai'?[{key:'tokenField',label:msg('输出上限参数'),type:'select' as const,defaultValue:'max_tokens',advanced:true,options:['max_tokens','max_completion_tokens'].map(value=>({value,label:value}))}]:[]),
-    {key:'responseFormat',label:msg('响应格式'),type:'select',defaultValue:'text',advanced:true,options:[{value:'text',label:msg('基础聊天接口')},...(protocol==='openai'?[{value:'json_object',label:'JSON Object'}]:[]),{value:'json_schema',label:'JSON Schema'}]},
+    {key:'responseFormat',label:msg('响应格式'),type:'select',defaultValue:'text',advanced:true,options:[{value:'text',label:msg('基础聊天接口')},...(protocol==='openai'?[{value:'json_object',label:msg('JSON 对象')}]:[]),{value:'json_schema',label:'JSON Schema'}]},
     ...(thinking==='off'&&llmProvider!=='kimi'?[{key:'temperature',label:msg('随机程度'),type:'number' as const,advanced:true,help:msg('留空使用服务默认值。')}]:[]),
   ];
 }

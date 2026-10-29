@@ -88,6 +88,8 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.nc-channel-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.nc-channel-status.nc-comic-tag { flex: none; padding: 1px 6px; color: var(--muted); background: var(--surface-soft); border-color: var(--line); font-weight: 500; }
 
 .nc-channel-type {
   color: var(--muted);

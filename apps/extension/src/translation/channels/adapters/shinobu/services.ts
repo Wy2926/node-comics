@@ -70,8 +70,8 @@ export async function saveCommonSettings(profile:ChannelProfile,values:Record<st
 export function serviceSelection(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean):ChannelServiceSelection{
   const state=readServices(profile),stored=providerSecrets(secrets);
   return {
-    label:msg('正文翻译服务'),description:msg('识别和绘图在浏览器内完成，仅文字发送至所选服务。'),addLabel:msg('添加 LLM 供应商'),selectedId:state.selectedId,initialValues:providerPreset('deepseek'),fields:serviceFields,changeValues:changeServiceValues,
-    items:[{id:'google',label:msg('谷歌翻译'),description:msg('无需配置，使用 Google Translate 翻译正文。')},...state.items.map(item=>({id:item.id,label:item.name,description:item.values.model+' · '+new URL(item.values.baseUrl).host,values:{...item.values,name:item.name},savedSecrets:stored[secretKey(item.id)]?['token']:[]}))],
+    get label(){return msg('正文翻译服务');},get description(){return msg('识别和绘图在浏览器内完成，仅文字发送至所选服务。');},get addLabel(){return msg('添加 LLM 供应商');},selectedId:state.selectedId,initialValues:providerPreset('deepseek'),fields:serviceFields,changeValues:changeServiceValues,
+    items:[{id:'google',get label(){return msg('谷歌翻译');},get description(){return msg('无需配置，使用 Google Translate 翻译正文。');}},...state.items.map(item=>({id:item.id,label:item.name,description:item.values.model+' · '+new URL(item.values.baseUrl).host,values:{...item.values,name:item.name},savedSecrets:stored[secretKey(item.id)]?['token']:[]}))],
     async select(id){
       if(id===state.selectedId)return;
       if(id!=='google'&&!state.items.some(item=>item.id===id))throw Error(errorMessage('TEXT_CONFIG_INVALID'));

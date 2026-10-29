@@ -1,3 +1,4 @@
+import {msg} from '../../../../i18n/runtime';
 /** Provider presets are configuration, not separate image/reader pipelines. */
 export const llmProviders = {
   deepseek:{label:'DeepSeek',baseUrl:'https://api.deepseek.com/v1'},
@@ -5,7 +6,7 @@ export const llmProviders = {
   openai:{label:'OpenAI',baseUrl:'https://api.openai.com/v1'},
   claude:{label:'Claude',baseUrl:'https://api.anthropic.com/v1'},
   gemini:{label:'Gemini',baseUrl:'https://generativelanguage.googleapis.com/v1beta/openai'},
-  glm:{label:'GLM / 智谱',baseUrl:'https://open.bigmodel.cn/api/paas/v4'},
+  glm:{get label(){return msg('GLM / 智谱');},baseUrl:'https://open.bigmodel.cn/api/paas/v4'},
   xiaomi:{label:'Xiaomi MiMo',baseUrl:'https://api.xiaomimimo.com/v1'},
   kimi:{label:'Kimi',baseUrl:'https://api.moonshot.cn/v1'},
 } as const;

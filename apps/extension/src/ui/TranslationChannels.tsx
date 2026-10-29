@@ -133,13 +133,14 @@ export function TranslationChannels({children}:{children?:ReactNode}){
       <div className="nc-channel-grid">
         {profiles.map(profile=>{
           const info=definitions.find(item=>item.id===profile.adapterId);
+          const label=info&&!info.configurable?info.label:profile.name;
           const selected=profile.id===active;
           return <article key={profile.id} className="nc-channel-card" data-selected={selected||undefined}>
             <label className="nc-channel-choice">
-              <input type="radio" name="translation-channel" aria-label={profile.name}
+              <input type="radio" name="translation-channel" aria-label={label+(info?.status?' · '+info.status:'')}
                 checked={selected} onChange={()=>void select(profile.id)}/>
               <span className="nc-channel-identity">
-                <strong>{profile.name}</strong>
+                <span className="nc-channel-title"><strong>{label}</strong>{info?.status&&<span className="nc-comic-tag nc-channel-status">{info.status}</span>}</span>
                 <span className="nc-channel-type">
                   {info?(info.configurable?info.label:msg('内置渠道')):profile.adapterId}
                 </span>

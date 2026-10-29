@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import type {ChannelResource,ChannelResources as ResourceManager} from '../translation/channels/contracts';
 import {msg} from '../i18n/runtime';
+import {useUiLocale} from '../i18n/react';
 import {Modal,SettingRow} from './components';
 import {Select,SelectOption} from './Select';
 import {LanguageFlag} from './LanguageFlag';
@@ -8,6 +9,7 @@ import {LanguageFlag} from './LanguageFlag';
 const resourceState=(state:ChannelResource['state'])=>({missing:msg('未下载'),downloading:msg('下载中'),paused:msg('已暂停'),verifying:msg('正在校验'),ready:msg('已就绪'),error:msg('下载失败')})[state];
 const size=(bytes:number)=>bytes<1024*1024?Math.ceil(bytes/1024)+' KB':(bytes/1024/1024).toFixed(1)+' MB';
 export function ChannelResources({manager,language}:{manager:ResourceManager;language?:string}){
+  const locale=useUiLocale();
   const [open,setOpen]=useState(false),[resources,setResources]=useState<ChannelResource[]>([]),[category,setCategory]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
   const [resourceLanguage,setResourceLanguage]=useState<string>();
   useEffect(()=>{
@@ -16,7 +18,7 @@ export function ChannelResources({manager,language}:{manager:ResourceManager;lan
     const refresh=()=>void manager.read(language).then(value=>{if(live){setResources(value);setLoading(false);}}).catch(()=>{if(live){setError(msg('资源状态读取失败，请重新打开。'));setLoading(false);}});
     refresh();const stop=manager.subscribe(refresh),timer=setInterval(refresh,3000);
     return()=>{live=false;stop();clearInterval(timer);};
-  },[open,manager,language]);
+  },[open,manager,language,locale]);
   async function act(action:'download'|'pause'|'remove'|'verify'|'stop',id?:string){
     setError('');setBusy(true);
     try{if(action==='stop')await manager.stop?.();else await manager.act(action,id,language);setResources(await manager.read(language));}catch(error){setError(error instanceof Error?error.message:msg('资源操作失败；请检查空间、网络或正在运行的任务。'));}finally{setBusy(false);}

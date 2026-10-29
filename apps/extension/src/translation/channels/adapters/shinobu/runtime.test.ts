@@ -7,14 +7,20 @@ import {entryOperations,saveOperation} from './operations';
 import {openTranslationBindings} from '../../../../comics/repositories/translation-bindings';
 import type {Job} from '../../../../types';
 import {localHostRequest} from '../../host-client';
+import {getDictionary,getLocale,installDictionary} from '../../../../i18n/runtime';
+import french from '../../../../i18n/dictionaries/fr.json';
+import * as assets from '../../../../storage/local-assets/store';
 vi.mock('../../host-client',()=>({localHostRequest:vi.fn(async()=>{})}));
 
-afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.clearAllMocks();});
+function png(width=900,height=1200){
+  const header=new Uint8Array(33);header.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
+  const view=new DataView(header.buffer);view.setUint32(16,width);view.setUint32(20,height);
+  return new Blob([header],{type:'image/png'});
+}
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();vi.clearAllMocks();});
 it.each(['zh-Hans','zh-Hant','ja','ko'])('admits %s without persisting the task token',async language=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
-  const header=new Uint8Array(33);header.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
-  const view=new DataView(header.buffer);view.setUint32(16,1000);view.setUint32(20,13000);
-  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob:async()=>new Blob([header],{type:'image/png'}),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob:async()=>png(1000,13000),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('long.png',1000,13000),blobKey:'fixture-long-image'}};
   await runtime.manual(target);
   const [record]=await entryOperations(target.entryId);
@@ -35,6 +41,43 @@ it('does not read images, create operations or dispatch automatic/manual work fo
   }
   expect(getBlob).not.toHaveBeenCalled();expect(onJobs).not.toHaveBeenCalled();expect(localHostRequest).not.toHaveBeenCalled();
 });
+it('retries a failed text request after the previous automatic window was cancelled, without reopening the runtime',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob:async()=>png(),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'retry-fixture'}};
+  try{
+    await runtime.manual(target);
+    const [first]=await entryOperations(target.entryId);
+    await saveOperation({...first,job:{...first.job,status:'failed',error:{code:'TEXT_RATE_LIMIT',message:'Previous request failed'}}});
+    const automatic=new AbortController();
+    await runtime.submit([target],()=>!automatic.signal.aborted);
+    expect(runtime.stateFor(target,true)).toMatchObject({kind:'error',retryable:true});
+    automatic.abort();
+    await runtime.manual(target);
+    const [retried]=await entryOperations(target.entryId);
+    expect(retried.job.id).not.toBe(first.job.id);
+    expect(retried.job.status).toBe('running');
+    expect(localHostRequest).toHaveBeenCalledTimes(2);
+  }finally{runtime.dispose();}
+});
+it.each(['automatic','manual'] as const)('cancels %s preparation when its own lifetime ends',async kind=>{
+  const admission=Promise.withResolvers<void>();
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>{
+    try{return await (typeof options==='function'?options():callback!({}));}
+    finally{if(name==='nc-shinobu-admission')admission.resolve();}
+  }}});
+  vi.spyOn(assets,'assetRecord').mockImplementation(async asset=>({id:asset.sha256,offset:asset.bytes,state:'ready',updatedAt:Date.now()}));
+  const automatic=new AbortController();let live=true;
+  const getBlob=vi.fn(async()=>{if(kind==='automatic')automatic.abort();else live=false;return png();});
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob,onJobs:async()=>{},onChange:()=>{},isCurrent:()=>live},parseConfig({}),'noto-sans-cjk');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'cancel-fixture'}};
+  try{
+    if(kind==='automatic')await runtime.submit([target],()=>!automatic.signal.aborted);else await runtime.manual(target);
+    await admission.promise;
+    expect(getBlob).toHaveBeenCalledOnce();expect(localHostRequest).not.toHaveBeenCalled();
+    expect(await entryOperations(target.entryId)).toEqual([]);
+  }finally{runtime.dispose();}
+});
 it('publishes only status changes and polls through the caller wait, without its own timer',async()=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!(null)}});
   const onJobs=vi.fn(async()=>{}),onChange=vi.fn(),getBlob=vi.fn(async()=>undefined);
@@ -42,6 +85,11 @@ it('publishes only status changes and polls through the caller wait, without its
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'unavailable'}};
   await runtime.manual(target);
   expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);
+  const previousLocale=getLocale(),previousDictionary=getDictionary();
+  try{
+    installDictionary('fr',french);
+    expect(runtime.stateFor(target,true)).toMatchObject({kind:'error',message:french['原图不可用，请恢复所属来源或本地原图缓存。']});
+  }finally{installDictionary(previousLocale,previousDictionary);}
   for(let i=0;i<5;i++)await runtime.restore([target]);
   expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);expect(getBlob).toHaveBeenCalledTimes(1);
   const [record]=await entryOperations(target.entryId);

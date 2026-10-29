@@ -82,11 +82,13 @@ export class ShinobuRuntime implements ChannelRuntime{
       await navigator.locks.request('nc-shinobu-admission',{ifAvailable:true},async lock=>{
         if(!lock||(await navigator.locks.query()).held?.some(l=>l.name===executionLock)||!this.current()||!this.check(target))return;
         const existing=await readOperation(this.id(target));if(existing){await this.adopt(existing);return;}
-        await this.begin(target);
+        await this.begin(target,undefined,()=>this.current()&&this.check(target));
       });
     }catch{this.changed();}finally{this.pumping=false;}
   }
-  private async begin(target:ReadingTarget,previous?:LocalOperation){
+  // Manual requests follow channel lifetime; automatic requests also follow their reading window.
+  private async begin(target:ReadingTarget,previous?:LocalOperation,requestCurrent=this.current){
+    if(!requestCurrent())return;
     const id=this.id(target),font=fullFont(this.fontId),fingerprint=digest([ENGINE_REVISION,TEXT_PROTOCOL_REVISION,this.config,this.options.language,font.sha256]);
     await navigator.locks.request(launchLock(id),async()=>{
       let dispatched=false;
@@ -99,11 +101,11 @@ export class ShinobuRuntime implements ChannelRuntime{
         if(reference)lease=await this.options.readOriginal?.(reference);
         const source=lease?.blob??(target.page.blobKey?await this.options.getBlob(target.page.blobKey):undefined);
         if(!source)throw Error('SOURCE_MISSING');
-        if(!this.current()||!this.check(target))return;
+        if(!requestCurrent())return;
         const metadata=await probeImageMetadata(source);
         if(!metadata)throw Error('SOURCE_CHANGED');
         const sha=await hashFile(source);if(target.page.imageSha256&&target.page.imageSha256!==sha)throw Error('SOURCE_CHANGED');
-        if(!this.current()||!this.check(target))return;
+        if(!requestCurrent())return;
         record.job.image_sha256=sha;record.fingerprint=digest([fingerprint,sha]);
         if(previous?.fingerprint===record.fingerprint){
           const checkpoint=await readCheckpoint(previous.job.id);
@@ -143,7 +145,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     if(!supportsLocalLanguage(this.options.language))return active?{kind:'error',message:errorMessage('TEXT_LANGUAGE_UNSUPPORTED'),retryable:false}:undefined;
     const record=this.records.get(this.id(target)),displayed=pageTranslation(target.page,target.mode,this.options.language,this.scope.key);
     if(record?.job.status==='running')return {kind:'translating',message:msgTranslate()};
-    if(record?.job.status==='failed')return {kind:'error',message:record.job.error?.message??errorMessage('PIPELINE_FAILED'),retryable:true,retryAction:'translate'};
+    if(record?.job.status==='failed')return {kind:'error',message:errorMessage(record.job.error?.code??'PIPELINE_FAILED'),retryable:true,retryAction:'translate'};
     if(error||target.page.translationError||displayed.expired)return {kind:'error',message:error||target.page.translationError||errorMessage('RESULT_NOT_CACHED'),retryable:true,retryAction:'translate'};
     if(displayed.ready||record?.job.status==='no_text'||this.delivered.get(this.id(target))?.status==='no_text')return;
     if(this.admissionError)return {kind:'error',message:errorMessage(this.admissionError),retryable:false};

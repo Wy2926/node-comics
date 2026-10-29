@@ -119,6 +119,8 @@ export interface ChannelDefinition {
   label:string;
   /** User-facing setup information, owned by the adapter. */
   description?:string;
+  /** Optional display badge, separate from the channel name. */
+  status?:string;
   guideUrl?:string;
   configurable:boolean;
   /** Non-configurable adapters have one permanent profile, initialized on first selection. */

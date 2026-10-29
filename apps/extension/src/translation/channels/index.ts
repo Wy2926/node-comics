@@ -54,8 +54,8 @@ export async function removeLocalTranslationEntry(entryId:string):Promise<void>{
 }
 
 export function availableChannelProtocols(){
-  return channelDefinitions().map(({id,label,description,guideUrl,configurable,fields})=>({
-    id,label,description,guideUrl,configurable,fields,
+  return channelDefinitions().map(({id,label,description,status,guideUrl,configurable,fields})=>({
+    id,label,description,status,guideUrl,configurable,fields,
   }));
 }
 function channelProfiles(saved:ChannelProfile[]):ChannelProfile[]{

@@ -3,6 +3,7 @@ import {translationFontName} from '../../../../backend/shared/translation-fonts'
 import type {FontDownload,FontDownloads} from '../translation/channels/contracts';
 import type {availableTranslationFonts} from '../translation/fonts';
 import {msg} from '../i18n/runtime';
+import {useUiLocale} from '../i18n/react';
 import {Icon} from '../icons';
 import {PickerMenu} from './PickerMenu';
 
@@ -12,6 +13,7 @@ export function FontDownloadMenu({id,downloads,choices,value,language,saving,fon
   id:string;downloads:FontDownloads;choices:ReturnType<typeof availableTranslationFonts>;value?:string;language:string;saving:boolean;
   fontStyle:(id:string)=>CSSProperties;onChoose:(id:string)=>Promise<boolean|undefined>;onOpenChange:(open:boolean)=>void;
 }){
+  const locale=useUiLocale();
   const [open,setOpen]=useState(false),[resources,setResources]=useState<FontDownload[]>([]),[error,setError]=useState(''),[pending,setPending]=useState<string[]>([]);
   const refreshRef=useRef(()=>{}),requests=useRef(new Set<string>());
   function toggle(next:boolean){setOpen(next);onOpenChange(next);if(next)setError('');}
@@ -31,7 +33,7 @@ export function FontDownloadMenu({id,downloads,choices,value,language,saving,fon
     refreshRef.current=()=>void refresh();void refresh();
     const stop=downloads.subscribe(schedule),poll=open?setInterval(schedule,3000):undefined;
     return()=>{live=false;stop();clearTimeout(timer);clearInterval(poll);};
-  },[downloads,open]);
+  },[downloads,open,locale]);
   async function download(font:FontDownload){
     if(requests.current.has(font.id))return;
     requests.current.add(font.id);setPending(ids=>[...ids,font.id]);setError('');

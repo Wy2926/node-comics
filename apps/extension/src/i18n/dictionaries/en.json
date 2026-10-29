@@ -1202,7 +1202,7 @@
   "请检查正文服务地址、模型与参数，然后保存设置。": "Check the text service address, model and parameters, then save the settings.",
   "资源操作失败；请检查空间、网络或正在运行的任务。": "The resource operation failed. Check storage, network access and running tasks.",
   "资源状态读取失败，请重新打开。": "Could not read resource status. Close and reopen this panel.",
-  "运行方式": "Compute backend",
+  "运行方式": "Processing mode",
   "资源正在使用，请停止任务或稍后再试。": "Resource is in use. Stop the task or try again shortly.",
   "资源校验失败，请重新下载。": "Resource verification failed. Download it again.",
   "一般无需修改。仅在服务要求特定参数时调整。": "Keep the defaults unless your service requires specific parameters.",
@@ -1241,7 +1241,7 @@
   "正在保存…": "Saving…",
   "正在读取资源…": "Loading resources…",
   "此字体用于本地译图嵌字，需先下载完整字库。更换后，新翻译或手动重译的页面使用新字体。": "This font renders text in local translations and requires a full font download. Changes apply to new translations or pages you manually retranslate.",
-  "浏览器本地翻译": "Browser local translation",
+  "浏览器本地翻译": "Local browser translation",
   "添加 LLM 供应商": "Add LLM provider",
   "清除原文并修复底色，为译文腾出位置。": "Removes original text and repairs the background for translated text.",
   "用于译图中的文字绘制，下载后可离线使用。": "Renders translated text. Available offline after downloading.",
@@ -1292,5 +1292,9 @@
   "待支持": "Coming soon",
   "此语言待支持，未启动本地翻译。": "This language is not supported yet. Local translation has not started.",
   "字体语言": "Font language",
-  "此语言的字体暂未开放，支持后可在这里下载和管理。": "Fonts for this language are not available yet. You can download and manage them here once supported."
+  "此语言的字体暂未开放，支持后可在这里下载和管理。": "Fonts for this language are not available yet. You can download and manage them here once supported.",
+  "测试版": "Beta",
+  "GLM / 智谱": "GLM / Zhipu",
+  "不启用": "Off",
+  "JSON 对象": "JSON object"
 }
