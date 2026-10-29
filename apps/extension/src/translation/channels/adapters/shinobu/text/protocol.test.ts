@@ -5,9 +5,10 @@ import {llmTranslate} from './openai-compatible';
 import {googleTranslate} from './google';
 const config=parseConfig({provider:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'organization/a-long-model-name:Q4_K_M'});
 describe('Shinobu text boundary',()=>{
-  it('supports minimal Chat Completions without optional schema or reasoning fields',()=>{
+  it('supports basic Chat Completions with reasoning off and optional fields omitted',()=>{
     const request=llmRequest(config,{a:'こんにちは'},'zh-Hans');
     expect(request).toMatchObject({model:config.model,stream:false});
+    expect(request).toHaveProperty('reasoning_effort','none');
     expect(request).not.toHaveProperty('max_tokens');expect(request).not.toHaveProperty('response_format');expect(request).not.toHaveProperty('temperature');expect(request).not.toHaveProperty('max_completion_tokens');
     expect(needsInternet(config)).toBe(false);expect(needsInternet(parseConfig({}))).toBe(true);
   });

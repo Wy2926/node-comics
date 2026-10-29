@@ -3,7 +3,8 @@ import {requireHostAccess} from '../../../../host-permissions';
 import {msg} from '../../../../i18n/runtime';
 import {readChannelCredentials,updateChannelSettings,writeChannelSecrets} from '../../configuration';
 import type {ChannelProfile,ChannelServiceSelection} from '../../contracts';
-import {configValues,parseConfig,serviceFields} from './config';
+import {configValues,parseConfig,serviceFields,changeServiceValues} from './config';
+import {providerPreset,thinkingParameters} from './providers';
 import {errorMessage} from './errors';
 
 interface TextService {id:string;name:string;scope:string;values:Record<string,string>}
@@ -69,7 +70,7 @@ export async function saveCommonSettings(profile:ChannelProfile,values:Record<st
 export function serviceSelection(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean):ChannelServiceSelection{
   const state=readServices(profile),stored=providerSecrets(secrets);
   return {
-    label:msg('正文翻译服务'),description:msg('识别和绘图在浏览器内完成，仅文字发送至所选服务。'),addLabel:msg('添加 LLM 供应商'),selectedId:state.selectedId,fields:serviceFields(),
+    label:msg('正文翻译服务'),description:msg('识别和绘图在浏览器内完成，仅文字发送至所选服务。'),addLabel:msg('添加 LLM 供应商'),selectedId:state.selectedId,initialValues:providerPreset('deepseek'),fields:serviceFields,changeValues:changeServiceValues,
     items:[{id:'google',label:msg('谷歌翻译'),description:msg('无需配置，使用 Google Translate 翻译正文。')},...state.items.map(item=>({id:item.id,label:item.name,description:item.values.model+' · '+new URL(item.values.baseUrl).host,values:{...item.values,name:item.name},savedSecrets:stored[secretKey(item.id)]?['token']:[]}))],
     async select(id){
       if(id===state.selectedId)return;
@@ -79,12 +80,16 @@ export function serviceSelection(profile:ChannelProfile,secrets:Record<string,st
     async save(values,id){
       const name=values.name?.trim();
       if(!name||name.length>80)throw Error(msg('请填写不超过 80 个字的供应商名称。'));
-      let config:Record<string,string>;try{config=textValues(values);}catch{throw Error(errorMessage('TEXT_CONFIG_INVALID'));}
+      let config:Record<string,string>;
+      try{
+        config=textValues(values);const parsed=parseConfig(config);thinkingParameters(parsed,parsed.maxTokens);
+        if(parsed.protocol==='anthropic'&&(parsed.maxTokens===undefined||parsed.responseFormat==='json_object'))throw Error('TEXT_CONFIG_INVALID');
+      }catch(error){throw Error(errorMessage(error instanceof Error?error.message:'TEXT_CONFIG_INVALID'));}
       const previous=id?state.items.find(item=>item.id===id):undefined;
       if(id&&!previous)throw Error(errorMessage('TEXT_CONFIG_CHANGED'));
       await requireHostAccess([new URL(config.baseUrl).origin+'/*']);
       await mutate(profile,isCurrent,(next,credentials)=>{
-        const key=id??crypto.randomUUID(),changed=previous?.values.baseUrl!==config.baseUrl||!!values.token;
+        const key=id??crypto.randomUUID(),changed=previous?.values.baseUrl!==config.baseUrl||previous?.values.protocol!==config.protocol||!!values.token;
         const item:TextService={id:key,name,values:config,scope:previous&&!changed?previous.scope:JSON.stringify([profile.id,'llm',key,crypto.randomUUID()])};
         if(values.token)credentials[secretKey(key)]=values.token;
         else if(previous?.values.baseUrl!==config.baseUrl)delete credentials[secretKey(key)];

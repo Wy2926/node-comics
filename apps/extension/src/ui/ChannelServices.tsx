@@ -9,12 +9,13 @@ import {SettingRow} from './components';
 export function ChannelServices({services}:{services:ChannelServiceSelection}){
   const id=useId(),[open,setOpen]=useState(false),[editing,setEditing]=useState<string|null|undefined>(),[values,setValues]=useState<Record<string,string>>({}),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const selected=services.items.find(item=>item.id===services.selectedId),original=services.items.find(item=>item.id===editing);
+  const fields=services.fields(values),changeValues=(next:Record<string,string>)=>{setValues(services.changeValues(values,next));setError('');};
   function toggle(next:boolean){setOpen(next);if(!next){setEditing(undefined);setValues({});setError('');}}
   async function run(action:()=>Promise<void>){
     setBusy(true);setError('');
     try{await action();toggle(false);document.getElementById(id)?.focus({preventScroll:true});}catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }
-  function edit(id?:string){setEditing(id??null);setValues(services.items.find(item=>item.id===id)?.values??{});setError('');}
+  function edit(id?:string){setEditing(id??null);setValues(services.items.find(item=>item.id===id)?.values??services.initialValues);setError('');}
   return <section className="nc-channel-services-panel">
     <SettingRow title={<label htmlFor={id}>{services.label}</label>} description={services.description} descriptionId={id+'-note'}>
       <PickerMenu id={id} label={services.label} descriptionId={id+'-note'} open={open} onOpenChange={toggle} busy={busy} width={420} viewKey={editing===undefined?'list':editing??'new'} trigger={<span>{selected?.label}</span>}>
@@ -33,10 +34,10 @@ export function ChannelServices({services}:{services:ChannelServiceSelection}){
       </div>:<div className="nc-picker-editor">
       <h4>{editing===null?services.addLabel:msg('编辑供应商')}</h4>
       <form className="nc-service-form" onSubmit={event=>{event.preventDefault();void run(()=>services.save(values,editing??undefined));}}>
-        <ChannelFields fields={services.fields.filter(field=>!field.advanced)} values={values} onChange={setValues} disabled={busy} saved={values.baseUrl===original?.values?.baseUrl?original?.savedSecrets:[]}/>
+        <ChannelFields fields={fields.filter(field=>!field.advanced)} values={values} onChange={changeValues} disabled={busy} saved={values.baseUrl===original?.values?.baseUrl?original?.savedSecrets:[]}/>
         <details className="nc-config-advanced"><summary>{msg('高级协议设置')}</summary>
           <p className="nc-muted">{msg('一般无需修改。仅在服务要求特定参数时调整。')}</p>
-          <ChannelFields fields={services.fields.filter(field=>field.advanced)} values={values} onChange={setValues} disabled={busy}/>
+          <ChannelFields fields={fields.filter(field=>field.advanced)} values={values} onChange={changeValues} disabled={busy}/>
         </details>
         {error&&<p className="error" role="alert">{error}</p>}
         <div className="nc-config-actions">

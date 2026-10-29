@@ -2,6 +2,7 @@ import {readCheckpoint,saveCheckpoint,type LocalOperation,type TextCheckpoint} f
 import {translationInput,TextError,type TextRegion} from './protocol';
 import {googleTranslate} from './google';
 import {llmTranslate} from './openai-compatible';
+import {anthropicTranslate} from './anthropic';
 export async function translateText(operation:LocalOperation,regions:readonly TextRegion[],signal:AbortSignal,token:string){
   const input=translationInput(regions);
   if(!Object.keys(input).length)return input;
@@ -17,6 +18,7 @@ export async function translateText(operation:LocalOperation,regions:readonly Te
   signal.throwIfAborted();
   const result=operation.config.provider==='google'
     ?await googleTranslate(input,operation.job.target_language,signal)
+    :operation.config.protocol==='anthropic'?await anthropicTranslate(operation.config,input,operation.job.target_language,token,signal)
     :await llmTranslate(operation.config,input,operation.job.target_language,token,signal);
   await saveCheckpoint({...sending,state:'succeeded',result});
   return result;

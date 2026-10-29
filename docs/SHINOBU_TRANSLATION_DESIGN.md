@@ -1,12 +1,12 @@
 # 浏览器本地翻译渠道
 
-基于 Shinobu 的图像流水线以“浏览器本地翻译”作为独立渠道接入插件：本机执行检测、OCR、去字和嵌字，正文服务可选 Google Translate 或基础 OpenAI 兼容 Chat Completions。无需 NodeLane 账号，不创建官方任务、不使用官方额度。图片留在本机，仅识别文字发送给所选正文服务。
+基于 Shinobu 的图像流水线以“浏览器本地翻译”作为独立渠道接入插件：本机执行检测、OCR、去字和嵌字，正文服务可选 Google Translate、OpenAI 兼容 Chat Completions 或 Anthropic Messages。无需 NodeLane 账号，不创建官方任务、不使用官方额度。图片留在本机，仅识别文字发送给所选正文服务。
 
 ## 使用与支持范围
 
 在「外观与设置 → 翻译渠道」直接选择内置的「浏览器本地翻译」，无需添加，也不能移除；初始默认渠道仍为 NodeLane。阅读器翻译设置可直接切换渠道，仍与全局设置及网页原位翻译共用当前渠道。
 
-正文服务默认使用谷歌翻译；可添加多个具名 LLM 供应商，每项独立保存地址、模型、访问令牌和协议参数。自定义下拉面板内完成选择、添加、编辑与移除，新增和编辑表单直接显示在面板内。保存供应商后立即使用该项；移除当前供应商回到谷歌翻译。高级协议参数默认收起，本机运行方式和文字过滤单独放在「本机识别设置」，选择后自动保存，不再显示保存按钮。本功能未发布，不迁移或兼容开发期的旧单供应商配置。
+正文服务默认使用谷歌翻译；可添加多个具名 LLM 供应商，每项独立保存地址、模型、访问令牌、思考程度和协议参数。内置 DeepSeek、OpenRouter、OpenAI、Claude、Gemini、GLM / 智谱、Xiaomi MiMo、Kimi 的地址与协议预置，也可添加自定义供应商。全部地址均可改为用户网关；模型名称由用户填写，预置不查询远程模型目录。自定义下拉面板内完成选择、添加、编辑与移除，新增和编辑表单直接显示在面板内。保存供应商后立即使用该项；移除当前供应商回到谷歌翻译。高级协议参数默认收起，本机运行方式和文字过滤单独放在「本机识别设置」，选择后自动保存，不再显示保存按钮。本功能未发布，不迁移或兼容开发期的旧单供应商配置。
 
 首版提供 `classic`，验收范围为日文来源、简体中文和繁体中文目标。其他语言、任意模型导入、任意模型网址、整本后台推理不在本次移植范围。
 
@@ -16,7 +16,7 @@
 
 「本地翻译字体」使用独立于远程渠道的字体下拉界面，按目标语言展示本机支持的完整字库。按钮和列表显示下载状态，列表内可直接下载、继续或重试；校验完成后才可选用。关闭下拉不停止下载，进度与资源管理界面同步。字体选择器只读取固定字体目录的元数据，不扫描模型或字体文件，关闭时不轮询；普通渠道继续使用原字体选择器。
 
-LLM 服务地址填写版本前缀，例如 `http://127.0.0.1:1234/v1`，不包含 `/chat/completions`。允许 HTTP/HTTPS 服务，包括本机与局域网 IP、域名；是否可达由实际请求决定，不通过浏览器联网状态提前拒绝 LLM 请求。供应商数量不设插件上限。按[开发约定](../AGENTS.md)，供应商 API Key 由用户的后端网关保管，插件仅保存该网关的受限访问令牌；本机无鉴权模型服务可留空。远程 LLM 费用由所配置服务承担。
+LLM 服务地址填写版本前缀，例如 `http://127.0.0.1:1234/v1`，不包含 `/chat/completions`、`/responses` 或 `/messages`。允许 HTTP/HTTPS 服务，包括本机与局域网 IP、域名；是否可达由实际请求决定，不通过浏览器联网状态提前拒绝 LLM 请求。供应商数量不设插件上限。本地正文服务允许用户配置自己的 API Key 或网关访问令牌，仅存入扩展的凭据库；本机无鉴权模型服务可留空。费用由用户所选服务计收。NodeLane 官方服务的密钥与执行边界不变。
 
 ## 模型基线与来源
 
@@ -46,7 +46,7 @@ flowchart LR
   H --> W[图像流水线 Worker]
   W --> O[ONNX Worker]
   W --> T[正文翻译桥接]
-  T --> G[Google / Chat Completions]
+  T --> G[Google / Chat Completions / Messages]
   H --> A[模型与完整字体存储]
   H --> B[已有完整译图缓存]
 ```
@@ -59,7 +59,8 @@ flowchart LR
 | [host.ts](../apps/extension/src/translation/channels/adapters/shinobu/host.ts) / [engine.ts](../apps/extension/src/translation/channels/adapters/shinobu/engine.ts) | 单任务执行、模型资源租约、Worker 生命周期及输出缓存 |
 | [pipeline.worker.ts](../apps/extension/src/translation/channels/adapters/shinobu/pipeline.worker.ts) | 上游平台适配，注入正文服务和所选完整字体 |
 | [services.ts](../apps/extension/src/translation/channels/adapters/shinobu/services.ts) | 多供应商配置、凭据绑定、选择及稳定结果作用域 |
-| [text/](../apps/extension/src/translation/channels/adapters/shinobu/text) | Google 与基础 LLM 协议，输出校验和请求回执；不依赖 Canvas 或视觉模型 |
+| [providers.ts](../apps/extension/src/translation/channels/adapters/shinobu/providers.ts) | 供应商预置、模型思考能力与参数映射；纯配置逻辑，不访问网络 |
+| [text/](../apps/extension/src/translation/channels/adapters/shinobu/text) | Google、Chat Completions 与 Messages 协议，输出校验和请求回执；不依赖 Canvas 或视觉模型 |
 | [storage/local-assets/](../apps/extension/src/storage/local-assets) | 1 MiB 分块、Range 续传、流式摘要校验、状态与删除互斥 |
 | [ChannelOptions.tsx](../apps/extension/src/ui/ChannelOptions.tsx) | 按通用字段与资源契约显示表单；不导入具体适配器 |
 | [host-background.ts](../apps/extension/src/translation/channels/host-background.ts) / [local-translation-host/](../apps/extension/entrypoints/local-translation-host) | 管理隐藏宿主的创建与回收，通过渠道注册入口按需加载本机执行器 |
@@ -85,13 +86,28 @@ Chrome 隐藏文档仅使用 `runtime` 扩展 API，通过消息请求后台管�
 
 Google 使用 POST 正文，逐区域保持边界，禁止携带 Cookie、Referer 和自动重定向。不会把 OCR 文本放进 URL。Google 的公开网页接口不具备服务 SLA，限流/失败在当前页显示，由用户重试。访问限制或跳转验证页明确显示 Google 不可用，不提示检查 LLM 令牌，也不自动重发。
 
-LLM 请求为 `model`、`messages`、`stream:false`。输出 Token 留空时不发送上限字段；填写时仅检查正整数，按所选的 `max_tokens` 或 `max_completion_tokens` 发送，不设插件统一范围；Temperature 默认省略。基础模式不发送 `response_format`，明确选择后才使用 `json_object` 或 `json_schema`。不强制 reasoning、store、供应商品牌参数，也不在参数拒绝后自动换参数重发。
+Chat Completions 使用 `model`、`messages`、`stream:false`。输出 Token 留空时不发送上限字段；填写时仅检查正整数，按所选的 `max_tokens` 或 `max_completion_tokens` 发送，不设插件统一范围。Messages 使用独立 `system`、`messages`、`max_tokens` 和 `x-api-key` 鉴权；该接口要求输出上限，预置为 16384，用户可修改。两个协议都默认省略 Temperature，开启思考时不发送该参数；Kimi 不显示该项。
+
+思考默认关闭，按供应商发送实际关闭参数；服务自身默认开启时也不能只省略字段。根据模型能力显示可用程度：只有开关的模型显示「开启」，支持强度的显示对应档位。已知强制思考的模型提示用户主动选择程度或换模型，保存时校验，不擅自开启。模型别名或自定义网关以其实际协议为准；自定义 Chat Completions 可选择 `reasoning_effort`、OpenRouter `reasoning`、`thinking.type`、`enable_thinking` 或不发送思考参数。最后一项仅用于不需要思考控制的模型。
+
+| 预置 | 思考参数与官方依据 |
+| --- | --- |
+| DeepSeek | `thinking.type` 开关，开启后发送 `reasoning_effort`；[思考模式](https://api-docs.deepseek.com/guides/thinking_mode/) |
+| OpenRouter | 关闭为 `reasoning.enabled:false`，开启后使用 `effort`；不把仅隐藏输出的 `exclude` 当作关闭；[Reasoning tokens](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) |
+| OpenAI | 按模型使用 `reasoning_effort`，非思考模型省略；[Reasoning](https://developers.openai.com/api/docs/guides/reasoning?api-mode=chat) |
+| Claude | 原生 Messages；旧款使用 1024 / 4096 / 8192 的思考预算，输出上限必须大于预算；支持自适应思考的型号使用 `thinking` 与 `output_config.effort`；[Extended thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking) |
+| Gemini | OpenAI 兼容接口的 `reasoning_effort`；[OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai) |
+| GLM / 智谱 | `thinking.type`，支持程度的型号额外使用 `reasoning_effort`；[深度思考](https://docs.bigmodel.cn/cn/guide/capabilities/thinking) |
+| Xiaomi MiMo | `thinking.type` 开关，输出上限默认使用 `max_completion_tokens`，兼容 Bearer 鉴权；[Chat Completions](https://mimo.mi.com/docs/api/text-generation/openai-api) |
+| Kimi | 可切换型号使用 `thinking.type`；K3 系列使用 `reasoning_effort`；[思考模型](https://platform.kimi.com/docs/guide/use-thinking-models) |
+
+基础模式依靠提示词返回 JSON，不发送结构化输出字段；明确选择后，Chat Completions 使用 `json_object` 或 `json_schema`，Messages 使用 `output_config.format` 的 JSON Schema。思考与结构化输出设置同时保留。不会在参数拒绝后自动换参数、换协议或重发请求。
 
 响应必须正常结束，拒绝截断、拒绝响应、工具调用、无内容信封。正文必须为区域 ID 到字符串的 JSON 对象（允许单个 JSON 代码围栏）；区域集合精确匹配，拒绝重复、未知、缺失 ID 和空译文。不会用额外模型调用修复响应。
 
 正文不分批，不设区域数、文本字符数或固定总耗时限制。LLM 每页一次请求，Google 仍逐区域串行请求以保持文本边界；等待至服务返回、网络失败或用户主动停止。响应读取保留 1 MiB 上限。两者只接收 ID 和文字，不接收图片、裁图、坐标、源站地址或阅读历史。
 
-操作键固定为作用域、目标语言与页面意图。每个尝试另有 UUID，冻结配置摘要包括引擎/文本协议版本、源图 SHA、字体 SHA、正文参数。Google 与各 LLM 供应商使用独立、稳定的结果作用域，切回原供应商可以恢复其已缓存译图。更换某供应商的端点或令牌仅改变该项结果作用域；更换字体/OCR/模型参数保留旧成功图，手动重译使用新摘要。活跃任务使用开始时固定的服务参数与令牌，不再依赖整个渠道配置修订；后续编辑影响新任务，修改其他供应商不打断当前任务。令牌经受信任的扩展消息传给宿主并仅留在运行内存；持久令牌只存于凭据库，不放入供应商列表、操作记录、检查点或普通设置。
+操作键固定为作用域、目标语言与页面意图。每个尝试另有 UUID，冻结配置摘要包括引擎/文本协议版本、源图 SHA、字体 SHA、正文参数。Google 与各 LLM 供应商使用独立、稳定的结果作用域，切回原供应商可以恢复其已缓存译图。更换某供应商的端点、接口协议或令牌仅改变该项结果作用域；更换字体/OCR/模型或思考参数保留旧成功图，手动重译使用新摘要。活跃任务使用开始时固定的服务参数与令牌，不再依赖整个渠道配置修订；后续编辑影响新任务，修改其他供应商不打断当前任务。令牌经受信任的扩展消息传给宿主并仅留在运行内存；持久令牌只存于凭据库，不放入供应商列表、操作记录、检查点或普通设置。
 
 正文请求前先保存整页输入及 `sending` 状态，写入失败就不发送；整页成功校验后保存结果。完整正文结果仅在源图、配置、稳定区域 ID、OCR 和顺序完全匹配时复用。检查点上限 64 MiB，保留 24 小时后在宿主启动时分批回收。
 
@@ -112,9 +128,10 @@ LLM 请求为 `model`、`messages`、`stream:false`。输出 Token 留空时不�
 本机验证环境为 macOS、Chrome 156.0.8078.48、Apple M6 / 24 GiB，使用单独的 Shinobu Debug 浏览器配置与自制 900×1200 双页 CBZ。
 
 - Chrome 已验证：5 个模型和默认字体安装与摘要校验，检测模型在 53 MiB 暂停后继续，切换 Google/LLM 动态字段、真实 Google 正文调用、完整图像流水线、诺托黑体和霞鹜文楷嵌字、原图/译图切换以及重开后缓存与阅读位置恢复。
-- Chrome 已验证多供应商新增、无效地址提示、移除当前项回到 Google、供应商与渠道来回切换、第二页位置保持和字体偏好保持。相同图片共用结果时，切换前先按渠道和图片摘要查询已交付绑定，避免异步恢复期间重复翻译。
+- Chrome 已验证供应商预置、自定义地址、动态思考字段、新增与编辑后的刷新恢复、无效配置提示、移除当前项回到 Google、供应商与渠道来回切换、第二页位置保持和字体偏好保持。相同图片共用结果时，切换前先按渠道和图片摘要查询已交付绑定，避免异步恢复期间重复翻译。
 - 隐藏宿主已在 Chrome 验证实际模型出图、资源下载、关闭阅读器后完成已接受任务、重开后的结果恢复及空闲自动关闭，全程不打开宿主标签页。生命周期测试覆盖并发创建、忙碌时保活、空闲释放和旧文档关闭消息隔离。
-- 基础 Chat Completions 已通过浏览器调用本机与局域网 HTTP 协议夹具验证，LLM 每页一次请求，输出 Token 留空时不携带上限字段。含缺字译文成功出图，仅跳过缺字字符；刷新后缓存与第二页位置恢复，没有重复请求。夹具返回的文字完成嵌字；它不是实际 LLM 模型效果验证。真实远程 LLM、JSON Schema 服务及各供应商兼容性尚未验收。
+- 基础 Chat Completions 已通过浏览器调用本机与局域网 HTTP 协议夹具验证，LLM 每页一次请求，输出 Token 留空时不携带上限字段。含缺字译文成功出图，仅跳过缺字字符；刷新后缓存与第二页位置恢复，没有重复请求。夹具返回的文字完成嵌字；它不是实际 LLM 模型效果验证。
+- OpenRouter 已使用生产请求与解析代码、两句自拟日文调用 `openai/gpt-5.4-mini`，关闭思考与低强度两次均返回有效译文；服务回报思考 Token 分别为 0 与 12。没有发送用户漫画或保存测试密钥。其余供应商和原生 Messages 通过协议夹具与官方参数核对，尚未进行各家的真实服务验收；真实 JSON Schema 服务与复杂漫画 LLM 效果仍未验收。
 - 单元测试覆盖分块续传/错误范围/空间不足、校验失败、资源租约、协议与输出校验、整页正文复用、未知结果不重发、晚到写入、删除隔离和恢复状态去重；另运行插件完整测试、类型/模块/i18n 检查和构建。
 - 同一工具链构建的 HEAD 基线磁盘总大小 23,876,459 字节；接入构建约 53 MB，主要增量为 26,827,543 字节的 ORT WASM。模型权重及新增完整字体没有打包。WXT 汇总会重复计数公共资产，此处按实际文件计量。
 - 未验证的项目包括跨平台/Firefox/Safari、密集竖排与长条真实漫画效果、长时稳定性及未启用新渠道时的延迟对照。不能据两页合成样本承诺通用漫画效果。

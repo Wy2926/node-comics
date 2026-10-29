@@ -54,8 +54,10 @@ describe('browser local text providers',()=>{
   it('clears retained credentials on destination changes and preserves them for model or name edits',async()=>{
     const f=await fixture();await (await f.current()).selection.save(provider('A','http://127.0.0.1:1234/v1','secret-a'));
     const a=await f.current(),id=a.selection.selectedId,scope=serviceScope(a.profile);
-    await a.selection.save({...provider('Renamed','http://127.0.0.1:1234/v1'),model:'other-model'},id);
-    let current=await f.current();expect(serviceToken(current.profile,current.secrets)).toBe('secret-a');expect(serviceScope(current.profile)).toBe(scope);
+    await a.selection.save({...provider('Renamed','http://127.0.0.1:1234/v1'),model:'other-model',thinking:'high'},id);
+    let current=await f.current();expect(serviceToken(current.profile,current.secrets)).toBe('secret-a');expect(serviceScope(current.profile)).toBe(scope);expect(profileConfig(current.profile).thinking).toBe('high');
+    await current.selection.save({...provider('Messages','http://127.0.0.1:1234/v1'),llmProvider:'claude',model:'claude-sonnet-4-6',thinking:'low',maxTokens:'16384'},id);
+    current=await f.current();expect(profileConfig(current.profile)).toMatchObject({protocol:'anthropic',thinking:'low',maxTokens:16384});expect(serviceScope(current.profile)).not.toBe(scope);expect(serviceToken(current.profile,current.secrets)).toBe('secret-a');
     await current.selection.save(provider('Moved','http://127.0.0.1:5678/v1'),id);
     current=await f.current();expect(serviceToken(current.profile,current.secrets)).toBe('');expect(serviceScope(current.profile)).not.toBe(scope);
   });

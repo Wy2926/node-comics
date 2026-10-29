@@ -20,5 +20,5 @@ button.nc-picker-choice {flex:1;min-width:0;text-align:start;}
 .nc-picker-editor {padding:10px;}
 .nc-picker-editor h4 {margin:0 0 16px;font-size:var(--text-body);}
 .nc-picker-editor .nc-config-row {grid-template-columns:minmax(80px,.7fr) minmax(0,1.5fr);gap:12px;}
-.nc-picker-editor .nc-config-actions {justify-content:flex-end;}
+.nc-picker-editor .nc-config-actions {position:sticky;bottom:0;justify-content:flex-end;background:var(--surface);padding-block:var(--settings-description-gap);}
 .nc-picker-editor .nc-config-advanced {padding-block:12px;}

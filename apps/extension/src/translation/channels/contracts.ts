@@ -36,7 +36,9 @@ export interface ChannelServiceSelection {
   addLabel:string;
   selectedId:string;
   items:readonly {id:string;label:string;description?:string;values?:Record<string,string>;savedSecrets?:readonly string[]}[];
-  fields:readonly ChannelField[];
+  initialValues:Record<string,string>;
+  fields(values:Record<string,string>):readonly ChannelField[];
+  changeValues(previous:Record<string,string>,next:Record<string,string>):Record<string,string>;
   select(id:string):Promise<void>;
   save(values:Record<string,string>,id?:string):Promise<void>;
   remove(id:string):Promise<void>;
