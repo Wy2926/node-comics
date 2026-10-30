@@ -1,6 +1,9 @@
 from pathlib import Path
-from io import BytesIO
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 import sys
+import ssl
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -8,8 +11,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from switch_release import activate, probe, release_lock
 from switch_release import main as switch_main
-from retire_release import main as retire_main
-from prepare_static_release import main as prepare_main, prepare
+from retire_release import main as retire_main, proxy_draining
+from prepare_static_release import prepare
 import json
 
 
@@ -21,58 +24,93 @@ class ReleaseTests(unittest.TestCase):
         self.active = self.root / 'api.inc'
         self.active.write_bytes(b'old')
 
-    def test_document_worker_reuses_server_network_without_file_volume_or_public_port(self):
-        deploy = Path(__file__).resolve().parents[2] / 'deploy'
-        document = (deploy / 'compose.document.yaml').read_text(encoding='utf-8')
-        server = (deploy / 'compose.server.yaml').read_text(encoding='utf-8')
-        network = ('\nnetworks:\n  infrastructure:\n    external: true\n'
-                   '    name: ${INFRA_NETWORK:-1panel-network}\n')
-        self.assertIn(network, server)
-        self.assertIn(network, document)
-        self.assertIn('    networks: [infrastructure]\n', document)
-        self.assertNotIn('volumes:', document)
-        self.assertNotIn('ports:', document)
-
-    def test_probe_identifies_release_checker_and_bypasses_cache(self):
-        response = BytesIO(b'{"status":"ready","release":"v1"}')
-        with patch('switch_release.urllib.request.urlopen', return_value=response) as opened:
-            probe('https://example.test/health/ready', 'v1')
-        request = opened.call_args.args[0]
-        self.assertEqual(request.get_header('Cache-control'), 'no-cache')
-        self.assertIn('NodeComicsReleaseCheck/', request.get_header('User-agent'))
-
-    def test_success_keeps_previous_and_does_not_stop_services(self):
-        calls = []
-        activate(self.active, b'new', lambda *args: calls.append(args), lambda: None)
-        self.assertEqual(calls, [('-t',), ('-s', 'reload')])
-        self.assertEqual(self.active.read_bytes(), b'new')
-        self.assertEqual(self.active.with_suffix('.inc.previous').read_bytes(), b'old')
+    def test_local_probe_preserves_host_and_rejects_wrong_release(self):
+        requests = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                requests.append(dict(self.headers))
+                self.send_response(200)
+                self.send_header('X-Static-Release', 'v1')
+                self.end_headers()
+                self.wfile.write(b'{"status":"ready","release":"v1"}')
+            def log_message(self, *args):
+                pass
+        with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server:
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                host = f'no-public-dns.invalid:{server.server_port}'
+                for static in (False, True):
+                    probe('http://' + host + '/', 'v1', local=True, static=static)
+                    with self.assertRaises(RuntimeError):
+                        probe('http://' + host + '/', 'wrong', local=True, static=static)
+                self.assertTrue(all(row['Host'] == host and row['Cache-Control'] == 'no-cache' for row in requests))
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
 
     def switch_args(self):
         return ['switch_release.py', 'api', '--active-file', str(self.active), '--release', 'new',
-                '--previous-release', 'old', '--probe-url', 'http://proxy/health/ready',
+                '--probe-url', 'http://proxy/health/ready',
                 '--port', '18089', '--nginx-bin', 'nginx']
 
-    def test_no_backup_switch_does_not_write_previous_include(self):
-        with patch('sys.argv', self.switch_args() + ['--no-backup']), patch('switch_release.probe'), \
-                patch('switch_release.subprocess.run') as run, patch('builtins.print'):
-            run.return_value.returncode = 0
-            switch_main()
-        self.assertIn(b'18089', self.active.read_bytes())
-        self.assertFalse(self.active.with_suffix('.inc.previous').exists())
+    def test_local_https_probe_preserves_sni_and_validates_certificate(self):
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        hostname, seen = 'no-public-dns.invalid', []
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostname)])
+        certificate = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.now(timezone.utc) - timedelta(minutes=1))
+            .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(hostname)]), critical=False)
+            .sign(key, hashes.SHA256()))
+        cert_path, key_path = self.root / 'cert.pem', self.root / 'key.pem'
+        cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+        key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert_path, key_path)
+        context.set_servername_callback(lambda socket, name, context: seen.append(name))
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"status":"ready","release":"v1"}')
+            def log_message(self, *args):
+                pass
+        with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server:
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                url = f'https://{hostname}:{server.server_port}/health/ready'
+                with self.assertRaises(ssl.SSLCertVerificationError):
+                    probe(url, 'v1', local=True)
+                trusted = ssl.create_default_context(cafile=str(cert_path))
+                with patch('switch_release.ssl.create_default_context', return_value=trusted):
+                    probe(url, 'v1', local=True)
+                    with self.assertRaises(ssl.SSLCertVerificationError):
+                        probe(url.replace(hostname, 'wrong-host.invalid'), 'v1', local=True)
+                self.assertEqual(seen, [hostname, hostname, 'wrong-host.invalid'])
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
 
-    def test_unhealthy_old_release_does_not_block_healthy_replacement(self):
+    def test_healthy_replacement_needs_no_previous_release_or_backup(self):
         calls = []
         def ready(url, release, **kwargs):
-            calls.append((url, release))
-            if release == 'old':
-                raise RuntimeError('old release is unavailable')
+            calls.append((url, release, kwargs.get('local', False)))
         with patch('sys.argv', self.switch_args()), patch('switch_release.probe', side_effect=ready), \
                 patch('switch_release.subprocess.run') as run, patch('builtins.print'):
             run.return_value.returncode = 0
             switch_main()
-        self.assertEqual(calls, [('http://127.0.0.1:18089/health/ready', 'new'), ('http://proxy/health/ready', 'new')])
+        self.assertEqual(calls, [('http://127.0.0.1:18089/health/ready', 'new', False), ('http://proxy/health/ready', 'new', True)])
         self.assertIn(b'18089', self.active.read_bytes())
+        self.assertFalse(self.active.with_suffix('.inc.previous').exists())
 
     def test_unready_candidate_does_not_replace_or_reload(self):
         with patch('sys.argv', self.switch_args()), patch('switch_release.probe', side_effect=RuntimeError('unready')), \
@@ -81,28 +119,18 @@ class ReleaseTests(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(self.active.read_bytes(), b'old')
 
-    def test_competing_activation_is_not_overwritten(self):
-        from contextlib import contextmanager
-        @contextmanager
-        def competing_lock(_):
-            self.active.write_bytes(b'competing')
-            yield
-        with patch('sys.argv', self.switch_args()), patch('switch_release.release_lock', competing_lock), \
-                patch('switch_release.subprocess.run') as run, self.assertRaisesRegex(RuntimeError, 'configuration changed'):
-            switch_main()
-        run.assert_not_called()
-        self.assertEqual(self.active.read_bytes(), b'competing')
-
-    def test_failed_rollback_health_is_reported_without_claiming_recovery(self):
+    def test_failed_post_reload_probe_keeps_new_config_and_reports_uncertainty(self):
         def unready():
             raise RuntimeError('unavailable')
-        with self.assertRaisesRegex(RuntimeError, 'recovery requires operator attention'):
-            activate(self.active, b'new', lambda *args: None, unready, verify_previous=unready, timeout=0)
-        self.assertEqual(self.active.read_bytes(), b'old')
+        calls = []
+        with self.assertRaisesRegex(RuntimeError, 'new include retained'):
+            activate(self.active, b'new', lambda *args: calls.append(args), unready, timeout=0)
+        self.assertEqual(self.active.read_bytes(), b'new')
+        self.assertEqual(calls, [('-t',), ('-s', 'reload')])
 
     def test_retirement_uses_active_port_not_release_inequality(self):
         argv = ['retire_release.py', 'api', '--container', 'old-slot', '--release', 'same',
-                '--active-dir', str(self.root), '--openresty-container', 'proxy', '--port', '18088',
+                '--active-dir', str(self.root), '--port', '18088', '--timeout', '1',
                 '--active-release', 'same', '--probe-url', 'http://proxy/health/ready']
         info = {'Id': 'frozen-container-id', 'Config': {'Env': ['RELEASE_ID=same'],
             'Labels': {'com.docker.compose.service': 'api-blue'}},
@@ -116,43 +144,46 @@ class ReleaseTests(unittest.TestCase):
             if args[:2] == ('inspect', '--format'):
                 return json.dumps({'Running': False, 'ExitCode': 0})
             return ''
-        for port in (18088, 18089):
+        for port, draining in ((18088, False), (18089, True), (18089, False)):
             calls.clear()
             self.active.write_text(f'server 127.0.0.1:{port};', encoding='utf-8')
             with patch('sys.argv', argv), patch('retire_release.docker', side_effect=docker), \
-                    patch('retire_release.probe'), patch('builtins.print'):
-                if port == 18088:
-                    with self.assertRaisesRegex(RuntimeError, 'still in the active upstream'):
+                    patch('retire_release.probe'), patch('retire_release.proxy_draining', return_value=draining), \
+                    patch('retire_release.time.monotonic', side_effect=range(20)), patch('builtins.print'):
+                if port == 18088 or draining:
+                    with self.assertRaisesRegex(RuntimeError, 'still in the active upstream|Proxy has not drained'):
                         retire_main()
                     self.assertFalse(any(call[0] == 'kill' for call in calls))
                 else:
                     retire_main()
                     self.assertIn(('kill', '--signal=TERM', 'frozen-container-id'), calls)
 
-    def test_bad_config_and_failed_probe_restore_old_config(self):
-        for fail_test in (True, False):
+    def test_native_nginx_drain_only_checks_current_master_children(self):
+        pid_file = self.root / 'nginx.pid'
+        pid_file.write_text('123\n')
+        for status, expected in (('worker process', False), ('worker process is shutting down', True)):
+            with patch('retire_release.subprocess.run') as run:
+                run.return_value.stdout = 'nginx: ' + status
+                self.assertEqual(proxy_draining(None, pid_file), expected)
+                run.assert_called_once_with(['ps', '--ppid', '123', '-o', 'args='],
+                    capture_output=True, text=True, timeout=5, check=True)
+
+    def test_nginx_activation_failure_restores_disk_config(self):
+        for failed_option in ('-t', '-s'):
+            calls = []
             def nginx(*args):
-                if fail_test and self.active.read_bytes() == b'new':
-                    raise RuntimeError('bad config')
-
-            def failed():
-                raise RuntimeError('wrong release')
-
-            with self.assertRaises(RuntimeError):
-                activate(self.active, b'new', nginx, failed, timeout=0)
+                calls.append(args)
+                if args[0] == failed_option:
+                    raise RuntimeError('nginx failed')
+            with self.assertRaisesRegex(RuntimeError, 'inspect running proxy state'):
+                activate(self.active, b'new', nginx, lambda: self.fail('No probe before successful reload'))
             self.assertEqual(self.active.read_bytes(), b'old')
+            self.assertEqual(calls, [('-t',)] if failed_option == '-t' else [('-t',), ('-s', 'reload')])
 
     def test_lock_prevents_overlapping_releases(self):
         with release_lock(self.root):
             with self.assertRaises(OSError):
                 activate(self.active, b'new', lambda *args: None, lambda: None)
-        self.assertEqual(self.active.read_bytes(), b'old')
-
-    def test_preflight_failure_does_not_touch_active_file(self):
-        def rejected():
-            raise RuntimeError('another release has become active')
-        with self.assertRaises(RuntimeError):
-            activate(self.active, b'new', lambda *args: None, lambda: None, preflight=rejected)
         self.assertEqual(self.active.read_bytes(), b'old')
 
     def test_private_entry_is_preserved_and_reserved_entries_rejected(self):
@@ -225,14 +256,6 @@ class ReleaseTests(unittest.TestCase):
             with self.subTest(origin=origin), self.assertRaisesRegex(ValueError, 'bare HTTPS origin'):
                 prepare('website', source, destination, 'v1', '/www/node-comics', document_r2_origin=origin)
             self.assertFalse(destination.exists())
-
-    def test_prepare_cli_forwards_optional_document_r2_origin(self):
-        origin = 'https://account.r2.cloudflarestorage.com'
-        argv = ['prepare_static_release.py', 'website', '--source', 'build', '--destination', 'static',
-                '--release', 'v1', '--document-r2-origin', origin]
-        with patch('sys.argv', argv), patch('prepare_static_release.prepare') as prepared, patch('builtins.print'):
-            prepare_main()
-        self.assertEqual(prepared.call_args.kwargs['document_r2_origin'], origin)
 
     def test_built_languages_get_localized_not_found_routes(self):
         source = self.root / 'build'

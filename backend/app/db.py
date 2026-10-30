@@ -1,5 +1,5 @@
 from functools import lru_cache
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, inspect, select, text
 from threading import Lock
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from .config import settings
@@ -35,7 +35,7 @@ def get_db():
 
 
 def load_models():
-    """Register the same model contract for migration and startup validation."""
+    """Register the model contract for explicit migrations."""
     from . import translation_models  # noqa: F401
     from . import models  # noqa: F401
     from . import health_models  # noqa: F401
@@ -68,10 +68,20 @@ def initialize():
             connection.execute(text("SELECT pg_advisory_xact_lock(761349210)"))
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
+        check_schema(connection)
         check_payment_environment(connection)
     settings().storage_path.mkdir(parents=True, exist_ok=True)
     for directory in ("inputs", "results", "staging"):
         (settings().storage_path / directory).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+
+def check_schema(connection):
+    """Validate the migrated structure once, not on every serving process startup."""
+    columns = inspect(connection).get_multi_columns(filter_names=list(Base.metadata.tables))
+    for table in Base.metadata.tables.values():
+        present = {column['name'] for column in columns.get((table.schema, table.name), ())}
+        if not set(table.columns.keys()) <= present:
+            raise RuntimeError(f'Database structure is incomplete for {table.name}; run the required migration')
 
 
 def check_payment_environment(connection):

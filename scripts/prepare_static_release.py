@@ -60,7 +60,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', release):
         raise ValueError('Invalid release ID')
     if not re.fullmatch(r'/[A-Za-z0-9_/-]+', nginx_root) or '..' in PurePosixPath(nginx_root).parts:
-        raise ValueError('nginx-root must be an absolute safe container-visible path')
+        raise ValueError('nginx-root must be an absolute safe proxy-visible path')
     if oidc_origin and not re.fullmatch(r'https://[A-Za-z0-9.-]+(?::[0-9]+)?', oidc_origin):
         raise ValueError('OIDC origin must be a bare HTTPS origin')
     if document_r2_origin:
@@ -187,7 +187,7 @@ def main():
     parser.add_argument('kind', choices=['website', 'admin'])
     parser.add_argument('--source', type=Path, required=True, help='Exported site directory')
     parser.add_argument('--destination', type=Path, required=True, help='Host static root')
-    parser.add_argument('--nginx-root', default='/www/node-comics', help='Same directory as seen inside OpenResty')
+    parser.add_argument('--nginx-root', default='/www/node-comics', help='Same directory as seen by Nginx/OpenResty')
     parser.add_argument('--release', required=True)
     parser.add_argument('--admin-path', default='')
     parser.add_argument('--oidc-origin', default='')

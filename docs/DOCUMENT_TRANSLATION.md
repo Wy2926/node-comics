@@ -143,7 +143,7 @@ Python 提供本地静态页面时，启用文件通道会仅在翻译页的 CSP
 
 [本地启动器](../backend/tests/manual_document_live_server.py)只连接独立 PostgreSQL `127.0.0.1:54329/nodecomics_document_local`（用户 `document_local`）与 Redis `127.0.0.1:6389/0`，不复用原有 `18088` 栈或生产库。启动前关闭两类 Settings 的隐式 dotenv 继承，并核对数据库实际身份；API 才能迁移和初始化，其他角色只检查现有库。
 
-在忽略的私有目录（例如 `artifacts/document-local/`）准备 `runtime.env`：`DATABASE_URL`、`REDIS_URL`、规范 UUIDv4 `DOCUMENT_RUN_ID`、至少 32 字符随机 `DEV_AUTH_SECRET`，以及位于该目录下且互不包含的绝对路径 `STORAGE_PATH`、`DOCUMENT_SPOOL_PATH`。可额外设置 `DOCUMENT_LOCAL_DB_PASSWORD` 供 Compose 使用，须与 URL 中密码相同。另准备 `providers.private.json`，内容为真实 `ProviderWrite` 数组（连接配置、模型、协议、路由、套餐范围及密钥），不得提交或写入日志。供应商只在本地开启 document 能力，不更改线上配置；已提供的文件输入／输出预算保留，未提供的使用 `DocumentTextPolicy` 默认值。
+在忽略的私有目录（例如 `artifacts/document-local/`）准备 `runtime.env`：`DATABASE_URL`、`REDIS_URL`、规范 UUIDv4 `DOCUMENT_RUN_ID`、至少 32 字符随机 `DEV_AUTH_SECRET`，以及位于该目录下的绝对路径 `STORAGE_PATH`。可额外设置 `DOCUMENT_LOCAL_DB_PASSWORD` 供 Compose 使用，须与 URL 中密码相同。另准备 `providers.private.json`，内容为真实 `ProviderWrite` 数组（连接配置、模型、协议、路由、套餐范围及密钥），不得提交或写入日志。供应商只在本地开启 document 能力，不更改线上配置；已提供的文件输入／输出预算保留，未提供的使用 `DocumentTextPolicy` 默认值。
 
 仓库根目录先启动专用持久化数据服务，再在独立终端分别运行后端角色与网页：
 

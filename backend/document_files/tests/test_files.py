@@ -10,7 +10,7 @@ import zipfile
 import pytest
 from PIL import Image
 
-from app.documents.files import (DocumentFileError, FileLimits, normalize_pages, package_zip,
+from comic_document_files import (DocumentFileError, FileLimits, normalize_pages, package_zip,
                                   run_file_operation, scan_source)
 
 
@@ -217,7 +217,7 @@ def test_cbz_uses_same_bounded_zip_parser(tmp_path):
 
 
 def test_child_is_not_given_r2_credentials(monkeypatch, tmp_path):
-    from app.documents import files
+    import comic_document_files as files
     monkeypatch.setenv('DOCUMENT_R2_SECRET_ACCESS_KEY', 'private-test-key')
     source = archive(tmp_path / 'source.zip', [('page.png', png())])
     captured = {}
@@ -237,7 +237,7 @@ def test_child_is_not_given_r2_credentials(monkeypatch, tmp_path):
 
 
 def test_parser_stdout_flood_is_bounded_and_killed(monkeypatch, tmp_path):
-    from app.documents import files
+    import comic_document_files as files
     source = archive(tmp_path / 'source.zip', [('page.png', png())])
     killed = []
     class Child:
@@ -257,7 +257,7 @@ def test_parser_stdout_flood_is_bounded_and_killed(monkeypatch, tmp_path):
 
 
 def test_parser_deadline_kills_child(monkeypatch, tmp_path):
-    from app.documents import files
+    import comic_document_files as files
     source = archive(tmp_path / 'source.zip', [('page.png', png())])
     killed = []
     class Child:
@@ -283,21 +283,6 @@ def test_required_sandbox_fails_closed_when_unavailable(monkeypatch, tmp_path):
     monkeypatch.setattr(files.sys, 'platform', 'unsupported')
     with pytest.raises(DocumentFileError, match='DOCUMENT_SANDBOX_UNAVAILABLE'):
         run_file_operation('scan', source, 'zip', require_sandbox=True)
-
-
-def test_shared_package_is_the_only_parser_implementation_and_backend_injects_settings(monkeypatch, tmp_path):
-    import comic_document_files as shared
-    from app.documents import files
-    from types import SimpleNamespace
-    assert files.DocumentFileError is shared.DocumentFileError
-    assert issubclass(files.FileLimits, shared.FileLimits)
-    configured = replace(shared.FileLimits(), max_page_pixels=1)
-    monkeypatch.setattr(files, 'get_document_settings', lambda: SimpleNamespace(
-        **{name: getattr(configured, name) for name in configured.__dataclass_fields__}))
-    source = archive(tmp_path / 'source.zip', [('page.png', png())])
-    with pytest.raises(DocumentFileError, match='DOCUMENT_PAGE_TOO_LARGE'):
-        list(files.normalize_pages(source, 'zip', tmp_path / 'configured'))
-    assert list(shared.normalize_pages(source, 'zip', tmp_path / 'standalone'))
 
 
 def test_shared_sandbox_launches_isolated_parser_not_backend_or_engine(monkeypatch, tmp_path):

@@ -91,12 +91,12 @@ def test_existing_original_still_counts_when_translation_is_new(cluster, png):
     assert counts()['ImageAdmission'] == counts()['Job'] == 1
 
 
-@pytest.mark.parametrize('mode', ['classic', 'classic'])
 @pytest.mark.parametrize('initial', [{}, {'priority': 'current'}, {'priority': 'prefetch'}])
-def test_legacy_priority_is_ignored_without_repeating_admission(cluster, png, mode, initial):
+def test_legacy_priority_is_ignored_without_repeating_admission(cluster, png, initial):
     from app.providers import digest
     client, _ = cluster
-    auth = (login if mode == 'classic' else login_plus)(client)
+    mode = 'classic'
+    auth = login(client)
     configure_system_limits(free_images_per_minute=1, plus_images_per_minute=1)
     image = descriptor(png)
     first = submit(client, auth, image, mode=mode, **initial)

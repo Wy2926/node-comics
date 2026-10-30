@@ -1,4 +1,4 @@
-"""Isolated PostgreSQL evidence for compatible startup and indexed expiry."""
+"""Isolated PostgreSQL evidence for indexed expiry."""
 from datetime import timedelta
 import os
 from uuid import uuid4
@@ -9,20 +9,6 @@ from test_postgres_concurrency import pg_scope, pg, new_job
 
 pytestmark = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_CONCURRENCY') != '1',
     reason='Requires dedicated PostgreSQL test database')
-
-
-def test_postgres_additive_schema_stamps_do_not_gate_readiness(pg):
-    from app.db import engine
-    from app.runtime import check_database
-    with engine().begin() as db:
-        db.execute(text("UPDATE alembic_version SET version_num='future_additive'"))
-        db.execute(text('ALTER TABLE users ADD COLUMN additive_note TEXT'))
-    check_database(startup=True)
-    check_database()
-    with engine().begin() as db:
-        db.execute(text('ALTER TABLE users RENAME COLUMN name TO retired_name'))
-    with pytest.raises(RuntimeError, match='structure is incomplete'):
-        check_database(startup=True)
 
 
 def test_postgres_expiry_uses_partial_index_and_preserves_other_work(pg):

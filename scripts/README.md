@@ -12,10 +12,11 @@
 | --- | --- |
 | `bootstrap.ps1` | 本地控制服务初始化与启动，见[后端](../backend/README.md) |
 | `seed_creem_test_catalog.py` | 仅在专用 Docker 手测库发布四个已核验 Creem test 商品；不创建支付、不发令牌，见[本地支付手测环境](../docs/DEPLOYMENT.md#本地-creem-手动验收) |
-| `switch_release.py` / `retire_release.py` | OpenResty 事务式 API／静态切换、失败回退及旧进程安全排空，见[部署规范](../docs/DEPLOYMENT.md) |
+| `switch_release.py` / `retire_release.py` | 原生 Nginx／OpenResty API 与静态切换、本机版本探测及旧进程排空；不自动回退或保留备份，见[部署规范](../docs/DEPLOYMENT.md) |
 | `prepare_static_release.py` | 准备独立官网／后台的不可变目录、安全头与资源保留池，不自动激活 |
 | `submit_indexnow.py <公开 URL>... [--submit]` | 官网新增或实质更新页面的 IndexNow 通知；默认干运行并检查线上 key 与 sitemap，`--submit` 才发送，见[官网 SEO 规范](../backend/website/SEO.md#indexnow-变更通知) |
-| `tests/rehearse_deployment.py` | 隔离 Docker 中真实代理切换、慢上传、SSE、合成供应商任务与回退；默认清理本轮资源，报告写入 artifacts |
+| `tests/rehearse_deployment.py` | 隔离 Docker 中真实代理切换、慢上传、SSE、合成供应商任务与排空；默认清理本轮资源，产物写入 artifacts |
+| `tests/test_document_llm_live_script.py` | LLM 手动验收工具的离线回归，不调用真实供应商；从仓库根用测试环境执行 `python -m pytest -q scripts/tests/test_document_llm_live_script.py`，不加载后端数据库夹具 |
 | `database_backup.py` / `verify_database_restore.py` | [备份与隔离恢复](../docs/OPERATIONS.md) |
 | `traffic.py report / rotate / geoip / errors` | 独立 GoAccess 报告、日志到期及容量回收、本地地理库更新、Nginx 错误脱敏，见[访问统计](../docs/OPERATIONS.md#nginx-访问统计) |
 | `export_openapi.py` | [导出 API 契约](../contracts/README.md) |

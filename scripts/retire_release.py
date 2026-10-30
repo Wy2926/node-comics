@@ -16,13 +16,25 @@ def docker(*args):
     return result.stdout.strip()
 
 
+def proxy_draining(container, pid_file):
+    if container:
+        processes = docker('top', container, '-eo', 'pid,args')
+    else:
+        master = int(pid_file.read_text().strip())
+        processes = subprocess.run(['ps', '--ppid', str(master), '-o', 'args='],
+            capture_output=True, text=True, timeout=5, check=True).stdout
+    return 'worker process is shutting down' in processes
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('role', choices=['api', 'worker', 'maintenance'])
     parser.add_argument('--container', required=True)
     parser.add_argument('--release', required=True, help='Exact release identity of the OLD container')
     parser.add_argument('--active-dir', type=Path, required=True)
-    parser.add_argument('--openresty-container')
+    proxy = parser.add_mutually_exclusive_group()
+    proxy.add_argument('--openresty-container')
+    proxy.add_argument('--nginx-pid-file', type=Path, default=Path('/run/nginx.pid'))
     parser.add_argument('--port', type=int, help='Old API published loopback port')
     parser.add_argument('--active-release')
     parser.add_argument('--probe-url')
@@ -33,14 +45,14 @@ def main():
         parser.error('--signal-only is only supported for worker handover')
     if args.timeout < 1:
         parser.error('--timeout must be positive')
-    if args.role == 'api' and not all((args.openresty_container, args.port, args.active_release, args.probe_url)):
-        parser.error('API retirement requires proxy container, old port, active release and proxy probe URL')
+    if args.role == 'api' and not all((args.port, args.active_release, args.probe_url)):
+        parser.error('API retirement requires old port, active release and local proxy probe URL')
     with release_lock(args.active_dir):
         info = json.loads(docker('inspect', args.container))[0]
         identity = info['Id']  # Freeze identity; never signal a reused container name.
         variables = dict(value.split('=', 1) for value in info['Config']['Env'] if '=' in value)
         role = info['Config'].get('Labels', {}).get('com.docker.compose.service')
-        allowed = {'api': {'api-blue', 'api-green'}, 'worker': {'control-worker'}, 'maintenance': {'maintenance'}}
+        allowed = {'api': {'api-blue', 'api-green'}, 'worker': {'control-worker', 'document-worker'}, 'maintenance': {'maintenance'}}
         if role not in allowed[args.role] or variables.get('RELEASE_ID') != args.release:
             raise RuntimeError('Container role/release mismatch; refusing to retire')
         if args.role == 'api':
@@ -50,9 +62,9 @@ def main():
             active = (args.active_dir / 'api.inc').read_text(encoding='utf-8')
             if re.search(r':' + str(args.port) + r'\s*;', active):
                 raise RuntimeError('Old API is still in the active upstream')
-            probe(args.probe_url, args.active_release)
+            probe(args.probe_url, args.active_release, local=True)
             until = time.monotonic() + args.timeout
-            while 'worker process is shutting down' in docker('top', args.openresty_container, '-eo', 'pid,args'):
+            while proxy_draining(args.openresty_container, args.nginx_pid_file):
                 if time.monotonic() >= until:
                     raise RuntimeError('Proxy has not drained; old API is retained without signalling')
                 time.sleep(1)

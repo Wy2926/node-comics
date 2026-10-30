@@ -9,7 +9,6 @@ Pillow==12.3.0
 python-multipart==0.0.32
 pydantic-settings==2.15.0
 PyJWT[crypto]==2.14.0
-pytest==9.1.1
 alembic==1.20.0
 stripe==15.6.1
 # https://pypi.org/project/redis/8.1.0/ (MIT)

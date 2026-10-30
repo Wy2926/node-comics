@@ -1,17 +1,13 @@
 """Opt-in real PostgreSQL races, with a separate database/schema and no paid calls.
 
-From the repository root (the database is deliberately not the product database):
-  docker exec node-comics-postgres-1 createdb -U nodecomics nodecomics_concurrency_test
-  docker run --rm --network node-comics_default --env-file deploy/.env.local \
-    -e RUN_POSTGRES_CONCURRENCY=1 -e TEST_PG_HOST=postgres \
-    --mount type=bind,source=<absolute backend path>,target=/app,readonly \
-    node-comics-backend:local python -m pytest tests/test_postgres_concurrency.py \
-    -v -p no:cacheprovider --tb=short
+Install requirements-test.txt, set RUN_POSTGRES_CONCURRENCY=1 and TEST_PG_HOST,
+TEST_PG_PORT, TEST_PG_USER, TEST_PG_PASSWORD for a dedicated PostgreSQL instance,
+then run: python -m pytest tests/test_postgres_concurrency.py -q
 
-The create-database command is needed only once. Every test creates and drops its
-own random schema in nodecomics_concurrency_test; image storage is under pytest's
-temporary directory, never the product volume. The fixture replaces provider
-credentials, endpoint and adapter. No real model call occurs.
+The instance must contain nodecomics_concurrency_test. Each test creates and drops
+its own random schema; image storage is under pytest's temporary directory, never
+the product volume. Provider calls are isolated. Production images contain no
+pytest; deploy/compose.tests.yaml supplies test dependencies and temporary services.
 """
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta

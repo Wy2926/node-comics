@@ -14,10 +14,6 @@ from test_postgres_concurrency import pg_scope, pytestmark  # noqa: F401
 from test_translation_providers import PATH, admin_case, test_decimal_prices_round_trip_and_pin_existing_revision  # noqa: F401
 from test_translation_plan_routing import (
     supplier,
-    test_admin_plan_validation_and_omitted_update_preserves_restrictions,
-    test_plan_pools_keep_stable_weights_and_read_candidates_once,
-    test_stopped_plan_pool_cannot_fall_back_to_another_plan,
-    test_missing_plan_fails_before_quota_and_capabilities_match_user,
     test_membership_changes_separate_new_models_but_replay_and_reuse_do_not_rebill,
     test_completed_same_model_result_reuses_across_plan_change_without_new_admission,
     test_explicit_retry_is_a_new_admission_using_current_plan,

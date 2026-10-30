@@ -1,27 +1,13 @@
-"""Read-only runtime preflight. Schema changes belong to app.migrate, never startup."""
+"""Dependency availability only; schema and payment-data checks belong to migration."""
 import os
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 from .config import settings
-from .db import Base, engine, load_models
+from .db import engine
 
 
-def check_schema(connection):
-    """Require used tables/columns, not an exact Alembic head. Additions are compatible."""
-    load_models()
-    columns = inspect(connection).get_multi_columns(filter_names=list(Base.metadata.tables))
-    for table in Base.metadata.tables.values():
-        present = {column['name'] for column in columns.get((table.schema, table.name), ())}
-        if not set(table.columns.keys()) <= present:
-            raise RuntimeError(f'Database structure is incomplete for {table.name}; run the required migration')
-
-
-def check_database(*, startup=False):
-    from .db import check_payment_environment
+def check_database():
     with engine().connect() as connection:
         connection.execute(text('SELECT 1'))
-        if startup:
-            check_schema(connection)
-            check_payment_environment(connection)
 
 
 def check_storage():
@@ -38,6 +24,6 @@ def check_redis():
 
 
 def check_runtime():
-    check_database(startup=True)
+    check_database()
     check_storage()
     check_redis()

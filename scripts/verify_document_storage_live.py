@@ -28,7 +28,7 @@ import httpx
 from dotenv import dotenv_values
 from PIL import Image, ImageDraw
 from app.documents.config import DocumentSettings
-from app.documents.files import run_file_operation, package_zip
+from comic_document_files import run_file_operation, package_zip
 from app.documents.storage import DocumentStore, DocumentStoreError
 from classic_node.object_transfer import ObjectTransfer
 

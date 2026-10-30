@@ -2,7 +2,7 @@
 
 No service is started on import. Only the API role migrates/seeds the dedicated
 local database; maintenance and document-worker use the same private files.
-The worker keeps the mandatory Linux parser sandbox and never simulates a GPU.
+Central workers do not parse files; the compute node owns its parser sandbox.
 """
 from argparse import ArgumentParser
 import json
@@ -20,7 +20,7 @@ DATABASE_USER = 'document_local'
 PAID_USERS = ('document-local-paid', 'document-local-other')
 PAID_PAGES = 2000
 RUNTIME_KEYS = frozenset(('DATABASE_URL', 'REDIS_URL', 'DOCUMENT_RUN_ID',
-                         'DEV_AUTH_SECRET', 'STORAGE_PATH', 'DOCUMENT_SPOOL_PATH'))
+                         'DEV_AUTH_SECRET', 'STORAGE_PATH'))
 COMPOSE_KEYS = frozenset(('DOCUMENT_LOCAL_DB_PASSWORD',))
 R2_KEYS = ('R2_ENDPOINT_URL', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_KEY_PREFIX')
 
@@ -62,7 +62,7 @@ def runtime_environment(env_file, runtime_env_file):
     """Build sensitive environment values without changing the process or files."""
     local, r2 = read_env(runtime_env_file), read_env(env_file)
     if set(local) - RUNTIME_KEYS - COMPOSE_KEYS or any(not local.get(key) for key in RUNTIME_KEYS):
-        raise LocalConfigurationError('The local runtime file requires the six runtime keys; only the optional Compose password is also allowed.')
+        raise LocalConfigurationError('The local runtime file requires five runtime keys; only the optional Compose password is also allowed.')
     local = {key: local[key] for key in RUNTIME_KEYS}
     validate_local_targets(local['DATABASE_URL'], local['REDIS_URL'])
     try:
@@ -70,10 +70,8 @@ def runtime_environment(env_file, runtime_env_file):
         if run_id.version != 4 or str(run_id) != local['DOCUMENT_RUN_ID']:
             raise ValueError()
         root = Path(runtime_env_file).resolve().parent
-        storage, spool = (Path(local[key]).resolve() for key in ('STORAGE_PATH', 'DOCUMENT_SPOOL_PATH'))
-        if (not all(Path(local[key]).is_absolute() for key in ('STORAGE_PATH', 'DOCUMENT_SPOOL_PATH'))
-                or any(path == root or not path.is_relative_to(root) for path in (storage, spool))
-                or storage.is_relative_to(spool) or spool.is_relative_to(storage)):
+        storage = Path(local['STORAGE_PATH']).resolve()
+        if not Path(local['STORAGE_PATH']).is_absolute() or storage == root or not storage.is_relative_to(root):
             raise ValueError()
         if len(local['DEV_AUTH_SECRET']) < 32 or any(not r2.get(key) for key in R2_KEYS):
             raise ValueError()
@@ -84,14 +82,14 @@ def runtime_environment(env_file, runtime_env_file):
     except (ValueError, OSError):
         raise LocalConfigurationError('Invalid local run UUID, private paths, signing secret or R2 namespace.') from None
     return {
-        **local, 'STORAGE_PATH': str(storage), 'DOCUMENT_SPOOL_PATH': str(spool),
+        **local, 'STORAGE_PATH': str(storage),
         'APP_ENV': 'development', 'DEV_AUTH': 'true', 'DEV_ADMIN_USERNAME': 'document-local-admin',
         'SERVE_STATIC': 'false', 'ADMIN_WEB_PATH': '', 'CLASSIC_ENABLED': 'true',
         'STRIPE_ENABLED': 'false', 'CREEM_ENABLED': 'false', 'STRIPE_ENVIRONMENT': 'test',
         'CREEM_ENVIRONMENT': 'test', 'GUEST_ENABLED': 'false', 'GA4_ENABLED': 'false',
         'FREE_DAILY_PAGES': '0', 'CORS_ORIGINS': 'http://127.0.0.1:5195',
         'REDIS_NAMESPACE': 'document-local-' + run_id.hex,
-        'DOCUMENT_ENABLED': 'true', 'DOCUMENT_PARSER_REQUIRE_SANDBOX': 'true',
+        'DOCUMENT_ENABLED': 'true',
         'DOCUMENT_WORKER_SLOTS': '1',
         **{'DOCUMENT_' + key: r2[key] for key in R2_KEYS if key != 'R2_KEY_PREFIX'},
         'DOCUMENT_R2_KEY_PREFIX': prefix,

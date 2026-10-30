@@ -111,13 +111,12 @@ def main():
         report['checks'].append(label)
         print(label, flush=True)
 
-    def switch(port, release, previous):
+    def switch(port, release):
         probe(f'http://127.0.0.1:{port}/health/ready', release)
         begin = time.perf_counter()
         # Docker Desktop proxy is bridged; production host-network OpenResty uses 127.0.0.1.
         activate(active / 'api.inc', f'server {proxy_host}:{port};\n'.encode(), nginx,
-                 lambda: probe(origin + '/health/ready', release),
-                 verify_previous=lambda: probe(origin + '/health/ready', previous))
+                 lambda: probe(origin + '/health/ready', release, local=True))
         report.setdefault('switch_seconds', []).append(round(time.perf_counter() - begin, 3))
 
     stopping = threading.Event()
@@ -284,7 +283,7 @@ http {
 
             sse_future, upload_future = pool.submit(stream), pool.submit(slow_upload)
             assert sse_started.wait(10) and upload_started.wait(10)
-            switch(green_port, 'rehearsal-green', 'rehearsal-blue')
+            switch(green_port, 'rehearsal-green')
             old_worker = compose('ps', '-q', 'control-worker')
             command(sys.executable, ROOT / 'scripts/retire_release.py', 'worker', '--container', old_worker,
                     '--release', 'rehearsal-blue', '--active-dir', active, '--signal-only')
@@ -318,14 +317,12 @@ http {
         check('invalid OpenResty configuration restores old include and keeps serving')
         try:
             activate(active / 'api.inc', f'server {proxy_host}:{blue_port};\n'.encode(), nginx,
-                     lambda: probe(origin + '/health/ready', 'deliberately-wrong-version'),
-                     verify_previous=lambda: probe(origin + '/health/ready', 'rehearsal-green'), timeout=1)
+                     lambda: probe(origin + '/health/ready', 'deliberately-wrong-version', local=True), timeout=1)
             raise AssertionError('Wrong version accepted')
         except RuntimeError:
-            assert (active / 'api.inc').read_bytes() == previous
-        check('post-reload version mismatch automatically rolls back')
-        switch(blue_port, 'rehearsal-blue', 'rehearsal-green')
-        check('explicit green-to-blue API rollback succeeds')
+            assert (active / 'api.inc').read_bytes() == f'server {proxy_host}:{blue_port};\n'.encode()
+        probe(origin + '/health/ready', 'rehearsal-blue', local=True)
+        check('post-reload verification failure preserves the new configuration without automatic rollback')
         command(sys.executable, ROOT / 'scripts/retire_release.py', 'api', '--container', compose('ps', '-q', 'api-green'),
                 '--release', 'rehearsal-green', '--active-dir', active, '--openresty-container', proxy,
                 '--port', str(green_port), '--active-release', 'rehearsal-blue', '--probe-url', origin + '/health/ready',

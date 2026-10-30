@@ -1,6 +1,5 @@
 """Opt-in R2 document channel; independent of the existing local image store."""
 from functools import lru_cache
-from pathlib import Path
 import re
 from urllib.parse import urlsplit
 
@@ -24,14 +23,12 @@ class DocumentSettings(BaseSettings):
     signed_url_seconds: int = Field(default=300, ge=30, le=900)
     upload_part_bytes: int = Field(default=16 * 1024 * 1024, ge=5 * 1024 * 1024, le=32 * 1024 * 1024)
     upload_lifetime_seconds: int = Field(default=3600, ge=300, le=86400)
-    spool_path: Path = Path('./document-spool')
     worker_slots: int = Field(default=1, ge=1, le=4)
     worker_poll_seconds: float = Field(default=2, ge=0.1, le=60)
     prepare_timeout_seconds: int = Field(default=900, ge=1, le=3600)
     package_timeout_seconds: int = Field(default=900, ge=1, le=3600)
     output_retention_days: int = Field(default=7, ge=1, le=365)
     waiting_retention_hours: int = Field(default=24, ge=1, le=168)
-    parser_require_sandbox: bool = True
     max_page_pixels: int = Field(default=24_000_000, ge=1, le=100_000_000)
     max_page_dimension: int = Field(default=20_000, ge=1, le=100_000)
     max_page_bytes: int = Field(default=128 * 1024 * 1024, ge=1024, le=512 * 1024 * 1024)

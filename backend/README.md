@@ -24,7 +24,7 @@ python -m app.workers
 python -m app.dispatcher
 ```
 
-首次运行及结构升级前单独执行 `python -m app.migrate`；上述进程只检查数据库兼容性，不自动迁移。后端 Docker 镜像不包含页面；生产官网、管理后台通过 `Dockerfile.static` 独立构建并由 OpenResty 提供。本地 `bootstrap.ps1 -Start` 单独运行两个前端的 npm 构建，并由根 Compose 只读挂载到 API，需安装 Node.js；直接运行 Python 时将官网产物放到 `app/website_dist`，后台产物由现有构建脚本生成。双槽位切换、后台排空和本地演练见[部署规范](../docs/DEPLOYMENT.md)。
+首次运行及结构升级前单独执行 `python -m app.migrate`，由迁移核对必要结构和支付数据环境；服务启动只检查依赖可用性，不自动迁移。后端 Docker 镜像不包含页面；生产官网、管理后台通过 `Dockerfile.static` 独立构建并由 Nginx 提供。本地 `bootstrap.ps1 -Start` 单独运行两个前端的 npm 构建，并由根 Compose 只读挂载到 API，需安装 Node.js；直接运行 Python 时将官网产物放到 `app/website_dist`，后台产物由现有构建脚本生成。双槽位切换、后台排空和本地演练见[部署规范](../docs/DEPLOYMENT.md)。
 
 ## 开发入口
 
@@ -47,6 +47,8 @@ docker compose -p node-comics-tests -f deploy/compose.tests.yaml up --build --ab
 docker compose -p node-comics-tests -f deploy/compose.tests.yaml down
 ```
 
-也可安装 [requirements-test.txt](requirements-test.txt)，在本目录执行 `python -m pytest -q tests`。未设置 `TEST_REDIS_URL` 时使用 fakeredis/Lua；设置为专用 Redis 8 测试实例后，验证真实脚本与跨进程共享，每个用例使用随机命名空间并仅清理自身键。PostgreSQL 并发套件需显式设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / PORT / USER / PASSWORD`，仅使用 `nodecomics_concurrency_test`；测试 Compose 提供独立临时 PostgreSQL 和 Redis。未启用的用例记为 skipped。
+也可安装 [requirements-test.txt](requirements-test.txt)，在本目录执行 `python -m pytest -q tests`；日常按改动模块选择测试，生产依赖不包含 pytest。未设置 `TEST_REDIS_URL` 时使用 fakeredis/Lua；设置为专用 Redis 8 测试实例后，验证真实脚本与跨进程共享，每个用例使用随机命名空间并仅清理自身键。PostgreSQL 套件保留数据库特有的并发、事务、类型与迁移回归，需显式设置 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / PORT / USER / PASSWORD`，仅使用 `nodecomics_concurrency_test`；测试 Compose 提供独立临时 PostgreSQL 和 Redis。未启用的用例记为 skipped。
+
+共享 PDF / ZIP 解析器测试位于 `document_files/tests`，安装解析依赖后执行 `python -m pytest -q document_files/tests`；不随中央 API 测试加载。离线运维脚本测试见[脚本入口](../scripts/README.md)。
 
 浏览器测试使用 `tests/manual_*_server.py` 的临时库和合成供应商；后端夹具连接 `TEST_REDIS_URL` 指定的 Redis 8（默认本机 6379），使用随机命名空间隔离。启动顺序见[脚本入口](../scripts/README.md)。真实 OIDC、支付和模型效果分别验收。真实文本 LLM + GPU + Docker 入口见 `scripts/verify_overlay_live.py`，仅连接隔离回环 HTTPS 环境。

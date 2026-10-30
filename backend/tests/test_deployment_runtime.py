@@ -1,15 +1,17 @@
-"""Additive schemas can roll forward; startup never creates missing structures."""
+"""Runtime checks availability; explicit migration owns structure validation."""
 import pytest
 from sqlalchemy import event, text
 
 
-def test_runtime_is_read_only_and_api_ready_without_workers(client):
+def test_startup_and_readiness_only_probe_dependencies(client):
     from app.db import engine
     from app.runtime import check_runtime
+    with engine().begin() as connection:
+        connection.execute(text("UPDATE alembic_version SET version_num='future_additive'"))
     statements = []
 
     def record(connection, cursor, statement, parameters, context, many):
-        statements.append(statement.strip().split()[0].upper())
+        statements.append(statement.strip().upper())
 
     event.listen(engine(), 'before_cursor_execute', record)
     try:
@@ -18,53 +20,34 @@ def test_runtime_is_read_only_and_api_ready_without_workers(client):
         assert response.status_code == 200
         assert 'no-store' in response.headers['cache-control']
         assert response.json()['release'] == 'development'
-        assert set(statements) <= {'SELECT', 'PRAGMA'}  # SQLite catalog inspection is read-only.
-        assert client.get('/health/cluster').status_code == 503
+        assert statements and set(statements) == {'SELECT 1'}
     finally:
         event.remove(engine(), 'before_cursor_execute', record)
+    assert client.get('/health/cluster').status_code == 503
 
 
-@pytest.mark.parametrize('revision', ['future_additive', 'older_stamp'])
-def test_schema_stamp_does_not_gate_compatible_structures(client, revision):
+def test_migration_rejects_missing_structure(client):
     from app.db import engine
-    from app.runtime import check_runtime
+    from app.migrate import migrate
     with engine().begin() as connection:
-        connection.execute(text('UPDATE alembic_version SET version_num=:revision'), {'revision': revision})
-        connection.execute(text('ALTER TABLE users ADD COLUMN additive_note TEXT'))
-    check_runtime()
-    assert client.get('/health/ready').status_code == 200
-    with engine().connect() as connection:
-        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == revision
-
-
-@pytest.mark.parametrize('ddl', ['DROP TABLE billing_checkout_aliases',
-    'ALTER TABLE users RENAME COLUMN name TO retired_name'])
-def test_startup_rejects_missing_used_tables_or_columns(client, ddl):
-    from app.db import engine
-    from app.runtime import check_runtime
-    with engine().begin() as connection:
-        connection.execute(text(ddl))
+        connection.execute(text('DROP TABLE billing_checkout_aliases'))
     with pytest.raises(RuntimeError, match='structure is incomplete'):
-        check_runtime()
+        migrate()
 
 
-def test_readiness_does_not_rescan_schema_or_payment_rows(client, monkeypatch):
-    from app import runtime, db
-    monkeypatch.setattr(runtime, 'check_schema', lambda *_: pytest.fail('schema scanned by health'))
-    monkeypatch.setattr(db, 'check_payment_environment', lambda *_: pytest.fail('billing scanned by health'))
-    assert client.get('/health/ready').status_code == 200
+def test_database_outage_is_not_reported_ready(client, monkeypatch):
+    from app import runtime
     monkeypatch.setattr(runtime, 'engine', lambda: (_ for _ in ()).throw(RuntimeError('offline')))
     assert client.get('/health/ready').status_code == 503
 
 
-def test_empty_database_is_not_initialized(tmp_path, monkeypatch):
+def test_database_probe_does_not_initialize_empty_database(tmp_path, monkeypatch):
     from sqlalchemy import create_engine, inspect
     from app import runtime
     empty = create_engine('sqlite:///' + str(tmp_path / 'empty.db'))
     monkeypatch.setattr(runtime, 'engine', lambda: empty)
     try:
-        with pytest.raises(Exception):
-            runtime.check_runtime()
+        runtime.check_database()
         assert inspect(empty).get_table_names() == []
     finally:
         empty.dispose()

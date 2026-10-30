@@ -19,7 +19,7 @@ def private_files(tmp_path):
         'DATABASE_URL': 'postgresql+psycopg://document_local:local-only@127.0.0.1:54329/nodecomics_document_local',
         'REDIS_URL': 'redis://127.0.0.1:6389/0', 'DOCUMENT_RUN_ID': str(uuid4()),
         'DEV_AUTH_SECRET': 'isolated-document-signing-secret-not-live',
-        'STORAGE_PATH': str(tmp_path / 'storage'), 'DOCUMENT_SPOOL_PATH': str(tmp_path / 'spool'),
+        'STORAGE_PATH': str(tmp_path / 'storage'),
     }
     source = {'R2_ENDPOINT_URL': 'https://isolated.r2.cloudflarestorage.com', 'R2_BUCKET': 'offline-fixture',
         'R2_ACCESS_KEY_ID': 'isolated-key-id', 'R2_SECRET_ACCESS_KEY': 'literal-${DO_NOT_EXPAND}',
@@ -43,7 +43,6 @@ def test_runtime_uses_only_explicit_isolated_values(private_files, monkeypatch):
     assert values['DOCUMENT_R2_KEY_PREFIX'] == 'allowed/test-prefix/document-local-' + runtime['DOCUMENT_RUN_ID']
     assert values['REDIS_NAMESPACE'] == 'document-local-' + runtime['DOCUMENT_RUN_ID'].replace('-', '')
     assert values['APP_ENV'] == 'development' and values['DEV_AUTH'] == 'true'
-    assert values['DOCUMENT_PARSER_REQUIRE_SANDBOX'] == 'true'
     assert values['STRIPE_ENABLED'] == values['CREEM_ENABLED'] == 'false'
     assert values['CORS_ORIGINS'] == 'http://127.0.0.1:5195'
     assert 'R2_SECRET_ACCESS_KEY' not in values
@@ -83,16 +82,15 @@ def test_rejects_non_dedicated_targets_before_migration(private_files, monkeypat
     assert 'secret' not in str(error.value) and 'production.invalid' not in str(error.value)
 
 
-@pytest.mark.parametrize('change', ['uuid', 'paths', 'overlap', 'secret', 'prefix', 'prefix_length', 'extra'])
+@pytest.mark.parametrize('change', ['uuid', 'paths', 'secret', 'prefix', 'prefix_length', 'extra'])
 def test_rejects_unsafe_local_namespace_and_paths(private_files, change):
     root, runtime_file, runtime, source, save = private_files
     if change == 'uuid': runtime['DOCUMENT_RUN_ID'] = 'not-a-uuid'
     elif change == 'paths': runtime['STORAGE_PATH'] = str(runtime_file.parent.parent)
-    elif change == 'overlap': runtime['DOCUMENT_SPOOL_PATH'] = runtime['STORAGE_PATH']
     elif change == 'secret': runtime['DEV_AUTH_SECRET'] = 'short'
     elif change == 'prefix': source['R2_KEY_PREFIX'] = '/'
     elif change == 'prefix_length': source['R2_KEY_PREFIX'] = 'x' * 97
-    elif change == 'extra': runtime['DOCUMENT_PARSER_REQUIRE_SANDBOX'] = 'false'
+    elif change == 'extra': runtime['DOCUMENT_UNKNOWN_SETTING'] = 'false'
     save()
     with pytest.raises(live.LocalConfigurationError):
         live.runtime_environment(root, runtime_file)
@@ -109,14 +107,13 @@ assert Settings.model_config['env_file'] is None
 assert DocumentSettings.model_config['env_file'] is None
 assert settings().app_env == 'development' and settings().dev_auth
 assert settings().oidc_issuer == '' and not settings().stripe_enabled
-assert get_document_settings().enabled and get_document_settings().parser_require_sandbox
+assert get_document_settings().enabled
 assert 'PGHOSTADDR' not in os.environ and 'PGSERVICE' not in os.environ
 print('isolated-configuration-ok')
 '''
     env = {**os.environ, 'PYTHONPATH': str(Path(live.__file__).parent),
         'APP_ENV': 'production', 'PGHOSTADDR': '203.0.113.1', 'PGSERVICE': 'production',
-        'OIDC_ISSUER': 'https://production.invalid', 'STRIPE_ENABLED': 'true',
-        'DOCUMENT_PARSER_REQUIRE_SANDBOX': 'false'}
+        'OIDC_ISSUER': 'https://production.invalid', 'STRIPE_ENABLED': 'true'}
     result = subprocess.run([sys.executable, '-c', code, str(root), str(runtime_file)],
         env=env, capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr

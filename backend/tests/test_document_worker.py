@@ -35,7 +35,7 @@ def test_fresh_worker_registers_foreign_keys_without_api_parser_or_database(tmp_
             assert targets and {'quota_periods', 'billing_terms'} <= Base.metadata.tables.keys()
             assert 'app.main' not in sys.modules
             assert 'alembic.command' not in sys.modules
-            assert 'app.documents.files' not in sys.modules and 'pypdfium2' not in sys.modules
+            assert 'comic_document_files' not in sys.modules and 'pypdfium2' not in sys.modules
     ''')
     environment = {name: value for name, value in os.environ.items()
                    if name.upper() in {'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'PATH'}}

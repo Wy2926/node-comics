@@ -4,14 +4,17 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import sys
 from types import SimpleNamespace
 
 import httpx
 import pytest
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'backend'))
 from app.adapters import openai_text
 
-SCRIPT = Path(__file__).resolve().parents[2] / 'scripts' / 'verify_document_llm_live.py'
+SCRIPT = ROOT / 'scripts' / 'verify_document_llm_live.py'
 SPEC = importlib.util.spec_from_file_location('document_llm_live_script', SCRIPT)
 smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
@@ -44,17 +47,16 @@ COMIC_TRANSLATIONS = {
 }
 
 
-def reply(request, *, mutate=lambda rows: rows, incomplete=False, translations=None):
+def reply(request, *, mutate=lambda rows: rows, incomplete=False, translations=None, language='zh-Hans'):
     payload = json.loads(request.content)
     chat = 'messages' in payload
     prompt = payload['messages' if chat else 'input']
     source = json.loads(prompt[1]['content'])['pages']
-    english = prompt[0]['content'].endswith('"en"')
     rows = []
     for page in source:
         for row in page['segments']:
             markers = ' '.join(re.findall(r'DOC-[A-Z0-9-]+', row['source']))
-            value = ('The travelers arrive at the library beside the river. ' if english else '米拉和凯一起乘车去图书馆。')
+            value = ('The travelers arrive at the library beside the river. ' if language == 'en' else '米拉和凯一起乘车去图书馆。')
             if row['id'] == 'p1:long':
                 value *= 60
             rows.append({'id': row['id'], 'text': translations[row['id']] if translations is not None else value + markers})
@@ -106,6 +108,7 @@ def test_small_keeps_frozen_routing_and_uses_independent_document_budget(wire, p
 
 
 def test_pages_200_has_all_ids_long_source_and_long_complete_output(wire):
+    wire.handler = lambda request: reply(request, language='en')
     source, language, markers, long_id = smoke.sample('pages-200')
     assert [page['page'] for page in source] == list(range(1, 201)) and language == 'en'
     segments = [row for page in source for row in page['segments']]
