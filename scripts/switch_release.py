@@ -64,7 +64,7 @@ def probe(url, release, *, static=False):
                 raise RuntimeError('API is not ready at the expected release')
 
 
-def activate(active, content, run_nginx, verify, *, verify_previous=None, preflight=None, timeout=30):
+def activate(active, content, run_nginx, verify, *, verify_previous=None, preflight=None, timeout=30, backup=True):
     """Restore the previous disk and running config if testing/reload/probing fails."""
     if active.is_symlink() or not active.is_file():
         raise ValueError('Active include must be an existing regular file')
@@ -72,7 +72,8 @@ def activate(active, content, run_nginx, verify, *, verify_previous=None, prefli
         if preflight:
             preflight()
         previous = active.read_bytes()
-        atomic_write(active.with_suffix(active.suffix + '.previous'), previous)
+        if backup:
+            atomic_write(active.with_suffix(active.suffix + '.previous'), previous)
         atomic_write(active, content)
         try:
             run_nginx('-t')
@@ -112,6 +113,7 @@ def main():
     parser.add_argument('--active-file', type=Path, required=True)
     parser.add_argument('--release', required=True)
     parser.add_argument('--previous-release', required=True)
+    parser.add_argument('--no-backup', action='store_true', help='Do not persist a previous include file')
     parser.add_argument('--probe-url', required=True, help='Uncached public/proxy endpoint, NOT the candidate port')
     parser.add_argument('--port', type=int, help='Candidate API loopback port')
     parser.add_argument('--candidate-file', type=Path, help='Prepared static include')
@@ -150,7 +152,7 @@ def main():
 
     activate(args.active_file, content, run_nginx,
              lambda: probe(args.probe_url, args.release, static=args.kind == 'static'),
-             verify_previous=previous_probe, preflight=preflight)
+             verify_previous=previous_probe, preflight=preflight, backup=not args.no_backup)
     print(json.dumps({'active': args.release, 'previous': args.previous_release,
                       'old_processes': 'retained; drain before retirement'}))
 

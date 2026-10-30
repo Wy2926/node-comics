@@ -62,15 +62,14 @@ docker @testCompose ps
 
 启动只读核对必需表／字段和支付环境，允许额外结构及不同 Alembic revision；缺少必需结构仍拒绝启动。运行时健康检查只看数据库、存储和 Redis 可用性，见[健康监控](OPERATIONS.md#健康信号)。结构检查不能证明类型、约束、协议或结算语义兼容：兼容增量可滚动发布，不兼容变更使用下述维护流程。
 
-当前 `image_result_expiry_0022` 只增加清理索引。大库先在事务外并发建索引，确认 valid 后再迁移，避免普通建索引阻塞写入：
+当前 `execution_retention_0023` 为任务及检查点增加清理进度字段与索引，兼容旧代码读取。大库先在事务外为领取回执并发建索引，确认 valid 后再迁移：
 
 ```sql
-CREATE INDEX CONCURRENTLY ix_jobs_image_result_expiry ON jobs (completed_at, id)
-WHERE workflow_kind = 'image' AND quota_kind != 'guest_trial'
-  AND status IN ('succeeded', 'no_text') AND discard_output IS FALSE;
+CREATE INDEX CONCURRENTLY ix_compute_claims_retention
+ON compute_claims (created_at, node_id, request_id);
 ```
 
-建索引中断后应先处理无效索引，不能只检查名称。从严格要求 0021 的旧构建升级时，先建索引但不改 revision，再部署兼容检查代码、切流并排空旧进程，最后执行 0022 迁移；本次代码可在 0021 表结构运行。首次启用保留期限会影响历史结果，提前核对[保留策略](OBJECT_STORAGE.md#原图与结果清理)并备份；回退镜像不会恢复已清理文件。
+建索引中断后应先处理无效索引，不能只检查名称。先迁移，再启动候选 API、切流并排空旧进程，最后启用新版 maintenance 清理；旧 API 仍依赖完整 JSON 的重放比较时不能先删除检查点。首次启用会处理历史数据，应按已确认的[保留策略](OBJECT_STORAGE.md#数据库执行数据清理)执行；回退镜像或调大周期都不能恢复已清理内容。
 
 PDF / ZIP 功能默认关闭；计算宿主需通过解析沙箱探测，并为私有 `state/documents` 提供持久磁盘和硬配额，不挂中心图片卷。中央文档 worker 只处理文本，无 PDFium、解压和大文件卷。迁移、沙箱、CORS 与整本模型能力配置按[文件任务部署规范](DOCUMENT_TRANSLATION.md#r2部署与生命周期)配套验收后再开放入口。
 
@@ -114,7 +113,7 @@ python scripts/switch_release.py api --port 18089 --release <新版本> --previo
   --probe-url https://comics.nodelane.net/health/ready --openresty-container <实际容器名>
 ```
 
-脚本在发布锁内确认配置未被并发修改、候选就绪，再原子替换 include、检查并 reload，最后核验代理实际版本。旧实例不健康不阻止切流；失败恢复旧 include 并核验，恢复失败明确报错。`.previous` 仅备份代理配置。原生安装可用 `--nginx-bin <绝对路径>`；探测须绕过 CDN 缓存。
+脚本在发布锁内确认配置未被并发修改、候选就绪，再原子替换 include、检查并 reload，最后核验代理实际版本。旧实例不健康不阻止切流；失败恢复旧 include 并核验，恢复失败明确报错。`.previous` 仅备份代理配置；明确不保留备份时加 `--no-backup`，切换成功并排空旧进程后可删除旧容器、镜像和静态发布目录，仍在使用的共享静态资源不删。原生安装可用 `--nginx-bin <绝对路径>`；探测须绕过 CDN 缓存。
 
 切回旧版使用相同命令，将 `--port / --release / --previous-release` 对调；先检查旧 API 仍然就绪且结构兼容。脚本不停止任何 API，不重试写请求，不执行迁移。
 

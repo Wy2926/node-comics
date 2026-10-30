@@ -10,6 +10,7 @@ const {numericFields, promptFields, promptMaxLength, settingKeys, normalizePromp
 
 const values = () => ({
   image_result_retention_days: 7,
+  empty_claim_retention_days: 1, completed_claim_retention_days: 7, execution_detail_retention_days: 90,
   free_daily_pages: 30, free_images_per_minute: 10, plus_images_per_minute: 100,
   upload_user_concurrency: 10, upload_global_concurrency: 16, upload_idle_timeout_seconds: 15,
   upload_body_timeout_seconds: 120, upload_ingress_lease_seconds: 45,

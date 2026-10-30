@@ -53,6 +53,14 @@ class ReleaseTests(unittest.TestCase):
                 '--previous-release', 'old', '--probe-url', 'http://proxy/health/ready',
                 '--port', '18089', '--nginx-bin', 'nginx']
 
+    def test_no_backup_switch_does_not_write_previous_include(self):
+        with patch('sys.argv', self.switch_args() + ['--no-backup']), patch('switch_release.probe'), \
+                patch('switch_release.subprocess.run') as run, patch('builtins.print'):
+            run.return_value.returncode = 0
+            switch_main()
+        self.assertIn(b'18089', self.active.read_bytes())
+        self.assertFalse(self.active.with_suffix('.inc.previous').exists())
+
     def test_unhealthy_old_release_does_not_block_healthy_replacement(self):
         calls = []
         def ready(url, release, **kwargs):

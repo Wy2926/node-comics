@@ -187,11 +187,23 @@ def test_no_text_checkpoint_is_terminal_idempotent_and_never_calls_llm(v3):
     lease = claim(v3).json()['leases'][0]
     body, reply = analyze(v3, lease, empty=True)
     assert reply['receipt']['job_status'] == 'no_text'
+    from app.execution_retention import cleanup_execution_data
+    from app.models import ClassicState
+    with session_factory()() as db:
+        cleanup_execution_data(db)
+        db.commit()
+        assert db.get(ClassicState, lease['job_id']).retention_stage == 1
     assert request(v3, f'/leases/{lease["lease_id"]}/analysis', body).json() == reply
     assert heartbeat(v3, [lease]).json()['leases'][0] == reply['receipt']
     with session_factory()() as db:
         assert db.scalar(select(func.count()).select_from(TextCall)) == 0
         assert db.get(ExecutionLease, lease['lease_id']).completed_at
+        db.delete(db.get(ClassicState, lease['job_id']))
+        db.commit()
+    assert request(v3, f'/leases/{lease["lease_id"]}/analysis', body).json() == reply
+    changed = {**body['analysis'], 'version': 'other'}
+    assert request(v3, f'/leases/{lease["lease_id"]}/analysis',
+        {**body, 'analysis': changed, 'analysis_hash': digest(changed)}).status_code == 409
 
 
 def test_analysis_text_revision_and_delivery_settle_once(v3, png):
@@ -213,6 +225,11 @@ def test_analysis_text_revision_and_delivery_settle_once(v3, png):
     response = deliver(v3, lease, result, data)
     assert response.status_code == 200, response.text
     assert response.json()['job_status'] == 'succeeded'
+    from app.execution_retention import cleanup_execution_data
+    with session_factory()() as db:
+        cleanup_execution_data(db)
+        db.commit()
+    assert request(v3, f'/leases/{lease["lease_id"]}/analysis', body).json()['receipt'] == response.json()
     assert deliver(v3, lease, result, data).json() == response.json()
     assert deliver(v3, lease, {**result, 'version': 'wrong'}, data).status_code == 409
     with session_factory()() as db:

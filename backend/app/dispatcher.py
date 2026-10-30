@@ -204,11 +204,18 @@ def main():
     billing_thread.start()
     next_oidc_probe = 0
     next_campaign_scan = 0
+    next_retention_scan = 0
     while not stopping.is_set():
         try:
             recover_once()
             with session_factory()() as db:
                 cleanup(db)
+            if time.monotonic() >= next_retention_scan:
+                from .execution_retention import cleanup_execution_data
+                with session_factory()() as db:
+                    cleanup_execution_data(db)
+                    db.commit()
+                next_retention_scan = time.monotonic() + 10
             if time.monotonic() >= next_oidc_probe:
                 probe_oidc()
                 next_oidc_probe = time.monotonic() + max(1, min(60, settings().cluster_node_timeout_seconds / 3))

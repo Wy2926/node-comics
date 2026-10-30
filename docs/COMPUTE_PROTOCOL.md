@@ -77,6 +77,8 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 
 analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 4 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。节点生成掩膜时检查非空像素，恢复已有检查点时在恢复文本工作前解码并校验掩膜；中心只校验其文件结构、尺寸和区域元数据。相同分析重复提交不会重新打开文本任务。
 
+终态后大检查点会被清理；analysis 重放核对阶段持久化的 `analysis_hash`，相同内容返回原回执，不依赖完整 JSON 仍在库中。
+
 译文为 `{analysis_hash, language, translations:{segment_id:text}, revision}`，revision 是前三项组成对象的摘要。只有 text 成功后才发送完整译文。updates 增量为 `{lease_id,status:active,translations}`，不带输入或 expires_at；相同 revision 不重发正文。长轮询不延长执行截止，迟到的活动响应不能恢复已停止页面。
 
 ## 覆盖结果与一次提交
@@ -158,6 +160,8 @@ result 的 width/height 是整页尺寸；output 的尺寸必须等于 bbox，bb
 ## 配置、幂等与恢复
 
 节点先持久化 claim 的 request_id、config_version 和 count，未知结果重放原内容；全部返回租约落入日志后才清除请求。同编号不同内容冲突，空回执也保存。非空批后仍有余量可立即补领；空批等待 poll_seconds、新就绪提示或资源释放。中心在候选查询前预查回执、配置和容量，进入调度锁后复核。
+
+claim 去重是有期限的：空回执默认保留 1 天，非空回执在关联任务及租约全部结束后默认保留 7 天，周期由数据库设置调整；在途回执不清理。期限内重放原回执，删除后的旧 request_id 会按新的领取请求处理，不重启历史任务或重复结算。任务 UUID 与租约终态回执不随 claim 清理删除，具体范围见[存储规范](OBJECT_STORAGE.md#数据库执行数据清理)。
 
 并发竞争导致候选失效时，中心提交并释放锁后最多重选一次；最终空批仍有可领取工作时可附 0.1–0.3 秒随机退避提示。提示不分配、不预留执行权，不改持久回执。
 

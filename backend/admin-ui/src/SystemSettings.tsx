@@ -123,7 +123,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
         </section>
         {(['storage', 'entitlements', 'guest', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
           <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">{group === 'upload' ? '↥' : '≡'}</span>
-            <div><h2 id={`settings-${group}`}>{group === 'storage' ? '结果保留' : group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
+            <div><h2 id={`settings-${group}`}>{group === 'storage' ? '数据保留与清理' : group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
               <p className="muted">{group === 'storage' ? '注册账户单图结果默认保留 7 天，浏览器已保存的完整译图不受影响。游客及整本文件结果使用各自期限。' : group === 'entitlements' ? '设置新额度周期与新开通运营会员段的默认页数。' : group === 'guest' ? '按服务配置的额度时区自然日计次，游客、网络和全站预算分别控制。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
           <div className="settings-fields">{numericFields.filter(field => field.group === group).map(field => {
             const fieldError = validation?.errors[field.key];

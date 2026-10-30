@@ -1,6 +1,12 @@
 export const numericFields = [
   {key: 'image_result_retention_days', group: 'storage', title: '注册账户单图结果保留时间', unit: '天', min: 1, max: 365, integer: true,
     help: '从任务完成起计算，读取不续期；保存后同时适用于已有结果。缩短会回收过期文件，延长不能恢复已删除文件；任务与账单记录保留。'},
+  {key: 'empty_claim_retention_days', group: 'storage', title: '空领取回执保留时间', unit: '天', min: 1, max: 365, integer: true,
+    help: '没有领取任务的节点轮询回执，到期自动删除。'},
+  {key: 'completed_claim_retention_days', group: 'storage', title: '已结束领取回执保留时间', unit: '天', min: 1, max: 365, integer: true,
+    help: '任务与租约全部结束后计算；在途和待核实任务不清理。'},
+  {key: 'execution_detail_retention_days', group: 'storage', title: '执行明细保留时间', unit: '天', min: 1, max: 365, integer: true,
+    help: '终态任务到期后只保留摘要、去重回执与账本。OCR 和译文按结果期限清理，图像掩码在任务结束后清理。'},
   {key: 'free_daily_pages', group: 'entitlements', title: '普通用户每日常规页数', unit: '页 / 天', min: 0, max: 1000000, integer: true,
     help: '仅新建的每日额度周期采用新值，已生效周期的已用、预占和总额保持不变。'},
   {key: 'guest_daily_limit', group: 'guest', title: '每位匿名访客每日受理上限', unit: '张 / 天', min: 1, max: 100, integer: true,

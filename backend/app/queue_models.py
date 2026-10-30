@@ -66,13 +66,14 @@ class ExecutionLease(Base):
 
 
 class ComputeClaim(Base):
-    """Durable whole-page claim receipt, including empty and reclaimed claims."""
+    """Bounded replay receipt; active executions outlive the retention window."""
     __tablename__ = "compute_claims"
     node_id: Mapped[str] = mapped_column(ForeignKey("compute_nodes.id"), primary_key=True)
     request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     request_hash: Mapped[str] = mapped_column(String(64))
     lease_ids: Mapped[list] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    __table_args__ = (Index('ix_compute_claims_retention', 'created_at', 'node_id', 'request_id'),)
 
 
 class SchedulerMutex(Base):

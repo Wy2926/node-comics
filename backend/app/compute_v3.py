@@ -388,8 +388,9 @@ def analysis(lease_id: str, body: AnalysisRequest, identity=Depends(node_auth), 
     lease = scoped_lease(db, lease_id, body.lease_token, identity)
     stage = db.get(JobStage, lease.stage_id)
     state = db.get(ClassicState, lease.job_id)
-    # A completed no-text submission can retrieve its original receipt.
-    if lease.completed_at and lease.outcome == 'succeeded' and state and state.analysis == body.analysis:
+    # Terminal replay uses the durable digest, not a checkpoint that may be reclaimed.
+    if (lease.completed_at and lease.outcome == 'succeeded'
+            and (stage.result or {}).get('analysis_hash') == body.analysis_hash):
         return {'analysis_hash': body.analysis_hash, 'receipt': receipt(lease)}
     _, _, job = live_lease(db, lease_id, body.lease_token, identity)
     if state.analysis:

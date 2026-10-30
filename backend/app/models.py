@@ -6,6 +6,8 @@ from .db import Base
 
 IMAGE_RESULT_EXPIRY_FILTER = ("workflow_kind = 'image' AND quota_kind != 'guest_trial' "
     "AND status IN ('succeeded', 'no_text') AND discard_output IS FALSE")
+EXECUTION_RETENTION_FILTER = ("details_compacted_at IS NULL AND "
+    "status IN ('succeeded', 'no_text', 'failed', 'cancelled')")
 
 
 def now():
@@ -97,10 +99,14 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     unknown_since: Mapped[datetime | None] = mapped_column(DateTime)
+    details_compacted_at: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (UniqueConstraint("owner_id", "operation", "idempotency_key"),
                      CheckConstraint("workflow_kind IN ('image', 'document')", name='ck_job_workflow'),
                      Index('ix_jobs_owner_workflow_created', 'owner_id', 'workflow_kind', 'created_at', 'id'),
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
+                     Index('ix_jobs_execution_retention', 'completed_at', 'id',
+                         sqlite_where=text(EXECUTION_RETENTION_FILTER),
+                         postgresql_where=text(EXECUTION_RETENTION_FILTER)),
                      Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"),
                       Index('ix_jobs_image_result_expiry', 'completed_at', 'id',
                            sqlite_where=text(IMAGE_RESULT_EXPIRY_FILTER),
@@ -150,6 +156,9 @@ class ClassicState(Base):
     timings: Mapped[dict] = mapped_column(JSON, default=dict)
     artifacts: Mapped[dict] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    # 0: execution checkpoint, 1: readable OCR/translation, 2: timing summary only.
+    retention_stage: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    __table_args__ = (Index('ix_classic_states_retention', 'retention_stage', 'job_id'),)
 
 
 class TextCall(Base):

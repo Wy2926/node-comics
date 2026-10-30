@@ -18,7 +18,8 @@ from .request_models import RequestBody
 from .translation_prompts import MAX_PROMPT_LENGTH, PROMPT_DEFAULTS
 
 router = APIRouter(prefix="/v1/admin/system-settings", tags=["system settings"])
-DATABASE_DEFAULTS = {'image_result_retention_days': 7}
+DATABASE_DEFAULTS = {'image_result_retention_days': 7, 'empty_claim_retention_days': 1,
+    'completed_claim_retention_days': 7, 'execution_detail_retention_days': 90}
 
 
 class RequestLimits(RequestBody):
@@ -27,6 +28,9 @@ class RequestLimits(RequestBody):
 
     free_daily_pages: int = Field(ge=0, le=1000000)
     image_result_retention_days: int = Field(ge=1, le=365)
+    empty_claim_retention_days: int = Field(ge=1, le=365)
+    completed_claim_retention_days: int = Field(ge=1, le=365)
+    execution_detail_retention_days: int = Field(ge=1, le=365)
 
     free_images_per_minute: int = Field(ge=1, le=10000)
     plus_images_per_minute: int = Field(ge=1, le=10000)
