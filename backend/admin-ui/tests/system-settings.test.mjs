@@ -9,6 +9,7 @@ const {numericFields, promptFields, promptMaxLength, settingKeys, normalizePromp
   await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
 
 const values = () => ({
+  image_result_retention_days: 7,
   free_daily_pages: 30, free_images_per_minute: 10, plus_images_per_minute: 100,
   upload_user_concurrency: 10, upload_global_concurrency: 16, upload_idle_timeout_seconds: 15,
   upload_body_timeout_seconds: 120, upload_ingress_lease_seconds: 45,

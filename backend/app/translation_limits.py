@@ -16,12 +16,7 @@ def server_now(db):
 def image_limit(db, user, *, policy=None):
     from .entitlements import admission_policy
     from .system_settings import get_request_limits
-    guest_operation = user.kind == 'guest' and bool(db.info.get('guest_network'))
-    cfg = db.info.get('guest_limits') if guest_operation else None
-    if cfg is None:
-        cfg = get_request_limits(db)
-        if guest_operation:
-            db.info['guest_limits'] = cfg  # Shared only until this guest operation exits.
+    cfg = get_request_limits(db)
     policy = policy or admission_policy(db, user)
     return cfg.plus_images_per_minute if policy.priority else cfg.free_images_per_minute
 

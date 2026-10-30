@@ -348,7 +348,7 @@ export default {
     {
       "title": "Terjemahan dan retensi",
       "paragraphs": [
-        "Ekstensi memakai terjemahan. Terjemahan menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+        "Ekstensi memakai terjemahan. Terjemahan menggunakan pengenalan, terjemahan teks, pembersihan, dan penyusunan huruf. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil gambar tunggal pribadi akun terdaftar disimpan selama 7 hari setelah tugas selesai secara default; durasinya dapat diatur administrator. Setelah kedaluwarsa, akses server dicabut dan file dihapus; hasil lokal yang disimpan tidak terpengaruh. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
         "Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen."
       ]
     },
@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Kebijakan privasi",
         "description": "Bagaimana NodeLane Comics menangani akun, gambar, izin, terjemahan, langganan, dan penghapusan.",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Terjemahan gambar situs web dan uji coba tamu",
             "paragraphs": [
               "Situs web menerima gambar JPG, PNG dan WebP. File asli, masukan terjemahan, hasil lengkap, dan riwayat disimpan di IndexedDB browser ini, tidak disinkronkan antar perangkat. Menghapus data situs akan menghapusnya. “Hapus catatan lokal” hanya menghapus salinan lokal, bukan tugas server atau catatan audit.",
               "Uji coba tamu menggunakan Cloudflare Turnstile. Cloudflare memproses sinyal browser dan jaringan yang diperlukan untuk verifikasi berdasarkan kebijakan privasinya; permintaan verifikasi kami tidak menyertakan gambar komik. Kami menggunakan cookie sesi HttpOnly aman yang bertahan hingga 30 hari, pengidentifikasi jaringan HMAC dan penghitung harian disimpan selama tujuh hari untuk mencegah penyalahgunaan. Pengidentifikasi ini adalah nama samaran, bukan jaminan anonimitas lengkap.",
-              "Hasil server tamu dapat diambil selama 24 jam setelah tugas berakhir, kemudian akses dicabut dan file diambil kembali. Hasil lokal yang disimpan tetap tersedia. Masukan dihapus saat tugas selesai; catatan tugas, biaya, dan keamanan yang diperlukan mengikuti aturan penyimpanannya masing-masing. Retensi hasil jangka panjang di bawah ini berlaku untuk akun terdaftar. Tamu tidak membuat akun penyedia identitas; masuk tidak menggabungkan riwayat. Uji coba default menerima hingga lima gambar baru setiap hari, dengan batas jaringan bersama; kegagalan juga diperhitungkan."
+              "Hasil server tamu dapat diambil selama 24 jam setelah tugas berakhir, kemudian akses dicabut dan file diambil kembali. Hasil lokal yang disimpan tetap tersedia. Masukan dihapus saat tugas selesai; catatan tugas, biaya, dan keamanan yang diperlukan mengikuti aturan penyimpanannya masing-masing. Masa simpan hasil di bawah ini berlaku untuk akun terdaftar. Tamu tidak membuat akun penyedia identitas; masuk tidak menggabungkan riwayat. Uji coba default menerima hingga lima gambar baru setiap hari, dengan batas jaringan bersama; kegagalan juga diperhitungkan."
             ]
           },
           {
             "title": "Ruang lingkup dan kontak",
             "paragraphs": [
-              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 2026-10-17. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
+              "Kebijakan ini mencakup situs web NodeLane Comics, ekstensi, layanan pembaca dan terjemahan, yang dikelola oleh tim NodeLane Comics. Hubungi comics@nodelane.net tentang privasi, akses, koreksi atau penghapusan. Diperbarui 2026-10-30. Perubahan material akan dijelaskan di halaman ini dan dikomunikasikan sebagaimana mestinya."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Retensi dan penghapusan",
             "paragraphs": [
-              "Terjemahan gambar tunggal: Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
+              "Terjemahan gambar tunggal: Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil gambar tunggal pribadi akun terdaftar disimpan selama 7 hari setelah tugas selesai secara default; durasinya dapat diatur administrator. Setelah kedaluwarsa, akses server dicabut dan file dihapus; hasil lokal yang disimpan tidak terpengaruh. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database.",
               "Terjemahan gambar tunggal: Hasil hanya digunakan kembali dalam akun yang sama ketika konten, mode, bahasa, dan konfigurasi efektif cocok dan permintaan yang valid tetap ada. Dokumen asli dan hasil tidak dibagikan ke seluruh pengguna. Browser menggabungkan overlay dengan gambar aslinya; server tidak menyimpan salinan asli permanen. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya.",
               "Untuk permintaan penghapusan akun atau yang lebih luas, hubungi kami untuk verifikasi identitas dan cakupan. Catatan transaksi, audit, atau keamanan mungkin memerlukan penyimpanan untuk kewajiban layanan, perselisihan, atau persyaratan yang berlaku. Tidak ada tenggat waktu penghapusan yang dijanjikan untuk semua catatan; tanggapannya akan menjelaskan hasil dan kendalanya."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Terjemahan seluruh PDF / ZIP / CBZ",
             "paragraphs": [
               "Terjemahan seluruh berkas memerlukan login. PDF / ZIP / CBZ terpilih diunggah langsung ke Cloudflare R2 privat. Node komputasi mengurai, mengenali dan merender halaman; model teks memproses teks dikenali yang diperlukan. R2 menyimpan masukan dan ZIP lengkap gambar terjemahan; basis data menyimpan tugas, teks dan penggunaan. Unggah/unduh memakai URL bertanda tangan berbatas waktu. Jangan bagikan; URL yang diterbitkan dapat tetap berlaku hingga kedaluwarsa.",
-              "Dokumen memiliki masa simpan tersendiri, bukan aturan jangka panjang lapisan gambar tunggal. Default: unggahan selesai dalam 1 jam; berkas terunggah yang belum dimulai kedaluwarsa setelah 24 jam; masukan selesai dan keluaran gagal dibersihkan setelah jeda 1 jam; ZIP berhasil disimpan 7 hari. Lihat waktu kedaluwarsa tugas. Masukan aktif atau belum pasti dapat ditahan untuk pemulihan. Berkas sementara node mengikuti prosedur pemulihan/pembersihan; catatan tugas, tagihan dan keamanan yang diperlukan disimpan terpisah. Unduhan server berakhir; salinan unduhan Anda kelola sendiri."
+              "Dokumen memiliki masa simpan tersendiri, bukan aturan penyimpanan lapisan gambar tunggal. Default: unggahan selesai dalam 1 jam; berkas terunggah yang belum dimulai kedaluwarsa setelah 24 jam; masukan selesai dan keluaran gagal dibersihkan setelah jeda 1 jam; ZIP berhasil disimpan 7 hari. Lihat waktu kedaluwarsa tugas. Masukan aktif atau belum pasti dapat ditahan untuk pemulihan. Berkas sementara node mengikuti prosedur pemulihan/pembersihan; catatan tugas, tagihan dan keamanan yang diperlukan disimpan terpisah. Unduhan server berakhir; salinan unduhan Anda kelola sendiri."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Apakah gambar diunggah atau disimpan?",
-        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil tetap bersifat pribadi selama akun Anda memiliki permintaan yang valid. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
+        "answer": "Saat menggunakan terjemahan resmi, aturan penyimpanan berikut berlaku. Untuk MTU, pemrosesan dan penyimpanan ditentukan oleh layanan yang Anda pilih. Ekstensi memakai terjemahan. Terjemahan mengirimkan gambar halaman yang dipilih ke backend dan penyedia yang relevan. Yang asli adalah file sementara di server pusat dan node komputasi, yang dihapus setelah tugas selesai, gagal, atau dibatalkan. Terjemahan menyimpan file overlay. Hasil gambar tunggal pribadi akun terdaftar disimpan selama 7 hari setelah tugas selesai secara default; durasinya dapat diatur administrator. Setelah kedaluwarsa, akses server dicabut dan file dihapus; hasil lokal yang disimpan tidak terpengaruh. Teks yang dikenali, terjemahan dan metadata yang diperlukan disimpan dalam database. Menghapus rekaman terjemahan akan segera mencabut akses server permintaan tersebut. Permintaan valid lainnya di akun Anda tetap dapat digunakan; file hasil dihapus setelah permintaan valid terakhir dicabut. Salinan yang diunduh atau disimpan dalam cache mungkin tetap ada di perangkat Anda sampai Anda menghapusnya. Cookie sumber, token login, dan riwayat penelusuran tidak diunggah.",
         "relatedPath": "/privacy/"
       },
       {

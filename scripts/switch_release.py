@@ -124,15 +124,22 @@ def main():
     if args.kind == 'api':
         if not args.port or not 1024 <= args.port <= 65535:
             parser.error('API activation requires a valid --port')
-        probe(f'http://127.0.0.1:{args.port}/health/ready', args.release)
         content = f'# release {args.release}\nserver 127.0.0.1:{args.port};\n'.encode()
     else:
         if not args.candidate_file:
             parser.error('Static activation requires --candidate-file')
         content = args.candidate_file.read_bytes()
-    # Verify the rollback target before changing anything.
+    # A broken old service must not prevent switching to a healthy replacement.
+    # Detect competing releases from the active include, not old HTTP readiness.
+    previous_content = args.active_file.read_bytes()
+
+    def preflight():
+        if args.active_file.read_bytes() != previous_content:
+            raise RuntimeError('Active configuration changed; inspect it before retrying')
+        if args.kind == 'api':
+            probe(f'http://127.0.0.1:{args.port}/health/ready', args.release)
+
     previous_probe = lambda: probe(args.probe_url, args.previous_release, static=args.kind == 'static')
-    previous_probe()
     command = ['docker', 'exec', args.openresty_container, 'openresty'] if args.openresty_container else [args.nginx_bin]
 
     def run_nginx(*options):
@@ -143,7 +150,7 @@ def main():
 
     activate(args.active_file, content, run_nginx,
              lambda: probe(args.probe_url, args.release, static=args.kind == 'static'),
-             verify_previous=previous_probe, preflight=previous_probe)
+             verify_previous=previous_probe, preflight=preflight)
     print(json.dumps({'active': args.release, 'previous': args.previous_release,
                       'old_processes': 'retained; drain before retirement'}))
 

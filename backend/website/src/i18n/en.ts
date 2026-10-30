@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Privacy policy",
         "description": "How NodeLane Comics handles accounts, images, permissions, translation, subscriptions and deletion.",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Website image translation and guest trials",
             "paragraphs": [
               "The website accepts JPG, PNG and WebP images. Original files, translation inputs, complete results and history are stored in this browser’s IndexedDB, not synced across devices. Clearing site data removes them. “Delete local record” removes only the local copy, not server tasks or audit records.",
               "Guest trials use Cloudflare Turnstile. Cloudflare processes browser and network signals needed for verification under its privacy policy; our verification requests do not include comic images. We use a secure HttpOnly session cookie lasting up to 30 days, HMAC network identifiers and daily counters retained for seven days to prevent abuse. These identifiers are pseudonymous, not a guarantee of complete anonymity.",
-              "Guest server results can be retrieved for 24 hours after a task ends, then access is revoked and files are reclaimed. Saved local results remain available. Inputs are removed at task completion; necessary task, cost and security records follow their respective retention rules. Long-term result retention below applies to registered accounts. Guests do not create an identity-provider account; signing in does not merge history. The default trial accepts up to five new images daily, with shared-network limits; failures also count."
+              "Guest server results can be retrieved for 24 hours after a task ends, then access is revoked and files are reclaimed. Saved local results remain available. Inputs are removed at task completion; necessary task, cost and security records follow their respective retention rules. The result retention period below applies to registered accounts. Guests do not create an identity-provider account; signing in does not merge history. The default trial accepts up to five new images daily, with shared-network limits; failures also count."
             ]
           },
           {
             "title": "Scope and contact",
             "paragraphs": [
-              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated 2026-10-17. Material changes will be explained on this page and communicated appropriately."
+              "This policy covers the NodeLane Comics website, extension, reader and translation services, maintained by the NodeLane Comics team. Contact comics@nodelane.net about privacy, access, correction or deletion. Updated 2026-10-30. Material changes will be explained on this page and communicated appropriately."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Retention and deletion",
             "paragraphs": [
-              "Single-image translation: Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database.",
+              "Single-image translation: Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Private single-image results for registered accounts are kept for 7 days after task completion by default, configurable by the administrator. After expiry, server access is revoked and files are reclaimed; saved local results are unaffected. Recognized text, translations and necessary metadata are stored in the database.",
               "Single-image translation: Results are reused only within the same account when content, mode, language and effective configuration match and a valid request remains. Originals and results are not shared across users. The browser combines overlays with its own original image; the server does not keep permanent original copies. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them.",
               "For account or broader deletion requests, contact us for identity and scope verification. Transaction, audit or security records may need retention for service obligations, disputes or applicable requirements. No single erasure deadline is promised for all records; the response will explain the outcome and constraints."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Whole PDF / ZIP / CBZ translation",
             "paragraphs": [
               "Whole-document translation requires sign-in. Selected PDF / ZIP / CBZ files upload directly to private Cloudflare R2. Compute nodes read, parse, recognize and render pages; text models process the necessary recognized text. R2 stores inputs and the complete translated-image ZIP; the database stores tasks, text and usage. Uploads and downloads use time-limited signed URLs. Do not share them; issued URLs may remain usable until expiry.",
-              "Documents have separate retention, not the long-term single-image overlay rules. By default, uploads must finish within 1 hour and uploaded but unstarted files expire after 24 hours. Inputs for active or unresolved tasks may remain for recovery. Terminal inputs and failed outputs are scheduled for cleanup after a default 1-hour delay; successful ZIPs remain for 7 days by default. Use the expiry shown on the task. Node temporary files follow recovery and cleanup procedures; necessary task, billing and security records are retained separately. Server downloads expire; downloaded copies remain under your control."
+              "Documents have separate retention, not the single-image overlay rules. By default, uploads must finish within 1 hour and uploaded but unstarted files expire after 24 hours. Inputs for active or unresolved tasks may remain for recovery. Terminal inputs and failed outputs are scheduled for cleanup after a default 1-hour delay; successful ZIPs remain for 7 days by default. Use the expiry shown on the task. Node temporary files follow recovery and cleanup procedures; necessary task, billing and security records are retained separately. Server downloads expire; downloaded copies remain under your control."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Are images uploaded or retained?",
-        "answer": "Using the official channel sends selected page images to NodeLane and relevant providers. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Results remain private while your account has a valid request. Recognized text, translations and necessary metadata are stored in the database. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them. Source cookies, login tokens and browsing history are not uploaded. Your own MTU follows its configured service and provider retention rules.",
+        "answer": "Using the official channel sends selected page images to NodeLane and relevant providers. Originals are temporary files on the central server and compute nodes, deleted after a task completes, fails or is cancelled. Translation keeps overlay files. Private single-image results for registered accounts are kept for 7 days after task completion by default, configurable by the administrator. After expiry, server access is revoked and files are reclaimed; saved local results are unaffected. Recognized text, translations and necessary metadata are stored in the database. Deleting a translation record immediately revokes that request’s server access. Other valid requests in your account remain usable; the result file is removed after the last valid request is revoked. Downloaded or cached copies may remain on your device until you clear them. Source cookies, login tokens and browsing history are not uploaded. Your own MTU follows its configured service and provider retention rules.",
         "relatedPath": "/privacy/"
       },
       {

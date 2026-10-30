@@ -348,7 +348,7 @@ export default {
     {
       "title": "Tradução e retenção",
       "paragraphs": [
-        "A extensão oferece tradução. A tradução utiliza reconhecimento, tradução de texto, limpeza e composição tipográfica. Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados permanecem privados enquanto sua conta tiver uma solicitação válida. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
+        "A extensão oferece tradução. A tradução utiliza reconhecimento, tradução de texto, limpeza e composição tipográfica. Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados privados de uma imagem de contas cadastradas são mantidos por padrão por 7 dias após a conclusão, com prazo configurável pelo administrador. Ao expirar, o acesso ao servidor é revogado e os arquivos são removidos; as cópias locais salvas não são afetadas. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
         "Os resultados são reutilizados somente na mesma conta quando o conteúdo, o modo, o idioma e a configuração efetiva correspondem e uma solicitação válida permanece. Originais e resultados não são compartilhados entre usuários. O navegador combina sobreposições com sua própria imagem original; o servidor não mantém cópias originais permanentes."
       ]
     },
@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Política de privacidade",
         "description": "Como NodeLane Comics lida com contas, imagens, permissões, tradução, assinaturas e exclusão.",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Tradução de imagens de sites e testes de convidados",
             "paragraphs": [
               "O site aceita imagens JPG, PNG e WebP. Arquivos originais, entradas de tradução, resultados completos e histórico são armazenados no IndexedDB deste navegador, não sincronizados entre dispositivos. Limpar os dados do site os remove. “Excluir registro local” remove apenas a cópia local, não tarefas do servidor ou registros de auditoria.",
               "Os testes de convidados usam o Cloudflare Turnstile. A Cloudflare processa sinais de navegador e de rede necessários para verificação de acordo com sua política de privacidade; nossos pedidos de verificação não incluem imagens de quadrinhos. Usamos um cookie de sessão HttpOnly seguro com duração de até 30 dias, identificadores de rede HMAC e contadores diários retidos por sete dias para evitar abusos. Esses identificadores são pseudônimos e não garantem anonimato completo.",
-              "Os resultados de convidados podem ser recuperados do servidor por 24 horas após o término da tarefa. Depois, o acesso é revogado e os arquivos são removidos. Os resultados salvos localmente continuam disponíveis. As imagens de entrada são removidas ao concluir a tarefa; registros necessários de tarefas, custos e segurança seguem suas próprias regras de retenção. A retenção de longo prazo descrita abaixo se aplica a contas cadastradas. Convidados não criam uma conta no provedor de identidade; fazer login não mescla os históricos. O teste padrão aceita até cinco novas imagens por dia, com limites compartilhados por rede; as falhas também contam."
+              "Os resultados de convidados podem ser recuperados do servidor por 24 horas após o término da tarefa. Depois, o acesso é revogado e os arquivos são removidos. Os resultados salvos localmente continuam disponíveis. As imagens de entrada são removidas ao concluir a tarefa; registros necessários de tarefas, custos e segurança seguem suas próprias regras de retenção. O prazo de retenção dos resultados descrito abaixo se aplica a contas cadastradas. Convidados não criam uma conta no provedor de identidade; fazer login não mescla os históricos. O teste padrão aceita até cinco novas imagens por dia, com limites compartilhados por rede; as falhas também contam."
             ]
           },
           {
             "title": "Escopo e contato",
             "paragraphs": [
-              "Esta política cobre o site NodeLane Comics, extensão, serviços de leitura e tradução, mantidos pela equipe NodeLane Comics. Entre em contato com comics@nodelane.net sobre privacidade, acesso, correção ou exclusão. Atualizado em 2026-10-17. As alterações materiais serão explicadas nesta página e comunicadas de forma adequada."
+              "Esta política cobre o site NodeLane Comics, extensão, serviços de leitura e tradução, mantidos pela equipe NodeLane Comics. Entre em contato com comics@nodelane.net sobre privacidade, acesso, correção ou exclusão. Atualizado em 2026-10-30. As alterações materiais serão explicadas nesta página e comunicadas de forma adequada."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Retenção e exclusão",
             "paragraphs": [
-              "Tradução de uma imagem: Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados permanecem privados enquanto sua conta tiver uma solicitação válida. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
+              "Tradução de uma imagem: Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados privados de uma imagem de contas cadastradas são mantidos por padrão por 7 dias após a conclusão, com prazo configurável pelo administrador. Ao expirar, o acesso ao servidor é revogado e os arquivos são removidos; as cópias locais salvas não são afetadas. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados.",
               "Tradução de uma imagem: Os resultados são reutilizados somente na mesma conta quando o conteúdo, o modo, o idioma e a configuração efetiva correspondem e uma solicitação válida permanece. Originais e resultados não são compartilhados entre usuários. O navegador combina sobreposições com sua própria imagem original; o servidor não mantém cópias originais permanentes. A exclusão de um registro de tradução revoga imediatamente o acesso ao servidor dessa solicitação. Outras solicitações válidas em sua conta permanecem utilizáveis; o arquivo de resultado é removido após a última solicitação válida ser revogada. As cópias baixadas ou armazenadas em cache podem permanecer no seu dispositivo até que você as apague.",
               "Para solicitações de exclusão de conta ou mais amplas, entre em contato conosco para verificação de identidade e escopo. Os registros de transações, auditorias ou segurança podem precisar de retenção para obrigações de serviço, disputas ou requisitos aplicáveis. Não é prometido um prazo único para eliminação de todos os registos; a resposta explicará o resultado e as restrições."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Tradução completa de PDF / ZIP / CBZ",
             "paragraphs": [
               "A tradução completa exige login. PDF / ZIP / CBZ selecionados são enviados diretamente ao Cloudflare R2 privado. Nós de processamento analisam, reconhecem e renderizam páginas; modelos de texto processam o texto reconhecido necessário. R2 guarda entradas e o ZIP completo de imagens traduzidas; o banco guarda tarefas, texto e uso. Envios e downloads usam URLs assinadas temporárias. Não compartilhe: uma URL emitida pode funcionar até expirar.",
-              "Documentos não seguem a retenção prolongada das camadas de imagens. Padrões: concluir envio em 1 hora; arquivos enviados não iniciados expiram em 24 horas; entradas encerradas e saídas com falha são limpas após 1 hora; ZIP bem-sucedidos ficam por 7 dias. Consulte a validade na tarefa. Entradas ativas ou com resultado incerto podem ficar para recuperação. Temporários dos nós seguem procedimentos de recuperação e limpeza; registros necessários de tarefas, cobrança e segurança são retidos separadamente. O download do servidor expira; cópias baixadas ficam sob seu controle."
+              "Documentos não seguem a retenção das camadas de imagens. Padrões: concluir envio em 1 hora; arquivos enviados não iniciados expiram em 24 horas; entradas encerradas e saídas com falha são limpas após 1 hora; ZIP bem-sucedidos ficam por 7 dias. Consulte a validade na tarefa. Entradas ativas ou com resultado incerto podem ficar para recuperação. Temporários dos nós seguem procedimentos de recuperação e limpeza; registros necessários de tarefas, cobrança e segurança são retidos separadamente. O download do servidor expira; cópias baixadas ficam sob seu controle."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "As imagens são carregadas ou retidas?",
-        "answer": "Ao usar a tradução oficial, aplicam-se as seguintes regras de retenção. A tradução envia imagens de páginas selecionadas para o back-end e provedores relevantes. Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados permanecem privados enquanto sua conta tiver uma solicitação válida. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados. A exclusão de um registro de tradução revoga imediatamente o acesso ao servidor dessa solicitação. Outras solicitações válidas em sua conta permanecem utilizáveis; o arquivo de resultado é removido após a última solicitação válida ser revogada. As cópias baixadas ou armazenadas em cache podem permanecer no seu dispositivo até que você as apague. Cookies de origem, tokens de login e histórico de navegação não são carregados. A extensão oferece tradução. Com MTU, as imagens são enviadas diretamente ao serviço selecionado; o processamento e a retenção dependem da configuração dele.",
+        "answer": "Ao usar a tradução oficial, aplicam-se as seguintes regras de retenção. A tradução envia imagens de páginas selecionadas para o back-end e provedores relevantes. Os originais são arquivos temporários no servidor central e nos nós de computação, excluídos após a conclusão, falha ou cancelamento de uma tarefa. A tradução mantém arquivos sobrepostos. Os resultados privados de uma imagem de contas cadastradas são mantidos por padrão por 7 dias após a conclusão, com prazo configurável pelo administrador. Ao expirar, o acesso ao servidor é revogado e os arquivos são removidos; as cópias locais salvas não são afetadas. Texto reconhecido, traduções e metadados necessários são armazenados no banco de dados. A exclusão de um registro de tradução revoga imediatamente o acesso ao servidor dessa solicitação. Outras solicitações válidas em sua conta permanecem utilizáveis; o arquivo de resultado é removido após a última solicitação válida ser revogada. As cópias baixadas ou armazenadas em cache podem permanecer no seu dispositivo até que você as apague. Cookies de origem, tokens de login e histórico de navegação não são carregados. A extensão oferece tradução. Com MTU, as imagens são enviadas diretamente ao serviço selecionado; o processamento e a retenção dependem da configuração dele.",
         "relatedPath": "/privacy/"
       },
       {

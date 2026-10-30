@@ -10732,6 +10732,12 @@
             "minimum": 0.0,
             "title": "Free Daily Pages"
           },
+          "image_result_retention_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Image Result Retention Days"
+          },
           "free_images_per_minute": {
             "type": "integer",
             "maximum": 10000.0,
@@ -10827,6 +10833,7 @@
         "type": "object",
         "required": [
           "free_daily_pages",
+          "image_result_retention_days",
           "free_images_per_minute",
           "plus_images_per_minute",
           "upload_user_concurrency",

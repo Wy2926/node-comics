@@ -591,7 +591,8 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
             );
           }
         }
-        if (snapshot?.state === 'succeeded') {
+        if (snapshot?.error?.code === 'RESULT_EXPIRED' && !data.result) throw new TranslationError('RESULT_EXPIRED');
+        if (snapshot?.state === 'succeeded' && snapshot.error?.code !== 'RESULT_EXPIRED') {
           if (!snapshot.result) throw new TranslationError('NETWORK_ERROR');
           const artifact = snapshot.result.artifact
             ? await (
@@ -656,7 +657,10 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     }
   }
   async function again(meta: RecordMeta,regenerate=false) {
-    if (meta.mode !== 'classic' || (regenerate?meta.state!=='succeeded':meta.state!=='failed')) return;
+    if (meta.mode !== 'classic') return;
+    const expired = meta.snapshot?.error?.code === 'RESULT_EXPIRED';
+    if (regenerate?meta.state!=='succeeded'&&!expired:meta.state!=='failed') return;
+    regenerate ||= expired;
     if(regenerate&&!selectedModelAvailable(caps?.translation_models,effectiveModelId)){setError(modelsCopy.not_allowed);return;}
     if (!meta.requestId) {
       await run([meta]);

@@ -18,11 +18,12 @@ from app.config import settings
 from app.db import engine, session_factory
 from app.models import User, now, uid
 from app.system_settings import (RequestLimits, SystemSettings, SystemSettingsUpdate, get_request_limits,
-    initialize_system_settings, put_system_settings, router, settings_json)
+    initialize_system_settings, put_system_settings, router, settings_json, DATABASE_DEFAULTS)
 from app.translation_prompts import MAX_PROMPT_LENGTH, PROMPT_DEFAULTS
 from test_classic import text_database
 
 DEFAULTS = {
+    **DATABASE_DEFAULTS,
     "free_daily_pages": 30,
     "free_images_per_minute": 10, "plus_images_per_minute": 100,
     "upload_user_concurrency": 10, "upload_global_concurrency": 16,
@@ -47,10 +48,26 @@ def test_main_application_exposes_system_settings(client):
     assert conflict.status_code == 409 and conflict.json()["error"]["code"] == "SYSTEM_SETTINGS_CONFLICT"
 
 
+def test_database_settings_allow_future_fields_without_dropping_them(client):
+    auth = login(client, 'admin')
+    current = client.get(PATH, headers=auth).json()
+    with session_factory()() as db:
+        row = db.get(SystemSettings, 1)
+        row.values = {**row.values, 'future_additive_setting': 42}
+        db.commit()
+    assert client.get(PATH, headers=auth).status_code == 200
+    response = client.put(PATH, headers=auth, json={'expected_version': current['version'],
+        'values': {**current['values'], 'image_result_retention_days': 14}})
+    assert response.status_code == 200
+    with session_factory()() as db:
+        assert get_request_limits(db).image_result_retention_days == 14
+        assert db.get(SystemSettings, 1).values['future_additive_setting'] == 42
+
+
 @pytest.fixture
 def system_case(text_database):
     for name, value in DEFAULTS.items():
-        if name not in PROMPT_DEFAULTS:
+        if name not in PROMPT_DEFAULTS and name not in DATABASE_DEFAULTS:
             setattr(settings(), name, value)
     with session_factory()() as db:
         operator = User(id=uid(), subject="settings-admin", name="Admin", role="admin")
@@ -90,6 +107,8 @@ def test_only_administrators_can_read_and_change_settings(system_case):
 
 
 @pytest.mark.parametrize("change", [
+    {"image_result_retention_days": 0}, {"image_result_retention_days": 366},
+    {"image_result_retention_days": True}, {"image_result_retention_days": 1.5},
     {"free_images_per_minute": 0}, {"plus_images_per_minute": 10001}, {"free_images_per_minute": True},
     {"upload_user_concurrency": 0}, {"upload_user_concurrency": 33},
     {"upload_global_concurrency": 129}, {"upload_user_concurrency": True},
@@ -114,7 +133,7 @@ def test_invalid_values_do_not_change_settings(system_case, change):
 
 def test_complete_values_and_consistent_limits_are_required(system_case):
     case = system_case
-    for field in ("upload_user_concurrency", "guest_daily_limit", "guest_network_daily_limit", "guest_global_daily_limit",
+    for field in ("image_result_retention_days", "upload_user_concurrency", "guest_daily_limit", "guest_network_daily_limit", "guest_global_daily_limit",
                   *PROMPT_DEFAULTS):
         missing = {name: value for name, value in DEFAULTS.items() if name != field}
         assert case.client.put(PATH, headers=case.auth,
@@ -200,7 +219,7 @@ def test_environment_only_seeds_once_and_initializer_leaves_commit_to_caller(sys
 def test_legacy_row_exposes_defaults_without_mutating_saved_settings(system_case):
     case = system_case
     legacy = {name: value for name, value in DEFAULTS.items()
-              if not name.startswith("guest_") and name not in PROMPT_DEFAULTS}
+              if not name.startswith("guest_") and name not in PROMPT_DEFAULTS and name not in DATABASE_DEFAULTS}
     with session_factory()() as db:
         db.add(SystemSettings(id=1, version=7, values=legacy, updated_at=now(),
                               updated_by=case.owner_id))

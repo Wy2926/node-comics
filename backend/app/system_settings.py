@@ -18,6 +18,7 @@ from .request_models import RequestBody
 from .translation_prompts import MAX_PROMPT_LENGTH, PROMPT_DEFAULTS
 
 router = APIRouter(prefix="/v1/admin/system-settings", tags=["system settings"])
+DATABASE_DEFAULTS = {'image_result_retention_days': 7}
 
 
 class RequestLimits(RequestBody):
@@ -25,6 +26,7 @@ class RequestLimits(RequestBody):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, allow_inf_nan=False)
 
     free_daily_pages: int = Field(ge=0, le=1000000)
+    image_result_retention_days: int = Field(ge=1, le=365)
 
     free_images_per_minute: int = Field(ge=1, le=10000)
     plus_images_per_minute: int = Field(ge=1, le=10000)
@@ -85,7 +87,8 @@ def initialize_system_settings(db):
         return row
     cfg = settings()
     values = RequestLimits.model_validate({**{name: getattr(cfg, name)
-        for name in RequestLimits.model_fields if name not in PROMPT_DEFAULTS}, **PROMPT_DEFAULTS})
+        for name in RequestLimits.model_fields if name not in PROMPT_DEFAULTS and name not in DATABASE_DEFAULTS},
+        **DATABASE_DEFAULTS, **PROMPT_DEFAULTS})
     if db.get_bind().dialect.name == "postgresql":
         from sqlalchemy.dialects.postgresql import insert
     else:
@@ -100,12 +103,18 @@ def stored_limits(values):
     # Existing versioned rows predate guest controls and editable prompts. Do not overwrite their
     # settings or versions during reads; a complete PUT persists the new fields.
     return RequestLimits.model_validate({'guest_daily_limit': 5,
-        'guest_network_daily_limit': 100, 'guest_global_daily_limit': 10000, **PROMPT_DEFAULTS, **values})
+        'guest_network_daily_limit': 100, 'guest_global_daily_limit': 10000, **DATABASE_DEFAULTS, **PROMPT_DEFAULTS,
+        **{key: value for key, value in values.items() if key in RequestLimits.model_fields}})
 
 
 def get_request_limits(db):
     """Use the supplied transaction/connection; never cache across requests."""
-    return stored_limits(initialize_system_settings(db).values)
+    if db.info.get('guest_network') and 'guest_limits' in db.info:
+        return db.info['guest_limits']
+    limits = stored_limits(initialize_system_settings(db).values)
+    if db.info.get('guest_network'):
+        db.info['guest_limits'] = limits  # Cleared by the guest operation's finally block.
+    return limits
 
 
 def settings_json(row):
@@ -139,7 +148,7 @@ def put_system_settings(body: SystemSettingsUpdate, user: User = Depends(admin),
     before = settings_json(previous)
     row = db.scalar(update(SystemSettings).where(SystemSettings.id == 1,
         SystemSettings.version == body.expected_version).values(
-            version=SystemSettings.version + 1, values=body.values.model_dump(),
+            version=SystemSettings.version + 1, values={**previous.values, **body.values.model_dump()},
             updated_at=now(), updated_by=user.id).returning(SystemSettings)
         .execution_options(populate_existing=True))
     if row is None:

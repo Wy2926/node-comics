@@ -129,7 +129,9 @@ def cleanup(db):
     lock_scheduler(db)
     orphan_cutoff = now() - timedelta(seconds=max(3600, settings().upload_body_timeout_seconds * 2))
     from .guests import expire_guests
+    from .result_retention import expire_registered_results
     expire_guests(db)
+    expire_registered_results(db)
     orphan_results = list(db.scalars(select(Asset).outerjoin(Job, Job.output_asset_id == Asset.id).where(
         Asset.kind != "original", Asset.deleted_at.is_(None), Asset.created_at <= orphan_cutoff,
         Job.id.is_(None)).limit(100)))

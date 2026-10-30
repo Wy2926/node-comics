@@ -18,7 +18,8 @@ test('prepaid terms and refund pages disclose no renewal, queued purchases and m
 test('all policies have an explicit revision and preserve separate data-processing disclosures', () => {
   for (const locale of locales) {
     const {policies} = dictionaries[locale].documents;
-    for (const policy of Object.values(policies)) assert.equal(policy.updated, '2026-10-17', locale);
+    for (const [key, policy] of Object.entries(policies))
+      assert.equal(policy.updated, key === 'privacy' ? '2026-10-30' : '2026-10-17', locale);
     const privacy = policies.privacy.sections.flatMap(section => section.paragraphs).join('\n');
     for (const required of ['localStorage', 'sessionStorage', 'IndexedDB', 'Cloudflare R2', 'PDF', 'ZIP', 'CBZ', 'Google Analytics 4', '14']) {
       assert.ok(privacy.includes(required), `${locale}: missing privacy disclosure ${required}`);

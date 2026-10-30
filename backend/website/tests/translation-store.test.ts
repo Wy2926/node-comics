@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRecords, readImages, removeRecord, removeRecords, saveRecord, storageBytes, type RecordMeta } from '../src/lib/translation-store';
+import { listRecords, readImages, removeRecord, removeRecords, saveRecord, storageBytes, localSnapshotState, type RecordMeta } from '../src/lib/translation-store';
 import { translationCacheCopy } from '../src/i18n/translation-cache';
 import { locales } from '../src/i18n/locales';
 
@@ -11,6 +11,12 @@ async function seed(id: string, scope: string) {
   await saveRecord(meta, { id, source, input, result });
   return meta.bytes;
 }
+
+test('expired server results retain local copies without waiting for an unavailable download', () => {
+  const snapshot = {id:'expired', state:'succeeded' as const, error:{code:'RESULT_EXPIRED',message:'expired'}};
+  assert.equal(localSnapshotState(snapshot, false), 'failed');
+  assert.equal(localSnapshotState(snapshot, true), 'succeeded');
+});
 
 test('bulk clearing removes metadata and every image blob, preserves other histories, and is repeatable', async () => {
   await seed('draft', 'draft:local');

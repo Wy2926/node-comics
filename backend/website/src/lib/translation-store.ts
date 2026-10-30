@@ -20,6 +20,7 @@ export interface Snapshot {
 }
 // Server completion is not local completion until the full image is durable.
 export function localSnapshotState(snapshot: Snapshot, hasResult: boolean) {
+  if (snapshot.error?.code === 'RESULT_EXPIRED') return hasResult ? 'succeeded' : 'failed';
   return snapshot.state === 'succeeded' && !hasResult
     ? 'receiving'
     : snapshot.state;

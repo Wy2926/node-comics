@@ -8,6 +8,9 @@ from conftest import login_plus as login, request_record, create, upload, run_jo
 from app.db import session_factory
 from app.models import Asset, Job, Ledger
 from app.assets import object_path
+from datetime import timedelta
+from app.models import now
+from conftest import configure_system_limits
 
 
 def finished(client, png, monkeypatch):
@@ -142,3 +145,114 @@ def test_open_result_stream_survives_concurrent_unlink(client, png, monkeypatch)
     response = client.get('/v1/translations/' + request + '/result', headers=auth)
     assert response.status_code == 200 and response.content == png
     assert not path.exists()
+
+
+def test_database_retention_changes_reads_reuse_and_bounded_cleanup(client, png, monkeypatch):
+    from app.dispatcher import cleanup
+    from app.translation_requests import TranslationRequest
+    auth, source, job_id, request = finished(client, png, monkeypatch)
+    alias = submit_asset(client, auth, source, key=uuid4().hex).json()['id']
+    with session_factory()() as db:
+        entry = db.get(Job, job_id)
+        entry.completed_at = now() - timedelta(days=8)
+        output = db.get(Asset, entry.output_asset_id)
+        path = object_path(output.storage_key)
+        owner, asset_id = entry.owner_id, output.id
+        db.commit()
+        ledger_count = db.scalar(select(func.count()).select_from(Ledger))
+    url = '/v1/translations/' + request
+    assert client.get(url, headers=auth).json()['error']['code'] == 'RESULT_EXPIRED'
+    assert client.get(url + '/result', headers=auth).status_code == 410
+    assert path.exists()  # Read expiry does not wait for, or perform, file cleanup.
+    configure_system_limits(image_result_retention_days=10)
+    assert client.get(url + '/result', headers=auth).status_code == 200
+    assert submit_asset(client, auth, source, key=uuid4().hex).json()['state'] == 'succeeded'
+    configure_system_limits(image_result_retention_days=7)
+    with session_factory()() as db:
+        cleanup(db)
+        cleanup(db)
+        assert db.get(Asset, asset_id).purged_at
+        assert db.get(Job, job_id).status == 'succeeded'
+        for key in (request, alias):
+            assert db.get(TranslationRequest, (owner, key)).revoked_at
+        assert db.scalar(select(func.count()).select_from(Ledger)) == ledger_count
+        assert db.scalar(select(func.count()).select_from(Job)) == 1
+    assert not path.exists()
+    configure_system_limits(image_result_retention_days=30)
+    assert client.get(url, headers=auth).json()['error']['code'] == 'RESULT_EXPIRED'
+    assert client.get(url + '/result', headers=auth).status_code == 410
+    assert client.get(url + '/result', headers=login(client, 'other')).status_code == 404
+    regenerated = client.put('/v1/translations/' + str(uuid4()), headers=auth, json={'regenerate_of': request})
+    assert regenerated.status_code == 202, regenerated.text
+    assert regenerated.json()['state'] == 'needs_input'
+    assert client.get(url, headers=auth).json()['error']['code'] == 'RESULT_EXPIRED'
+
+
+def test_expiry_boundary_and_live_tasks_are_not_deleted(client, png, monkeypatch):
+    from app import result_retention
+    from app.dispatcher import cleanup
+    auth, _, job_id, request = finished(client, png, monkeypatch)
+    at = now()
+    monkeypatch.setattr(result_retention, 'now', lambda: at)
+    with session_factory()() as db:
+        entry = db.get(Job, job_id)
+        entry.completed_at = at - timedelta(days=7) + timedelta(microseconds=1)
+        assert not result_retention.result_expired(db, entry)
+        entry.completed_at -= timedelta(microseconds=1)
+        assert result_retention.result_expired(db, entry)
+        entry.status, entry.completed_at = 'running', None
+        entry.created_at = at - timedelta(days=30)
+        path = object_path(db.get(Asset, entry.output_asset_id).storage_key)
+        db.commit()
+        cleanup(db)
+        assert path.exists() and not db.get(Job, job_id).discard_output
+
+
+def test_expired_result_cannot_be_reused_or_replayed_before_cleanup(client, png, monkeypatch):
+    from app.translation_requests import TranslationRequest
+    auth, source, job_id, request = finished(client, png, monkeypatch)
+    with session_factory()() as db:
+        entry = db.get(Job, job_id)
+        entry.completed_at = now() - timedelta(days=8)
+        old = db.get(TranslationRequest, (entry.owner_id, request))
+        body = {key: value for key, value in old.descriptor.items() if key in {'image', 'mode', 'target_language'}}
+        db.commit()
+    # A read is never a paid retry; only a new explicit submission can create work.
+    assert client.put('/v1/translations/' + request, headers=auth, json=body).status_code == 410
+    fresh = submit_asset(client, auth, source, key=uuid4().hex)
+    assert fresh.status_code == 202 and fresh.json()['state'] == 'queued'  # Fixture uploads the retained local source.
+    with session_factory()() as db:
+        assert db.scalar(select(func.count()).select_from(Job)) == 2
+
+
+def test_expiry_index_and_failed_unlink_are_retryable(client, png, monkeypatch):
+    from sqlalchemy import text
+    from app.models import IMAGE_RESULT_EXPIRY_FILTER
+    from app.dispatcher import cleanup
+    from app.storage import LocalStore
+    auth, _, job_id, request = finished(client, png, monkeypatch)
+    with session_factory()() as db:
+        job = db.get(Job, job_id)
+        job.completed_at = now() - timedelta(days=8)
+        output = db.get(Asset, job.output_asset_id)
+        path, output_id = object_path(output.storage_key), output.id
+        db.commit()
+        # Representative history: reclaimed rows must not dominate the pending-expiry scan.
+        template = dict(db.execute(select(Job.__table__).where(Job.id == job_id)).mappings().one())
+        db.execute(Job.__table__.insert(), [{**template, 'id': str(uuid4()), 'idempotency_key': str(uuid4()),
+            'discard_output': True, 'input_asset_id': None, 'output_asset_id': None} for _ in range(2000)])
+        db.execute(text('ANALYZE'))
+        plan = db.execute(text('EXPLAIN QUERY PLAN SELECT id FROM jobs WHERE ' + IMAGE_RESULT_EXPIRY_FILTER +
+            ' AND completed_at <= :cutoff ORDER BY completed_at, id LIMIT 100'), {'cutoff': now()}).all()
+        assert 'ix_jobs_image_result_expiry' in str(plan)
+        original_delete = LocalStore.delete
+        monkeypatch.setattr(LocalStore, 'delete', lambda *_: (_ for _ in ()).throw(OSError('busy')))
+        cleanup(db)
+        assert path.exists() and output.deleted_at and output.purged_at is None
+        assert client.get('/v1/translations/' + request + '/result', headers=auth).status_code == 410
+        monkeypatch.setattr(LocalStore, 'delete', original_delete)
+        cleanup(db)
+        db.expire_all()
+        assert not path.exists() and db.get(Asset, output_id).purged_at
+        cleanup(db)
+        assert db.scalar(select(func.count()).select_from(Ledger).where(Ledger.kind == 'settle')) == 1

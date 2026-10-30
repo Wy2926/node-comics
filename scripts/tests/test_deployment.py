@@ -7,7 +7,10 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from switch_release import activate, probe, release_lock
+from switch_release import main as switch_main
+from retire_release import main as retire_main
 from prepare_static_release import main as prepare_main, prepare
+import json
 
 
 class ReleaseTests(unittest.TestCase):
@@ -44,6 +47,79 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(calls, [('-t',), ('-s', 'reload')])
         self.assertEqual(self.active.read_bytes(), b'new')
         self.assertEqual(self.active.with_suffix('.inc.previous').read_bytes(), b'old')
+
+    def switch_args(self):
+        return ['switch_release.py', 'api', '--active-file', str(self.active), '--release', 'new',
+                '--previous-release', 'old', '--probe-url', 'http://proxy/health/ready',
+                '--port', '18089', '--nginx-bin', 'nginx']
+
+    def test_unhealthy_old_release_does_not_block_healthy_replacement(self):
+        calls = []
+        def ready(url, release, **kwargs):
+            calls.append((url, release))
+            if release == 'old':
+                raise RuntimeError('old release is unavailable')
+        with patch('sys.argv', self.switch_args()), patch('switch_release.probe', side_effect=ready), \
+                patch('switch_release.subprocess.run') as run, patch('builtins.print'):
+            run.return_value.returncode = 0
+            switch_main()
+        self.assertEqual(calls, [('http://127.0.0.1:18089/health/ready', 'new'), ('http://proxy/health/ready', 'new')])
+        self.assertIn(b'18089', self.active.read_bytes())
+
+    def test_unready_candidate_does_not_replace_or_reload(self):
+        with patch('sys.argv', self.switch_args()), patch('switch_release.probe', side_effect=RuntimeError('unready')), \
+                patch('switch_release.subprocess.run') as run, self.assertRaisesRegex(RuntimeError, 'unready'):
+            switch_main()
+        run.assert_not_called()
+        self.assertEqual(self.active.read_bytes(), b'old')
+
+    def test_competing_activation_is_not_overwritten(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def competing_lock(_):
+            self.active.write_bytes(b'competing')
+            yield
+        with patch('sys.argv', self.switch_args()), patch('switch_release.release_lock', competing_lock), \
+                patch('switch_release.subprocess.run') as run, self.assertRaisesRegex(RuntimeError, 'configuration changed'):
+            switch_main()
+        run.assert_not_called()
+        self.assertEqual(self.active.read_bytes(), b'competing')
+
+    def test_failed_rollback_health_is_reported_without_claiming_recovery(self):
+        def unready():
+            raise RuntimeError('unavailable')
+        with self.assertRaisesRegex(RuntimeError, 'recovery requires operator attention'):
+            activate(self.active, b'new', lambda *args: None, unready, verify_previous=unready, timeout=0)
+        self.assertEqual(self.active.read_bytes(), b'old')
+
+    def test_retirement_uses_active_port_not_release_inequality(self):
+        argv = ['retire_release.py', 'api', '--container', 'old-slot', '--release', 'same',
+                '--active-dir', str(self.root), '--openresty-container', 'proxy', '--port', '18088',
+                '--active-release', 'same', '--probe-url', 'http://proxy/health/ready']
+        info = {'Id': 'frozen-container-id', 'Config': {'Env': ['RELEASE_ID=same'],
+            'Labels': {'com.docker.compose.service': 'api-blue'}},
+            'HostConfig': {'PortBindings': {'8000/tcp': [{'HostPort': '18088', 'HostIp': '127.0.0.1'}]}},
+            'State': {'Running': True}}
+        calls = []
+        def docker(*args):
+            calls.append(args)
+            if args == ('inspect', 'old-slot'):
+                return json.dumps([info])
+            if args[:2] == ('inspect', '--format'):
+                return json.dumps({'Running': False, 'ExitCode': 0})
+            return ''
+        for port in (18088, 18089):
+            calls.clear()
+            self.active.write_text(f'server 127.0.0.1:{port};', encoding='utf-8')
+            with patch('sys.argv', argv), patch('retire_release.docker', side_effect=docker), \
+                    patch('retire_release.probe'), patch('builtins.print'):
+                if port == 18088:
+                    with self.assertRaisesRegex(RuntimeError, 'still in the active upstream'):
+                        retire_main()
+                    self.assertFalse(any(call[0] == 'kill' for call in calls))
+                else:
+                    retire_main()
+                    self.assertIn(('kill', '--signal=TERM', 'frozen-container-id'), calls)
 
     def test_bad_config_and_failed_probe_restore_old_config(self):
         for fail_test in (True, False):

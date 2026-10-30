@@ -341,6 +341,24 @@ it.each(['failed','succeeded'] as const)('reuses frozen scaled metadata and cach
   expect(next.image).toEqual(previous.image);expect(next.inputSize).toEqual(previous.inputSize);expect(next.inputProfile).toBe(previous.inputProfile);
   expect(upload).toHaveBeenCalledOnce();expect(await hashFile(upload.mock.calls[0][1])).toBe(previous.image.sha256);expect(encode).toHaveBeenCalledOnce();
 });
+it('does not automatically resubmit expired results and uses regenerate only after manual action',async()=>{
+  const f=fixture(),t=target(1),previous=makeOperation(t,f.core.scope,'zh-Hans',originalInput(1));
+  previous.state='accepted';
+  previous.result=snapshot(previous.requestId,previous.request,{state:'succeeded',result:null,
+    error:{code:'RESULT_EXPIRED',message:'expired'}});
+  const projected=translationJob(previous.result,previous);
+  expect(projected).toMatchObject({status:'succeeded',result_expired:true,result_available:false});
+  expect(projected.result).toBeUndefined();
+  t.page.jobs=[projected];await saveReceipt(previous,projected);
+  vi.mocked(f.api.translations).mockResolvedValue({items:[previous.result],missing_ids:[],unchanged:false,etag:'expired'});
+  await f.core.submit([t]);await f.core.submit([t]);
+  expect(f.submit).not.toHaveBeenCalled();
+  f.submit.mockImplementationOnce(async(id,body)=>snapshot(id,body,{state:'needs_input'}));
+  vi.spyOn(f.api,'translationInput').mockImplementation(async(id)=>snapshot(id,previous.request));
+  await f.core.manual(t);await f.core.finishUploads();
+  expect(f.submit).toHaveBeenCalledOnce();
+  expect(f.submit.mock.calls[0][1]).toEqual({regenerate_of:previous.requestId});
+});
 it.each([true,false])('rebuilds a mis-sized no-text upload only on explicit retry, with local operation=%s',async stored=>{
   const f=fixture(),t=target(1),source=jpegWithSize(800,20687,2*1024*1024),sha=await hashFile(source),output=jpegWithSize(800,20687);
   Object.assign(t.page,{width:800,height:20687,imageSha256:sha,imageByteSize:source.size,imageMime:source.type,translationScope:f.core.scope});

@@ -34,8 +34,8 @@ def get_db():
         yield session
 
 
-def initialize():
-    """Explicit migration helper; never called by serving processes."""
+def load_models():
+    """Register the same model contract for migration and startup validation."""
     from . import translation_models  # noqa: F401
     from . import models  # noqa: F401
     from . import health_models  # noqa: F401
@@ -51,6 +51,11 @@ def initialize():
     from . import support_requests  # noqa: F401
     from . import comic_title_cache  # noqa: F401
     from .documents import models as document_models  # noqa: F401
+
+
+def initialize():
+    """Explicit migration helper; never called by serving processes."""
+    load_models()
     from alembic import command
     from alembic.config import Config
     from pathlib import Path

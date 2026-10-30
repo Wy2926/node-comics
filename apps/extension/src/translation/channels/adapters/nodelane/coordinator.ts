@@ -20,7 +20,7 @@ const active=(r:LocalOperation)=>r.state==='uncertain'||r.state==='accepted'&&!!
 const policyKey=(rights:Entitlements|undefined)=>rights?new Sha256().update(new TextEncoder().encode(JSON.stringify(rights))).digest():undefined;
 /** The reader keeps its display model; server resources are always public translation UUIDs. */
 export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperation):Job{
-  const unavailable=snapshot.error?.code==='TRANSLATION_UNAVAILABLE';
+  const unavailable=['TRANSLATION_UNAVAILABLE','RESULT_EXPIRED'].includes(snapshot.error?.code??'');
   const result=snapshot.state==='succeeded'&&snapshot.result&&!unavailable?{key:snapshot.result.artifact?.sha256??snapshot.id,recoverable:true}:undefined;
   return {id:snapshot.id,result,delivery:snapshot.result??undefined,model:snapshot.model,requested_model_id:snapshot.requested_model_id??record?.modelId,font_id:snapshot.font_id===undefined?record?.fontId:snapshot.font_id,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,source_image_sha256:record?.sourceSha256,input_profile:record?.inputProfile,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
 }

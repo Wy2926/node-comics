@@ -349,7 +349,7 @@ export default {
     {
       "title": "Dịch và lưu giữ",
       "paragraphs": [
-        "Tiện ích dùng dịch với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi có yêu cầu hợp lệ; khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
+        "Tiện ích dùng dịch với nhận diện/OCR, dịch chữ, sửa nền cục bộ và dàn chữ. Ảnh gốc chính thức xóa sau hoàn thành, thất bại hoặc hủy; kết quả lưu lớp phủ. Kết quả ảnh đơn riêng tư của tài khoản đã đăng ký mặc định giữ 7 ngày sau khi hoàn thành, do quản trị viên cấu hình; hết hạn sẽ xóa tệp máy chủ, không ảnh hưởng bản lưu cục bộ. khách lấy được kết quả trong 24 giờ sau tác vụ. MTU xử lý và lưu giữ theo dịch vụ riêng.",
         "Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn."
       ]
     },
@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Chính sách bảo mật",
         "description": "Cách NodeLane Comics xử lý tài khoản, hình ảnh, quyền, bản dịch, đăng ký và xóa.",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Dịch hình ảnh website và khách dùng thử",
             "paragraphs": [
               "Trang web chấp nhận hình ảnh JPG, PNG và WebP. Các tệp gốc, đầu vào bản dịch, kết quả hoàn chỉnh và lịch sử được lưu trữ trong IndexedDB của trình duyệt này, không được đồng bộ hóa trên các thiết bị. Xóa dữ liệu trang web sẽ loại bỏ chúng. “Xóa bản ghi cục bộ” chỉ xóa bản sao cục bộ chứ không xóa tác vụ máy chủ hoặc bản ghi kiểm tra.",
               "Khách dùng thử sử dụng Cloudflare Turnstile. Cloudflare xử lý các tín hiệu mạng và trình duyệt cần thiết để xác minh theo chính sách quyền riêng tư của mình; yêu cầu xác minh của chúng tôi không bao gồm hình ảnh truyện tranh. Chúng tôi sử dụng cookie phiên HttpOnly an toàn kéo dài tới 30 ngày, số nhận dạng mạng HMAC và bộ đếm hàng ngày được giữ lại trong bảy ngày để ngăn chặn hành vi lạm dụng. Những số nhận dạng này là bút danh, không đảm bảo tính ẩn danh hoàn toàn.",
-              "Kết quả của máy chủ khách có thể được truy xuất trong 24 giờ sau khi tác vụ kết thúc, sau đó quyền truy cập sẽ bị thu hồi và các tệp được lấy lại. Kết quả cục bộ đã lưu vẫn có sẵn. Đầu vào được loại bỏ khi hoàn thành nhiệm vụ; các hồ sơ nhiệm vụ, chi phí và bảo mật cần thiết tuân theo các quy tắc lưu giữ tương ứng. Việc duy trì kết quả lâu dài dưới đây áp dụng cho các tài khoản đã đăng ký. Khách không tạo tài khoản nhà cung cấp danh tính; đăng nhập không hợp nhất lịch sử. Bản dùng thử mặc định chấp nhận tối đa năm hình ảnh mới hàng ngày, với giới hạn mạng chia sẻ; thất bại cũng được tính."
+              "Kết quả của máy chủ khách có thể được truy xuất trong 24 giờ sau khi tác vụ kết thúc, sau đó quyền truy cập sẽ bị thu hồi và các tệp được lấy lại. Kết quả cục bộ đã lưu vẫn có sẵn. Đầu vào được loại bỏ khi hoàn thành nhiệm vụ; các hồ sơ nhiệm vụ, chi phí và bảo mật cần thiết tuân theo các quy tắc lưu giữ tương ứng. Thời hạn lưu kết quả dưới đây áp dụng cho các tài khoản đã đăng ký. Khách không tạo tài khoản nhà cung cấp danh tính; đăng nhập không hợp nhất lịch sử. Bản dùng thử mặc định chấp nhận tối đa năm hình ảnh mới hàng ngày, với giới hạn mạng chia sẻ; thất bại cũng được tính."
             ]
           },
           {
             "title": "Phạm vi và liên hệ",
             "paragraphs": [
-              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 2026-10-17. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
+              "Chính sách này áp dụng cho trang web NodeLane Comics, các dịch vụ mở rộng, trình đọc và dịch thuật, do nhóm NodeLane Comics duy trì. Liên hệ comics@nodelane.net về quyền riêng tư, quyền truy cập, chỉnh sửa hoặc xóa. Cập nhật ngày 2026-10-30. Những thay đổi quan trọng sẽ được giải thích trên trang này và được thông báo một cách thích hợp."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Giữ lại và xóa",
             "paragraphs": [
-              "Dịch ảnh đơn: Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký còn giữ khi có yêu cầu hợp lệ; chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
+              "Dịch ảnh đơn: Ảnh gốc chính thức lưu tạm trên máy chủ trung tâm và nút tính toán, rồi xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả ảnh đơn riêng tư của tài khoản đã đăng ký mặc định được giữ 7 ngày sau khi hoàn thành, do quản trị viên cấu hình. Khi hết hạn, quyền truy cập máy chủ bị thu hồi và tệp được xóa; bản lưu cục bộ không bị ảnh hưởng. chữ nhận diện, bản dịch và siêu dữ liệu cần thiết nằm trong cơ sở dữ liệu. Kết quả máy chủ khách theo thời hạn 24 giờ nêu trên.",
               "Dịch ảnh đơn: Kết quả chỉ được sử dụng lại trong cùng một tài khoản khi nội dung, chế độ, ngôn ngữ và cấu hình hiệu quả khớp với nhau và vẫn còn yêu cầu hợp lệ. Bản gốc và kết quả không được chia sẻ giữa những người dùng. Trình duyệt kết hợp các lớp phủ với hình ảnh gốc của chính nó; máy chủ không giữ bản gốc vĩnh viễn. Việc xóa bản ghi dịch sẽ ngay lập tức thu hồi quyền truy cập máy chủ của yêu cầu đó. Các yêu cầu hợp lệ khác trong tài khoản của bạn vẫn có thể sử dụng được; tệp kết quả sẽ bị xóa sau khi yêu cầu hợp lệ cuối cùng bị thu hồi. Các bản sao đã tải xuống hoặc được lưu vào bộ nhớ đệm có thể vẫn còn trên thiết bị của bạn cho đến khi bạn xóa chúng.",
               "Đối với các yêu cầu xóa tài khoản hoặc phạm vi rộng hơn, hãy liên hệ với chúng tôi để xác minh danh tính và phạm vi. Hồ sơ giao dịch, kiểm toán hoặc bảo mật có thể cần được lưu giữ để phục vụ các nghĩa vụ dịch vụ, tranh chấp hoặc các yêu cầu hiện hành. Không có thời hạn xóa duy nhất nào được hứa hẹn cho tất cả hồ sơ; câu trả lời sẽ giải thích kết quả và những hạn chế."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Dịch trọn PDF / ZIP / CBZ",
             "paragraphs": [
               "Dịch trọn tệp cần đăng nhập. PDF / ZIP / CBZ đã chọn được tải thẳng lên Cloudflare R2 riêng tư. Nút tính toán phân tích, nhận dạng và dựng trang; mô hình văn bản xử lý chữ nhận dạng cần thiết. R2 giữ đầu vào và ZIP đầy đủ ảnh đã dịch; cơ sở dữ liệu giữ tác vụ, văn bản và sử dụng. Tải lên/xuống dùng URL có chữ ký có thời hạn. Không chia sẻ; URL đã cấp có thể còn dùng được đến khi hết hạn.",
-              "Tài liệu có hạn riêng, không theo lưu giữ lâu dài của lớp phủ ảnh đơn. Mặc định: tải xong trong 1 giờ; tệp đã tải nhưng chưa bắt đầu hết hạn sau 24 giờ; đầu vào kết thúc và đầu ra lỗi được dọn sau 1 giờ; ZIP thành công giữ 7 ngày. Xem hạn trên tác vụ. Đầu vào đang chạy hoặc chưa rõ kết quả có thể giữ để khôi phục. Tệp tạm của nút theo quy trình khôi phục/dọn dẹp; hồ sơ tác vụ, hóa đơn và bảo mật cần thiết giữ riêng. Tải từ máy chủ hết hạn; bản đã tải do bạn quản lý."
+              "Tài liệu có hạn riêng, không theo lưu giữ của lớp phủ ảnh đơn. Mặc định: tải xong trong 1 giờ; tệp đã tải nhưng chưa bắt đầu hết hạn sau 24 giờ; đầu vào kết thúc và đầu ra lỗi được dọn sau 1 giờ; ZIP thành công giữ 7 ngày. Xem hạn trên tác vụ. Đầu vào đang chạy hoặc chưa rõ kết quả có thể giữ để khôi phục. Tệp tạm của nút theo quy trình khôi phục/dọn dẹp; hồ sơ tác vụ, hóa đơn và bảo mật cần thiết giữ riêng. Tải từ máy chủ hết hạn; bản đã tải do bạn quản lý."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Hình ảnh có được tải lên hoặc giữ lại không?",
-        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả riêng tư của tài khoản đã đăng ký giữ khi còn yêu cầu hợp lệ; khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
+        "answer": "Khi dùng dịch vụ dịch chính thức, ảnh được chọn và thông tin tác vụ cần thiết gửi đến máy chủ. Ảnh gốc xóa sau hoàn thành, thất bại hoặc hủy. Dịch lưu lớp phủ. Kết quả ảnh đơn riêng tư của tài khoản đã đăng ký mặc định giữ 7 ngày sau khi hoàn thành, do quản trị viên cấu hình; hết hạn sẽ xóa tệp máy chủ, không ảnh hưởng bản lưu cục bộ. khách có thể lấy kết quả trong 24 giờ sau tác vụ. Thu hồi yêu cầu hợp lệ cuối cùng sẽ xóa kết quả máy chủ, nhưng bản sao trên thiết bị cần tự xóa. MTU xử lý và lưu ảnh theo cấu hình dịch vụ riêng.",
         "relatedPath": "/privacy/"
       },
       {

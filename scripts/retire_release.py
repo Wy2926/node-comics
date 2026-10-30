@@ -44,8 +44,6 @@ def main():
         if role not in allowed[args.role] or variables.get('RELEASE_ID') != args.release:
             raise RuntimeError('Container role/release mismatch; refusing to retire')
         if args.role == 'api':
-            if args.active_release == args.release:
-                raise RuntimeError('Cannot retire the active release')
             bindings = info['HostConfig']['PortBindings'].get('8000/tcp') or []
             if not any(row['HostPort'] == str(args.port) and row['HostIp'] == '127.0.0.1' for row in bindings):
                 raise RuntimeError('Old API port does not match the inspected container')

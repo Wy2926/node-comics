@@ -164,7 +164,7 @@ def reserve_guest(db, user, job, at):
     if not network or job.mode != 'classic':
         problem('GUEST_FORBIDDEN', '匿名任务缺少有效准入', 403)
     cfg = settings()
-    limits = db.info.get('guest_limits') or get_request_limits(db)
+    limits = get_request_limits(db)
     active = select(Job.id).where(Job.status.in_(ACTIVE), Job.id != job.id)
     if db.scalar(active.where(Job.owner_id == user.id).limit(1)):
         raise HTTPException(429, detail={'code': 'GUEST_BUSY', 'message': '请等待当前图片完成'}, headers={'Retry-After': '5'})

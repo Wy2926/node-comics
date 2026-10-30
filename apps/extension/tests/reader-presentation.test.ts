@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {type Job,type Page} from '../src/types';
-import {pageTranslation,latestResults,readingImage,imagePrefetchReady,type ImageLoadState} from '../src/reader/presentation';
+import {pageTranslation,latestResults,readingImage,imagePrefetchReady,canRetryPage,type ImageLoadState} from '../src/reader/presentation';
 import {emptyPage} from '../src/reader/model';
 
 import {needsTranslation} from '../src/translation/automatic';
@@ -89,6 +89,13 @@ describe('latest effect selection',()=>{
   });
 });
 describe('display projection and submission',()=>{
+  it('expired server results require an explicit rerun and keep local images readable',()=>{
+    const p=page([job('expired','succeeded',1,{result:undefined,result_expired:true,error:{code:'RESULT_EXPIRED',message:'expired'}})]);
+    expect(needsTranslation(p,'classic','zh-Hans',scope)).toBe(false);
+    expect(canRetryPage(pageTranslation(p,'classic','zh-Hans',scope))).toBe(true);
+    p.outputBlobs.expired='local-copy';
+    expect(readingImage(p,'classic',true,'zh-Hans',scope).key).toBe('local-copy');
+  });
   it('does not retranslate an existing effect after supplier configuration changes',()=>{
     const restored=page([job('first','succeeded',1)]);
     expect(needsTranslation(restored,'classic','zh-Hans',scope)).toBe(false);

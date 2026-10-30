@@ -77,12 +77,12 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
 
   return <main id="main" tabIndex={-1} className="system-settings">
     <div className="page-heading"><div><p className="eyebrow">SYSTEM SETTINGS</p><h1>系统设置</h1>
-      <p className="muted">管理漫画翻译提示词、默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
+      <p className="muted">管理译图保留期限、漫画翻译提示词、默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
       <button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</button>
     </div>
     <div className="sync-line"><span role="status">{operation === 'saving' ? '正在保存设置…' : operation === 'loading' ? '正在读取系统设置…' :
       snapshot ? `版本 ${snapshot.version} · ${dirty ? '有未保存的更改' : '与已保存设置一致'}` : '尚未读取设置'}</span>
-      <span>{snapshot?.updated_at ? `最后保存 ${time(snapshot.updated_at)}` : '保存后对新请求生效'}</span></div>
+      <span>{snapshot?.updated_at ? `最后保存 ${time(snapshot.updated_at)}` : '各项生效范围见下方说明'}</span></div>
     {error && <div className="error" role="alert">{error}{draft && ' 你的输入已保留。'}</div>}
     {conflict && <div className="error settings-conflict" role="alert"><div><strong>设置已被其他管理员更新</strong>
       <p>你的输入已保留。请先读取最新设置，核对后再次保存。</p></div>
@@ -121,10 +121,10 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
           })}</div>
           <p className="settings-section-note">尽量忠实保留原意、关系与笑点，但模型无法凭空获得未提供的画面或前文。修改会记录到操作审计中；请勿填写密钥或私有漫画内容。</p>
         </section>
-        {(['entitlements', 'guest', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
+        {(['storage', 'entitlements', 'guest', 'translation', 'upload', 'feedback'] as const).map(group => <section className="panel settings-panel" key={group} aria-labelledby={`settings-${group}`}>
           <div className="settings-section-heading"><span className="settings-section-icon" aria-hidden="true">{group === 'upload' ? '↥' : '≡'}</span>
-            <div><h2 id={`settings-${group}`}>{group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
-              <p className="muted">{group === 'entitlements' ? '设置新额度周期与新开通运营会员段的默认页数。' : group === 'guest' ? '按服务配置的额度时区自然日计次，游客、网络和全站预算分别控制。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
+            <div><h2 id={`settings-${group}`}>{group === 'storage' ? '结果保留' : group === 'entitlements' ? '额度默认值' : group === 'guest' ? '匿名体验每日预算' : group === 'translation' ? '翻译速率' : group === 'upload' ? '上传保护' : '反馈保护'}</h2>
+              <p className="muted">{group === 'storage' ? '注册账户单图结果默认保留 7 天，浏览器已保存的完整译图不受影响。游客及整本文件结果使用各自期限。' : group === 'entitlements' ? '设置新额度周期与新开通运营会员段的默认页数。' : group === 'guest' ? '按服务配置的额度时区自然日计次，游客、网络和全站预算分别控制。' : group === 'translation' ? '跨模式、语言和设备合计，不限制账户待处理任务数量。' : group === 'upload' ? '控制上传连接数量与等待时间，保持服务可用。' : '限制重复新增反馈，保留用户正常反馈与重试的空间。'}</p></div></div>
           <div className="settings-fields">{numericFields.filter(field => field.group === group).map(field => {
             const fieldError = validation?.errors[field.key];
             const isChanged = changed(draft, snapshot.values, field.key);
@@ -140,7 +140,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
               {isChanged && <p className="settings-current-value">当前已保存：{snapshot.values[field.key]} {field.unit}</p>}
             </div>;
           })}</div>
-          <p className="settings-section-note">{group === 'entitlements' ? '额度按新周期或新会员段生效；付费订阅使用产品绑定的权益版本。修改记录可在操作审计中查询。' : group === 'guest' ? '保存后按新限额与当天已用次数判断新受理；同一 UUID 重放或本人有效任务复用不再次计次。修改记录可在操作审计中查询。' : group === 'translation' ? '保存后即时用于新翻译准入，已消耗的分钟名额不会清零；每日与会员月页数权益独立计算。' : group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
+          <p className="settings-section-note">{group === 'storage' ? '保存后读取与清理统一按新期限执行。到期不自动重新翻译或扣费；缩短前请确认历史结果的影响。' : group === 'entitlements' ? '额度按新周期或新会员段生效；付费订阅使用产品绑定的权益版本。修改记录可在操作审计中查询。' : group === 'guest' ? '保存后按新限额与当天已用次数判断新受理；同一 UUID 重放或本人有效任务复用不再次计次。修改记录可在操作审计中查询。' : group === 'translation' ? '保存后即时用于新翻译准入，已消耗的分钟名额不会清零；每日与会员月页数权益独立计算。' : group === 'upload' ? '保存对新接纳的上传生效；已接纳的上传保持原有超时设置。' :
             '修改设置不会清零已经使用的反馈预算，也不会改变用户的翻译页数额度。'}</p>
         </section>)}
       </fieldset>

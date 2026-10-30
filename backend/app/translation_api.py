@@ -27,6 +27,8 @@ from .translation_fonts import RequestedFont, resolve_font
 from .translation_requests import TranslationRequest
 from .upload_models import UploadReservation
 from .uploads import create_upload
+from .result_retention import result_expired
+from .system_settings import get_request_limits
 
 router = APIRouter(tags=['translations'])
 
@@ -76,8 +78,8 @@ def iso(value):
     return value.isoformat() + 'Z' if value else None
 
 
-def unavailable(db, row, entry, assets=None):
-    if entry and (entry.entitlement or {}).get('plan') == 'guest' and entry.completed_at and entry.completed_at <= now() - timedelta(hours=24):
+def unavailable(db, row, entry, assets=None, *, days=None):
+    if result_expired(db, entry, days=days):
         return True
     if row.revoked_at or entry is None:
         return True
@@ -96,10 +98,13 @@ def snapshot_context(db, rows):
     awaiting = {entry.id for entry in entries.values() if entry.status == 'awaiting_upload'}
     uploads = {upload.job_id: upload for upload in db.scalars(select(UploadReservation).where(
         UploadReservation.job_id.in_(awaiting)))} if awaiting else {}
+    needs_retention = any(entry.quota_kind != 'guest_trial' and entry.status in {'succeeded', 'no_text'}
+        and entry.completed_at for entry in entries.values())
+    days = get_request_limits(db).image_result_retention_days if needs_retention else None
     withdrawn = {row.job_id for row in rows if row.job_id in entries and
-        unavailable(db, row, entries[row.job_id], assets)}
+        unavailable(db, row, entries[row.job_id], assets, days=days)}
     resolved = resolved_execution_ids(db, {key: entries[key] for key in withdrawn})
-    return entries, assets, uploads, resolved
+    return entries, assets, uploads, resolved, days
 
 
 def resolved_execution_ids(db, entries):
@@ -138,14 +143,17 @@ def translation_json(db, row, *, context=None):
         'failed' if entry.status in {'failed', 'cancelled'} else
         'running' if entry.status == 'running' and entry.phase != 'validate_upload' else 'queued') if entry else 'failed'
     error = ({'code': entry.error_code, 'message': entry.error_message or '翻译失败'} if entry and entry.error_code else None)
-    withdrawn = unavailable(db, row, entry, assets)
-    if withdrawn:
+    expired = bool(entry and entry.quota_kind != 'guest_trial' and result_expired(db, entry, days=context[4]))
+    withdrawn = unavailable(db, row, entry, assets, days=context[4])
+    if expired:
+        state, error = 'succeeded', {'code': 'RESULT_EXPIRED', 'message': '译图已过期，请手动重新翻译'}
+    elif withdrawn:
         state, error = 'failed', {'code': 'TRANSLATION_UNAVAILABLE', 'message': '翻译访问已撤销'}
     elif state == 'failed' and error is None:
         error = {'code': 'TRANSLATION_CANCELLED', 'message': '翻译已取消'}
     upload = context[2].get(row.job_id) if state == 'needs_input' else None
     result = None
-    if state == 'succeeded':
+    if state == 'succeeded' and not withdrawn:
         output = asset_for(entry.output_asset_id) if entry.output_asset_id else None
         source = asset_for(entry.input_asset_id) if entry.input_asset_id else None
         description = entry.result_description or {}
@@ -201,7 +209,9 @@ def accept_translation(db, user, request_id, body):
     if previous_id:
         previous = owned_translation(db, user.id, previous_id)
         entry = db.get(Job, previous.job_id) if previous.job_id else None
-        if unavailable(db, previous, entry):
+        expired_regeneration = bool(body.regenerate_of and entry and entry.quota_kind != 'guest_trial'
+            and entry.status in {'succeeded', 'no_text'} and result_expired(db, entry))
+        if unavailable(db, previous, entry) and not expired_regeneration:
             problem('TRANSLATION_UNAVAILABLE', '来源翻译访问已撤销或过期', 410)
         unknown = entry.status in {'outcome_unknown', 'unknown_released'}
         if unknown and (body.retry_of or not body.acknowledge_unknown_cost):
@@ -440,6 +450,8 @@ def translation_result(translation_id: UUID, request: Request, user: User = Depe
     row = owned_translation(db, user.id, translation_id)
     entry = db.get(Job, row.job_id) if row.job_id else None
     if unavailable(db, row, entry):
+        if entry and entry.quota_kind != 'guest_trial' and result_expired(db, entry):
+            problem('RESULT_EXPIRED', '译图已过期，请手动重新翻译', 410)
         problem('TRANSLATION_UNAVAILABLE', '翻译访问已撤销', 410)
     if entry.status != 'succeeded' or not entry.output_asset_id:
         problem('RESULT_NOT_AVAILABLE', '此翻译没有结果文件', 409)

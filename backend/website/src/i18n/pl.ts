@@ -348,7 +348,7 @@ export default {
     {
       "title": "Tłumaczenie i przechowywanie",
       "paragraphs": [
-        "Rozszerzenie używa tłumaczenia. Tłumaczenie wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+        "Rozszerzenie używa tłumaczenia. Tłumaczenie wykorzystuje rozpoznawanie, tłumaczenie tekstu, czyszczenie i skład. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Prywatne wyniki pojedynczych obrazów zarejestrowanych kont są domyślnie przechowywane przez 7 dni od zakończenia zadania; okres ustala administrator. Potem dostęp do serwera jest cofany, a pliki usuwane. Zapisane kopie lokalne pozostają dostępne. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
         "Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii."
       ]
     },
@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Polityka prywatności",
         "description": "Jak NodeLane Comics obsługuje konta, obrazy, uprawnienia, tłumaczenia, subskrypcje i usuwanie.",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Tłumaczenie obrazu strony internetowej i testy gościnne",
             "paragraphs": [
               "Na stronie akceptowane są obrazy JPG, PNG i WebP. Oryginalne pliki, dane wejściowe do tłumaczeń, pełne wyniki i historia są przechowywane w IndexedDB tej przeglądarki i nie są synchronizowane między urządzeniami. Wyczyszczenie danych witryny powoduje ich usunięcie. „Usuń rekord lokalny” usuwa tylko kopię lokalną, a nie zadania serwera lub rekordy audytu.",
               "Wersje próbne dla gości korzystają z kołowrotu Cloudflare. Cloudflare przetwarza sygnały przeglądarki i sieci potrzebne do weryfikacji zgodnie ze swoją polityką prywatności; nasze prośby o weryfikację nie obejmują obrazów komiksowych. Używamy bezpiecznego pliku cookie sesji HttpOnly trwającego do 30 dni, identyfikatorów sieci HMAC i dziennych liczników przechowywanych przez siedem dni, aby zapobiec nadużyciom. Identyfikatory te mają charakter pseudonimowy i nie gwarantują całkowitej anonimowości.",
-              "Wyniki serwera gościa można pobrać przez 24 godziny po zakończeniu zadania, po czym dostęp zostanie cofnięty i pliki zostaną odzyskane. Zapisane wyniki lokalne pozostają dostępne. Dane wejściowe są usuwane po zakończeniu zadania; niezbędne rejestry zadań, kosztów i bezpieczeństwa podlegają odpowiednim zasadom przechowywania. Długoterminowe przechowywanie wyników poniżej dotyczy zarejestrowanych kont. Goście nie tworzą konta dostawcy tożsamości; zalogowanie się nie powoduje scalania historii. Domyślna wersja próbna akceptuje do pięciu nowych obrazów dziennie, z limitami sieci współdzielonej; porażki też się liczą."
+              "Wyniki serwera gościa można pobrać przez 24 godziny po zakończeniu zadania, po czym dostęp zostanie cofnięty i pliki zostaną odzyskane. Zapisane wyniki lokalne pozostają dostępne. Dane wejściowe są usuwane po zakończeniu zadania; niezbędne rejestry zadań, kosztów i bezpieczeństwa podlegają odpowiednim zasadom przechowywania. Poniższy okres przechowywania wyników dotyczy zarejestrowanych kont. Goście nie tworzą konta dostawcy tożsamości; zalogowanie się nie powoduje scalania historii. Domyślna wersja próbna akceptuje do pięciu nowych obrazów dziennie, z limitami sieci współdzielonej; porażki też się liczą."
             ]
           },
           {
             "title": "Zakres i kontakt",
             "paragraphs": [
-              "Niniejsza polityka dotyczy witryny internetowej NodeLane Comics, jej rozszerzenia, usług czytnika i tłumaczeń, prowadzonych przez zespół NodeLane Comics. Skontaktuj się z comics@nodelane.net w sprawie prywatności, dostępu, poprawiania lub usuwania. Zaktualizowano 2026-10-17 r. Istotne zmiany zostaną wyjaśnione na tej stronie i odpowiednio przekazane."
+              "Niniejsza polityka dotyczy witryny internetowej NodeLane Comics, jej rozszerzenia, usług czytnika i tłumaczeń, prowadzonych przez zespół NodeLane Comics. Skontaktuj się z comics@nodelane.net w sprawie prywatności, dostępu, poprawiania lub usuwania. Zaktualizowano 2026-10-30 r. Istotne zmiany zostaną wyjaśnione na tej stronie i odpowiednio przekazane."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Przechowywanie i usuwanie",
             "paragraphs": [
-              "Tłumaczenie pojedynczego obrazu: Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
+              "Tłumaczenie pojedynczego obrazu: Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Prywatne wyniki pojedynczych obrazów zarejestrowanych kont są domyślnie przechowywane przez 7 dni od zakończenia zadania; okres ustala administrator. Potem dostęp do serwera jest cofany, a pliki usuwane. Zapisane kopie lokalne pozostają dostępne. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych.",
               "Tłumaczenie pojedynczego obrazu: Wyniki są ponownie wykorzystywane tylko w ramach tego samego konta, jeśli zawartość, tryb, język i efektywna konfiguracja są zgodne, a żądanie pozostaje ważne. Oryginały i wyniki nie są udostępniane użytkownikom. Przeglądarka łączy nakładki z własnym oryginalnym obrazem; serwer nie przechowuje trwałych oryginalnych kopii. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz.",
               "W przypadku żądań usunięcia konta lub szerszych wniosków skontaktuj się z nami w celu weryfikacji tożsamości i zakresu. Rejestry transakcji, audytów lub bezpieczeństwa mogą wymagać przechowywania ze względu na zobowiązania serwisowe, spory lub obowiązujące wymagania. Nie ma określonego terminu usunięcia wszystkich zapisów; odpowiedź wyjaśni wynik i ograniczenia."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Tłumaczenie całego PDF / ZIP / CBZ",
             "paragraphs": [
               "Tłumaczenie całego pliku wymaga logowania. Wybrane PDF / ZIP / CBZ trafiają bezpośrednio do prywatnego Cloudflare R2. Węzły obliczeniowe analizują, rozpoznają i renderują strony; modele tekstowe przetwarzają niezbędny rozpoznany tekst. R2 przechowuje wejścia i pełny ZIP przetłumaczonych obrazów, baza — zadania, tekst i użycie. Przesyłanie i pobieranie korzysta z czasowych podpisanych URL. Nie udostępniaj ich: wydany URL może działać do wygaśnięcia.",
-              "Dokumenty mają inne terminy niż długie przechowywanie nakładek pojedynczych obrazów. Domyślnie: przesłanie w 1 godzinę; przesłane, nierozpoczęte pliki wygasają po 24 godzinach; zakończone wejścia i nieudane wyjścia są czyszczone po 1 godzinie; udane ZIP przechowujemy 7 dni. Sprawdź termin w zadaniu. Aktywne lub nierozstrzygnięte wejścia mogą pozostać do odzyskania. Pliki tymczasowe węzłów podlegają procedurom odzyskiwania i czyszczenia; niezbędne rejestry zadań, rozliczeń i bezpieczeństwa pozostają osobno. Pobieranie z serwera wygasa; pobrane kopie kontrolujesz samodzielnie."
+              "Dokumenty mają inne terminy niż przechowywanie nakładek pojedynczych obrazów. Domyślnie: przesłanie w 1 godzinę; przesłane, nierozpoczęte pliki wygasają po 24 godzinach; zakończone wejścia i nieudane wyjścia są czyszczone po 1 godzinie; udane ZIP przechowujemy 7 dni. Sprawdź termin w zadaniu. Aktywne lub nierozstrzygnięte wejścia mogą pozostać do odzyskania. Pliki tymczasowe węzłów podlegają procedurom odzyskiwania i czyszczenia; niezbędne rejestry zadań, rozliczeń i bezpieczeństwa pozostają osobno. Pobieranie z serwera wygasa; pobrane kopie kontrolujesz samodzielnie."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Czy obrazy są przesyłane lub zachowywane?",
-        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa tłumaczenia. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Wyniki pozostają prywatne, dopóki na Twoim koncie znajduje się ważne żądanie. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
+        "answer": "Przy korzystaniu z oficjalnego tłumaczenia obowiązują poniższe zasady przechowywania. Dla MTU przetwarzanie i przechowywanie określa wybrana usługa. Rozszerzenie używa tłumaczenia. Tłumaczenie wysyła wybrane obrazy stron do backendu i odpowiednich dostawców. Oryginały to pliki tymczasowe na serwerze centralnym i węzłach obliczeniowych, usuwane po ukończeniu zadania, niepowodzeniu lub anulowaniu. Tłumaczenie zachowuje pliki nakładek. Prywatne wyniki pojedynczych obrazów zarejestrowanych kont są domyślnie przechowywane przez 7 dni od zakończenia zadania; okres ustala administrator. Potem dostęp do serwera jest cofany, a pliki usuwane. Zapisane kopie lokalne pozostają dostępne. Rozpoznany tekst, tłumaczenia i niezbędne metadane są przechowywane w bazie danych. Usunięcie rekordu tłumaczenia natychmiast unieważnia dostęp do serwera tego żądania. Inne ważne żądania na Twoim koncie pozostają przydatne; plik wynikowy jest usuwany po odwołaniu ostatniego prawidłowego żądania. Pobrane lub zapisane w pamięci podręcznej kopie mogą pozostać na Twoim urządzeniu, dopóki ich nie wyczyścisz. Źródłowe pliki cookie, tokeny logowania i historia przeglądania nie są przesyłane.",
         "relatedPath": "/privacy/"
       },
       {

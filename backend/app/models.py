@@ -4,6 +4,9 @@ from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKe
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
+IMAGE_RESULT_EXPIRY_FILTER = ("workflow_kind = 'image' AND quota_kind != 'guest_trial' "
+    "AND status IN ('succeeded', 'no_text') AND discard_output IS FALSE")
+
 
 def now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -99,6 +102,9 @@ class Job(Base):
                      Index('ix_jobs_owner_workflow_created', 'owner_id', 'workflow_kind', 'created_at', 'id'),
                      Index("ix_jobs_created_at", "created_at"), Index("ix_jobs_completed_at", "completed_at"),
                      Index("ix_jobs_owner_content", "owner_id", "cache_key", "created_at"),
+                      Index('ix_jobs_image_result_expiry', 'completed_at', 'id',
+                           sqlite_where=text(IMAGE_RESULT_EXPIRY_FILTER),
+                           postgresql_where=text(IMAGE_RESULT_EXPIRY_FILTER)),
                      Index("ix_jobs_guest_expiry", "completed_at",
                          sqlite_where=text("quota_kind = 'guest_trial' AND discard_output IS 0"),
                          postgresql_where=text("quota_kind = 'guest_trial' AND discard_output IS FALSE")))

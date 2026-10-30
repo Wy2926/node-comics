@@ -348,7 +348,7 @@ export default {
     {
       "title": "Çeviri ve saklama",
       "paragraphs": [
-        "Uzantı çeviri kullanır. çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+        "Uzantı çeviri kullanır. çeviri; tanıma, metin çevirisi, temizleme ve dizgiyi kullanır. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Kayıtlı hesapların özel tek görsel sonuçları, görev tamamlandıktan sonra varsayılan olarak 7 gün saklanır; süre yönetici tarafından ayarlanabilir. Süre dolunca sunucu erişimi kaldırılır ve dosyalar silinir; kaydedilmiş yerel sonuçlar etkilenmez. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
         "Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz."
       ]
     },
@@ -412,20 +412,20 @@ export default {
       "privacy": {
         "title": "Gizlilik politikası",
         "description": "NodeLane Comics hesapları, görselleri, izinleri, çeviriyi, abonelikleri ve silme işlemlerini nasıl ele alır?",
-        "updated": "2026-10-17",
+        "updated": "2026-10-30",
         "sections": [
           {
             "title": "Web sitesi görseli çevirisi ve konuk denemeleri",
             "paragraphs": [
               "Web sitesi JPG, PNG ve WebP resimlerini kabul eder. Orijinal dosyalar, çeviri girişleri, tüm sonuçlar ve geçmiş bu tarayıcının IndexedDB'sinde saklanır, cihazlar arasında senkronize edilmez. Site verilerinin temizlenmesi bunları kaldırır. \"Yerel kaydı sil\", sunucu görevlerini veya denetim kayıtlarını değil, yalnızca yerel kopyayı kaldırır.",
               "Misafir denemeleri Cloudflare Turnstileni kullanır. Cloudflare, gizlilik politikası kapsamında doğrulama için gereken tarayıcı ve ağ sinyallerini işler; doğrulama taleplerimiz çizgi roman görseller içermiyor. Kötüye kullanımı önlemek için 30 güne kadar dayanan güvenli bir HttpOnly oturum çerezi, HMAC ağ tanımlayıcıları ve yedi gün boyunca saklanan günlük sayaçları kullanıyoruz. Bu tanımlayıcılar takma addır ve tam bir anonimlik garantisi vermez.",
-              "Konuk sunucu sonuçları, görev sona erdikten sonra 24 saat süreyle alınabilir, ardından erişim iptal edilir ve dosyalar geri alınır. Kaydedilen yerel sonuçlar kullanılabilir durumda kalır. Görev tamamlandığında girdiler kaldırılır; gerekli görev, maliyet ve güvenlik kayıtları ilgili saklama kurallarına uyar. Aşağıdaki uzun vadeli sonuç saklama, kayıtlı hesaplar için geçerlidir. Misafirler kimlik sağlayıcı hesabı oluşturmaz; oturum açmak geçmişi birleştirmez. Varsayılan deneme, paylaşılan ağ sınırlarıyla birlikte günde en fazla beş yeni görüntüyü kabul eder; başarısızlıklar da sayılır."
+              "Konuk sunucu sonuçları, görev sona erdikten sonra 24 saat süreyle alınabilir, ardından erişim iptal edilir ve dosyalar geri alınır. Kaydedilen yerel sonuçlar kullanılabilir durumda kalır. Görev tamamlandığında girdiler kaldırılır; gerekli görev, maliyet ve güvenlik kayıtları ilgili saklama kurallarına uyar. Aşağıdaki sonuç saklama süresi, kayıtlı hesaplar için geçerlidir. Misafirler kimlik sağlayıcı hesabı oluşturmaz; oturum açmak geçmişi birleştirmez. Varsayılan deneme, paylaşılan ağ sınırlarıyla birlikte günde en fazla beş yeni görüntüyü kabul eder; başarısızlıklar da sayılır."
             ]
           },
           {
             "title": "Kapsam ve iletişim",
             "paragraphs": [
-              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 2026-10-17'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
+              "Bu politika, NodeLane Comics ekibi tarafından yürütülen NodeLane Comics web sitesini, uzantısını, okuyucu ve çeviri hizmetlerini kapsar. Gizlilik, erişim, düzeltme veya silme konusunda comics@nodelane.net ile iletişime geçin. 2026-10-30'da güncellendi. Önemli değişiklikler bu sayfada açıklanacak ve uygun şekilde iletilecektir."
             ]
           },
           {
@@ -460,7 +460,7 @@ export default {
           {
             "title": "Saklama ve silme",
             "paragraphs": [
-              "Tek görsel çevirisi: Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
+              "Tek görsel çevirisi: Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Kayıtlı hesapların özel tek görsel sonuçları, görev tamamlandıktan sonra varsayılan olarak 7 gün saklanır; süre yönetici tarafından ayarlanabilir. Süre dolunca sunucu erişimi kaldırılır ve dosyalar silinir; kaydedilmiş yerel sonuçlar etkilenmez. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır.",
               "Tek görsel çevirisi: Sonuçlar yalnızca içerik, mod, dil ve etkin yapılandırma eşleştiğinde ve geçerli bir istek kaldığında aynı hesapta yeniden kullanılır. Orijinaller ve sonuçlar kullanıcılar arasında paylaşılmaz. Tarayıcı kaplamaları kendi orijinal görüntüsüyle birleştirir; sunucu kalıcı orijinal kopyaları saklamaz. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir.",
               "Hesap silme veya daha geniş kapsamlı silme talepleri için kimlik ve kapsam doğrulaması amacıyla bizimle iletişime geçin. İşlem, denetim veya güvenlik kayıtlarının hizmet yükümlülükleri, anlaşmazlıklar veya geçerli gereksinimler nedeniyle saklanması gerekebilir. Tüm kayıtlar için tek bir silme tarihi sözü verilmemektedir; yanıt, sonucu ve kısıtlamaları açıklayacaktır."
             ]
@@ -476,7 +476,7 @@ export default {
             "title": "Tam PDF / ZIP / CBZ çevirisi",
             "paragraphs": [
               "Tam dosya çevirisi oturum gerektirir. Seçilen PDF / ZIP / CBZ doğrudan özel Cloudflare R2 alanına yüklenir. İşlem düğümleri sayfaları ayrıştırır, tanır ve oluşturur; metin modelleri gerekli tanınmış metni işler. R2 girdileri ve tüm çevrilmiş görsellerin ZIP dosyasını, veritabanı görev, metin ve kullanımı saklar. Yükleme ve indirme süreli imzalı URL kullanır. Paylaşmayın; verilmiş URL süresi dolana kadar çalışabilir.",
-              "Belgeler, tek görsel katmanlarının uzun süreli saklama kuralına tabi değildir. Varsayılanlar: yükleme 1 saatte tamamlanır; yüklenmiş ama başlatılmamış dosya 24 saatte sona erer; bitmiş girdiler ve başarısız çıktılar 1 saat gecikmeyle temizlenir; başarılı ZIP 7 gün tutulur. Görevdeki son tarihe bakın. Etkin veya sonucu belirsiz girdiler kurtarma için kalabilir. Düğüm geçici dosyaları kurtarma/temizleme süreçlerine tabidir; gerekli görev, fatura ve güvenlik kayıtları ayrı tutulur. Sunucu indirmesi sona erer; indirilmiş kopyaları siz yönetirsiniz."
+              "Belgeler, tek görsel katmanlarının saklama kuralına tabi değildir. Varsayılanlar: yükleme 1 saatte tamamlanır; yüklenmiş ama başlatılmamış dosya 24 saatte sona erer; bitmiş girdiler ve başarısız çıktılar 1 saat gecikmeyle temizlenir; başarılı ZIP 7 gün tutulur. Görevdeki son tarihe bakın. Etkin veya sonucu belirsiz girdiler kurtarma için kalabilir. Düğüm geçici dosyaları kurtarma/temizleme süreçlerine tabidir; gerekli görev, fatura ve güvenlik kayıtları ayrı tutulur. Sunucu indirmesi sona erer; indirilmiş kopyaları siz yönetirsiniz."
             ]
           }
         ]
@@ -600,7 +600,7 @@ export default {
       {
         "id": "image-privacy",
         "question": "Resimler yükleniyor mu yoksa saklanıyor mu?",
-        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı çeviri kullanır. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Hesabınızda geçerli bir istek olduğu sürece sonuçlar gizli kalır. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
+        "answer": "Resmî çeviriyi kullandığınızda aşağıdaki saklama kuralları geçerlidir. MTU için işleme ve saklama koşullarını seçtiğiniz hizmet belirler. Uzantı çeviri kullanır. Çeviri, seçilen sayfa görsellerini arka uca ve ilgili sağlayıcılara gönderir. Orijinaller, merkezi sunucuda ve bilgi işlem düğümlerinde bulunan ve bir görev tamamlandıktan, başarısız olduktan veya iptal edildikten sonra silinen geçici dosyalardır. çeviri, kaplama dosyalarını korur. Kayıtlı hesapların özel tek görsel sonuçları, görev tamamlandıktan sonra varsayılan olarak 7 gün saklanır; süre yönetici tarafından ayarlanabilir. Süre dolunca sunucu erişimi kaldırılır ve dosyalar silinir; kaydedilmiş yerel sonuçlar etkilenmez. Tanınan metin, çeviriler ve gerekli meta veriler veritabanında saklanır. Bir çeviri kaydının silinmesi, söz konusu isteğin sunucu erişimini anında iptal eder. Hesabınızdaki diğer geçerli istekler kullanılabilir durumda kalır; sonuç dosyası, son geçerli istek iptal edildikten sonra kaldırılır. İndirilen veya önbelleğe alınan kopyalar, siz onları temizleyene kadar cihazınızda kalabilir. Kaynak çerezleri, oturum açma belirteçleri ve göz atma geçmişi yüklenmez.",
         "relatedPath": "/privacy/"
       },
       {

@@ -8,6 +8,8 @@ from .entitlements import admission_policy, free_model_policy, locked_user, requ
 from .providers import configuration, digest
 from .scheduler import ACTIVE, ensure_stages, lock_scheduler, touch_job
 from .translation_fonts import resolve_font
+from .result_retention import result_expired
+from .system_settings import get_request_limits
 
 TERMINAL = {"succeeded", "no_text", "failed", "cancelled", "unknown_released"}
 
@@ -83,15 +85,14 @@ def content_key(asset, mode, language, config):
 
 def find_reusable(db, user, asset, mode, language, config):
     sha = asset.sha256 if hasattr(asset, 'sha256') else asset
+    days = get_request_limits(db).image_result_retention_days if user.kind != 'guest' else None
     candidates = db.scalars(select(Job).where(Job.owner_id == user.id,
         Job.cache_key == content_key(sha, mode, language, config),
         Job.status.in_(ACTIVE | {'succeeded', 'no_text'}), Job.cancel_requested.is_(False),
         Job.discard_output.is_(False)).order_by(Job.created_at.desc(), Job.id))
     for candidate in candidates:
-        if user.kind == 'guest' and candidate.completed_at:
-            from datetime import timedelta
-            if candidate.completed_at <= now() - timedelta(hours=24):
-                continue
+        if result_expired(db, candidate, days=days):
+            continue
         if candidate.input_asset_id and not descriptor_available(db.get(Asset, candidate.input_asset_id)):
             continue
         if candidate.status == 'succeeded' and candidate.output_asset_id:

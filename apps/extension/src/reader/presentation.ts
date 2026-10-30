@@ -47,7 +47,7 @@ export function canRetryPage(translation:ReturnType<typeof pageTranslation>,stat
   const {latest,pending,ready}=translation;
   if(!latest||pending||!['failed','cancelled','no_text','succeeded'].includes(latest.status))return false;
   if(state&&(state.kind!=='error'||state.retryable===false||state.retryLabel))return false;
-  return latest.status!=='succeeded'||ready;
+  return latest.status!=='succeeded'||ready||latest.error?.code==='RESULT_EXPIRED';
 }
 export function taskText(job?:Job){
   if(!job)return msg("尚未翻译");
