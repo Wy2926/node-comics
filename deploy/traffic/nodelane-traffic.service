@@ -1,0 +1,21 @@
+[Unit]
+Description=Incremental private Nginx traffic reports
+
+[Service]
+Type=oneshot
+User=nodelane-traffic
+Group=www-data
+SupplementaryGroups=adm
+StateDirectory=nodelane-traffic
+StateDirectoryMode=0750
+UMask=0027
+ExecStart=/usr/bin/python3 /usr/local/lib/nodelane-traffic/traffic.py report
+Nice=10
+CPUQuota=75%
+MemoryMax=512M
+TimeoutStartSec=55
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nodelane-traffic

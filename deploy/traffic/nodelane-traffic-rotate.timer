@@ -1,0 +1,7 @@
+[Unit]
+Description=Check traffic log age and size every 15 minutes
+[Timer]
+OnCalendar=*-*-* *:0/15:15
+Persistent=true
+[Install]
+WantedBy=timers.target

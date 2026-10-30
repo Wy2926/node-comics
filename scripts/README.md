@@ -17,6 +17,7 @@
 | `submit_indexnow.py <公开 URL>... [--submit]` | 官网新增或实质更新页面的 IndexNow 通知；默认干运行并检查线上 key 与 sitemap，`--submit` 才发送，见[官网 SEO 规范](../backend/website/SEO.md#indexnow-变更通知) |
 | `tests/rehearse_deployment.py` | 隔离 Docker 中真实代理切换、慢上传、SSE、合成供应商任务与回退；默认清理本轮资源，报告写入 artifacts |
 | `database_backup.py` / `verify_database_restore.py` | [备份与隔离恢复](../docs/OPERATIONS.md) |
+| `traffic.py report / rotate / geoip / errors` | 独立 GoAccess 报告、日志到期及容量回收、本地地理库更新、Nginx 错误脱敏，见[访问统计](../docs/OPERATIONS.md#nginx-访问统计) |
 | `export_openapi.py` | [导出 API 契约](../contracts/README.md) |
 | `validate_analytics.py --env-file <私密配置路径>` | 用后端实际载荷格式向 GA4 验证端点严格校验全部插件事件；不调用收集端点、不写报表，不能验证 secret 或真实入库。只读指定文件的 GA4 配置（未指定时取进程环境），结果写入 `artifacts/analytics-config/validation.json` |
 | `verify_extension_release.py` | 校验安装包与已填写的永久下载地址，见[部署规范](../docs/DEPLOYMENT.md) |

@@ -1,0 +1,8 @@
+[Unit]
+Description=Check monthly GeoIP release daily (download only when changed)
+[Timer]
+OnCalendar=*-*-* 05:20:00 Asia/Shanghai
+RandomizedDelaySec=10m
+Persistent=true
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,21 @@
+[Unit]
+Description=Redact Nginx error messages before storing them
+[Service]
+User=nodelane-traffic
+Group=www-data
+RuntimeDirectory=nodelane-traffic
+RuntimeDirectoryMode=0750
+LogsDirectory=nodelane-traffic
+LogsDirectoryMode=0750
+UMask=0027
+Environment=TZ=Asia/Shanghai
+ExecStart=/usr/bin/python3 /usr/local/lib/nodelane-traffic/traffic.py errors
+Restart=on-failure
+RestartSec=2
+MemoryMax=64M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

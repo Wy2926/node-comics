@@ -35,6 +35,33 @@
 
 仓库 Compose 中的中心服务及自带 Redis／PostgreSQL 诊断日志按每份 10 MiB、最多 3 份轮转，生产外部 PostgreSQL 由既有基础设施管理。节点的诊断日志轮转与 SQLite 恢复数据库生命周期见[节点配置](NODE_CONFIGURATION.md)；不能用日志轮转策略删除未确认任务。
 
+## Nginx 访问统计
+
+原生 Nginx 部署可启用 [GoAccess 配置](../deploy/traffic/) 与 [维护脚本](../scripts/traffic.py)，独立于应用镜像、数据库和健康门禁。GoAccess 使用官方签名仓库的 1.12（MIT），IP 数据使用 DB-IP Lite City / ASN（CC-BY-4.0）；本地查询，无逐 IP 外部请求或反向 DNS。数据库来源、月份及 SHA-256 写入 `geoip/sources.json`，报告保留来源署名。
+
+- `/traffic/` 为独立只读统计页，HTTPS Basic Auth 专用管理员账号，凭据不复用 root 或业务密码；所有 HTML 和资源均鉴权、no-store、noindex。密码文件 `/etc/nodelane/traffic.htpasswd` 为 root:www-data 0640，初始凭据仅保存于 root 的私有文件，不提交仓库。
+- 网站 PV 仅计公开 HTML 的 GET 200/304，排除预取、静态资源、私有页面、API 和已知爬虫；UV 为 IP＋UA＋日期估算，多日数字不是跨日去重人数。网站爬虫只读网站日志，不能将正常节点领取当作爬虫。API、节点、Auth 与 SSE／长轮询分开查看。
+- 日志只记录处理后的客户端 IP、无查询参数且归一化的路径、来源域名、UA、状态、字节数、请求及上游耗时、主机、连接号。不记录 Cookie、Authorization 或正文；私有后台路径通过单独 map 排除。保留现有真实 IP 信任链，不信任任意公网 XFF。
+- Nginx 使用 32 KiB 缓冲、5 秒刷新；普通错误经本地 Unix syslog 接收器移除 request/upstream/referrer 上下文与路径后落盘。`errors.html` 显示当前错误日志最近 100 条，具体业务异常仍查应用脱敏日志。
+- 每分钟增量生成统计，按原生 inode／行号续读；轮转不用 copytruncate、不压缩，避免归档解压改变 inode 后重复统计。按北京时间自然日清理统计：GoAccess `keep-last` 本身按有数据日期计数，脚本额外清除超龄日期与完全过期缓存，不插入假访问来推动日期。
+
+保留策略集中在 `/etc/nodelane/traffic.json`（初始值见 [settings.json](../deploy/traffic/settings.json)）：原始访问／错误日志 7 天、统计 30 天；单文件 64 MiB 触发轮转，原始日志总量软上限 1 GiB。每 15 分钟检查大小与年龄，超量先删最旧归档；流量突增或定时器异常时可能短时超过软上限。容量回收不删除正在写入的日志。统计服务限制 512 MiB、0.75 CPU、55 秒，失败不影响网站服务，页面保留最近成功结果及更新时间。
+
+运行布局：脚本 `/usr/local/lib/nodelane-traffic/traffic.py`；配置 `/etc/nodelane/{traffic.json,goaccess.conf,traffic.logs.inc,traffic.dashboard.inc}`；HTTP 级 map `/etc/nginx/conf.d/nodelane-traffic.conf`；日志 `/var/log/nginx/traffic/`、`/var/log/nodelane-traffic/`；统计、缓存及地理库 `/var/lib/nodelane-traffic/`。运行账号 `nodelane-traffic`，主组 www-data，附加组 adm。私有路径分别写入 `traffic-private-route.map`（归一化）与 `traffic-private-kind.map`（排除），不要把真实后台入口写入仓库。
+
+将 `nginx.logs.inc` 放入要统计的 HTTPS server，把 `nginx.dashboard.inc` 仅放入官网 server；关闭继承的原始 combined 访问日志，错误日志指向本地脱敏接收器。配置校验后 reload，无需重启应用。配置和 systemd 单元位于 [deploy/traffic](../deploy/traffic/)，不直接覆盖其他机器的站点、TLS 或代理信任配置。
+
+```sh
+systemctl enable --now nodelane-traffic-errors.service nodelane-traffic.timer \
+  nodelane-traffic-rotate.timer nodelane-traffic-geoip.timer
+systemctl start nodelane-traffic.service                 # 立即更新报告
+systemctl start nodelane-traffic-rotate.service          # 轮转及年龄/容量回收
+systemctl start nodelane-traffic-geoip.service            # 检查月度地理库；每天自动检查一次
+journalctl -u nodelane-traffic.service -n 20 --no-pager   # 只输出聚合计数，不输出原始日志
+```
+
+验证：`python scripts/tests/test_traffic.py`；Linux 安装 Nginx／GoAccess 后运行 `python scripts/tests/test_traffic_native.py`，使用隔离回环端口和临时日志，覆盖脱敏、分类、空数据、同秒增量、轮转去重、自然日过期、GeoIP 与合成负载，不调用真实业务。
+
 ## 数据库备份
 
 运行环境：仓库 `backend/.venv` 的 Python 及依赖；PostgreSQL 17 使用同主版本 `pg_dump` / `pg_restore`。Windows 没有客户端时，可用 `--pg-container` 指定当前 PostgreSQL 容器，由容器内工具连接自身 5432 端口；主机 URL 必须指向同一容器的本机回环映射端口。工具先核验 Docker 端口绑定，再比较两个连接的 PostgreSQL `system_identifier` 和服务启动时间；身份不一致或无法查询时拒绝执行，也不会创建恢复库。账号需能连接 `postgres` 库并读取 `pg_control_system()`。不要将该选项用于其他数据库服务器。

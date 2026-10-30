@@ -1,0 +1,9 @@
+{
+  "log_dir": "/var/log/nginx/traffic",
+  "state_dir": "/var/lib/nodelane-traffic",
+  "raw_days": 7,
+  "report_days": 30,
+  "raw_max_bytes": 1073741824,
+  "rotate_bytes": 67108864,
+  "timezone": "Asia/Shanghai"
+}
