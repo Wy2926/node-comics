@@ -63,7 +63,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
 | `safari_fixture_server.mjs` / `prepare_safari_fixture.mjs` | Safari 模拟器的回环 OIDC、公开／防盗链图片、重定向与合成翻译服务，以及仅加入本地测试构建的 API／原生桥探针；使用方式和验收边界见 [Safari 技术验证](../docs/SAFARI_PROTOTYPE.md) |
 | `verify_notifications.mjs` | Vite 5187 的隔离身份与提示夹具；全局登录过期／错误／成功提示的关闭、自动收起、交互暂停、亮暗主题，以及逐图提示收起、重试与原图位置恢复；不访问外网 |
-| `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；`INLINE_SITE_ONLY=prefetch` 检查页内 1/3／短图补位与暂停；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
+| `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；弹窗覆盖当前域名开关、全局名单管理、目录边界、正则校验／超时与导航重新匹配；`INLINE_SITE_ONLY=prefetch` 检查页内 1/3／短图补位与暂停；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
 | `verify_region_translation.mjs` | 真实可见标签页截图、选区精确裁片与松手自动上传；生产 MV3 的隔离副本／合成网页／模拟 API 检查拖动中右键／Esc 取消、处理边框、范围外像素、原图恢复、滚动定位与预览降级、后台重启时冻结字节与 UUID 恢复及切标签竞态。无头浏览器不能触发原生 action／菜单授予 `activeTab`，仅测试副本临时增加 `<all_urls>`，不改正式权限、不证明原生授权手势；`REGION_CAPTURE_FIXTURE_PERMISSION=0` 可复现未获手势授权的截图拒绝。默认 `REGION_DPR=2`，可取 `1`、`1.25`、`1.5`、`2`；沿用 `PLAYWRIGHT_MODULE`、`TEST_EXTENSION_DIR` 与 `TEST_CHROMIUM`／`CHROMIUM_PATH`，产物写入 `artifacts/region-validation/`，不调用真实账号或模型 |
 | `verify_analytics.mjs` | 隔离 Chromium MV3 检查默认关闭、书架卡片拒绝／关闭不重弹、搜索与导入入口可用、12 种主题组合及窄宽大字、主动同意、跨标签同步、白名单无凭据请求、失败留队列、撤回清理与重新同意；后台及页面 HTTP(S) 全部模拟，不向真实 API 或 GA4 发送；截图写入 `artifacts/analytics/` |
 | `verify_chapter_imports.mjs` | 真实 DM5／Comic PASH 裸章节归属与完整目录 |
@@ -90,7 +90,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_reader_preload.mjs` | 同一 Vite 5181 夹具的 `?highres=1` 样本；真实 4000×6000 原图的邻页加载、非当前可见页、并排／单页、失败隔离、位置恢复与图片 URL 释放，不访问源站或翻译服务 |
 | `verify_reader_images.mjs` | Vite 5181 的隔离图片组件夹具；合成 PNG 与受控预解码失败、延迟，检查原生加载回退、坏图、候选显示失败保留旧图、增强缓存查询期间父图独立显示、已有增强字节跳过父图读取、显示身份、取消与 URL 清理，不访问外网 |
 | `verify_extension_theme.mjs` | Vite 5175 或 `TEST_READER_URL`，主题、菜单与位置恢复 |
-| `verify_settings_layout.mjs` | Vite 5181 或 `TEST_READER_URL`；设置分组、16 语／字号／窄屏、主题说明、模型菜单与保存失败恢复；隔离浏览器和模拟 API |
+| `verify_settings_layout.mjs` | Vite 5181 或 `TEST_READER_URL`；设置分组、16 语／字号／窄屏、主题说明、模型菜单与保存失败恢复、自动翻译网站空状态与浏览器预览保存失败；隔离浏览器和模拟 API |
 | `verify_extension_mobile.mjs` | Vite 5181 或回环 `TEST_READER_URL`；Chromium／Firefox／WebKit 的 320–430px 与横屏、导航、弹框、CBZ 实际导入、阅读工具及位置恢复，含模拟软键盘视口、Popup 和无 OffscreenCanvas 的 20000px 长图。`--reader-only` 聚焦默认沉浸、上下工具无占位、轻点显隐／原生触摸滚动、位置保持和桌面悬停／焦点／窄窗口隔离。`MOBILE_BROWSER` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，外部 HTTP 全部模拟，截图写入 `artifacts/mobile-validation/`（可用 `MOBILE_ARTIFACTS` 指定）；不是 Firefox Android／Orion 真机验收 |
 | `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复，以及同 CFI 段内小幅滚动、连续重开的像素级位置保持、字号／屏宽变化后的文字锚点恢复、本书布局独立保存与恢复全局默认。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网；模拟浏览器通过不等同真机通过 |
 | `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |

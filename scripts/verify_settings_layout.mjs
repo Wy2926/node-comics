@@ -80,7 +80,7 @@ try {
   await trigger.waitFor();
   assert.equal(await page.locator('.nc-preferences .page-title').count(), 0);
   const ja = JSON.parse(await readFile(path.join(dictionaries, 'ja.json'), 'utf8'));
-  const sectionKeys = ['外观与主题', '阅读偏好', '翻译渠道', '增强渠道', '键盘快捷键', '图片与隐私', '本机资料与独立缓存', '来源连接'];
+  const sectionKeys = ['外观与主题', '阅读偏好', '翻译渠道', '自动翻译网站', '增强渠道', '键盘快捷键', '图片与隐私', '本机资料与独立缓存', '来源连接'];
   assert.deepEqual(await page.locator('.nc-preferences > .settings-card h3').allTextContents(), sectionKeys.map(key => ja[key]));
   assert.equal(await page.locator('.nc-channel-settings .nc-model-picker').count(), 1);
   assert.equal(await page.locator('.nc-channel-settings').getByRole('switch', {name: ja['翻译书名与简介']}).count(), 1);
@@ -144,10 +144,14 @@ try {
   await menu.waitFor({state: 'hidden'});
   check('failed model preference write retains selection; retry closes normally');
 
-  await page.getByRole('switch', {name: ja['标签页自动翻译'], exact: true}).click();
-  await page.locator('.nc-auto-tabs-error').waitFor();
+  assert(await page.getByRole('switch', {name: ja['标签页自动翻译'], exact: true}).isDisabled());
+  await page.getByRole('button', {name: ja['添加网站'], exact: true}).click();
+  await page.getByRole('textbox', {name: ja['网站网址或域名'], exact: true}).fill('comics.example.com');
+  await page.getByRole('button', {name: ja['保存并开启'], exact: true}).click();
+  await page.getByRole('dialog').getByRole('alert').waitFor();
   assert.equal(await page.getByRole('switch', {name: ja['标签页自动翻译'], exact: true}).getAttribute('aria-checked'), 'false');
-  check('browser-preview permission failure stays inline and does not enable auto-translation');
+  await page.getByRole('button', {name: ja['取消'], exact: true}).click();
+  check('browser-preview save failure stays inline and does not enable automatic translation');
 
   let dictionary = ja;
   for (const file of (await readdir(dictionaries)).filter(file => file.endsWith('.json'))) {

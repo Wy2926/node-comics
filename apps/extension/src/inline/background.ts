@@ -70,7 +70,7 @@ async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus
     if(!tab.url||!safeImageUrl(tab.url,tab.url))return;
     if(info&&(info.frameId!==0||info.mediaType!=='image'||!info.srcUrl||info.pageUrl!==tab.url))throw Error(msg('图片范围无效。'));
     if(automatic){
-      if(!tab.active||!await automaticTabsAllowed())return;
+      if(!tab.active||!await automaticTabsAllowed(tab.url))return;
       const region=await chrome.tabs.sendMessage(tabId,{type:'NC_REGION_IDENTITY'},{frameId:0}).catch(()=>null);
       if(region?.url===tab.url&&(region.enabled||region.dismissedUrl===tab.url))return;
       const existing=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},{frameId:0}).catch(()=>null);
@@ -96,7 +96,7 @@ async function activate(tabId:number,automatic:boolean,info?:chrome.contextMenus
     const identity=await chrome.tabs.sendMessage(tabId,{type:'NC_INLINE_IDENTITY'},target);
     assertCurrent(current);
     if(!identity||identity.url!==tab.url)throw Error(msg("网页已变化，请重新启动翻译。"));
-    if(automatic&&!await automaticTabsAllowed())return;
+    if(automatic&&!await automaticTabsAllowed(identity.url))return;
     assertCurrent(current);
     await chrome.storage.session.set({[activationKey(tabId)]:{url:identity.url,navigationId:identity.navigationId,documentId,automatic,...(selection?{image:selection.image}:{})} satisfies Activation});
     assertCurrent(current);epoch.active=true;
@@ -118,7 +118,8 @@ export async function suspendInline(tabId:number){
 async function stopAutomaticInline(tabId:number){
   await navigator.locks.request('nc-inline-activation:'+tabId,async()=>{
     // Recheck after waiting for any activation; a newer enable wins over an old stop.
-    if(await automaticTabsAllowed())return;
+    const tab=await chrome.tabs.get(tabId).catch(()=>undefined);
+    if(await automaticTabsAllowed(tab?.url))return;
     const key=activationKey(tabId),saved=await chrome.storage.session.get(key),activation=saved[key] as Activation|undefined;
     if(!activation?.automatic)return;
     invalidateTab(tabId);
@@ -379,7 +380,7 @@ async function checkedRequest(message:InlineRequest,sender:chrome.runtime.Messag
   assertCurrent(active);
   if(!current)throw Error(msg('网页已变化，请重新右键翻译当前页面。'));
   const {activation,tab}=current;
-  if(activation.automatic&&!await automaticTabsAllowed())throw Error(msg('标签页自动翻译已关闭。'));
+  if(activation.automatic&&!await automaticTabsAllowed(tab.url))throw Error(msg('标签页自动翻译已关闭。'));
   assertCurrent(active);
   if(!Number.isSafeInteger(message.generation)||message.generation<0)throw Error(msg('阅读窗口无效。'));
   if(message.type!=='NC_INLINE_IMAGE')windowGenerations.set(tabId,Math.max(windowGenerations.get(tabId)??0,message.generation));

@@ -2,9 +2,10 @@ import { validUiLanguage } from '../../i18n/locales';
 import { initialReaderSettings, mirrorReader } from '../../inline/settings';
 import { defaults, languageLabels, type Settings } from '../../types';
 import {normalizeReaderZoom} from '../../reader/view';
+import {normalizeAutoTranslateSites} from '../../inline/auto-tab-rules';
 
 function known(value: Partial<Settings>): Settings {
-  return Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,value?.[key as keyof Settings]??fallback])) as unknown as Settings;
+  return {...Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,value?.[key as keyof Settings]??fallback])),autoTranslateSites:normalizeAutoTranslateSites(value?.autoTranslateSites)} as unknown as Settings;
 }
 export function settings(): Settings {
   try {

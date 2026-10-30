@@ -105,21 +105,15 @@ html,body,#root {
 .nc-popup-language .nc-select-list { font-size: var(--text-caption); }
 .nc-popup-language .nc-select-content { gap: 7px; }
 .nc-popup .nc-auto-tabs {
-  margin: 12px 0;
-  padding: 10px 0 0;
-}
-.nc-popup .nc-auto-tabs-row {
-  gap: 12px;
-}
-.nc-popup .nc-auto-tabs-row b {
-  font-size: var(--text-caption);
+  margin: 8px 0;
+  padding: 6px 0 0;
 }
 .nc-popup .nc-auto-tabs p {
   font-size: .6875rem;
   line-height: 1.5;
 }
 .nc-popup .nc-comic-action {
-  min-height: 54px;
+  min-height: 44px;
   justify-content: space-between;
   flex-wrap: wrap;
   padding: 10px 14px;

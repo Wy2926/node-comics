@@ -1,10 +1,181 @@
-.nc-auto-tabs{width:100%;padding:16px 0;border-top:1px solid var(--line)}
-.nc-auto-tabs-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.nc-auto-tabs-row>div{min-width:0}
-.nc-auto-tabs-row b{font-size:.875rem}
-.nc-auto-tabs p{margin:4px 0 0;color:var(--muted);font-size:.75rem;line-height:1.6}
-.nc-auto-tabs .switch{flex-shrink:0}
-.nc-auto-tabs .nc-auto-tabs-error{color:var(--danger)}
-.nc-popup .nc-auto-tabs{margin:0 0 18px;padding:12px 0 0}
-.nc-popup .nc-auto-tabs-row b{font-size:.75rem}
-.nc-popup .nc-auto-tabs p{font-size:.625rem}
+.nc-auto-tabs {
+  width: 100%;
+  border-top: 1px solid var(--line);
+}
+.nc-auto-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+.nc-auto-tabs-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.nc-auto-tabs-heading b {
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+}
+.nc-auto-tabs-heading span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+.nc-auto-tabs .switch {
+  flex-shrink: 0;
+}
+.nc-auto-tabs-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+.nc-auto-tabs-scope > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nc-auto-tabs-scope button {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  padding: 4px 0;
+  font: inherit;
+}
+.nc-auto-tabs p {
+  font-size: var(--text-caption);
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.nc-auto-tabs .nc-auto-tabs-error {
+  color: var(--danger);
+}
+.nc-auto-sites {
+  scroll-margin-top: 100px;
+}
+.nc-auto-sites-description, .nc-auto-sites-empty {
+  font-size: var(--settings-description-size);
+  color: var(--muted);
+  margin: var(--settings-field-gap) 0;
+}
+.nc-auto-sites-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.nc-auto-sites-domain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  overflow-wrap: anywhere;
+}
+.nc-auto-sites-domain b {
+  font-size: var(--settings-label-size);
+  font-weight: 550;
+}
+.nc-auto-sites-domain span {
+  font-size: var(--text-caption);
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nc-auto-sites-edit {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: var(--text-caption);
+}
+.nc-auto-sites-row > .switch, .nc-auto-sites-row > .icon-button {
+  flex-shrink: 0;
+}
+.nc-auto-sites-add {
+  margin-top: var(--settings-field-gap);
+}
+.nc-app .modal.nc-auto-site-editor {
+  width: min(600px, calc(100vw - 32px));
+}
+.nc-auto-site-editor > .nc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--settings-description-gap);
+}
+.nc-auto-site-form, .nc-auto-site-fields {
+  display: grid;
+  gap: var(--settings-field-gap);
+}
+.nc-app .nc-auto-site-form .field, .nc-app .nc-auto-site-form p {
+  margin: 0;
+}
+.nc-app .nc-auto-site-form .field {
+  gap: var(--settings-description-gap);
+}
+.nc-auto-site-form .muted, .nc-auto-site-form p {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+.nc-auto-site-form textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.nc-auto-site-choices {
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.nc-auto-site-choices legend {
+  margin-bottom: 8px;
+  font-size: var(--text-small);
+}
+.nc-auto-site-choices label, .nc-auto-site-regex-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-small);
+}
+.nc-auto-site-form input[type=radio] {
+  accent-color: var(--accent);
+}
+.nc-auto-site-form details > summary {
+  color: var(--accent);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+.nc-auto-site-regex-choice {
+  margin: 10px 0;
+}
+.nc-auto-site-match {
+  color: var(--success);
+}
+@media (max-width: 480px) {
+  .nc-auto-sites-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .nc-auto-sites-domain {
+    flex-basis: 100%;
+  }
+  .nc-auto-sites-row > .switch {
+    margin-inline-start: auto;
+  }
+}

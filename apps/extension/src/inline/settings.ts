@@ -1,5 +1,6 @@
 import {resolveLocale} from '../i18n/locales';
 import {defaults,type Settings} from '../types';
+import {normalizeAutoTranslateSites} from './auto-tab-rules';
 
 export const settingsKey='nc-reader-settings';
 const extensionStorage=()=>typeof chrome!=='undefined'&&chrome.storage?.local;
@@ -9,7 +10,11 @@ export function initialReaderSettings():Settings {
   const locale=resolveLocale('auto',languages);
   return {...defaults,language:locale==='zh-CN'?'zh-Hans':locale==='zh-TW'?'zh-Hant':locale};
 }
-const restoredSettings=(value?:unknown):Settings=>value==null?initialReaderSettings():{...defaults,...(typeof value==='object'?value as Partial<Settings>:{})};
+const restoredSettings=(value?:unknown):Settings=>{
+  if(value==null)return initialReaderSettings();
+  const saved=typeof value==='object'?value as Partial<Settings>:{};
+  return {...defaults,...saved,autoTranslateSites:normalizeAutoTranslateSites(saved.autoTranslateSites)};
+};
 export const translationLanguageChanged=(before?:unknown,after?:unknown)=>restoredSettings(before).language!==restoredSettings(after).language;
 async function settingsLock<T>(run:()=>Promise<T>):Promise<T> {
   return await (typeof navigator!=='undefined'&&navigator.locks?navigator.locks.request(settingsKey,run):run());

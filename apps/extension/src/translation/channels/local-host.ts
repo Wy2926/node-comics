@@ -4,6 +4,7 @@ export function registerLocalHost(close:()=>Promise<void>){
   const hosts=new Map<string,Promise<ChannelLocalHost>>();
   const active=new Set<string>();
   let closing=false,pendingRequests=0;
+  let pendingRegex=0;
   let timer:ReturnType<typeof setTimeout>;
   const idle=()=>{
     clearTimeout(timer);
@@ -16,6 +17,13 @@ export function registerLocalHost(close:()=>Promise<void>){
   chrome.runtime.onMessage.addListener((request,sender,reply)=>{
     if(request?.type!==LOCAL_HOST_MESSAGE||sender.id!==chrome.runtime.id||(sender.url?!sender.url.startsWith(chrome.runtime.getURL('/')):sender.tab!==undefined))return;
     if(request.action==='ping'){reply({ready:!closing});idle();return;}
+    if(request.action==='match-tab-url'){
+      if(closing||pendingRegex>=8||typeof request.pattern!=='string'||typeof request.url!=='string'||request.pattern.length>300||request.url.length>16_384){reply({ok:false,error:'LOCAL_HOST_UNAVAILABLE'});return;}
+      pendingRequests++;pendingRegex++;clearTimeout(timer);
+      const work=import('../../inline/auto-tab-regex').then(({runAutoTabRegex})=>runAutoTabRegex(request.pattern,request.url));
+      void work.then(value=>reply({ok:true,value}),()=>reply({ok:false,error:'LOCAL_HOST_UNAVAILABLE'})).finally(()=>{pendingRequests--;pendingRegex--;idle();});
+      return true;
+    }
     if(request.action!=='dispatch'||typeof request.adapterId!=='string')return;
     if(closing){reply({ok:false,error:'LOCAL_HOST_UNAVAILABLE'});return;}
     pendingRequests++;

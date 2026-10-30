@@ -99,6 +99,15 @@ beforeEach(async()=>{
 afterEach(async()=>{await background.suspendInline(7);vi.unstubAllGlobals();});
 
 describe('inline activation lifetime',()=>{
+  it('authorizes automatic work against the tab URL while allowing images from another hostname',async()=>{
+    session['nc-inline:7']={url,navigationId:'nav-7',documentId:'doc-7',automatic:true};
+    mocks.automatic.mockImplementation(async(tabUrl:string)=>tabUrl===url);
+    const images=[{id:'cdn-page',url:'https://images.cdn.test/page.png',width:500,height:700}];
+    expect(await send(request(1,images))).toMatchObject({ok:true});
+    expect(mocks.automatic).toHaveBeenCalledWith(url);
+    expect(mocks.automatic.mock.calls.every(([value])=>value===url)).toBe(true);
+    expect(mocks.readImage.mock.calls.some(([imageUrl,pageUrl])=>imageUrl===images[0].url&&pageUrl===url)).toBe(true);
+  });
   it('remembers the browser language on a background-first translation without invalidating it',async()=>{
     Object.assign(navigator,{languages:['zh-TW'],language:'zh-TW'});
     const saved:Record<string,unknown>={};
