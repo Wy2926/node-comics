@@ -1,0 +1,57 @@
+{
+  "websites": [
+    {
+      "name": "comics.nodelane.net",
+      "domains": ["comics.nodelane.net"],
+      "logPath": "/share/logs/comics.access.log",
+      "logType": "nginx",
+      "logFormat": "$remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $request_time \"$host\""
+    },
+    {
+      "name": "comics-a.nodelane.net",
+      "domains": ["comics-a.nodelane.net"],
+      "logPath": "/share/logs/comics-api.access.log",
+      "logType": "nginx",
+      "logFormat": "$remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $request_time \"$host\""
+    },
+    {
+      "name": "auth.nodelane.net",
+      "domains": ["auth.nodelane.net"],
+      "logPath": "/share/logs/auth.access.log",
+      "logType": "nginx",
+      "logFormat": "$remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $request_time \"$host\""
+    },
+    {
+      "name": "auth-admin.nodelane.net",
+      "domains": ["auth-admin.nodelane.net"],
+      "logPath": "/share/logs/auth-admin.access.log",
+      "logType": "nginx",
+      "logFormat": "$remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $request_time \"$host\""
+    }
+  ],
+  "system": {
+    "language": "zh-CN",
+    "logDestination": "stdout",
+    "taskInterval": "1m",
+    "logRetentionDays": 30
+  },
+  "database": {
+    "driver": "postgres",
+    "dsn": "postgres://nginxpulse:REPLACE_WITH_NGINXPULSE_DB_PASSWORD@127.0.0.1:5432/nginxpulse?sslmode=disable"
+  },
+  "pvFilter": {
+    "statusCodeInclude": [200],
+    "excludePatterns": [
+      "favicon.ico$",
+      "robots.txt$",
+      "sitemap.xml$",
+      "rss.xml$",
+      "feed.xml$",
+      "atom.xml$",
+      "\\.(css|js|mjs|map|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|zip|xpi|crx|pdf)$",
+      "^/(v1|internal|webhooks|billing)(/|$)",
+      "^/:private$"
+    ],
+    "excludeIPs": ["127.0.0.1", "::1"]
+  }
+}

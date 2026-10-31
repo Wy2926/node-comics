@@ -137,7 +137,7 @@ maintenance 保持单活：先退休旧实例（含计费维护线程结束）�
 
 先用候选镜像运行既有迁移命令，升级至 `admin_workspace_0024`：新增任务来源 IP、匿名反馈处理状态和备注、概览查询索引；已有任务 IP 留空，旧反馈进入待处理。该迁移只做加法，随后更新 API 与后台静态产物。生产 PostgreSQL 应先核对表规模和索引创建耗时；未执行的环境不视为已验证。
 
-国家解析复用流量统计的本地库。在 Compose 插值文件 `.env` 中设置 `GEOIP_DIRECTORY=/var/lib/nodelane-traffic/geoip`，应用 `.env.server` 保持 `GEOIP_DATABASE=/geoip/city.mmdb`。先更新 `scripts/traffic.py` 并运行一次 `geoip` 子命令，为容器 UID 10001 准备公开库的读取权限（目录 755、文件 644，日志权限不变）。仅 API 槽位只读挂载目录；已有 DB-IP 更新任务继续维护，不增加常驻服务。缺库时任务仍可管理，国家列显示地理库未就绪。来源、许可与更新规则见[管理后台](ADMIN_CONSOLE.md#任务-ip-与国家)。
+国家解析使用独立本地库，不依赖站点统计。在 Compose 插值文件 `.env` 中设置 `GEOIP_DIRECTORY=/var/lib/nodelane-geoip`，应用 `.env.server` 保持 `GEOIP_DATABASE=/geoip/city.mmdb`。按[GeoIP 运维](OPERATIONS.md#管理后台-geoip)先准备数据库，再更新 API 只读目录挂载；仅 API 槽位需要此目录。缺库时任务仍可管理，国家列显示地理库未就绪。查询规则见[管理后台](ADMIN_CONSOLE.md#任务-ip-与国家)。
 
 ## 官网与后台独立发布
 

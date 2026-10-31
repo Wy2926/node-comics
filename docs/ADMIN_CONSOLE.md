@@ -90,7 +90,7 @@ npm --prefix backend/admin-ui run release -- \
 
 国家在查询时用 `GEOIP_DATABASE` 指向的本地 MMDB 解析，支持 IPv4 / IPv6。一个分页请求只打开一次 mmap，按本页地址去重；不向外部服务发送 IP，不做无界缓存。缺库、无匹配、内网地址分别明确提示。国家代表当前数据库对提交 IP 的推断，VPN / 代理的出口所在地不等于用户实际所在地。
 
-生产复用流量统计已有的 DB-IP Lite City 数据库，Compose `.env` 设置 `GEOIP_DIRECTORY=/var/lib/nodelane-traffic/geoip`，应用 `.env.server` 使用 `GEOIP_DATABASE=/geoip/city.mmdb`。API 只读挂载整个目录；首次接入先部署更新后的 GeoIP 脚本并运行一次更新（即使当月库已存在），将公开库目录/文件权限设为 755/644，供容器 UID 10001 读取，不改变日志权限。原有 `scripts/traffic.py geoip` 原子更新后下次查询自动使用新库；来源、月份、SHA-256 和 CC BY 4.0 许可保存在该目录 `sources.json`。地理数据来源：[DB-IP Lite](https://db-ip.com/db/lite.php)。
+后台独立使用 DB-IP Lite City，Compose `.env` 设置 `GEOIP_DIRECTORY=/var/lib/nodelane-geoip`，应用 `.env.server` 使用 `GEOIP_DATABASE=/geoip/city.mmdb`。API 只读挂载整个目录；`scripts/update_geoip.py` 验证并原子更新后，下次查询自动使用新库。不依赖 NginxPulse 的地理解析或数据库。安装、权限、来源与许可记录统一见[管理后台 GeoIP 运维](OPERATIONS.md#管理后台-geoip)。地理数据来源：[DB-IP Lite](https://db-ip.com/db/lite.php)。
 
 ### 即时反馈与供应商测试
 

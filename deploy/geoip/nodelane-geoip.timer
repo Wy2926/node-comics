@@ -1,5 +1,5 @@
 [Unit]
-Description=Check monthly GeoIP release daily (download only when changed)
+Description=Check the monthly DB-IP release daily
 [Timer]
 OnCalendar=*-*-* 05:20:00 Asia/Shanghai
 RandomizedDelaySec=10m

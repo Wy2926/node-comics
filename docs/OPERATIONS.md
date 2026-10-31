@@ -37,30 +37,65 @@
 
 ## Nginx 访问统计
 
-原生 Nginx 部署可启用 [GoAccess 配置](../deploy/traffic/) 与 [维护脚本](../scripts/traffic.py)，独立于应用镜像、数据库和健康门禁。GoAccess 使用官方签名仓库的 1.12（MIT），IP 数据使用 DB-IP Lite City / ASN（CC-BY-4.0）；本地查询，无逐 IP 外部请求或反向 DNS。数据库来源、月份及 SHA-256 写入 `geoip/sources.json`，报告保留来源署名。
+使用独立 [NginxPulse Compose](../deploy/compose.nginxpulse.yaml)，采用上游原生界面、数据库、增量解析、多站点配置与统计口径；不接入业务数据库、应用发布或健康门禁，不在官网埋点。镜像固定版本与摘要，来源和许可见[依赖说明](../deploy/nginxpulse/THIRD_PARTY.md)。
 
-- `/traffic/` 为独立只读统计页，HTTPS Basic Auth 专用管理员账号，凭据不复用 root 或业务密码；所有 HTML 和资源均鉴权、no-store、noindex。密码文件 `/etc/nodelane/traffic.htpasswd` 为 root:www-data 0640，初始凭据仅保存于 root 的私有文件，不提交仓库。
-- 网站 PV 仅计公开 HTML 的 GET 200/304，排除预取、静态资源、私有页面、API 和已知爬虫；UV 为 IP＋UA＋日期估算，多日数字不是跨日去重人数。网站爬虫只读网站日志，不能将正常节点领取当作爬虫。API、节点、Auth 与 SSE／长轮询分开查看。
-- 日志只记录处理后的客户端 IP、无查询参数且归一化的路径、来源域名、UA、状态、字节数、请求及上游耗时、主机、连接号。不记录 Cookie、Authorization 或正文；私有后台路径通过单独 map 排除。保留现有真实 IP 信任链，不信任任意公网 XFF。
-- Nginx 使用 32 KiB 缓冲、5 秒刷新；普通错误经本地 Unix syslog 接收器移除 request/upstream/referrer 上下文与路径后落盘。`errors.html` 显示当前错误日志最近 100 条，具体业务异常仍查应用脱敏日志。
-- 每分钟增量生成统计，按原生 inode／行号续读；轮转不用 copytruncate、不压缩，避免归档解压改变 inode 后重复统计。按北京时间自然日清理统计：GoAccess `keep-last` 本身按有数据日期计数，脚本额外清除超龄日期与完全过期缓存，不插入假访问来推动日期。
+### 数据与权限
 
-保留策略集中在 `/etc/nodelane/traffic.json`（初始值见 [settings.json](../deploy/traffic/settings.json)）：原始访问／错误日志 7 天、统计 30 天；单文件 64 MiB 触发轮转，原始日志总量软上限 1 GiB。每 15 分钟检查大小与年龄，超量先删最旧归档；流量突增或定时器异常时可能短时超过软上限。容量回收不删除正在写入的日志。统计服务限制 512 MiB、0.75 CPU、55 秒，失败不影响网站服务，页面保留最近成功结果及更新时间。
+- 面板地址由私密环境文件的 `NGINXPULSE_ORIGIN` 与 `NGINXPULSE_BASE_PATH` 决定，默认 `https://comics.nodelane.net/traffic/`，提供原生概况、日报、实时、访问明细和系统配置。HTTPS Basic Auth 使用专用管理员凭据，所有页面、资源及 API 均鉴权、no-store、noindex；写请求必须来自配置的同源地址。原生配置可修改，不能把这个入口当作只读报表对外分享。
+- 每个站点一份脱敏访问日志，使用原生固定站点配置，不按客户端 Host 动态建站，也不把同一请求重复写入分类日志。不记录查询参数、Cookie、Authorization 或正文；任务路径归一化，身份服务路径收敛为 `/:private`。账户、回调、支付、后台和统计页排除；真实后台入口只写入服务器私有 map。保留部署环境已核实的真实 IP 信任链。
+- PV、UV、会话、机器人判断及日期筛选遵循 NginxPulse，不另外实现统计算法。初始 `pvFilter` 排除静态资源、API、节点、账单路径和私有占位路径；统计值不等于登录人数、付款或翻译任务数。SSE／长轮询的请求耗时是连接持续时间；源站日志不包含 CDN 未回源命中和浏览器内未发请求的页面切换。
+- **地理解析采用上游默认行为**：本地 ip2region 无法匹配时，将 IP 发往 `ip-api.com` 批量补全，默认接口为 HTTP。它不是“完全本地／匿名统计”；上游缓存、访客和会话数据也是受控数据。官网隐私披露与运行环境的数据外发要求须在生产启用前核对。后台任务国家查询仍使用下节的独立本地 MMDB，不调用该接口。
+- 容器只读挂载指定访问日志目录，不挂载宿主 Nginx 配置、证书、Docker socket 或业务数据。仅前端端口绑定 `127.0.0.1:${NGINXPULSE_PORT}`（默认 18090），API 8089 和内置 PostgreSQL 不对宿主发布。
 
-运行布局：脚本 `/usr/local/lib/nodelane-traffic/traffic.py`；配置 `/etc/nodelane/{traffic.json,goaccess.conf,traffic.logs.inc,traffic.dashboard.inc}`；HTTP 级 map `/etc/nginx/conf.d/nodelane-traffic.conf`；日志 `/var/log/nginx/traffic/`、`/var/log/nodelane-traffic/`；统计、缓存及地理库 `/var/lib/nodelane-traffic/`。运行账号 `nodelane-traffic`，主组 www-data，附加组 adm。私有路径分别写入 `traffic-private-route.map`（归一化）与 `traffic-private-kind.map`（排除），不要把真实后台入口写入仓库。
+### 安装与维护
 
-将 `nginx.logs.inc` 放入要统计的 HTTPS server，把 `nginx.dashboard.inc` 仅放入官网 server；关闭继承的原始 combined 访问日志，错误日志指向本地脱敏接收器。配置校验后 reload，无需重启应用。配置和 systemd 单元位于 [deploy/traffic](../deploy/traffic/)，不直接覆盖其他机器的站点、TLS 或代理信任配置。
+以下以 Debian/Ubuntu 的 `www-data`、`adm` 为例，先核对本机用户、组与 UID。首次安装：
+
+1. 创建 `/var/log/nginx/nginxpulse`（www-data:adm 0750）和 `/etc/nodelane/nginxpulse`（统计进程 UID:adm 0750）。将[初始配置](../deploy/nginxpulse/nginxpulse_config.json)复制为后者的 `nginxpulse_config.json`，权限 0640；按实际部署保留需要的站点，后续通过原生界面维护，升级时不覆盖此文件。配置目录必须可写，供设置保存。
+2. 复制[环境示例](../deploy/nginxpulse/server.env.example)到 `/etc/nodelane/nginxpulse.env`，设置面板 HTTPS origin（无尾斜线）、单段路径（不带斜线、不与业务路由冲突）、未占用的回环端口和进程 UID、日志读取组 GID，以及用 `openssl rand -hex 32` 生成的数据库密码。使用不加引号的字面量 `KEY=value`，不写变量引用或行尾注释。将同一密码填入私密 `nginxpulse_config.json` 的 `database.dsn` 占位处，保持容器内置数据库地址 `127.0.0.1:5432/nginxpulse`，不要连接业务数据库。原生设置保存要求完整 DSN，不能只配置环境变量。环境文件仅管理员可读，两份私密配置均勿提交仓库；不要修改已有数据库密码后期待容器自动重置数据库账户。
+3. 创建 `/etc/nodelane/nginxpulse.htpasswd`（root:www-data 0640），使用独立密码。创建 `/etc/nodelane/nginxpulse-private.map`，按[示例](../deploy/nginxpulse/private.map.example)排除实际后台入口；文件必须存在且不提交真实路径。
+4. 用下方命令从同一环境文件生成代理配置，将 `nginx.http.conf` 安装到 `/etc/nginx/conf.d/nodelane-nginxpulse.conf`，将 `nginx.dashboard.inc` 安装到 `/etc/nodelane/nginxpulse.dashboard.inc`，仅在面板 origin 对应的 HTTPS server 中 include 后者。按下表为各统计站点安装一份[日志片段](../deploy/nginxpulse/nginx.logs.inc)，替换其中的固定日志文件名。不要覆盖站点现有 TLS、真实 IP 或业务路由；更换统计站点域名时另行调整 HTTP 模板的公开路径白名单。关闭同层其他原始访问日志，避免未脱敏副本。
+5. 为错误脱敏创建系统账号 `nodelane-nginx-errors`（主组 www-data），将 [nginx_error_log.py](../scripts/nginx_error_log.py)安装到 `/usr/local/lib/nodelane/`，安装并启动 [nodelane-nginx-errors.service](../deploy/nginxpulse/nodelane-nginx-errors.service)。它只保护日志，不参与统计；脱敏结果在 `/var/log/nodelane-nginx-errors/error.log`，不提供额外报表。
+6. 将 [logrotate 配置](../deploy/nginxpulse/logrotate.conf)安装到 `/etc/logrotate.d/nodelane-nginxpulse`，由系统现有定时任务执行。访问日志 rename/create/reopen，不用 copytruncate；每天轮转、保留 7 份并延迟压缩。分析器只跟踪每站活动日志，不使用包含轮转归档的通配符，避免同一记录以新文件路径再次入库；归档用于受控排障，不自动回填。轮询采集与轮转不具备事务保证，轮转前未扫描的尾部可能遗漏，不能作为计费或完整审计依据。此策略不是磁盘容量硬上限，需监控宿主磁盘。
+
+| 站点 | 宿主 `/var/log/nginx/nginxpulse/` 下的文件 |
+| --- | --- |
+| `comics.nodelane.net` | `comics.access.log` |
+| `comics-a.nodelane.net` | `comics-api.access.log` |
+| `auth.nodelane.net` | `auth.access.log` |
+| `auth-admin.nodelane.net` | `auth-admin.access.log` |
+
+从仓库根目录执行，`--env-file` 指向已准备的私密文件：
 
 ```sh
-systemctl enable --now nodelane-traffic-errors.service nodelane-traffic.timer \
-  nodelane-traffic-rotate.timer nodelane-traffic-geoip.timer
-systemctl start nodelane-traffic.service                 # 立即更新报告
-systemctl start nodelane-traffic-rotate.service          # 轮转及年龄/容量回收
-systemctl start nodelane-traffic-geoip.service            # 检查月度地理库；每天自动检查一次
-journalctl -u nodelane-traffic.service -n 20 --no-pager   # 只输出聚合计数，不输出原始日志
+python3 scripts/configure_nginxpulse.py --env-file /etc/nodelane/nginxpulse.env --output /run/nodelane-nginxpulse
+install -m 0644 /run/nodelane-nginxpulse/nginx.http.conf /etc/nginx/conf.d/nodelane-nginxpulse.conf
+install -m 0644 /run/nodelane-nginxpulse/nginx.dashboard.inc /etc/nodelane/nginxpulse.dashboard.inc
+docker compose --env-file /etc/nodelane/nginxpulse.env -f deploy/compose.nginxpulse.yaml config --quiet
+docker compose --env-file /etc/nodelane/nginxpulse.env -f deploy/compose.nginxpulse.yaml up -d --wait --wait-timeout 90
+nginx -t && systemctl reload nginx
+docker compose --env-file /etc/nodelane/nginxpulse.env -f deploy/compose.nginxpulse.yaml ps
 ```
 
-验证：`python scripts/tests/test_traffic.py`；Linux 安装 Nginx／GoAccess 后运行 `python scripts/tests/test_traffic_native.py`，使用隔离回环端口和临时日志，覆盖脱敏、分类、空数据、同秒增量、轮转去重、自然日过期、GeoIP 与合成负载，不调用真实业务。
+修改访问地址或端口后重跑上述生成、安装、Compose 和 Nginx 校验/reload 步骤；Compose 将路径传给上游 `WEB_BASE_PATH`，覆盖原生设置，不能只在面板内修改路径。域名需已有对应 DNS、证书和 HTTPS server；脚本不自动修改这些资源。旧路径不保留兼容入口，重载前检查新路径不与官网、后台或语言路由冲突。单段路径限制遵循[上游字段说明](https://nginx-pulse-docs.kaisir.cn/docs/Config-Reference#webbasepath)。
+
+容器内置独立 PostgreSQL，配置目录、`data` 和 `postgres` 卷必须一起保留；停止后备份或采用数据库一致性备份，不用 `down --volumes` 清理生产。默认北京时间、每分钟扫描、入库访问数据保留 30 天；这里保留的是访问明细，不只是匿名聚合。缓存与维表的清理由上游实现负责，不宣称全部 IP 在第 30 天删除。原始日志轮转与数据库清理相互独立。
+
+Compose 初始限制为 1 CPU、1 GiB 内存，属于资源预算而非吞吐保证；历史回填和实际峰值需在目标主机测量。应用失效只影响统计页，不阻断网站。维护日志与配置可能包含 IP、路径或数据库信息，仅在管理员环境查看，不上传公共日志。
+
+验证：`python scripts/tests/test_nginx_support.py` 只保留地址配置、错误脱敏和 GeoIP 原子更新的关键回归。部署后检查匿名页面/资源/API 为 401、认证后为 200，跨源写请求为 403，四站日志能被原生面板读取；检查轮转及容器重启后不重复入库，网站/API 健康与其他业务进程不受影响。不维护上游功能的重复测试框架。
+
+### 管理后台 GeoIP
+
+[update_geoip.py](../scripts/update_geoip.py)只维护后台使用的 DB-IP Lite City，不依赖统计服务，也不下载无消费者的 ASN 库。安装系统 Python 的 `maxminddb`（项目版本见[后端依赖](../backend/THIRD_PARTY.md)），将脚本安装到 `/usr/local/lib/nodelane/`，安装 [service](../deploy/geoip/nodelane-geoip.service) 和 [timer](../deploy/geoip/nodelane-geoip.timer) 后执行：
+
+```sh
+systemctl daemon-reload
+systemctl enable --now nodelane-geoip.timer
+systemctl start nodelane-geoip.service
+```
+
+数据库位于 `/var/lib/nodelane-geoip/city.mmdb`，目录／文件权限 755／644，API 只读挂载整个目录。每天检查月度发布，下载并验证后原子替换；来源、月份、SHA-256 和 CC BY 4.0 许可保存在 `sources.json`。已有部署切换挂载前先准备并验证新目录，不能给运行中的 API 挂空目录。完整后台行为见[任务 IP 与国家](ADMIN_CONSOLE.md#任务-ip-与国家)。
 
 ## 数据库备份
 

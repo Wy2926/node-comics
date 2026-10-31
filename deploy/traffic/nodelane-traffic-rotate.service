@@ -1,6 +1,0 @@
-[Unit]
-Description=Rotate and expire Nginx traffic logs
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/python3 /usr/local/lib/nodelane-traffic/traffic.py rotate
-Nice=10

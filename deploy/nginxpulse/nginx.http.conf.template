@@ -1,0 +1,39 @@
+# http context. Sanitize at the source, before the upstream analyzer reads logs.
+map $http_origin $pulse_same_origin {
+    default 0;
+    "@NGINXPULSE_ORIGIN@" 1;
+}
+map $request_method $pulse_write_allowed {
+    default $pulse_same_origin;
+    GET 1;
+    HEAD 1;
+}
+map $http_referer $pulse_referrer {
+    default "-";
+    ~^https?://([^/@:]+)(?::[0-9]+)?(?:/|$) https://$1/;
+}
+map $uri $pulse_route {
+    default $uri;
+    ~^/v1/(guest/)?translations/events$ /v1/translations/events;
+    ~^/v1/(guest/)?translations/[^/]+/([^/]+)$ /v1/$1translations/:id/$2;
+    ~^/v1/(guest/)?translations/[^/]+$ /v1/$1translations/:id;
+    ~^/v1/documents/[^/]+/([^/]+)$ /v1/documents/:id/$1;
+    ~^/v1/documents/[^/]+$ /v1/documents/:id;
+    ~^/internal/(documents/)?compute/(v[0-9]+)/(nodes|leases)/[^/]+/([^/]+)$ /internal/$1compute/$2/$3/:id/$4;
+}
+map $host $pulse_path {
+    default /:private;
+    comics.nodelane.net $pulse_route;
+    comics-a.nodelane.net $pulse_route;
+}
+map $uri $pulse_public {
+    # Host-local file: exclude the real private admin entry without committing it.
+    include /etc/nodelane/nginxpulse-private.map;
+    default 1;
+    ~^/(@NGINXPULSE_BASE_PATH@|health)(/|$) 0;
+    ~^/v1/admin(/|$) 0;
+    ~^/(?:[a-z][a-z](?:-[a-z][a-z])?/)?(auth|account|payment|drive-connect)(/|$) 0;
+}
+log_format nodelane_nginxpulse escape=json
+    '$remote_addr - - [$time_local] "$request_method $pulse_path $server_protocol" '
+    '$status $body_bytes_sent "$pulse_referrer" "$http_user_agent" $request_time "$server_name"';

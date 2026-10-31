@@ -1,15 +1,15 @@
 [Unit]
 Description=Redact Nginx error messages before storing them
 [Service]
-User=nodelane-traffic
+User=nodelane-nginx-errors
 Group=www-data
-RuntimeDirectory=nodelane-traffic
+RuntimeDirectory=nodelane-nginx-errors
 RuntimeDirectoryMode=0750
-LogsDirectory=nodelane-traffic
+LogsDirectory=nodelane-nginx-errors
 LogsDirectoryMode=0750
 UMask=0027
 Environment=TZ=Asia/Shanghai
-ExecStart=/usr/bin/python3 /usr/local/lib/nodelane-traffic/traffic.py errors
+ExecStart=/usr/bin/python3 /usr/local/lib/nodelane/nginx_error_log.py
 Restart=on-failure
 RestartSec=2
 MemoryMax=64M

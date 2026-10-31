@@ -1,0 +1,47 @@
+# Independent upstream application, including its own PostgreSQL.
+name: nodelane-nginxpulse
+services:
+  nginxpulse:
+    image: magiccoders/nginxpulse:v1.6.24@sha256:92b40d49ce7e84d61b2aa4aaab1027747a6e509faafccd6d6ed6f08c5a9cb5f6
+    restart: unless-stopped
+    # Upstream supervises PostgreSQL and handles TERM, not Nginx's inherited QUIT.
+    stop_signal: SIGTERM
+    stop_grace_period: 90s
+    ports:
+      - "127.0.0.1:${NGINXPULSE_PORT:-18090}:8088"
+    environment:
+      TZ: Asia/Shanghai
+      PUID: "${NGINXPULSE_UID:-10002}"
+      PGID: "${NGINXPULSE_GID:-4}"
+      POSTGRES_PASSWORD: "${NGINXPULSE_DB_PASSWORD:?Set a private hex database password}"
+      WEB_BASE_PATH: "${NGINXPULSE_BASE_PATH:?Set a single-segment dashboard path}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8088/$${WEB_BASE_PATH}/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - type: bind
+        source: ${NGINXPULSE_LOG_DIRECTORY:-/var/log/nginx/nginxpulse}
+        target: /share/logs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${NGINXPULSE_CONFIG_DIRECTORY:-/etc/nodelane/nginxpulse}
+        target: /app/configs
+        bind:
+          create_host_path: false
+      - data:/app/var/nginxpulse_data
+      - postgres:/app/var/pgdata
+    cpus: 1.0
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  data:
+  postgres:

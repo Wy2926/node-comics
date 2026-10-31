@@ -1,0 +1,3 @@
+# Install as /etc/nodelane/nginxpulse-private.map and replace the placeholder.
+# Keep real private admin paths outside the repository.
+~^/REPLACE_PRIVATE_ADMIN_ENTRY(/|$) 0;

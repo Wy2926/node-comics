@@ -18,7 +18,8 @@
 | `tests/rehearse_deployment.py` | 隔离 Docker 中真实代理切换、慢上传、SSE、合成供应商任务与排空；默认清理本轮资源，产物写入 artifacts |
 | `tests/test_document_llm_live_script.py` | LLM 手动验收工具的离线回归，不调用真实供应商；从仓库根用测试环境执行 `python -m pytest -q scripts/tests/test_document_llm_live_script.py`，不加载后端数据库夹具 |
 | `database_backup.py` / `verify_database_restore.py` | [备份与隔离恢复](../docs/OPERATIONS.md) |
-| `traffic.py report / rotate / geoip / errors` | 独立 GoAccess 报告、日志到期及容量回收、本地地理库更新、Nginx 错误脱敏，见[访问统计](../docs/OPERATIONS.md#nginx-访问统计) |
+| `update_geoip.py` / `nginx_error_log.py` | 独立后台地理库更新与 Nginx 错误脱敏；站点统计由 [NginxPulse](../docs/OPERATIONS.md#nginx-访问统计)原生服务处理 |
+| `configure_nginxpulse.py` / `tests/test_nginx_support.py` | 从统一地址配置生成 NginxPulse 代理片段；只保留配置和基础设施关键回归，见[访问统计](../docs/OPERATIONS.md#nginx-访问统计) |
 | `export_openapi.py` | [导出 API 契约](../contracts/README.md) |
 | `validate_analytics.py --env-file <私密配置路径>` | 用后端实际载荷格式向 GA4 验证端点严格校验全部插件事件；不调用收集端点、不写报表，不能验证 secret 或真实入库。只读指定文件的 GA4 配置（未指定时取进程环境），结果写入 `artifacts/analytics-config/validation.json` |
 | `verify_extension_release.py` | 校验安装包与已填写的永久下载地址，见[部署规范](../docs/DEPLOYMENT.md) |

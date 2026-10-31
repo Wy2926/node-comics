@@ -1,0 +1,17 @@
+[Unit]
+Description=Update the admin API's local DB-IP Lite City database
+[Service]
+Type=oneshot
+DynamicUser=true
+StateDirectory=nodelane-geoip
+StateDirectoryMode=0755
+UMask=0022
+Environment=TZ=Asia/Shanghai
+ExecStart=/usr/bin/python3 /usr/local/lib/nodelane/update_geoip.py
+Nice=10
+MemoryMax=256M
+TimeoutStartSec=10min
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
