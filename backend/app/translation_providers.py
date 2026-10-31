@@ -1,17 +1,18 @@
 """Database-owned translation suppliers. No environment seeding or legacy fallback."""
 from contextlib import contextmanager
 import logging
+import time
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import Field, SecretStr, field_validator, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, undefer
-from .adapters.llm import TextError
+from .adapters.llm import RequestLimits, TextError
 from .adapters.text import TextPolicy
 from .auth import admin
 from .billing_models import BillingPlan
-from .admin_audit import record_audit, sanitize
+from .admin_audit import record_audit
 from .db import get_db, session_factory
 from .errors import problem
 from .models import User, now, uid
@@ -254,16 +255,43 @@ def toggle_provider(provider_id: str, body: ProviderToggle, user: User = Depends
     return provider_json(db, provider)
 
 
-@router.get('/{provider_id}/revisions')
-def revisions(provider_id: str, offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
-              user: User = Depends(admin), db: Session = Depends(get_db)):
+class ProviderTest(RequestBody):
+    revision_id: str = Field(min_length=1, max_length=36)
+
+
+@router.post('/{provider_id}/test')
+def test_provider(provider_id: str, body: ProviderTest, user: User = Depends(admin), db: Session = Depends(get_db)):
+    from .translation_provider_limits import reserve_request
+    from .redis_state import window
     provider = get_provider(db, provider_id)
-    query = select(TranslationProviderRevision.id, TranslationProviderRevision.channel,
-        TranslationProviderRevision.config, TranslationProviderRevision.created_at).where(
-        TranslationProviderRevision.provider_id == provider_id)
-    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    rows = db.execute(query.order_by(TranslationProviderRevision.created_at.desc(), TranslationProviderRevision.id.desc())
-                      .offset(offset).limit(limit))
-    return {'items': [{'id': row.id, 'channel': row.channel, 'config': sanitize(row.config),
-            'current': row.id == provider.revision_id, 'created_at': row.created_at} for row in rows],
-            'total': total, 'next_offset': offset + limit if offset + limit < total else None}
+    if provider.revision_id != body.revision_id:
+        problem('PROVIDER_REVISION_CONFLICT', '配置已经变化，请刷新后测试当前版本', 409)
+    revision = db.get(TranslationProviderRevision, provider.revision_id,
+                      options=[undefer(TranslationProviderRevision.api_key)])
+    if not revision or revision.channel not in CHANNELS:
+        problem('TRANSLATION_PROVIDER_UNAVAILABLE', '供应商配置不可用', 409)
+    # A saved but disabled provider can be tested before enabling traffic.
+    budget = window('admin-provider-test', provider.id, 1, member=uid(), seconds=30)
+    if budget['retry_after_seconds']:
+        problem('PROVIDER_TEST_RATE_LIMITED', '此供应商刚刚测试过，请 30 秒后再试', 429)
+    reserve_request(provider)
+    channel, config, credential, actor_id = revision.channel, dict(revision.config), revision.api_key, user.id
+    revision_id = revision.id
+    db.rollback()  # Never hold a DB connection/lock during the upstream call.
+    started = time.monotonic()
+    try:
+        result = CHANNELS[channel].call([
+            {'role': 'system', 'content': 'Translate the user text into Simplified Chinese. Return only the translation.'},
+            {'role': 'user', 'content': 'Hello, world!'}], config, credential,
+            limits=RequestLimits(timeout_seconds=min(config['timeout_seconds'], 30),
+                                 max_output_tokens=min(config['max_output_tokens'], 1024), max_response_bytes=65536))
+        outcome = {'ok': True, 'response': result.content[:2000].replace(credential, '[redacted]'), 'usage': result.usage}
+    except TextError as error:
+        # Adapter messages are curated; never return raw response bodies or credentials.
+        outcome = {'ok': False, 'error_code': error.code, 'message': error.message, 'usage': error.usage}
+    elapsed = round((time.monotonic() - started) * 1000)
+    record_audit(db, actor_id, 'text_provider.test', 'translation_provider', provider_id,
+        details={'revision_id': revision_id, 'ok': outcome['ok'], 'elapsed_ms': elapsed,
+                 'usage': outcome['usage'], 'error_code': outcome.get('error_code')})
+    db.commit()
+    return {**outcome, 'elapsed_ms': elapsed, 'model': config['model'], 'revision_id': revision_id}

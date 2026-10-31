@@ -17,3 +17,6 @@ redis==8.1.0
 # https://pypi.org/project/boto3/1.43.111/ (Apache-2.0), R2 document control/signing only.
 # boto3-1.43.111-py3-none-any.whl sha256: c79994619c8d89e45f6fd0edc5c5b5a70c9358f00423f4c99cb64931f89ecf37
 boto3==1.43.111
+
+# https://pypi.org/project/maxminddb/3.2.0/ (Apache-2.0), local GeoIP country lookup.
+maxminddb==3.2.0

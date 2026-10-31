@@ -108,7 +108,7 @@ def find_reusable(db, user, asset, mode, language, config):
 
 
 def create_job(db, user, asset, mode, language, key, *, operation=None, force=False, config=None,
-               source_sha256=None, request_hash_override=None, result_format='overlay-v1', model_id=None, font_id=None):
+               source_sha256=None, request_hash_override=None, result_format='overlay-v1', model_id=None, font_id=None, submitted_ip=None):
     lock_scheduler(db)
     user = locked_user(db, user.id)
     operation = operation or f"translate:{mode}"
@@ -159,7 +159,7 @@ def create_job(db, user, asset, mode, language, key, *, operation=None, force=Fa
     kind = require_entitlement(user, mode, db=db, policy=policy)
     version = (db.scalar(select(func.max(Job.version)).where(Job.owner_id == user.id, Job.cache_key == ck)) or 0) + 1
     job = Job(id=uid(), owner_id=user.id, input_asset_id=asset.id if asset else None, source_sha256=sha,
-        mode=mode, target_language=language,
+        mode=mode, target_language=language, submitted_ip=submitted_ip,
         operation=operation, idempotency_key=key, request_hash=request_hash, cache_key=ck, config=config,
         quota_pages=0, quota_kind=kind, settlement="free", version=version,
         status="queued" if asset else "awaiting_upload", phase="queued" if asset else "awaiting_upload", created_at=at)

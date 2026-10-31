@@ -68,6 +68,7 @@ class Job(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    submitted_ip: Mapped[str | None] = mapped_column(String(45))
     input_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
     input_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     source_sha256: Mapped[str] = mapped_column(String(64), default="", index=True)

@@ -1,52 +1,63 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {Button} from './ui';
+import {lazy, Suspense, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {authError, type AuthConfig, errorText, finishLogin, getAdmin, hasSession, request, saveToken, startLogin} from './api';
-import {TaskDetail, UserDetail} from './Details';
+import {EntityWorkspace} from './EntityWorkspace';
+import {EntityActiveContext, EntityContext} from './EntityLink';
+import {InboxBell, InboxCount, InboxProvider} from './Inbox';
+import {Tabs} from 'antd';
+import {AppstoreOutlined, UserOutlined, ShoppingOutlined, InboxOutlined, FileImageOutlined, ApiOutlined, CloudServerOutlined, SettingOutlined} from '@ant-design/icons';
 import {Nodes, Tasks, Users} from './Lists';
 import {Overview} from './Overview';
 import {NodeConfigDialog} from './NodeConfig';
-import {SystemSettingsPage} from './SystemSettings';
-import {TranslationProvidersPage} from './TranslationProviders';
-import {BillingCatalogPage} from './BillingCatalog';
-import {BillingOrdersPage} from './BillingOrders';
-import {FeedbackPage} from './FeedbackPage';
-import {SupportRequestsPage} from './SupportRequestsPage';
-import {BillingEventsPage} from './BillingEvents';
-import {BillingSubscriptionsPage} from './BillingSubscriptions';
-import {AuditLogPage} from './AuditLog';
-import {OperationsPage} from './Operations';
-import {StatisticsPage} from './Statistics';
-import {QuotaCampaignsPage} from './QuotaCampaigns';
+const SystemSettingsPage = lazy(() => import('./SystemSettings').then(module => ({default: module.SystemSettingsPage})));
+const TranslationProvidersPage = lazy(() => import('./TranslationProviders').then(module => ({default: module.TranslationProvidersPage})));
+const BillingCatalogPage = lazy(() => import('./BillingCatalog').then(module => ({default: module.BillingCatalogPage})));
+const BillingOrdersPage = lazy(() => import('./BillingOrders').then(module => ({default: module.BillingOrdersPage})));
+const FeedbackPage = lazy(() => import('./FeedbackPage').then(module => ({default: module.FeedbackPage})));
+const SupportRequestsPage = lazy(() => import('./SupportRequestsPage').then(module => ({default: module.SupportRequestsPage})));
+const BillingEventsPage = lazy(() => import('./BillingEvents').then(module => ({default: module.BillingEventsPage})));
+const BillingSubscriptionsPage = lazy(() => import('./BillingSubscriptions').then(module => ({default: module.BillingSubscriptionsPage})));
+const AuditLogPage = lazy(() => import('./AuditLog').then(module => ({default: module.AuditLogPage})));
+const ServiceHealthPage = lazy(() => import('./ServiceHealth').then(module => ({default: module.ServiceHealthPage})));
+const StatisticsPage = lazy(() => import('./Statistics').then(module => ({default: module.StatisticsPage})));
+const QuotaCampaignsPage = lazy(() => import('./QuotaCampaigns').then(module => ({default: module.QuotaCampaignsPage})));
 import type {Node} from './types';
-import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, TaskDetail as TaskData, User, UserDetail as UserData} from './types';
+import type {AdminUser, Nodes as NodesData, Overview as OverviewData, Page, Task, User} from './types';
 import {Empty, href, label, Pagination, time} from './ui';
 
 const views = {
-  overview: ['运行概览', 'LIVE OPERATIONS', '从用户提交到译图交付，掌握当前运行情况。', '◫'],
-  tasks: ['翻译任务', 'TRANSLATION TASKS', '查看单图与整本文件的状态、等待时间及节点履历。', '≡'],
-  nodes: ['计算节点', 'COMPUTE RESOURCES', '查看图像计算节点与控制资源池的心跳、容量和占用。', '▦'],
-  'translation-providers': ['翻译供应商', 'TRANSLATION PROVIDERS', '管理文本翻译的渠道、模型与独立供应商配置。', '⇄'],
-  users: ['用户管理', 'READER ACCOUNTS', '查看用户会员状态、翻译活动和当前页数额度。', '♙'],
-  'quota-campaigns': ['额度活动', 'QUOTA CAMPAIGNS', '配置自动赠送规则与发放范围。', '◇'],
-  billing: ['产品与价格', 'PRODUCTS & PRICES', '管理套餐产品、月付／年付价格与支付渠道。', '◇'],
-  orders: ['订单管理', 'PAYMENTS & ORDERS', '查看支付订单、订阅状态和流转记录。', '▤'],
-  subscriptions: ['订阅与权益', 'SUBSCRIPTIONS', '追溯客户、订阅、账单与授权周期。', '◇'],
-  'billing-events': ['支付事件', 'PAYMENT EVENTS', '排查支付通知、处理失败与积压。', '↻'],
-  feedback: ['翻译反馈', 'READER FEEDBACK', '处理读者反馈并记录处理过程。', '✎'],
-  'plugin-feedback': ['插件反馈', 'PLUGIN FEEDBACK', '查看匿名提交的插件问题与建议。', '✉'],
-  'uninstall-feedback': ['卸载反馈', 'UNINSTALL FEEDBACK', '查看用户自愿提交的卸载原因与建议。', '✉'],
-  'site-requests': ['网站适配申请', 'WEBSITE REQUESTS', '查看匿名提交的网站兼容申请。', '↗'],
-  operations: ['运行诊断', 'DIAGNOSTICS', '查看服务健康、图片授权与受理记录。', '⌕'],
-  statistics: ['用量与成本', 'USAGE & COST', '查看调用计量与业务统计。', '▥'],
-  audit: ['操作审计', 'AUDIT LOG', '查询管理员操作和变更记录。', '≡'],
-  settings: ['系统设置', 'SYSTEM SETTINGS', '管理翻译提示词、默认额度与请求保护设置。', '⚙'],
+  overview: ['概览', '先处理反馈与订单，再查看用户和翻译运行情况。'],
+  tasks: ['翻译任务', '查看单图与整本文件的状态、等待时间及节点履历。'],
+  nodes: ['计算节点', '查看图像计算节点与控制资源池的心跳、容量和占用。'],
+  'translation-providers': ['翻译供应商', '管理文本翻译的渠道、模型与独立供应商配置。'],
+  users: ['用户管理', '查看用户会员状态、翻译活动和当前页数额度。'],
+  'quota-campaigns': ['额度活动', '配置自动赠送规则与发放范围。'],
+  billing: ['产品与价格', '管理套餐产品、月付／年付价格与支付渠道。'],
+  orders: ['订单管理', '查看支付订单、订阅状态和流转记录。'],
+  subscriptions: ['订阅与权益', '追溯客户、订阅、账单与授权周期。'],
+  'billing-events': ['支付事件', '排查支付通知、处理失败与积压。'],
+  feedback: ['翻译反馈', '处理读者反馈并记录处理过程。'],
+  'plugin-feedback': ['插件反馈', '查看匿名提交的插件问题与建议。'],
+  'uninstall-feedback': ['卸载反馈', '查看用户自愿提交的卸载原因与建议。'],
+  'site-requests': ['网站适配申请', '查看匿名提交的网站兼容申请。'],
+  health: ['服务健康', '查看服务实例和运行异常。'],
+  statistics: ['用量与成本', '查看调用计量与业务统计。'],
+  audit: ['操作审计', '查询管理员操作和变更记录。'],
+  settings: ['系统设置', '管理翻译提示词、默认额度与请求保护设置。'],
 } as const;
 type View = keyof typeof views;
 const navigationGroups: {name: string; pages: View[]}[] = [
-  {name: '翻译与运行', pages: ['overview', 'tasks', 'nodes', 'operations', 'statistics']},
-  {name: '用户与交易', pages: ['users', 'quota-campaigns', 'feedback', 'plugin-feedback', 'uninstall-feedback', 'site-requests', 'billing', 'orders', 'subscriptions', 'billing-events']},
-  {name: '配置与审计', pages: ['translation-providers', 'settings', 'audit']},
+  {name: '工作台', pages: ['overview', 'users', 'orders', 'feedback', 'tasks']},
+  {name: '服务与配置', pages: ['translation-providers', 'nodes', 'settings']},
 ];
-type Target = {kind: 'tasks' | 'users'; id: string};
+const sections: Partial<Record<View, View[]>> = {
+  orders: ['orders', 'subscriptions', 'billing', 'billing-events'],
+  feedback: ['feedback', 'plugin-feedback', 'uninstall-feedback', 'site-requests'],
+  settings: ['settings', 'quota-campaigns', 'health', 'statistics', 'audit'],
+};
+const navIcons = {overview: AppstoreOutlined, users: UserOutlined, orders: ShoppingOutlined, feedback: InboxOutlined,
+  tasks: FileImageOutlined, 'translation-providers': ApiOutlined, nodes: CloudServerOutlined, settings: SettingOutlined};
+const sectionFor = (view: View) => (Object.entries(sections).find(([, children]) => children?.includes(view))?.[0] || view) as View;
 
 function useResource<T>(url: string, onUnauthorized: (message: string) => void, auto = false) {
   const [data, setData] = useState<T>();
@@ -85,64 +96,44 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
     for (const key of ['owner_id', 'node_id']) if (params.get(key)) next[key] = params.get(key)!;
     onChange(next);
   }}>
-    <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '任务 ID / 用户名称' : '用户名称 / ID'}/></label>
+    <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '用户名或任务编号' : '搜索用户名称'}/></label>
     {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic'])}
       {select('workflow_kind', '任务类型', ['image', 'document'])}
       {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'uploading', 'preflight', 'awaiting_quota', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}
       </> :
       <label>会员类型<select name="plan" defaultValue={params.get('plan') || ''}><option value="">全部</option><option value="free">普通</option><option value="lite">Lite</option><option value="plus">PLUS</option></select></label>}
-    <button className="primary">筛选</button><button type="button" className="secondary" onClick={() => onChange({})}>重置</button>
+    <Button className="primary">筛选</Button><Button type="button" className="secondary" onClick={() => onChange({})}>重置</Button>
   </form>
-    {['owner_id', 'node_id'].filter(k => params.has(k)).map(k => <span className="scope-chip" key={k}>{k === 'owner_id' ? '用户' : '节点'}：{params.get(k)}</span>)}
+    {['owner_id', 'node_id'].filter(k => params.has(k)).map(k => <span className="scope-chip" key={k}>{k === 'owner_id' ? '已限定所选用户' : '已限定所选节点'}</span>)}
   </section>;
 }
 
-function DetailDialog({target, onClose, onUnauthorized}: {target: Target; onClose: () => void; onUnauthorized: (message: string) => void}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const {data, busy, error, reload} = useResource<TaskData | UserData>(`/v1/admin/monitor/${target.kind}/${encodeURIComponent(target.id)}`, onUnauthorized);
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const element = dialog.current!; element.showModal();
-    return () => {element.close(); if (opener?.isConnected) opener.focus();};
-  }, []);
-  return <dialog ref={dialog} onCancel={onClose} aria-labelledby="detail-title">
-    <div className="dialog-top"><h2 id="detail-title">{target.kind === 'tasks' ? '翻译任务详情' : '用户权益'}</h2>
-      <div><button className="secondary" disabled={busy} onClick={reload}>{busy ? '正在刷新…' : '刷新详情'}</button><button className="secondary" onClick={onClose} aria-label="关闭详情">关闭 ×</button></div></div>
-    <div className="dialog-content" aria-busy={busy}>
-      {error && <p className="error" role="alert">{error} 请点击“刷新详情”重试。{data && ' 当前详情可能已过时。'}</p>}
-      {!data && busy && <p className="loading" role="status">正在读取详情…</p>}
-      {data && (target.kind === 'tasks' ? <TaskDetail job={data as TaskData} onChanged={reload} onUnauthorized={onUnauthorized}/> : <UserDetail user={data as UserData} onChanged={reload} onUnauthorized={onUnauthorized}/>)}
-    </div>
-  </dialog>;
-}
-
 function WorkspacePage({view, params, onUnauthorized, onNavigate, auto, setAuto}: {view: 'overview' | 'tasks' | 'users' | 'nodes'; params: URLSearchParams; onUnauthorized: (message: string) => void; onNavigate: (values: Record<string, string>) => void; auto: boolean; setAuto: (value: boolean) => void}) {
-  const [detail, setDetail] = useState<Target>();
+  const openEntity = useContext(EntityContext), detailOpen = useContext(EntityActiveContext);
   const [nodeConfig, setNodeConfig] = useState<Node | 'new'>();
   const query = new URLSearchParams();
   const allowed = view === 'tasks' ? ['mode', 'workflow_kind', 'status', 'q', 'owner_id', 'node_id', 'offset'] : view === 'users' ? ['q', 'plan', 'offset'] : [];
   for (const key of allowed) if (params.get(key)) query.set(key, params.get(key)!);
-  const {data, busy, error, reload} = useResource<OverviewData | NodesData | Page<Task> | Page<AdminUser>>(`/v1/admin/monitor/${view}?${query}`, onUnauthorized, auto && !detail);
+  const {data, busy, error, reload} = useResource<OverviewData | NodesData | Page<Task> | Page<AdminUser>>(`/v1/admin/monitor/${view}?${query}`, onUnauthorized, auto && !detailOpen);
   const page = data as Page<Task> | Page<AdminUser> | undefined;
-  const [title, eyebrow, description] = views[view];
+  const [title, description] = views[view];
   useEffect(() => {document.title = `${title} · Node Comics 管理后台`;}, [title]);
   return <main id="main" tabIndex={-1}>
-    <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="muted">{description}</p></div>
-      <div className="refresh-controls"><label><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)}/>每 15 秒刷新</label><button className="secondary" disabled={busy} onClick={reload}>{busy ? '正在刷新…' : '↻ 刷新数据'}</button></div></div>
+    <div className="page-heading"><div><h1>{title}</h1><p className="muted">{description}</p></div>
+      <div className="refresh-controls"><label><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)}/>每 15 秒刷新</label><Button className="secondary" disabled={busy} onClick={reload}>{busy ? '正在刷新…' : '↻ 刷新数据'}</Button></div></div>
     <div className="sync-line"><span role="status">{busy ? '正在读取数据…' : error ? '更新失败 · 当前数据可能已过时' : `已更新 ${time(data?.generated_at)}`}{!auto && ' · 自动刷新已暂停'}</span><span>时间按浏览器本地时区显示</span></div>
     {error && <div className="error" role="alert">{error}</div>}
     <Filters view={view} params={params} onChange={values => {if (href(view, values) === location.hash) reload(); else onNavigate(values);}}/>
     <div aria-busy={busy}>
       {!data && (busy ? <div className="loading" role="status">正在读取数据…</div> : <Empty>暂时无法读取数据，请点击刷新重试</Empty>)}
       {data && view === 'overview' && <Overview data={data as OverviewData}/>}
-      {view === 'nodes' && <div className="node-actions"><button className="primary" onClick={() => setNodeConfig('new')}>＋ 添加翻译节点</button></div>}
+      {view === 'nodes' && <div className="node-actions"><Button className="primary" onClick={() => setNodeConfig('new')}>＋ 添加翻译节点</Button></div>}
       {data && view === 'nodes' && <Nodes data={data as NodesData} onConfigure={setNodeConfig}/>}
       {data && (view === 'tasks' || view === 'users') && <><section className="panel list-panel">
-        {view === 'tasks' ? <Tasks items={(data as Page<Task>).items} onTask={id => setDetail({kind: 'tasks', id})}/> : <Users items={(data as Page<AdminUser>).items} onUser={id => setDetail({kind: 'users', id})}/>}
+        {view === 'tasks' ? <Tasks items={(data as Page<Task>).items} onTask={id => openEntity({kind: 'tasks', id})}/> : <Users items={(data as Page<AdminUser>).items} onUser={id => openEntity({kind: 'users', id})}/>}
         <Pagination total={page!.total} count={page!.items.length} offset={Number(params.get('offset') || 0)} next={page!.next_offset} onPage={offset => onNavigate({...Object.fromEntries(params), offset: String(offset)})}/>
       </section>{view === 'tasks' && <p className="footnote">执行占用按租约时间合并，并行阶段不重复累计；总耗时包含上传、等待与恢复。节点筛选包含该节点曾参与的全部任务。</p>}</>}
     </div>
-    {detail && <DetailDialog key={detail.id} target={detail} onClose={() => {setDetail(undefined); if (detail.kind === 'users') reload();}} onUnauthorized={onUnauthorized}/>}
     {nodeConfig && <NodeConfigDialog node={nodeConfig} onClose={() => setNodeConfig(undefined)} onSaved={reload}/>}
   </main>;
 }
@@ -177,8 +168,9 @@ export function App() {
   const [rawView, query = ''] = hash.slice(1).split('?');
   const view = (Object.hasOwn(views, rawView) ? rawView : 'overview') as View;
   const params = new URLSearchParams(query);
+  const section = sectionFor(view);
   return <><a className="skip" href="#main" onClick={event => {event.preventDefault(); document.getElementById('main')?.focus();}}>跳转到主要内容</a>{!user ? <section className="login-screen"><div className="login-card">
-    <span className="brand-mark" aria-hidden="true">N<span>✦</span></span><p className="eyebrow">NODE COMICS / OPERATIONS</p><h1>每一页，都有迹可循。</h1><p className="muted">登录管理后台，查看用户、翻译队列与节点运行情况。</p>
+    <span className="brand-mark" aria-hidden="true">N</span><h1>管理工作台</h1><p className="muted">登录后管理用户、订单、反馈与翻译服务。</p>
     <form onSubmit={async event => {
       event.preventDefault(); if (!config) return;
       const username = String(new FormData(event.currentTarget).get('username') || '').trim();
@@ -192,27 +184,28 @@ export function App() {
       finally {setAuthBusy(false);}
     }}>
       {config?.dev_auth && <label>开发环境用户名<input name="username" autoComplete="username" maxLength={60} placeholder="管理员用户名" required/></label>}
-      <button className="primary" disabled={authBusy || !config}>{authBusy ? '正在连接…' : config?.dev_auth ? '登录开发环境' : '使用统一身份登录'}</button>
+      <Button className="primary" disabled={authBusy || !config}>{authBusy ? '正在连接…' : config?.dev_auth ? '登录开发环境' : '使用统一身份登录'}</Button>
     </form>
-    {authMessage && <p className="error" role="alert">{authMessage}</p>}{!config && !authBusy && <button className="secondary" onClick={() => setBoot(n => n + 1)}>重新连接</button>}
+    {authMessage && <p className="error" role="alert">{authMessage}</p>}{!config && !authBusy && <Button className="secondary" onClick={() => setBoot(n => n + 1)}>重新连接</Button>}
     <p className="footnote">仅管理员可访问业务数据</p>
-  </div></section> : <div className="workspace"><aside className="sidebar"><a href="#overview" className="brand"><span className="brand-mark" aria-hidden="true">N<span>✦</span></span><span>Node Comics<small>管理后台</small></span></a>
-    <nav aria-label="后台导航">{navigationGroups.map(group => <div className="nav-group" key={group.name}><p className="nav-group-label">{group.name}</p>{group.pages.map(key => <a href={href(key)} key={key} aria-current={view === key ? 'page' : undefined}><span aria-hidden="true">{views[key][3]}</span>{views[key][0]}</a>)}</div>)}</nav>
-    <div className="sidebar-bottom"><span className="tiny-label">ADMINISTRATOR</span><b>{user.name}</b><button onClick={() => logout()}>退出登录 ↗</button></div>
-  </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><span className="top-brand">NODE COMICS <span className="dot"/></span></header>
-    {view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
+  </div></section> : <InboxProvider onUnauthorized={logout}><EntityWorkspace onUnauthorized={logout}><div className="workspace"><aside className="sidebar"><a href="#overview" className="brand"><span className="brand-mark" aria-hidden="true">N</span><span>Node Comics<small>管理后台</small></span></a>
+    <nav aria-label="后台导航">{navigationGroups.map(group => <div className="nav-group" key={group.name}><p className="nav-group-label">{group.name}</p>{group.pages.map(key => <a href={href(key)} key={key} aria-current={section === key ? 'page' : undefined}><span aria-hidden="true">{(() => {const Icon = navIcons[key as keyof typeof navIcons]; return Icon ? <Icon/> : null;})()}</span>{key === 'feedback' ? '反馈收件箱' : views[key][0]}{key === 'feedback' && <InboxCount/>}</a>)}</div>)}</nav>
+    <div className="sidebar-bottom"><b>{user.name}</b><Button onClick={() => logout()}>退出登录 ↗</Button></div>
+  </aside><div className="main-wrap"><header className="topbar"><span>控制中心 <span className="muted">/</span> <b>{views[view][0]}</b></span><div className="topbar-actions"><span className="muted">{user.name}</span><InboxBell/></div></header>
+    {sections[section] && <div className="section-tabs"><Tabs activeKey={view} onChange={key => {location.hash = href(key);}} items={sections[section]!.map(key => ({key, label: views[key][0]}))}/></div>}
+    <Suspense fallback={<div className="loading" role="status">正在打开页面…</div>}>{view === 'settings' ? <SystemSettingsPage onUnauthorized={logout}/> :
       view === 'quota-campaigns' ? <QuotaCampaignsPage onUnauthorized={logout}/> :
       view === 'translation-providers' ? <TranslationProvidersPage onUnauthorized={logout}/> :
       view === 'feedback' ? <FeedbackPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
-      view === 'site-requests' || view === 'plugin-feedback' || view === 'uninstall-feedback' ? <SupportRequestsPage key={view} kind={view === 'site-requests' ? 'website' : view === 'uninstall-feedback' ? 'uninstall' : 'plugin'} onUnauthorized={logout}/> :
+      view === 'site-requests' || view === 'plugin-feedback' || view === 'uninstall-feedback' ? <SupportRequestsPage key={hash} params={params} kind={view === 'site-requests' ? 'website' : view === 'uninstall-feedback' ? 'uninstall' : 'plugin'} onUnauthorized={logout}/> :
       view === 'billing-events' ? <BillingEventsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       view === 'subscriptions' ? <BillingSubscriptionsPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       view === 'audit' ? <AuditLogPage onUnauthorized={logout}/> :
-      view === 'operations' ? <OperationsPage onUnauthorized={logout}/> :
+      view === 'health' ? <ServiceHealthPage onUnauthorized={logout}/> :
       view === 'statistics' ? <StatisticsPage onUnauthorized={logout}/> :
       view === 'billing' ? <BillingCatalogPage onUnauthorized={logout}/> :
       view === 'orders' ? <BillingOrdersPage key={hash} params={params} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/> :
       <WorkspacePage key={hash} view={view} params={params} auto={auto} setAuto={setAuto} onUnauthorized={logout} onNavigate={values => {location.hash = href(view, values);}}/>}
-    <footer>Node Comics · Operations <span>用户与任务数据仅供管理使用</span></footer>
-  </div></div>}</>;
+    </Suspense><footer>Node Comics · Operations <span>用户与任务数据仅供管理使用</span></footer>
+  </div></div></EntityWorkspace></InboxProvider>}</>;
 }

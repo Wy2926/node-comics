@@ -1,3 +1,4 @@
+import {Button} from './ui';
 import {useRef, useState} from 'react';
 import {authError, errorText, request} from './api';
 import {benefitsSummary, billingEndpoint, billingTypeName, environmentName, intervalName, minorAmount, pageAllowance, money, priceAmount, providerName, type BillingChannel, type BillingEnvironment, type BillingPrice, type BillingProduct, type BillingProvider, type BillingType} from './billing';
@@ -80,6 +81,6 @@ export function BillingCatalogForm({editor, channels, products, onClose, onSaved
       </div><p className="muted">{editor.price.billing_type === 'onetime' ? '平台使用一次性商品：Creem 选择 onetime / once，Stripe 选择 one_time；会员期限由本站价格决定。' : '平台产品的金额、币种和周期须与此价格一致。'}保存关联后，点击“验证并启用”检查平台配置。</p>{channel && (!channel.credential_configured || channel.environment !== editor.price.environment) && <p className="provider-warning">{!channel.credential_configured ? '渠道 API 密钥尚未配置。' : '渠道当前环境与此价格不一致。'}可先保存草稿，服务端配置完成后再验证启用。</p>}</>}
     </fieldset>
     {error && <div className="error" role="alert">{error} 结果不确定时先关闭并刷新列表核实；保留此表单重试不会重复创建。</div>}
-    <div className="provider-save-bar"><small>已有订阅和购买额度保留原价格与权益。</small><div className="provider-actions"><button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</button><button className="primary" disabled={busy}>{busy ? '正在保存…' : editor.kind === 'price' || editor.kind === 'binding' ? '保存草稿' : '保存产品'}</button></div></div>
+    <div className="provider-save-bar"><small>已有订阅和购买额度保留原价格与权益。</small><div className="provider-actions"><Button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</Button><Button className="primary" disabled={busy}>{busy ? '正在保存…' : editor.kind === 'price' || editor.kind === 'binding' ? '保存草稿' : '保存产品'}</Button></div></div>
   </form></BillingDialog>;
 }

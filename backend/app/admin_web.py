@@ -16,7 +16,7 @@ def page(filename):
     token_url = urlsplit(settings().oidc_token_endpoint)
     token_origin = f"{token_url.scheme}://{token_url.netloc}" if token_url.scheme in {"http", "https"} and token_url.netloc else ""
     return FileResponse(target, headers={"Content-Security-Policy":
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
         f"connect-src 'self' {token_origin}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"})
 
 

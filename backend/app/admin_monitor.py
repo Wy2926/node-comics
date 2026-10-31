@@ -4,10 +4,11 @@ from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, case, exists, extract, func, or_, select
+from sqlalchemy import case, exists, extract, func, or_, select
 from sqlalchemy.orm import Session, defer
 
 from .auth import admin, user_json
+from .geoip import countries
 from .config import settings
 from .db import get_db
 from .entitlements import entitlements_json, iso, membership_benefits, period_json, plus_dates
@@ -16,6 +17,7 @@ from .entitlement_models import QuotaPeriod
 from .errors import problem
 from .models import Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ComputeNode, ExecutionLease, JobStage
+from .translation_models import TranslationProvider
 from .scheduler import ACTIVE
 
 router = APIRouter(prefix="/v1/admin/monitor", dependencies=[Depends(admin)])
@@ -84,7 +86,7 @@ def task_json(job, owner_name, leases, at):
         job.status == "no_text" and r.stage in {"page"})]
     completed_by = final[-1] if final else None
     return {"id": job.id, "owner_id": job.owner_id, "owner_name": owner_name, "mode": job.mode,
-            "workflow_kind": job.workflow_kind,
+            "workflow_kind": job.workflow_kind, "submitted_ip": job.submitted_ip,
             "target_language": job.target_language, "status": job.status, "phase": job.phase,
             "created_at": iso(job.created_at), "completed_at": iso(job.completed_at),
             "settlement": job.settlement, "quota_pages": job.quota_pages, "error_code": job.error_code,
@@ -124,7 +126,9 @@ def tasks(status: Status | None = None, mode: Mode | None = None,
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.execute(query.order_by(Job.created_at.desc(), Job.id.desc()).offset(offset).limit(limit)).all()
     leases = lease_rows(db, [job.id for job, _ in rows]) if rows else {}
-    return {"items": [task_json(job, name, leases.get(job.id, []), at) for job, name in rows],
+    locations = countries(job.submitted_ip for job, _ in rows)
+    return {"items": [{**task_json(job, name, leases.get(job.id, []), at),
+                       "country": locations.get(job.submitted_ip)} for job, name in rows],
             "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}
 
 
@@ -143,20 +147,22 @@ def task_detail(job_id: str, db: Session = Depends(get_db)):
         "started_at": iso(r.started_at), "completed_at": iso(r.completed_at), "expires_at": iso(r.expires_at),
         "seconds": seconds(r.started_at, lease_end(r, at)),
         "outcome": r.outcome or ("expired" if r.expires_at <= at else "running")} for r in leases]
-    calls = db.execute(select(TextCall.id, TextCall.model, TextCall.provider_id, TextCall.sequence,
+    calls = db.execute(select(TextCall.id, TextCall.model, TextCall.provider_id, TranslationProvider.name.label('provider_name'), TextCall.sequence,
         TextCall.group_index, TextCall.started_at, TextCall.completed_at, TextCall.cost_state,
-        TextCall.accounted_micros, TextCall.error_code).where(TextCall.job_id == job.id).order_by(TextCall.started_at)).all()
-    provider = db.execute(select(Attempt.provider_id, Attempt.cost_state).where(Attempt.id == job.attempt_id)).first() if job.attempt_id else None
-    return {**task_json(job, name, leases, at), "generated_at": iso(at), "error_message": job.error_message,
+        TextCall.accounted_micros, TextCall.usage, TextCall.error_code).outerjoin(TranslationProvider, TranslationProvider.id == TextCall.provider_id).where(TextCall.job_id == job.id).order_by(TextCall.started_at, TextCall.id)).all()
+    provider = db.execute(select(Attempt.provider_id, Attempt.cost_state, TranslationProvider.name).outerjoin(
+        TranslationProvider, TranslationProvider.id == Attempt.provider_id).where(Attempt.id == job.attempt_id)).first() if job.attempt_id else None
+    return {**task_json(job, name, leases, at), "country": countries([job.submitted_ip]).get(job.submitted_ip), "generated_at": iso(at), "error_message": job.error_message,
         "timings": db.scalar(select(ClassicState.timings).where(ClassicState.job_id == job.id)) or {},
-        "provider": {"id": provider.provider_id, "cost_state": provider.cost_state} if provider else None,
+        "provider": {"id": provider.provider_id, "name": provider.name, "cost_state": provider.cost_state} if provider else None,
         "stages": [{"name": s.name, "page_index": s.page_index, "status": s.status, "attempts": s.attempts,
                     "available_at": iso(s.available_at), "completed_at": iso(s.completed_at)}
                    for s in sorted(stages, key=lambda s: (STAGE_ORDER.get(s.name, 99), s.page_index))],
         "executions": executions, "text_cost_micros": sum(c.accounted_micros for c in calls),
-        "text_calls": [{"id": c.id, "model": c.model, "provider_id": c.provider_id, "sequence": c.sequence,
+        "text_calls": [{"id": c.id, "model": c.model, "provider_id": c.provider_id, "provider_name": c.provider_name, "sequence": c.sequence,
             "group": c.group_index, "started_at": iso(c.started_at), "completed_at": iso(c.completed_at),
             "seconds": seconds(c.started_at, c.completed_at), "cost_state": c.cost_state,
+            "input_tokens": (c.usage or {}).get("input_tokens"), "output_tokens": (c.usage or {}).get("output_tokens"),
             "accounted_micros": c.accounted_micros, "error_code": c.error_code} for c in calls]}
 
 
@@ -180,7 +186,8 @@ def overview(db: Session = Depends(get_db)):
     user_count = db.scalar(select(func.count()).select_from(User).where(User.kind == 'registered'))
     plus_count = db.scalar(select(func.count()).select_from(User).where(
         User.kind == 'registered', plan_expression(at) == 'plus'))
-    return {"generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
+    from .admin_workspace import commerce_summary
+    return {**commerce_summary(db, since), "generated_at": iso(at), "window_hours": 24, "users": {"total": user_count, "plus": plus_count,
         "submitted_24h": db.scalar(select(func.count(func.distinct(Job.owner_id))).join(User, User.id == Job.owner_id).where(Job.created_at >= since, User.kind == 'registered'))},
         "nodes": {"total": len(nodes), "online_enabled": online}, "leases": dict(lease_counts),
         "queues": queues, "stages": [{"name": name, "status": status, "count": count} for name, status, count in stages],

@@ -1,8 +1,8 @@
+import {Button} from './ui';
 import {useRef, useState} from 'react';
 import {ApiError, errorText, request} from './api';
 import type {UserDetail} from './types';
 import {time} from './ui';
-import './CareOperations.css';
 
 type Operation = {key: string; path: string; body: Record<string, unknown>; summary: string; done?: boolean};
 const localDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -67,8 +67,8 @@ export function MembershipActions({user, onChanged}: {user: UserDetail; onChange
       <div className="care-section-heading"><h4>{operation.done ? '权益操作已完成' : '恢复原权益操作'}</h4><span className={`care-status ${operation.done ? 'care-status-resolved' : 'care-status-reviewing'}`}>{operation.done ? '已完成' : '待确认'}</span></div>
       <p>{operation.summary}</p><div className="care-receipt-note"><span className="care-label">操作备注</span><p>{String(operation.body.note)}</p></div>
       <p className="care-subtitle" role="status">{operation.done ? '操作成功，权益已更新。' : busy ? '正在提交操作，请稍候…' : '提交结果尚未确认，请恢复原操作，避免重复发放。'}</p>
-      <div className="care-action-footer">{operation.done ? <button className="secondary" onClick={() => {save(undefined); setNote(''); setError('');}}>创建另一笔操作</button>
-        : <button className="primary" disabled={busy} onClick={() => void submit()}>{busy ? '正在提交…' : '重试并核实原操作'}</button>}</div>
+      <div className="care-action-footer">{operation.done ? <Button className="secondary" onClick={() => {save(undefined); setNote(''); setError('');}}>创建另一笔操作</Button>
+        : <Button className="primary" disabled={busy} onClick={() => void submit()}>{busy ? '正在提交…' : '重试并核实原操作'}</Button>}</div>
     </div> : <form className="care-form" onSubmit={event => {event.preventDefault(); void submit();}}>
       <fieldset disabled={busy}>
         <div className="care-operation-choice"><label>操作类型<select aria-label="操作类型" value={kind} onChange={e => setKind(e.target.value)}><option value="plus">赠送 PLUS 会员</option><option value="quota">赠送翻译额度</option><option value="compensation">当前周期额度补偿</option><option value="expire" disabled={!extendingGift}>结束赠送会员</option></select></label><p className="care-subtitle">{({plus: extendingGift ? '在已有赠送后追加天数，保留原翻译周期。' : '赠送会员接在已付款权益之后，无付费权益则立即生效。', quota: '按指定起止时间，独立赠送免费模型页数。', compensation: '补足当前周期页数，到期时间保持不变。', expire: '结束当前赠送及尚未开始的赠送安排。'} as Record<string, string>)[kind]}</p></div>
@@ -87,7 +87,7 @@ export function MembershipActions({user, onChanged}: {user: UserDetail; onChange
         </div>
         <div className={`care-impact ${kind === 'expire' ? 'care-impact-danger' : ''}`}><span className="care-label">{kind === 'expire' ? '提前结束的影响' : '操作影响'}</span><p>{kind === 'plus' ? <>{extendingGift ? '从当前赠送结束时间延长，保留已用和预占额度。' : '已付款权益结束后生效，等待期间不消耗天数；页数留空表示不限量。'}天数按 24 小时计算，翻译每 30 天刷新。赠送期间不续费扣款，取消自动续费后不会恢复扣款。</> : kind === 'expire' ? '确认后结束当前及尚未生效的赠送会员。已付款权益、独立赠送页数与在途任务结算保留；此操作不会提前已安排的续费时间，也不会重新开启已取消的自动续费。' : kind === 'compensation' ? '补偿沿用当前额度桶的到期时间。月度补偿需要有效有限订阅桶；免费额度仅供免费模型使用。' : '时间使用本机时区。赠送页数仅供免费模型使用；免费模型用完免费额度后仍会扣订阅或购买额度。额度赠送不增加翻译速率。'}</p></div>
         <label>操作备注<textarea maxLength={200} rows={2} required value={note} onChange={e => setNote(e.target.value)} placeholder="填写赠送、补偿或提前结束原因"/></label>
-        <div className="care-action-footer"><small>原因必填 · {note.length} / 200</small><button className={kind === 'expire' ? 'care-danger-button' : 'primary'} disabled={!note.trim()}>{busy ? '正在提交…' : kind === 'expire' ? '确认提前结束' : kind === 'compensation' ? '确认补偿' : '确认赠送'}</button></div>
+        <div className="care-action-footer"><small>原因必填 · {note.length} / 200</small><Button className={kind === 'expire' ? 'care-danger-button' : 'primary'} disabled={!note.trim()}>{busy ? '正在提交…' : kind === 'expire' ? '确认提前结束' : kind === 'compensation' ? '确认补偿' : '确认赠送'}</Button></div>
       </fieldset>
     </form>}
     {error && <p className="error" role="alert">{error}</p>}

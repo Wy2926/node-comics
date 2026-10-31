@@ -1,22 +1,24 @@
+import {EntityLink} from './EntityLink';
+import {Country} from './ui';
 import type {Mode, TaskDetail as TaskData, UserDetail as UserData} from './types';
-import {Badge, duration, Empty, Jump, label, number, Stat, Table, time} from './ui';
+import {Badge, duration, Empty, label, number, Stat, Table, time} from './ui';
 import {MembershipActions} from './MembershipActions';
 import {TaskAttempts} from './TaskAttempts';
 import {UserHistory} from './UserHistory';
 import {taskTimingRows} from './timings';
 
-export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
+export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
   return <>
-    <div className="detail-summary"><div><code>{j.id}</code><p>{j.owner_name} · {label(j.mode)} · {label(j.workflow_kind)} · {j.target_language}</p></div><Badge value={j.status}/></div>
+    <div className="detail-summary"><div><h3>{label(j.workflow_kind)}翻译 → {j.target_language}</h3><p><EntityLink kind="users" id={j.owner_id}>{j.owner_name}</EntityLink> · {label(j.mode)} · {label(j.workflow_kind)} · {j.target_language}</p></div><Badge value={j.status}/></div>
     <div className="detail-stats"><Stat title="总耗时" value={duration(j.elapsed_seconds)} note="从创建到结束 / 当前"/>
       <Stat title="首次等待" value={duration(j.initial_wait_seconds)} note="创建至首次领取"/>
       <Stat title="执行占用" value={duration(j.execution_seconds)} note="并行阶段合并"/>
       <Stat title="非执行时间" value={duration(j.non_execution_seconds)} note="上传、排队与阶段间等待"/></div>
-    <dl className="detail-meta"><dt>创建时间</dt><dd>{time(j.created_at)}</dd><dt>结束时间</dt><dd>{time(j.completed_at)}</dd>
+    <dl className="detail-meta"><dt>提交 IP</dt><dd>{j.submitted_ip || "未记录"}</dd><dt>来源国家 / 地区</dt><dd><Country value={j.country}/></dd><dt>创建时间</dt><dd>{time(j.created_at)}</dd><dt>结束时间</dt><dd>{time(j.completed_at)}</dd>
       <dt>交付节点</dt><dd>{final?.name || '—'}</dd>
       <dt>交付执行机 / 进程</dt><dd>{final ? final.executor_id || '未记录' : '—'}</dd>
-      <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.id || '—'}</dd></dl>
+      <dt>额度结算</dt><dd>{label(j.settlement)} · {j.quota_pages} 页</dd><dt>供应商</dt><dd>{j.provider?.name || '未记录'}</dd></dl>
     {j.error_code && <p className="error">{j.error_message && <>{j.error_message}<br/></>}错误代码：{j.error_code}</p>}
     {j.expired_leases > 0 && <p className="attention">{j.expired_leases} 个租约已过期，等待回收。</p>}
     <h3 className="detail-heading">阶段进度</h3><div className="stage-flow">{j.stages.length ? j.stages.map(s =>
@@ -33,9 +35,11 @@ export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: 
       <Table heads={['环节', '耗时', '来源']}>{taskTimingRows(j.timings).map(({key, seconds, source}) => <tr key={`${source}:${key}`}><td>{({download: '原图下载', download_queue: '下载等待', analyze: '检测 / OCR', analyze_queue: '分析等待', inpaint: '抹字', inpaint_queue: '抹字等待', render: '嵌字与编码', render_queue: '嵌字等待', render_areas: '嵌字：气泡分析', render_layout: '嵌字：排版绘字', render_diff: '嵌字：差异提取', render_encode: '嵌字：WebP 编码', detect_lock_wait: '检测模型锁等待', ocr_lock_wait: 'OCR 模型锁等待（各文本块累计）', inpaint_lock_wait: '抹字模型锁等待', analysis_submit: '分析提交', text_wait: '等待译文', local_total: '领取至结果冻结', output_put: '结果提交', total: '中心登记与结算'} as Record<string, string>)[key] ?? key}</td><td className="numeric">{seconds < 1 ? `${Math.round(seconds * 1000)} 毫秒` : duration(seconds)}</td><td>{source}</td></tr>)}</Table>
       <p className="panel-note">节点耗时用于观测；嵌字细项已包含在嵌字与编码内，锁等待已包含在所属计算阶段内。OCR 锁等待为并行文本块累计值，可能大于实际墙钟时间。各阶段可并行，分项不能直接相加；整页租约占用不代表 GPU 计算时间。</p></>}
     {j.text_calls.length > 0 && <><h3 className="detail-heading">文本调用计量</h3><p className="muted">合计 ¥{(j.text_cost_micros / 1000000).toFixed(6)}，包含估算或未知消耗的预占。成本仅计量，不限制文本调用；次数、时限与限流仍生效。</p>
-      <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', '成本记录', '结果']}>{j.text_calls.map(c =>
-        <tr key={c.id}><td>{c.model}<small>{c.provider_id}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>
-          <td>¥{(c.accounted_micros / 1000000).toFixed(6)}<small>{label(c.cost_state)}</small></td><td>{c.error_code || '—'}</td></tr>)}</Table></>}
+      <Table heads={['模型 / 供应商', '分组 / 次数', '耗时', 'Token 用量', '成本记录', '结果']}>{j.text_calls.map(c =>
+        <tr key={c.id}><td>{c.model}<small>{c.provider_name || '未记录'}</small></td><td>{c.group} / {c.sequence}</td><td>{duration(c.seconds)}</td>
+          <td className="numeric">输入 {c.input_tokens == null ? '未提供' : number(c.input_tokens)}<small>输出 {c.output_tokens == null ? '未提供' : number(c.output_tokens)}</small></td>
+          <td>¥{(c.accounted_micros / 1000000).toFixed(6)}<small>{label(c.cost_state)}</small></td><td>{c.error_code || '—'}</td></tr>)}</Table>
+      <p className="panel-note">Token 为供应商返回的用量，每次调用与重试分别记录；未提供用量时显示“未提供”，不按 0 计算。</p></>}
     <TaskAttempts jobId={j.id} refreshKey={j.generated_at} onUnauthorized={onUnauthorized}/>
     <p className="footnote">快照时间 {time(j.generated_at)} · 详情打开时暂停列表自动刷新</p>
   </>;
@@ -43,9 +47,9 @@ export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onChanged: 
 export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData; onChanged: () => void; onUnauthorized: (message: string) => void}) {
   const e = u.entitlements;
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
-  return <div className="care-user-detail"><div className="detail-summary"><div><h3>{u.name}</h3><code>{u.id}</code></div><span className="badge accent">{e.plan === 'plus' ? 'PLUS' : e.plan === 'lite' ? 'Lite' : '普通'}</span></div>
+  return <div className="care-user-detail">
     {e.hourly_image_rate_limit && <p className="muted">每滚动 60 分钟最多新受理 {e.hourly_image_rate_limit.limit} 页，跨模式、语言和设备合计。</p>}
-    <dl className="detail-meta"><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
+    <dl className="detail-meta"><dt>会员 / 角色</dt><dd>{e.plan === 'plus' ? 'PLUS' : e.plan === 'lite' ? 'Lite' : '普通'} · {u.role === 'admin' ? '管理员' : '读者'}</dd><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
       <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>
     <div className="queue-grid">{(['classic'] as Mode[]).map(mode => {
       const m = e.modes[mode], q = m.quota;
@@ -63,7 +67,7 @@ export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData
     {buckets.length ? <Table heads={['类型', '授予 / 已用 / 预占', '到期']}>{buckets.map(b => <tr key={b.id}>
       <td>{label(b.mode)} · {label(b.source)}</td>
       <td>{b.granted} / {b.used} / {b.reserved}</td><td>{b.expires_at ? time(b.expires_at) : '永久有效'}</td></tr>)}</Table> : <Empty>暂无有限页数额度</Empty>}
-    <div className="care-user-links"><Jump view="tasks" params={{owner_id: u.id}}>查看该用户全部任务 ↗</Jump><Jump view="subscriptions" params={{owner_id: u.id}}>查看该用户订阅与授权期 ↗</Jump></div>
+    <details className="technical-details"><summary>用户编号</summary><code>{u.id}</code></details>
     <UserHistory userId={u.id} revision={JSON.stringify(u)} onUnauthorized={onUnauthorized}/>
   </div>;
 }

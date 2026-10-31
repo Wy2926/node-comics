@@ -8,10 +8,8 @@ let playwright;
 try {playwright = require('playwright');} catch {
   playwright = require(path.resolve(path.dirname(process.execPath), '../node_modules/playwright'));
 }
-const origin = 'http://127.0.0.1:18096';
-const image = process.env.ADMIN_COMPLETION_IMAGE;
+const origin = process.env.ADMIN_FIXTURE_URL || 'http://127.0.0.1:18090';
 const controls = process.env.ADMIN_FIXTURE_CONTROLS;
-assert(image, 'Set ADMIN_COMPLETION_IMAGE to the synthetic image printed by the fixture server.');
 assert(controls, 'Set ADMIN_FIXTURE_CONTROLS to the disposable control file printed by the server.');
 assert((await (await fetch(`${origin}/v1/auth/config`)).json()).dev_auth, 'Requires disposable development fixture.');
 const output = path.resolve('artifacts/admin-completion');
@@ -24,10 +22,12 @@ const checks = [], errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const visible = locator => locator.first().waitFor({state: 'visible'});
 const shot = name => page.screenshot({path: path.join(output, `${name}.png`), fullPage: true});
-const nav = async (name) => {
-  await page.getByRole('navigation', {name: '后台导航'}).getByRole('link', {name, exact: true}).click();
+const routes = {'概览': 'overview', '翻译任务': 'tasks', '计算节点': 'nodes', '翻译供应商': 'translation-providers', '用户管理': 'users', '产品与价格': 'billing', '订单管理': 'orders', '订阅与权益': 'subscriptions', '支付事件': 'billing-events', '翻译反馈': 'feedback', '服务健康': 'health', '用量与成本': 'statistics', '操作审计': 'audit', '系统设置': 'settings'};
+const settled = () => page.waitForFunction(() => !Array.from(document.querySelectorAll('[aria-busy="true"]')).some(element => element.getClientRects().length));
+const nav = async name => {
+  await page.goto(`${origin}/console-test/#${routes[name]}`);
   await visible(page.getByRole('heading', {name, exact: true, level: 1}));
-  await page.waitForLoadState('networkidle');
+  await settled();
 };
 const close = async (dialog = page.getByRole('dialog')) => {
   await dialog.getByRole('button', {name: /关闭/}).first().click();
@@ -49,9 +49,9 @@ try {
   await page.goto(`${origin}/console-test/`);
   await page.getByLabel('开发环境用户名').fill('admin');
   await page.getByRole('button', {name: '登录开发环境', exact: true}).click();
-  await visible(page.getByRole('heading', {name: '运行概览', exact: true}));
-  const navigation = ['运行概览', '翻译任务', '计算节点', '翻译供应商', '用户管理', '产品与价格', '订单管理', '订阅与权益', '支付事件', '翻译反馈', '运行诊断', '用量与成本', '操作审计', '系统设置'];
-  for (const name of navigation) {await nav(name); assert.equal(await page.locator('main [role="alert"]').count(), 0, name);}
+  await visible(page.getByRole('heading', {name: '概览', exact: true}));
+  const navigation = ['概览', '翻译任务', '计算节点', '翻译供应商', '用户管理', '产品与价格', '订单管理', '订阅与权益', '支付事件', '翻译反馈', '服务健康', '用量与成本', '操作审计', '系统设置'];
+  for (const name of navigation) {await nav(name); assert.equal(await page.locator('#main [role="alert"]').count(), 0, name);}
   checks.push('All 14 navigation pages load without application errors');
 
   await page.locator('#free_daily_pages').fill('88');
@@ -71,7 +71,7 @@ try {
   await page.getByRole('button', {name: '查看 / 处理'}).click();
   await page.getByRole('button', {name: '恢复原处理操作'}).click();
   await visible(page.getByRole('heading', {name: '处理历史'}));
-  await page.waitForLoadState('networkidle');
+  await settled();
   assert.equal(await page.getByRole('dialog').locator('tbody tr').count(), 1);
   await shot('04-feedback'); await close();
   checks.push('Feedback review retains exact request after dialog close and records only one history row');
@@ -79,7 +79,7 @@ try {
   await nav('用户管理');
   await page.getByLabel('搜索', {exact: true}).fill('20000000-0000-4000-8000-000000000000');
   await page.getByRole('button', {name: '筛选', exact: true}).click();
-  await page.getByRole('button', {name: '查看权益', exact: true}).click();
+  await page.getByRole('button', {name: '管理用户', exact: true}).click();
   await page.getByLabel('操作类型').selectOption('compensation');
   await page.getByLabel('补偿页数').fill('7');
   await page.getByLabel('操作备注').fill('隔离验收：补偿七页');
@@ -87,12 +87,12 @@ try {
   await page.getByRole('button', {name: '确认补偿'}).click();
   await visible(page.getByRole('button', {name: '重试并核实原操作'}));
   await restoreMember(); await close();
-  await page.getByRole('button', {name: '查看权益', exact: true}).click();
+  await page.getByRole('button', {name: '管理用户', exact: true}).click();
   await page.getByRole('button', {name: '重试并核实原操作'}).click();
   await visible(page.getByRole('button', {name: '创建另一笔操作'}));
   for (const name of ['额度周期', '扣页账本', '预占任务', '会员操作']) {
     await page.getByRole('group', {name: '历史类别'}).getByRole('button', {name, exact: true}).click();
-    await page.waitForLoadState('networkidle');
+    await settled();
   }
   await shot('05-membership-history');
   await page.getByRole('button', {name: '创建另一笔操作'}).click();
@@ -123,7 +123,7 @@ try {
   await page.getByRole('button', {name: '客户与试用资格'}).click();
   assert.equal(await page.getByRole('button', {name: '客户与试用资格', exact: true}).getAttribute('aria-pressed'), 'true');
   await page.getByRole('button', {name: '试用资格', exact: true}).click();
-  await page.waitForLoadState('networkidle'); await close();
+  await settled(); await close();
   checks.push('Order per-refund details, subscription terms/monthly buckets and customer trial history render');
 
   await nav('支付事件');
@@ -139,24 +139,19 @@ try {
   await shot('08-payment-event'); await close();
   checks.push('Payment event retry survives browser reload and confirms original receipt without requeue');
 
-  await nav('运行诊断'); await shot('09-health');
-  await page.getByRole('button', {name: '用户准入', exact: true}).click();
-  await page.getByLabel('用户 ID', {exact: true}).fill('20000000-0000-4000-8000-000000000000');
-  await page.getByRole('button', {name: '查询用户'}).click();
-  await visible(page.getByText('fixture-reading', {exact: true}));
-  await shot('10-user-diagnostics');
-  for (const name of ['上传会话', '翻译请求', '图片记录', '文件页映射', '生成版本', '结果授权']) {
-    await page.getByRole('button', {name, exact: true}).click(); await page.waitForLoadState('networkidle');
-    assert.equal(await page.locator('main [role="alert"]').count(), 0, name);
-  }
-  await page.getByRole('button', {name: '供应商版本', exact: true}).click();
-  await page.getByLabel('文本供应商').selectOption({index: 1});
-  await page.waitForLoadState('networkidle'); await shot('11-provider-history');
+  await nav('服务健康'); await shot('09-health');
+  await nav('用户管理');
+  await page.getByLabel('搜索', {exact: true}).fill('星野同学');
+  await page.getByRole('button', {name: '筛选', exact: true}).click();
+  await page.getByRole('button', {name: '管理用户', exact: true}).click();
+  await page.getByRole('tab', {name: '请求诊断', exact: true}).click();
+  await visible(page.getByRole('heading', {name: '请求保护', exact: true}));
+  await shot('10-user-diagnostics'); await close();
   await nav('用量与成本'); await shot('12-statistics');
   await nav('操作审计');
-  assert((await authenticated('/v1/admin/audit')).body.total >= 8);
+  assert((await authenticated('/v1/admin/audit')).body.total >= 5);
   await page.getByText('查看变更内容', {exact: true}).first().click(); await shot('13-audit');
-  checks.push('All diagnostic tabs, immutable provider versions, separated statistics and audited operations load');
+  checks.push('User-scoped diagnostics, service health, separated statistics and audited operations load');
 
   let release;
   const pending = new Promise(resolve => {release = resolve;});

@@ -67,7 +67,7 @@ def seed(db):
     attempt = Attempt(job_id=completed.id, provider_id="fixture-text", lease_expires_at=at+timedelta(seconds=600), cost_state="reported")
     db.add(attempt); db.flush(); completed.attempt_id=attempt.id
     db.add(TextCall(job_id=completed.id, attempt_id=attempt.id, group_index=0, sequence=1, provider_id="fixture-text",
-        model="fixture-model", reserved_micros=6000, accounted_micros=2000, cost_state="reported",
+        model="fixture-model", usage={"input_tokens": 512, "output_tokens": 128}, reserved_micros=6000, accounted_micros=2000, cost_state="estimated",
         started_at=completed.created_at+timedelta(seconds=45), completed_at=completed.created_at+timedelta(seconds=75)))
     running=job(2,"running",age=50); running.phase="text"
     execution(running,"text","control-text",10,None)

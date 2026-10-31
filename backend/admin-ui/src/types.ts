@@ -29,6 +29,9 @@ export type TranslationProviderInput = {
 export type User = {id: string; name: string; role: string};
 export type Page<T> = {items: T[]; total: number; next_offset: number | null; generated_at: string};
 export type Overview = {
+  commerce: {orders_24h: number; attention_orders: number; revenue_24h: {currency: string; amount: number; count: number}[]; recent_orders: import('./billing').BillingOrder[]};
+  inbox: import('./Inbox').InboxData;
+  recent_feedback: {id: string; kind: string; comment: string; name: string; status: string; created_at: string}[];
   generated_at: string; submitted_24h: number;
   users: {total: number; plus: number; submitted_24h: number};
   nodes: {total: number; online_enabled: number};
@@ -39,6 +42,7 @@ export type Overview = {
 };
 export type Task = {
   id: string; owner_id: string; owner_name: string; mode: Mode; target_language: string;
+  submitted_ip: string | null; country: {code: string | null; status: string} | null;
   workflow_kind: 'image' | 'document'; status: string; phase: string;
   created_at: string; completed_at: string | null; settlement: string;
   quota_pages: number; error_code: string | null; cancel_requested: boolean; discard_output: boolean;
@@ -50,14 +54,14 @@ export type Task = {
 export type TaskDetail = Task & {
   timings?: {node?: Record<string, number>; delivery?: Record<string, number>};
   error_message: string | null;
-  generated_at: string; provider: {id: string; cost_state: string} | null;
+  generated_at: string; provider: {id: string; name: string | null; cost_state: string} | null;
   stages: {name: string; page_index: number; status: string; attempts: number; available_at: string; completed_at: string | null}[];
   executions: {id: string; stage: string; page_index: number; generation: number; node_id: string; node_name: string;
     executor_id: string | null;  started_at: string; completed_at: string | null;
     expires_at: string; seconds: number; outcome: string}[];
   text_cost_micros: number;
-  text_calls: {id: string; model: string; provider_id: string; sequence: number; group: number;
-    seconds: number | null; cost_state: string; accounted_micros: number; error_code: string | null}[];
+  text_calls: {id: string; model: string; provider_id: string; provider_name: string | null; sequence: number; group: number;
+    seconds: number | null; cost_state: string; accounted_micros: number; input_tokens: number | null; output_tokens: number | null; error_code: string | null}[];
 };
 export type Node = {
   config_version: number; applied_config_version: number; config_error: string | null; supported_languages: string[];

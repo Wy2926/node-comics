@@ -4,23 +4,20 @@
 
 ## 页面与统计口径
 
-| 页面 | 信息与操作 |
+主导航只保留八个入口。订单内合并订阅、产品价格与支付事件；反馈收件箱合并翻译、插件、卸载、网站适配；额度活动、用量、健康和审计归入系统设置。
+
+| 工作区 | 信息与操作 |
 | --- | --- |
-| 运行概览 | 当前在途、排队等待、有效执行租约、近 24 小时完成和失败；常规按上传、排队、运行、待核实统计；阶段积压、用户和资源概况 |
-| 翻译任务 | 任务／用户名搜索、模式／状态／用户／节点筛选；执行履历、文本计量、分页供应商调用 |
-| 计算节点 | 图像计算节点与控制资源池、设备、引擎版本、能力、启停状态、心跳、执行位占用、过期租约，以及近 24 小时阶段次数／耗时；跳转参与任务 |
-| 翻译供应商 | 文本 LLM 创建、配置、思考程度、密钥替换、启停、正文适用套餐、正文／漫画名分流权重及供应商上游 RPM；版本历史位于运行诊断 |
-| 用户管理 | 用户与当前权益；运营会员开通／续期／提前结束、限时赠送、当期补偿；历史额度桶、账本、预占任务和操作人／原因分页 |
-| 额度活动 | 创建／复制赠送规则、启用／暂停、同一活动期限调整；模式、页数、新老用户范围、发放窗口、到账后有效天数／永久；到账人数、累计页数与分页发放记录 |
-| 系统设置 | 每日默认额度、游客／网络／全站匿名每日预算、滚动分钟准入、上传并发／超时／占位及反馈预算；版本冲突保护和变更审计 |
-| 产品与价格 | 会员／额度包权益、独立的权益周期和付款方式及 Stripe／Creem 渠道绑定；同会员产品可售自动续费与一次性季卡／年卡；验证平台商品后发布，新版仅影响后续购买 |
-| 订单管理 | 全渠道订单筛选与分页；原价格、结账、订阅、流转和通知；逐笔退款／争议及退款完整性核对；按所选历史订单定向核实 |
-| 订阅与权益 | 订阅与客户列表、跨渠道试用已使用／在途占用；多笔有效订阅提示与筛选，人工核对重复付款和续费；订阅详情串联账单、实际授权期和月度额度桶 |
-| 支付事件 | 全局事件、异常、处理次数、接收时间、平台资源和关联订单；带原因、状态冲突与冷却保护的重新入队 |
-| 翻译反馈 | 状态／问题／用户／任务筛选；关联真实生成或复用版本；处理人、备注、乐观冲突检查及分页历史 |
-| 运行诊断 | 服务健康、用户准入、上传、请求 UUID、图片描述、任务结果及文本供应商历史版本 |
-| 用量与成本 | UTC 日期下的任务终态与平均总耗时、文本调用及未知预占、完成后新增的本人复用请求、按渠道／环境／币种／状态汇总的订单原金额 |
-| 操作审计 | 操作者、动作、目标类型／编号、时间筛选与分页；脱敏前后值、备注和关联业务信息 |
+| 概览 | 近 24 小时正式订单实收原金额（分币种、退款前）、订单与异常数、待处理反馈、用户；最近订单和反馈待办优先，底部为翻译服务状态 |
+| 用户管理 | 按名字搜索；点用户打开工作台，联查权益、任务、订单、订阅、反馈、准入诊断；运营会员、限时赠送与补偿保留原因和历史 |
+| 订单管理 | 以用户、购买内容、金额和状态为主；订单详情联查通知、退款、争议和权益；子页管理订阅、产品价格、渠道与支付事件 |
+| 反馈收件箱 | 四类反馈、待处理角标与即时提醒；打开处理抽屉，记录状态和备注；翻译反馈可直接查看用户与关联任务 |
+| 翻译任务 | 用户、任务类型、状态、提交时间和 IP 所在国家；筛选与分页；执行履历和文本计量在详情查看 |
+| 翻译供应商 | 创建与编辑连接；高级请求、分流和价格配置分组折叠；启停、套餐、权重、RPM；对已保存配置发送一次测试请求 |
+| 计算节点 | 名称、能力、心跳、执行位、阶段耗时和配置；联查参与任务 |
+| 系统设置 | 额度、提示词与预算；子页为额度活动、用量成本、服务健康和操作审计 |
+
+用户和任务通过抽屉直接联查，关闭后保留原列表位置、筛选和用户页签。列表不再要求复制用户 ID 到其他页面输入；上传、资产、请求 UUID、结果等纯编号诊断列表及其专用接口已移除。必要技术编号仍保留在详情或审计。
 
 `<ADMIN_WEB_PATH>#billing` 先创建产品并选择会员或额度包，再添加对应价格，最后关联支付渠道。会员产品的价格分别选择自动续费（月／季／年）或一次性会员（季／年）；季卡／年卡直接复用原 PLUS／Pro 产品及无试用权益版本，无需另建产品。额度包配置常规页数、有效天数（空为不过期）、已有会员服务档位及小时受理限制；不含试用和周期页数，只能创建 `onetime + once` 价格。金额填写实际金额，API 使用币种最小单位，不预设额度包售价。价格默认草稿，至少一个渠道验证启用后才能发布；Creem 首次试用需分别关联常规和试用产品，不自动续费季卡／年卡则分别绑定无试用的 onetime 商品。调价复制为新价格，更新权益供后续价格选用；已有权益及在途结账继续原价。`#orders` 显示订单流转及最近支付通知，结果未知且缺少结账编号时，可填入平台编号核实恢复。额度包订单显示原购买桶与已用／预占；一次性会员按原订单关联授权期和逐月额度。部分退款提示人工核定，不按金额自动折算页数或期限。完整表结构、状态、年度额度规则及隔离浏览器复现见[多渠道支付设计](STRIPE_BILLING.md)。
 
@@ -34,10 +31,11 @@
 - **交付节点**：当前整页协议下，成功交付及无文字任务取成功的 page 租约。所有参与节点和重试都保留在执行履历。本人复用只增加指向同一 Job 的请求 UUID，不新增计算任务，也不进入本任务列表。
 - **控制资源池**：`control-text / control-validate_upload` 是共享执行容量。控制工作进程领取时写入 `executor_id=hostname:pid`，任务详情可定位执行机／进程。图像节点直接记录其注册 ID。
 - **过期租约**：单独标记为待回收，不显示成有效执行；回收前仍占资源容量。
+- **文本调用计量**：单图和文件任务的每次 LLM 调用及重试分别显示输入／输出 Token 与成本。Token 读取已有供应商用量记录，0 与未提供区分；缺失用量不推算、不补记。成本按任务配置单价估算，未知消耗仍保留预占，不等同已核对账单。
 - **最近提交**表示最近任务创建时间；系统未记录用户最后登录或当前在线状态，后台不会据此推断。
 - 时间按浏览器本地时区显示。监控列表默认每 15 秒刷新，可暂停；后台标签页隐藏或详情打开时停止监控列表定时刷新。产品和订单页面手动刷新。请求失败保留上次数据并标记可能过时，支持重试；产品数据读取失败时禁用修改，刷新成功后恢复。
 
-`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，显示正文适用套餐与两种用途的权重；正文按套餐内候选权重分配，漫画名显示全站预计比例。编辑可选择全部或指定正文套餐，页面提示未覆盖的套餐；权重设为 0 停止该用途的新分配。停用供应商还会暂停其已有正文任务。上游 RPM 独立于模型参数和用户业务限流，由两种用途的实际调用共享，修改不生成模型版本。思考程度默认 `none`，模型支持范围、套餐路由和版本规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。页面路由还包括 `#subscriptions / #billing-events / #feedback / #operations / #statistics / #audit`。表结构以[数据库迁移](../backend/migrations/versions/)和模型为准，不另维护表数／字段数快照。
+`<ADMIN_WEB_PATH>#translation-providers` 管理文本 LLM，显示正文适用套餐与两种用途的权重；正文按套餐内候选权重分配，漫画名显示全站预计比例。编辑可选择全部或指定正文套餐，页面提示未覆盖的套餐；权重设为 0 停止该用途的新分配。停用供应商还会暂停其已有正文任务。上游 RPM 独立于模型参数和用户业务限流，由两种用途的实际调用共享，修改不生成模型版本。思考程度默认 `none`，模型支持范围、套餐路由和版本规则见 [LLM 翻译供应商](TRANSLATION_PROVIDERS.md)。订单、反馈等业务子页可直接访问；旧 `#operations` 页面已删除，健康状态统一在 `#health`。表结构以[数据库迁移](../backend/migrations/versions/)和模型为准，不另维护表数／字段数快照。
 
 ### 处理操作与恢复
 
@@ -51,7 +49,7 @@
 
 ## 运行与构建
 
-前端源码：`backend/admin-ui/`。本机需要 Node.js 22+、npm，后端环境要求见 [backend/README.md](../backend/README.md)。
+前端源码：`backend/admin-ui/`，组件采用 Ant Design，颜色、圆角、间距与控件尺寸集中在 `src/theme.tsx` 和 `src/admin.css`。本机需要 Node.js 22+、npm，后端环境要求见 [backend/README.md](../backend/README.md)。
 
 ```powershell
 cd backend/admin-ui
@@ -61,6 +59,44 @@ npm run build
 ```
 
 构建输出到 `backend/app/admin_web/dist/`，已被仓库忽略。本地 `SERVE_STATIC=true` 时由 API 托管页面；生产由 OpenResty 同源提供独立静态产物，不运行 Node.js 服务。资源使用相对路径，更换入口无需重编前端，但须同步应用配置、OIDC 回调和代理路由。开发预览可运行 `npm run dev`，访问 `http://127.0.0.1:5175/`，默认代理 API `http://127.0.0.1:18088`，可用 `ADMIN_API_ORIGIN` 指定本地测试服务。Vite 开发服务器不用于验证生产入口限制。
+
+### 一条命令预览与打包
+
+首次准备 Python 测试依赖（仅预览需要），然后启动后台热更新：
+
+```sh
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements-test.txt
+npm --prefix backend/admin-ui ci
+npm --prefix backend/admin-ui run demo
+```
+
+Windows 使用 `backend/.venv/Scripts/python.exe`。打开 `http://127.0.0.1:5175/`，开发用户名为 `admin`。脚本同时启动 Vite 和独立 SQLite / 内存 Redis 夹具，任务、国家、订单、反馈及模型响应均为合成数据，不连接生产或真实支付/LLM；Ctrl+C 停止两个进程。重新启动创建新的临时库。`ADMIN_PYTHON / ADMIN_FIXTURE_PORT / ADMIN_UI_PORT` 可分别覆盖 Python、API 端口（默认 18090）和前端端口。连接自己的本地 API 使用 `npm run dev` 与 `ADMIN_API_ORIGIN`。
+
+只改前端时，独立构建并准备不可覆盖的静态发布目录：
+
+```sh
+npm --prefix backend/admin-ui run release -- \
+  --release <版本> --destination <静态根绝对路径> \
+  --nginx-root <代理可见的静态根绝对路径> \
+  --admin-path <现有私有入口> --oidc-origin <身份服务HTTPS源>
+```
+
+这条命令复用 `prepare_static_release.py`，生成 `release.inc` 与静态文件，不切换线上入口。API / 数据库变化先按[部署规范](DEPLOYMENT.md)迁移与更新，再替换后台静态发布；入口和 OIDC 回调沿用现有配置。无需在生产运行 Node.js。Ant Design 动态样式需要 CSP `style-src 'self' 'unsafe-inline'`；脚本仍仅允许同源，不开放内联脚本。
+
+### 任务 IP 与国家
+
+单图和整本任务首次受理时保存 ASGI 已校验的对端 IP，重放和本人复用保持原任务来源。反向代理必须覆盖客户端提供的转发头，并且 API 仅信任指定代理；不直接采信请求中的 `CF-Connecting-IP` 等头。IP 仅出现在管理员接口，历史任务不回填或猜测。
+
+国家在查询时用 `GEOIP_DATABASE` 指向的本地 MMDB 解析，支持 IPv4 / IPv6。一个分页请求只打开一次 mmap，按本页地址去重；不向外部服务发送 IP，不做无界缓存。缺库、无匹配、内网地址分别明确提示。国家代表当前数据库对提交 IP 的推断，VPN / 代理的出口所在地不等于用户实际所在地。
+
+生产复用流量统计已有的 DB-IP Lite City 数据库，Compose `.env` 设置 `GEOIP_DIRECTORY=/var/lib/nodelane-traffic/geoip`，应用 `.env.server` 使用 `GEOIP_DATABASE=/geoip/city.mmdb`。API 只读挂载整个目录；首次接入先部署更新后的 GeoIP 脚本并运行一次更新（即使当月库已存在），将公开库目录/文件权限设为 755/644，供容器 UID 10001 读取，不改变日志权限。原有 `scripts/traffic.py geoip` 原子更新后下次查询自动使用新库；来源、月份、SHA-256 和 CC BY 4.0 许可保存在该目录 `sources.json`。地理数据来源：[DB-IP Lite](https://db-ip.com/db/lite.php)。
+
+### 即时反馈与供应商测试
+
+已登录且页面可见时建立一条带 Bearer 的 SSE 连接，复用现有数据库提交通知；四类反馈新增后显示提醒和待处理角标，处理后同步数量。首次连接不弹历史提醒，断线退避重连，隐藏标签页断开；不发送桌面权限请求或终端用户通知。连接不持有数据库事务，最长 295 秒并受令牌过期限制，20 秒保活、60 秒校准；跨实例使用已有 PostgreSQL LISTEN/NOTIFY。
+
+供应商测试使用已保存模型版本、密钥和协议，可测停用中的供应商；单次固定短句、最多 30 秒、不自动重试，成功显示回复、耗时和 token，失败显示错误。每供应商 30 秒冷却并占用共享上游 RPM，不创建翻译任务、不扣用户额度；真实供应商可能收费。审计只保留结果、版本、耗时与用量，不保存密钥或回复全文。
 
 ### 私有入口配置
 
@@ -99,13 +135,15 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 | API 前缀 | 路径与用途 |
 | --- | --- |
-| `/v1/admin/translation-providers` | 列表、POST 创建、PUT 配置、PATCH 启停；`/{id}/revisions` 配置版本分页，不回显密钥 |
+| `/v1/admin/translation-providers` | 列表、POST 创建、PUT 配置、PATCH 启停；`POST /{id}/test` 测试已保存连接，不回显密钥 |
 | `/v1/admin/jobs/{id}` | `/attempts` 分页履历 |
 | `/v1/admin/users/{id}` | `/membership / quota-grants / quota-compensations` 业务操作；`/quota-periods / usage-ledger / membership-operations / reserved-jobs` 历史分页 |
 | `/v1/admin/quota-campaigns` | 额度活动页面使用；`PUT /{id}` 幂等创建、`PATCH /{id}` 按版本启用／暂停、`PATCH /{id}/duration` 调整期限、`GET /{id}/awards` 查看领取回执 |
 | `/v1/admin/feedback` | 列表、`/{id}` 详情／处理、`/{id}/reviews` 历史分页 |
 | `/v1/admin/billing` | `/orders` 与定向 reconcile；`/events` 及详情／retry；`/subscriptions` 及详情／invoices／terms；`/customers / accounts/{id}` |
-| `/v1/admin/operations` | `/health / users/{id} / uploads / requests / assets / results / statistics` |
+| `/v1/admin/operations` | `/health / users/{id} / statistics` |
+| `/v1/admin/workspace` | `/inbox` 反馈摘要，`/events` 管理员 SSE |
+| `/v1/admin/support-requests` | 三类匿名反馈分页、`/{id}` 详情与 PATCH 处理 |
 | `/v1/admin/audit` | 管理动作分页检索，仅显示脱敏元数据 |
 | `/v1/admin/system-settings` | GET 当前版本与推荐提示词，PUT 完整配置（含两项提示词）及预期版本 |
 
@@ -115,7 +153,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 除支付管理模块使用 `page / page_size` 外，历史和诊断列表使用 `offset / limit`，每页上限 100。审计记录操作者、目标、前后值、原因与时间，同事务写入；回滚业务不留下成功审计。令牌、密钥、对象路径、签名地址、OCR／译文载荷不写入审计快照。
 
-统计取最近 1–90 天并按 UTC 日期汇总。供应商／模型筛选仅作用于文本调用表；最多返回 2000 个分组并显式标记截断。文本金额含估算／未知消耗预占，不是已对账费用；复用数量统计本人 Job 完成后创建并指向该 Job 的请求 UUID，不是阅读浏览次数；订单原金额按币种分列，不作为净收入。结果诊断直接查询成功或无字 Job，并显示有效本人请求数。服务健康只提供当前实例与积压，不提供历史告警和消息通知。
+统计取最近 1–90 天并按 UTC 日期汇总。供应商／模型筛选仅作用于文本调用表；最多返回 2000 个分组并显式标记截断。文本金额含估算／未知消耗预占，不是已对账费用；复用数量统计本人 Job 完成后创建并指向该 Job 的请求 UUID，不是阅读浏览次数；订单原金额按币种分列，不作为净收入。服务健康只提供当前实例与积压，不提供历史告警。
 
 ## 匿名网站申请、插件与卸载反馈
 
@@ -123,7 +161,7 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 - `POST /v1/support-requests`：`kind=website|plugin|uninstall`，UUID `Idempotency-Key`；网站申请要求名称与公开 HTTP(S) 地址，插件与卸载反馈要求正文。名称／URL／说明／联系方式上限分别为 100／2048／1000／200 字符，联系方式可选且不限定邮箱。请求体最多 16 KiB。
 - 网站地址拒绝凭据和本地地址，去除 query／fragment；服务端只保存，不抓取。重复原请求不新增记录，同编号改内容为 409。未知回包冻结原草稿与编号重试，已知拒绝允许修改。
-- `GET /v1/admin/support-requests?kind=website|plugin|uninstall&offset=0&limit=25` 仅管理员可读，按时间和 ID 倒序分页。三类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
+- `GET /v1/admin/support-requests?kind=website|plugin|uninstall&offset=0&limit=25` 仅管理员可读，支持 `status` 筛选，按时间和 ID 倒序分页。`PATCH /{id}` 提交 `status / note / expected_reviewed_at`，状态为 received、reviewing 或 resolved，处理备注必填；过时更新返回 409，同状态与备注重放不重复记审计。三类共享匿名限流：对端地址摘要每 60 秒新增最多 5 条、UTC 日 20 条，重放不计；429 返回 `Retry-After`，转发地址只接受可信代理配置。
 - `support_requests` 持久保存回执；限流与短期幂等计数保存在 Redis，到期自动回收。正文、联系方式、原网络地址不写默认日志；公开回执仅含 `id` 与 `created_at`。
 
 卸载后通过浏览器 `runtime.setUninstallURL` 打开官网 `/uninstall/`，按插件界面语言选择简中、繁中、英文、日文或韩文页面，其他语言回退英文。地址不附带账号、安装标识或阅读记录。反馈自愿且无需登录，可跳过或直接关闭；选一个主要原因、选填最多 800 字说明，只有主动提交才创建记录。原因统一为中文文案与说明一起保存到 `comment`，`kind=uninstall`；不采集卸载统计，不发送 GA4 事件。页面不索引；当前标签页保存草稿和原始请求，未知回包时锁定内容，用同一个 UUID 重试，成功后显示已收到。上线需先部署后端、官网与管理后台，再发布含卸载入口的插件。
@@ -132,29 +170,9 @@ python -c "import secrets; print('ADMIN_WEB_PATH=/console-' + secrets.token_hex(
 
 ## 验证
 
-后台从 `backend/admin-ui` 执行 `npm ci`、`npm run check`、`npm test`、`npm run build`；后端与专用 PostgreSQL 环境见[后端说明](../backend/README.md#验证)。检查管理员隔离、重复写入／未知回执恢复、审计同事务、订单定向核实，以及页面加载、空结果、失败和重试。
+从 `backend/admin-ui` 执行 `npm run check`、`npm test`、`npm run build`。后端关键回归包含 `test_admin_workspace.py`、`test_admin_monitor.py`、`test_feedback_admin.py`和 `test_support_requests.py`，覆盖来源地址、管理员隔离、幂等与冲突、提交后提醒、供应商冷却和无用户扣费；支付和权益修改仍使用各自专用回归。
 
-### 隔离浏览器
-
-先构建后台，然后在一个终端运行服务：
-
-```powershell
-cd backend
-$env:ADMIN_FIXTURE_PORT = '18096'
-.venv/Scripts/python.exe tests/manual_admin_completion_server.py
-```
-
-在另一个终端，从仓库根目录运行下列命令。两个路径使用服务启动时打印的临时路径，不要指向其他图片或环境文件。验收脚本要求 Chrome 和可导入的 Playwright；也支持 Codex 自带的 Node 运行时依赖。
-
-```powershell
-$env:ADMIN_COMPLETION_IMAGE = '<启动时打印的 ADMIN_COMPLETION_IMAGE>'
-$env:ADMIN_FIXTURE_CONTROLS = '<启动时打印的 ADMIN_FIXTURE_CONTROLS>'
-node scripts/verify_admin_completion.mjs
-```
-
-额度活动专项使用同一夹具，在独立重建的空库运行 `node scripts/verify_quota_campaign_admin.mjs`（支持 `PLAYWRIGHT_MODULE`）。覆盖创建与复制、启停、同一活动期限调整、审计筛选、注册赠送与记录分页、提交成功但回执丢失后的刷新恢复、版本冲突、读取失败禁用配置、键盘焦点和窄屏布局；结果写入 `artifacts/admin-quota-campaigns/`。
-
-脚本会修改合成数据，每次复验先重启夹具以重建空库。报告和截图写入已忽略的 `artifacts/admin-completion/`；`controls.json` 的 `lose_receipt` 会在业务事务成功后模拟一次 503，验证不确定回包恢复。该机制仅存在于独立验收服务。
+使用 `npm run demo` 在桌面浏览器验收：概览进入订单、用户内切换各页签、任务 IP 与国家、关闭多层详情后恢复位置、反馈处理与即时提醒、供应商测试成功/失败、表单校验。夹具打印的 `controls.json` 支持 `fail / delay` 模拟监控读取失败，`lose_receipt` 支持指定写接口在提交后返回一次 503；仅影响合成数据。截图与性能测量放在忽略的 `artifacts/`，不提交过程报告。
 
 PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG_PORT / TEST_PG_USER / TEST_PG_PASSWORD`，运行 `test_admin_completion_postgres.py` 及既有支付／设置并发套件；测试固定限制在 `nodecomics_concurrency_test` 库，详见 `test_postgres_concurrency.py` 和 `deploy/compose.tests.yaml`。未启用的专用测试不计通过。
 
@@ -164,4 +182,6 @@ PostgreSQL 专项使用 `RUN_POSTGRES_CONCURRENCY=1` 和 `TEST_PG_HOST / TEST_PG
 
 ## 前端依赖
 
-实际版本由 `backend/admin-ui/package-lock.json` 固定，下载完整性由其中 `integrity` 校验。运行时 React / React DOM **19.3.0**（MIT）；构建 Vite **7.3.6**（MIT）、TypeScript **5.9.3**（Apache-2.0）。其余类型与构建插件以锁文件和包内许可为准。使用系统字体，无新增字体文件、模型权重、外部 CDN 或图片依赖。
+实际版本由 `backend/admin-ui/package-lock.json` 固定，下载完整性由其中 `integrity` 校验。运行时 React / React DOM **19.3.0**（MIT）；UI [Ant Design](https://github.com/ant-design/ant-design) **6.6.8** 与 [Ant Design Icons](https://github.com/ant-design/ant-design-icons) **6.3.4**（MIT）；构建 Vite **7.3.7**（MIT）、TypeScript **5.9.3**（Apache-2.0）。其余类型与构建插件以锁文件和包内许可为准。使用系统字体，无新增字体文件、模型权重、外部 CDN 或图片依赖。
+
+后台国家解析使用 [maxminddb](https://github.com/maxmind/MaxMind-DB-Reader-python) **3.2.0**（Apache-2.0），版本、源包摘要和许可记录见 [backend/THIRD_PARTY.md](../backend/THIRD_PARTY.md)。

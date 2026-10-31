@@ -1,3 +1,4 @@
+import {Button} from './ui';
 import {useState} from 'react';
 import {DataTable, ResourceError, useAdminResource, type Row} from './AdminResource';
 import {Stat, time} from './ui';
@@ -7,11 +8,11 @@ type Statistics = {jobs: Row[]; reuse: Row[]; text_calls: Row[]; payments: Row[]
 export function StatisticsPage({onUnauthorized}: {onUnauthorized: (message: string) => void}) {
   const [query, setQuery] = useState('days=7');
   const {data, error, busy, reload} = useAdminResource<Statistics>(`/v1/admin/operations/statistics?${query}`, onUnauthorized);
-  return <main id="main" tabIndex={-1} className="admin-surface"><div className="page-heading"><div><p className="eyebrow">USAGE & COST</p><h1>用量与成本</h1><p className="muted">按 UTC 日期查看任务结果、文本调用计量、结果复用和订单金额。</p></div><button className="secondary" onClick={reload} disabled={busy}>刷新统计</button></div>
+  return <main id="main" tabIndex={-1} className="admin-surface"><div className="page-heading"><div><h1>用量与成本</h1><p className="muted">按 UTC 日期查看任务结果、文本调用计量、结果复用和订单金额。</p></div><Button className="secondary" onClick={reload} disabled={busy}>刷新统计</Button></div>
     <form className="filters filter-form" onSubmit={event => {event.preventDefault(); const next = new URLSearchParams();
       for (const [key, value] of new FormData(event.currentTarget)) if (String(value).trim()) next.set(key, String(value).trim()); if (next.toString() === query) reload(); else setQuery(next.toString());}}>
       <label>时间范围<select name="days" defaultValue="7"><option value="1">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select></label>
-      <label>文本供应商 ID<input name="provider_id" maxLength={80}/></label><label>文本模型<input name="model" maxLength={120}/></label><button className="primary">查询</button></form>
+      <label>文本供应商 ID<input name="provider_id" maxLength={80}/></label><label>文本模型<input name="model" maxLength={120}/></label><Button className="primary">查询</Button></form>
     <ResourceError error={error} stale={!!data}/>{busy && <p role="status">正在汇总统计…</p>}{data && <>
       <div className="stats-grid"><Stat title="已结束任务" value={String(data.jobs.reduce((sum,row)=>sum+Number(row.count),0))} note="所选时间范围 · 含成功与失败"/><Stat title="完成结果复用" value={String(data.reuse.reduce((sum,row)=>sum+Number(row.requests),0))} note="完成后新增的翻译请求"/><Stat title="文本调用" value={`${data.text_calls_truncated ? '≥ ' : ''}${data.text_calls.reduce((sum,row)=>sum+Number(row.calls),0)}`} note="应用供应商与模型筛选"/><Stat title="未知消耗调用" value={`${data.text_calls_truncated ? '≥ ' : ''}${data.text_calls.reduce((sum,row)=>sum+Number(row.unknown_calls),0)}`} note="成本仍待核实"/></div>
       <section className="panel"><h2>任务完成情况</h2><DataTable rows={data.jobs} columns={[{key:'day',title:'日期'},{key:'mode',title:'模式'},{key:'workflow_kind',title:'任务类型'},{key:'status',title:'终态'},{key:'count',title:'任务数'},{key:'avg_seconds',title:'平均总耗时（秒）'}]}/></section>

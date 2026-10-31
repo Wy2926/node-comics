@@ -1,3 +1,4 @@
+import {Button} from './ui';
 import {useEffect, useState} from 'react';
 import {authError, errorText, request} from './api';
 import {Empty, label, Pagination, Table, time} from './ui';
@@ -25,7 +26,7 @@ export function TaskAttempts({jobId, refreshKey, onUnauthorized}: {
   return <section aria-label="供应商请求尝试" aria-busy={busy}>
     <h3 className="detail-heading">供应商请求尝试 <span>{data?.total ?? '—'} 次</span></h3>
     <p className="panel-note">请求编号用于向供应商核实。未知消耗保留原记录；人工交付结论不代表供应商账单已核对。</p>
-    {error && <p className="error" role="alert">{error} <button className="text-link" disabled={busy} onClick={() => setRevision(n => n + 1)}>重试读取</button></p>}
+    {error && <p className="error" role="alert">{error} <Button className="text-link" disabled={busy} onClick={() => setRevision(n => n + 1)}>重试读取</Button></p>}
     {!data && busy && <p role="status">正在读取请求记录…</p>}
     {data && (data.items.length ? <>
       <Table heads={['供应商 / 请求编号', '开始 / 上游发送', '完成 / 心跳', '计量 / 结果']}>{data.items.map(row => <tr key={row.id}>

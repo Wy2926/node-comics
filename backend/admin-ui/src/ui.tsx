@@ -1,11 +1,12 @@
-import type {ReactNode} from 'react';
+import {Button as AntButton} from 'antd';
+import type {ReactNode, ButtonHTMLAttributes} from 'react';
 
 export const labels: Record<string, string> = {
   classic: '常规翻译', awaiting_upload: '待上传', validating_upload: '校验上传',
   image: '单图', document: '整本文件', uploading: '上传中', preflight: '文件预检', awaiting_quota: '等待补额',
   doc_prepare: '文件预检', doc_ocr: '逐页 OCR', doc_text: '整本文本翻译', doc_render: '逐页译图', doc_zip: 'ZIP 打包',
   queued: '排队中', running: '执行中', outcome_unknown: '结果待核实', unknown_released: '未知结果已释放',
-  succeeded: '已完成', no_text: '无文字', failed: '失败', cancelled: '已取消', ready: '待执行', waiting: '等待依赖',
+  succeeded: '已完成', completed: '已完成', no_text: '无文字', failed: '失败', cancelled: '已取消', ready: '待执行', waiting: '等待依赖',
   expired: '租约已过期', page: '整页执行与交付', analyze: '文字检测 / OCR', text: '文本翻译',
   inpaint: '背景修复', render: '嵌字与交付', validate_upload: '上传校验', reserved: '已预占', charged: '已结算',
   released: '已释放', reported: '已报告', unknown: '待核实', estimated: '估算', active: '全部在途', attention: '需要关注',
@@ -44,7 +45,17 @@ export function Table({heads, children}: {heads: string[]; children: ReactNode})
 }
 export function Pagination({total, count, offset, next, onPage}: {total: number; count: number; offset: number; next: number | null; onPage: (offset: number) => void}) {
   return <div className="pagination"><span>共 {number(total)} 条{count ? ` · 第 ${number(offset + 1)}–${number(offset + count)} 条` : ''}</span><div>
-    <button className="secondary" disabled={!offset} onClick={() => onPage(Math.max(0, offset - 25))}>上一页</button>
-    <button className="secondary" disabled={next == null} onClick={() => next != null && onPage(next)}>下一页</button>
+    <Button className="secondary" disabled={!offset} onClick={() => onPage(Math.max(0, offset - 25))}>上一页</Button>
+    <Button className="secondary" disabled={next == null} onClick={() => next != null && onPage(next)}>下一页</Button>
   </div></div>;
+}
+
+export function Button({type, className = '', ...props}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">) {
+  return <AntButton {...props} htmlType={type || 'submit'} className={className}
+    type={className.includes('primary') ? 'primary' : className.includes('text-link') ? 'link' : 'default'}/>;
+}
+const countries = new Intl.DisplayNames(['zh-CN'], {type: 'region'});
+export function Country({value}: {value: import('./types').Task['country']}) {
+  if (value?.code) return <span title="按提交 IP 的当前 GeoIP 数据库解析">{countries.of(value.code) || value.code}</span>;
+  return <span className="muted">{value?.status === 'private' ? '内网 / 本机' : value?.status === 'unavailable' ? '国家未知（地理库未就绪）' : '国家未知'}</span>;
 }

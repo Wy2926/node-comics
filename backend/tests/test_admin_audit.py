@@ -128,7 +128,7 @@ def test_node_mutations_record_configuration_without_node_credentials(client):
         assert saved.applied_config_version == 0
 
 
-def test_text_provider_audit_and_revision_history_preserve_old_configuration(client):
+def test_text_provider_audit_preserves_configuration_changes(client):
     from app.config import settings
     from app.db import session_factory
     from app.providers import configuration
@@ -148,18 +148,9 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
     with session_factory()() as db:
         assert configuration(db, 'classic', 'en', provider['id'])['text']['model'] == 'model-two'
     assert client.patch(f'{path}/{provider["id"]}', headers=admin, json={'enabled': False}).status_code == 200
-    rows = client.get(f'{path}/{provider["id"]}/revisions?limit=1', headers=admin)
-    assert rows.status_code == 200 and rows.json()['total'] == 2 and rows.json()['next_offset'] == 1
-    assert rows.json()['items'][0]['current'] and rows.json()['items'][0]['config']['model'] == 'model-two'
-    assert rows.json()['items'][0]['config']['max_output_tokens'] == 2048
-    older = client.get(f'{path}/{provider["id"]}/revisions?offset=1&limit=1', headers=admin)
-    assert older.json()['items'][0]['config']['model'] == 'model-one' and not older.json()['items'][0]['current']
-    assert older.json()['items'][0]['config']['max_output_tokens'] == 4096
-    assert client.get(f'{path}/{provider["id"]}/revisions', headers=login(client, 'reader')).status_code == 403
     audit = client.get('/v1/admin/audit', headers=admin, params={'target_type': 'translation_provider', 'target_id': provider['id']})
     assert {row['action'] for row in audit.json()['items']} == {'text_provider.create', 'text_provider.update', 'text_provider.toggle'}
-    for response in (rows, older, audit):
-        assert 'PRIVATE_TEST_TEXT_KEY' not in response.text and 'PRIVATE_ROTATED_TEXT_KEY' not in response.text
+    assert 'PRIVATE_TEST_TEXT_KEY' not in audit.text and 'PRIVATE_ROTATED_TEXT_KEY' not in audit.text
     update = next(row for row in audit.json()['items'] if row['action'] == 'text_provider.update')
     assert update['before']['revision_id'] == provider['revision_id']
     assert update['after']['revision_id'] == changed.json()['revision_id']
@@ -170,7 +161,7 @@ def test_text_provider_audit_and_revision_history_preserve_old_configuration(cli
 
 def test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_existing_grants(client):
     from app.db import session_factory
-    from app.entitlements import DAILY, allowance_json, entitlements_json, period_spec
+    from app.entitlements import DAILY, allowance_json, period_spec
     from app.entitlement_models import QuotaPeriod
     from app.models import User, now
     admin = login(client, 'admin')

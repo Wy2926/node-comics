@@ -71,6 +71,7 @@ services:
       - ./backend/website/dist:/app/app/website_dist:ro
       - ./backend/app/admin_web/dist:/app/app/admin_web/dist:ro
       - ./backend/extension-release.json:/app/extension-release.json:ro
+      - ${GEOIP_DIRECTORY:-./geoip}:/geoip:ro
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
     ports: ["127.0.0.1:${API_PORT:-18088}:8000"]
     stop_grace_period: 31m

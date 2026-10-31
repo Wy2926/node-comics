@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import Index, String, func, select
+from sqlalchemy import Index, String, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -34,7 +34,11 @@ class SupportRequest(Base):
     idempotency_key: Mapped[str] = mapped_column(String(36), unique=True)
     request_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=now)
-    __table_args__ = (Index('ix_support_requests_kind_created', 'kind', 'created_at', 'id'),)
+    status: Mapped[str] = mapped_column(String(20), default='received', server_default='received')
+    review_note: Mapped[str] = mapped_column(String(500), default='', server_default='')
+    reviewed_at: Mapped[datetime | None] = mapped_column()
+    __table_args__ = (Index('ix_support_requests_kind_created', 'kind', 'created_at', 'id'),
+                     Index('ix_support_status_created', 'status', 'created_at', 'id'))
 
 
 class SupportRequestBody(RequestBody):
@@ -127,9 +131,61 @@ def submit_support_request(body: SupportRequestBody, request: Request,
 
 @router.get('/v1/admin/support-requests')
 def list_support_requests(kind: Literal['website', 'plugin', 'uninstall'], offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100),
+                       status: Literal['received', 'reviewing', 'resolved'] | None = None,
                        user: User = Depends(admin), db: Session = Depends(get_db)):
     query = select(SupportRequest).where(SupportRequest.kind == kind)
+    if status:
+        query = query.where(SupportRequest.status == status)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(query.order_by(SupportRequest.created_at.desc(), SupportRequest.id.desc()).offset(offset).limit(limit))
-    return {'items': [{**receipt(row), 'kind': row.kind, 'site_name': row.site_name, 'url': row.url, 'comment': row.comment, 'contact': row.contact} for row in rows],
+    return {'items': [support_json(row) for row in rows],
             'total': total, 'next_offset': offset + limit if offset + limit < total else None}
+
+
+def support_json(row):
+    return {**receipt(row), 'kind': row.kind, 'site_name': row.site_name, 'url': row.url,
+            'comment': row.comment, 'contact': row.contact, 'status': row.status,
+            'review_note': row.review_note,
+            'reviewed_at': row.reviewed_at.isoformat() + 'Z' if row.reviewed_at else None}
+
+
+class SupportReview(RequestBody):
+    status: Literal['received', 'reviewing', 'resolved']
+    note: str = Field(min_length=1, max_length=500)
+    expected_reviewed_at: str | None = Field(default=None, max_length=40)
+
+    @field_validator('note')
+    @classmethod
+    def nonempty(cls, value):
+        if not value.strip():
+            raise ValueError('请填写处理备注')
+        return value.strip()
+
+
+@router.patch('/v1/admin/support-requests/{request_id}')
+def review_support(request_id: str, body: SupportReview, user: User = Depends(admin), db: Session = Depends(get_db)):
+    from .admin_audit import record_audit
+    if db.get_bind().dialect.name == 'sqlite':
+        db.execute(update(SupportRequest).where(SupportRequest.id == request_id).values(status=SupportRequest.status))
+    row = db.scalar(select(SupportRequest).where(SupportRequest.id == request_id).with_for_update())
+    if row is None:
+        problem('NOT_FOUND', '反馈不存在', 404)
+    # Lost acknowledgements can be retried without writing a second review.
+    if row.status == body.status and row.review_note == body.note:
+        return support_json(row)
+    if support_json(row)['reviewed_at'] != body.expected_reviewed_at:
+        problem('SUPPORT_REVIEW_CONFLICT', '反馈已被更新，请刷新后重新处理', 409)
+    before = {'status': row.status, 'note': row.review_note}
+    row.status, row.review_note, row.reviewed_at = body.status, body.note, now()
+    record_audit(db, user.id, 'support.review', 'support_request', row.id,
+                 before=before, after={'status': row.status, 'note': row.review_note})
+    db.commit()
+    return support_json(row)
+
+
+@router.get('/v1/admin/support-requests/{request_id}')
+def support_detail(request_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
+    row = db.get(SupportRequest, request_id)
+    if row is None:
+        problem('NOT_FOUND', '反馈不存在', 404)
+    return support_json(row)

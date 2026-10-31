@@ -13,36 +13,21 @@ PRIVATE = 'PRIVATE_FIXTURE_MUST_NOT_LEAK'
 @pytest.fixture
 def operations(client, monkeypatch):
     from app.db import session_factory
-    from app.models import Asset, Attempt, Job, TextCall, User, now
+    from app.models import Attempt, Job, TextCall, User, now
     from app.translation_requests import TranslationRequest
     from app import redis_state
     from admission_test_utils import milliseconds, freeze_clock
-    from app.upload_models import UploadReservation
     from app.health_models import ServiceHeartbeat
     from app.billing_models import BillingEvent
     admin = login(client, 'admin')
     reader = login(client, 'reader')
-    reused_reader = login(client, 'reused-reader')
     at = now().replace(microsecond=0)
     freeze_clock(monkeypatch, [at])
     with session_factory()() as db:
         a = db.scalar(select(User).where(User.subject == 'dev:reader'))
-        b = db.scalar(select(User).where(User.subject == 'dev:reused-reader'))
-
-        def asset(owner, name, kind='original', parent=None):
-            row = Asset(id=name, owner_id=owner.id, sha256=('a' if kind == 'original' else 'b') * 64,
-                storage_key=f'{PRIVATE}/{kind}', kind=kind, parent_id=parent,
-                mime='image/png', width=320, height=480, byte_size=500, expires_at=None)
-            db.add(row); db.flush(); return row
-
-        source = asset(a, 'source-a')
-        output = asset(a, 'output-a', 'classic', source.id)
-        shared_source = asset(b, 'source-b')
-        shared_output = asset(b, 'output-b', 'classic', shared_source.id)
 
         def job(name, status, created=None, completed=None):
-            row = Job(id=name, owner_id=a.id, input_asset_id=source.id if status == 'succeeded' else None,
-                output_asset_id=output.id if status == 'succeeded' else None, source_sha256=source.sha256,
+            row = Job(id=name, owner_id=a.id, source_sha256='a' * 64,
                 mode='classic', target_language='en', status=status, phase=status, operation='isolated-diagnostics',
                 idempotency_key=name, request_hash='c' * 64, cache_key=name, config={'private': PRIVATE},
                 quota_kind='classic_daily', quota_pages=1, settlement='settled',
@@ -51,7 +36,7 @@ def operations(client, monkeypatch):
 
         done = job('done-job', 'succeeded', completed=at - timedelta(seconds=10))
         waiting = job('waiting-job', 'awaiting_upload')
-        expired = job('expired-upload-job', 'failed', completed=at - timedelta(seconds=5))
+        job('expired-upload-job', 'failed', completed=at - timedelta(seconds=5))
         job('old-job', 'succeeded', created=at - timedelta(days=95), completed=at - timedelta(days=95) + timedelta(seconds=40))
         job('future-job', 'succeeded', created=at + timedelta(days=1), completed=at + timedelta(days=1, seconds=40))
         db.add_all([
@@ -63,10 +48,6 @@ def operations(client, monkeypatch):
             BillingEvent(id='pending-payment', environment='test', provider='creem', event_type='order.paid', resource_id='order-test',
                 payload={'private': PRIVATE}, occurred_at=at, status='pending', attempts=2, received_at=at - timedelta(hours=1)),
         ])
-        for upload_id, row, status in [('upload-waiting', waiting, 'awaiting_upload'), ('upload-expired', expired, 'expired')]:
-            db.add(UploadReservation(id=upload_id, job_id=row.id, owner_id=a.id, mode='classic', expected_sha256='d' * 64,
-                expected_size=500, mime='image/png', status=status, expires_at=at + timedelta(seconds=40),
-                max_expires_at=at + timedelta(minutes=10), verified_info={'private': PRIVATE}))
         db.flush()
         client_state = redis_state.client()
         client_state.hset(redis_state.key('control', a.id + ':translation'), mapping={'tokens': 2.5, 'at': milliseconds(at)})
@@ -74,7 +55,6 @@ def operations(client, monkeypatch):
         client_state.hset(redis_state.key('feedback', a.id), mapping={'tokens': 4, 'at': milliseconds(at),
             'day': milliseconds(at.replace(hour=0, minute=0, second=0)), 'receipts': 3})
         client_state.zadd(redis_state.key('image', a.id), {done.id: milliseconds(at) - 10000, waiting.id: milliseconds(at) - 65000})
-        client_state.set(redis_state.key('upload-token', 'upload-waiting'), PRIVATE, ex=30)
         client_state.zadd(redis_state.key('upload-global'), {PRIVATE: milliseconds(at) + 30000})
         client_state.zadd(redis_state.key('upload-user', a.id), {PRIVATE: milliseconds(at) + 30000})
         attempt = Attempt(job_id=done.id, provider_id='text-a', lease_expires_at=at)
@@ -87,10 +67,10 @@ def operations(client, monkeypatch):
                 model=model, reserved_micros=cost, accounted_micros=cost, cost_state=state, error_code=error,
                 started_at=at - timedelta(seconds=30), completed_at=at - timedelta(seconds=20)))
         db.commit()
-        yield {'client': client, 'admin': admin, 'reader': reader, 'a': a.id, 'b': b.id, 'at': at}
+        yield {'client': client, 'admin': admin, 'reader': reader, 'a': a.id, 'at': at}
 
 
-@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/uploads', '/requests', '/assets', '/results', '/statistics'])
+@pytest.mark.parametrize('path', ['/health', '/users/unknown', '/statistics'])
 def test_diagnostics_are_admin_only(client, path):
     assert client.get(ROOT + path).status_code == 401
     assert client.get(ROOT + path, headers=login(client, 'reader')).status_code == 403
@@ -105,55 +85,11 @@ def test_metadata_views_never_touch_objects_or_expose_private_payloads(operation
             if hasattr(cls, name):
                 monkeypatch.setattr(cls, name, forbidden)
     case = operations
-    for path in ['/health', f'/users/{case["a"]}', '/uploads', '/requests', '/assets', '/results', '/statistics']:
+    for path in ['/health', f'/users/{case["a"]}', '/statistics']:
         result = case['client'].get(ROOT + path, headers=case['admin'])
         assert result.status_code == 200, result.text
         assert PRIVATE not in result.text
         assert not any(f'"{field}"' in result.text for field in ['storage_key', 'verified_info', 'descriptor', 'fingerprint', 'window', 'payload'])
-
-
-def test_filters_pagination_and_reuse_relationships(operations):
-    case = operations
-    def get(path):
-        result = case['client'].get(ROOT + path, headers=case['admin'])
-        assert result.status_code == 200, result.text
-        return result.json()
-    first = get('/assets?limit=2')
-    second = get('/assets?limit=2&offset=2')
-    assert first['total'] == 4 and first['next_offset'] == 2
-    assert len(second['items']) == 2 and not ({row['id'] for row in first['items']} & {row['id'] for row in second['items']})
-    source = get('/assets?q=source-a')['items'][0]
-    assert source['job_count'] == 3
-    assert get('/assets?q=' + 'a' * 64)['total'] == 2
-    assert get('/assets?job_id=done-job')['total'] == 2
-    assert get(f'/assets?owner_id={case["b"]}')['total'] == 2
-    assert get('/uploads?status=expired')['items'][0]['job_id'] == 'expired-upload-job'
-    assert get('/uploads?job_id=waiting-job')['items'][0]['ingress_expires_at']
-    assert get(f'/uploads?owner_id={case["b"]}')['total'] == 0
-    assert get('/requests?request_id=22222222-2222-4222-8222-222222222222')['items'][0]['job_id'] == 'done-job'
-    assert get('/requests?job_id=done-job')['total'] == 2
-    assert get('/results?q=done-job')['items'][0]['request_count'] == 2
-    assert get(f'/results?owner_id={case["b"]}')['total'] == 0
-    assert get('/results?q=done-job&mode=classic')['total'] == 1
-    assert get('/results?mode=classic')['total'] == 3
-    assert case['client'].get(ROOT + '/assets?limit=101', headers=case['admin']).status_code == 422
-
-
-def test_availability_preserves_pinned_originals_but_never_deleted_access(operations):
-    from app.db import session_factory
-    from app.models import Asset
-    case = operations
-    with session_factory()() as db:
-        source = db.get(Asset, 'source-b')
-        source.expires_at = case['at'] - timedelta(days=1)
-        source.active_references = 1
-        db.commit()
-    asset = case['client'].get(ROOT + '/assets?q=source-b', headers=case['admin']).json()['items'][0]
-    assert asset['available']
-    with session_factory()() as db:
-        db.get(Asset, 'source-b').deleted_at = case['at']
-        db.commit()
-    assert not case['client'].get(ROOT + '/assets?q=source-b', headers=case['admin']).json()['items'][0]['available']
 
 
 def test_user_admissions_and_service_health_explain_current_state(operations):

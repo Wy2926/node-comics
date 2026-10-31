@@ -13,8 +13,6 @@ from test_stripe_billing import billing
 from test_admin_operations import (
     operations,
     test_metadata_views_never_touch_objects_or_expose_private_payloads,
-    test_filters_pagination_and_reuse_relationships,
-    test_availability_preserves_pinned_originals_but_never_deleted_access,
     test_statistics_separate_execution_from_grants_and_keep_unknown_cost,
     test_payment_statistics_do_not_merge_test_and_live_orders,
     test_payment_health_keeps_environment_backlogs_separate,
@@ -24,7 +22,7 @@ from test_admin_audit import (
     test_record_audit_shares_transaction_and_deduplicates_operation,
     test_audit_redacts_nested_secrets_and_signed_url_query,
     test_node_mutations_record_configuration_without_node_credentials,
-    test_text_provider_audit_and_revision_history_preserve_old_configuration,
+    test_text_provider_audit_preserves_configuration_changes,
     test_versioned_rules_affect_new_periods_and_memberships_without_rewriting_existing_grants,
 )
 from test_billing_admin_completion import (

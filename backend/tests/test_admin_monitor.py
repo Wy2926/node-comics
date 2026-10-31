@@ -49,6 +49,50 @@ def test_uninstrumented_and_expired_timings(monitor):
     assert expired["running_nodes"] == [] and expired["executions"][0]["outcome"] == "expired"
 
 
+def test_call_tokens_keep_retries_zero_and_missing_usage_distinct(monitor):
+    from app.db import session_factory
+    from app.models import TextCall
+    client, auth, _ = monitor
+    with session_factory()() as db:
+        original = db.scalar(select(TextCall).where(TextCall.job_id == DONE_ID))
+        # Only normalized counts may leave the API, not arbitrary upstream fields.
+        original.usage = {**original.usage, 'private': 'SHOULD_NOT_LEAK'}
+        for sequence, usage in [(2, {'input_tokens': 100, 'output_tokens': 0}), (3, None)]:
+            db.add(TextCall(job_id=DONE_ID, attempt_id=original.attempt_id, group_index=0, sequence=sequence,
+                provider_id=original.provider_id, model=original.model, usage=usage,
+                reserved_micros=6000, accounted_micros=6000, cost_state='unknown' if usage is None else 'estimated',
+                error_code='TEXT_TIMEOUT' if usage is None else 'TEXT_REFUSED',
+                started_at=original.started_at + timedelta(seconds=sequence)))
+        db.commit()
+    response = client.get('/v1/admin/monitor/tasks/' + DONE_ID, headers=auth)
+    assert response.status_code == 200
+    data = response.json()
+    assert [(c['sequence'], c['input_tokens'], c['output_tokens']) for c in data['text_calls']] == [
+        (1, 512, 128), (2, 100, 0), (3, None, None)]
+    assert data['text_cost_micros'] == 14000
+    assert 'SHOULD_NOT_LEAK' not in response.text
+
+
+def test_attempts_timeline_is_admin_only_paginated_and_metadata_only(monitor):
+    from app.db import session_factory
+    from app.models import Attempt, now
+    client, auth, _ = monitor
+    with session_factory()() as db:
+        for index in range(2):
+            db.add(Attempt(job_id=DONE_ID, provider_id='fixture-text', request_id=f'request-{index}',
+                started_at=now() + timedelta(seconds=index), call_started_at=now(), lease_expires_at=now(),
+                usage={'input_tokens': 10, 'output_tokens': index}, cost_state='estimated'))
+        db.commit()
+    url = f'/v1/admin/jobs/{DONE_ID}/attempts'
+    assert client.get(url, headers=login(client, 'reader')).status_code == 403
+    response = client.get(url + '?limit=2', headers=auth)
+    assert response.status_code == 200 and response.json()['total'] == 3
+    assert response.json()['next_offset'] == 2
+    assert response.json()['items'][0]['request_id'] == 'request-1'
+    assert len(client.get(url + '?offset=2&limit=2', headers=auth).json()['items']) == 1
+    assert 'storage_backend' not in response.text and 'isolated-test-provider-key' not in response.text
+
+
 def test_task_filter_pagination_and_no_duplicate_nodes(monitor):
     client, auth, data = monitor
     first = client.get("/v1/admin/monitor/tasks?limit=10", headers=auth).json()

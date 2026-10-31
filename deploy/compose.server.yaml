@@ -30,6 +30,9 @@ x-server: &server
 
 x-api: &api
   <<: *server
+  volumes:
+    - translation_files:/data/translation
+    - ${GEOIP_DIRECTORY:-./geoip}:/geoip:ro
   command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log, --proxy-headers, --forwarded-allow-ips, "*"]
   stop_grace_period: 31m
   healthcheck:

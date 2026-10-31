@@ -43,7 +43,9 @@ class Feedback(Base):
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),
                      ForeignKeyConstraint(["owner_id", "translation_id"], ["translation_requests.owner_id", "translation_requests.id"]),
                      Index("ix_feedback_owner_created", "owner_id", "created_at"),
-                     Index("ix_feedback_job", "job_id"))
+                     Index("ix_feedback_job", "job_id"),
+                     Index("ix_feedback_status_created", "status", "created_at", "id"),
+                     Index("ix_feedback_created", "created_at", "id"))
 
 
 class FeedbackRequest(RequestBody):
@@ -184,8 +186,12 @@ def admin_feedback(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le
                    status: Literal["received", "reviewing", "resolved"] | None = None,
                    issue: Literal["missing_text", "meaning", "typesetting", "art_changed", "other"] | None = None,
                    owner_id: str | None = Query(None, max_length=36), job_id: str | None = Query(None, max_length=36),
+                   q: str = Query("", max_length=120),
                    user: User = Depends(admin), db: Session = Depends(get_db)):
     query = select(Feedback)
+    if q.strip():
+        query = query.join(User, User.id == Feedback.owner_id).where(
+            User.name.contains(q.strip(), autoescape=True) | Feedback.comment.contains(q.strip(), autoescape=True))
     if status:
         query = query.where(Feedback.status == status)
     if issue:

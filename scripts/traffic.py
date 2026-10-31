@@ -7,7 +7,6 @@ import hashlib
 import html
 import ipaddress
 import json
-import os
 from pathlib import Path
 import re
 import socket
@@ -166,6 +165,11 @@ def geoip(cfg):
     import maxminddb
     directory = Path(cfg['state_dir']) / 'geoip'
     directory.mkdir(exist_ok=True)
+    # These downloaded public databases are also mounted read-only by the API
+    # container (UID 10001). Do not relax permissions on logs or traffic reports.
+    directory.chmod(0o755)
+    for database in directory.glob('*.mmdb'):
+        database.chmod(0o644)
     month = datetime.now(ZoneInfo(cfg['timezone'])).strftime('%Y-%m')
     manifest = directory / 'sources.json'
     previous = json.loads(manifest.read_text()) if manifest.exists() else {}
@@ -189,7 +193,7 @@ def geoip(cfg):
                 if kind.lower() not in database.metadata().database_type.lower():
                     raise RuntimeError('Unexpected GeoIP database type')
                 database.get('8.8.8.8')
-            temporary.chmod(0o640)
+            temporary.chmod(0o644)
             temporary.replace(target)
             sources[kind] = {'url': url, 'sha256': digest.hexdigest(), 'bytes': target.stat().st_size}
         finally:

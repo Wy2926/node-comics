@@ -1,33 +1,25 @@
 """Bounded metadata diagnostics; never fetch private objects or provider APIs."""
 from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .auth import admin
 from .config import settings
 from .db import get_db
 from .errors import problem
-from .models import Asset, Job, TextCall, User, now
+from .models import Job, TextCall, User, now
 from .health import queue_alerts
 from .health_models import ServiceHeartbeat
 from .translation_requests import TranslationRequest
 from .translation_limits import image_budget, control_budget
 from .comic_title_limits import title_budget
 from .feedback_limits import feedback_budget
-from .upload_models import UploadReservation
 from .upload_ingress import ingress_snapshot
 from .billing_models import BillingEvent, BillingOrder
 from .admin_monitor import duration_sql
 
 router = APIRouter(prefix='/v1/admin/operations', dependencies=[Depends(admin)])
-
-
-def page(db, query, offset, limit):
-    total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
-    return {'items': [dict(row._mapping) for row in db.execute(query.offset(offset).limit(limit))],
-            'total': total, 'next_offset': offset + limit if offset + limit < total else None,
-            'generated_at': now()}
 
 
 def columns(model, names):
@@ -77,73 +69,6 @@ def user_diagnostics(owner_id: str, db: Session = Depends(get_db)):
             'scope', 'recorded_tokens', 'refilled_at', 'active_leases')} for control in controls],
         'feedback': {name: feedback[name] for name in (
             'recorded_tokens', 'refilled_at', 'day_started_at', 'daily_receipts')}}
-
-
-@router.get('/uploads')
-def uploads(owner_id: str | None = Query(None, max_length=36), job_id: str | None = Query(None, max_length=36),
-        status: str | None = Query(None, max_length=24), offset: int = Query(0, ge=0),
-        limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(UploadReservation, 'id job_id owner_id mode expected_sha256 expected_size mime status asset_id created_at expires_at max_expires_at completed_at error_code error_message'))
-    for col, value in ((UploadReservation.owner_id, owner_id), (UploadReservation.job_id, job_id), (UploadReservation.status, status)):
-        if value:
-            query = query.where(col == value)
-    result = page(db, query.order_by(UploadReservation.created_at.desc(), UploadReservation.id), offset, limit)
-    _, deadlines = ingress_snapshot([row['id'] for row in result['items']])
-    for row in result['items']:
-        row['ingress_expires_at'] = deadlines[row['id']]
-    return result
-
-
-@router.get('/requests')
-def requests(owner_id: str | None = Query(None, max_length=36), request_id: str | None = Query(None, max_length=36),
-        job_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
-        limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    query = select(*columns(TranslationRequest, 'owner_id id job_id created_at revoked_at'))
-    for col, value in ((TranslationRequest.owner_id, owner_id), (TranslationRequest.id, request_id),
-                       (TranslationRequest.job_id, job_id)):
-        if value:
-            query = query.where(col == value)
-    return page(db, query.order_by(TranslationRequest.created_at.desc(), TranslationRequest.owner_id,
-        TranslationRequest.id), offset, limit)
-
-
-@router.get('/assets')
-def assets(owner_id: str | None = Query(None, max_length=36), q: str | None = Query(None, max_length=64),
-        job_id: str | None = Query(None, max_length=36), offset: int = Query(0, ge=0),
-        limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    valid = and_(Asset.deleted_at.is_(None), Asset.purged_at.is_(None),
-        or_(Asset.expires_at.is_(None), Asset.expires_at > now(), Asset.active_references > 0))
-    job_count = select(func.count()).select_from(Job).where(or_(Job.input_asset_id == Asset.id,
-        Job.output_asset_id == Asset.id)).correlate(Asset).scalar_subquery()
-    query = select(*columns(Asset, 'id owner_id sha256 kind parent_id mime width height byte_size active_references created_at expires_at deleted_at purged_at'),
-        valid.label('available'), job_count.label('job_count'))
-    if owner_id:
-        query = query.where(Asset.owner_id == owner_id)
-    if q:
-        query = query.where(or_(Asset.id == q, Asset.sha256 == q))
-    if job_id:
-        query = query.where(Asset.id.in_(select(Job.input_asset_id).where(Job.id == job_id).union(
-            select(Job.output_asset_id).where(Job.id == job_id))))
-    return page(db, query.order_by(Asset.created_at.desc(), Asset.id), offset, limit)
-
-
-@router.get('/results')
-def results(owner_id: str | None = Query(None, max_length=36), q: str | None = Query(None, max_length=64),
-        mode: str | None = Query(None, max_length=20), offset: int = Query(0, ge=0),
-        limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    request_count = select(func.count()).select_from(TranslationRequest).where(
-        TranslationRequest.job_id == Job.id, TranslationRequest.owner_id == Job.owner_id,
-        TranslationRequest.revoked_at.is_(None)).correlate(Job).scalar_subquery()
-    query = select(*columns(Job, 'id owner_id source_sha256 mode target_language version status input_asset_id output_asset_id'),
-        Job.completed_at.label('generated_at'), request_count.label('request_count')).where(
-            Job.workflow_kind == 'image', Job.status.in_(['succeeded', 'no_text']))
-    if q:
-        query = query.where(or_(Job.id == q, Job.source_sha256 == q))
-    if owner_id:
-        query = query.where(Job.owner_id == owner_id)
-    if mode:
-        query = query.where(Job.mode == mode)
-    return page(db, query.order_by(Job.completed_at.desc(), Job.id), offset, limit)
 
 
 @router.get('/statistics')

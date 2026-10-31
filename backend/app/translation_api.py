@@ -1,6 +1,5 @@
 """Per-image translation resources, immutable intents and resumable snapshots."""
 import asyncio
-from datetime import timedelta
 from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
@@ -20,7 +19,7 @@ from .models import Asset, Attempt, ClassicState, Job, TextCall, User, now
 from .queue_models import ExecutionLease
 from .providers import digest
 from .request_models import RequestBody
-from .scheduler import ACTIVE, lock_scheduler, touch_job
+from .scheduler import lock_scheduler, touch_job
 from .schemas import TranslationHistoryResponse, TranslationResponse, TranslationsResponse
 from .translation_limits import acquire_control, release_control
 from .translation_fonts import RequestedFont, resolve_font
@@ -186,7 +185,7 @@ def translation_json(db, row, *, context=None):
         'updated_at': iso(row.revoked_at or (entry.changed_at if entry else row.created_at))}
 
 
-def accept_translation(db, user, request_id, body):
+def accept_translation(db, user, request_id, body, *, submitted_ip=None):
     content = body.model_dump(mode='json')
     if body.model_id is not None:
         content['model_id'] = body.model_id
@@ -245,7 +244,7 @@ def accept_translation(db, user, request_id, body):
     asset = None  # Inputs are private to each actual job, never claimed by hash.
     entry = create_job(db, user, asset, mode, language, request_id, operation='translation',
         force=previous_id is not None, source_sha256=image.sha256, request_hash_override=signature,
-        result_format=result_format, model_id=model_id, font_id=font_id)
+        result_format=result_format, model_id=model_id, font_id=font_id, submitted_ip=submitted_ip)
     row = db.get(TranslationRequest, (user.id, request_id))
     row.descriptor = {**(row.descriptor or {}), 'image': image.model_dump(), 'mode': mode, 'target_language': language,
         'retry_of': str(body.retry_of) if body.retry_of else None,
@@ -275,7 +274,8 @@ def translate(translation_id: UUID, body: TranslationInput, request: Request, us
     token = acquire_control(owner_id)
     try:
         lock_scheduler(db)
-        row = accept_translation(db, db.get(User, owner_id), str(translation_id), body)
+        from .client_address import client_ip
+        row = accept_translation(db, db.get(User, owner_id), str(translation_id), body, submitted_ip=client_ip(request))
         # Persist admission before building the client snapshot.
         db.commit()
         result = translation_json(db, row)

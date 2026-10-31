@@ -15,13 +15,14 @@ export function saveToken(value: string) {
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {super(message);}
 }
-async function fetchResponse(path: string, options: RequestInit = {}): Promise<Response> {
+export async function fetchResponse(path: string, options: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {cache: 'no-store', ...options,
     headers: {...(token ? {Authorization: `Bearer ${token}`} : {}), ...options.headers}});
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new ApiError(body.error?.message || `请求失败 (${response.status})`, response.status, body.error?.code);
   }
+  if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method) && path.startsWith('/v1/admin/') && !path.endsWith('/test')) window.dispatchEvent(new Event('admin-mutation'));
   return response;
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

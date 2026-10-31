@@ -268,6 +268,7 @@ class BillingOrder(Base):
         Index('uq_billing_initial_order', 'checkout_id', unique=True,
             sqlite_where=text("kind = 'initial'"), postgresql_where=text("kind = 'initial'")),
         Index('ix_billing_orders_created', 'created_at', 'id'),
+        Index('ix_billing_orders_paid', 'paid_at'),
         Index('ix_billing_orders_filter', 'provider', 'status', 'created_at'))
 
 

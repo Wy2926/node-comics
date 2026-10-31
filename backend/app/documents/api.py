@@ -209,7 +209,7 @@ def _ensure_upload(db, job, document):
 
 
 @router.put('/{request_id}', status_code=202)
-def create_document(request_id: UUID, body: DocumentInput, user: User = Depends(guarded_user), db: Session = Depends(get_db)):
+def create_document(request_id: UUID, body: DocumentInput, request: Request, user: User = Depends(guarded_user), db: Session = Depends(get_db)):
     cfg = _enabled()
     request_hash = digest(body.model_dump())
     lock_scheduler(db)
@@ -223,7 +223,8 @@ def create_document(request_id: UUID, body: DocumentInput, user: User = Depends(
     else:
         config, policy = _model(db, user, body)
         at = now()
-        job = Job(id=uid(), owner_id=user.id, mode='classic', workflow_kind='document',
+        from ..client_address import client_ip
+        job = Job(id=uid(), owner_id=user.id, submitted_ip=client_ip(request), mode='classic', workflow_kind='document',
             target_language=body.target_language, operation=OPERATION, idempotency_key=str(request_id),
             source_sha256=body.sha256, request_hash=request_hash, cache_key=digest([user.id, request_hash]),
             config=config, quota_pages=0, quota_kind='document_pages', settlement='unreserved',

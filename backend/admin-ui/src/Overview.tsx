@@ -1,51 +1,40 @@
 import type {Overview as OverviewData} from './types';
-import {Badge, duration, Empty, href, Jump, label, number, Stat, Table} from './ui';
+import {duration, Empty, href, Jump, label, number, Stat, Table, time} from './ui';
+import {billingStatus, environmentName, money} from './billing';
+import {EntityLink} from './EntityLink';
+import {inboxLabels, inboxViews} from './Inbox';
 
 export function Overview({data}: {data: OverviewData}) {
-  const queues = data.queues;
-  const count = (status: string) => queues.filter(q => q.status === status).reduce((s, q) => s + q.count, 0);
-  const active = queues.reduce((s, q) => s + q.count, 0);
-  const success = data.completed_24h.filter(s => ['succeeded', 'no_text'].includes(s.status)).reduce((sum, s) => sum + s.count, 0);
-  const failed = data.completed_24h.filter(s => s.status === 'failed').reduce((sum, s) => sum + s.count, 0);
-  const oldest = Math.max(0, ...queues.filter(q => q.status === 'queued').map(q => q.oldest_seconds));
-  const inactiveNodes = data.nodes.total - data.nodes.online_enabled;
-  return <>
-    <div className="stats-grid">
-      <Stat title="当前在途" value={number(active)} note="含上传、排队、执行与待核实" tint/>
-      <Stat title="排队等待" value={number(count('queued'))} note={`最早提交已等待 ${duration(oldest)}`}/>
-      <Stat title="正在执行" value={number(data.leases.running)} note="个有效阶段租约"/>
-      <Stat title="近 24 小时完成" value={number(success)} note={`${number(failed)} 个任务失败 · 含无文字结果`}/>
+  const active = data.queues.reduce((sum, row) => sum + row.count, 0);
+  const success = data.completed_24h.filter(row => ['succeeded', 'no_text'].includes(row.status)).reduce((sum, row) => sum + row.count, 0);
+  const failed = data.completed_24h.filter(row => row.status === 'failed').reduce((sum, row) => sum + row.count, 0);
+  const revenue = data.commerce.revenue_24h.map(row => money(row.amount, row.currency)).join(' / ');
+  return <div className="overview-workspace">
+    <div className="stats-grid business-stats">
+      <a href={href('orders', {environment: 'live'})}><Stat title="近 24 小时实收原金额" value={revenue || '暂无收款'} note="正式订单 · 分币种 · 退款前金额"/></a>
+      <a href={href('orders')}><Stat title="近 24 小时订单" value={number(data.commerce.orders_24h)} note={`${data.commerce.attention_orders} 笔异常或待核定 · 含测试订单`}/></a>
+      <a href={href('feedback')}><Stat title="待处理反馈" value={number(data.inbox.total)} note="翻译、插件、卸载与网站适配" tint/></a>
+      <a href={href('users')}><Stat title="注册用户" value={number(data.users.total)} note={`${number(data.users.submitted_24h)} 位近 24 小时提交过任务`}/></a>
     </div>
-    {!!(count('outcome_unknown') || data.leases.expired || inactiveNodes) && <div className="attention"><b>需要关注</b>
-      {!!count('outcome_unknown') && <Jump view="tasks" params={{status: 'outcome_unknown'}}>{count('outcome_unknown')} 个任务结果待核实</Jump>}
-      {!!data.leases.expired && <Jump view="nodes">{data.leases.expired} 个租约过期待回收</Jump>}
-      {!!inactiveNodes && <Jump view="nodes">{inactiveNodes} 个节点或资源池离线 / 停用</Jump>}
-    </div>}
-    <div className="section-heading"><div><h2>翻译队列</h2><p>按任务类型查看积压；单图一页一任务，整本文件按一个任务统计。</p></div><Jump view="tasks" params={{status: 'active'}}>查看全部在途 ↗</Jump></div>
-    <div className="queue-grid">{(['image', 'document'] as const).map(kind => {
-      const rows = queues.filter(q => (q.workflow_kind || 'image') === kind);
-      const total = rows.reduce((s, r) => s + r.count, 0);
-      const sum = (test: (row: typeof rows[number]) => boolean) => rows.filter(test).reduce((s, r) => s + r.count, 0);
-      return <section className="panel queue-panel" key={kind}>
-        <div className="panel-heading"><div className="mode-title"><span className="mode-icon classic">文</span>
-          <div><h3>{label(kind)}</h3><span className="muted">{kind === 'image' ? 'OCR → 翻译 / 修复 → 嵌字' : 'R2 → OCR 汇总 → 一次翻译 → ZIP'}</span></div></div><b>{number(total)} <small>个任务在途</small></b></div>
-        <div className="queue-counts">{(kind === 'image' ? ['awaiting_upload', 'validating_upload', 'queued', 'running', 'outcome_unknown'] : ['uploading', 'preflight', 'awaiting_quota', 'queued', 'running', 'outcome_unknown']).map(status =>
-          <a href={href('tasks', {workflow_kind: kind, status})} key={status}><span>{label(status)}</span><strong>{number(sum(r => r.status === status))}</strong></a>)}</div>
-      </section>;
-    })}</div>
-    <div className="bottom-grid"><section className="panel"><div className="panel-heading"><div><h2>阶段积压</h2><p className="muted">待执行包含暂不可调度阶段；阶段数可多于页数。</p></div></div>
-      <Table heads={['阶段', '待执行', '执行中', '等待依赖']}>{['validate_upload', 'page', 'analyze', 'text', 'inpaint', 'render', 'doc_prepare', 'doc_ocr', 'doc_text', 'doc_render', 'doc_zip'].map(name => <tr key={name}><td>{label(name)}</td>
-        {['ready', 'running', 'waiting'].map(status => <td key={status} className="numeric">{number(data.stages.filter(s => s.name === name && s.status === status).reduce((n, s) => n + s.count, 0))}</td>)}</tr>)}</Table>
-    </section><section className="panel account-overview"><h2>用户与资源</h2>
-      <div className="mini-stat"><span>注册用户</span><strong>{number(data.users.total)}</strong></div>
-      <div className="mini-stat"><span>有效 PLUS</span><Jump view="users" params={{plan: 'plus'}}>{number(data.users.plus)}</Jump></div>
-      <div className="mini-stat"><span>24 小时内提交用户</span><b>{number(data.users.submitted_24h)}</b></div>
-      <div className="mini-stat"><span>24 小时内提交任务数</span><b>{number(data.submitted_24h)}</b></div>
-      <div className="mini-stat"><span>在线且启用的节点 / 资源池</span><Jump view="nodes">{data.nodes.online_enabled} / {data.nodes.total}</Jump></div>
-      <p className="panel-note">图像节点代表计算设备，控制资源池代表上传和文本的共享执行容量。</p>
-    </section></div>
-    <section className="panel completion-panel"><div className="panel-heading"><h2>近 24 小时交付表现</h2><span className="muted">总耗时包含等待与缓存命中任务。</span></div>
-      {data.completed_24h.length ? <Table heads={['类型', '结果', '任务数', '平均总耗时']}>{data.completed_24h.map(s => <tr key={`${s.mode}-${s.workflow_kind}-${s.status}`}><td>{label(s.workflow_kind || 'image')}</td><td><Badge value={s.status}/></td><td>{number(s.count)}</td><td>{duration(s.avg_elapsed_seconds)}</td></tr>)}</Table> : <Empty>近 24 小时暂无结束的任务</Empty>}
+    <div className="overview-columns">
+      <section className="panel overview-orders"><div className="panel-heading"><div><h2>最近订单</h2><p className="muted">从用户和购买内容开始核对</p></div><Jump view="orders">全部订单 →</Jump></div>
+        {data.commerce.recent_orders.length ? <Table heads={['用户 / 产品', '金额', '状态', '时间']}>{data.commerce.recent_orders.map(order => <tr key={order.id}>
+          <td><EntityLink kind="users" id={order.owner_id}>{order.owner_name}</EntityLink><small><a className="text-link" href={href('orders', {detail: order.id})}>{order.product_name}</a></small></td>
+          <td className="numeric">{money(order.total, order.currency)}<small>{environmentName(order.environment)}</small></td><td><span className={`badge ${order.status === 'paid' ? 'good' : ['failed','unknown','disputed'].includes(order.status) ? 'warn' : ''}`}>{billingStatus(order.status)}</span></td><td>{time(order.created_at)}</td>
+        </tr>)}</Table> : <Empty>暂无订单</Empty>}
+      </section>
+      <section className="panel overview-inbox"><div className="panel-heading"><div><h2>反馈待办</h2><p className="muted">新反馈会在右上角即时提醒</p></div><Jump view="feedback">进入收件箱 →</Jump></div>
+        <div className="inbox-categories">{Object.entries(inboxLabels).map(([kind, title]) => <a key={kind} href={href(inboxViews[kind])}><span>{title}</span><b>{data.inbox.counts[kind] || 0}</b></a>)}</div>
+        {data.recent_feedback.length ? <div className="feedback-preview">{data.recent_feedback.map(row => <a key={row.id} href={href(inboxViews[row.kind], {detail: row.id})}>
+          <div><b>{row.name}</b><span className="badge">{inboxLabels[row.kind]}</span></div><p>{row.comment || '申请适配网站'}</p><small>{time(row.created_at)} · {row.status === 'received' ? '待处理' : '处理中'}</small>
+        </a>)}</div> : <Empty>反馈已处理完毕</Empty>}
+      </section>
+    </div>
+    <section className="panel running-summary"><div className="panel-heading"><div><h2>翻译服务</h2><p className="muted">当前在途 {number(active)} · 近 24 小时完成 {number(success)}</p></div><Jump view="tasks">查看任务 →</Jump></div>
+      <div className="service-metrics"><Jump view="nodes">在线资源 <b>{data.nodes.online_enabled} / {data.nodes.total}</b></Jump><Jump view="tasks" params={{status: 'attention'}}>失败任务 <b>{failed}</b></Jump><Jump view="nodes">过期租约 <b>{data.leases.expired || 0}</b></Jump></div>
+      <div className="queue-statuses">{data.queues.length ? data.queues.map(row => <a key={`${row.workflow_kind}:${row.status}`} href={href('tasks', {status: row.status, workflow_kind: row.workflow_kind})}>
+        <span>{label(row.workflow_kind)} · {label(row.status)}</span><strong>{row.count}</strong>{row.status === 'queued' && <small>最早已等待 {duration(row.oldest_seconds)}</small>}
+      </a>) : <p className="muted">当前没有在途任务。</p>}</div>
     </section>
-  </>;
+  </div>;
 }

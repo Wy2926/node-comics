@@ -95,7 +95,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_settings_layout.mjs` | Vite 5181 或 `TEST_READER_URL`；设置分组、16 语／字号／窄屏、主题说明、模型菜单与保存失败恢复、自动翻译网站空状态与浏览器预览保存失败；隔离浏览器和模拟 API |
 | `verify_extension_mobile.mjs` | Vite 5181 或回环 `TEST_READER_URL`；Chromium／Firefox／WebKit 的 320–430px 与横屏、导航、弹框、CBZ 实际导入、阅读工具及位置恢复，含模拟软键盘视口、Popup 和无 OffscreenCanvas 的 20000px 长图。`--reader-only` 聚焦默认沉浸、上下工具无占位、轻点显隐／原生触摸滚动、位置保持和桌面悬停／焦点／窄窗口隔离。`MOBILE_BROWSER` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，外部 HTTP 全部模拟，截图写入 `artifacts/mobile-validation/`（可用 `MOBILE_ARTIFACTS` 指定）；不是 Firefox Android／Orion 真机验收 |
 | `node --test apps/extension/tests/epub-reader.browser.mjs` | 独立 Vite 5198 的 EPUB 夹具；Chromium／Firefox／WebKit 触屏竖横屏正文、目录、章节跳转、加载中退出、单图失败重试、增强状态与预取失败恢复，以及同 CFI 段内小幅滚动、连续重开的像素级位置保持、字号／屏宽变化后的文字锚点恢复、本书布局独立保存与恢复全局默认。`EPUB_ENGINES` 可选引擎子集，沿用 `PLAYWRIGHT_MODULE`，禁止外网；模拟浏览器通过不等同真机通过 |
-| `verify_membership_admin.mjs` / `verify_admin_completion.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
+| `verify_admin_completion.mjs` / `verify_quota_campaign_admin.mjs` | 会员、赠送与管理操作，见[后台验收](../docs/ADMIN_CONSOLE.md#验证) |
 | `verify_quota_campaign_admin.mjs` | 同一独立重建的管理夹具，额度活动创建与期限调整、启停、审计、回执恢复、并发冲突、发放记录与窄屏布局 |
 | `verify_account_entitlements.mjs` | 先在插件目录运行 `npx vite --host 127.0.0.1 --port 5186 --strictPort`；账户余额／到期、官网定价跳转、额度包按需分页、错误重试、账户隔离、主题与窄屏；同时检查本版更新说明只在进入书架后自动提示一次、手动重开、焦点恢复和 16 语大字号布局，`--release-only` 仅检查更新面板。使用合成权益数据，不创建支付，沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，截图写入 artifacts/account-entitlements |
 | `verify_extension_upgrade.mjs` | 构建 Chrome MV3 后在仓库根运行；复制产物到独立 Chromium profile，以旧版本号夹具触发真实升级事件，检查首次安装仅开一个书架标签、升级不新建标签且不改变当前页面和激活状态。使用 PLAYWRIGHT_MODULE／TEST_CHROMIUM，产物写入 artifacts/extension-upgrade，外网禁用；不代表商店自动更新或旧发布包兼容性验收 |

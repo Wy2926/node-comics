@@ -116,7 +116,7 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
                     atomic_write(pooled, content)
         common = headers(release)
         if kind == 'admin':
-            csp = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            csp = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
                    f"connect-src 'self' {oidc_origin}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
             configs.append(block(admin_path.rstrip('/'), f'    return 307 {admin_path}$is_args$args;\n' + headers(release, private=True)))
             configs.append(block(admin_path, f'    root {public};\n    try_files /index.html =404;\n' + headers(release, private=True, csp=csp)))

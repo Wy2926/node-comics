@@ -22,7 +22,7 @@ from .documents.admin import router as document_admin_router
 from .documents.storage import DocumentStoreError
 from .auth import bearer, identity, token_for, user_json
 from .config import settings
-from .db import get_db, session_factory
+from .db import get_db
 from .runtime import check_runtime
 from .errors import problem
 from .entitlements import entitlements_json
@@ -42,6 +42,7 @@ from .system_settings import router as system_settings_router
 from .translation_providers import router as translation_providers_router
 from .reader_api import router as reader_router
 from .support_requests import router as support_requests_router
+from .admin_workspace import router as admin_workspace_router
 from .quota_grants import router as grants_router
 from .quota_campaigns import router as campaigns_router
 from .billing_api import router as billing_router
@@ -74,6 +75,7 @@ app.include_router(document_compute_router)
 app.include_router(document_admin_router)
 app.include_router(reader_router)
 app.include_router(support_requests_router)
+app.include_router(admin_workspace_router)
 app.include_router(grants_router)
 app.include_router(campaigns_router)
 app.include_router(billing_router)

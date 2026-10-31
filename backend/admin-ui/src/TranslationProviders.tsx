@@ -1,3 +1,5 @@
+import {Button} from './ui';
+import {ProviderTest} from './ProviderTest';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {authError, errorText, request, sendRequest} from './api';
 import {TranslationProviderDialog} from './TranslationProviderDialog';
@@ -12,6 +14,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
+  const [testing, setTesting] = useState<TranslationProvider>();
   const [editing, setEditing] = useState<TranslationProvider | 'new'>();
   const [pending, setPending] = useState<string>();
   const loadController = useRef<AbortController | undefined>(undefined);
@@ -68,23 +71,23 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
   }
 
   return <main id="main" tabIndex={-1} className="translation-providers">
-    <div className="page-heading"><div><p className="eyebrow">TRANSLATION PROVIDERS</p><h1>翻译供应商</h1>
+    <div className="page-heading"><div><h1>翻译供应商</h1>
       <p className="muted">正文按用户套餐选择 LLM 模型池；正文与漫画名分别设置分流权重。</p></div>
-      <div className="provider-actions"><button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新列表'}</button>
-        <button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => {setNotice(''); setEditing('new');}}>＋ 新建供应商</button></div></div>
+      <div className="provider-actions"><Button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>{loading ? '正在刷新…' : '↻ 刷新列表'}</Button>
+        <Button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => {setNotice(''); setEditing('new');}}>＋ 新建供应商</Button></div></div>
     <div className="sync-line"><span role="status">{pending ? '正在更新供应商…' : loading ? '正在读取供应商…' : loadError || actionError ? '请刷新列表核实最新状态' : `已更新 ${time(loadedAt)}`}</span>
       <span>时间按浏览器本地时区显示</span></div>
-    <section className="panel provider-guide" aria-label="供应商生效规则">
+    <details className="provider-guide"><summary>分流与配置生效规则</summary>
       <p><strong>按比例分流 · 两种用途独立配置</strong></p>
       <p>启用且对应用途权重大于 0 的供应商参与分流。权重 3:1 表示大量不同输入约按 75%:25% 分配；相同内容与目标语言稳定选择供应商，便于复用结果。</p>
       <p>正文先按有效套餐筛选供应商，再计算权重。全部套餐表示不限制；指定套餐无可用供应商时不借用其他模型池。套餐变化和路由调整只影响新任务，已有任务保留模型快照。</p>
       <p>权重为 0 时停止分配新请求，已有正文任务继续原供应商；停用则暂停其已有任务。分流比例不代表 HTTP 并发配额，正文仍受供应商 RPM 与共享文本执行位限制。</p>
       <p>修改模型参数或密钥会产生新版本，已提交的正文任务保持原版本。漫画名只在缓存未命中时分流，调整配置不清除已有缓存。</p>
-    </section>
+    </details>
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {loadError && <div className="error" role="alert">{loadError} {data ? '当前列表可能已过时，操作暂不可用。' : '暂时无法读取供应商。'}
-      <button type="button" className="text-link" disabled={busy} onClick={() => void reload(false)}>重新读取列表</button></div>}
-    {actionError && <div className="error" role="alert">{actionError}<button type="button" className="text-link" disabled={busy} onClick={() => void reload()}>刷新列表</button></div>}
+      <Button type="button" className="text-link" disabled={busy} onClick={() => void reload(false)}>重新读取列表</Button></div>}
+    {actionError && <div className="error" role="alert">{actionError}<Button type="button" className="text-link" disabled={busy} onClick={() => void reload()}>刷新列表</Button></div>}
     {data && !loadError && !loading && !canCreate && <p className="provider-warning" role="status">当前没有可配置的 OpenAI 渠道或支持的协议。请检查服务端渠道配置后刷新列表。</p>}
     {data && !loadError && !loading && unservedPlans.length > 0 && <p className="provider-warning" role="status">
       以下套餐暂无可用正文供应商：{unservedPlans.map(plan => plan.name).join('、')}。请配置适用套餐、启用供应商并将正文权重设为大于 0。</p>}
@@ -94,8 +97,8 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
       {!data ? <div className="loading" role="status">{loading ? '正在读取翻译供应商…' : '暂时无法读取列表，请刷新重试。'}</div> :
         !data.items.length ? <div className="empty"><span aria-hidden="true">⇄</span><h3>尚未创建翻译供应商</h3>
           <p>添加供应商并填写模型、密钥，以及正文与漫画名的分流权重。</p>
-          <button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => setEditing('new')}>新建翻译供应商</button></div> :
-          <Table heads={['供应商 / 渠道', '模型 / 接口', '状态 / 密钥', '版本 / 最近更新', '操作']}>
+          <Button type="button" className="primary" disabled={blocked || !canCreate} onClick={() => setEditing('new')}>新建翻译供应商</Button></div> :
+          <Table heads={['供应商 / 渠道', '模型 / 接口', '状态 / 密钥', '最近更新', '操作']}>
             {data.items.map(provider => {
               return <tr key={provider.id}>
                 <td><div className="provider-name"><b>{provider.name}</b></div>
@@ -103,7 +106,7 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
                     `${label}权重 ${provider[key]}${key === 'title_weight' ? ` · 约 ${(provider[key] / totalWeight(key) * 100).toFixed(1)}%` : ' · 按套餐内权重分配'}` : `${label}不分流 · 权重 ${provider[key]}`}</small>)}
                   <small>正文套餐：{provider.text_plan_ids === null ? '全部套餐' : provider.text_plan_ids.map(id => data.plans.find(plan => plan.id === id)?.name ?? id).join('、')}</small>
                   <small>{data.channels.find(channel => channel.id === provider.channel)?.label ?? provider.channel}</small>
-                  <small>ID <code>{provider.id}</code></small></td>
+                  </td>
                 <td><b>{provider.config.model}</b><small>{protocolLabels[provider.config.protocol] ?? provider.config.protocol}</small>
                   <small>思考：{reasoningLabels[provider.config.reasoning_effort ?? 'provider_default']}</small>
                   {!!provider.config.openrouter_providers?.length && <small>上游顺序：{provider.config.openrouter_providers.join(' → ')}</small>}
@@ -112,17 +115,18 @@ export function TranslationProvidersPage({onUnauthorized}: {onUnauthorized: (mes
                   <small>{provider.credential_configured ? '密钥已配置' : '密钥未配置'}</small>
                   <small>上游上限 {provider.requests_per_minute} 次 / 分钟</small>
                   {!provider.enabled && <small>排队文本阶段暂停</small>}</td>
-                <td><code>{provider.revision_id}</code><small>{time(provider.updated_at)}</small></td>
-                <td><div className="provider-row-actions">
-                  <button type="button" className="text-link" disabled={blocked || provider.channel !== 'openai'} aria-label={`编辑 ${provider.name}`} onClick={() => {setNotice(''); setEditing(provider);}}>编辑</button>
-                  <button type="button" className="text-link" disabled={blocked} aria-label={`${provider.enabled ? '停用' : '启用'} ${provider.name}`} onClick={() => void toggle(provider)}>
-                    {pending === provider.id ? '正在更新…' : provider.enabled ? '停用' : '启用'}</button>
+                <td>{time(provider.updated_at)}</td>
+                <td><div className="provider-row-actions"><Button type="button" className="text-link" disabled={blocked} onClick={() => setTesting(provider)}>测试连接</Button>
+                  <Button type="button" className="text-link" disabled={blocked || provider.channel !== 'openai'} aria-label={`编辑 ${provider.name}`} onClick={() => {setNotice(''); setEditing(provider);}}>编辑</Button>
+                  <Button type="button" className="text-link" disabled={blocked} aria-label={`${provider.enabled ? '停用' : '启用'} ${provider.name}`} onClick={() => void toggle(provider)}>
+                    {pending === provider.id ? '正在更新…' : provider.enabled ? '停用' : '启用'}</Button>
                 </div>{!provider.enabled && <small>启用后按权重参与分流</small>}{provider.channel !== 'openai' && <small>此渠道暂未支持编辑</small>}</td>
               </tr>;
             })}
           </Table>}
     </section>
     {data && <p className="footnote provider-footnote">共 {data.items.length} 个供应商 · {data.items.filter(provider => provider.enabled).length} 个已启用。密钥仅显示配置状态。</p>}
+    {testing && <ProviderTest provider={testing} onClose={() => setTesting(undefined)} onUnauthorized={onUnauthorized}/>}
     {editing && data && <TranslationProviderDialog provider={editing === 'new' ? undefined : editing} channels={data.channels} plans={data.plans} onUnauthorized={onUnauthorized}
       onClose={() => setEditing(undefined)} onRefresh={() => {setEditing(undefined); void reload(); requestAnimationFrame(() => document.getElementById('main')?.focus());}}
       onSaved={() => {setNotice(editing === 'new' ? '供应商已创建，按启用状态与两种用途的权重参与分流。' : '供应商已保存，分流权重仅影响后续分配，已提交的正文任务仍保持原版本。'); setEditing(undefined); void reload(false); requestAnimationFrame(() => document.getElementById('main')?.focus());}}/>}

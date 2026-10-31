@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     dev_auth_secret: str = ""
     dev_admin_username: str = "admin"
     admin_web_path: str = ""
+    geoip_database: str = "/geoip/city.mmdb"
     oidc_issuer: str = ""
     oidc_audience: str = ""
     oidc_jwks_url: str = ""

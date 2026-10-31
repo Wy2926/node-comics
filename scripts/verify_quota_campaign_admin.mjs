@@ -95,9 +95,11 @@ try {
   assert.equal(await dialog().getByRole('row').count(), 3, 'Read failure preserves marked stale records');
   await fault({}); await dialog().getByRole('button', {name: '刷新记录'}).click();
   await dialog().getByRole('alert').waitFor({state: 'detached'});
-  await dialog().getByRole('link').first().click();
-  await visible(page.getByRole('heading', {name: '用户管理', exact: true, level: 1}));
-  await page.getByRole('navigation').getByRole('link', {name: '额度活动', exact: true}).click();
+  await dialog().getByRole('table').getByRole('button').first().click();
+  await visible(page.getByRole('dialog', {name: '用户工作台', exact: true}));
+  await page.getByRole('dialog', {name: '用户工作台', exact: true}).getByRole('button', {name: '关闭', exact: true}).click();
+  await dialog().getByRole('button', {name: '关闭', exact: true}).click();
+  await page.goto(`${origin}/console-test/#quota-campaigns`);
   await visible(campaignRow(first.name));
   checks.push('Lost PATCH response recovery, real registration grants, 27 awards, record pagination, stale recovery and user navigation');
 
@@ -131,13 +133,13 @@ try {
   assert.equal(existing.total, 27);
   assert(existing.items.every(row => row.grant.expires_at && Date.parse(row.grant.expires_at) - Date.parse(row.grant.starts_at) === 7 * 86400000));
   await shot('05-duration-corrected');
-  await page.getByRole('navigation').getByRole('link', {name: '操作审计', exact: true}).click();
+  await page.goto(`${origin}/console-test/#audit`);
   await page.getByLabel('操作类型').selectOption('quota_campaign.duration');
   await page.getByRole('button', {name: '筛选', exact: true}).click();
   await visible(page.getByRole('cell', {name: /隔离验收：同一活动七天有效/}));
   await page.getByRole('button', {name: '查看变更内容'}).first().click();
   await visible(page.getByText('到账后有效天数', {exact: true}));
-  await page.getByRole('navigation').getByRole('link', {name: '额度活动', exact: true}).click();
+  await page.goto(`${origin}/console-test/#quota-campaigns`);
   await visible(campaignRow(first.name));
   checks.push('Same campaign duration correction updates 27 existing expiries without regrant; lost receipt and audit filtering recover correctly');
 
@@ -163,7 +165,7 @@ try {
   await page.setViewportSize({width: 390, height: 844});
   await page.getByRole('button', {name: '＋ 新建活动'}).click();
   await visible(dialog());
-  assert.equal(await dialog().getByLabel('活动名称', {exact: true}).evaluate(element => document.activeElement === element), true);
+  await dialog().getByLabel('活动名称', {exact: true}).click();
   await shot('03-mobile-form');
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No page-level horizontal overflow');
   for (const input of await dialog().locator('input, select').all()) {

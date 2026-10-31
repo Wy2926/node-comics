@@ -276,11 +276,11 @@ def list_awards(campaign_id: CampaignId, offset: int = Query(0, ge=0), limit: in
                 operator: User = Depends(admin), db: Session = Depends(get_db)):
     if db.get(QuotaCampaign, campaign_id) is None:
         problem('NOT_FOUND', '额度活动不存在', 404)
-    query = select(QuotaCampaignAward, QuotaPeriod).join(QuotaPeriod,
-        QuotaPeriod.id == QuotaCampaignAward.period_id).where(QuotaCampaignAward.campaign_id == campaign_id)
+    query = select(QuotaCampaignAward, QuotaPeriod, User.name).join(QuotaPeriod,
+        QuotaPeriod.id == QuotaCampaignAward.period_id).join(User, User.id == QuotaCampaignAward.owner_id).where(QuotaCampaignAward.campaign_id == campaign_id)
     rows = db.execute(query.order_by(QuotaCampaignAward.created_at, QuotaCampaignAward.owner_id)
                       .offset(offset).limit(limit))
-    return {'items': [{'owner_id': row.owner_id, 'created_at': iso(row.created_at),
-                       'grant': period_json(period)} for row, period in rows],
+    return {'items': [{'owner_id': row.owner_id, 'owner_name': name, 'created_at': iso(row.created_at),
+                       'grant': period_json(period)} for row, period, name in rows],
             'total': db.scalar(select(func.count()).select_from(QuotaCampaignAward)
                               .where(QuotaCampaignAward.campaign_id == campaign_id))}

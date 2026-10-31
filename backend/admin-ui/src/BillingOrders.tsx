@@ -1,3 +1,5 @@
+import {Button} from './ui';
+import {EntityLink} from './EntityLink';
 import {useEffect, useRef, useState} from 'react';
 import {authError, errorText, request} from './api';
 import {benefitsSummary, billingEndpoint, billingStatus, billingTime as time, environmentName, intervalName, money, orderKind, providerName, type BillingOrderDetail, type BillingOrderPage} from './billing';
@@ -18,13 +20,13 @@ function OrderDetail({id, onClose, onUnauthorized, onChanged}: {id: string; onCl
     finally {actionPending.current = false; setReconciling(false);}
   }
   return <BillingDialog title="订单详情" onClose={onClose} busy={reconciling}><div className="billing-order-detail" aria-busy={loading || reconciling}>
-    <div className="billing-detail-toolbar"><code>{id}</code><div className="provider-actions"><button className="secondary" disabled={loading || reconciling} onClick={() => void reload()}>{loading ? '正在刷新…' : '刷新详情'}</button><button className="secondary" disabled={!data || loading || reconciling || !!error} onClick={() => void reconcile()}>{reconciling ? '正在核实…' : '核实平台状态'}</button></div></div>
+    <div className="billing-detail-toolbar"><span className="muted">支付结果与流转记录</span><div className="provider-actions"><Button className="secondary" disabled={loading || reconciling} onClick={() => void reload()}>{loading ? '正在刷新…' : '刷新详情'}</Button><Button className="secondary" disabled={!data || loading || reconciling || !!error} onClick={() => void reconcile()}>{reconciling ? '正在核实…' : '核实平台状态'}</Button></div></div>
     {notice && <p className="settings-notice" role="status">{notice}</p>}{actionError && <p className="error" role="alert">{actionError} 请核对平台记录后重试。</p>}
     {error && <div className="error" role="alert">{error} 请刷新重试。{data && '当前详情可能已过时。'}</div>}
     {!data ? <p className="loading" role="status">{loading ? '正在读取订单…' : '暂时无法读取订单详情。'}</p> : <>
       <div className="detail-summary"><div><h3>{data.order.product_name || '购买订单'} · {intervalName(data.order.interval, data.order.billing_type)}</h3><p>{data.order.owner_name} · {providerName(data.order.provider)} · {environmentName(data.order.environment)}</p></div><BillingBadge status={data.order.status}/></div>
       <div className="billing-order-amount"><strong>{money(data.order.total, data.order.currency)}</strong><span>{orderKind(data.order.kind, data.order.interval, data.order.billing_type)}</span></div>
-      <dl className="detail-meta"><dt>创建时间</dt><dd>{time(data.order.created_at)}</dd><dt>最近更新</dt><dd>{time(data.order.updated_at)}</dd><dt>支付时间</dt><dd>{time(data.order.paid_at)}</dd><dt>税前金额</dt><dd>{money(data.order.subtotal, data.order.currency)}</dd><dt>用户</dt><dd><a className="text-link" href={href('users', {q: data.order.owner_id})}>{data.order.owner_name}</a><small className="billing-block"><code>{data.order.owner_id}</code></small></dd><dt>平台订单编号</dt><dd><code>{data.order.external_id || '—'}</code></dd><dt>本地价格编号</dt><dd><code>{data.order.price_id || '—'}</code></dd><dt>渠道关联编号</dt><dd><code>{data.order.binding_id || '—'}</code></dd></dl>
+      <dl className="detail-meta"><dt>创建时间</dt><dd>{time(data.order.created_at)}</dd><dt>最近更新</dt><dd>{time(data.order.updated_at)}</dd><dt>支付时间</dt><dd>{time(data.order.paid_at)}</dd><dt>税前金额</dt><dd>{money(data.order.subtotal, data.order.currency)}</dd><dt>用户</dt><dd><EntityLink kind="users" id={data.order.owner_id}>{data.order.owner_name}</EntityLink></dd></dl><details className="technical-details"><summary>平台关联与技术编号</summary><dl className="detail-meta"><dt>订单编号</dt><dd><code>{id}</code></dd><dt>平台订单编号</dt><dd><code>{data.order.external_id || '—'}</code></dd><dt>本地价格编号</dt><dd><code>{data.order.price_id || '—'}</code></dd><dt>渠道关联编号</dt><dd><code>{data.order.binding_id || '—'}</code></dd></dl></details>
       {data.order.error_code && <p className="error">订单异常：{data.order.error_code}</p>}
       <h3 className="detail-heading">退款与争议</h3>
       {data.refund_summary && <><dl className="detail-meta"><dt>平台退款累计</dt><dd>{money(data.refund_summary.reported_total, data.refund_summary.currency)}</dd><dt>已记录成功退款</dt><dd>{money(data.refund_summary.recorded_succeeded_total, data.refund_summary.currency)}</dd></dl>{!data.refund_summary.details_complete && (data.refunds?.length > 0 || ['refunded', 'partially_refunded'].includes(data.order.status) || (data.refund_summary.reported_total ?? 0) > 0) && <p className="muted">退款明细尚未与平台累计金额完整核对。未知金额以“—”显示；历史通知未提供的明细不会推算。</p>}</>}
@@ -48,35 +50,35 @@ function OrderDetail({id, onClose, onUnauthorized, onChanged}: {id: string; onCl
   </div></BillingDialog>;
 }
 
-export function BillingOrdersPage({params, onNavigate, onUnauthorized}: {params: URLSearchParams; onNavigate: (values: Record<string, string>) => void; onUnauthorized: (message: string) => void}) {
+export function BillingOrdersPage({params, onNavigate, onUnauthorized, embedded = false}: {embedded?: boolean; params: URLSearchParams; onNavigate: (values: Record<string, string>) => void; onUnauthorized: (message: string) => void}) {
   const query = new URLSearchParams();
   for (const key of ['provider', 'environment', 'status', 'owner_id', 'q', 'created_from', 'created_to', 'page']) if (params.get(key)) query.set(key, params.get(key)!);
   query.set('page_size', '30');
   const {data, loading, error, reload} = useBillingResource<BillingOrderPage>(`${billingEndpoint}/orders?${query}`, onUnauthorized);
-  const [detail, setDetail] = useState<string>();
+  const [detail, setDetail] = useState<string | undefined>(() => params.get("detail") || undefined);
   const [filterError, setFilterError] = useState('');
-  useEffect(() => {document.title = '订单管理 · Node Comics 管理后台';}, []);
+  useEffect(() => {if (!embedded) document.title = '订单管理 · Node Comics 管理后台';}, [embedded]);
   const navigate = (values: Record<string, string>) => {if (href('orders', values) === location.hash) void reload(); else onNavigate(values);};
   const localDate = (value: string | null) => {if (!value) return ''; const date = new Date(value); if (!Number.isFinite(date.getTime())) return ''; return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);};
-  return <main id="main" tabIndex={-1} className="billing-orders">
-    <div className="page-heading"><div><p className="eyebrow">PAYMENTS & ORDERS</p><h1>订单管理</h1><p className="muted">查看各支付渠道的全部订单、支付结果、订阅状态和流转记录。</p></div><button className="secondary" disabled={loading} onClick={() => void reload()}>{loading ? '正在刷新…' : '刷新订单'}</button></div>
+  return <section id={embedded ? undefined : "main"} tabIndex={-1} className="billing-orders">
+    <div className="page-heading">{!embedded && <div><h1>订单管理</h1><p className="muted">查看各支付渠道的全部订单、支付结果、订阅状态和流转记录。</p></div>}<Button className="secondary" disabled={loading} onClick={() => void reload()}>{loading ? '正在刷新…' : '刷新订单'}</Button></div>
     <section className="filters" aria-label="订单筛选"><form className="filter-form" key={params.toString()} onSubmit={event => {event.preventDefault(); setFilterError(''); const values: Record<string, string> = {}; for (const [key, value] of new FormData(event.currentTarget)) {const text = String(value).trim(); if (text) values[key] = ['created_from', 'created_to'].includes(key) ? new Date(text).toISOString() : text;} if (values.created_from && values.created_to && values.created_from > values.created_to) {setFilterError('结束时间不能早于开始时间。'); return;} if (params.has('owner_id')) values.owner_id = params.get('owner_id')!; navigate(values);}}>
       <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') ?? ''} placeholder="订单 / 平台编号 / 用户"/></label>
       <label>支付渠道<select name="provider" defaultValue={params.get('provider') ?? ''}><option value="">全部渠道</option><option value="stripe">Stripe</option><option value="creem">Creem</option></select></label>
       <label>订单状态<select name="status" defaultValue={params.get('status') ?? ''}><option value="">全部状态</option>{['creating', 'pending', 'processing', 'unknown', 'trialing', 'paid', 'failed', 'expired', 'canceled', 'refunded', 'partially_refunded', 'disputed'].map(status => <option key={status} value={status}>{billingStatus(status)}</option>)}</select></label>
       <label>支付环境<select name="environment" defaultValue={params.get('environment') ?? ''}><option value="">全部环境</option><option value="test">测试环境</option><option value="live">正式环境</option></select></label>
       <label>创建时间从<input name="created_from" type="datetime-local" defaultValue={localDate(params.get('created_from'))}/></label><label>创建时间至<input name="created_to" type="datetime-local" defaultValue={localDate(params.get('created_to'))}/></label>
-      <button className="primary">筛选</button><button className="secondary" type="button" onClick={() => navigate({})}>重置</button>
-    </form>{filterError && <p className="error" role="alert">{filterError}</p>}{params.has('owner_id') && <span className="scope-chip">用户：{params.get('owner_id')}</span>}</section>
+      <Button className="primary">筛选</Button><Button className="secondary" type="button" onClick={() => navigate({})}>重置</Button>
+    </form>{filterError && <p className="error" role="alert">{filterError}</p>}{params.has('owner_id') && <span className="scope-chip">已限定所选用户</span>}</section>
     {error && <div className="error" role="alert">{error} {data ? '当前订单列表可能已过时。' : '请刷新订单重试。'}</div>}
     <section className="panel list-panel" aria-label="订单列表" aria-busy={loading}>{!data ? <p className="loading" role="status">{loading ? '正在读取订单…' : '暂时无法读取订单。'}</p> : <>
       {!data.items.length ? <Empty>{query.has('q') || query.has('status') || query.has('provider') || query.has('created_from') || query.has('created_to') ? '没有符合筛选条件的订单' : '暂无订单'}</Empty> : <Table heads={['订单 / 用户', '产品 / 周期', '支付渠道', '金额', '状态', '创建 / 更新时间', '操作']}>{data.items.map(order => <tr key={order.id}>
-        <td><button className="text-link billing-order-link" onClick={() => setDetail(order.id)}>{order.id}</button><small>{order.owner_name}</small>{order.external_id && <small>平台 <code>{order.external_id}</code></small>}</td>
+        <td><EntityLink kind="users" id={order.owner_id}>{order.owner_name}</EntityLink><small><Button className="text-link" onClick={() => setDetail(order.id)}>查看订单详情</Button></small></td>
         <td><b>{order.product_name || '订单'}</b><small>{intervalName(order.interval, order.billing_type)} · {orderKind(order.kind, order.interval, order.billing_type)}</small></td><td>{providerName(order.provider)}<small>{environmentName(order.environment)}</small></td><td className="numeric">{money(order.total, order.currency)}</td>
-        <td><BillingBadge status={order.status}/>{order.error_code && <small className="billing-error-code">{order.error_code}</small>}</td><td>{time(order.created_at)}<small>{time(order.updated_at)}</small></td><td><button className="text-link" onClick={() => setDetail(order.id)} aria-label={`查看订单 ${order.id}`}>查看流转</button></td>
+        <td><BillingBadge status={order.status}/>{order.error_code && <small className="billing-error-code">{order.error_code}</small>}</td><td>{time(order.created_at)}<small>{time(order.updated_at)}</small></td><td><Button className="text-link" onClick={() => setDetail(order.id)} aria-label={`查看订单 ${order.id}`}>查看流转</Button></td>
       </tr>)}</Table>}
-      <div className="pagination"><span>共 {data.total.toLocaleString('zh-CN')} 笔订单{data.items.length > 0 && ` · 第 ${(data.page - 1) * data.page_size + 1}–${(data.page - 1) * data.page_size + data.items.length} 笔`}</span><div><button className="secondary" disabled={loading || data.page <= 1} onClick={() => navigate({...Object.fromEntries(params), page: String(data.page - 1)})}>上一页</button><button className="secondary" disabled={loading || data.page * data.page_size >= data.total} onClick={() => navigate({...Object.fromEntries(params), page: String(data.page + 1)})}>下一页</button></div></div>
+      <div className="pagination"><span>共 {data.total.toLocaleString('zh-CN')} 笔订单{data.items.length > 0 && ` · 第 ${(data.page - 1) * data.page_size + 1}–${(data.page - 1) * data.page_size + data.items.length} 笔`}</span><div><Button className="secondary" disabled={loading || data.page <= 1} onClick={() => navigate({...Object.fromEntries(params), page: String(data.page - 1)})}>上一页</Button><Button className="secondary" disabled={loading || data.page * data.page_size >= data.total} onClick={() => navigate({...Object.fromEntries(params), page: String(data.page + 1)})}>下一页</Button></div></div>
     </>}</section><p className="footnote billing-footnote">时间按浏览器本地时区显示。订单详情保留支付平台事件与处理状态，订阅续费分别记录为订单。</p>
     {detail && <OrderDetail key={detail} id={detail} onClose={() => setDetail(undefined)} onUnauthorized={onUnauthorized} onChanged={reload}/>}
-  </main>;
+  </section>;
 }

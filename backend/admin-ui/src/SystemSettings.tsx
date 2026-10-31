@@ -1,3 +1,4 @@
+import {Button} from './ui';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {ApiError, authError, errorText, request} from './api';
 import {time} from './ui';
@@ -76,9 +77,9 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
   }
 
   return <main id="main" tabIndex={-1} className="system-settings">
-    <div className="page-heading"><div><p className="eyebrow">SYSTEM SETTINGS</p><h1>系统设置</h1>
+    <div className="page-heading"><div><h1>系统设置</h1>
       <p className="muted">管理译图保留期限、漫画翻译提示词、默认额度及匿名体验、翻译、上传和反馈保护规则。</p></div>
-      <button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</button>
+      <Button className="secondary" disabled={busy} onClick={() => void reload()}>{operation === 'loading' ? '正在读取…' : '↻ 读取最新设置'}</Button>
     </div>
     <div className="sync-line"><span role="status">{operation === 'saving' ? '正在保存设置…' : operation === 'loading' ? '正在读取系统设置…' :
       snapshot ? `版本 ${snapshot.version} · ${dirty ? '有未保存的更改' : '与已保存设置一致'}` : '尚未读取设置'}</span>
@@ -86,7 +87,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
     {error && <div className="error" role="alert">{error}{draft && ' 你的输入已保留。'}</div>}
     {conflict && <div className="error settings-conflict" role="alert"><div><strong>设置已被其他管理员更新</strong>
       <p>你的输入已保留。请先读取最新设置，核对后再次保存。</p></div>
-      <button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>读取最新设置，保留我的修改</button></div>}
+      <Button type="button" className="secondary" disabled={busy} onClick={() => void reload()}>读取最新设置，保留我的修改</Button></div>}
     {notice && <p className="success settings-notice" role="status">{notice}</p>}
     {!snapshot || !draft ? <section className="panel settings-loading" aria-busy={busy}>
       <p role="status">{busy ? '正在读取系统设置…' : '暂时无法读取设置，请点击“读取最新设置”重试。'}</p>
@@ -107,12 +108,12 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
                 aria-describedby={`${field.key}-help ${field.key}-effect ${field.key}-count${fieldError ? ` ${field.key}-error` : ''}`}
                 onChange={event => {setDraft({...draft, [field.key]: event.target.value}); setNotice('');}}/>
               <div className="settings-prompt-actions"><span className="muted" id={`${field.key}-count`}>{promptLength(draft[field.key])} / {promptMaxLength} 字符</span>
-                <button type="button" className="secondary" disabled={normalizePrompt(draft[field.key]) === snapshot.prompt_defaults[field.key]} onClick={() => {
+                <Button type="button" className="secondary" disabled={normalizePrompt(draft[field.key]) === snapshot.prompt_defaults[field.key]} onClick={() => {
                   const recommended = snapshot.prompt_defaults[field.key];
                   setDraft({...draft, [field.key]: recommended});
                   setNotice(recommended === snapshot.values[field.key] ? `已恢复“${field.title}”的已保存推荐内容。` :
                     `已将“${field.title}”恢复为推荐内容，请保存后生效。`);
-                }}>恢复推荐提示词</button></div>
+                }}>恢复推荐提示词</Button></div>
               <p className="muted" id={`${field.key}-help`}>{field.help}</p>
               <p className="muted" id={`${field.key}-effect`}>{field.effect}</p>
               {fieldError && <p className="settings-field-error" id={`${field.key}-error`}>{fieldError}</p>}
@@ -146,7 +147,7 @@ export function SystemSettingsPage({onUnauthorized}: {onUnauthorized: (message: 
       </fieldset>
       <div className="panel settings-save-bar"><div><strong>{conflict ? '请先读取最新设置' : dirty ? '有未保存的更改' : '设置已同步'}</strong>
         <p className="muted">{invalid ? '请修正上方标出的设置后保存。' : dirty ? '核对修改后保存，离开此页前请保存更改。' : '调整上方设置后可保存；无需重启服务。'}</p></div>
-        <button className="primary" disabled={busy || !dirty || invalid || conflict}>{operation === 'saving' ? '正在保存…' : '保存系统设置'}</button></div>
+        <Button className="primary" disabled={busy || !dirty || invalid || conflict}>{operation === 'saving' ? '正在保存…' : '保存系统设置'}</Button></div>
     </form>}
   </main>;
 }

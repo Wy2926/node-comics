@@ -45,7 +45,6 @@ class Hub:
 
     @contextmanager
     def subscribe(self, topic):
-        from .errors import problem
         loop, wake = asyncio.get_running_loop(), asyncio.Event()
         key = (topic, id(wake))
         with self.lock:
@@ -112,6 +111,8 @@ def publish(db, topic):
 def policy_wakeups(db, flush_context, instances):
     """Wake after policy/capacity commits; snapshots remain the source of truth."""
     from .models import User
+    from .reader_api import Feedback
+    from .support_requests import SupportRequest
     from .entitlement_models import QuotaPeriod
     from .billing_models import BillingTerm
     from .queue_models import ComputeNode
@@ -131,6 +132,8 @@ def policy_wakeups(db, flush_context, instances):
             if row in db.new or any(state.attrs[name].history.has_changes()
                     for name in ('granted', 'starts_at', 'ends_at', 'grants_access')):
                 topics.add('user:' + row.owner_id)
+        elif isinstance(row, (Feedback, SupportRequest)):
+            topics.add('admin:inbox')
         elif isinstance(row, (ComputeNode, TranslationProvider)):
             state = inspect(row)
             fields = ('enabled', 'capacity', 'desired_config', 'config_version', 'credential_hash',
