@@ -22,7 +22,8 @@ export async function fetchResponse(path: string, options: RequestInit = {}): Pr
     const body = await response.json().catch(() => ({}));
     throw new ApiError(body.error?.message || `请求失败 (${response.status})`, response.status, body.error?.code);
   }
-  if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method) && path.startsWith('/v1/admin/') && !path.endsWith('/test')) window.dispatchEvent(new Event('admin-mutation'));
+  if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method) && path.startsWith('/v1/admin/') &&
+    !['/test', '/auth-profile/refresh'].some(suffix => path.endsWith(suffix))) window.dispatchEvent(new Event('admin-mutation'));
   return response;
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

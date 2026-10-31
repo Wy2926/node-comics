@@ -202,6 +202,9 @@ def main():
     from .billing_sync import run as billing_maintenance
     billing_thread = Thread(target=billing_maintenance, args=(stopping,))
     billing_thread.start()
+    from .auth_profiles import run as sync_auth_profiles
+    auth_thread = Thread(target=sync_auth_profiles, args=(stopping,))
+    auth_thread.start()
     next_oidc_probe = 0
     next_campaign_scan = 0
     next_retention_scan = 0
@@ -228,6 +231,7 @@ def main():
             report_failure("maintenance", error)
         stopping.wait(settings().dispatch_interval_seconds)
     billing_thread.join()
+    auth_thread.join()
 
 
 if __name__ == "__main__":

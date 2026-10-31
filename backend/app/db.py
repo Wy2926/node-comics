@@ -47,6 +47,7 @@ def load_models():
     from . import quota_campaign_models  # noqa: F401
     from . import guest_models  # noqa: F401
     from . import admin_audit  # noqa: F401
+    from . import auth_profiles  # noqa: F401
     from . import feedback_review_models  # noqa: F401
     from . import support_requests  # noqa: F401
     from . import comic_title_cache  # noqa: F401

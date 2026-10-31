@@ -71,10 +71,15 @@ export type Node = {
   completed_24h: {outcome: string; count: number; avg_seconds: number}[];
 };
 export type Nodes = {items: Node[]; generated_at: string; timeout_seconds: number};
-export type AdminUser = User & {created_at: string; plan: string; plus_expires_at: string | null;
+export type AuthProfile = {configured: boolean; supported: boolean; auth_user_id: string | null;
+  email: string | null; username: string | null; name: string | null; phone: string | null;
+  suspended: boolean | null; deleted: boolean | null; auth_created_at: string | null; last_sign_in_at: string | null;
+  synced_at: string | null; attempted_at: string | null; pending: boolean; error: string | null};
+export type AdminUser = User & {auth_profile: AuthProfile; created_at: string; plan: string; plus_expires_at: string | null;
   last_submitted_at: string | null; jobs: Record<string, number>; active_jobs: number};
 export type Bucket = {id: string; mode: Mode; source: string; granted: number; used: number; reserved: number; expires_at: string | null};
 export type UserDetail = User & {
+  auth_profile: AuthProfile;
   grants: (Bucket & {starts_at: string; note: string})[];
   created_at: string;
   entitlements: {plan: string; plus_expires_at: string | null; image_rate_limit: {window_seconds: number; limit: number}; hourly_image_rate_limit?: {window_seconds: number; limit: number} | null;

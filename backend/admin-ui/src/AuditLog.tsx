@@ -4,6 +4,7 @@ import {Pagination, Table, time} from './ui';
 import {ResourceError, useAdminResource, type DataPage} from './AdminResource';
 
 const actions: Record<string, string> = {
+  'user.auth_profile.refresh': '刷新 Auth 信息',
   'node.create': '添加节点', 'node.configure': '修改节点配置', 'node.rotate_credential': '轮换节点凭据',
   'system_settings.update': '修改系统设置', 'text_provider.create': '添加文本供应商',
   'text_provider.update': '修改文本供应商', 'text_provider.toggle': '启停文本供应商', 'text_provider.default': '切换正文供应商',

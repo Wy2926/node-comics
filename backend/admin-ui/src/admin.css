@@ -224,6 +224,8 @@ tbody tr:hover td {background: #fafbfc;}
 .record-heading > button {margin-left: auto;}
 .user-avatar {display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); border-radius: var(--radius); width: 48px; height: 48px; font-size: 20px;}
 .user-name {font-weight: 600;}
+.auth-profile {margin-bottom: 20px;}
+.auth-profile dd {overflow-wrap: anywhere;}
 .ip-address {font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px;}
 .technical-details {margin-top: 16px; color: var(--muted); font-size: 12px;}
 .detail-summary {display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px;}

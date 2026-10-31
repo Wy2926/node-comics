@@ -6,6 +6,7 @@ import {MembershipActions} from './MembershipActions';
 import {TaskAttempts} from './TaskAttempts';
 import {UserHistory} from './UserHistory';
 import {taskTimingRows} from './timings';
+import {AuthProfile} from './AuthProfile';
 
 export function TaskDetail({job: j, onUnauthorized}: {job: TaskData; onUnauthorized: (message: string) => void}) {
   const final = j.completed_by;
@@ -48,6 +49,7 @@ export function UserDetail({user: u, onChanged, onUnauthorized}: {user: UserData
   const e = u.entitlements;
   const buckets = Object.values(e.modes).flatMap(m => m.quota?.buckets || []);
   return <div className="care-user-detail">
+    <AuthProfile key={u.id} userId={u.id} profile={u.auth_profile} onUnauthorized={onUnauthorized}/>
     {e.hourly_image_rate_limit && <p className="muted">每滚动 60 分钟最多新受理 {e.hourly_image_rate_limit.limit} 页，跨模式、语言和设备合计。</p>}
     <dl className="detail-meta"><dt>会员 / 角色</dt><dd>{e.plan === 'plus' ? 'PLUS' : e.plan === 'lite' ? 'Lite' : '普通'} · {u.role === 'admin' ? '管理员' : '读者'}</dd><dt>注册时间</dt><dd>{time(u.created_at)}</dd><dt>会员到期</dt><dd>{time(e.plus_expires_at)}</dd>
       <dt>新翻译图片速率</dt><dd>{e.image_rate_limit.limit} 张 / 滚动 {e.image_rate_limit.window_seconds} 秒</dd></dl>

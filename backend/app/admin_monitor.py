@@ -8,6 +8,7 @@ from sqlalchemy import case, exists, extract, func, or_, select
 from sqlalchemy.orm import Session, defer
 
 from .auth import admin, user_json
+from .auth_profiles import AuthProfile, profile_json
 from .geoip import countries
 from .config import settings
 from .db import get_db
@@ -230,21 +231,25 @@ def nodes(db: Session = Depends(get_db)):
 @router.get("/users")
 def users(q: str = Query("", max_length=120), plan: str | None = Query(None, max_length=64, pattern=r'^[a-z][a-z0-9_-]*$'),
           offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100), db: Session = Depends(get_db)):
-    at, query = now(), select(User).where(User.kind == 'registered')
+    at, query = now(), select(User).outerjoin(AuthProfile, AuthProfile.owner_id == User.id).where(User.kind == 'registered')
     if q.strip():
-        query = query.where(or_(User.name.contains(q.strip(), autoescape=True), User.id.contains(q.strip(), autoescape=True)))
+        query = query.where(or_(*(column.contains(q.strip(), autoescape=True) for column in
+            (User.name, User.id, AuthProfile.email, AuthProfile.username, AuthProfile.name))))
     if plan:
         query = query.where(plan_expression(at) == plan)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = list(db.scalars(query.order_by(User.created_at.desc(), User.id).offset(offset).limit(limit)))
     stats = defaultdict(dict)
     latest = {}
+    profiles = {}
     if rows:
         ids = [u.id for u in rows]
+        profiles = {p.owner_id: p for p in db.scalars(select(AuthProfile).where(AuthProfile.owner_id.in_(ids)))}
         for owner, status, count in db.execute(select(Job.owner_id, Job.status, func.count()).where(Job.owner_id.in_(ids)).group_by(Job.owner_id, Job.status)):
             stats[owner][status] = count
         latest = dict(db.execute(select(Job.owner_id, func.max(Job.created_at)).where(Job.owner_id.in_(ids)).group_by(Job.owner_id)).all())
-    return {"items": [{**user_json(u), "created_at": iso(u.created_at), "plan": membership_benefits(db, u, at)['plan'],
+    return {"items": [{**user_json(u), "auth_profile": profile_json(u, profiles.get(u.id)),
+        "created_at": iso(u.created_at), "plan": membership_benefits(db, u, at)['plan'],
         "plus_expires_at": iso(plus_dates(db, u, at)[1]), "last_submitted_at": iso(latest.get(u.id)),
         "jobs": stats[u.id], "active_jobs": sum(stats[u.id].get(s, 0) for s in MONITOR_ACTIVE)} for u in rows],
         "total": total, "next_offset": offset + limit if offset + limit < total else None, "generated_at": iso(at)}
@@ -255,7 +260,8 @@ def user_detail(user_id: str, db: Session = Depends(get_db)):
     user = db.get(User, user_id)
     if not user:
         problem("NOT_FOUND", "用户不存在", 404)
-    return {**user_json(user), "created_at": iso(user.created_at), "entitlements": entitlements_json(db, user),
+    return {**user_json(user), "auth_profile": profile_json(user, db.get(AuthProfile, user.id)),
+            "created_at": iso(user.created_at), "entitlements": entitlements_json(db, user),
             "grants": [period_json(row) for row in db.scalars(select(QuotaPeriod).where(
                 QuotaPeriod.owner_id == user.id, QuotaPeriod.source == "grant")
                 .order_by(QuotaPeriod.starts_at.desc(), QuotaPeriod.id).limit(50))]}

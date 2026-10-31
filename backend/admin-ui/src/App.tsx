@@ -96,7 +96,7 @@ function Filters({view, params, onChange}: {view: View; params: URLSearchParams;
     for (const key of ['owner_id', 'node_id']) if (params.get(key)) next[key] = params.get(key)!;
     onChange(next);
   }}>
-    <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '用户名或任务编号' : '搜索用户名称'}/></label>
+    <label className="search-label">搜索<input name="q" maxLength={120} defaultValue={params.get('q') || ''} placeholder={view === 'tasks' ? '用户名或任务编号' : '昵称、邮箱或 Auth 用户名'}/></label>
     {view === 'tasks' ? <>{select('mode', '翻译模式', ['classic'])}
       {select('workflow_kind', '任务类型', ['image', 'document'])}
       {select('status', '任务状态', ['active', 'attention', 'queued', 'running', 'awaiting_upload', 'validating_upload', 'uploading', 'preflight', 'awaiting_quota', 'succeeded', 'no_text', 'failed', 'outcome_unknown', 'unknown_released', 'cancelled'])}

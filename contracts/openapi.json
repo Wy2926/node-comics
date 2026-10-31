@@ -7006,6 +7006,48 @@
         }
       }
     },
+    "/v1/admin/users/{user_id}/auth-profile/refresh": {
+      "post": {
+        "summary": "Refresh",
+        "operationId": "refresh_v1_admin_users__user_id__auth_profile_refresh_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/system-settings": {
       "get": {
         "tags": [

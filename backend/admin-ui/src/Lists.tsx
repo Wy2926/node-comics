@@ -21,14 +21,15 @@ export function Tasks({items, onTask}: {items: Task[]; onTask: (id: string) => v
 }
 export function Users({items, onUser}: {items: AdminUser[]; onUser: (id: string) => void}) {
   if (!items.length) return <Empty>没有符合条件的用户</Empty>;
-  return <Table heads={['用户', '会员 / 角色', '当前在途', '累计任务 / 完成', '最近提交', '注册时间', '操作']}>
+  return <Table heads={['用户 / 邮箱', '会员 / 角色', '当前在途', '累计任务 / 完成', '最近登录 Auth', '最近提交', '注册时间', '操作']}>
     {items.map(u => <tr key={u.id}>
-      <td><Button className="text-link user-name" onClick={() => onUser(u.id)}>{u.name}</Button></td>
+      <td><Button className="text-link user-name" onClick={() => onUser(u.id)}>{u.name}</Button>
+        <small>{u.auth_profile.email || (u.auth_profile.synced_at ? 'Auth 未设置邮箱' : 'Auth 尚未同步')}{u.auth_profile.error && ' · 同步异常'}</small></td>
       <td><span className={`badge ${u.plan !== 'free' ? 'accent' : ''}`}>{u.plan === 'plus' ? 'PLUS' : u.plan === 'lite' ? 'Lite' : '普通'}</span>
         <small>{u.role === 'admin' ? '管理员' : '读者'}{u.plan !== 'free' && ` · 到期 ${time(u.plus_expires_at)}`}</small></td>
       <td><Jump view="tasks" params={{owner_id: u.id, status: 'active'}}>{number(u.active_jobs)}</Jump></td>
       <td>{number(Object.values(u.jobs).reduce((s, v) => s + v, 0))} / {number((u.jobs.succeeded || 0) + (u.jobs.no_text || 0))}<small>失败 {number(u.jobs.failed)}</small></td>
-      <td>{time(u.last_submitted_at)}</td><td>{time(u.created_at)}</td>
+      <td>{time(u.auth_profile.last_sign_in_at)}</td><td>{time(u.last_submitted_at)}</td><td>{time(u.created_at)}</td>
       <td><Button className="text-link" onClick={() => onUser(u.id)}>管理用户</Button></td>
     </tr>)}
   </Table>;

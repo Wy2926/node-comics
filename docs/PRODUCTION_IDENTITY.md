@@ -40,6 +40,14 @@ Firefox 的授权码交换与令牌续期使用同一请求方法：临时 DNR �
 
 Safari 扩展自身请求的 Origin 不受该 DNR 规则影响，授权码交换和续期改由容器的原生消息处理器执行。令牌分支只接受两种令牌 POST，HTTPS（Debug 构建允许回环 HTTP），使用临时 URLSession，不发送 Cookie、Referer 或 Origin，不跟随重定向、不持久化或记录凭据。请求体最多 64 KiB，响应流最多 128 KiB，网络总期限 20 秒；JavaScript 等待最多 25 秒。网站访问权限、PKCE 和 API 身份校验仍在扩展中完成。网页内容脚本不具有此原生消息能力，令牌回到扩展私有会话库。公开来源 GET 使用独立的消息分支，规则见[公共图片读取](IMAGE_ACCESS.md#safari-公开来源通道)，不能调用令牌 POST 或携带业务凭据。
 
+## Auth 资料回调
+
+管理后台的只读资料同步使用独立 Logto Machine-to-Machine 应用，不修改现有浏览器应用、PKCE 或客户端 scope。后端 `.env.server` 配置 `LOGTO_MANAGEMENT_CLIENT_ID`、`LOGTO_MANAGEMENT_CLIENT_SECRET` 和 `LOGTO_WEBHOOK_SECRET`；三个值仅留服务端。自托管 Logto 的 Management API resource 为 `https://default.logto.app/api`，授予专用应用现有 Management API access 角色（`all`）；应用代码只调用按用户 ID 查询接口，不使用该凭据修改 Auth 用户。
+
+在 Logto 创建 Webhook，地址 `https://comics.nodelane.net/webhooks/logto`，订阅 `User.Created`、`User.Data.Updated`、`User.SuspensionStatus.Updated`、`User.Deleted`、`PostSignIn`、`PostRegister`。将 signing key 配置为 `LOGTO_WEBHOOK_SECRET`，先完成数据库迁移并部署 API、maintenance，再启用回调。后端校验原始请求体的 HMAC-SHA256 签名，事件写入持久待同步记录后返回 200；只匹配当前 issuer 下已经存在的本站用户，不导入其他产品用户，不保存完整回调载荷。
+
+回调触发后台重新读取权威资料；登录时间采用 Auth 返回的 `lastSignInAt`，不以回调接收时间或手动刷新时间代替。SSO 下未产生新的 Auth 登录事件时不推断“本站最新访问”。后台交互、重试和数据边界见[Auth 资料同步](ADMIN_CONSOLE.md#auth-资料同步)。
+
 ## 撤销与并发行为
 
 支持 `identity.launchWebAuthFlow` 的插件保留浏览器原生授权和既有 OIDC 回调；存在窗口 API 时将新开的身份服务弹出窗口调整为 600 × 760，完成后由浏览器关闭。Firefox Android 等缺少 identity 的环境先创建空白标签页、绑定其 tab ID 和监听，再导航到授权站；只读取该标签页主框架的精确回调，保留 PKCE、state、有效期和返回 issuer 校验，拒绝重复或冲突的回调参数。授权、令牌与回调域均须具有已安装的网站访问权限。这个非 blocking 监听不等于原生网络拦截，不能依赖回调域真的返回网页。

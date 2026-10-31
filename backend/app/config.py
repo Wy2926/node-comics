@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     oidc_admin_role: str = "node-comics-admin"
     oidc_jwks_cache_seconds: int = Field(default=300, ge=1, le=300)
     oidc_jwks_timeout_seconds: int = Field(default=10, ge=1, le=30)
+    logto_management_client_id: str = ""
+    logto_management_client_secret: SecretStr = SecretStr("")
+    logto_webhook_secret: SecretStr = SecretStr("")
     cors_origins: str = "http://localhost:18080,http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
     extension_ids: str = ""
     guest_enabled: bool = False
@@ -173,6 +176,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_identity(self):
+        if bool(self.logto_management_client_id) != bool(self.logto_management_client_secret.get_secret_value()):
+            raise ValueError('Logto Management client ID and secret must be configured together')
+        if self.logto_management_client_id and (not self.oidc_issuer or not self.oidc_token_endpoint):
+            raise ValueError('Logto profile sync requires OIDC issuer and token endpoint')
         if self.app_env == "production":
             if self.dev_auth:
                 raise ValueError("Production requires DEV_AUTH=false; passwordless development login is forbidden")
