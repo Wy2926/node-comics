@@ -6,7 +6,7 @@ import { dictionaries, locales, publicPaths } from '../src/i18n';
 import { guidePresentation } from '../src/i18n/guide-presentation';
 
 test('desktop tutorials have complete, independently captured Chinese, Japanese, Korean and English image sets', () => {
-  const names = ['channel-form.webp', 'library.webp', 'reader-directory.webp', 'reader-settings.webp', 'remote-library.webp', 'search-results.webp', 'search.webp', 'translation-settings.webp'];
+  const names = ['builtin-channel.webp', 'builtin-resources.webp', 'builtin-service.webp', 'channel-form.webp', 'library.webp', 'reader-directory.webp', 'reader-settings.webp', 'remote-library.webp', 'search-results.webp', 'search.webp', 'translation-settings.webp'];
   const hashes = new Set<string>();
   for (const locale of ['zh-CN', 'en', 'ja', 'ko']) {
     const directory = new URL(`../src/assets/guides/${locale}/`, import.meta.url);
@@ -23,12 +23,18 @@ test('desktop tutorials have complete, independently captured Chinese, Japanese,
   }
 });
 
-test('all locales have the search workflow, actionable import steps and current quota copy', () => {
+test('all locales have illustrated search and built-in translation workflows, import steps and current quota copy', () => {
   assert.deepEqual(Object.keys(guidePresentation).sort(), [...locales].sort());
   assert.ok(publicPaths.includes('/guides/find-manga/'));
+  assert.ok(publicPaths.includes('/guides/builtin-translation/'));
   for (const locale of locales) {
     const { documents } = dictionaries[locale];
     const search = documents.guides.find(guide => guide.slug === 'find-manga')!;
+    const builtin = documents.guides.find(guide => guide.slug === 'builtin-translation')!;
+    assert.ok(builtin.title && builtin.description && builtin.captureNote);
+    assert.equal(builtin.sections.length, 7);
+    assert.ok(builtin.sections.every(section => section.title && section.paragraphs[0]));
+    for (const slug of builtin.related ?? []) assert.ok(documents.guides.some(guide => guide.slug === slug));
     assert.equal(search.sections.length, 4);
     assert.ok(search.title && search.description);
     assert.ok(search.sections.every(section => section.title && section.paragraphs[0]));

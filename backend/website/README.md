@@ -51,7 +51,7 @@ uv run --with-requirements backend/requirements.txt python backend/tests/manual_
 - 登录使用原账户额度，匿名身份与额度独立，规则见[会员额度](../../docs/MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。历史按账户／游客隔离，不在登录时自动合并；本地与服务器期限见[存储规范](../../docs/OBJECT_STORAGE.md#官网本地历史与游客结果)。工作台不索引、禁止共享缓存。
 
 - [src/i18n](src/i18n)：简中、繁中、英、日、韩、法、西、巴西葡萄牙、德、意、俄、波兰、乌克兰、土耳其、越南、印尼、阿拉伯语独立字典；常规公开页面或文案同步 17 语。语言由 URL 决定，切换保留当前页面；[官网语言选择](../../docs/WEBSITE_LANGUAGE_DESIGN.md)定义浏览器语言提示、手动偏好和匹配规则。
-- [本地翻译内容](src/i18n/guides)：连接 manga-translator-ui 的操作教程与本地漫画翻译介绍；[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。对外统一称“翻译”或“图片翻译”，官方与 MTU 只作为服务渠道区分。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南由列表、帮助、FAQ 和相关文章进入，正文支持步骤、命令、对照表及来源链接。
+- [本地翻译内容](src/i18n/guides)：浏览器内置翻译、连接 manga-translator-ui 的操作教程与本地漫画翻译介绍。内置翻译教程 `/guides/builtin-translation/` 的 17 语正文维护在 [builtin-translation.ts](src/i18n/guides/builtin-translation.ts)，覆盖模型／字体下载、支持的目标语言、Google／LLM 配置、首次翻译与排障；说明本机图片处理、文本服务联网及费用边界，入口位于教程目录与帮助页。[主字典](src/i18n)维护本地格式、EPUB、Google Drive／OPDS、网页图片与选区翻译指南。对外统一称“翻译”或“图片翻译”，官方、浏览器内置与 MTU 作为服务渠道区分。EPUB 只翻译内嵌位图，OPDS 进度仅在来源支持时同步。指南正文支持步骤、命令、对照表及来源链接。
 - 教程目录优先展示可独立完成的操作流程，选型、隐私、排障和兼容状态放入次级阅读区；名称搜索教程为 `/guides/find-manga/`。正文使用编号、可折叠目录、步骤、图注和原尺寸图片链接，不引入客户端框架或富文本 HTML 注入。桌面截图在 [src/assets/guides](src/assets/guides) 中维护中、日、韩、英四套：简繁中文用简中，日、韩对应各自版本，其余页面用英文；正文及图注仍为 17 语。构建生成响应式 WebP，图片懒加载且保留尺寸，页面只引用当前语言图片。截图映射及精选入口在 [guide-media.ts](src/data/guide-media.ts)，来源与验证边界见 [ASSETS.md](ASSETS.md)。
 - 卸载反馈页 `/uninstall/` 提供17 语可选问卷，通过同源匿名反馈 API 保存。原因、幂等重试与上线顺序见[反馈规范](../../docs/ADMIN_CONSOLE.md#匿名网站申请插件与卸载反馈)。
 - [src/data/site.ts](src/data/site.ts)：域名、邮件与商店地址；[extension-release.json](../extension-release.json)：安装包版本、摘要与永久公开下载地址。官网构建读取目录，历史下载路径由静态配置重定向，不由后端签名或代理文件。

@@ -24,6 +24,7 @@ interface Props {
   noindex?: boolean;
   schema?: Record<string, unknown>[];
   image?: string;
+  imageAlt?: string;
 }
 const { title, description, noindex = false, schema = [], image = '/social-cover.webp' } = Astro.props;
 const path = Astro.url.pathname;
@@ -76,13 +77,13 @@ const graph = [
     <meta property="og:locale" content={ogLocales[locale]} />
     {pageLanguages.filter(language => language !== locale).map(language => <meta property="og:locale:alternate" content={ogLocales[language]} />)}
     <meta property="og:image" content={absolute(image)} />
-    <meta property="og:image:alt" content={t.ogAlt} />
+    <meta property="og:image:alt" content={Astro.props.imageAlt ?? t.ogAlt} />
     {image === '/social-cover.webp' && <><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:type" content="image/webp" /></>}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={absolute(image)} />
-    <meta name="twitter:image:alt" content={t.ogAlt} />
+    <meta name="twitter:image:alt" content={Astro.props.imageAlt ?? t.ogAlt} />
     <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')} />
   </head>
   <body data-install-stores={JSON.stringify(site.stores)} data-page={route}>

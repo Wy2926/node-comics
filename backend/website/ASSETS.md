@@ -86,7 +86,7 @@ Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simp
 
 ## 桌面教程截图
 
-[src/assets/guides/](src/assets/guides/) 是 Chrome 中实际运行的 NodeLane Comics 0.11.2 界面，1440 × 960，以 WebP（质量 92）保存，没有重画 UI、拼接或替换文字。每个场景分别切换简体中文、日语、韩语、英语后截图，八个场景共 32 张；简繁中文页面共用中文截图，日语、韩语页面使用对应版本，其余语言使用英文截图。远程书库中文版来自浏览器原生截图，日、韩、英版来自用户提供的 PNG 截图，仅转换为 WebP；其余场景直接使用浏览器原生 WebP 截图。页面通过 Astro 生成响应式小图，点击查看原图；只加载当前页面所需图片，不增加客户端图库框架。
+[src/assets/guides/](src/assets/guides/) 中的书库、阅读目录、阅读设置、翻译设置、渠道表单、远程书库、名称搜索和搜索结果八个场景来自 Chrome 中实际运行的 NodeLane Comics 0.11.2 界面，1440 × 960，以 WebP（质量 92）保存，没有重画 UI、拼接或替换文字。每个场景分别切换简体中文、日语、韩语、英语后截图，八个场景共 32 张；简繁中文页面共用中文截图，日语、韩语页面使用对应版本，其余语言使用英文截图。远程书库中文版来自浏览器原生截图，日、韩、英版来自用户提供的 PNG 截图，仅转换为 WebP；其余场景直接使用浏览器原生 WebP 截图。页面通过 Astro 生成响应式小图，点击查看原图；只加载当前页面所需图片，不增加客户端图库框架。
 
 本地书库、目录和阅读设置使用项目原创 [starlight-bookshop.png](../../samples/starlight-bookshop.png) 导入的单页示例；四版漫画均为英文原图，不表示翻译效果。搜索是 Atsumaru／MangaPill 的真实结果；远程书库展示用户已连接的 wol.moe / Wenku8 OPDS 总收藏榜，保留书库返回的中文标题和封面。漫画封面、站点名称与第三方 UI 归各自权利人，不作为本站原创素材重新授权。截图未展示其他个人书库内容、凭据或令牌，连接表单没有填入地址。
 
@@ -126,6 +126,29 @@ Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simp
 | [src/assets/guides/zh-CN/search-results.webp](src/assets/guides/zh-CN/search-results.webp) | `e21f9610c641c786adfd26bdb0a7f275230f088547783e6c9fbbd51d2f39cce4` |
 | [src/assets/guides/zh-CN/search.webp](src/assets/guides/zh-CN/search.webp) | `490444776d6d9d80a87b4e07e28760b8fe8efe111ffde8a38fbea53e3389964e` |
 | [src/assets/guides/zh-CN/translation-settings.webp](src/assets/guides/zh-CN/translation-settings.webp) | `30573e9c73edda9b7094f57c1bc03149df7a76c3d40721e80c12d29f4d04b51c` |
+
+## 浏览器内置翻译教程截图
+
+`builtin-channel.webp`、`builtin-resources.webp`、`builtin-service.webp` 分别展示内置渠道选择、模型与字体资源管理、正文翻译服务选择。来源是本仓库 NodeLane Comics 1.2.0 的真实设置组件，运行于本机浏览器预览；不是安装版扩展或翻译效果验收。采集时使用空白本地资料，未登录、未填凭据、未下载模型，也未调用 Google／LLM 或加载漫画。
+
+中、英、日、韩各自切换界面语言独立截图，共 12 张，保留默认简体中文目标与未下载资源状态。原始浏览器截图为 1280 × 720，仅转换为 WebP（质量 92），未重画、拼接或替换文字。图片为项目自身界面，不含第三方漫画素材。资源下载前状态由文章图注说明；版本展示不代表所有浏览器商店已经更新。模型推理、浏览器权限、服务连通性和译图质量仍需在安装版扩展单独验证。
+
+正文复用响应式图片与原尺寸链接，每页仅引用对应语言的三个场景，懒加载；封面复用于目录与文章分享元数据。下表记录构建前文件摘要。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| [src/assets/guides/zh-CN/builtin-channel.webp](src/assets/guides/zh-CN/builtin-channel.webp) | `c991790102cda14e88e4a32ec879fa0ea0b4abada7f921df1d22399797bfce87` |
+| [src/assets/guides/zh-CN/builtin-resources.webp](src/assets/guides/zh-CN/builtin-resources.webp) | `1ab6ba5cc5019f58c8696e1ab1be42b1f7ca21cde4810d4011d249ac85689085` |
+| [src/assets/guides/zh-CN/builtin-service.webp](src/assets/guides/zh-CN/builtin-service.webp) | `987c8eac260bd250ff52c642b438742b11ad2ed31e979f80379b07a83f46f982` |
+| [src/assets/guides/en/builtin-channel.webp](src/assets/guides/en/builtin-channel.webp) | `2766a3a7d268f408d75f1f9e35ddff63c4e16fafe77f938bd50c986b7737a6ae` |
+| [src/assets/guides/en/builtin-resources.webp](src/assets/guides/en/builtin-resources.webp) | `f2f47c6a988c9b0d2c7de2592a914144501c0c3c9131bc9d2e5b1e31e4638d4c` |
+| [src/assets/guides/en/builtin-service.webp](src/assets/guides/en/builtin-service.webp) | `2c668cdfe7b55cd5ce7f6692076d484dfec7f23650fb937a6f8c298fb29dbcba` |
+| [src/assets/guides/ja/builtin-channel.webp](src/assets/guides/ja/builtin-channel.webp) | `75c77542e64af89b339d85e025b09d56d3f7b73fe53b5d69cff12945b8859718` |
+| [src/assets/guides/ja/builtin-resources.webp](src/assets/guides/ja/builtin-resources.webp) | `1cc8a8274b5dfc3d88a2f15cbb4b3321ebfff91c36bce2251364cf1ae892ae10` |
+| [src/assets/guides/ja/builtin-service.webp](src/assets/guides/ja/builtin-service.webp) | `1ccb1f54c4584ddc6b618fdb745d45db12abb9c43ca7b6f21c1823c24701b9bd` |
+| [src/assets/guides/ko/builtin-channel.webp](src/assets/guides/ko/builtin-channel.webp) | `448ca0c506a580843b7651ab39129933656aab5ea4928c12d28388eec3e2605f` |
+| [src/assets/guides/ko/builtin-resources.webp](src/assets/guides/ko/builtin-resources.webp) | `88b1ed724d5efbd1653ac0f6db8825e1b83c80813131d3a70a0ed55806ceef01` |
+| [src/assets/guides/ko/builtin-service.webp](src/assets/guides/ko/builtin-service.webp) | `a2e9677f8d6714e9d835d95b8ae3656d95292103ea0e69c4c2935f44307f346d` |
 
 ## Android Firefox 教程截图
 
