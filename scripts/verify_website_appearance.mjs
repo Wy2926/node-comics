@@ -1,0 +1,186 @@
+// Local website + unified-workbench fixture; synthetic images, no real identity or model.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const sharp = createRequire(new URL('../backend/website/package.json', import.meta.url))('sharp');
+const website = process.env.WEBSITE_PREVIEW_URL || 'http://127.0.0.1:4321';
+const fixture = 'http://127.0.0.1:5194';
+const out = resolve('artifacts/website-appearance');
+await mkdir(out, { recursive: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.TEST_CHROMIUM ? { executablePath: process.env.TEST_CHROMIUM } : {}) });
+const errors = [], checks = [], metrics = {};
+const pass = message => { checks.push(message); console.log('PASS ' + message); };
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: 'dark' });
+await context.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+const page = await context.newPage();
+page.on('pageerror', error => errors.push(error.message));
+const noOverflow = async () => assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'page overflow ' + page.url());
+const theme = () => page.locator('html').getAttribute('data-site-theme');
+const ready = async () => { await page.locator('.file-dropzone button').waitFor(); await page.waitForFunction(() => !document.querySelector('.file-dropzone button').disabled); };
+const previewReady = async (view) => { await page.locator('.image-preview-stage img').waitFor(); await page.waitForFunction(() => document.querySelector('.image-preview-stage img')?.naturalWidth > 0 && document.querySelector('.image-preview-stage')?.getAttribute('aria-busy') === 'false'); if (view) await page.waitForFunction(label => document.querySelector('.image-preview-status')?.textContent === label, view); };
+try {
+  await page.goto(website);
+  await page.locator('[data-theme-toggle]:not([hidden])').waitFor();
+  assert.equal(await theme(), 'midnight');
+  const geometry = () => page.locator('.header-inner, .home-hero, .home-feature-rows').evaluateAll(elements => elements.map(element => { const r = element.getBoundingClientRect(); return [r.width, r.height]; }));
+  const before = await geometry();
+  await page.screenshot({ path: out + '/home-dark.png' });
+  assert.equal(await page.locator('[data-theme-select]').count(), 0);
+  await page.locator('[data-theme-toggle]').click();
+  assert.equal(await theme(), 'paper');
+  assert.deepEqual(await geometry(), before, 'appearance must not change layout');
+  assert.equal(await page.locator('body').evaluate(element => getComputedStyle(element).colorScheme), 'light');
+  await page.reload();
+  assert.equal(await theme(), 'paper');
+  await page.screenshot({ path: out + '/home-light.png' });
+  assert.equal(await page.locator('.home-feature-row').count(), 4);
+  assert.ok(await page.locator('.home-comparison').evaluate(element => !!(element.compareDocumentPosition(document.querySelector('.home-features')) & Node.DOCUMENT_POSITION_FOLLOWING)));
+  await page.locator('[data-language-notice] button').click().catch(() => {});
+  await page.locator('.home-features').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.querySelector('.home-features').dataset.reveal === 'visible');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.screenshot({ path: out + '/features-light.png' });
+  await page.locator('[data-theme-toggle]').press('Enter');
+  assert.equal(await theme(), 'midnight');
+  assert.equal(await page.locator('[data-theme-toggle]').getAttribute('aria-pressed'), 'true');
+  await page.locator('[data-theme-toggle]').press('Space');
+  assert.equal(await theme(), 'paper');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  assert.equal(await theme(), 'paper', 'explicit choice takes precedence over the system');
+  await page.evaluate(() => localStorage.removeItem('nc-site-theme'));
+  await page.reload();
+  await page.emulateMedia({ colorScheme: 'light' }); await page.waitForFunction(() => document.documentElement.dataset.siteTheme === 'paper');
+  await page.emulateMedia({ colorScheme: 'dark' }); await page.waitForFunction(() => document.documentElement.dataset.siteTheme === 'midnight');
+  pass('appearance follows system, persists manual choice and keeps identical geometry; effects precede four features');
+  for (const locale of ['', 'en/', 'de/', 'ar/']) {
+    await page.goto(website + '/' + locale);
+    for (const width of [1440, 1366, 1280, 1024, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await noOverflow();
+      const featureLayout = await page.locator('.home-feature-row').evaluateAll(rows => rows.map(row => {
+        const copy = row.querySelector('.home-feature-copy').getBoundingClientRect();
+        const image = row.querySelector('.home-feature-image').getBoundingClientRect();
+        return { side: Math.sign(copy.x - image.x), stacked: copy.bottom <= image.top };
+      }));
+      if (width <= 760) assert.ok(featureLayout.every(row => row.stacked), 'mobile features must put copy before screenshots');
+      else assert.deepEqual(featureLayout.map(row => row.side), locale === 'ar/' ? [1, -1, 1, -1] : [-1, 1, -1, 1], 'feature screenshots must alternate sides');
+      const overlap = await page.locator('.header-inner > .brand, .header-tools').evaluateAll(elements => {
+        const [a, b] = elements.map(element => element.getBoundingClientRect());
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      });
+      assert.equal(overlap, false, 'header controls overlap ' + locale + width);
+    }
+  }
+  pass('Chinese, English, German and RTL navigation fits 1440–320 px; feature screenshots alternate and stack on mobile');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(website + '/help/');
+  if (await theme() !== 'midnight') await page.locator('[data-theme-toggle]').click();
+  assert.equal(await page.locator('body').evaluate(element => getComputedStyle(element).backgroundImage), 'none', 'payment page gradient must not leak onto other pages');
+  await page.screenshot({ path: out + '/help-dark.png' });
+  pass('dark help page has no leaked payment background');
+  const nojs = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'dark' });
+  const staticPage = await nojs.newPage(); await staticPage.goto(website);
+  assert.equal(await staticPage.locator('.brand-logo-dark').first().isVisible(), true);
+  assert.equal(await staticPage.locator('.home-feature-row').count(), 4);
+  await nojs.close();
+  const denied = await browser.newContext({ colorScheme: 'dark' });
+  await denied.addInitScript(() => { Storage.prototype.getItem = () => { throw Error('blocked'); }; Storage.prototype.setItem = () => { throw Error('blocked'); }; });
+  const blocked = await denied.newPage(); await blocked.goto(website);
+  await blocked.locator('[data-theme-toggle]').click();
+  assert.equal(await blocked.locator('html').getAttribute('data-site-theme'), 'paper'); await denied.close();
+  pass('no-JS system appearance and storage-denied manual switching remain usable');
+
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await page.goto(fixture + '/tests/document-fixture.html?scenario=empty'); await ready();
+  await page.addInitScript(() => {
+    window.__imageUrls = new Set();
+    const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
+    URL.createObjectURL = blob => { const url = create(blob); if (blob.type.startsWith('image/')) window.__imageUrls.add(url); return url; };
+    URL.revokeObjectURL = url => { window.__imageUrls.delete(url); revoke(url); };
+  });
+  await page.reload(); await ready();
+  const long = await sharp({ create: { width: 600, height: 6000, channels: 3, background: '#f3e5cf' } }).composite([{ input: Buffer.from('<svg width="600" height="6000"><path d="M30 80H560M30 800H560M30 2000H560M30 4000H560" stroke="#264c77" stroke-width="20"/><text x="30" y="160" font-size="40">Synthetic preview</text></svg>') }]).png().toBuffer();
+  const small = await sharp({ create: { width: 600, height: 800, channels: 3, background: '#9bc2ed' } }).png().toBuffer();
+  const selectedAt = performance.now();
+  await page.locator('input[type=file]').setInputFiles([
+    { name: 'long-page.png', mimeType: 'image/png', buffer: long },
+    ...[1, 2, 3].map(n => ({ name: `page-${n}.png`, mimeType: 'image/png', buffer: small })),
+  ]);
+  await page.waitForFunction(() => document.querySelectorAll('.image-task-card').length === 4);
+  assert.ok(await page.locator('.file-dropzone').evaluate(element => element.getBoundingClientRect().height >= 290));
+  const card = page.locator('.image-task-card').filter({ hasText: 'long-page.png' });
+  await card.scrollIntoViewIfNeeded(); await card.locator('.record-thumbnail img').waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('.record-thumbnail img').length === 4);
+  assert.ok(await page.locator('.record-thumbnail img').evaluateAll(images => images.every(img => {
+    const inner = img.getBoundingClientRect(), outer = img.parentElement.getBoundingClientRect();
+    return inner.top >= outer.top && inner.bottom <= outer.bottom && inner.left >= outer.left && inner.right <= outer.right;
+  })), 'thumbnails must fit completely inside their card');
+  metrics.fourCardReadyMs = Math.round(performance.now() - selectedAt);
+  metrics.thumbnails = await page.locator('.record-thumbnail img').evaluateAll(images => images.map(img => ({ width: img.naturalWidth, height: img.naturalHeight })));
+  await page.screenshot({ path: out + '/cards-dark.png' });
+  await card.locator('.record-thumbnail').click(); await previewReady();
+  const windowY = await page.evaluate(() => scrollY);
+  await page.locator('.image-preview-stage').evaluate(element => { element.scrollTop = 850; });
+  await page.getByRole('button', { name: '实际大小', exact: true }).click();
+  assert.ok(await page.locator('.image-preview-stage').evaluate(element => element.scrollTop > 0));
+  await page.keyboard.press('Escape');
+  await page.locator('.image-preview').waitFor({ state: 'detached' });
+  assert.equal(await card.locator('.record-thumbnail').evaluate(element => element === document.activeElement), true);
+  assert.ok(Math.abs(await page.evaluate(() => scrollY) - windowY) < 2);
+  pass('large upload stays expanded; cards show source previews; dialog restores focus and page position');
+  await page.getByRole('button', { name: '开始翻译', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.image-task-card[data-state=succeeded]').length === 4, null, { timeout: 60000 });
+  await card.locator('.record-thumbnail').click(); await previewReady();
+  await page.locator('.image-preview-stage').evaluate(element => { element.scrollTop = 1000; });
+  const ratio = () => page.locator('.image-preview-stage').evaluate(element => element.scrollTop / element.scrollHeight);
+  const offset = await ratio();
+  await page.getByRole('button', { name: '原图', exact: true }).click(); await previewReady('原图');
+  assert.ok(Math.abs(await ratio() - offset) < .005);
+  await page.getByRole('button', { name: '译图', exact: true }).click(); await previewReady('译图');
+  assert.ok(Math.abs(await ratio() - offset) < .005);
+  await page.screenshot({ path: out + '/preview-dark.png' });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.image-preview').getByRole('button', { name: '下载完整译图', exact: true }).click()]);
+  assert.ok(download.suggestedFilename().includes('long-page'));
+  await page.keyboard.press('Escape');
+  const [direct] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: '下载完整译图', exact: true }).click()]);
+  assert.ok(direct.suggestedFilename().includes('long-page'));
+  assert.equal(await page.locator('.image-preview').count(), 0);
+  pass('translated previews keep long-image position through original/result switching; both download entries work');
+  // Remove only this local result, then retry the viewer without submitting another task.
+  await page.evaluate(async () => {
+    const db = await new Promise(resolve => { const req = indexedDB.open('nc-website-translations-v1'); req.onsuccess = () => resolve(req.result); });
+    const tx = db.transaction(['records', 'images'], 'readwrite');
+    const req = tx.objectStore('records').getAll();
+    req.onsuccess = () => { const row = req.result.find(row => row.name === 'long-page.png'); const image = tx.objectStore('images').get(row.id); image.onsuccess = () => { const data = image.result; delete data.result; tx.objectStore('images').put(data); }; };
+    await new Promise(resolve => { tx.oncomplete = resolve; }); db.close();
+  });
+  const requestCount = () => page.locator('#document-observation').evaluate(node => JSON.parse(node.textContent).observations.filter(row => row.path.startsWith('/v1/translations/')).length);
+  const calls = await requestCount();
+  await card.locator('.record-thumbnail').click(); await page.getByText('图片暂时无法显示', { exact: false }).waitFor();
+  await page.getByRole('button', { name: '原图', exact: true }).click(); await previewReady('原图');
+  await page.getByRole('button', { name: '译图', exact: true }).click(); await page.getByRole('button', { name: '重新加载', exact: true }).waitFor();
+  assert.equal(await page.locator('.image-preview-stage img').isVisible(), true);
+  await page.getByRole('button', { name: '重新加载', exact: true }).click();
+  await page.getByRole('button', { name: '重新加载', exact: true }).waitFor();
+  assert.equal(await requestCount(), calls);
+  await page.keyboard.press('Escape');
+  pass('missing result retains the visible original and retry creates no translation requests');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await card.locator('.record-thumbnail').click();
+  await page.getByRole('button', { name: '原图', exact: true }).click(); await previewReady('原图');
+  const box = await page.locator('.image-preview').boundingBox(); assert.equal(box.width, 390); assert.equal(box.height, 844);
+  await page.screenshot({ path: out + '/preview-mobile.png' }); await page.keyboard.press('Escape');
+  await noOverflow();
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await page.getByRole('button', { name: '模拟切换账户', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.image-task-card').length === 0);
+  await page.waitForFunction(() => window.__imageUrls.size === 0);
+  pass('mobile preview fills screen; account switch releases all old image URLs');
+  await page.goto(fixture + '/tests/document-fixture.html?scenario=empty&theme=light'); await ready();
+  await page.screenshot({ path: out + '/upload-light.png' });
+  assert.deepEqual(errors, []);
+  await writeFile(out + '/checks.json', JSON.stringify({ checks, errors, metrics }, null, 2));
+} catch (error) { await page.screenshot({ path: out + '/failure.png' }).catch(() => {}); throw error; } finally { await browser.close(); }

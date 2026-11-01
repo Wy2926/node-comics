@@ -7,14 +7,12 @@ export default function FileDropzone({
   busyLabel,
   onBusyChange,
   disabled = false,
-  compact = false,
   onFiles,
 }: {
   copy: Pick<WorkbenchCopy, 'select' | 'drop'>;
   busyLabel: string;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
-  compact?: boolean;
   onFiles: (files: File[]) => Promise<void>;
 }) {
   const input = useRef<HTMLInputElement>(null),
@@ -41,13 +39,15 @@ export default function FileDropzone({
     <div
       className="file-dropzone"
       data-drag={drag}
-      data-compact={compact}
       aria-busy={busy}
       aria-disabled={busy || disabled}
       aria-label={t.select}
       aria-describedby={descriptionId}
       role="group"
       tabIndex={busy || disabled ? -1 : 0}
+      onClick={event => {
+        if (!busy && !disabled && !(event.target as HTMLElement).closest('button, input')) input.current?.click();
+      }}
       onKeyDown={(event) => {
         if (
           event.target === event.currentTarget &&

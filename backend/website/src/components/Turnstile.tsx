@@ -64,7 +64,7 @@ export default function Turnstile({
         id = window.turnstile!.render(host.current, {
           sitekey: siteKey,
           action,
-          theme: 'auto',
+          theme: getComputedStyle(document.documentElement).colorScheme === 'dark' ? 'dark' : 'light',
           size: widgetSize,
           appearance: 'always',
           callback: (value: string) => {

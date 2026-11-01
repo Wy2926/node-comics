@@ -7,6 +7,7 @@ import {paymentSuccess} from '../src/i18n/payment-success';
 import {projectCopy} from '../src/i18n/project';
 import {languageNoticeCopy} from '../src/i18n/language-notice';
 import {commerceCopy} from '../src/i18n/commerce';
+import { siteUi } from '../src/i18n/site-ui';
 import { homeCopy } from '../src/i18n/home';
 
 test('homepage locales provide complete text and matching gallery/translation entries', () => {
@@ -24,7 +25,10 @@ test('homepage locales provide complete text and matching gallery/translation en
       for (const [key, entry] of Object.entries(reference)) check((value as Record<string, unknown>)[key], entry, `${path}.${key}`);
     }
   }
-  for (const locale of locales) check(homeCopy[locale], homeCopy.en, locale);
+  for (const locale of locales) {
+    check(homeCopy[locale], homeCopy.en, locale);
+    check(siteUi[locale], siteUi.en, locale + ".appearance-preview");
+  }
 });
 test('seventeen independent dictionaries cover all public content and account messages',()=>{
   const reference=dictionaries['zh-CN'];

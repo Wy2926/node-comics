@@ -7,8 +7,8 @@ import type { TranslationResult } from '../../shared/translation-images/types';
 import { importImages } from '../src/lib/translation-store';
 
 const limits = { max_bytes: 128 * 1024 * 1024, max_pixels: 100000 ** 2, max_dimension: 100000 };
-type Message = { source: Blob; limits?: typeof limits; result?: TranslationResult; artifact?: Blob; allowTiles?: boolean };
-type Reply = { error?: string; input?: Blob; result?: Blob; width?: number; height?: number; sha256?: string; mime?: string };
+type Message = { source: Blob; limits?: typeof limits; result?: TranslationResult; artifact?: Blob; allowTiles?: boolean; thumbnail?: boolean };
+type Reply = { thumbnail?: Blob; error?: string; input?: Blob; result?: Blob; width?: number; height?: number; sha256?: string; mime?: string };
 type Handler = (event: { data: Message }) => Promise<void>;
 let handler: Handler | undefined;
 
@@ -238,4 +238,20 @@ test('does not hide a decode failure during optional compression', async () => w
   state.failDecodeAt = 2;
   assert.deepEqual(await state.send({ source: png(64, 20000, false, 1024 * 1024), allowTiles: true }), { error: 'IMAGE_PROCESSING_FAILED' });
   assert.equal(state.decodes.length, 2); assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
+}));
+
+
+test('thumbnail bounds its surface, follows orientation and releases pixels on success and failure', async () => withWorker(async state => {
+  state.actual = [2400, 3600];
+  const reply = await state.send({ source: png(3600, 2400), thumbnail: true });
+  assert.equal(reply.thumbnail?.type, 'image/webp');
+  assert.deepEqual(state.surfaces, [[320, 480]]);
+  assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
+  assert.ok(state.canvases.every(canvas => canvas.width === 1 && canvas.height === 1));
+  state.overflow = true;
+  assert.ok((await state.send({ source: png(100, 200), thumbnail: true })).error);
+  assert.ok(state.bitmaps.every(bitmap => bitmap.closed));
+  const count = state.decodes.length;
+  assert.ok((await state.send({ source: png(100000, 100000), thumbnail: true })).error);
+  assert.equal(state.decodes.length, count, 'huge thumbnails must not allocate full pixels automatically');
 }));

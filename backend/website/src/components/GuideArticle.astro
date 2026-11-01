@@ -17,7 +17,7 @@ const href = (path: string) => localPath(path, locale);
     <a class="guide-help" href={href('/help/')}>{t.help} ↗</a>
   </aside>
   <article class="prose guide-prose">
-    {Object.keys(media).length > 0 && <p class="capture-note">{guidePresentation[locale].screenshots}</p>}
+    {Object.keys(media).length > 0 && <p class="capture-note">{guide.captureNote ?? guidePresentation[locale].screenshots}</p>}
     {guide.sections.map((section, index) => <ArticleSection section={section} index={index} locale={locale} numbered={!section.screenshot} image={media[index] ? guideImage(media[index]!, locale) : undefined} />)}
     <aside class="guide-next"><h2>{t.related}</h2>{related.map(item => <a href={href(`/guides/${item.slug}/`)}><span>{item.title}</span><span aria-hidden="true">↗</span></a>)}</aside>
   </article>

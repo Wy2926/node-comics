@@ -1,0 +1,59 @@
+/* Website-only tokens; the shared Drive/extension palette stays independent. */
+:root, body[data-site-theme] {
+  color-scheme: light dark;
+  --monochrome-filter: brightness(1);
+  --canvas: light-dark(#f6f8fc, #111820);
+  --surface: light-dark(#ffffff, #1a232d);
+  --surface-soft: light-dark(#edf2f8, #222e3b);
+  --ink: light-dark(#202d43, #e4e9f0);
+  --muted: light-dark(#54647b, #b1bfcc);
+  --line: light-dark(#d4ddea, #344151);
+  --input-line: light-dark(#8798ad, #65778b);
+  --accent: light-dark(#1769b3, #8db8ed);
+  --accent-hover: light-dark(#125591, #aecdf3);
+  --accent-soft: light-dark(#e5effc, #24374c);
+  --accent-on: light-dark(#ffffff, #08182a);
+  --action-bg: light-dark(#1769b3, #246abb);
+  --action-hover: light-dark(#125591, #2b72c5);
+  --action-ink: #ffffff;
+  --success: light-dark(#267352, #8ce0bb);
+  --warning: light-dark(#82501c, #e8c478);
+  --danger: light-dark(#af3845, #ffa5a9);
+  --danger-soft: light-dark(#fff0f2, #3a202b);
+  --site-elevation: 0 12px 40px light-dark(#202d4320, #00000066);
+  --site-backdrop: light-dark(#202d4370, #000000b3);
+  --comic-stroke: var(--line);
+  --comic-border: 1px solid var(--line);
+  --comic-input-border: 1px solid var(--input-line);
+  --comic-control-radius: 4px;
+  --comic-card-radius: 8px;
+  --comic-panel-radius: 10px;
+  --comic-tab-radius: 4px;
+  --comic-tab-paper: var(--surface-soft);
+  --comic-tab-selected-bottom: var(--accent);
+  --comic-control-selected-bg: var(--accent-soft);
+  --comic-control-selected-ink: var(--ink);
+  --comic-control-disabled-bg: var(--surface-soft);
+  --comic-control-disabled-ink: var(--muted);
+  --comic-control-disabled-border: var(--line);
+  --comic-warning-paper: light-dark(#fff3cc, #342e20);
+  --comic-warning-ink: var(--ink);
+  --comic-focus-ring: 2px solid var(--accent);
+  --comic-dialog-shadow: var(--site-elevation);
+  --comic-shadow-small: none;
+  --comic-shadow: none;
+  --comic-shadow-hover: none;
+  --comic-shadow-active: none;
+  --comic-shadow-disabled: none;
+  --comic-control-hover-translate: 0, 0;
+  --comic-control-active-translate: 0, 0;
+  --comic-dot-pattern: none;
+  background: var(--canvas);
+  color: var(--ink);
+}
+:root[data-site-theme='paper'], body[data-site-theme='paper'] { color-scheme: light; --monochrome-filter: brightness(.18); }
+:root[data-site-theme='midnight'], body[data-site-theme='midnight'] { color-scheme: dark; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-site-theme]), body[data-site-theme='paper'] { --monochrome-filter: brightness(.18); }
+}

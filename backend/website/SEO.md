@@ -23,6 +23,7 @@
 | `/guides/manga-translation/` | 如何在浏览器翻译漫画 | how to translate manga in a browser |
 | `/guides/translation-modes/` | 图片翻译、官方与 MTU 渠道选择 | manga translation, official vs MTU service |
 | `/guides/local-translation/` | 本地翻译教程、manga-translator-ui 连接与排错 | manga-translator-ui setup, local translation tutorial |
+| `/guides/builtin-translation/` | 浏览器内置漫画翻译、模型与字体下载、无需部署 | built-in manga translator, local browser translation setup |
 | `/guides/local-manga-translator/` | 本地漫画翻译工具、费用、隐私与离线条件 | local manga translator, self-hosted manga translation |
 | `/guides/local-comics/` | CBZ／CBR／PDF／MOBI／EPUB 阅读 | CBZ reader, CBR reader, PDF / MOBI / EPUB reader |
 | `/guides/remote-library/` | Google Drive、OPDS 远程书库与阅读进度 | Google Drive comics, OPDS reader, reading progress |
@@ -48,7 +49,8 @@
 
 ## 元数据与可抓取内容
 
-- [src/i18n](src/i18n) 是17 语内容来源，本地翻译的两篇文章维护在 [src/i18n/guides](src/i18n/guides)。普通页面的 `seo*Title` 用于搜索标题，页面介绍用于 description 和可见正文；指南和政策使用自身的 `title`、`description`。首页摘要来自 [src/i18n/home](src/i18n/home)，标题和正文共同表明产品用途。
+- [src/i18n](src/i18n) 是 17 语内容来源，浏览器内置翻译与自部署翻译文章维护在 [src/i18n/guides](src/i18n/guides)。普通页面的 `seo*Title` 用于搜索标题，页面介绍用于 description 和可见正文；指南和政策使用自身的 `title`、`description`。首页摘要来自 [src/i18n/home](src/i18n/home)，标题和正文共同表明产品用途。
+- 有桌面截图封面的指南将同语言封面用于 Open Graph 和 Article 图片，图片说明采用文章标题；其余页面沿用站点分享图。内置翻译教程提供三个设置场景，正文为 17 语，中／英／日／韩四套真实界面截图按现有语言规则选用，不以配置截图宣称模型效果或完全离线翻译。
 - [Base.astro](src/layouts/Base.astro) 输出每页自引用 canonical、17 个互相对应的 hreflang 和简中 `x-default`；各语言保持独立可抓取 URL，不按 IP 或浏览器语言强制跳转。标题、摘要同步到 Open Graph 和 Twitter，并提供分享图和替代文本。[Google 多语言建议](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)
 - [LocalizedPage.astro](src/components/LocalizedPage.astro) 输出产品 SoftwareApplication、指南 Article 和 FAQPage；公共布局包含 Organization、WebSite、WebPage、内页面包屑。只标记真实可见内容，不编造评分、销量或价格。新指南填写实际 `published` 与 `updated` 日期，内容更新时修改该篇 `updated`，不用构建时间冒充内容更新时间。指南通过 `related` 指定相关文章；正文命令、表格和链接由 [ArticleSection.astro](src/components/ArticleSection.astro) 输出静态 HTML，站内链接随当前语言切换。
 - [sitemap.xml.ts](src/pages/sitemap.xml.ts) 从 `publicPaths` 生成全部 17 语公开页面（包括手机安装教程），并提供对应语言链接。账户、授权回调、支付返回和 404 页面使用 noindex，不进入站点地图。让爬虫能够读取 noindex，不用 robots.txt 屏蔽这些 HTML 页面。

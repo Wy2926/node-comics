@@ -3,7 +3,7 @@ import type { Locale } from '../i18n/types';
 
 export const screenshotLocales = ['zh-CN', 'en', 'ja', 'ko'] as const;
 export type ScreenshotLocale = typeof screenshotLocales[number];
-export const screenshotNames = ['library', 'reader-directory', 'reader-settings', 'translation-settings', 'channel-form', 'remote-library', 'search', 'search-results'] as const;
+export const screenshotNames = ['library', 'reader-directory', 'reader-settings', 'translation-settings', 'channel-form', 'remote-library', 'search', 'search-results', 'builtin-channel', 'builtin-resources', 'builtin-service'] as const;
 export type GuideImage = typeof screenshotNames[number];
 
 const images = import.meta.glob<{ default: ImageMetadata }>('../assets/guides/*/*.webp', { eager: true });
@@ -27,11 +27,12 @@ export function guideImage(name: GuideImage, locale: Locale): ImageMetadata {
 }
 
 // Only substantial, actionable workflows lead the tutorial directory.
-export const featuredGuides = ['manga-translation', 'local-comics', 'find-manga', 'remote-library', 'local-translation', 'android-firefox'];
+export const featuredGuides = ['manga-translation', 'builtin-translation', 'local-comics', 'find-manga', 'remote-library', 'local-translation', 'android-firefox'];
 
 export const guideCovers: Record<string, GuideImage> = {
   'manga-translation': 'translation-settings', 'local-comics': 'library', 'find-manga': 'search',
   'remote-library': 'remote-library', 'local-translation': 'channel-form',
+  'builtin-translation': 'builtin-channel',
 };
 
 export const guideImages: Record<string, Partial<Record<number, GuideImage>>> = {
@@ -41,4 +42,5 @@ export const guideImages: Record<string, Partial<Record<number, GuideImage>>> = 
   'remote-library': { 0: 'remote-library' },
   'local-translation': { 3: 'channel-form', 4: 'translation-settings' },
   'find-manga': { 0: 'search', 2: 'search-results' },
+  'builtin-translation': { 0: 'builtin-channel', 1: 'builtin-resources', 3: 'builtin-service' },
 };
