@@ -13,7 +13,7 @@ if (location.port !== '5194') throw Error('Use isolated document fixture port 51
 const params = new URLSearchParams(location.search), locale = (params.get('locale') ?? 'zh-CN') as Locale;
 document.documentElement.lang = locale;
 document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
-if (params.get('theme') !== 'light') document.body.dataset.siteTheme = 'midnight';
+document.documentElement.dataset.siteTheme = params.get('theme') === 'light' ? 'paper' : 'midnight';
 function chooseSynthetic(bytes: number) {
   const started = performance.now();
   const input = document.querySelector('.file-dropzone input[type=file]') as HTMLInputElement | null;

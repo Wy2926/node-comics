@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const css=(file:string)=>readFileSync(new URL('../src/styles/'+file,import.meta.url),'utf8');
 
 test('website shape tokens use restrained radii without changing shared reader or Drive tokens',()=>{
-  const theme=css('marketing.css');
+  const theme=css('site-tokens.css');
   assert.match(theme,/body\[data-site-theme='midnight'\]/);
   for(const [token,value] of [['control',4],['card',8],['panel',10],['tab',4]]){
     assert.ok(theme.includes(`--comic-${token}-radius: ${value}px;`));

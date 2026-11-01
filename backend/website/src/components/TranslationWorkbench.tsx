@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import FileDropzone from './FileDropzone';
+import ImageThumbnail from './ImageThumbnail';
+import { siteUi } from '../i18n/site-ui';
 import Turnstile from './Turnstile';
 import TranslationModelPicker from './TranslationModelPicker';
 import DocumentTaskRow from './DocumentTaskRow';
@@ -44,6 +46,8 @@ import { pixels } from '../lib/translation-pixels';
 import { saveDownload, translationArchive, translationFilename } from '../lib/translation-download';
 import '../styles/translate.css';
 
+const ImagePreview = lazy(() => import('./ImagePreview'));
+
 const active = new Set([
   'needs_input',
   'queued',
@@ -69,6 +73,8 @@ const delay = (ms: number, signal: AbortSignal) =>
   });
 
 export default function TranslationWorkbench({ locale, copy: t, workbench: w }: { locale: Locale; copy: TranslationCopy; workbench: WorkbenchCopy }) {
+  const previewCopy = siteUi[locale];
+  const [previewId, setPreviewId] = useState<string>();
   const documentText = documentCopy(locale);
   const cacheCopy = translationCacheCopy[locale];
   const modelsCopy = modelCopy[locale];
@@ -222,6 +228,8 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     void load();
     const unsubscribe = subscribeAuth(() => {
       scopeVersion.current++;
+      setPreviewId(undefined);
+      setVolatile(undefined);
       controller.current?.abort(Error('AUTH_REQUIRED'));
       resumeOnReturn.current = false;
       verification.current?.reject(Error('AUTH_REQUIRED'));
@@ -305,6 +313,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     controller.current?.abort(Error('USER_PAUSED'));
   }
   async function changeHistory(value: boolean) {
+    setPreviewId(undefined);
     if (running.current) return;
     const version = ++scopeVersion.current;
     const identity = value ? undefined : account;
@@ -722,6 +731,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
         ? row.scope.startsWith('guest:')
         : row.scope === 'user:' + account?.id),
   );
+  const previewRow = displayed.find(row => row.id === previewId);
   const completed = displayed.filter((row) => row.state === 'succeeded' || row.id === volatile?.id);
   const tasks = [
     ...displayed.map(row => ({ kind: 'image' as const, row, id: row.id, created: row.created })),
@@ -803,7 +813,6 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
         <FileDropzone
           copy={w}
           busyLabel={t.busy}
-          compact={!!tasks.length || !!documents.file}
           disabled={workingNow || clearing || !ready}
           onFiles={addFiles}
           onBusyChange={(value) => { setImporting(value); if (value) setCacheNotice(''); }}
@@ -891,7 +900,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
             </div>
           )}
           <ol className="translation-records">
-            {showDocumentDraft && <li data-state="draft">
+            {showDocumentDraft && <li className="workbench-document-row" data-state="draft">
               <span className="record-kind" aria-hidden="true">{/\.pdf$/i.test(documents.file!.name) ? 'PDF' : 'ZIP'}</span>
               <div className="record-copy"><strong>{documents.file!.name}</strong><small><span>{documents.busy ? documentText[documents.progress?.phase ?? 'hashing'] : t.draft}</span><span>{(documents.file!.size / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })} MB</span><span>{w.cloud}</span><span>{documentText.output}</span></small>
                 {documents.progress && <div className="translation-progress" role="status"><span>{documents.progress.percent}%</span><progress max={100} value={documents.progress.percent} aria-label={documentText[documents.progress.phase]}/></div>}
@@ -902,8 +911,8 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
               if (task.kind === 'document') return <DocumentTaskRow key={'document:' + task.id} row={task.row} locale={locale} disabled={!!documents.actionId} onAction={(row, operation) => { void documents.action(row, operation); }} uploadProgress={documents.busy && documents.draftId === task.id ? documents.progress : undefined}/>;
               const row = task.row;
               return (
-              <li key={row.id} data-state={row.state}>
-                  <span className="record-kind" aria-hidden="true">{row.name.split('.').pop()?.toUpperCase().slice(0, 4) || 'IMG'}</span>
+              <li className="image-task-card" key={row.id} data-state={row.state}>
+                  <ImageThumbnail id={row.id} translated={row.state === 'succeeded'} result={volatile?.id === row.id ? volatile.blob : undefined} label={`${previewCopy.view} · ${row.name}`} onOpen={() => setPreviewId(row.id)}/>
                   <div className="record-copy">
                     <strong title={row.name}>{row.name}</strong>
                     <small>
@@ -917,6 +926,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
                     {row.error && <p className="translation-error">{errorText(row.error)}</p>}
                   </div>
                   <div className="record-actions">
+                    <button className="button secondary" onClick={() => setPreviewId(row.id)}>{previewCopy.view}</button>
                     {busy && active.has(row.state) && runningIds.current.includes(row.id) && <button className="button secondary" onClick={pause}>{t.cancel}</button>}
                     {(row.state === 'succeeded' || volatile?.id === row.id) && (
                       <button className="button secondary" disabled={downloading || clearing} onClick={() => void download([row])}>{t.download}</button>
@@ -939,6 +949,11 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
           {!tasks.length && !showDocumentDraft && <p className="translation-history-empty">{documents.loading ? documentText.loading : w.empty}</p>}
           <nav className="workbench-pagination" aria-label={documentText.history} lang={documentText.lang}>{documents.before && <button className="button secondary" disabled={documents.loading} onClick={() => documents.page(null)}>{documentText.latest}</button>}{documents.nextCursor && <button className="button secondary" disabled={documents.loading || documents.busy} onClick={() => documents.page(documents.nextCursor)}>{documentText.older}</button>}</nav>
       </section>
+      {previewRow && <Suspense fallback={<p role="status">{t.busy}</p>}>
+        <ImagePreview key={previewRow.id} row={previewRow} result={volatile?.id === previewRow.id ? volatile.blob : undefined}
+          locale={locale} downloadLabel={t.download} loadingLabel={t.busy} downloading={downloading || clearing}
+          onDownload={() => void download([previewRow])} onClose={() => setPreviewId(undefined)}/>
+      </Suspense>}
       <details className="translation-notes translation-details">
         <summary>{w.details}</summary>
         <div className="translation-notes-body">

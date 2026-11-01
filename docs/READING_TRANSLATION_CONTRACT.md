@@ -20,7 +20,7 @@
 
 注册用户调用现有 Bearer `/v1/translations`；游客调用同结构 Cookie `/v1/guest/translations`，均要求 `X-Translation-Protocol: overlay-v1`。游客额外使用 `X-Guest-Request: 1`，新 UUID 携带 `X-Turnstile-Token`（action=`guest_translate`）；`POST /v1/guest/session` 的 token 对应 `guest_session`。服务端校验 Turnstile hostname/action，不把前端成功当作准入。身份与限额见[会员额度](MEMBERSHIP_AND_QUOTAS.md#官网匿名体验)。
 
-受理／上传前冻结本地 UUID、实际输入与结果格式；可选 `resultFormat` 字段随记录保存，旧记录缺字段表示普通覆盖，无需修改 IndexedDB 表结构。刷新和失联后先 GET 原 UUID，仅确认 404 才以同 UUID 提交原描述；恢复不按当前分块能力重选格式，`needs_input` 重传原字节。已冻结的本地送译副本缺失时明确失败，不重新编码并改写原摘要。SSE 退避核实，未知结果不自动重调。普通／分块覆盖均合成并保存完整译图，再次查看直接读本地；写盘失败仍可立即下载。明确重试／重译创建新 UUID，请求体使用 `retry_of`／`regenerate_of` 及可选 `model_id`，由服务端继承结果格式，不把传输失败当作重译。
+受理／上传前冻结本地 UUID、实际输入与结果格式；可选 `resultFormat` 字段随记录保存，旧记录缺字段表示普通覆盖，无需修改 IndexedDB 表结构。刷新和失联后先 GET 原 UUID，仅确认 404 才以同 UUID 提交原描述；恢复不按当前分块能力重选格式，`needs_input` 重传原字节。已冻结的本地送译副本缺失时明确失败，不重新编码并改写原摘要。SSE 退避核实，未知结果不自动重调。普通／分块覆盖均合成并保存完整译图，再次查看直接读本地；卡片预览与下载共用已有完整译图，预览失败只重载本地图片，原译切换保持对应位置，关闭恢复卡片焦点，换号清除当前预览与图片引用。写盘失败仍可立即预览和下载。明确重试／重译创建新 UUID，请求体使用 `retry_of`／`regenerate_of` 及可选 `model_id`，由服务端继承结果格式，不把传输失败当作重译。
 
 提交请求、接收并保存译图分别显示本地进度；“同步已暂停”只描述客户端停止同步，不表示后端任务暂停。页面隐藏或断网后停止订阅，回到前台且网络恢复时核实原 UUID；用户主动暂停后由用户恢复。验证使用固定浮层，不占工作台布局；新匿名会话与新翻译分别取得各自 action 的 token，已有任务恢复不重复验证。
 

@@ -12,7 +12,7 @@
 | Logo / favicon | 复用插件品牌资源，深色布局使用插件原始 `logo-horizontal-en-dark.webp` / `logo-horizontal-zh-dark.webp` 的本地副本；命名见[品牌规范](../../docs/BRAND_AND_STORE_LISTING.md) |
 | [GitHubMark.astro](src/components/GitHubMark.astro) | GitHub 官方 [Octicons mark-github-16](https://github.com/primer/octicons/blob/90af1f14984832de34e94b2d530043fbcf85eb7f/icons/mark-github-16.svg)，固定版本 `90af1f14984832de34e94b2d530043fbcf85eb7f`；保留原始轮廓，仅使用 `currentColor` 和 20px 显示尺寸。上游 SVG SHA-256：`7421820090b50ac79d7c2bf7c951a433d7098a8a9c474809207bdd45f62d9d46`；[MIT 许可](public/licenses/octicons.txt)随静态产物分发 |
 
-首页截图和对照图按屏幕尺寸生成 WebP，保持画面比例，点击可打开大图；不重画 UI 或修改截图文字。网页翻译截图是 MangaPill 同页、同位置的英文原图与繁体中文译图；搜索截图是加载完成后的 Atsumaru／MangaPill 两个结果。各语言首页共用这些真实界面，不冒充对应语言的操作实测。黑白对照原图是日文，彩色原图以繁中为主；两张原图均保留原始文件，各提供当前 17 种支持语言中除原文语言外的 16 份重新翻译结果。生成的设计稿不作为产品素材使用。漫画与站点 UI 归各自权利人，用户提供素材不意味着重新授予许可；生成插画不重新授予第三方开源许可。
+首页截图和对照图按屏幕尺寸生成 WebP，保持画面比例，点击可打开大图；不重画 UI 或修改截图文字。功能概览复用文档中的原图／译图对照与离线中心截图（简繁中文用中文，其余语言用英文），书库和搜索结果复用下文的本地化桌面教程截图；仅加载对应语言的 480／800／1280 像素 WebP，原始截图按点击读取。网页翻译截图是 MangaPill 同页、同位置的英文原图与繁体中文译图；搜索截图是加载完成后的 Atsumaru／MangaPill 两个结果。各语言首页共用这些真实界面，不冒充对应语言的操作实测。黑白对照原图是日文，彩色原图以繁中为主；两张原图均保留原始文件，各提供当前 17 种支持语言中除原文语言外的 16 份重新翻译结果。生成的设计稿不作为产品素材使用。漫画与站点 UI 归各自权利人，用户提供素材不意味着重新授予许可；生成插画不重新授予第三方开源许可。
 
 ### 首页素材摘要
 

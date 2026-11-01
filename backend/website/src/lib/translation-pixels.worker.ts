@@ -23,10 +23,26 @@ self.onmessage = async (
     result?: TranslationResult;
     artifact?: Blob;
     allowTiles?: boolean;
+    thumbnail?: boolean;
   }>,
 ) => {
   try {
     const { source, limits, result, artifact, allowTiles = false } = event.data;
+    if (event.data.thumbnail) {
+      const thumbnail = await imageWork(async () => {
+        const metadata = await probeImageMetadata(source);
+        if (!metadata || metadata.width * metadata.height > 64 * 1024 * 1024) throw Error('IMAGE_DIMENSIONS_LIMIT');
+        const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, 480 / Math.max(bitmap.width, bitmap.height));
+        const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
+        try {
+          canvas.getContext('2d', { colorSpace: 'srgb' })!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          return await canvas.convertToBlob({ type: 'image/webp', quality: .8 });
+        } finally { bitmap.close(); canvas.width = canvas.height = 1; }
+      });
+      self.postMessage({ thumbnail });
+      return;
+    }
     if (result) {
       self.postMessage({
         result: await materializeResult(

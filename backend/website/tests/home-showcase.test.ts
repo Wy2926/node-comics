@@ -27,7 +27,8 @@ test('homepage remains statically readable and does not pull in billing or a UI 
   assert.match(source, /data-home-controls hidden/);
   assert.match(source, /loading="eager" fetchpriority="high"/);
   assert.match(source, /home-image-pair/);
-  assert.match(source, /home-search/);
+  assert.match(source, /home-features/);
+  assert.ok(source.indexOf('home-comparison container') < source.indexOf('home-features container'));
   assert.match(source, /loading="lazy"/);
   assert.match(source, /type="range"/);
   assert.doesNotMatch(source, /data-inline="(?:original|translated)"/);

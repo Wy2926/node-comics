@@ -9,36 +9,29 @@ export interface PixelResult {
   mime: string;
   result?: Blob;
 }
-export function pixels(
-  source: Blob,
-  limits: { max_bytes: number; max_pixels: number; max_dimension: number },
-  result?: TranslationResult,
-  artifact?: Blob,
-  allowTiles = false,
-): Promise<PixelResult> {
-  const work = () =>
-    new Promise<PixelResult>((resolve, reject) => {
-      const worker = new PixelWorker();
-      const timer = setTimeout(() => {
-        worker.terminate();
-        reject(Error('IMAGE_PROCESSING_FAILED'));
-      }, 120000);
-      const finish = () => {
-        clearTimeout(timer);
-        worker.terminate();
-      };
-      worker.onerror = () => {
-        finish();
-        reject(Error('IMAGE_PROCESSING_FAILED'));
-      };
-      worker.onmessage = (event) => {
-        finish();
-        if (event.data.error) reject(Error(event.data.error));
-        else resolve(event.data);
-      };
-      worker.postMessage({ source, limits, result, artifact, allowTiles });
-    });
+function pixelOperation<T>(message: unknown, signal?: AbortSignal): Promise<T> {
+  const work = () => new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    const worker = new PixelWorker();
+    const finish = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); worker.terminate(); };
+    const abort = () => { finish(); reject(signal?.reason); };
+    const timer = setTimeout(() => { finish(); reject(Error('IMAGE_PROCESSING_FAILED')); }, 120000);
+    signal?.addEventListener('abort', abort, { once: true });
+    worker.onerror = () => { finish(); reject(Error('IMAGE_PROCESSING_FAILED')); };
+    worker.onmessage = event => {
+      finish();
+      if (event.data.error) reject(Error(event.data.error));
+      else resolve(event.data);
+    };
+    worker.postMessage(message);
+  });
   const next = tail.then(work);
   tail = next.catch(() => undefined);
   return next;
+}
+export function pixels(source: Blob, limits: { max_bytes: number; max_pixels: number; max_dimension: number }, result?: TranslationResult, artifact?: Blob, allowTiles = false): Promise<PixelResult> {
+  return pixelOperation({ source, limits, result, artifact, allowTiles });
+}
+export function imageThumbnail(source: Blob, signal: AbortSignal): Promise<{ thumbnail: Blob }> {
+  return pixelOperation({ source, thumbnail: true }, signal);
 }

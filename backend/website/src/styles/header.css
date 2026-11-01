@@ -84,3 +84,16 @@
   .site-header .language-menu nav { inset-inline-start: 0; inset-inline-end: auto; }
   .mobile-nav { grid-column: 2; grid-row: 2; justify-self: end; }
 }
+
+.theme-toggle { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 1px solid transparent; border-radius: var(--comic-control-radius); background: transparent; color: var(--ink); }
+.theme-toggle[hidden] { display: none; }
+.theme-toggle:hover { background: var(--accent-soft); }
+.theme-toggle[aria-pressed='false'] .theme-sun, .theme-toggle[aria-pressed='true'] .theme-moon { display: none; }
+.theme-toggle:focus-visible { outline: var(--comic-focus-ring); outline-offset: var(--comic-focus-offset); }
+.brand-logo-dark { display: none; }
+:root[data-site-theme='midnight'] .brand-logo-dark { display: block; }
+:root[data-site-theme='midnight'] .brand-logo-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-site-theme]) .brand-logo-dark { display: block; }
+  :root:not([data-site-theme]) .brand-logo-light { display: none; }
+}

@@ -29,7 +29,7 @@ const brand=dictionaries[locale].ui.brandName;
     <link rel="canonical" href={absolute(localPath('/payment/success/',locale))} />
     <link rel="icon" href="/favicon.ico" />
   </head>
-  <body>
+  <body class="payment-success-page">
     <LanguageNotice locale={locale} enabled={false}/>
     <header class="receipt-header">
       <a class="brand" href={localPath('/',locale)} aria-label={brand}><Image src={locale.startsWith('zh')?logoZh:logoEn} alt={brand} width={240} loading="eager" /></a>
@@ -54,7 +54,7 @@ const brand=dictionaries[locale].ui.brandName;
   </body>
 </html>
 <style>
-  body{min-height:100svh;background:radial-gradient(ellipse at 50% 36%,#e8f3ff 0,transparent 65%),var(--canvas)}
+  .payment-success-page{min-height:100svh;background:radial-gradient(ellipse at 50% 36%,var(--accent-soft) 0,transparent 65%),var(--canvas)}
   .receipt-header{max-width:1120px;margin:auto;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px}
   main{padding:34px 24px 72px;display:grid;place-items:center}
   .receipt{width:min(100%,560px);background:var(--surface);border:var(--comic-border);border-radius:var(--comic-panel-radius);box-shadow:var(--comic-shadow);text-align:center;overflow:hidden}

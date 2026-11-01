@@ -131,6 +131,7 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 
 | 工具 | 范围 |
 | --- | --- |
+| `verify_website_appearance.mjs` | 构建预览与 Vite 5194 统一工作台夹具；检查亮暗／系统偏好、存储受限、无 JS、四语窄屏／RTL、功能区顺序和截图交替／手机端堆叠、深色背景隔离、图片卡片与长图预览、位置和焦点恢复、下载、缺失结果重载、换号释放图片；截图写入 `artifacts/website-appearance`。只使用本地合成图片及模拟接口，不调用真实身份或模型 |
 | `verify_website_compare.mjs` | 构建预览中的 17 语首页、黑白／彩色各 16 语真实译图切换、按需加载与失败保留、桌面并排与窄屏滑杆、母语选择器、RTL、键盘、无 JavaScript 和减少动画；截图写入 `artifacts/website-compare`，禁止第三方请求，不调用身份、计费或翻译服务 |
 | `verify_website_languages.mjs` | 17 语公开页面、14 档宽度导航防挤压／遮挡、RTL、无 JS 导航、桌面键盘操作、Android Chromium／iPhone WebKit 触控语言与导航菜单、返回恢复、可滚动语言菜单；提示的完整文案跟随浏览器推荐语言，检查 17 语跨方向排版、桌面／320px 大字、仅点击切换、手动偏好／关闭、查询与锚点保留、私有流程抑制和存储不可用。`--notices-only` 只检查语言提示，`--header-only` 只检查导航布局，`--menus-only` 检查布局与菜单交互；触控检查需安装与 Playwright 匹配的 WebKit，不调用真实身份、计费或模型服务 |
 | `verify_website_guides.mjs` | 构建预览中的 17 语教程目录及六篇图文教程、桌面／320px 窄屏、四语截图源文件摘要匹配与放大链接、中日韩英桌面／手机截图、无 JavaScript 与断图降级；不调用身份、计费或翻译服务 |

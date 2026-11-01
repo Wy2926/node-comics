@@ -66,7 +66,7 @@ try{
     assert.equal(row.resultFormat,'overlay-tiles-v1');assert.equal(row.snapshot.result.representation,'overlay-tiles-v1');
     assert.equal(before.admitted_requests[row.requestId].result_format,'overlay-tiles-v1');
     assert.deepEqual([row.width,row.height],[100000,64]);
-    assert.equal(await page.locator('.translation-workbench img, .translation-canvas').count(),0);
+    assert.equal(await page.locator('.record-thumbnail').count(),1);
     const image=await downloadAndCompare(page,row,'wide');assert.equal(image.format,'PNG');
     check('100000x64 classic negotiates tiles and downloads an exact full PNG across the 2048px lettering boundary');
     await page.reload();await ready(page);await waitState(page,'succeeded');
@@ -147,13 +147,13 @@ try{
     await page.waitForFunction(()=>document.querySelectorAll('.translation-records li').length===2);
     await page.getByRole('button',{name:'开始翻译',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.translation-records li[data-state="succeeded"]').length===2,undefined,{timeout:60000});
-    assert.equal(await page.locator('.translation-workbench img, .translation-canvas, input[type="range"]').count(),0);
+    assert.equal(await page.locator('.record-thumbnail').count(),2);
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'打包下载已完成（ZIP）',exact:true}).click()]);
     const archive=path.join(out,'translations.zip');await download.saveAs(archive);
     const summary=JSON.parse(execFileSync(python,['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))',archive],{encoding:'utf8'}));
     assert.equal(summary.length,2);assert(summary.every(name=>/\.(png|webp|jpg)$/.test(name)));
     assert.equal((await state()).create_calls,2);
-    check('batch uploads two images, completes two distinct tasks and downloads one valid ZIP without previews');
+    check('batch uploads two images, completes two distinct tasks and downloads one valid ZIP from the card grid');
   });
   assert.deepEqual(errors,[]);
   await writeFile(path.join(out,'results.json'),JSON.stringify({checks,errors,scenarios,liveProvider:false,syntheticApi:true},null,2));

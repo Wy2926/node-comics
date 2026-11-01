@@ -199,7 +199,7 @@ for (const file of htmlFiles) {
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
     if ($('.home-copy a[data-install-extension]').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
     if ($('main .home-plan, main .home-price, main .home-cycle, main a[href$="/pricing/"]').length) errors.push(`${label}: pricing belongs on the separate pricing page`);
-    if ($('main a[href$="/translate/"]').length || $(`.site-header nav a[href="${localPath('/translate/',locale)}"]`).length !== 2) errors.push(`${label}: translator must be in desktop and mobile navigation`);
+    if ($('main .home-translator-link[href$="/translate/"]').length !== 1 || $(`.site-header nav a[href="${localPath('/translate/',locale)}"]`).length !== 2) errors.push(`${label}: translator must be in desktop and mobile navigation`);
     if ($('main [data-install-icon][src="/browsers/chrome.svg"]').length !== 2) errors.push(`${label}: installation icons need a Chrome no-script fallback`);
     for (const store of browserStores) {
       const entrance = $(`.hero-store[data-browser="${store.id}"]`);
@@ -217,7 +217,7 @@ for (const file of htmlFiles) {
     const scripts = await Promise.all($('script[type=module]').toArray().map(node => $(node).attr('src') ? readFile(join(root, $(node).attr('src')!), 'utf8') : $(node).text()));
     const showcaseScript = scripts.find(text => text.includes('[data-home-showcase]'));
     if (!showcaseScript || gzipSync(showcaseScript).byteLength > 4 * 1024) errors.push(`${label}: homepage interaction script exceeds its 4 KiB gzip budget`);
-    if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-search img[loading="lazy"]').length !== 1) errors.push(`${label}: comparison and search must be lazy-loaded static content`);
+    if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-feature-row').length !== 4 || $('.home-feature-image img[loading="lazy"][srcset][width][height]').length !== 4) errors.push(`${label}: expected lazy comparison images and four plugin features with responsive screenshots`);
     if ($('.home-image-pair input[type=range][hidden]').length !== 1 || $('[data-view-choice]').length) errors.push(`${label}: mobile comparison must use a slider rather than original/translated buttons`);
     if ($('button[data-sample]').length !== 2 || $('[data-language-choice]').length !== locales.length || $('[data-language-choice]:not([hidden])').length !== 16)
       errors.push(`${label}: expected two samples and all 16 available translation languages`);
@@ -312,7 +312,7 @@ for (const file of htmlFiles) {
     const accepted = (upload.attr('accept') ?? '').split(',');
     if (!upload.is('[multiple]') || !['image/jpeg', 'image/png', 'image/webp', '.pdf', '.zip', '.cbz'].every(type => accepted.includes(type)) || $('.translation-files').length !== 1 || $('.document-workbench, .translation-kind-nav').length) errors.push(`${label}: translator needs one mixed-file upload and one task list`);
     if ($('button[data-download-all], button[data-clear-cache]').length) errors.push(`${label}: empty translator must not show image-only history actions`);
-    if ($('.translation-workbench img, .translation-viewer, .translation-canvas, .translation-workbench input[type=range]').length) errors.push(`${label}: translator must not include image previews, comparison or zoom controls`);
+    if ($('.image-preview, .record-thumbnail').length) errors.push(`${label}: empty translator must not load private image previews`);
   }
   if (basePath(route) === '/pricing/') {
     const published = $('.published-plan-pricing');
