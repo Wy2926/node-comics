@@ -12,7 +12,7 @@ from .assets import available, object_path
 from .auth import identity
 from .config import settings
 from .db import get_db, session_factory
-from .errors import problem
+from .errors import ANALYSIS_LIMIT_MESSAGES, problem
 from .jobs import cancel_job, create_job
 from .languages import Language
 from .models import Asset, Attempt, ClassicState, Job, TextCall, User, now
@@ -142,6 +142,8 @@ def translation_json(db, row, *, context=None):
         'failed' if entry.status in {'failed', 'cancelled'} else
         'running' if entry.status == 'running' and entry.phase != 'validate_upload' else 'queued') if entry else 'failed'
     error = ({'code': entry.error_code, 'message': entry.error_message or '翻译失败'} if entry and entry.error_code else None)
+    if error and error['code'] in ANALYSIS_LIMIT_MESSAGES:
+        error['message'] = ANALYSIS_LIMIT_MESSAGES[error['code']]
     expired = bool(entry and entry.quota_kind != 'guest_trial' and result_expired(db, entry, days=context[4]))
     withdrawn = unavailable(db, row, entry, assets, days=context[4])
     if expired:
@@ -217,6 +219,8 @@ def accept_translation(db, user, request_id, body, *, submitted_ip=None):
             problem('UNKNOWN_COST_ACK_REQUIRED', '原调用结果待核实，不能自动重试', 409)
         if not unknown and body.retry_of and entry.status not in {'failed', 'cancelled'}:
             problem('RETRY_NOT_ALLOWED', '只有明确失败或取消的请求可以重试', 409)
+        if body.retry_of and entry.error_code in ANALYSIS_LIMIT_MESSAGES:
+            problem(entry.error_code, ANALYSIS_LIMIT_MESSAGES[entry.error_code], 422)
         if not unknown and body.regenerate_of and entry.status not in {'succeeded', 'no_text'}:
             problem('REGENERATE_NOT_ALLOWED', '只有完成的请求可以重新翻译', 409)
         image = ImageDescriptor.model_validate(previous.descriptor['image'])

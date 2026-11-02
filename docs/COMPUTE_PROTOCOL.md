@@ -75,7 +75,9 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 
 注册的 `supported_font_ids` 缺省为空列表，仅声明该节点已准备并能加载的字体 ID。任务的 `config.font_id` 随任务配置冻结并参与结果缓存身份，只分配给声明该 ID 的节点；领取重试和注册恢复沿用原配置。在途字体租约未排空时不得降级移除字体支持，否则注册返回 `409 NODE_FONT_CAPABILITY_CONFLICT`。ID 必须属于固定字体目录且支持目标语言，不传字体文件路径、URL 或任意字体名。节点按文件指定实际字族和字重，缺字由已注册的回退字体补齐；未安装或语言不兼容以 `CLASSIC_FONT_UNSUPPORTED` 失败，不能静默改用其他主字体。旧客户端、文件任务或历史检查点省略 `font_id`、传 `null` 或空字符串时使用目标语言的具体默认字体，调度仍要求节点支持该字体，不再使用旧的粗体默认文件。字体不改变 OCR、文本内容或译文 revision；文本检查点无需重复存放字体。
 
-analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 4 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。节点生成掩膜时检查非空像素，恢复已有检查点时在恢复文本工作前解码并校验掩膜；中心只校验其文件结构、尺寸和区域元数据。相同分析重复提交不会重新打开文本任务。
+analysis 的 regions 保留分组几何和排版参数，并提供四点 lines；segments 按相同顺序提供唯一 ID 和原文。无文字为两个空列表与 null mask。整个分析不超过 5 MiB；只有有界 mask 检查点仍用 PNG base64，不携带完整原图或译图。节点生成掩膜时检查非空像素，恢复已有检查点时在恢复文本工作前解码并校验掩膜；中心只校验其文件结构、尺寸和区域元数据。相同分析重复提交不会重新打开文本任务。
+
+分析数据（含掩膜）超过 5 MiB 报 `CLASSIC_ANALYSIS_TOO_LARGE`，文字区域超过 200 个报 `CLASSIC_REGION_LIMIT_EXCEEDED`，单段原文超过 4000 字符报 `CLASSIC_TEXT_LIMIT_EXCEEDED`。这些是确定性输入／结果超限，不使用可重试的 `CLASSIC_ANALYZE_FAILED`：节点停止该页后续处理，仅通过现有 complete 请求交付错误；中心直接结束任务并按现有失败规则释放额度，不重新排队，也不调用文本服务。通信失败可重送同一错误回执，但不重新分析原图。中心接收分析时执行相同限制，错误只含固定代码，不上传 OCR 正文或原始异常。上述上限与原图上传字节上限相互独立。
 
 终态后大检查点会被清理；analysis 重放核对阶段持久化的 `analysis_hash`，相同内容返回原回执，不依赖完整 JSON 仍在库中。
 
@@ -199,7 +201,7 @@ multipart 请求体接收受 `upload_body_timeout_seconds` 总时限约束，持
 | `doc_render` | 本地 input／analysis_ref、内联 `{analysis_hash,language,translations,revision}` | 本地 `output_ref`、quality_flags |
 | `doc_zip` | 完整有序的页 output_ref 与中心指定 output_key | 已 PUT 的最终 ZIP `output_ref` |
 
-本地文件描述只含 `{sha256,byte_size,mime,width?,height?}`，不能携带路径、R2 key 或签名。源和最终 ZIP 才含中心分配的 R2 key。完整 analysis JSON／掩膜留在宿主，单页分析及完成检查点最多 4 MiB；OCR 内联文本最多 200 段，每段原文最多 4000 字符、唯一 ID 最多 80 字符。API 不下载 analysis、不解析图像，应用层仍在 LLM 前校验完整 OCR 契约。无文字页提交空 segments 与 no_text，复用本地规范化原图，跳过 LLM／render 对该页的处理。
+本地文件描述只含 `{sha256,byte_size,mime,width?,height?}`，不能携带路径、R2 key 或签名。源和最终 ZIP 才含中心分配的 R2 key。完整 analysis JSON／掩膜留在宿主，单页分析及完成检查点最多 5 MiB；OCR 内联文本最多 200 段，每段原文最多 4000 字符、唯一 ID 最多 80 字符。API 不下载 analysis、不解析图像，应用层仍在 LLM 前校验完整 OCR 契约。无文字页提交空 segments 与 no_text，复用本地规范化原图，跳过 LLM／render 对该页的处理。
 
 全部 OCR 页完成后，中央才汇总一次 LLM。完整发送意图和请求先提交数据库，完整响应与调用状态／成本同事务持久化，再分发各页内联译文；这些私有正文列延迟加载，不进入默认监控或普通任务列表。请求身份或段落覆盖不匹配即拒绝，不截断、拆分或自动重发。未知调用保留预占；已有 DB 响应可恢复逐页检查点而不再次请求模型。具体文字、额度与人工核实规则以[文件翻译](DOCUMENT_TRANSLATION.md#整本-llm)为准。
 

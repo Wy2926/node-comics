@@ -13,7 +13,7 @@ from .timing import record, stage
 # png64 utility budget only; input admission is owned by the center.
 MAX_MASK_BYTES = 24 * 1024 * 1024
 MAX_RESULT_BYTES = 88 * 1024 * 1024
-MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
+MAX_CHECKPOINT_BYTES = 5 * 1024 * 1024
 
 
 def digest(value):
@@ -28,11 +28,11 @@ def timestamp(value):
     return parsed.timestamp()
 
 
-def png64(image, limit=MAX_MASK_BYTES):
+def png64(image, limit=MAX_MASK_BYTES, *, overflow_code='INPUT_INVALID'):
     out = BytesIO()
     image.save(out, format='PNG', compress_level=1)
     if out.tell() > limit:
-        raise NodeFailure('INPUT_INVALID')
+        raise NodeFailure(overflow_code)
     return base64.b64encode(out.getvalue()).decode('ascii')
 
 

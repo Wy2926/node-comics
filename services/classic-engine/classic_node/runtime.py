@@ -165,6 +165,12 @@ class Runtime:
 
     def analyze(self, rgb, input_hash, *, masks=None):
         regions, mask, raw, bubbles = self.engine.analyze(rgb)
+        if len(regions) > 200:
+            raise NodeFailure('CLASSIC_REGION_LIMIT_EXCEEDED')
+        if any(len(region.text) > 4000 for region in regions):
+            raise NodeFailure('CLASSIC_TEXT_LIMIT_EXCEEDED')
+        if any(not region.text.strip() for region in regions):
+            raise NodeFailure('CLASSIC_OCR_INVALID')
         if regions and (mask is None or not mask.any()):
             raise NodeFailure('CLASSIC_ANALYZE_FAILED')
         native = {}
@@ -174,7 +180,7 @@ class Runtime:
             if value.dtype != np.uint8 or value.shape != rgb.shape[:2]:
                 raise NodeFailure('CLASSIC_ANALYZE_FAILED')
             with stage('analyze_checkpoint'), Image.fromarray(value) as image:
-                payload = png64(image, MAX_CHECKPOINT_BYTES)
+                payload = png64(image, MAX_CHECKPOINT_BYTES, overflow_code='CLASSIC_ANALYSIS_TOO_LARGE')
             if masks is not None:
                 # DBNet can return a crop of its padded mask. Retain only this
                 # page's compact pixels, so nbytes accounts for the whole buffer.
@@ -189,9 +195,8 @@ class Runtime:
             'regions': [serialize_region(region) for region in regions],
             'mask': encoded('mask', mask), 'raw_mask': encoded('raw_mask', raw),
             'bubble_mask': encoded('bubble_mask', bubbles)}
-        if (len(regions) > 200 or any(not item['source'].strip() or len(item['source']) > 4000 for item in analysis['segments'])
-                or len(json.dumps(analysis, allow_nan=False).encode()) > MAX_CHECKPOINT_BYTES):
-            raise NodeFailure('CLASSIC_ANALYZE_FAILED')
+        if len(json.dumps(analysis, allow_nan=False).encode()) > MAX_CHECKPOINT_BYTES:
+            raise NodeFailure('CLASSIC_ANALYSIS_TOO_LARGE')
         if masks is not None:
             masks.clear()
             masks.update(native)

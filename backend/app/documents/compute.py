@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..compute_v3 import config_payload, no_store, stamp
 from ..config import settings
 from ..db import get_db
-from ..errors import ProcessingError, problem
+from ..errors import ProcessingError, node_error, problem
 from ..models import Job, now
 from ..node_auth import node_auth
 from ..node_config import NodeConfig
@@ -32,7 +32,7 @@ router = APIRouter(prefix='/internal/documents/compute/v2', tags=['document comp
                    dependencies=[Depends(no_store)])
 log = logging.getLogger('uvicorn.error.documents')
 NODE_STAGES = ('doc_prepare', 'doc_ocr', 'doc_render', 'doc_zip')
-MAX_JSON_BYTES = 4 * 1024 * 1024
+MAX_JSON_BYTES = 5 * 1024 * 1024
 MAX_ZIP_BYTES = 4 * 1024 ** 3
 FILE_LIMITS = ('max_page_pixels', 'max_page_dimension', 'max_page_bytes', 'max_expanded_bytes',
                'max_output_bytes', 'max_spool_bytes', 'parser_memory_bytes', 'parser_timeout_seconds', 'pdf_dpi')
@@ -344,7 +344,9 @@ def checked_result(db, lease, stage, body):
     page = db.get(DocumentPage, (lease.job_id, stage.page_index))
     if stage.name == 'doc_render':
         return {'output_ref': image_reference(body.output_ref, page.input_ref)}
-    if (body.analysis_ref.mime != 'application/json' or body.analysis_ref.byte_size > MAX_JSON_BYTES
+    if body.analysis_ref.byte_size > MAX_JSON_BYTES:
+        raise node_error('CLASSIC_ANALYSIS_TOO_LARGE')
+    if (body.analysis_ref.mime != 'application/json'
             or body.analysis_ref.width is not None or body.analysis_ref.height is not None
             or body.text.page_index != stage.page_index or body.no_text != (not body.text.segments)):
         problem('DOCUMENT_ARTIFACT_INVALID', 'OCR 检查点与页面不匹配', 422)
@@ -382,7 +384,7 @@ def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)
                        stage=stage.name, page_index=stage.page_index)
         if body.error:
             db.rollback()
-            fail_lease(lease_id, ProcessingError(body.error, '文件节点执行失败'), token=body.lease_token,
+            fail_lease(lease_id, node_error(body.error), token=body.lease_token,
                        node_id=identity, workspace_generation=body.workspace_generation)
             db.expire_all()
             metrics['outcome'] = 'failed'

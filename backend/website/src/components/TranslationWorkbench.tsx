@@ -86,11 +86,12 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
     try{if(value)localStorage.setItem(key,value);else localStorage.removeItem(key);}catch{/* Choice still applies to this batch. */}
     setModelId(value);
   }
-  function errorText(code:string){
+  function errorText(code:string,message?:string){
     if(code==='TRANSLATION_MODEL_NOT_ALLOWED')return modelsCopy.not_allowed;
     if(code==='TRANSLATION_MODEL_UNAVAILABLE'||code==='TRANSLATION_MODEL_INVALID')return modelsCopy.temporary;
     if(code==='DAILY_QUOTA_EXHAUSTED')return modelsCopy.quota_exhausted;
-    return translationError(code,t);
+    const translated=translationError(code,t);
+    return translated===t.generic&&message?message:translated;
   }
   const [rows, setRows] = useState<RecordMeta[]>([]),
     [account, setAccount] = useState<Account>(),
@@ -923,7 +924,7 @@ export default function TranslationWorkbench({ locale, copy: t, workbench: w }: 
                       {row.snapshot?.result?.kind === 'no_text' && <span>{t.noText}</span>}
                       {row.snapshot?.result?.kind === 'partial' && <span>{t.partial}</span>}
                     </small>
-                    {row.error && <p className="translation-error">{errorText(row.error)}</p>}
+                    {row.error && <p className="translation-error">{errorText(row.error,row.snapshot?.error?.code===row.error?row.snapshot.error.message:undefined)}</p>}
                   </div>
                   <div className="record-actions">
                     <button className="button secondary" onClick={() => setPreviewId(row.id)}>{previewCopy.view}</button>

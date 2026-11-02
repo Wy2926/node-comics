@@ -10,12 +10,12 @@ from .adapters.llm import TextError
 from .adapters.text import LANGUAGE_CODE_VERSIONS, LEGACY_SYSTEM, call_text, groups, input_bound, parse_translations
 from .assets import available
 from .db import session_factory
-from .errors import ProcessingError
+from .errors import ProcessingError, node_error
 from .image_metadata import image_metadata
 from .models import Asset, ClassicState, Job, TextCall, now, uid
 from .translation_provider_limits import reserve_request, release_unstarted_request
 
-MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
+MAX_CHECKPOINT_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_BYTES = 24 * 1024 * 1024
 
 
@@ -49,18 +49,22 @@ def text_remaining(db, job):
 def validate_analysis(result, width, height):
     try:
         if len(json.dumps(result, allow_nan=False).encode()) > MAX_CHECKPOINT_BYTES:
-            raise ValueError()
+            raise node_error('CLASSIC_ANALYSIS_TOO_LARGE')
         segments = result['segments']
-        if result['width'] != width or result['height'] != height or not isinstance(segments, list) or len(segments) > 200:
+        if result['width'] != width or result['height'] != height or not isinstance(segments, list):
             raise ValueError()
+        if len(segments) > 200:
+            raise node_error('CLASSIC_REGION_LIMIT_EXCEEDED')
         if len(result['regions']) != len(segments):
             raise ValueError()
         seen = set()
         for segment in segments:
             if set(segment) != {'id', 'source'} or not isinstance(segment['id'], str) or not 1 <= len(segment['id']) <= 80 or segment['id'] in seen:
                 raise ValueError()
-            if not isinstance(segment['source'], str) or not segment['source'].strip() or len(segment['source']) > 4000:
+            if not isinstance(segment['source'], str) or not segment['source'].strip():
                 raise ValueError()
+            if len(segment['source']) > 4000:
+                raise node_error('CLASSIC_TEXT_LIMIT_EXCEEDED')
             seen.add(segment['id'])
         if segments:
             mask_bytes = decode_bounded(result['mask'], MAX_CHECKPOINT_BYTES)

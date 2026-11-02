@@ -21,7 +21,7 @@ from .classic import validate_analysis
 from .node_auth import node_auth
 from .config import settings
 from .db import get_db, session_factory
-from .errors import ProcessingError, problem
+from .errors import ProcessingError, node_error, problem
 from .languages import Language, LANGUAGES
 from .translation_fonts import FontId, FONT_LANGUAGES, resolve_font, supports_font
 from .models import Asset, Attempt, ClassicState, Job, now
@@ -805,7 +805,7 @@ def complete(lease_id: str, body: CompletionRequest, identity=Depends(node_auth)
         from .dispatcher import recover_lease
         recover_lease(lease_id)
     else:
-        fail_stage(lease_id, ProcessingError(body.error.code, f'计算节点未能完成此页（{body.error.code}）'),
+        fail_stage(lease_id, node_error(body.error.code),
                    token=body.lease_token, node_id=identity)
     with session_factory()() as db:
         lease = scoped_lease(db, lease_id, body.lease_token, identity)
