@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 from .resources import resolve_cpu_resources
 
 ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto', 'backend': 'cuda',
+    'ocr_backend': 'classic', 'ocr_model': None,
     'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None,
     'ocr_batch_size': 4, 'ocr_min_batch_size': 1, 'color_batch_size': 4, 'detect_batch_size': 4,
     'ocr_arena_extend_strategy': 'kSameAsRequested', 'ocr_arena_shrinkage': True}
@@ -16,13 +17,20 @@ LOCAL_DEFAULTS = {'local_pages': 2, 'render_workers': 'auto', 'max_leases': 8,
     'resident_bytes': 1024 ** 3, 'document_spool_bytes': 6 * 1024 ** 3}
 
 
+def engine_options(engine):
+    """Only active backend options affect execution, diagnostics and checkpoints."""
+    unused = (('ocr_min_batch_size', 'ocr_arena_extend_strategy', 'ocr_arena_shrinkage')
+              if engine.get('ocr_backend', 'classic') == 'hayai' else ('ocr_model',))
+    return {key: value for key, value in engine.items() if key not in unused}
+
+
 def execution_settings(config):
     """An explicit, credential/path-free allowlist for diagnostics and reports."""
     local = {key: config.get(key, default) for key, default in LOCAL_DEFAULTS.items()}
     local['inpaint_slots'] = config.get('inpaint_slots', local['local_pages'])
     local['analysis_workers'] = config.get('analysis_workers', local['download_workers'])
-    local['engine'] = {key: config.get('engine', {}).get(key, default)
-                      for key, default in ENGINE_DEFAULTS.items() if key not in {'models', 'font', 'keep_lang'}}
+    local['engine'] = {key: value for key, value in engine_options(ENGINE_DEFAULTS | config.get('engine', {})).items()
+                      if key in ENGINE_DEFAULTS and key not in {'models', 'font', 'keep_lang', 'ocr_model'}}
     return local
 
 
@@ -59,7 +67,7 @@ def load(path):
         raise ValueError('Node identity and credential are required')
     if set(value.get('engine', {})) - set(ENGINE_DEFAULTS):
         raise ValueError('Unknown local engine option')
-    value['engine'] = ENGINE_DEFAULTS | value.get('engine', {})
+    value['engine'] = engine_options(ENGINE_DEFAULTS | value.get('engine', {}))
     for key, default in LOCAL_DEFAULTS.items():
         value.setdefault(key, default)
     value.setdefault('inpaint_slots', value['local_pages'])
@@ -92,21 +100,31 @@ def load(path):
         raise ValueError('engine.threads must be auto or a positive integer')
     if type(value['engine']['gpu']) is not int or value['engine']['gpu'] < 0:
         raise ValueError('gpu must be a nonnegative device index')
-    if value['engine']['backend'] not in ('cuda', 'amd'):
-        raise ValueError('backend must be cuda or amd')
+    from mtu_engine.backend import BACKENDS
+    if value['engine']['backend'] not in BACKENDS:
+        raise ValueError('backend must be cuda, amd or mps')
+    if value['engine']['ocr_backend'] not in ('classic', 'hayai'):
+        raise ValueError('ocr_backend must be classic or hayai')
+    if value['engine']['ocr_backend'] == 'hayai':
+        if not isinstance(value['engine']['ocr_model'], str) or not value['engine']['ocr_model']:
+            raise ValueError('hayai OCR requires ocr_model')
+        value['engine']['ocr_model'] = str((path.parent / value['engine']['ocr_model']).resolve())
     if type(value['engine']['inpainting_size']) is not int or value['engine']['inpainting_size'] not in (512, 768, 1024):
         raise ValueError('inpainting_size must be 512, 768 or 1024')
     if type(value['engine']['detect_size']) is not int or not 512 <= value['engine']['detect_size'] <= 2048:
         raise ValueError('detect_size must be between 512 and 2048')
-    for key in ('ocr_batch_size', 'ocr_min_batch_size', 'color_batch_size', 'detect_batch_size'):
-        if type(value['engine'][key]) is not int or not 1 <= value['engine'][key] <= 32:
-            raise ValueError(f'engine.{key} must be between 1 and 32')
-    if value['engine']['ocr_min_batch_size'] > value['engine']['ocr_batch_size']:
-        raise ValueError('ocr_min_batch_size must not exceed ocr_batch_size')
-    if value['engine']['ocr_arena_extend_strategy'] not in ('kNextPowerOfTwo', 'kSameAsRequested'):
-        raise ValueError('ocr_arena_extend_strategy must be kNextPowerOfTwo or kSameAsRequested')
-    if type(value['engine']['ocr_arena_shrinkage']) is not bool:
-        raise ValueError('ocr_arena_shrinkage must be a boolean')
+    for key in ('ocr_batch_size', 'color_batch_size', 'detect_batch_size'):
+        limit = 8 if key == 'ocr_batch_size' and value['engine']['ocr_backend'] == 'hayai' else 32
+        if type(value['engine'][key]) is not int or not 1 <= value['engine'][key] <= limit:
+            raise ValueError(f'engine.{key} must be between 1 and {limit}')
+    if value['engine']['ocr_backend'] == 'classic':
+        minimum = value['engine']['ocr_min_batch_size']
+        if type(minimum) is not int or not 1 <= minimum <= value['engine']['ocr_batch_size']:
+            raise ValueError('ocr_min_batch_size must be between 1 and ocr_batch_size')
+        if value['engine']['ocr_arena_extend_strategy'] not in ('kNextPowerOfTwo', 'kSameAsRequested'):
+            raise ValueError('ocr_arena_extend_strategy must be kNextPowerOfTwo or kSameAsRequested')
+        if type(value['engine']['ocr_arena_shrinkage']) is not bool:
+            raise ValueError('ocr_arena_shrinkage must be a boolean')
     if value['engine']['keep_lang'] is not None:
         from langcodes import tag_is_valid
         language = value['engine']['keep_lang']

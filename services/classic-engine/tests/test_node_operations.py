@@ -105,10 +105,12 @@ def test_attach_and_image_stage_never_sample_or_write_diagnostics(tmp_path, monk
 def test_execution_settings_allowlist_excludes_identity_paths_and_credentials():
     settings = execution_settings({'node_token': 'secret-token', 'control_url': 'private-origin',
         'proxy_url': 'http://proxy-user:proxy-password@proxy-private:8080',
-        'engine': {'models': 'private-model-path', 'font': ['private-font-path'], 'ocr_batch_size': 2}})
+        'engine': {'models': 'private-model-path', 'font': ['private-font-path'], 'ocr_batch_size': 2,
+                   'unexpected_secret': 'private-engine-secret'}})
     assert settings['engine']['ocr_batch_size'] == 2
     assert not any(value in json.dumps(settings) for value in ('secret-token', 'private-origin', 'private-model-path', 'private-font-path'))
     assert 'proxy' not in json.dumps(settings)
+    assert 'private-engine-secret' not in json.dumps(settings)
 
 
 def test_process_survives_registration_outage_then_registers(tmp_path):
@@ -326,8 +328,8 @@ def test_persistent_operator_stop_prevents_restart(tmp_path, monkeypatch):
     assert not (tmp_path / 'owner.sqlite3').exists()
 
 
-@pytest.mark.parametrize('backend', [None, 'cuda', 'amd'])
-def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypatch, capsys, backend):
+@pytest.mark.parametrize('backend,device', [(None, 'cuda'), ('cuda', 'cuda'), ('amd', 'hip'), ('mps', 'mps')])
+def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypatch, capsys, backend, device):
     from classic_node import __main__ as cli
     import sys
     bundle = tmp_path / '节点 程序'
@@ -352,7 +354,7 @@ def test_bundle_assets_resolve_independently_of_private_data(tmp_path, monkeypat
     monkeypatch.setitem(sys.modules, 'classic_node.runtime', SimpleNamespace(Runtime=FakeRuntime))
     assert cli.execute(SimpleNamespace(command='check', config='elsewhere/node.json', bundle_root=bundle)) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report['inpainting_backend'] == ('pytorch-hip-fp32' if backend == 'amd' else 'pytorch-cuda-fp32')
+    assert report['inpainting_backend'] == f'pytorch-{device}-fp32'
     assert observed['models'] == str(bundle / 'models')
     assert observed['font'] == [str(bundle / 'fonts/font.otf')]
     assert observed['warmup'] and observed['closed']

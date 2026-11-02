@@ -1,6 +1,6 @@
 # MTU 计算节点
 
-常规漫画翻译的 v3 图像计算节点。组装固定版本的 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) DBNet 检测与文字蒙版、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字；复用 [Manga-Overlay-Translator](https://github.com/Yuff1010/Manga-Overlay-Translator) 文字类别加权评分，逐段试读并分流到中／韩／英各自的 PP-OCRv5 模型和日文 Manga OCR。Paddle 等比缩放与批处理使用 [RapidOCR](https://github.com/RapidAI/RapidOCR)，段落合并与阅读顺序使用 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 原生分组。图像模型使用 CUDA；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
+常规漫画翻译的 v3 图像计算节点。使用 MTU DBNet 检测文字，BallonsTranslator 分组，支持经典语言专家或 Hayai 512 识别；中心执行文本翻译，节点完成取色、气泡处理、LaMa 抹字与 Qt 嵌字，输出无损 WebP 覆盖层。组成与行为见 [ENGINE.md](ENGINE.md)，上游版本与许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 ## 开发运行
 
@@ -33,6 +33,36 @@ uv run --project environments/amd --locked python -m classic_node check --config
 
 AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`；真实模型测试另外设置 `MTU_TEST_BACKEND=amd`。2 万／5 万像素图应先单页测量再增加并发；不能因使用相同并发参数便推断与 RTX 5060 容量或性能相同。
 
+### Apple Silicon 与 Hayai OCR
+
+主图像管线用 [macOS 独立环境](environments/macos/pyproject.toml)，显式配置 `engine.backend: "mps"`、`gpu: 0`。检测、取色、气泡和 LaMa 使用 MPS；默认 `ocr_backend: "classic"` 的日文识别使用 MPS，PP-OCR 使用 CPU ONNX。MPS 并发边界见 [ENGINE.md](ENGINE.md#可选后端)。
+
+```sh
+uv sync --project environments/macos --locked --group test
+```
+
+Hayai 复用节点现有环境。准备工具下载并校验固定版本，已有源文件直接复用；生成资产保存在仓库外：
+
+```sh
+WORK="$HOME/Developer/ocr-tests/node-comics-hayai"
+uv run --project environments/macos --locked python -m tools.prepare_hayai --source "$WORK/source" --output "$WORK/hayai"
+uv run --project environments/macos --locked python -m tools.prepare_mtu --ocr-backend hayai --output "$WORK/assets" --cache "$WORK/downloads"
+```
+
+在私有配置中设置以下字段，并让 `models`／`font` 指向准备好的公共资产。`ocr_model` 相对配置文件解析：
+
+```json
+{
+  "backend": "mps",
+  "gpu": 0,
+  "ocr_backend": "hayai",
+  "ocr_model": "/absolute/path/hayai",
+  "ocr_batch_size": 8
+}
+```
+
+`prepare_mtu --ocr-backend hayai` 只准备共享资产；已有完整公共资产包可直接复用，无须重建。配置规则见[节点配置](../../docs/NODE_CONFIGURATION.md)，推理流程与验证范围见 [OCR 后端契约](ENGINE.md#ocr-后端契约)。切换前按[升级规则](docs/NODE_OPERATIONS.md#升级与验收)处理待恢复任务；`check` 只校验和预热，`run` 才接单。
+
 ## 验证
 
 ```powershell
@@ -60,6 +90,16 @@ AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`�
 分析细分记录检测、分组、路由、OCR、取色、气泡、蒙版细化和检查点耗时；抹字细分准备、纯色填充、LaMa。锁等待包含在对应阶段内，不可重复相加。仅原有时间字段送中心，细分指标及字节／次数计数留在本地测量，不扩展协议、不记录私有文本。大图提前分块时 `render_encode` 是分块差分、编码、校验及组包的总墙钟时间，`render_diff` 仅为分块前规划；比较输出开销应使用二者之和。`render_tile_diff_sum`／`render_tile_encode_sum` 是并发任务耗时之和，不是墙钟时间。
 
 取色记录 `analyze_color_gate` 检查耗时、`color_fast_regions`／`color_fast_lines` 无明显彩色而直接使用默认配色的段／行数和 `color_model_lines` 实际模型输入行数；前者包含在 `analyze_colors` 内。每段最大有效行取色和默认黑字白边不保留灰字、反白字原样式，须比较原图与输出，不能只验收耗时；完整 OCR、抹字与排版几何仍需保持。具体规则见 [ENGINE.md](ENGINE.md#排版配置)。
+
+### OCR 回归
+
+[benchmark_ocr.py](tools/benchmark_ocr.py) 通过当前 `Runtime` 的真实分析管线验证所选后端，默认读取官网两张原图。每张预热后重复五轮，保存文字、原始行几何、图片摘要和耗时；不会注册节点或请求翻译。分别使用 `classic`／`hayai` 的私有本地配置和不同输出文件：
+
+```sh
+uv run --project environments/macos --locked python -m tools.benchmark_ocr --config /path/to/check.local.json --output /path/to/ocr-result.json
+```
+
+`--input` 可指定图片，`--repeats` 设置轮数。结果里的 `ocr_seconds` 包含经典路由或 Hayai 裁剪／预处理／识别，`analysis_seconds` 还包含检测、取色、气泡和蒙版；加载单独计时，形状预热不计入。重复输出不一致会报错，已有报告不会覆盖。人工逐字参考和私有结果留在仓库外，不能使用官网译图作为 OCR 真值；两张样本不足以证明通用准确率或 CUDA 性能。
 
 ## 部署与协议
 

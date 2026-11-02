@@ -12,12 +12,14 @@ import pytest
 from classic_node.timing import collect
 from mtu_engine.colors import Colors, _CpuColorModel, _monochrome, ensure_stroke_contrast
 from mtu_engine.engine import serialize_region
-from mtu_engine.ocr import OCR_MAX_WIDTH
+from mtu_engine.ocr.crops import OCR_MAX_WIDTH
 
 
 def region(lines, texts=None, language='unknown'):
     value = SimpleNamespace(lines=lines, texts=texts if texts is not None else ['original OCR'],
-                            text='original OCR', language=language)
+                            text='original OCR', language=language,
+                            ocr_line_aligned=language in ('en', 'ch', 'korean') or
+                            (language == 'japan' and len(lines) == 1))
     def set_colors(fg, bg):
         value.fg_colors, value.bg_colors = fg, bg
     value.set_font_colors = set_colors

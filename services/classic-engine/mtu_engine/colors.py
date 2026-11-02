@@ -176,15 +176,12 @@ class Colors:
 
     @staticmethod
     def _line_texts(region):
-        language = getattr(region, 'language', None)
-        aligned = (language in ('en', 'ch', 'korean', 'japan') and len(region.texts) == len(region.lines)
-                   and (language != 'japan' or len(region.lines) == 1))
-        # Manga OCR writes a whole paragraph to its first line. It must never be
-        # used as the conditioning text for just that first line's image.
+        aligned = getattr(region, 'ocr_line_aligned', False) and len(region.texts) == len(region.lines)
+        # Paragraph text must never condition just the first line's image.
         return region.texts if aligned else [None] * len(region.lines)
 
     def _monochrome_region(self, image, region):
-        from .ocr import valid_crop
+        from .ocr.crops import valid_crop
         # Inspect every line, not only a representative: a colored last line
         # must keep the paragraph on the model path rather than the plain style.
         checked = False
@@ -199,7 +196,7 @@ class Colors:
 
     def _representative(self, image, region):
         from modules.detection.script_detection import _line_area
-        from .ocr import valid_crop
+        from .ocr.crops import valid_crop
         texts = self._line_texts(region)
         # Prefer reliable line-aligned OCR, then the existing native largest-line
         # rule (first wins ties). Japanese paragraph text stays unaligned here.

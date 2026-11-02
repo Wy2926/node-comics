@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from mtu_engine.engine import Engine
+from mtu_engine.ocr.classic import ClassicOCR
 from classic_node.timing import collect
 
 
@@ -40,15 +41,17 @@ def analysis(monkeypatch):
         is_valuable_text=lambda text: any(char.isalpha() for char in text)))
     engine = Engine.__new__(Engine)
     engine.gpu, engine.keep_lang = 0, None
+    engine.backend, engine.device = 'cuda', 'cuda:0'
+    engine.ocr = ClassicOCR.__new__(ClassicOCR)
     engine.config = SimpleNamespace(
         detector=SimpleNamespace(detection_size=1280, text_threshold=0.5, box_threshold=0.7, unclip_ratio=2.3),
         render=SimpleNamespace(stroke_width=0.1),
         ocr=SimpleNamespace(prob=0.5, min_text_length=1), mask_dilation_offset=0, kernel_size=3)
     engine._detector_lock, engine._bubble_lock = Lock(), Lock()
     engine.detector = SimpleNamespace(detect=detect)
-    engine.router = SimpleNamespace(classify=lambda image, blocks, groups: (['en'] * len(blocks), [None] * len(blocks)))
-    engine.recognizers = {}
-    engine.japanese = SimpleNamespace(recognize=lambda *args: pytest.fail('Unexpected Japanese branch'))
+    engine.ocr.router = SimpleNamespace(classify=lambda image, blocks, groups: (['en'] * len(blocks), [None] * len(blocks)))
+    engine.ocr.recognizers = {}
+    engine.ocr.japanese = SimpleNamespace(recognize=lambda *args: pytest.fail('Unexpected Japanese branch'))
     def colors(image, regions):
         assert image is source and not hasattr(engine, '_ocr_lock')
         assert all(not region.adjust_bg_color and region.default_stroke_width == .1 for region in regions)
@@ -88,8 +91,8 @@ def test_warmup_covers_amd_block_shapes_without_changing_cuda(analysis, backend,
             raise RuntimeError('fixture inpaint failed')
 
     engine.detector.detect = record('detect')
-    engine.probes = {name: SimpleNamespace(recognize=record(name)) for name in ('en', 'ch', 'korean')}
-    engine.router.choose = lambda *args: calls.append(('route', None))
+    engine.ocr.recognizers = {name: SimpleNamespace(recognize=record(name)) for name in ('en', 'ch', 'korean')}
+    engine.ocr.router.choose = lambda *args: calls.append(('route', None))
     engine.colors.apply = lambda *args: calls.append(('colors', None))
     engine.inpainter = SimpleNamespace(inpaint=inpaint)
     with pytest.raises(RuntimeError, match='fixture inpaint failed') if fail_at else nullcontext():
@@ -111,7 +114,7 @@ def test_partial_ocr_retains_recognized_text_order_and_original_geometry(analysi
         for line, text in zip(lines, texts):
             line.text, line.prob = text, 0.9 if text else 0.1
 
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     regions, mask, raw, bubbles = engine.analyze(source)
     assert len(regions) == 1
     assert regions[0].texts == texts
@@ -135,7 +138,7 @@ def test_no_eligible_text_skips_bubbles_and_erasure(analysis, texts, keep_lang, 
         for line, text in zip(lines, texts):
             line.text, line.prob = text, 0.1
 
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     assert engine.analyze(source) == ([], None, None, None)
     assert calls == []
 
@@ -146,7 +149,7 @@ def test_ocr_failure_does_not_reach_erasure(analysis):
     async def recognize(*args):
         raise RuntimeError('OCR failed')
 
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with pytest.raises(RuntimeError, match='OCR failed'):
         engine.analyze(source)
     assert calls == []
@@ -158,7 +161,7 @@ def test_mixed_page_routes_korean_only_and_preserves_paragraph_order(analysis, m
               for quad in quads]
     monkeypatch.setitem(sys.modules, 'ballontranslator.utils.textblock',
                         SimpleNamespace(group_output=lambda *args: blocks))
-    engine.router = SimpleNamespace(classify=lambda image, blocks, groups: (['korean', 'en', 'korean'], [None] * 3))
+    engine.ocr.router = SimpleNamespace(classify=lambda image, blocks, groups: (['korean', 'en', 'korean'], [None] * 3))
     observed = []
 
     async def korean(rgb, lines, config):
@@ -170,7 +173,7 @@ def test_mixed_page_routes_korean_only_and_preserves_paragraph_order(analysis, m
         observed.append(('other', len(lines)))
         lines[0].text, lines[0].prob = 'middle', 0.99
 
-    engine.recognizers = {'en': SimpleNamespace(recognize=other), 'korean': SimpleNamespace(recognize=korean)}
+    engine.ocr.recognizers = {'en': SimpleNamespace(recognize=other), 'korean': SimpleNamespace(recognize=korean)}
     regions, *_ = engine.analyze(source)
     assert observed == [('other', 1), ('ko', 2)]
     assert [region.text for region in regions] == ['첫 번째', 'middle', '마지막']
@@ -184,7 +187,7 @@ def test_four_languages_use_selected_experts_without_fallback(analysis, monkeypa
     quads = quads + [quads[0] + [1, 0]]
     blocks = [SimpleNamespace(lines=[quad], font_size=12, angle=0, src_is_vertical=False) for quad in quads]
     monkeypatch.setitem(sys.modules, 'ballontranslator.utils.textblock', SimpleNamespace(group_output=lambda *args: blocks))
-    engine.router = SimpleNamespace(classify=lambda *args: (['japan', 'ch', 'en', 'korean'], [None] * 4))
+    engine.ocr.router = SimpleNamespace(classify=lambda *args: (['japan', 'ch', 'en', 'korean'], [None] * 4))
     observed = []
     def model(language):
         async def recognize(image, lines, config):
@@ -192,12 +195,12 @@ def test_four_languages_use_selected_experts_without_fallback(analysis, monkeypa
             for line in lines:
                 line.text = '' if language == 'en' else language
         return SimpleNamespace(recognize=recognize)
-    engine.recognizers = {lang: model(lang) for lang in ('en', 'ch', 'korean')}
+    engine.ocr.recognizers = {lang: model(lang) for lang in ('en', 'ch', 'korean')}
     def japanese(image, selected, groups):
         observed.append('japan')
         assert selected == [blocks[0]]
         groups[0][0].text = 'japan'
-    engine.japanese = SimpleNamespace(recognize=japanese)
+    engine.ocr.japanese = SimpleNamespace(recognize=japanese)
     regions, *_ = engine.analyze(source)
     assert observed == ['en', 'ch', 'korean', 'japan']
     assert [r.text for r in regions] == ['japan', 'ch', 'korean']
@@ -208,8 +211,8 @@ def test_four_languages_use_selected_experts_without_fallback(analysis, monkeypa
 
 def test_unknown_language_does_not_call_recognizers_or_erase(analysis):
     engine, source, _, calls = analysis
-    engine.router = SimpleNamespace(classify=lambda *args: ([None], [None]))
-    engine.recognizers['en'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Unknown is not English'))
+    engine.ocr.router = SimpleNamespace(classify=lambda *args: ([None], [None]))
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Unknown is not English'))
     assert engine.analyze(source) == ([], None, None, None)
     assert calls == []
 
@@ -217,13 +220,13 @@ def test_unknown_language_does_not_call_recognizers_or_erase(analysis):
 @pytest.mark.parametrize('score,text', [(.9, 'cached'), (.3, ''), (.49, ''), (.5, 'cached')])
 def test_representative_reuse_skips_only_that_line_and_keeps_order(analysis, score, text):
     engine, source, quads, _ = analysis
-    engine.router = SimpleNamespace(classify=lambda *args: (['en'], [(1, {'text': 'cached', 'conf': score})]))
+    engine.ocr.router = SimpleNamespace(classify=lambda *args: (['en'], [(1, {'text': 'cached', 'conf': score})]))
     observed = []
     async def recognize(rgb, lines, config):
         observed.extend(lines)
         for line, value in zip(lines, ['first', 'last'], strict=True):
             line.text, line.prob = value, .9
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     regions, *_ = engine.analyze(source)
     assert len(observed) == 2
     assert regions[0].texts == ['first', text, 'last']
@@ -235,12 +238,12 @@ def test_single_line_reuse_never_calls_formal_model_and_is_page_local(analysis, 
     engine, source, quads, _ = analysis
     block = SimpleNamespace(lines=[quads[0]], font_size=12, angle=0, src_is_vertical=False)
     monkeypatch.setitem(sys.modules, 'ballontranslator.utils.textblock', SimpleNamespace(group_output=lambda *args: [block]))
-    engine.recognizers['ch'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Representative read twice'))
+    engine.ocr.recognizers['ch'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Representative read twice'))
     for text in ('first page', 'second page'):
-        engine.router = SimpleNamespace(classify=lambda *args: (['ch'], [(0, {'text': text, 'conf': .8})]))
+        engine.ocr.router = SimpleNamespace(classify=lambda *args: (['ch'], [(0, {'text': text, 'conf': .8})]))
         regions, *_ = engine.analyze(source)
         assert regions[0].texts == [text]
-    engine.router = SimpleNamespace(classify=lambda *args: ([None], [None]))
+    engine.ocr.router = SimpleNamespace(classify=lambda *args: ([None], [None]))
     assert engine.analyze(source) == ([], None, None, None)
 
 
@@ -249,8 +252,8 @@ def test_weak_reused_script_evidence_alone_does_not_authorize_erasure(analysis, 
     engine, source, quads, calls = analysis
     block = SimpleNamespace(lines=[quads[0]], font_size=12, angle=0, src_is_vertical=False)
     monkeypatch.setitem(sys.modules, 'ballontranslator.utils.textblock', SimpleNamespace(group_output=lambda *args: [block]))
-    engine.router = SimpleNamespace(classify=lambda *args: (['en'], [(0, {'text': 'uncertain', 'conf': score})]))
-    engine.recognizers['en'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Representative read twice'))
+    engine.ocr.router = SimpleNamespace(classify=lambda *args: (['en'], [(0, {'text': 'uncertain', 'conf': score})]))
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=lambda *args: pytest.fail('Representative read twice'))
     assert engine.analyze(source) == ([], None, None, None)
     assert calls == []
 
@@ -258,10 +261,9 @@ def test_weak_reused_script_evidence_alone_does_not_authorize_erasure(analysis, 
 def test_close_does_not_unload_shared_probe_recognizers_twice(analysis):
     engine, _, _, _ = analysis
     closed = []
-    engine.probes = {lang: SimpleNamespace(close=lambda lang=lang: closed.append(lang))
+    engine.ocr.recognizers = {lang: SimpleNamespace(close=lambda lang=lang: closed.append(lang))
                      for lang in ('en', 'ch', 'korean')}
-    engine.recognizers = engine.probes
-    engine.japanese = SimpleNamespace(close=lambda: closed.append('japan'))
+    engine.ocr.japanese = SimpleNamespace(close=lambda: closed.append('japan'))
     engine.colors = SimpleNamespace(close=lambda: closed.append('colors'))
     async def unload():
         closed.append('unload')
@@ -275,7 +277,7 @@ def test_analysis_does_not_require_new_center_timing_keys(analysis):
     async def recognize(rgb, lines, config):
         for line in lines:
             line.text = 'recognized'
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values:
         engine.analyze(source)
     assert {'analyze_detect', 'analyze_route', 'analyze_ocr', 'analyze_colors',
@@ -287,7 +289,7 @@ def test_analysis_failure_releases_locks_without_new_timing_keys(analysis):
     engine, source, _, _ = analysis
     async def recognize(*args):
         raise RuntimeError('OCR failed')
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
     with collect() as values, pytest.raises(RuntimeError, match='OCR failed'):
         engine.analyze(source)
     assert values['analyze_ocr'] >= 0
@@ -323,9 +325,9 @@ def test_other_page_ocr_progresses_while_a_different_model_is_busy(analysis, hel
             entered.set()
             assert release.wait(5), 'Test did not release the color model'
 
-    engine.router = SimpleNamespace(classify=classify)
-    engine.recognizers['en'] = SimpleNamespace(recognize=recognize)
-    engine.japanese = SimpleNamespace(recognize=japanese)
+    engine.ocr.router = SimpleNamespace(classify=classify)
+    engine.ocr.recognizers['en'] = SimpleNamespace(recognize=recognize)
+    engine.ocr.japanese = SimpleNamespace(recognize=japanese)
     engine.colors = SimpleNamespace(apply=colors)
     with ThreadPoolExecutor(2) as pool:
         first = pool.submit(engine.analyze, source)

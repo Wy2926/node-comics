@@ -8,7 +8,7 @@ from rapidocr.ch_ppocr_rec.typings import TextRecOutput
 
 from classic_node.config import ENGINE_DEFAULTS
 from classic_node.timing import collect
-from mtu_engine.ocr import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, Recognizer
+from mtu_engine.ocr.paddle import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, Recognizer
 
 
 @pytest.mark.parametrize(('height', 'width'), [(48, 180), (32, 600), (48, 3200), (90, 120)])
@@ -28,7 +28,7 @@ def test_native_resize_is_not_overridden_and_preserves_long_line_width(height, w
 def test_adapter_preserves_order_confidence_and_skips_unsupported_crops(monkeypatch):
     model = SimpleNamespace(session=object(), _decode_ctc=lambda pred: ('unused', 1),
                             _get_rotate_crop_image=lambda image, pts: pts)
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     recognizer = Recognizer(model)
     assert recognizer.rec_batch_num == ENGINE_DEFAULTS['ocr_batch_size']
     assert recognizer.session._session is model.session
@@ -50,7 +50,7 @@ def test_adapter_preserves_order_confidence_and_skips_unsupported_crops(monkeypa
 
 def test_empty_lines_do_not_call_inference(monkeypatch):
     model = SimpleNamespace(session=object(), _decode_ctc=None, _get_rotate_crop_image=None)
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     recognizer = Recognizer(model)
     monkeypatch.setattr(TextRecognizer, '__call__', lambda *args: pytest.fail('empty inference'))
     assert recognizer.recognize(None, [], 0.5) == []
@@ -100,7 +100,7 @@ def test_oom_reuses_native_batches_with_bounded_request_local_retry(monkeypatch,
         if len(batch) > 1:
             raise RuntimeError('bfc_arena.cc: Failed to allocate memory for requested buffer of size 108545280')
         return np.rint((batch[:, 0, 0, 0] + 1) * 127.5).astype(int)
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     recognizer = Recognizer(SimpleNamespace(session=infer, _decode_ctc=lambda value: (str(value), .9)),
                             batch_size=4, min_batch_size=minimum, recover=lambda: releases.append(1))
     crops = [np.full((48, width, 3), i, np.uint8) for i, width in enumerate((200, 50, 100, 90))]
@@ -125,7 +125,7 @@ def test_non_allocation_failure_never_retries_or_reclaims(monkeypatch, message):
     def infer(batch):
         calls.append(1)
         raise RuntimeError(message)
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     reader = Recognizer(SimpleNamespace(session=infer, _decode_ctc=None),
                         recover=lambda: pytest.fail('must not clear allocator'))
     with pytest.raises(RuntimeError, match=message):

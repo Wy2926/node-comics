@@ -11,10 +11,12 @@ import numpy as np
 from PIL import Image
 
 from mtu_engine.assets import LOCK, file_hash, verify
+from mtu_engine.backend import ORT_PACKAGES
 from mtu_engine.engine import Engine, serialize_region
 from mtu_engine.fonts import DEFAULT_FONT_IDS, FONT_CHOICES, resolve_font_id
 from .render_pool import RenderPool, RenderPoolError, RenderMemoryError, ipc_bytes, render_page
 from .operations import LOG
+from .config import engine_options
 from .protocol import MAX_CHECKPOINT_BYTES, NodeFailure, digest, mask_image, png64
 from .timing import stage
 
@@ -26,10 +28,6 @@ LANGUAGE_PROBES = {'zh-Hans': '简体中文漫画', 'zh-Hant': '繁體中文漫�
                    'pl': 'Polskiąćęłńóśźż', 'uk': 'Українськаіїєґ', 'tr': 'Türkçeğıİş',
                    'vi': 'Tiếng Việtắằẳẵặớờởỡợ', 'id': 'Bahasa Indonesia',
                    'ar': 'العربية لا لأ لإ لآ مُحَمَّد ٢٠٠،؟…: AMIRA (200)'}
-
-
-def model_identity(models):
-    return verify(models)['files']
 
 
 def decode_mask(analysis, name, size, masks=None):
@@ -48,9 +46,10 @@ class Runtime:
 
     def __init__(self, config):
         self.config = config
-        options = config['engine']
+        options = engine_options(config['engine'])
         backend = options.get('backend', 'cuda')
-        assets = model_identity(options['models'])
+        ocr_backend = options.get('ocr_backend', 'classic')
+        assets = verify(options['models'], ocr_backend)['files']
         self.engine = Engine(**options)
         self.render_pool = None
         self._render_warning_lock = Lock()
@@ -63,18 +62,22 @@ class Runtime:
         source = Path(__file__).resolve().parents[1]
         code = {path.relative_to(source).as_posix(): file_hash(path)
                 for directory in ('mtu_engine', 'classic_node')
-                for path in sorted((source / directory).glob('*.py'))}
-        dependencies = {name: package_version(name) for name in (
-            'torch', 'torchvision', 'onnxruntime-directml' if backend == 'amd' else 'onnxruntime-gpu',
+                for path in sorted((source / directory).rglob('*.py'))}
+        packages = (
+            'torch', 'torchvision',
             'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
-            'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely', 'rapidocr',
-            'PySide6-Essentials', 'shiboken6', 'mahotas', 'manga-ocr',
-            'transformers', 'huggingface-hub', 'tokenizers')}
+            'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely',
+            'transformers', 'huggingface-hub', 'tokenizers', 'safetensors',
+            'PySide6-Essentials', 'shiboken6', 'mahotas')
+        if ocr_backend == 'classic':
+            packages += (ORT_PACKAGES[backend], 'rapidocr', 'manga-ocr')
+        dependencies = {name: package_version(name) for name in packages}
         self.version = f'mtu-{backend}-v1-' + digest({'upstream': LOCK['source']['revision'],
-            'code': code, 'assets': assets, 'dependencies': dependencies,
+            'code': code, 'assets': assets, 'dependencies': dependencies, 'ocr': self.engine.ocr.identity,
             'font_choices': FONT_CHOICES, 'default_font_ids': DEFAULT_FONT_IDS,
             'fonts': [file_hash(path) for path in options['font']],
-            'options': {key: value for key, value in options.items() if key not in {'models', 'font', 'threads', 'gpu'}}})[:32]
+            'options': {key: value for key, value in options.items()
+                        if key not in {'models', 'font', 'threads', 'gpu', 'ocr_model'}}})[:32]
         if config.get('render_workers', 1) > 1:
             try:
                 self.render_pool = RenderPool(options['models'], options['font'], config['render_workers'],

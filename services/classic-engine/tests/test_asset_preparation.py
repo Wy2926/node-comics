@@ -1,7 +1,6 @@
 """Offline asset inventory and generated-directory upgrade checks; no models."""
 import json
 from pathlib import Path
-import tomllib
 import zipfile
 
 import pytest
@@ -10,25 +9,11 @@ from mtu_engine.assets import LOCK, verify
 from tools import prepare_mtu
 
 
-def test_recognition_inventory_keeps_shared_paddle_and_manga_without_openocr():
-    files = {asset['file'] for asset in LOCK['models']}
-    assert {f'ocr/{language}_PP-OCRv5_rec_mobile_infer.onnx'
-            for language in ('ch', 'en', 'korean')} <= files
-    assert 'manga/pytorch_model.bin' in files
-    assert not any('openocr' in asset['file'].lower()
-                   for asset in LOCK['models'] + LOCK['support'])
-    root = Path(__file__).resolve().parents[1]
-    project = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))
-    assert not any(name.startswith('openocr') for name in project['project']['dependencies'])
-    packages = {item['name'] for item in tomllib.loads((root / 'uv.lock').read_text(encoding='utf-8'))['package']}
-    assert 'onnxruntime-gpu' in packages
-    assert not {'openocr-python', 'onnxruntime'} & packages
-
-
-def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cache(tmp_path, monkeypatch):
+@pytest.mark.parametrize('ocr_backend', ['classic', 'hayai'])
+def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cache(tmp_path, monkeypatch, ocr_backend):
     output, cache = tmp_path / 'prepared', tmp_path / 'download-cache'
-    stale = ('models/openocr/openocr_svtrv2_ch.pth', 'upstream/openocr/svtrv2_ch.yml',
-             'upstream/openocr/LICENSE', 'licenses/openocr-unused.txt',
+    stale = ('models/retired/weights.bin', 'upstream/retired/module.py',
+             'upstream/retired/LICENSE', 'licenses/retired-model.txt',
              'fonts/RetiredFont.ttf', 'licenses/RetiredFont-OFL.txt')
     for name in stale:
         path = output / name
@@ -58,7 +43,7 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         prefix = repository + '-' + source['revision'] + '/'
         entries = {prefix + name + '/__init__.py': '' for name in modules}
         entries[prefix + 'LICENSE'] = 'retained source license'
-        if key == 'source':
+        if 'patches' in source:
             entries.update({prefix + name: ''.join(patch['before'] for patch in patches)
                             for name, patches in source['patches'].items()})
         archives[source['url']] = entries
@@ -66,10 +51,7 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         'pyphen/dictionaries/hyph_en_US.dic': 'UTF-8\n',
         'pyphen/dictionaries/README_en_US.txt': 'retained dictionary notice',
     }
-    downloads = []
-
     def download(url, checksum, target):
-        downloads.append(url)
         target = Path(target)
         if url in archives:
             with zipfile.ZipFile(target, 'w') as package:
@@ -80,18 +62,17 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         return target
 
     monkeypatch.setattr(prepare_mtu, 'download', download)
-    manifest = prepare_mtu.prepare(output, cache)
-    assert verify(output / 'models') == manifest
-    assert not any('openocr' in url.lower() for url in downloads)
-    assert not any('openocr' in name.lower() for name in manifest['files'])
+    manifest = prepare_mtu.prepare(output, cache, ocr_backend)
+    assert verify(output / 'models', ocr_backend) == manifest
     assert all(not (output / name).exists() for name in stale)
     assert {path.name for path in (output / 'fonts').iterdir()} == {'Test.ttf'}
     assert sample.read_bytes() == b'private user sample'
     assert cached_sample.read_bytes() == b'existing cache content'
-    assert 'upstream/manga_ocr/LICENSE' in manifest['files']
-    assert 'upstream/mot/LICENSE' in manifest['files']
-    assert 'models/ocr/ch_PP-OCRv5_rec_mobile_infer.onnx' in manifest['files']
-    assert 'models/manga/pytorch_model.bin' in manifest['files']
+    for name in ('upstream/manga_ocr/LICENSE', 'upstream/mot/LICENSE',
+                 'models/ocr/ch_PP-OCRv5_rec_mobile_infer.onnx', 'models/manga/pytorch_model.bin'):
+        assert (name in manifest['files']) == (ocr_backend == 'classic')
+    assert 'models/ocr/ocr_ar_48px.ckpt' in manifest['files']
+    assert 'models/ocr/alphabet-all-v7.txt' in manifest['files']
     assert not any(name.startswith('samples/') for name in manifest['files'])
 
 

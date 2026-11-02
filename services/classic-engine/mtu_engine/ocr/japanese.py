@@ -2,14 +2,14 @@
 from pathlib import Path
 from threading import Lock
 
-import numpy as np
 from PIL import Image
 
 from classic_node.timing import waiting_for
+from .crops import paragraph_box
 
 
 class Japanese:
-    def __init__(self, models, gpu):
+    def __init__(self, models, gpu, *, backend='cuda'):
         from loguru import logger
         logger.disable('manga_ocr')
         from manga_ocr import MangaOcr
@@ -19,8 +19,10 @@ class Japanese:
             if not (directory / name).is_file():
                 raise ValueError('Missing prepared Manga OCR assets; runtime downloads are disabled')
         self.model = MangaOcr(str(directory))
-        if self.model.model.device.type != 'cuda' or self.model.model.device.index != gpu:
-            raise RuntimeError('Manga OCR requires the configured CUDA device')
+        device = self.model.model.device
+        expected = 'mps' if backend == 'mps' else 'cuda'
+        if device.type != expected or (expected == 'cuda' and device.index != gpu):
+            raise RuntimeError(f'Manga OCR requires the configured {expected.upper()} device')
         self._lock = Lock()
 
     def recognize(self, image, blocks, groups):
@@ -28,9 +30,7 @@ class Japanese:
         for block, lines in zip(blocks, groups, strict=True):
             for line in lines:
                 line.text, line.prob = '', 0.  # Manga OCR exposes no confidence.
-            left, top, right, bottom = np.asarray(block.xyxy, dtype=int)
-            left, right = np.clip([left, right], 0, width)
-            top, bottom = np.clip([top, bottom], 0, height)
+            left, top, right, bottom = paragraph_box(block.xyxy, width, height)
             if lines and right > left and bottom > top:
                 # Read a complete paragraph without rotating vertical columns.
                 # Keep all original polygons for masking and checkpointing.

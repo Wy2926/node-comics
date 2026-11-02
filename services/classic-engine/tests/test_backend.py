@@ -11,7 +11,7 @@ from classic_node.config import ENGINE_DEFAULTS, execution_settings, load
 from mtu_engine.backend import validate_backend
 
 
-@pytest.mark.parametrize('selection', [None, 'cuda', 'amd'])
+@pytest.mark.parametrize('selection', [None, 'cuda', 'amd', 'mps'])
 def test_backend_config_is_opt_in_and_keeps_resource_defaults(tmp_path, selection):
     engine = {} if selection is None else {'backend': selection}
     path = tmp_path / 'node.json'
@@ -30,7 +30,7 @@ def test_backend_config_is_opt_in_and_keeps_resource_defaults(tmp_path, selectio
     value = json.loads(path.read_text())
     value['engine'] = engine
     path.write_text(json.dumps(value))
-    with pytest.raises(ValueError, match='backend must be cuda or amd'):
+    with pytest.raises(ValueError, match='backend must be cuda, amd or mps'):
         load(path)
 
 

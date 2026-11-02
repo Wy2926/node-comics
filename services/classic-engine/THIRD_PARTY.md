@@ -1,5 +1,27 @@
 # Third-party sources
 
+## Hayai OCR v2.5 Nova
+
+[prepare_hayai.py](tools/prepare_hayai.py) prepares
+[Hayai OCR v2.5 Nova](https://huggingface.co/JustANormalTinkerer/hayai-ocr-v2.5-nova)
+at revision `2803d0dc005fa4396ab1e7c5a472d2c450a247f7` (Apache-2.0).
+Its original FP32 `model.safetensors` is 627,709,088 bytes, SHA-256
+`ac63cd177c5b68bd91e18dd4408e0400461c7cf19f484b0da1643e232d1ffc3a`.
+The [SigLIP2 NaFlex processor](https://huggingface.co/google/siglip2-base-patch16-naflex)
+is pinned at `b53b807d3a2d5e2b3911292f2d69e5341cdc064c` (Apache-2.0);
+its weights are already included in the Hayai checkpoint and are not downloaded again.
+
+[models.py](mtu_engine/ocr/models.py) pins SHA-256 for every model/configuration
+source file, tokenizer, processor and model card. Preparation retains those files
+unchanged with a `source.json` manifest, publishing only complete verified assets
+outside the repository. Runtime checks all hashes before importing the checkpoint's
+custom Python code. No upstream weights or inference algorithms are vendored here.
+
+The adapter calls the pinned upstream `_FastEngine` without copying its inference
+algorithms. It checks EOS/pad tokens to reject truncated paragraphs and ignores the
+upstream training-only IDS head. Runtime settings and supported validation scope are
+specified in [the OCR contract](ENGINE.md#ocr-后端契约).
+
 ## Manga Translator UI
 
 The image pipeline imports source from [hgmzhn/manga-translator-ui](https://github.com/hgmzhn/manga-translator-ui), pinned by commit, archive URL and SHA-256 in [upstream.lock.json](mtu_engine/upstream.lock.json). Preparation retains `manga_translator/`, the upstream `LICENSE.txt`, dependency manifests and checksums under `upstream/`. The project carries GPL-3.0 terms; original notices within source files remain intact.
@@ -39,7 +61,7 @@ An analysis-local bounded cache reuses identical native perspective crops, RGB/B
 
 ## Paragraph sampling and language routing
 
-[ogkalu2/comic-translate](https://github.com/ogkalu2/comic-translate) supplies the unmodified `_line_area` rule used to select a paragraph's largest line, retaining the first line on ties. The selected line uses the same MTU perspective crop and rotation as final recognition, not Comic Translate's axis-aligned crop. Preparation retains its pinned `modules/`, `imkit/`, Apache-2.0 `LICENSE` and dependency manifests under `upstream/comic_translate/`. Its OSD model, GUI, account/credits, cloud OCR and OCR factory are not used.
+[ogkalu2/comic-translate](https://github.com/ogkalu2/comic-translate) supplies the unmodified `_line_area` rule used to select a paragraph's largest line, retaining the first line on ties. The selected line uses the same MTU perspective crop and rotation as final recognition, not Comic Translate's axis-aligned crop. Preparation retains its pinned `modules/`, `imkit/`, Apache-2.0 `LICENSE` and dependency manifests under `upstream/comic_translate/`. Its OSD model, GUI, account/credits, cloud OCR and OCR factory are not used. Checksum-recorded patches defer the PySide6 `Qt` import until its GUI layout function is called and ONNX Runtime imports until an OSD session is requested. Using `_line_area` therefore loads neither a second Qt binding nor the unused ONNX runtime; the sampling algorithm is unchanged.
 
 [Yuff1010/Manga-Overlay-Translator](https://github.com/Yuff1010/Manga-Overlay-Translator) supplies the unmodified `detect_lang`, character-script categories and weights. Its complete OCR module and MIT notice are pinned by revision and SHA-256 under `upstream/mot/`. The adapter supplies existing paragraph crops and three batched PP-OCRv5 predictions instead of repeating detection; English replaces the Spanish candidate using the same Latin weights, and Chinese/Japanese share the CJK probe prediction. Empty/unsupported evidence is rejected before the upstream first-candidate default. No learned classifier, custom scoring, model training or conversion is maintained.
 
@@ -48,7 +70,7 @@ An analysis-local bounded cache reuses identical native perspective crops, RGB/B
 - Chinese / Korean / English: separate PP-OCRv5 mobile recognizers, shared between paragraph probing and final recognition. English and Chinese use the published [ogkalu/ppocr-v5-onnx](https://huggingface.co/ogkalu/ppocr-v5-onnx) ONNX weights and dictionaries under Apache-2.0; Korean files are distributed by MTU. All files are checksum-pinned. The Chinese probe also supplies Japanese routing evidence. Only selected-model representative lines padded to width 320 reuse their probe result; longer lines are recognized normally, and private results are not cached across pages.
 - Japanese: [kha-white/manga-ocr](https://github.com/kha-white/manga-ocr), `manga-ocr==0.1.16`, and [manga-ocr-base](https://huggingface.co/kha-white/manga-ocr-base) at the locked revision. Original model, tokenizer, processor, model card and Apache-2.0 notice are retained. Native paragraph generation and postprocessing are unchanged.
 
-Models load from prepared local paths only. The locked `onnxruntime-gpu` distribution supplies the CUDA inference runtime; no separate CPU `onnxruntime` distribution is installed.
+These assets are prepared only for `classic`; the shared 48px color weights remain necessary for either OCR choice. Models load from prepared local paths only. The default locked `onnxruntime-gpu` distribution supplies the CUDA inference runtime; no separate CPU `onnxruntime` distribution is installed.
 
 PySide6-Essentials / Shiboken6 are required by upstream utility imports; their original Qt LGPL/GPL notices remain in the wheel metadata. Both are pinned to Qt 6.9.2 to match the existing PyQt6 Qt runtime. `mahotas` retains its MIT license in its distribution. Open-source license obligations remain applicable; no commercial OCR license is used.
 
@@ -65,3 +87,5 @@ PySide6-Essentials / Shiboken6 are required by upstream utility imports; their o
 - Proxy support uses the existing HTTPX 0.28.1 client with its `socks` extra and [socksio](https://github.com/sethmlarson/socksio) 1.0.0 (MIT). Both runtime lockfiles retain package sources and SHA-256; the installed distributions retain their license notices.
 
 `mtu-assets.json` records prepared source, model, dictionary, font and notice hashes. Node startup verifies those files before importing upstream image stages. Distribution manifests include the assembled runtime and source provenance. This inventory records origins; it does not replace upstream terms.
+
+The optional [macOS environment](environments/macos/pyproject.toml) and its lock retain official PyTorch / TorchVision Apple Silicon wheels and ONNX Runtime CPU 1.23.2. Main image stages use MPS; classic PP-OCR uses CPU ONNX. Hayai uses that same PyTorch environment and does not import RapidOCR, Manga OCR or ONNX Runtime. Original distribution notices remain in each environment.

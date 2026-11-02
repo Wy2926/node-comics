@@ -11,13 +11,13 @@ HOST = ENGINE.parent / 'compute-node'
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(HOST))
 from build_support import download, sha256
-from mtu_engine.assets import LOCK
+from mtu_engine.assets import LOCK, selected_asset
 
 
-def apply_source_patches(upstream):
+def apply_source_patches(upstream, source='source'):
     """Apply exact, reviewable lockfile edits; fail if the pinned source drifts."""
     upstream = Path(upstream).resolve()
-    for relative, patches in LOCK['source'].get('patches', {}).items():
+    for relative, patches in LOCK[source].get('patches', {}).items():
         path = (upstream / relative).resolve()
         if not path.is_relative_to(upstream):
             raise ValueError('Unsafe upstream patch path')
@@ -29,7 +29,7 @@ def apply_source_patches(upstream):
         path.write_text(text, encoding='utf-8', newline='\n')
 
 
-def prepare(output, cache):
+def prepare(output, cache, ocr_backend='classic'):
     output, cache = Path(output).resolve(), Path(cache).resolve()
     output.mkdir(parents=True, exist_ok=True)
     if (output / 'node.json').exists() or (output / 'state').exists():
@@ -67,18 +67,23 @@ def prepare(output, cache):
                 with package.open(info) as src, target.open('wb') as dst:
                     shutil.copyfileobj(src, dst)
     apply_source_patches(output / 'upstream')
+    apply_source_patches(output / 'upstream/comic_translate', 'comic_translate')
     # The native paragraph grouping imports BallonsTranslator's text types.
     for relative in ('config/textstyles', 'data'):
         directory = output / 'upstream' / relative
         directory.mkdir(parents=True, exist_ok=True)
         (directory / '.node-prepared').write_text('Prepared for paragraph grouping imports.\n', encoding='utf-8')
     for asset in LOCK['support']:
+        if not selected_asset(asset['file'], ocr_backend):
+            continue
         target = (output / asset['file']).resolve()
         if not target.is_relative_to(output / 'upstream'):
             raise ValueError('Unsafe upstream support path')
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(download(asset['url'], asset['sha256'], cache / asset['sha256']), target)
     for asset in LOCK['models']:
+        if not selected_asset('models/' + asset['file'], ocr_backend):
+            continue
         cached = download(asset['url'], asset['sha256'], cache / asset['sha256'])
         if 'archive' in asset:
             with zipfile.ZipFile(cached) as package:
@@ -141,5 +146,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ENGINE / '.assets')
     parser.add_argument('--cache', type=Path, default=HOST / '.build/downloads')
+    parser.add_argument('--ocr-backend', choices=('classic', 'hayai'), default='classic')
     args = parser.parse_args()
-    prepare(args.output, args.cache)
+    prepare(args.output, args.cache, args.ocr_backend)
