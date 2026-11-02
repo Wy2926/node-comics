@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import pytest
 
-from mtu_engine.routing import ScriptRouter
+from mtu_engine.ocr.routing import ScriptRouter
 from classic_node.timing import collect
 
 
@@ -149,7 +149,7 @@ def test_every_probe_runs_once_per_page_and_routes_stay_per_paragraph(monkeypatc
 
 
 def test_probe_width_limit_preserves_candidate_alignment(monkeypatch):
-    from mtu_engine.ocr import Paddle, Recognizer
+    from mtu_engine.ocr.paddle import Paddle, Recognizer
     from rapidocr.ch_ppocr_rec import TextRecognizer
     model = Paddle.__new__(Paddle)
     seen = []

@@ -12,10 +12,9 @@ from rapidocr.inference_engine.onnxruntime import OrtInferSession
 
 from classic_node.config import ENGINE_DEFAULTS
 from classic_node.timing import waiting_for, record, stage
-from .page_cache import bgr, crop as cached_crop, normalized
+from ..page_cache import bgr, crop as cached_crop, normalized
 
-OCR_IMAGE_SHAPE = (3, 48, 320)
-OCR_MAX_WIDTH = 3200  # PaddleX's standard recognition width limit.
+from .crops import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH, valid_crop, short_crop
 # Windows AMD driver safety: DML submissions across languages must not overlap.
 # CUDA retains its original independent per-model locks.
 _DML_INFERENCE_LOCK = Lock()
@@ -41,16 +40,6 @@ def release_cuda_cache(gpu):
     # can use them. Never unload weights, touch live tensors or flush each page.
     with torch.cuda.device(gpu):
         torch.cuda.empty_cache()
-
-
-def valid_crop(crop):
-    return (crop is not None and crop.size > 0
-            and crop.shape[1] * OCR_IMAGE_SHAPE[1] <= crop.shape[0] * OCR_MAX_WIDTH)
-
-
-def short_crop(crop):
-    """These crops always use RapidOCR's fixed minimum padding width."""
-    return valid_crop(crop) and crop.shape[1] * OCR_IMAGE_SHAPE[1] <= crop.shape[0] * OCR_IMAGE_SHAPE[2]
 
 
 class _LockedSession:
@@ -145,8 +134,6 @@ class Paddle:
                  min_batch_size=ENGINE_DEFAULTS['ocr_min_batch_size'],
                  arena_extend_strategy=ENGINE_DEFAULTS['ocr_arena_extend_strategy'],
                  arena_shrinkage=ENGINE_DEFAULTS['ocr_arena_shrinkage'], backend='cuda'):
-        if backend not in ('cuda', 'amd'):
-            raise ValueError('backend must be cuda or amd')
         from manga_translator.ocr.model_paddleocr import ModelPaddleOCR
         from manga_translator.utils.onnx_runtime import create_inference_session, import_onnxruntime
         ort = import_onnxruntime()
@@ -172,6 +159,10 @@ class Paddle:
                                                  providers=[(provider, {'device_id': gpu})])
             # CUDA arena options and CUDA allocation recovery do not apply to DML.
             arena_shrinkage = False
+        elif backend == 'mps':
+            provider = 'CPUExecutionProvider'
+            model.session = ort.InferenceSession(model_path, sess_options=options, providers=[provider])
+            arena_shrinkage = False
         else:
             model.session, _ = create_inference_session(ort, model_path,
                 device='cuda', sess_options=options,
@@ -192,8 +183,8 @@ class Paddle:
             model.session.run = partial(model.session.run, run_options=options)
         self.session = model.session
         self.recognizer = Recognizer(model, batch_size,
-            batch_size if backend == 'amd' else min_batch_size,
-            None if backend == 'amd' else partial(release_cuda_cache, gpu),
+            min_batch_size if backend == 'cuda' else batch_size,
+            partial(release_cuda_cache, gpu) if backend == 'cuda' else None,
             inference_lock=_DML_INFERENCE_LOCK if backend == 'amd' else None)
 
     def probe(self, crops):

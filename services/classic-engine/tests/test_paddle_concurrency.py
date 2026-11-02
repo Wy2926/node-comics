@@ -11,7 +11,7 @@ import pytest
 from rapidocr.ch_ppocr_rec import TextRecognizer
 
 from classic_node import timing
-from mtu_engine.ocr import Paddle, Recognizer
+from mtu_engine.ocr.paddle import Paddle, Recognizer
 
 
 @pytest.mark.parametrize('shrink', [False, True])
@@ -43,7 +43,7 @@ def test_paddle_delegates_memory_policy_to_native_ort(monkeypatch, tmp_path, shr
                         SimpleNamespace(ModelPaddleOCR=lambda _: model))
     monkeypatch.setitem(sys.modules, 'manga_translator.utils.onnx_runtime',
                         SimpleNamespace(create_inference_session=create, import_onnxruntime=lambda: ort))
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     paddle = Paddle(tmp_path, 'en', 2, 3, batch_size=3, min_batch_size=1,
                     arena_extend_strategy='kSameAsRequested', arena_shrinkage=shrink)
     assert captured['cuda_options'] == {'device_id': 2, 'cudnn_conv_algo_search': 'HEURISTIC',
@@ -54,7 +54,7 @@ def test_paddle_delegates_memory_policy_to_native_ort(monkeypatch, tmp_path, shr
     assert (runs[0].entries if shrink else runs[0]) == (
         {'memory.enable_memory_arena_shrinkage': 'gpu:2'} if shrink else None)
     assert paddle.recognizer.rec_batch_num == 3
-    from mtu_engine.ocr import _DML_INFERENCE_LOCK, release_cuda_cache
+    from mtu_engine.ocr.paddle import _DML_INFERENCE_LOCK, release_cuda_cache
     assert paddle.recognizer.session._lock is not _DML_INFERENCE_LOCK
     assert paddle.recognizer.min_batch_size == 1
     assert paddle.recognizer.recover.func is release_cuda_cache and paddle.recognizer.recover.args == (2,)
@@ -110,7 +110,7 @@ def test_amd_sessions_share_only_the_inference_lock_and_never_cuda_policy(monkey
         ModelPaddleOCR=lambda _: SimpleNamespace(_load_char_dict=lambda _: ['x'])))
     monkeypatch.setitem(sys.modules, 'manga_translator.utils.onnx_runtime', SimpleNamespace(
         create_inference_session=unexpected, import_onnxruntime=lambda: ort))
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     if failure:
         with pytest.raises((RuntimeError, ValueError)):
             Paddle(tmp_path, 'ch', 0, 4, backend='amd')
@@ -134,7 +134,7 @@ def _prediction(batch):
 
 
 def _paddle(monkeypatch, infer, *, decode=None, crop=None):
-    monkeypatch.setattr('mtu_engine.ocr.OrtInferSession', lambda cfg: cfg['session'])
+    monkeypatch.setattr('mtu_engine.ocr.paddle.OrtInferSession', lambda cfg: cfg['session'])
     model = SimpleNamespace(session=infer,
                             _decode_ctc=decode or (lambda value: (str(value), .9)),
                             _get_rotate_crop_image=crop or (lambda image, pts: pts))

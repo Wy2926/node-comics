@@ -54,13 +54,14 @@ def execute(args):
         runtime = Runtime(config)
         try:
             runtime.warmup()
+            backend = config['engine'].get('backend', 'cuda')
             print(json.dumps({'protocol_version': 3, 'version': runtime.version,
                 'languages': runtime.languages, 'ready': True, 'gpu': config['engine']['gpu'],
                 'supported_font_ids': runtime.supported_font_ids,
                 'cpu_resources': config.get('_cpu_resources'),
                 'execution_settings': execution_settings(config),
-                'inpainting_backend': ('pytorch-hip-fp32' if config['engine'].get('backend', 'cuda') == 'amd'
-                                       else 'pytorch-cuda-fp32'), 'renderer': 'mtu-pyqt6'}))
+                'inpainting_backend': 'pytorch-' + ('hip' if backend == 'amd' else backend) + '-fp32',
+                'renderer': 'mtu-pyqt6'}))
         finally:
             runtime.close()
         return 0

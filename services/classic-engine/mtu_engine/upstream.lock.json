@@ -190,7 +190,33 @@
     "revision": "8977b91a4f7a40c3917c5a268e9e7d78e1d818da",
     "url": "https://codeload.github.com/ogkalu2/comic-translate/zip/8977b91a4f7a40c3917c5a268e9e7d78e1d818da",
     "sha256": "db8ccb74697ee66f81af983642227b642c098eb0025e8a24e6a0ea4e6518509f",
-    "license": "Apache-2.0"
+    "license": "Apache-2.0",
+    "patches": {
+      "modules/utils/language_utils.py": [
+        {
+          "before": "from PySide6.QtCore import Qt\n",
+          "after": "from __future__ import annotations\n"
+        },
+        {
+          "before": "def get_layout_direction(language: str) -> Qt.LayoutDirection:\n",
+          "after": "def get_layout_direction(language: str) -> Qt.LayoutDirection:\n    # Node Comics: image-only utilities must not load a second Qt binding.\n    from PySide6.QtCore import Qt\n"
+        }
+      ],
+      "modules/detection/script_detection.py": [
+        {
+          "before": "import onnxruntime as ort\n",
+          "after": ""
+        },
+        {
+          "before": "def _make_session_options():\n    so = ort.SessionOptions()",
+          "after": "def _make_session_options():\n    import onnxruntime as ort\n    so = ort.SessionOptions()"
+        },
+        {
+          "before": "    def initialize(self) -> None:\n        if self.session is not None:",
+          "after": "    def initialize(self) -> None:\n        import onnxruntime as ort\n        if self.session is not None:"
+        }
+      ]
+    }
   },
   "hyphenation": {
     "url": "https://files.pythonhosted.org/packages/7b/1f/c2142d2edf833a90728e5cdeb10bdbdc094dde8dbac078cee0cf33f5e11b/pyphen-0.17.2-py3-none-any.whl",

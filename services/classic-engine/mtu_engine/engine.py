@@ -11,6 +11,7 @@ import numpy as np
 from classic_node.timing import record, stage, waiting_for
 
 from .assets import activate
+from .backend import device_context, validate_backend
 from .colors import ensure_stroke_contrast
 from .fonts import FONT_CHOICES, font_filename
 from .layout import associate_bubbles, fit_bubbles
@@ -244,15 +245,16 @@ class Renderer:
 class Engine:
     def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None,
                  ocr_batch_size=None, ocr_min_batch_size=None, color_batch_size=None, detect_batch_size=None,
-                 ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None, backend='cuda'):
+                 ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None, backend='cuda',
+                 ocr_backend='classic', ocr_model=None, ocr_python=None):
         from classic_node.config import ENGINE_DEFAULTS
         import cv2
         import torch
-        from .backend import validate_backend
         validate_backend(backend, gpu)
         self.models = Path(models)
         self.gpu = gpu
         self.backend = backend
+        self.device = 'mps' if backend == 'mps' else f'cuda:{gpu}'
         self.keep_lang = keep_lang
         self.renderer = Renderer(models, font)
         self.config = configuration(detect_size, inpainting_size)
@@ -261,8 +263,9 @@ class Engine:
         self._detector_lock = Lock()
         self._bubble_lock = Lock()
         torch.set_num_threads(threads)
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
+        if backend != 'mps':
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
         from manga_translator.utils import ModelWrapper, MangaLensBubbleDetector
         ModelWrapper._MODEL_DIR = str(self.models)
         from manga_translator.detection.default import DefaultDetector
@@ -273,18 +276,16 @@ class Engine:
         from manga_translator.inpainting.inpainting_lama_mpe import LamaLargeInpainter
         from manga_translator.ocr.model_48px import Model48pxOCR
         from .colors import Colors
-        from .ocr import Paddle
-        from .experts import Japanese
-        from .routing import ScriptRouter
-        # Select only the upstream CUDA checkpoint; do not fetch an unused CPU
+        from .ocr import create as create_ocr
+        # Select only the upstream PyTorch checkpoint; do not fetch an unused CPU
         # ONNX model just to satisfy the upstream multi-backend download map.
-        class CudaLama(LamaLargeInpainter):
+        class TorchLama(LamaLargeInpainter):
             _MODEL_MAPPING = {'model': LamaLargeInpainter._MODEL_MAPPING['model']}
-        with torch.cuda.device(gpu):
+        with device_context(backend, gpu):
             self.detector = DefaultDetector()
             self.detector.max_batch_size = (ENGINE_DEFAULTS['detect_batch_size']
                                            if detect_batch_size is None else detect_batch_size)
-            self.inpainter = CudaLama()
+            self.inpainter = TorchLama()
             self.color_model = Model48pxOCR()
             for model in (self.detector, self.inpainter, self.color_model):
                 # Keep upstream model diagnostics out of operational logs.
@@ -293,31 +294,26 @@ class Engine:
                 model.logger.setLevel(logging.CRITICAL + 1)
                 if not model.is_downloaded():
                     raise ValueError('Missing prepared model; runtime downloads are disabled')
-                if backend == 'amd' and model is self.inpainter:
-                    asyncio.run(model.load('cuda', force_torch=True))
+                device = 'mps' if backend == 'mps' else 'cuda'
+                if backend != 'cuda' and model is self.inpainter:
+                    asyncio.run(model.load(device, force_torch=True))
                 else:
-                    asyncio.run(model.load('cuda'))
+                    asyncio.run(model.load(device))
             self.colors = Colors(self.color_model, color_batch_size)
             options = {'batch_size': ocr_batch_size, 'min_batch_size': ocr_min_batch_size,
                        'arena_extend_strategy': ocr_arena_extend_strategy, 'arena_shrinkage': ocr_arena_shrinkage}
             options = {key: ENGINE_DEFAULTS['ocr_' + key] if value is None else value for key, value in options.items()}
-            if backend == 'amd':
-                options['backend'] = backend
-            self.probes = {language: Paddle(self.models, language, gpu, threads, **options)
-                           for language in ('en', 'ch', 'korean')}
-            self.recognizers = self.probes
-            self.japanese = Japanese(self.models, gpu)
-            self.router = ScriptRouter(self.models, self.probes)
             self.bubbles = MangaLensBubbleDetector(
-                model_path=self.models / 'detection/mangalens.pt', device=f'cuda:{gpu}',
+                model_path=self.models / 'detection/mangalens.pt', device=self.device,
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)
+            self.ocr = create_ocr(ocr_backend, self.models, gpu, threads, backend=backend,
+                                  model=ocr_model, python=ocr_python, **options)
         # Upstream imports can disable OpenCV threading. Apply the node's CPU
         # budget after loading them, including DBNet and mask bilateral filters.
         cv2.setNumThreads(threads)
 
     def warmup(self):
-        import torch
-        from manga_translator.utils import Quadrilateral, TextBlock
+        from manga_translator.utils import TextBlock
         rgb = np.full((512, 512, 3), 255, dtype=np.uint8)
         mask = np.zeros((512, 512), dtype=np.uint8)
         mask[230:260, 230:260] = 255
@@ -325,16 +321,13 @@ class Engine:
             c = self.config
             await self.detector.detect(rgb, c.detector.detection_size, c.detector.text_threshold,
                                        c.detector.box_threshold, c.detector.unclip_ratio)
-            for model in self.probes.values():
-                await model.recognize(rgb, [Quadrilateral(np.array([[20, 20], [240, 20], [240, 68], [20, 68]]), '', 1)], c.ocr)
-            # Manga OCR runs its bundled example during construction. Exercise
-            # the upstream scorer too, without downloads or text logging.
-            self.router.choose({lang: {'text': 'test', 'conf': .9}
-                                for lang in ('en', 'ch', 'japan', 'korean')})
+            await self.ocr.warmup(rgb, c.ocr)
             # Colored input must exercise both model paths, not the gray bypass.
-            self.colors.apply(np.full_like(rgb, (180, 30, 50)), [TextBlock(
-                lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=[text], language=language)
-                for text, language in [('warmup', 'en'), ('', 'unknown')]])
+            color_blocks = [TextBlock(lines=[[[20, 20], [240, 20], [240, 68], [20, 68]]], texts=[text])
+                            for text in ('warmup', '')]
+            for block in color_blocks:
+                block.ocr_line_aligned = True
+            self.colors.apply(np.full_like(rgb, (180, 30, 50)), color_blocks)
             await self.inpainter.inpaint(rgb, mask, c.inpainter, c.inpainter.inpainting_size)
             if self.backend == 'amd':
                 # Native per-block LaMa inputs are square and padded to 64.
@@ -348,16 +341,15 @@ class Engine:
                     sample_mask[center - 15:center + 15, center - 15:center + 15] = 255
                     await self.inpainter.inpaint(sample, sample_mask, c.inpainter,
                                                 c.inpainter.inpainting_size)
-        with self._detector_lock, self._bubble_lock, torch.cuda.device(self.gpu):
+        with device_context(self.backend, self.gpu), self._detector_lock, self._bubble_lock:
             asyncio.run(run())
-            self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
+            self.bubbles.detect(rgb, device=self.device)
 
     def analyze(self, rgb):
-        import torch
         from manga_translator.mask_refinement import dispatch as refine
         from ballontranslator.utils.textblock import group_output
         from manga_translator.utils import (
-            TextBlock, Quadrilateral, build_bubble_mask_from_mangalens_result, is_valuable_text)
+            TextBlock, build_bubble_mask_from_mangalens_result, is_valuable_text)
         async def run():
             c = self.config
             with stage('analyze_detect'), waiting_for(self._detector_lock, 'detect_lock_wait'):
@@ -367,35 +359,17 @@ class Engine:
             # order, using DBNet lines without loading or running a CTD model.
             with stage('analyze_group'):
                 blocks = group_output([], [line.pts for line in lines], rgb.shape[1], rgb.shape[0])
-                groups = [[Quadrilateral(np.asarray(line), '', 1) for line in block.lines] for block in blocks]
-            # RapidOCR sorts by aspect ratio, pads bounded batches and restores
-            # input order; paragraph grouping remains entirely upstream.
-            with stage('analyze_route'):
-                buckets, readings = self.router.classify(rgb, blocks, groups)
-            for group, reading in zip(groups, readings, strict=True):
-                if reading is not None:
-                    index, row = reading
-                    group[index].text = row['text'] if row['conf'] >= c.ocr.prob else ''
-                    group[index].prob = row['conf']
-            for language, model in self.recognizers.items():
-                selected = [line for bucket, group, reading in zip(buckets, groups, readings, strict=True)
-                            if bucket == language for index, line in enumerate(group)
-                            if reading is None or index != reading[0]]
-                if selected:
-                    with stage('analyze_ocr'):
-                        await model.recognize(rgb, selected, c.ocr)
-            japanese = [index for index, bucket in enumerate(buckets) if bucket == 'japan']
-            if japanese:
-                with stage('analyze_ocr'):
-                    self.japanese.recognize(rgb, [blocks[i] for i in japanese], [groups[i] for i in japanese])
-            # Keep the selected OCR route local to this analysis, so color
-            # extraction can distinguish line OCR from Japanese paragraph OCR.
-            regions = [TextBlock(lines=block.lines, texts=[line.text for line in group], language=language,
-                                 font_size=block.font_size, angle=block.angle,
-                                 direction='v' if block.src_is_vertical else 'h',
-                                 default_stroke_width=c.render.stroke_width, adjust_bg_color=False)
-                       for block, group, language in zip(blocks, groups, buckets, strict=True)
-                       if group]
+            readings = await self.ocr.recognize(rgb, blocks, c.ocr)
+            regions = []
+            for block, reading in zip(blocks, readings, strict=True):
+                if not reading.texts:
+                    continue
+                region = TextBlock(lines=block.lines, texts=reading.texts, language=reading.language,
+                    font_size=block.font_size, angle=block.angle,
+                    direction='v' if block.src_is_vertical else 'h',
+                    default_stroke_width=c.render.stroke_width, adjust_bg_color=False)
+                region.ocr_line_aligned = reading.line_aligned
+                regions.append(region)
             regions = [region for region in regions
                        if len(region.text.strip()) >= c.ocr.min_text_length and is_valuable_text(region.text)
                        and (self.keep_lang is None or region.source_lang == self.keep_lang)]
@@ -407,7 +381,7 @@ class Engine:
             with stage('analyze_colors'):
                 self.colors.apply(rgb, regions)
             with stage('analyze_bubbles'), self._bubble_lock:
-                detected_bubbles = self.bubbles.detect(rgb, device=f'cuda:{self.gpu}')
+                detected_bubbles = self.bubbles.detect(rgb, device=self.device)
             with stage('analyze_bubble_mask'):
                 bubbles = build_bubble_mask_from_mangalens_result(detected_bubbles, rgb.shape[:2])
                 associate_bubbles(regions, bubbles)
@@ -416,12 +390,11 @@ class Engine:
                                     kernel_size=c.kernel_size, limit_mask_dilation_to_bubble_mask=True,
                                     bubble_mask=bubbles)
             return regions, mask, raw, bubbles
-        with page_images(rgb), torch.cuda.device(self.gpu):
+        with page_images(rgb), device_context(self.backend, self.gpu):
             return asyncio.run(run())
 
     def inpaint(self, rgb, mask, raw_mask, bubble_mask, regions, *, cache=None):
         import cv2
-        import torch
         from manga_translator.utils import TextBlock, erode_bubble_mask
         from manga_translator.inpainting.ballon_fill import (
             MODEL_BUBBLE_SHRINK_RATIO, inpaint_regions_per_block, solid_fill_pure_bubbles)
@@ -454,16 +427,15 @@ class Engine:
             # tensors and padding are per-call. The compute pool bounds readers.
             return await self.inpainter.inpaint(crop, local_mask, self.config.inpainter,
                                                 self.config.inpainter.inpainting_size)
-        with stage('inpaint_lama'), torch.cuda.device(self.gpu):
+        with stage('inpaint_lama'), device_context(self.backend, self.gpu):
             # solid_fill returns an owned mask; the native block loop may clear it.
             result, _ = asyncio.run(inpaint_regions_per_block(filled, remaining, inpaint))
         return result
 
     def close(self):
-        import torch
         # Node shutdown joins the compute pool before unloading model weights.
-        with self._detector_lock, self._bubble_lock, torch.cuda.device(self.gpu):
-            for model in (*self.probes.values(), self.japanese, self.colors):
+        with device_context(self.backend, self.gpu), self._detector_lock, self._bubble_lock:
+            for model in (self.ocr, self.colors):
                 model.close()
             for model in (self.detector, self.inpainter, self.color_model):
                 asyncio.run(model.unload())

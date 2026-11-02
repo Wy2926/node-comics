@@ -5,7 +5,7 @@ from threading import Lock
 import numpy as np
 
 from classic_node.timing import waiting_for
-from .ocr import short_crop, valid_crop
+from .crops import short_crop, valid_crop
 
 class ScriptRouter:
     def __init__(self, models, probes):

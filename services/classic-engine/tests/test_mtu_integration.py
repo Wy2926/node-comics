@@ -15,7 +15,7 @@ from classic_node.runtime import LANGUAGE_PROBES
 from mtu_engine.engine import Engine, Renderer, serialize_region
 from mtu_engine.fonts import DEFAULT_FONT_IDS, FONT_CHOICES
 from classic_node.config import ENGINE_DEFAULTS
-from mtu_engine.ocr import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
+from mtu_engine.ocr.crops import OCR_IMAGE_SHAPE, OCR_MAX_WIDTH
 
 
 @pytest.fixture(scope='module')
@@ -37,7 +37,7 @@ def deny_network(*args, **kwargs):
 @pytest.mark.parametrize('language,text', [('en', 'HELLO'), ('japan', 'こんにちは'),
                                          ('ch', '你好世界'), ('korean', '안녕하세요')])
 def test_native_script_scoring_keeps_weak_evidence_for_every_expert(assets, offline, language, text):
-    from mtu_engine.routing import ScriptRouter
+    from mtu_engine.ocr.routing import ScriptRouter
     router = ScriptRouter(assets[0], {})
     predictions = {lang: {'text': '', 'conf': 0.} for lang in router.native.DETECT_CANDIDATES}
     predictions['en'] = {'text': 'I', 'conf': .6}
@@ -49,7 +49,7 @@ def test_native_script_scoring_keeps_weak_evidence_for_every_expert(assets, offl
 
 
 def test_native_script_scoring_keeps_clear_latin_over_weak_other_scripts(assets, offline):
-    from mtu_engine.routing import ScriptRouter
+    from mtu_engine.ocr.routing import ScriptRouter
     router = ScriptRouter(assets[0], {})
     weak = {'text': 'あ', 'conf': .31}
     assert router.choose({'en': {'text': 'HELLO WORLD', 'conf': .95},
@@ -219,7 +219,7 @@ def test_long_page_cross_seam_lines_are_complete_without_duplicate_ocr(assets, o
     from manga_translator.utils.generic import build_det_rearrange_plan, det_rearrange_patch_spans
     from ballontranslator.utils.textblock import group_output
     from mtu_engine.engine import configuration
-    from mtu_engine.ocr import Paddle
+    from mtu_engine.ocr.paddle import Paddle
     ModelWrapper._MODEL_DIR = str(models)
     detector = default.DefaultDetector()
     asyncio.run(detector.load('cuda'))
@@ -774,15 +774,14 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
         monkeypatch.setattr(engine.colors.predictor, '_estimate_colors_batch', predict)
         engine.warmup()
         assert color_batches == [2]  # Both known-text and fallback models were warmed.
-        for probe in engine.probes.values():
+        for probe in engine.ocr.recognizers.values():
             provider = 'DmlExecutionProvider' if backend == 'amd' else 'CUDAExecutionProvider'
             assert probe.session.get_providers()[0] == provider
             if backend == 'cuda':
                 assert int(probe.session.get_provider_options()[provider]['device_id']) == engine.gpu
             assert probe.session.get_session_options().intra_op_num_threads == 2
-        assert engine.recognizers is engine.probes
-        assert len({id(probe.session) for probe in engine.probes.values()}) == 3
-        assert engine.japanese.model.model.device.type == 'cuda'
+        assert len({id(probe.session) for probe in engine.ocr.recognizers.values()}) == 3
+        assert engine.ocr.japanese.model.model.device.type == 'cuda'
         assert engine.color_model.use_gpu
         assert next(engine.color_model.model.parameters()).device.type == 'cuda'
         assert engine.colors.predictor.color_model.model is engine.color_model.model
@@ -800,21 +799,21 @@ def test_cuda_models_warmup_and_local_inpaint_offline(assets, offline, monkeypat
             quad = np.array([[x1-3,y1-3],[x2+3,y1-3],[x2+3,y2+3],[x1-3,y2+3]])
             block = SimpleNamespace(xyxy=[x1-3,y1-3,x2+3,y2+3], lines=[quad], src_is_vertical=False)
             line = Quadrilateral(quad, '', 1)
-            routes, _ = engine.router.classify(np.array(image), [block], [[line]])
+            routes, _ = engine.ocr.router.classify(np.array(image), [block], [[line]])
             assert routes == [language]
             if language == 'japan':
-                engine.japanese.recognize(np.array(image), [block], [[line]])
+                engine.ocr.japanese.recognize(np.array(image), [block], [[line]])
             else:
-                asyncio.run(engine.recognizers[language].recognize(np.array(image), [line], engine.config.ocr))
+                asyncio.run(engine.ocr.recognizers[language].recognize(np.array(image), [line], engine.config.ocr))
             assert ''.join(line.text.split()) == ''.join(text.split())
         # Exercise the real detector at the page boundary and cross the old
         # 16+remainder boundary with native bounded OCR batches and tail batches.
         shapes = []
-        infer = engine.probes['en'].session.run
+        infer = engine.ocr.recognizers['en'].session.run
         def capture(outputs, feed, *args, **kwargs):
             shapes.append(next(iter(feed.values())).shape)
             return infer(outputs, feed, *args, **kwargs)
-        monkeypatch.setattr(engine.probes['en'].session, 'run', capture)
+        monkeypatch.setattr(engine.ocr.recognizers['en'].session, 'run', capture)
         edge_font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 26)
         sentence = 'BUT UNLIKE ME'
         edge_inputs = []
@@ -893,8 +892,8 @@ def test_long_lines_and_partial_ocr_continue_at_different_positions(assets, offl
                  'The evening sky was full of distant stars.',
                  'Our next adventure begins early tomorrow.']
     font = ImageFont.truetype(str(models.parent / 'fonts/NotoSans-Regular.ttf'), 24)
-    recognize = engine.recognizers['en'].recognize
-    classify = engine.router.classify
+    recognize = engine.ocr.recognizers['en'].recognize
+    classify = engine.ocr.router.classify
     failure = None
 
     def rejected(text):
@@ -916,8 +915,8 @@ def test_long_lines_and_partial_ocr_continue_at_different_positions(assets, offl
                 line.prob = 0.1 if failure == 'low-confidence' else 0.0
         return result
 
-    monkeypatch.setattr(engine.recognizers['en'], 'recognize', incomplete)
-    monkeypatch.setattr(engine.router, 'classify', incomplete_readings)
+    monkeypatch.setattr(engine.ocr.recognizers['en'], 'recognize', incomplete)
+    monkeypatch.setattr(engine.ocr.router, 'classify', incomplete_readings)
     try:
         engine.warmup()
         for top in (32, 440, 900):

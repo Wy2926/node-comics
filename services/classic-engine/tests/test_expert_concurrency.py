@@ -9,7 +9,7 @@ import pytest
 
 from classic_node.timing import collect
 from mtu_engine.colors import _CpuColorModel
-from mtu_engine.experts import Japanese
+from mtu_engine.ocr.japanese import Japanese
 
 
 class ObservedLock:
@@ -152,7 +152,7 @@ def test_japanese_lock_only_covers_each_paragraph_model_call(model_factory, monk
             assert not expert._lock.locked()
             self._text = value
 
-    from mtu_engine.experts import Image
+    from mtu_engine.ocr.japanese import Image
     fromarray = Image.fromarray
 
     def crop(pixels):

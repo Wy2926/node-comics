@@ -25,7 +25,8 @@ def test_recognition_inventory_keeps_shared_paddle_and_manga_without_openocr():
     assert not {'openocr-python', 'onnxruntime'} & packages
 
 
-def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cache(tmp_path, monkeypatch):
+@pytest.mark.parametrize('ocr_backend', ['classic', 'mlx8'])
+def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cache(tmp_path, monkeypatch, ocr_backend):
     output, cache = tmp_path / 'prepared', tmp_path / 'download-cache'
     stale = ('models/openocr/openocr_svtrv2_ch.pth', 'upstream/openocr/svtrv2_ch.yml',
              'upstream/openocr/LICENSE', 'licenses/openocr-unused.txt',
@@ -58,7 +59,7 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         prefix = repository + '-' + source['revision'] + '/'
         entries = {prefix + name + '/__init__.py': '' for name in modules}
         entries[prefix + 'LICENSE'] = 'retained source license'
-        if key == 'source':
+        if 'patches' in source:
             entries.update({prefix + name: ''.join(patch['before'] for patch in patches)
                             for name, patches in source['patches'].items()})
         archives[source['url']] = entries
@@ -80,18 +81,19 @@ def test_prepare_removes_retired_generated_assets_but_preserves_samples_and_cach
         return target
 
     monkeypatch.setattr(prepare_mtu, 'download', download)
-    manifest = prepare_mtu.prepare(output, cache)
-    assert verify(output / 'models') == manifest
+    manifest = prepare_mtu.prepare(output, cache, ocr_backend)
+    assert verify(output / 'models', ocr_backend) == manifest
     assert not any('openocr' in url.lower() for url in downloads)
     assert not any('openocr' in name.lower() for name in manifest['files'])
     assert all(not (output / name).exists() for name in stale)
     assert {path.name for path in (output / 'fonts').iterdir()} == {'Test.ttf'}
     assert sample.read_bytes() == b'private user sample'
     assert cached_sample.read_bytes() == b'existing cache content'
-    assert 'upstream/manga_ocr/LICENSE' in manifest['files']
-    assert 'upstream/mot/LICENSE' in manifest['files']
-    assert 'models/ocr/ch_PP-OCRv5_rec_mobile_infer.onnx' in manifest['files']
-    assert 'models/manga/pytorch_model.bin' in manifest['files']
+    for name in ('upstream/manga_ocr/LICENSE', 'upstream/mot/LICENSE',
+                 'models/ocr/ch_PP-OCRv5_rec_mobile_infer.onnx', 'models/manga/pytorch_model.bin'):
+        assert (name in manifest['files']) == (ocr_backend == 'classic')
+    assert 'models/ocr/ocr_ar_48px.ckpt' in manifest['files']
+    assert 'models/ocr/alphabet-all-v7.txt' in manifest['files']
     assert not any(name.startswith('samples/') for name in manifest['files'])
 
 
