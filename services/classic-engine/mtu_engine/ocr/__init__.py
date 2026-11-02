@@ -9,11 +9,11 @@ class Reading:
     line_aligned: bool = False
 
 
-def create(name, models, gpu=0, threads=2, *, batch_size, backend='cuda', model=None, python=None, **options):
+def create(name, models, gpu=0, threads=2, *, batch_size, backend='cuda', model=None, **options):
     if name == 'classic':
         from .classic import ClassicOCR
         return ClassicOCR(models, gpu, threads, backend=backend, batch_size=batch_size, **options)
-    if name == 'mlx8':
-        from .mlx import MLXOCR
-        return MLXOCR(python, model, threads, batch_size=batch_size)
-    raise ValueError('ocr_backend must be classic or mlx8')
+    if name == 'hayai':
+        from .hayai import HayaiOCR
+        return HayaiOCR(model, gpu, backend=backend, batch_size=batch_size)
+    raise ValueError('ocr_backend must be classic or hayai')

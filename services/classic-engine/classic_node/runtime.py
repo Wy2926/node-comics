@@ -67,17 +67,17 @@ class Runtime:
             'torch', 'torchvision',
             'ultralytics', 'PyQt6', 'PyQt6-Qt6', 'PyHyphen',
             'numpy', 'opencv-python', 'Pillow', 'networkx', 'shapely',
+            'transformers', 'huggingface-hub', 'tokenizers', 'safetensors',
             'PySide6-Essentials', 'shiboken6', 'mahotas')
         if ocr_backend == 'classic':
-            packages += (ORT_PACKAGES[backend], 'rapidocr', 'manga-ocr',
-                         'transformers', 'huggingface-hub', 'tokenizers')
+            packages += (ORT_PACKAGES[backend], 'rapidocr', 'manga-ocr')
         dependencies = {name: package_version(name) for name in packages}
         self.version = f'mtu-{backend}-v1-' + digest({'upstream': LOCK['source']['revision'],
             'code': code, 'assets': assets, 'dependencies': dependencies, 'ocr': self.engine.ocr.identity,
             'font_choices': FONT_CHOICES, 'default_font_ids': DEFAULT_FONT_IDS,
             'fonts': [file_hash(path) for path in options['font']],
             'options': {key: value for key, value in options.items()
-                        if key not in {'models', 'font', 'threads', 'gpu', 'ocr_model', 'ocr_python'}}})[:32]
+                        if key not in {'models', 'font', 'threads', 'gpu', 'ocr_model'}}})[:32]
         if config.get('render_workers', 1) > 1:
             try:
                 self.render_pool = RenderPool(options['models'], options['font'], config['render_workers'],

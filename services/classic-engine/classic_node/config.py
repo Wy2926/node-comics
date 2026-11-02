@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from .resources import resolve_cpu_resources
 
 ENGINE_DEFAULTS = {'models': '.assets/models', 'gpu': 0, 'threads': 'auto', 'backend': 'cuda',
-    'ocr_backend': 'classic', 'ocr_model': None, 'ocr_python': None,
+    'ocr_backend': 'classic', 'ocr_model': None,
     'font': [], 'detect_size': 1280, 'inpainting_size': 512, 'keep_lang': None,
     'ocr_batch_size': 4, 'ocr_min_batch_size': 1, 'color_batch_size': 4, 'detect_batch_size': 4,
     'ocr_arena_extend_strategy': 'kSameAsRequested', 'ocr_arena_shrinkage': True}
@@ -20,7 +20,7 @@ LOCAL_DEFAULTS = {'local_pages': 2, 'render_workers': 'auto', 'max_leases': 8,
 def engine_options(engine):
     """Only active backend options affect execution, diagnostics and checkpoints."""
     unused = (('ocr_min_batch_size', 'ocr_arena_extend_strategy', 'ocr_arena_shrinkage')
-              if engine.get('ocr_backend', 'classic') == 'mlx8' else ('ocr_model', 'ocr_python'))
+              if engine.get('ocr_backend', 'classic') == 'hayai' else ('ocr_model',))
     return {key: value for key, value in engine.items() if key not in unused}
 
 
@@ -30,7 +30,7 @@ def execution_settings(config):
     local['inpaint_slots'] = config.get('inpaint_slots', local['local_pages'])
     local['analysis_workers'] = config.get('analysis_workers', local['download_workers'])
     local['engine'] = {key: value for key, value in engine_options(ENGINE_DEFAULTS | config.get('engine', {})).items()
-                      if key in ENGINE_DEFAULTS and key not in {'models', 'font', 'keep_lang', 'ocr_model', 'ocr_python'}}
+                      if key in ENGINE_DEFAULTS and key not in {'models', 'font', 'keep_lang', 'ocr_model'}}
     return local
 
 
@@ -103,21 +103,18 @@ def load(path):
     from mtu_engine.backend import BACKENDS
     if value['engine']['backend'] not in BACKENDS:
         raise ValueError('backend must be cuda, amd or mps')
-    if value['engine']['ocr_backend'] not in ('classic', 'mlx8'):
-        raise ValueError('ocr_backend must be classic or mlx8')
-    if value['engine']['ocr_backend'] == 'mlx8':
-        if value['engine']['backend'] != 'mps':
-            raise ValueError('mlx8 OCR requires backend mps')
-        for key in ('ocr_model', 'ocr_python'):
-            if not isinstance(value['engine'][key], str) or not value['engine'][key]:
-                raise ValueError(f'mlx8 OCR requires {key}')
-            value['engine'][key] = os.path.abspath(path.parent / value['engine'][key])
+    if value['engine']['ocr_backend'] not in ('classic', 'hayai'):
+        raise ValueError('ocr_backend must be classic or hayai')
+    if value['engine']['ocr_backend'] == 'hayai':
+        if not isinstance(value['engine']['ocr_model'], str) or not value['engine']['ocr_model']:
+            raise ValueError('hayai OCR requires ocr_model')
+        value['engine']['ocr_model'] = str((path.parent / value['engine']['ocr_model']).resolve())
     if type(value['engine']['inpainting_size']) is not int or value['engine']['inpainting_size'] not in (512, 768, 1024):
         raise ValueError('inpainting_size must be 512, 768 or 1024')
     if type(value['engine']['detect_size']) is not int or not 512 <= value['engine']['detect_size'] <= 2048:
         raise ValueError('detect_size must be between 512 and 2048')
     for key in ('ocr_batch_size', 'color_batch_size', 'detect_batch_size'):
-        limit = 8 if key == 'ocr_batch_size' and value['engine']['ocr_backend'] == 'mlx8' else 32
+        limit = 8 if key == 'ocr_batch_size' and value['engine']['ocr_backend'] == 'hayai' else 32
         if type(value['engine'][key]) is not int or not 1 <= value['engine'][key] <= limit:
             raise ValueError(f'engine.{key} must be between 1 and {limit}')
     if value['engine']['ocr_backend'] == 'classic':

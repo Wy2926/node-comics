@@ -1,26 +1,26 @@
 # Third-party sources
 
-## Xiaomi-OCR-0 and optional MLX recognition
+## Hayai OCR v2.5 Nova
 
-[prepare_xiaomi.py](tools/prepare_xiaomi.py) prepares
-[Xiaomi-OCR-0](https://huggingface.co/xiaomi-research/Xiaomi-OCR-0) at revision
-`bbd8cf8d21f256b3644b44cb860f3a7cecb93c30`. The upstream model card declares
-Apache-2.0. The 1,746,937,856-byte `model.safetensors` has upstream LFS SHA-256
-`d4551e9f6127ac9e35cff7b4f7a72a90410e03e6c8676a36f0e2b7eaeb5d5348`.
-No weights or third-party inference code are vendored here.
+[prepare_hayai.py](tools/prepare_hayai.py) prepares
+[Hayai OCR v2.5 Nova](https://huggingface.co/JustANormalTinkerer/hayai-ocr-v2.5-nova)
+at revision `2803d0dc005fa4396ab1e7c5a472d2c450a247f7` (Apache-2.0).
+Its original FP32 `model.safetensors` is 627,709,088 bytes, SHA-256
+`ac63cd177c5b68bd91e18dd4408e0400461c7cf19f484b0da1643e232d1ffc3a`.
+The [SigLIP2 NaFlex processor](https://huggingface.co/google/siglip2-base-patch16-naflex)
+is pinned at `b53b807d3a2d5e2b3911292f2d69e5341cdc064c` (Apache-2.0);
+its weights are already included in the Hayai checkpoint and are not downloaded again.
 
-The isolated backend uses [MLX](https://github.com/ml-explore/mlx) / mlx-metal
-0.32.4 and [MLX-VLM](https://github.com/Blaizzy/mlx-vlm) 0.7.11 (MIT), pinned in
-[xiaomi-mlx-requirements.txt](environments/xiaomi-mlx-requirements.txt).
-It calls the upstream loader, affine converter and batch generator without copying
-their algorithms. Language linear/embedding weights use INT8 with group size 64;
-vision remains BF16 and KV is unquantized. The prepared directory retains the
-original model card, HF processor, tokenizer, chat template and a
-`conversion-source.json` containing source revision/hash, conversion versions,
-quantization scope and output checksums. Runtime verifies this self-contained
-artifact and needs no original BF16 checkpoint or classic recognition weights.
-Package licenses remain in the isolated environment; generated files stay outside
-the repository. Preparation publishes only verified complete conversions.
+[models.py](mtu_engine/ocr/models.py) pins SHA-256 for every model/configuration
+source file, tokenizer, processor and model card. Preparation retains those files
+unchanged with a `source.json` manifest, publishing only complete verified assets
+outside the repository. Runtime checks all hashes before importing the checkpoint's
+custom Python code. No upstream weights or inference algorithms are vendored here.
+
+The adapter calls the pinned upstream `_FastEngine` without copying its inference
+algorithms. It checks EOS/pad tokens to reject truncated paragraphs and ignores the
+upstream training-only IDS head. Runtime settings and supported validation scope are
+specified in [the OCR contract](ENGINE.md#ocr-后端契约).
 
 ## Manga Translator UI
 
@@ -88,4 +88,4 @@ PySide6-Essentials / Shiboken6 are required by upstream utility imports; their o
 
 `mtu-assets.json` records prepared source, model, dictionary, font and notice hashes. Node startup verifies those files before importing upstream image stages. Distribution manifests include the assembled runtime and source provenance. This inventory records origins; it does not replace upstream terms.
 
-The optional [macOS environment](environments/macos/pyproject.toml) and its lock retain official PyTorch / TorchVision Apple Silicon wheels and ONNX Runtime CPU 1.23.2. Main image stages use MPS; classic PP-OCR uses CPU ONNX. The separately pinned MLX worker does not import RapidOCR, Manga OCR or ONNX Runtime. Original distribution notices remain in each environment.
+The optional [macOS environment](environments/macos/pyproject.toml) and its lock retain official PyTorch / TorchVision Apple Silicon wheels and ONNX Runtime CPU 1.23.2. Main image stages use MPS; classic PP-OCR uses CPU ONNX. Hayai uses that same PyTorch environment and does not import RapidOCR, Manga OCR or ONNX Runtime. Original distribution notices remain in each environment.

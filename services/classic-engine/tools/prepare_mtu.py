@@ -146,6 +146,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ENGINE / '.assets')
     parser.add_argument('--cache', type=Path, default=HOST / '.build/downloads')
-    parser.add_argument('--ocr-backend', choices=('classic', 'mlx8'), default='classic')
+    parser.add_argument('--ocr-backend', choices=('classic', 'hayai'), default='classic')
     args = parser.parse_args()
     prepare(args.output, args.cache, args.ocr_backend)

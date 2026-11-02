@@ -1,6 +1,6 @@
 # MTU 计算节点
 
-常规漫画翻译的 v3 图像计算节点。组装固定版本的 [Manga Translator UI](https://github.com/hgmzhn/manga-translator-ui) DBNet 检测与文字蒙版、MangaLens、LaMa Large 和 PyQt6 气泡适配嵌字；复用 [Manga-Overlay-Translator](https://github.com/Yuff1010/Manga-Overlay-Translator) 文字类别加权评分，逐段试读并分流到中／韩／英各自的 PP-OCRv5 模型和日文 Manga OCR。Paddle 等比缩放与批处理使用 [RapidOCR](https://github.com/RapidAI/RapidOCR)，段落合并与阅读顺序使用 [BallonsTranslator](https://github.com/dmMaze/BallonsTranslator) 原生分组。默认图像模型使用 CUDA，OCR 可选择现有语言专家或独立 MLX 8 位后端；中心执行文本翻译，节点输出无损 WebP 覆盖层。实现边界与支持范围见 [ENGINE.md](ENGINE.md)。
+常规漫画翻译的 v3 图像计算节点。使用 MTU DBNet 检测文字，BallonsTranslator 分组，支持经典语言专家或 Hayai 512 识别；中心执行文本翻译，节点完成取色、气泡处理、LaMa 抹字与 Qt 嵌字，输出无损 WebP 覆盖层。组成与行为见 [ENGINE.md](ENGINE.md)，上游版本与许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 ## 开发运行
 
@@ -33,38 +33,35 @@ uv run --project environments/amd --locked python -m classic_node check --config
 
 AMD 验证沿用下列工具，用该环境的 Python 并增加 `--backend amd`；真实模型测试另外设置 `MTU_TEST_BACKEND=amd`。2 万／5 万像素图应先单页测量再增加并发；不能因使用相同并发参数便推断与 RTX 5060 容量或性能相同。
 
-### Apple Silicon 与可选 MLX 8 位 OCR
+### Apple Silicon 与 Hayai OCR
 
-主图像管线用 [macOS 独立环境](environments/macos/pyproject.toml)，显式配置 `engine.backend: "mps"`、`gpu: 0`。检测、取色、气泡和 LaMa 使用 MPS；默认 `ocr_backend: "classic"` 的日文识别使用 MPS，PP-OCR 使用 CPU ONNX。环境不混入 CUDA／DirectML，运行时不自动回退。MPS 并发边界见 [ENGINE.md](ENGINE.md#可选后端)。
+主图像管线用 [macOS 独立环境](environments/macos/pyproject.toml)，显式配置 `engine.backend: "mps"`、`gpu: 0`。检测、取色、气泡和 LaMa 使用 MPS；默认 `ocr_backend: "classic"` 的日文识别使用 MPS，PP-OCR 使用 CPU ONNX。MPS 并发边界见 [ENGINE.md](ENGINE.md#可选后端)。
 
 ```sh
 uv sync --project environments/macos --locked --group test
 ```
 
-MLX 8 位选择 `ocr_backend: "mlx8"`，只加载小米识别器。它有独立的 Python／Transformers 5 环境，以常驻本地进程连接主管线。两种 OCR 互不导入对方的实现，不要求准备对方的识别权重；检测、取色、抹字与嵌字继续共享。准备工具统一负责固定版本下载与 8 位转换；`--source` 已存在时复用本地原权重，输出目录须位于仓库外：
+Hayai 复用节点现有环境。准备工具下载并校验固定版本，已有源文件直接复用；生成资产保存在仓库外：
 
 ```sh
-WORK="$HOME/Developer/ocr-tests/node-comics-xiaomi"
-uv venv "$WORK/mlx-env" --python 3.12
-uv pip install --python "$WORK/mlx-env/bin/python" -r environments/xiaomi-mlx-requirements.txt
-"$WORK/mlx-env/bin/python" -m tools.prepare_xiaomi --source "$WORK/model" --output "$WORK/prepared-mlx8"
-uv run --project environments/macos --locked python -m tools.prepare_mtu --ocr-backend mlx8 --output "$WORK/assets" --cache "$WORK/downloads"
+WORK="$HOME/Developer/ocr-tests/node-comics-hayai"
+uv run --project environments/macos --locked python -m tools.prepare_hayai --source "$WORK/source" --output "$WORK/hayai"
+uv run --project environments/macos --locked python -m tools.prepare_mtu --ocr-backend hayai --output "$WORK/assets" --cache "$WORK/downloads"
 ```
 
-在私有配置中设置以下 `engine` 字段，并让 `models`／`font` 指向准备好的公共资产。路径可以相对配置文件；`ocr_python` 必须指向虚拟环境入口，不能换成它的符号链接目标。
+在私有配置中设置以下字段，并让 `models`／`font` 指向准备好的公共资产。`ocr_model` 相对配置文件解析：
 
 ```json
 {
   "backend": "mps",
   "gpu": 0,
-  "ocr_backend": "mlx8",
-  "ocr_model": "/absolute/path/prepared-mlx8",
-  "ocr_python": "/absolute/path/mlx-env/bin/python",
+  "ocr_backend": "hayai",
+  "ocr_model": "/absolute/path/hayai",
   "ocr_batch_size": 8
 }
 ```
 
-转换产物包含原始处理器、分词器、模型卡及校验清单，推理不再需要原 BF16 权重。`prepare_mtu --ocr-backend mlx8` 跳过 PP-OCR、Manga OCR 与分流资产，保留共享取色模型；匹配当前锁文件的完整资产包也可用于 MLX。切回 `classic` 须使用完整资产，且无须 MLX 环境。启动指纹包含所选 OCR、量化资产摘要及依赖版本，切换后端按[升级规则](docs/NODE_OPERATIONS.md#升级与验收)处理旧检查点。`check` 只校验和预热，`run` 才接单；修改代码或配置不会自动启动节点。
+`prepare_mtu --ocr-backend hayai` 只准备共享资产；已有完整公共资产包可直接复用，无须重建。配置规则见[节点配置](../../docs/NODE_CONFIGURATION.md)，推理流程与验证范围见 [OCR 后端契约](ENGINE.md#ocr-后端契约)。切换前按[升级规则](docs/NODE_OPERATIONS.md#升级与验收)处理待恢复任务；`check` 只校验和预热，`run` 才接单。
 
 ## 验证
 
@@ -96,13 +93,13 @@ uv run --project environments/macos --locked python -m tools.prepare_mtu --ocr-b
 
 ### OCR 回归
 
-[benchmark_ocr.py](tools/benchmark_ocr.py) 通过当前 `Runtime` 的真实分析管线验证所选后端，默认读取官网两张原图。每张预热后重复五轮，保存文字、原始行几何、图片摘要和耗时；不会注册节点或请求翻译。分别使用 `classic`／`mlx8` 的私有本地配置和不同输出文件：
+[benchmark_ocr.py](tools/benchmark_ocr.py) 通过当前 `Runtime` 的真实分析管线验证所选后端，默认读取官网两张原图。每张预热后重复五轮，保存文字、原始行几何、图片摘要和耗时；不会注册节点或请求翻译。分别使用 `classic`／`hayai` 的私有本地配置和不同输出文件：
 
 ```sh
 uv run --project environments/macos --locked python -m tools.benchmark_ocr --config /path/to/check.local.json --output /path/to/ocr-result.json
 ```
 
-`--input` 可指定图片，`--repeats` 设置轮数。结果里的 `ocr_seconds` 包含经典路由或 MLX 裁剪／进程通信，`analysis_seconds` 还包含检测、取色、气泡和蒙版；加载单独计时，形状预热不计入。重复输出不一致会报错，已有报告不会覆盖。人工逐字参考和私有结果留在仓库外，不能使用官网译图作为 OCR 真值；两张样本不足以证明通用准确率或 CUDA 性能。
+`--input` 可指定图片，`--repeats` 设置轮数。结果里的 `ocr_seconds` 包含经典路由或 Hayai 裁剪／预处理／识别，`analysis_seconds` 还包含检测、取色、气泡和蒙版；加载单独计时，形状预热不计入。重复输出不一致会报错，已有报告不会覆盖。人工逐字参考和私有结果留在仓库外，不能使用官网译图作为 OCR 真值；两张样本不足以证明通用准确率或 CUDA 性能。
 
 ## 部署与协议
 

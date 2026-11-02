@@ -54,14 +54,14 @@ def test_backend_identity_queries_only_its_own_ort_distribution(monkeypatch, tmp
     assert 'onnxruntime-directml' in packages and 'onnxruntime-gpu' not in packages
 
 
-def test_mlx_identity_needs_no_classic_packages_and_ignores_install_paths(monkeypatch, tmp_path):
+def test_hayai_identity_needs_no_classic_packages_and_ignores_install_paths(monkeypatch, tmp_path):
     config = prepare(monkeypatch, tmp_path, str.isascii)
-    config['engine'].update(backend='mps', ocr_backend='mlx8', ocr_model='weights', ocr_python='venv/python')
+    config['engine'].update(backend='mps', ocr_backend='hayai', ocr_model='weights')
     packages = []
     monkeypatch.setattr(runtime, 'package_version', lambda name: (packages.append(name), 'test')[1])
     first = runtime.Runtime(config).version
     assert not {'onnxruntime', 'onnxruntime-gpu', 'onnxruntime-directml', 'manga-ocr', 'rapidocr'} & set(packages)
-    config['engine'].update(ocr_model='moved/weights', ocr_python='moved/venv/python')
+    config['engine'].update(ocr_model='moved/weights')
     assert runtime.Runtime(config).version == first
     config['engine'].update(ocr_min_batch_size=99, ocr_arena_shrinkage=False)
     assert runtime.Runtime(config).version == first

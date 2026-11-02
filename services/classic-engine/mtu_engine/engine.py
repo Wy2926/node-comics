@@ -246,7 +246,7 @@ class Engine:
     def __init__(self, models, font, gpu=0, threads=2, detect_size=1280, inpainting_size=512, keep_lang=None,
                  ocr_batch_size=None, ocr_min_batch_size=None, color_batch_size=None, detect_batch_size=None,
                  ocr_arena_extend_strategy=None, ocr_arena_shrinkage=None, backend='cuda',
-                 ocr_backend='classic', ocr_model=None, ocr_python=None):
+                 ocr_backend='classic', ocr_model=None):
         from classic_node.config import ENGINE_DEFAULTS
         import cv2
         import torch
@@ -307,7 +307,7 @@ class Engine:
                 model_path=self.models / 'detection/mangalens.pt', device=self.device,
                 imgsz=768, conf=0.25, iou=0.7, auto_download=False, auto_load=True)
             self.ocr = create_ocr(ocr_backend, self.models, gpu, threads, backend=backend,
-                                  model=ocr_model, python=ocr_python, **options)
+                                  model=ocr_model, **options)
         # Upstream imports can disable OpenCV threading. Apply the node's CPU
         # budget after loading them, including DBNet and mask bilateral filters.
         cv2.setNumThreads(threads)
