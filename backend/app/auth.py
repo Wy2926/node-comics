@@ -44,6 +44,10 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
                 problem("AUTH_UNCONFIGURED", "管理员尚未配置身份服务", 503)
             key = jwks_client().get_signing_key_from_jwt(credentials.credentials)
             claims = jwt.decode(credentials.credentials, key.key, algorithms=["RS256", "ES256", "ES384"], audience=cfg.oidc_audience, issuer=cfg.oidc_issuer, options={"require": ["exp", "sub", "iss", "aud"]})
+    except jwt.PyJWKClientConnectionError:
+        # An unavailable key source cannot establish identity, but does not
+        # prove the credential is revoked. A 401 would make clients log out.
+        problem("AUTH_UNAVAILABLE", "暂时无法验证登录，请稍后重试", 503)
     except jwt.PyJWTError:
         problem("TOKEN_INVALID", "登录已过期，请重新登录", 401)
     if not isinstance(claims["sub"], str) or not claims["sub"]:

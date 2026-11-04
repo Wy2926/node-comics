@@ -45,7 +45,13 @@ export function sessionAuthorization(id:string):Authorization{
       // Logout/account switch can complete while the refresh is on the network.
       await currentSession(id);
       if(response.status===429||response.status>=500)return unavailable(session,rejected);
-      if(!response.ok)return expire(session);
+      if(!response.ok){
+        const failure=await response.json().catch(()=>null);
+        // Only an explicit grant rejection invalidates the account. Proxy,
+        // client configuration and other transport errors are not revocation.
+        if(['invalid_grant','login_required','interaction_required'].includes(failure?.error))return expire(session);
+        return unavailable(session,rejected);
+      }
       let next:Session;
       try{
         const tokens=await response.json();

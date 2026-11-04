@@ -79,8 +79,8 @@ describe('shared renewable sessions',()=>{
     await expect(bound().entitlements()).rejects.toBeInstanceOf(RefreshUnavailable);
     expect(request).toHaveBeenCalledOnce();expect((await readAuth()).session).not.toBeNull();
   });
-  it('clears revoked credentials and notifies subscribers only once',async()=>{
-    await saveSession({...renewable(),refreshAt:Date.now()-1});request.mockResolvedValueOnce(Response.json({error:'invalid_grant',error_description:'secret text'},{status:400}));
+  it.each(['invalid_grant','login_required','interaction_required'])('clears credentials on %s and notifies subscribers only once',async error=>{
+    await saveSession({...renewable(),refreshAt:Date.now()-1});request.mockResolvedValueOnce(Response.json({error,error_description:'secret text'},{status:400}));
     const changed=vi.fn(),unsubscribe=subscribeAuth(changed);
     try{
       const attempts=await Promise.allSettled([sessionAuthorization('test-session').token(),sessionAuthorization('test-session').token()]);
@@ -111,6 +111,35 @@ describe('shared renewable sessions',()=>{
 });
 
 describe('authenticated API boundaries',()=>{
+  it('retains a newly saved login when product identity verification is temporarily unavailable',async()=>{
+    await saveSession(renewable());
+    request.mockResolvedValueOnce(Response.json({error:{code:'AUTH_UNAVAILABLE',message:'Authentication service unavailable'}},{status:503}));
+    await expect(bound().capabilities()).rejects.toMatchObject({status:503,code:'AUTH_UNAVAILABLE'});
+    expect((await readAuth()).session?.id).toBe('test-session');
+    expect(request).toHaveBeenCalledOnce();
+  });
+  it.each([
+    {status:400,body:JSON.stringify({error:'temporarily_unavailable'})},
+    {status:401,body:JSON.stringify({error:'invalid_client'})},
+    {status:403,body:'<html>Access denied by proxy</html>'},
+    {status:408,body:''},
+  ])('retains a new login after API 401 and a non-revocation refresh failure ($status)',async({status,body})=>{
+    await saveSession(renewable());
+    request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(new Response(body,{status}));
+    await expect(bound().capabilities()).rejects.toBeInstanceOf(RefreshUnavailable);
+    expect((await readAuth()).session).toMatchObject({id:'test-session',token:'test-token',credential:{refreshToken:'refresh-one'}});
+    // A rejected access token is not used to replay the failed request; repeated
+    // refresh attempts share the existing cooldown instead of hitting the IdP.
+    await expect(sessionAuthorization('test-session').token('test-token')).rejects.toBeInstanceOf(RefreshUnavailable);
+    expect(request).toHaveBeenCalledTimes(2);
+    const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+31000);
+    try{
+      request.mockResolvedValueOnce(renewed());
+      expect(await sessionAuthorization('test-session').token('test-token')).toBe('new-access');
+      expect((await readAuth()).session?.id).toBe('test-session');
+      expect(request).toHaveBeenCalledTimes(3);
+    }finally{now.mockRestore();}
+  });
   it('recovers a 401 once, replaying the exact operation body and idempotency key',async()=>{
     await saveSession(renewable());request.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(renewed()).mockResolvedValueOnce(Response.json({ok:true}));
     const body=JSON.stringify({operation_key:'stable-operation'});

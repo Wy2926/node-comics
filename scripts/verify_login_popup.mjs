@@ -14,7 +14,9 @@ const output=path.join(root,'artifacts/login-popup');await mkdir(output,{recursi
 const run=await mkdtemp(path.join(output,'run-')),profile=path.join(run,'profile');await mkdir(profile);
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const origin='https://comics.nodelane.net',flows=new Map(),checks=[],pageErrors=[];
-let tokenRequests=0,phase='bootstrap',context,reader;
+let tokenRequests=0,refreshRequests=0,entitlementRequests=0,accountFailure='',phase='bootstrap',context,reader;
+const balance=available=>({granted:available,used:0,reserved:0,available,next_expiry_at:null,resets_at:null});
+const entitlements=()=>({plan:'free',plan_name:'free',plus_started_at:null,plus_expires_at:null,timezone:'Asia/Shanghai',generated_at:new Date().toISOString(),pending_previous_period_pages:0,image_rate_limit:{limit:10,window_seconds:60},free_quota:balance(30),subscription_quota:{...balance(0),unlimited:false},purchase_quota:balance(0),modes:{}});
 execFileSync(process.env.PYTHON||'python',['-c',`import sys,datetime,pathlib
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -44,12 +46,25 @@ const server=createServer({key:await readFile(path.join(profile,'key.pem')),cert
       response.writeHead(302,{Location:callback.href});response.end();return;
     }
     if(url.pathname==='/fixture/token'){
-      let body='';for await(const chunk of request)body+=chunk;const params=new URLSearchParams(body),flow=flows.get(params.get('code'));
+      let body='';for await(const chunk of request)body+=chunk;const params=new URLSearchParams(body);
+      if(params.get('grant_type')==='refresh_token'){
+        assert.equal(params.get('refresh_token'),'fixture-refresh');refreshRequests++;
+        assert(['refresh-unavailable','revoked'].includes(accountFailure));
+        json(response,{error:accountFailure==='revoked'?'invalid_grant':'temporarily_unavailable'},400);return;
+      }
+      const flow=flows.get(params.get('code'));
       assert(flow);assert.equal(params.get('redirect_uri'),flow.redirect_uri);assert.equal(createHash('sha256').update(params.get('code_verifier')).digest('base64url'),flow.code_challenge);
       tokenRequests++;flows.delete(params.get('code'));json(response,{access_token:'fixture-access',refresh_token:'fixture-refresh',token_type:'Bearer',expires_in:3600});return;
     }
     if(url.pathname.endsWith('/v1/me')){assert.equal(request.headers.authorization,'Bearer fixture-access');json(response,{user:{id:'fixture-reader',name:'隔离测试读者',role:'reader'}});return;}
-    if(url.pathname.endsWith('/v1/capabilities')){json(response,{modes:[],languages:[],limits:{},entitlements:null});return;}
+    if(['/v1/capabilities','/v1/me/entitlements'].includes(url.pathname)){
+      if(url.pathname==='/v1/me/entitlements'){assert.equal(request.headers.authorization,'Bearer fixture-access');entitlementRequests++;}
+      if(request.headers.authorization&&accountFailure){
+        const unavailable=accountFailure==='api-unavailable';
+        json(response,{error:{code:unavailable?'AUTH_UNAVAILABLE':'TOKEN_INVALID',message:unavailable?'暂时无法验证登录，请稍后重试':'登录已过期，请重新登录'}},unavailable?503:401);return;
+      }
+      json(response,url.pathname==='/v1/me/entitlements'?entitlements():{result_protocol:'overlay-v1',modes:[],languages:[],limits:{},entitlements:request.headers.authorization?entitlements():null});return;
+    }
     json(response,{error:{message:'隔离夹具未提供此接口'}},503);
   })().catch(()=>{if(!response.headersSent)response.writeHead(500);response.end();});
 });
@@ -92,8 +107,60 @@ try{
   await reader.waitForFunction(()=>document.querySelector('input[aria-label="阅读进度"]')?.value==='2');
   await reader.waitForFunction(()=>document.querySelector('[data-page-index="1"] img.nc-page-image')?.naturalWidth>0);
   checks.push('Original comic resumes on page 2 after cancellation, authorization failure and successful login');
-  assert.equal(tokenRequests,1);assert.deepEqual(pageErrors,[]);
-  const result={checks,tokenRequests,pageErrors,browser:context.browser()?.version(),nativeIdentity:true,liveIdentityProvider:false};
+  assert.equal(tokenRequests,1);
+  await reader.getByRole('button',{name:'返回我的漫画',exact:true}).click();
+  await reader.getByRole('button',{name:'我的账户',exact:true}).click();
+  for(const failure of ['api-unavailable','refresh-unavailable','revoked']){
+    phase=failure;accountFailure=failure;
+    await reader.getByRole('button',{name:'退出登录',exact:true}).click();
+    await reader.getByRole('button',{name:'登录账户',exact:true}).click();
+    const capabilityResponse=reader.waitForResponse(response=>new URL(response.url()).pathname==='/v1/capabilities'&&response.status()===(failure==='api-unavailable'?503:401));
+    const opened=context.waitForEvent('page');
+    await reader.getByRole('button',{name:'登录，开启漫译',exact:true}).click();
+    const popup=await opened,closed=popup.waitForEvent('close');
+    await popup.getByRole('button',{name:'完成测试登录'}).click();await closed;await capabilityResponse;
+    let auth;
+    for(let attempt=0;attempt<100;attempt++){
+      auth=await reader.evaluate(()=>chrome.storage.local.get('nc-auth').then(value=>value['nc-auth']));
+      if(failure==='api-unavailable'||auth?.reason==='expired'||auth?.session?.retryAt)break;
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
+    if(failure==='revoked'){
+      assert.equal(auth.session,null);assert.equal(auth.reason,'expired');
+      await reader.locator('.nc-notifications').getByRole('button',{name:'重新登录',exact:true}).waitFor();
+      await reader.getByRole('button',{name:'登录账户',exact:true}).waitFor();
+      assert.equal(await reader.getByText('正在读取会员权益…',{exact:true}).count(),0);
+      checks.push('An explicitly revoked grant still clears the new session and offers sign-in');
+    }else{
+      assert.equal(auth.session?.user.id,'fixture-reader');assert.equal(auth.reason,undefined);
+      await reader.getByText('隔离测试读者',{exact:true}).waitFor();
+      assert.equal(await reader.locator('.nc-notifications').getByRole('button',{name:'重新登录',exact:true}).count(),0);
+      if(failure==='api-unavailable')assert.equal(refreshRequests,0);
+      else {assert(auth.session.retryAt>Date.now());assert.equal(refreshRequests,1);}
+      checks.push(failure+': post-login service failure retains the account without a misleading expired-login prompt');
+      phase=failure+'-account-load';
+      const accountError=reader.getByRole('alert').filter({hasText:'暂时无法读取权益'});
+      await accountError.waitFor({timeout:5000});
+      assert.equal(await reader.getByText('正在读取会员权益…',{exact:true}).count(),0);
+      assert.equal(await reader.getByText('权益读取中',{exact:true}).count(),0);
+      await reader.screenshot({path:path.join(run,'account-'+failure+'.png')});
+      const refresh=reader.getByRole('button',{name:'刷新权益',exact:true}),beforeRequests=entitlementRequests;
+      const failedRefresh=reader.waitForResponse(response=>new URL(response.url()).pathname==='/v1/me/entitlements');
+      await refresh.click();await failedRefresh;await accountError.waitFor();
+      assert.equal(await refresh.getAttribute('aria-busy'),'false');
+      assert.equal(await reader.getByText('正在读取会员权益…',{exact:true}).count(),0);
+      assert.equal(entitlementRequests,beforeRequests+1);
+      phase=failure+'-account-recovery';accountFailure='';
+      await refresh.click();await reader.getByText('免费额度',{exact:true}).waitFor();
+      assert.equal(await accountError.count(),0);assert.equal(await refresh.getAttribute('aria-busy'),'false');
+      assert.equal(entitlementRequests,beforeRequests+2);
+      assert.equal((await reader.evaluate(()=>chrome.storage.local.get('nc-auth').then(value=>value['nc-auth']))).session.id,auth.session.id);
+      checks.push(failure+': first-load and retry failures stop loading; one manual retry recovers balances in the same session');
+    }
+    await reader.screenshot({path:path.join(run,'reader-'+failure+'.png')});
+  }
+  assert.equal(tokenRequests,4);assert.equal(refreshRequests,2);assert.deepEqual(pageErrors,[]);
+  const result={checks,tokenRequests,refreshRequests,entitlementRequests,pageErrors,browser:context.browser()?.version(),nativeIdentity:true,liveIdentityProvider:false};
   await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }catch(error){
   const failure={phase,errorType:error.name};await writeFile(path.join(run,'failure.json'),JSON.stringify(failure));console.error(failure);process.exitCode=1;

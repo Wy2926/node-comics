@@ -154,11 +154,24 @@ def test_revoked_signing_key_expires_and_rotated_key_is_accepted(rotating_jwks):
 
 def test_expired_jwks_does_not_accept_stale_key_during_outage(rotating_jwks):
     client, state, clock, _, old, _, token_headers = rotating_jwks
-    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 200
+    auth = token_headers(old, "old")
+    first = client.get("/v1/me", headers=auth)
+    assert first.status_code == 200
     state["unavailable"] = True
-    clock[0] += 31
-    assert client.get("/v1/me", headers=token_headers(old, "old")).status_code == 401
+    # Login can succeed just before the shared key cache expires. The next
+    # account request must not report a revoked credential for a network outage.
+    clock[0] += 29
+    assert client.get("/v1/me", headers=auth).status_code == 200
+    clock[0] += 2
+    response = client.get("/v1/capabilities", headers=auth)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AUTH_UNAVAILABLE"
     assert state["requests"] == 2
+    state["unavailable"] = False
+    recovered = client.get("/v1/me", headers=auth)
+    assert recovered.status_code == 200
+    assert recovered.json()["user"]["id"] == first.json()["user"]["id"]
+    assert state["requests"] == 3
 
 
 @pytest.mark.parametrize("subject", ["", 123, "x" * 255])

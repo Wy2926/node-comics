@@ -17,7 +17,7 @@ const rights:Entitlements={plan:'custom',plan_name:'后台配置的套餐',plus_
   image_rate_limit:{limit:37,window_seconds:60},free_quota:balance(6),subscription_quota:{...balance(2457),unlimited:false},purchase_quota:balance(3195),
   modes:{classic:{allowed:true,unlimited:false,quota_kind:'classic_monthly',consent_version:'fixture',quota:null}}};
 const account:Session={id:'fixture',token:'synthetic',expiresAt:1,refreshAt:0,credential:{kind:'development'},apiOrigin:api.base,user:{id:'fixture',name:'Reader',role:'reader'}};
-const renderAccount=(data=rights,session:Session|null=account)=>renderToStaticMarkup(<AccountPage api={api} account={session} rights={data} testing={false} onLogin={noop} onLogout={noop} onEntitlements={noop}/>);
+const renderAccount=(data=rights,session:Session|null=account)=>renderToStaticMarkup(<AccountPage api={api} account={session} rights={data} rightsLoading={false} testing={false} onLogin={noop} onLogout={noop} onEntitlements={noop}/>);
 
 it('uses server names and expiry, with one pricing link and no old subscription layout or billing operations',()=>{
   const html=renderAccount();

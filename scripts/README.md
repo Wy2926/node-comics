@@ -63,7 +63,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_image_transport.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与默认 HTTP 缓存复用 |
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
 | `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有 Komga 测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |
-| `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试与登录后阅读恢复 |
+| `verify_login_popup.mjs` | 模拟 OIDC、PKCE、取消、失败重试、登录后服务故障／撤权、账户加载失败与重试恢复、阅读恢复 |
 | `safari_fixture_server.mjs` / `prepare_safari_fixture.mjs` | Safari 模拟器的回环 OIDC、公开／防盗链图片、重定向与合成翻译服务，以及仅加入本地测试构建的 API／原生桥探针；使用方式和验收边界见 [Safari 技术验证](../docs/SAFARI_PROTOTYPE.md) |
 | `verify_notifications.mjs` | Vite 5187 的隔离身份与提示夹具；全局登录过期／错误／成功提示的关闭、自动收起、交互暂停、亮暗主题，以及逐图提示收起、重试与原图位置恢复；不访问外网 |
 | `verify_inline_translation.mjs` / `verify_popup.mjs` | 原位翻译与弹窗；弹窗覆盖当前域名开关、全局名单管理、目录边界、正则校验／超时与导航重新匹配；`INLINE_SITE_ONLY=prefetch` 检查页内 1/3／短图补位与暂停；原位夹具含超过 65 MiB 的旧 PNG 缓存及页面原图，验证真实扩展分块传输、字节一致、缓存恢复与位置保持（填充边界样本，不代表压缩率）；各站点真实网络开关见[站点说明](../docs/SITE_ADAPTERS.md#现有站点) |
