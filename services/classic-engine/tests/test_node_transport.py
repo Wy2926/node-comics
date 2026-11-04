@@ -7,7 +7,7 @@ import time
 
 import httpx
 import pytest
-from classic_node.agent import Page
+from classic_node.agent import Agent, Page
 from classic_node.journal import Journal
 from classic_node.protocol import ControlFailure, NodeFailure
 from classic_node.transport import PREFIX, Transport
@@ -80,22 +80,156 @@ def test_input_uses_center_node_and_current_lease_credentials():
         client.close()
 
 
-def test_input_download_receives_256_kib_chunks_and_the_final_tail():
-    data = bytes(range(256)) * 2048 + b'tail'
-    checks = []
+def input_page(data):
+    now = datetime.now(timezone.utc)
+    return Page({'lease_id': 'test', 'lease_token': 'lease-secret', 'status': 'active',
+                 'expires_at': (now + timedelta(seconds=300)).isoformat(), 'input': metadata(data)},
+                now.isoformat(), time.monotonic())
+
+
+def input_agent(client):
+    # Run the real per-page retry/download path without starting GPU or scheduler pools.
+    agent = object.__new__(Agent)
+    agent.transport = client
+    return agent
+
+
+def test_input_download_checks_cancellation_without_waiting_for_a_full_chunk():
+    data = b'image'
+    page, partial = input_page(data), bytearray()
 
     class Body(httpx.SyncByteStream):
         def __iter__(self):
-            yield data
+            yield data[:1]
+            page.stopped = True
+            yield data[1:2]
+            pytest.fail('Cancelled download continued reading')
 
     client = Transport(config(), control_transport=httpx.MockTransport(
         lambda _: httpx.Response(200, stream=Body())))
     try:
-        assert client.download('test', 'lease-secret', metadata(data),
-                               check=lambda: checks.append(True)) == data
-        assert len(checks) == 4  # Before GET, two 256 KiB chunks, then the tail.
+        with pytest.raises(NodeFailure, match='LEASE_STOPPED'):
+            client.download('test', 'lease-secret', metadata(data), page.check, partial=partial)
+        assert partial == data[:1]
     finally:
         client.close()
+
+
+@pytest.mark.parametrize('outcome', ['range', 'ignored', 'truncated', 'slow', 'complete_then_error'])
+def test_input_retry_preserves_partial_bytes_and_verifies_the_complete_image(monkeypatch, outcome):
+    import classic_node.transport as transport
+    data = bytes(range(256)) * 1024 + b'tail'
+    offset = len(data) if outcome == 'complete_then_error' else 73
+    observed, clock = [], [0.]
+    monkeypatch.setattr(transport, 'monotonic', lambda: clock[0])
+
+    class Body(httpx.SyncByteStream):
+        def __iter__(self):
+            if outcome == 'slow':
+                clock[0] = 11.
+            yield data[:offset]
+            if outcome == 'truncated':
+                return
+            if outcome == 'slow':
+                pytest.fail('Low-speed response was not interrupted')
+            raise httpx.ReadError('private connection details')
+
+    def center(request):
+        observed.append(request)
+        if len(observed) == 1:
+            assert 'range' not in request.headers
+            return httpx.Response(200, stream=Body())
+        assert request.headers['range'] == f'bytes={offset}-'
+        assert request.headers['if-range'] == f'"{metadata(data)["sha256"]}"'
+        if len(observed) == 2:
+            return httpx.Response(503)  # An outage must not erase the downloaded prefix.
+        if outcome == 'ignored':
+            return httpx.Response(200, content=data)
+        return httpx.Response(206, headers={'Content-Range': f'bytes {offset}-{len(data) - 1}/{len(data)}'},
+                              content=data[offset:])
+
+    client = Transport(config(), control_transport=httpx.MockTransport(center))
+    try:
+        assert input_agent(client).input_bytes(input_page(data))[0] == data
+        assert len(observed) == (1 if outcome == 'complete_then_error' else 3)
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('invalid', ['start', 'end', 'total', 'length', 'encoding', 'hash'])
+def test_input_resume_rejects_inconsistent_ranges_and_corrupt_bytes(invalid):
+    data = b'complete image'
+    partial = bytearray(data[:3])
+    size = len(data)
+    headers = {'Content-Range': f'bytes 3-{size - 1}/{size}', 'Content-Length': str(size - 3)}
+    headers.update({
+        'start': {'Content-Range': f'bytes 2-{size - 1}/{size}'},
+        'end': {'Content-Range': f'bytes 3-{size - 2}/{size}'},
+        'total': {'Content-Range': f'bytes 3-{size - 1}/{size + 1}'},
+        'length': {'Content-Length': str(size)},
+        'encoding': {'Content-Encoding': 'gzip'},
+        'hash': {},
+    }[invalid])
+
+    class Body(httpx.SyncByteStream):
+        def __iter__(self):
+            yield b'X' * (size - 3) if invalid == 'hash' else data[3:]
+
+    client = Transport(config(), control_transport=httpx.MockTransport(
+        lambda _: httpx.Response(206, headers=headers, stream=Body())))
+    try:
+        with pytest.raises(NodeFailure, match='INPUT_HASH_MISMATCH' if invalid == 'hash' else 'INPUT_INVALID'):
+            client.download('test', 'lease-secret', metadata(data), partial=partial)
+    finally:
+        client.close()
+
+
+def test_input_stalled_socket_times_out_and_resumes_without_changing_control_timeout(monkeypatch):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Event, Thread
+    import classic_node.transport as transport
+
+    monkeypatch.setattr(transport, 'INPUT_READ_SECONDS', .1)
+    data = bytes(range(256)) * 1024 + b'tail'
+    release, observed = Event(), []
+
+    class Center(BaseHTTPRequestHandler):
+        protocol_version = 'HTTP/1.1'
+
+        def log_message(self, *_):
+            pass
+
+        def do_GET(self):
+            observed.append(self.headers.get('Range'))
+            first = len(observed) == 1
+            self.send_response(200 if first else 206)
+            self.send_header('Content-Length', str(len(data) if first else len(data) - 73))
+            if not first:
+                self.send_header('Content-Range', f'bytes 73-{len(data) - 1}/{len(data)}')
+            self.end_headers()
+            self.wfile.write(data[:73] if first else data[73:])
+            self.wfile.flush()
+            if first:
+                release.wait(5)
+                self.close_connection = True
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Center)
+    thread = Thread(target=server.serve_forever, kwargs={'poll_interval': .01}, daemon=True)
+    thread.start()
+    client = Transport(config() | {'control_url': f'http://127.0.0.1:{server.server_port}'})
+    before = client.control.timeout.as_dict()
+    started = time.monotonic()
+    try:
+        assert input_agent(client).input_bytes(input_page(data))[0] == data
+        assert observed == [None, 'bytes=73-']
+        assert time.monotonic() - started < 3
+        assert client.control.timeout.as_dict() == before
+    finally:
+        release.set()
+        client.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 @pytest.mark.parametrize('path', ['http://control.example.test/input', 'https://other.example.test/input',

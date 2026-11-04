@@ -195,7 +195,7 @@ class SimulatedTransport:
             raise AssertionError(body.get('error'))
         raise AssertionError('Unexpected endpoint: ' + path)
 
-    def download(self, key, token, metadata, check):
+    def download(self, key, token, metadata, check, *, partial=None):
         self.gate('download', key)
         check()
         return self.input_for(key)

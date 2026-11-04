@@ -265,8 +265,9 @@ class Agent:
         metadata = page.lease.get('input')
         if not metadata:
             raise ControlFailure('CONTROL_INVALID_RESPONSE')
+        partial = bytearray()  # Per-page memory, released when this download ends.
         data = self.retry(page, lambda: self.transport.download(page.lease['lease_id'],
-            page.lease['lease_token'], metadata, page.check))
+            page.lease['lease_token'], metadata, page.check, partial=partial))
         return data, metadata
 
     def deliver(self, page, body):

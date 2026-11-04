@@ -3,10 +3,14 @@ import hashlib
 import json
 import re
 import ssl
+from time import monotonic
 import httpx
 from .protocol import ControlFailure, MAX_RESULT_BYTES, NodeFailure
 
 PREFIX = '/internal/compute/v3'
+INPUT_READ_SECONDS = 5
+INPUT_PROGRESS_SECONDS = 10
+INPUT_MIN_BYTES_PER_SECOND = 1024
 
 
 def control_client(config, *, headers=None, transport=None, timeout=30):
@@ -70,7 +74,7 @@ class Transport:
             raise NodeFailure('INPUT_INVALID')
         return f'{PREFIX}/leases/{lease_id}/{operation}'
 
-    def download(self, lease_id, token, metadata, check=lambda: None):
+    def download(self, lease_id, token, metadata, check=lambda: None, *, partial=None):
         path = self.lease_path(lease_id, 'input')
         # A relative exact route prevents a compromised descriptor forwarding credentials.
         if metadata.get('path') != path:
@@ -78,29 +82,68 @@ class Transport:
         limit = metadata['byte_size']
         if type(limit) is not int or limit <= 0:
             raise NodeFailure('INPUT_INVALID')
+        data = bytearray() if partial is None else partial
+        offset = len(data)
+        if offset > limit:
+            raise NodeFailure('INPUT_INVALID')
+        check()
+        # A separate timeout object leaves heartbeat, long-poll and upload policy intact.
+        timeout = httpx.Timeout(self.control.timeout)
+        timeout.read = min(timeout.read, INPUT_READ_SECONDS) if timeout.read is not None else INPUT_READ_SECONDS
+        headers = {'Accept-Encoding': 'identity', 'X-Lease-Token': token}
+        if offset:
+            headers.update({'Range': f'bytes={offset}-', 'If-Range': f'"{metadata["sha256"]}"'})
         try:
-            check()
-            with self.control.stream('GET', path, headers={'Accept-Encoding': 'identity', 'X-Lease-Token': token}) as response:
+            if offset == limit:
+                # All declared bytes may have arrived before the connection reported failure.
+                return self.verified_input(data, metadata)
+            with self.control.stream('GET', path, headers=headers, timeout=timeout) as response:
                 if response.status_code >= 300:
                     # Read only bounded error bytes so lease expiry still fences local work.
                     raw = bytearray()
-                    for chunk in response.iter_bytes(4096):
-                        raw.extend(chunk)
-                        if len(raw) > 8192:
+                    started = monotonic()
+                    for chunk in response.iter_bytes():
+                        check()
+                        raw.extend(chunk[:8192 - len(raw)])
+                        if len(raw) == 8192 or monotonic() - started >= INPUT_READ_SECONDS:
                             break
-                    self.checked(httpx.Response(response.status_code, content=bytes(raw[:8192])))
-                if response.status_code != 200:
-                    raise ControlFailure('CONTROL_INVALID_RESPONSE')
-                data = bytearray()
-                for chunk in response.iter_bytes(256 * 1024):
-                    check()
-                    data.extend(chunk)
-                    if len(data) > limit:
+                    self.checked(httpx.Response(response.status_code, content=bytes(raw)))
+                if response.headers.get('content-encoding', 'identity').lower() != 'identity':
+                    raise NodeFailure('INPUT_INVALID')
+                if response.status_code == 206:
+                    if not offset or response.headers.get('content-range') != f'bytes {offset}-{limit - 1}/{limit}':
                         raise NodeFailure('INPUT_INVALID')
+                elif response.status_code == 200:
+                    offset = 0  # Range ignored or If-Range changed: replace, never append.
+                else:
+                    raise ControlFailure('CONTROL_INVALID_RESPONSE')
+                length = response.headers.get('content-length')
+                if length is not None and length != str(limit - offset):
+                    raise NodeFailure('INPUT_INVALID')
+                if offset == 0:
+                    data.clear()
+                progress_at, progress_size = monotonic(), len(data)
+                # Check cancellation and progress for each network fragment,
+                # without waiting to fill an application-sized read buffer.
+                for chunk in response.iter_bytes():
+                    check()
+                    if len(data) + len(chunk) > limit:
+                        raise NodeFailure('INPUT_INVALID')
+                    data.extend(chunk)
+                    current = monotonic()
+                    elapsed = current - progress_at
+                    if elapsed >= INPUT_PROGRESS_SECONDS:
+                        if len(data) < limit and len(data) - progress_size < elapsed * INPUT_MIN_BYTES_PER_SECOND:
+                            raise ControlFailure('INPUT_DOWNLOAD_SLOW')
+                        progress_at, progress_size = current, len(data)
         except httpx.HTTPError as error:
             raise self.network_error(error) from None
         if len(data) != limit:
-            raise NodeFailure('INPUT_INVALID')
+            raise ControlFailure('INPUT_DOWNLOAD_INCOMPLETE')
+        return self.verified_input(data, metadata)
+
+    @staticmethod
+    def verified_input(data, metadata):
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise NodeFailure('INPUT_HASH_MISMATCH')
         return bytes(data)

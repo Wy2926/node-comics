@@ -429,7 +429,7 @@ def test_input_missing_metadata_or_file_is_unavailable(v3, missing):
     assert response.json()['error']['code'] == 'INPUT_UNAVAILABLE'
 
 
-def test_input_streams_256_kib_chunks_without_a_database_transaction(v3, png):
+def test_input_streams_bounded_chunks_and_ranges_without_a_database_transaction(v3, png):
     import asyncio
     from app.compute_v3 import read_input as input_response
 
@@ -445,14 +445,45 @@ def test_input_streams_256_kib_chunks_without_a_database_transaction(v3, png):
     async def drain(response):
         return [chunk async for chunk in response.body_iterator]
 
-    with session_factory()() as db:
-        response = input_response(lease['lease_id'], db=db)
-        assert not db.in_transaction()
-        chunks = asyncio.run(drain(response))
-        assert not db.in_transaction()
-    assert [len(chunk) for chunk in chunks] == [256 * 1024, len(data) - 256 * 1024]
-    assert b''.join(chunks) == data
-    assert response.headers['content-length'] == str(len(data))
+    for offset in (0, 73):
+        with session_factory()() as db:
+            response = input_response(lease['lease_id'], db=db, range_header=f'bytes={offset}-' if offset else None)
+            assert not db.in_transaction()
+            chunks = asyncio.run(drain(response))
+            assert not db.in_transaction()
+        assert all(0 < len(chunk) <= 256 * 1024 for chunk in chunks)
+        assert b''.join(chunks) == data[offset:]
+        assert response.headers['content-length'] == str(len(data) - offset)
+        assert response.status_code == (206 if offset else 200)
+        if offset:
+            assert response.headers['content-range'] == f'bytes {offset}-{len(data) - 1}/{len(data)}'
+
+
+def test_input_byte_ranges_and_validators_preserve_the_exact_source(v3):
+    v3['create']()
+    lease = claim(v3).json()['leases'][0]
+    full = read_input(v3, lease)
+    data, size = full.content, len(full.content)
+    etag = f'"{lease["input"]["sha256"]}"'
+    assert full.headers['accept-ranges'] == 'bytes' and full.headers['etag'] == etag
+    for value, start, end in [('bytes=0-', 0, size - 1), ('bytes=73-', 73, size - 1),
+                              ('bytes=1-7', 1, 7), (f'bytes={size - 1}-{size + 10}', size - 1, size - 1),
+                              ('bytes=-5', size - 5, size - 1)]:
+        response = v3['client'].get(lease['input']['path'],
+            headers={**v3['auth'], 'Range': value, 'If-Range': etag})
+        assert response.status_code == 206
+        assert response.content == data[start:end + 1]
+        assert response.headers['content-length'] == str(end - start + 1)
+        assert response.headers['content-range'] == f'bytes {start}-{end}/{size}'
+    for value in (f'bytes={size}-', 'bytes=9-1', 'bytes=-0', 'bytes=-', 'bytes=0-1,3-5',
+                  'items=0-', 'bytes=' + '9' * 100 + '-'):
+        response = v3['client'].get(lease['input']['path'], headers={**v3['auth'], 'Range': value})
+        assert response.status_code == 416 and response.content == b''
+        assert response.headers['content-range'] == f'bytes */{size}'
+    response = v3['client'].get(lease['input']['path'],
+        headers={**v3['auth'], 'Range': 'bytes=73-', 'If-Range': '"another-source"'})
+    assert response.status_code == 200 and response.content == data
+    assert v3['client'].get(lease['input']['path'], headers={'Range': 'bytes=73-'}).status_code == 401
 
 
 def test_result_written_before_lost_commit_is_recovered(v3, png, monkeypatch):

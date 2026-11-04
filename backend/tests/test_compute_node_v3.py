@@ -154,6 +154,48 @@ def test_font_selection_reaches_actual_node_client_without_extra_text_call(v3, t
         journal.close()
 
 
+def test_interrupted_input_resumes_against_center_without_repeating_page_work(v3, tmp_path):
+    jobs, runtime = v3['create'](), FixtureRuntime()
+    agent, transport, journal = node_for(v3, tmp_path, 1, runtime)
+    original = transport.control._transport
+    requests = []
+
+    class Interrupted(httpx.SyncByteStream):
+        def __init__(self, data):
+            self.data = data
+
+        def __iter__(self):
+            yield self.data[:73]
+            raise httpx.ReadError('connection lost during input')
+
+    def control(request):
+        response = original.handle_request(request)
+        if request.url.path.endswith('/input'):
+            requests.append((request.headers.get('range'), response.status_code))
+            if len(requests) == 1:
+                return httpx.Response(200, headers=response.headers, stream=Interrupted(response.content))
+        return response
+
+    transport.control._transport = httpx.MockTransport(control)
+    try:
+        agent.register()
+        agent.claim()
+        drive(agent, jobs)
+        assert requests == [(None, 200), ('bytes=73-', 206)]
+        assert runtime.analyzed == runtime.rendered == 1
+        assert not journal.leases() and agent.pipeline.used == 0
+        from app.models import TextCall, Ledger
+        from sqlalchemy import func
+        with session_factory()() as db:
+            assert db.scalar(select(func.count()).select_from(TextCall)) == 1
+            assert db.scalar(select(func.count()).select_from(Ledger).where(
+                Ledger.job_id == jobs[0], Ledger.kind == 'settle')) == 1
+    finally:
+        agent.close()
+        transport.close()
+        journal.close()
+
+
 def test_definitive_output_rejection_reports_failure_once_and_drains_buffers(v3, tmp_path):
     jobs = v3['create']()
     runtime = FixtureRuntime()

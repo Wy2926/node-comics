@@ -1577,6 +1577,38 @@
             }
           },
           {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          },
+          {
+            "name": "If-Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Range"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1617,6 +1649,12 @@
                 "schema": {}
               }
             }
+          },
+          "206": {
+            "description": "Single byte range of the immutable input, with Content-Range."
+          },
+          "416": {
+            "description": "Invalid or unsatisfiable single byte range, with Content-Range: bytes */size."
           },
           "422": {
             "description": "Validation Error",

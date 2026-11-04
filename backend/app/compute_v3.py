@@ -3,10 +3,11 @@ import asyncio
 from datetime import datetime, timedelta
 import hmac
 import random
+import re
 from typing import Annotated, Literal
 import time
 
-from fastapi import APIRouter, Depends, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Header, Response, Request, HTTPException
 from starlette.responses import StreamingResponse
 from starlette.datastructures import UploadFile
 from pydantic import ValidationError, model_validator
@@ -415,16 +416,41 @@ def analysis(lease_id: str, body: AnalysisRequest, identity=Depends(node_auth), 
     return result
 
 
-@router.get('/leases/{lease_id}/input', dependencies=[Depends(node_auth)])
-def read_input(lease_id: str, db: Session = Depends(get_db)):
+@router.get('/leases/{lease_id}/input', dependencies=[Depends(node_auth)], responses={
+    206: {'description': 'Single byte range of the immutable input, with Content-Range.'},
+    416: {'description': 'Invalid or unsatisfiable single byte range, with Content-Range: bytes */size.'}})
+def read_input(lease_id: str, db: Session = Depends(get_db),
+               range_header: Annotated[str | None, Header(alias='Range')] = None,
+               if_range: Annotated[str | None, Header(alias='If-Range')] = None):
     # Trusted nodes read existing files; execution fencing stays on control routes.
-    source = db.execute(select(Asset.storage_key, Asset.mime, Asset.byte_size)
+    source = db.execute(select(Asset.storage_key, Asset.mime, Asset.byte_size, Asset.sha256)
         .join(Job, Job.input_asset_id == Asset.id)
         .join(ExecutionLease, ExecutionLease.job_id == Job.id)
         .where(ExecutionLease.id == lease_id)).one_or_none()
     db.rollback()  # Release the read transaction before opening or streaming the file.
     if source is None:
         raise ProcessingError('INPUT_UNAVAILABLE', '临时原图不可用，请恢复输入')
+    size = source.byte_size
+    etag = f'"{source.sha256}"'
+    headers = {'Accept-Ranges': 'bytes', 'ETag': etag, 'Cache-Control': 'private, no-store'}
+    start, end, status = 0, size - 1, 200
+    if range_header is not None and (if_range is None or if_range == etag):
+        # Only one range is useful for sequential resume; never build multipart ranges.
+        match = re.fullmatch(r'bytes=([0-9]{0,20})-([0-9]{0,20})', range_header)
+        if match and any(match.groups()):
+            first, last = match.groups()
+            if first:
+                start = int(first)
+                end = min(int(last), end) if last else end
+            else:
+                start = max(0, size - int(last))
+        else:
+            start = size
+        if not 0 <= start <= end < size:
+            return Response(status_code=416, headers={**headers, 'Content-Range': f'bytes */{size}'})
+        status = 206
+        headers['Content-Range'] = f'bytes {start}-{end}/{size}'
+    headers['Content-Length'] = str(end - start + 1)
     try:
         handle = get_store().path(source.storage_key).open('rb')
     except OSError:
@@ -432,12 +458,14 @@ def read_input(lease_id: str, db: Session = Depends(get_db)):
 
     def chunks():
         try:
-            while chunk := handle.read(256 * 1024):
+            handle.seek(start)
+            remaining = end - start + 1
+            while remaining and (chunk := handle.read(min(256 * 1024, remaining))):
+                remaining -= len(chunk)
                 yield chunk
         finally:
             handle.close()
-    return StreamingResponse(chunks(), media_type=source.mime,
-                             headers={'Content-Length': str(source.byte_size), 'Cache-Control': 'private, no-store'})
+    return StreamingResponse(chunks(), status_code=status, media_type=source.mime, headers=headers)
 
 
 class NodeError(RequestBody):

@@ -34,7 +34,9 @@ sequenceDiagram
 
 本节单图路径以前缀 `/internal/compute/v3` 开始，携带 `Authorization: Bearer <node_token>` 和 `X-Node-Id`。中心使用 HTTPS；节点下载客户端只接受租约描述中的精确相对路径，不接受外部 URL、任意跳转或源站凭据。单图原图、覆盖文件都通过中心传输，不签发下载/上传 URL，不使用对象存储客户端、MD5 或 ETag 上传确认。文件任务的 R2 传输独立见下节，不改变单图链路。
 
-原图 GET 只验证节点身份，再按租约 ID 定位原图文件；不获取调度锁，不校验租约令牌、节点归属、执行代次、取消状态或处理期限。所有已认证节点均为可信自管节点，可读取路径对应的现存原图；文件删除后不可再读取。服务端读取与节点接收缓冲均为 256 KiB，单次 HTTP 响应流式传输。取消和过期仍阻止执行与交付，节点验证长度与 SHA-256，读取成功不延长执行权。
+原图 GET 只验证节点身份，再按租约 ID 定位原图文件；不获取调度锁，不校验租约令牌、节点归属、执行代次、取消状态或处理期限。所有已认证节点均为可信自管节点，可读取路径对应的现存原图；文件删除后不可再读取。服务端以最多 256 KiB 读块流式返回，减少文件读取和异步调度开销；该大小不限定 TCP 包或节点收到的片段大小，下载期间不占数据库事务。响应声明 `Accept-Ranges: bytes`，`ETag` 为带双引号的输入 SHA-256；支持单个字节范围，成功返回 `206`、精确 `Content-Range` 与范围长度，非法、多段或不可满足的范围返回 `416` 和 `Content-Range: bytes */<总长度>`。`If-Range` 与摘要不符时返回完整 `200`。
+
+节点收到网络数据即检查取消与租约，不等待凑满读块。原图 GET 的读超时为 `request_seconds` 与 5 秒的较小值，其他控制请求和上传沿用原超时；每个至少 10 秒的接收窗口平均不足 1 KiB/s 时也中断重试。网络异常、未收齐或低速中断保留当前页内存中的前缀，经原有约 0.5 秒等待后以 `Range: bytes=<已收字节>-` 和绑定摘要的 `If-Range` 续传。节点核对 `206` 的起点、终点、总长度与响应长度，拒绝压缩传输；收到完整 `200` 则丢弃旧前缀重新接收。完整输入仍须核对长度与 SHA-256，错误摘要不重试相同输入。该缓冲计入现有页内存预算，不落盘、不跨页复用，进程重启后重新下载。取消和过期仍阻止执行与交付，读取成功不延长执行权。
 
 JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False)` 的 SHA-256；文件摘要直接散列字节。默认日志不写图片、OCR 全文、令牌或原始异常。
 
@@ -47,7 +49,7 @@ JSON 摘要为 UTF-8 编码的 `json.dumps(value, sort_keys=True, ensure_ascii=T
 | `POST /nodes/{id}/updates` | revision、wait_seconds（0–20）、config_version、can_claim、最多 32 项 leases 快照 | revision、claim_ready、变化的 leases；配置变化时带 config；不续租、不领取 |
 | `POST /nodes/{id}/heartbeat` | config_version、leases 中的 lease_id、lease_token、translations_revision、phase | server_time、config、逐项续期／停止／终态；只返回更新的译文 |
 | `POST /leases/{id}/analysis` | lease_token、analysis_hash、analysis | analysis_hash、receipt；有文字时 receipt 为 null，无文字时为稳定终态 |
-| `GET /leases/{id}/input` | 节点身份头 | 原图二进制；不跳转、不签名 |
+| `GET /leases/{id}/input` | 节点身份头，可选单个 Range 与 If-Range | 完整原图 200／范围 206／不可满足 416；不跳转、不签名 |
 | `PUT /leases/{id}/result` | multipart：一个 metadata 字符串字段、最多一个 output 文件 | 稳定 terminal 回执本体 |
 | `POST /leases/{id}/complete` | lease_token、error:{code}，可带 timings | 错误或停止确认的稳定 terminal 回执；不接受结果图片 |
 
