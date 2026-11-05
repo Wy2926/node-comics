@@ -6,7 +6,7 @@ interface FrozenInput {sha256:string;sourceSha256?:string;profile?:PreparedInput
 /** Shared by upload and result composition; the caller owns source leases and task state. */
 export async function loadTranslationInput(scope:string,input:FrozenInput,readSource:()=>Promise<Blob|undefined>,current:()=>boolean):Promise<Blob|undefined>{
   assertCurrent(current);
-  const cached=input.profile?await readInput(scope,input.sha256):undefined;
+  const cached=await readInput(scope,input.sha256);
   assertCurrent(current);
   if(cached)return cached;
   const source=await readSource();assertCurrent(current);

@@ -13,6 +13,7 @@ import type {RuntimeOptions} from '../src/translation/channels/contracts';
 import type {Job} from '../src/types';
 import {hashFile} from '../src/importers/hash';
 import {decodedImage, transferLocks} from './channel-transfer-fixture';
+import {PDF_RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
 
 const runtimes: DirectImageRuntime[] = [];
 beforeEach(() => {transferLocks(); decodedImage();});
@@ -43,6 +44,18 @@ function setup(scope = {key: crypto.randomUUID()}, options: Partial<Pick<Runtime
   }, driver);
   runtimes.push(runtime); return {runtime, jobs, scope, driver, consumed};
 }
+it('keeps a legacy PDF receipt across raster changes without submitting another transfer',async()=>{
+  const scope={key:crypto.randomUUID()},ref={entryId:'book',contentId:'pdf-content',pageId:'pdf-page',renderProfileId:PDF_RENDER_PROFILE};
+  const wanted={...target(ref.pageId),page:{...target(ref.pageId).page,...ref,id:ref.pageId,blobKey:pageReference(ref),imageSha256:'a'.repeat(64)}};
+  const id=JSON.stringify([scope.key,'zh-Hans','classic',['sha256',wanted.page.imageSha256]]),uuid=crypto.randomUUID();
+  await saveDirectOperation({id,scope:scope.key,entryId:ref.entryId,pageId:ref.pageId,job:{id:uuid,mode:'classic',target_language:'zh-Hans',image_sha256:wanted.page.imageSha256,status:'failed',phase:'failed',created_at:'2026-01-01',version:1,quota_pages:0,cache_hit:false}});
+  const first=setup(scope);await first.runtime.restore([wanted]);first.runtime.dispose();
+  const reopened=setup(scope),changed={...wanted,page:{...wanted.page,imageSha256:'b'.repeat(64)}};
+  await reopened.runtime.submit([changed]);await reopened.runtime.refresh();
+  expect(reopened.driver.start).not.toHaveBeenCalled();
+  expect(await readDirectOperations(scope.key)).toMatchObject([{id,job:{id:uuid,source_page:ref}}]);
+  expect(reopened.jobs.get(uuid)?.source_page).toEqual(ref);
+});
 
 it('retains two current pages plus five successors, skips a failed source and keeps MTU transfers serial', async () => {
   const first=Promise.withResolvers<Response>(),fetcher=vi.fn(async()=>new Response(new Blob(['translated'],{type:'image/png'}))).mockImplementationOnce(()=>first.promise);

@@ -1,10 +1,12 @@
 import type {Job,Page,ReadingEntry} from '../types';
 import {mergeJobs} from '../reader/jobs';
 import type {TranslationScope} from './channels/contracts';
+import {pageReference} from '../comics/pages/identity';
 
-export function matchesPage(page:Page,job:Job){const sha=job.source_image_sha256??job.image_sha256;return page.jobs.some(j=>j.id===job.id)||!!sha&&sha===page.imageSha256;}
-function indexJobs(jobs:Job[]){const index=new Map<string,Job[]>();for(const job of jobs){const sha=job.source_image_sha256??job.image_sha256;for(const key of [`job:${job.id}`,...(sha?[`sha:${sha}`]:[])])index.set(key,[...(index.get(key)??[]),job]);}return index;}
-function pageJobs(page:Page,index:Map<string,Job[]>,includeLocal=true){const keys=[...(page.imageSha256?[`sha:${page.imageSha256}`]:[]),...(includeLocal?page.jobs.map(j=>`job:${j.id}`):[])];return [...new Map(keys.flatMap(key=>index.get(key)??[]).map(job=>[job.id,job])).values()];}
+const sourceKey=(page:Page)=>page.entryId&&page.contentId&&page.renderProfileId?pageReference({entryId:page.entryId,contentId:page.contentId,pageId:page.id,renderProfileId:page.renderProfileId}):undefined;
+export function matchesPage(page:Page,job:Job){const sha=job.source_image_sha256??job.image_sha256;return page.jobs.some(j=>j.id===job.id)||!!sha&&sha===page.imageSha256||!!job.source_page&&pageReference(job.source_page)===sourceKey(page);}
+function indexJobs(jobs:Job[]){const index=new Map<string,Job[]>();for(const job of jobs){const sha=job.source_image_sha256??job.image_sha256;for(const key of [`job:${job.id}`,...(sha?[`sha:${sha}`]:[]),...(job.source_page?[pageReference(job.source_page)]:[])])index.set(key,[...(index.get(key)??[]),job]);}return index;}
+function pageJobs(page:Page,index:Map<string,Job[]>,includeLocal=true){const source=sourceKey(page),keys=[...(source?[source]:[]),...(page.imageSha256?[`sha:${page.imageSha256}`]:[]),...(includeLocal?page.jobs.map(j=>`job:${j.id}`):[])];return [...new Map(keys.flatMap(key=>index.get(key)??[]).map(job=>[job.id,job])).values()];}
 /** Channel status never downloads images or changes the original's layout geometry. */
 export function applyChannelJobs(copy:ReadingEntry,jobs:Job[],scope:TranslationScope){
  let changed=false;const index=indexJobs(jobs);

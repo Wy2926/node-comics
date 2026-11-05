@@ -89,7 +89,7 @@ export async function exportOriginalFile(
   try {
     target = context.destination?.getWriter();
     await binding.assertCurrent();
-    if (!target && source.snapshot.size > MAX_EXPORT_BYTES) {
+    if (!target && binding.entry.format !== 'pdf' && source.snapshot.size > MAX_EXPORT_BYTES) {
       throw Error('此浏览器直接下载源文件最多支持 128 MiB，请使用支持直接写入文件的浏览器。');
     }
     for (let offset = 0; offset < source.snapshot.size; offset += 1024 * 1024) {

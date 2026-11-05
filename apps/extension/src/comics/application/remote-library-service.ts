@@ -1,4 +1,4 @@
-import { catalog, sourceRemovalKey } from '../repositories';
+import { catalog, removeContentPages, sourceRemovalKey } from '../repositories';
 import type { Comic, Entry, SourceArtwork, SourceConnection } from '../domain';
 import type { IndexedPage, FileIndex } from '../formats/contracts';
 import { MAX_ENTRIES } from '../formats/limits';
@@ -236,10 +236,10 @@ export function remoteSourceContext(
     signal,
   };
 }
-function validatePages(pages: IndexedPage[]) {
+function validatePages(pages: IndexedPage[], format:Entry['format']='image-sequence') {
   if (
     !pages.length ||
-    pages.length > 1500 ||
+    (format !== 'pdf' && pages.length > 1500) ||
     pages.some((page, index) => page.ordinal !== index || !page.name || !page.locator)
   )
     throw Error('来源没有有效的完整页面索引。');
@@ -252,8 +252,8 @@ function sameRepresentation(entry: Entry, plan: RemoteReadingPlan) {
     JSON.stringify(entry.sourceSnapshot) === JSON.stringify(plan.snapshot)
   );
 }
-function validateIndex(index: FileIndex) {
-  if(index.kind==='images')return validatePages(index.pages);
+function validateIndex(index: FileIndex,format:Entry['format']) {
+  if(index.kind==='images')return validatePages(index.pages,format);
   if(!index.chapters.length||index.chapters.length>MAX_ENTRIES||new Set(index.chapters.map(chapter=>chapter.id)).size!==index.chapters.length)
     throw Error('电子书没有有效的完整章节索引。');
 }
@@ -277,7 +277,7 @@ async function indexRemotePlan(
   const source = await openFileSource(input);
   try {
     const index = await indexFile(context.plan.format, source, signal);
-    validateIndex(index);
+    validateIndex(index,context.plan.format);
     return index;
   } finally {
     await source.close();
@@ -291,7 +291,7 @@ async function publishRemote(
   guard?: RemoteDownloadGuard,
   signal?: AbortSignal,
 ) {
-  validateIndex(index);
+  validateIndex(index,context.plan.format);
   const pages=index.kind==='images'?index.pages:[],document=index.kind==='epub'?index:undefined;
   return catalog.mutate(
     ['connections', 'comics', 'entries', 'pageDescriptors', 'metadata'],
@@ -531,7 +531,7 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
           const previous = await tx.list('pageDescriptors', {
             index: 'contentOrdinal',
             range: IDBKeyRange.bound([entry.contentId, -Infinity], [entry.contentId, Infinity]),
-            limit: 1500,
+            limit: Math.max(entry.pageCount ?? 0,1500),
           });
           // A page feed cannot prove unchanged bytes from stable URLs/counts. Explicit reload starts fresh;
           // only a file representation with the same validated snapshot may retain its reading identity.
@@ -543,14 +543,7 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
           const contentId = changed ? preparedContentId : entry.contentId,
             values = changed ? descriptors(contentId, pages) : incoming;
           if (changed) {
-            for (const page of previous)
-              await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
-            for (const value of await tx.list('materializations', {
-              index: 'contentId',
-              range: entry.contentId,
-              limit: 5000,
-            }))
-              await tx.remove('materializations', value.id);
+            await removeContentPages(tx,entry.contentId);
             const position = await tx.get('positions', entry.id);
             if (position)
               await tx.put('positions', {
@@ -561,7 +554,8 @@ export async function reloadRemoteEntry(entryId: string, signal?: AbortSignal): 
                 relativeOffset: 0,
               });
           }
-          for (const page of values) await tx.put('pageDescriptors', page);
+          // The same validated file and page sequence already own their descriptors and measured geometry.
+          if (changed) for (const page of values) await tx.put('pageDescriptors', page);
           const now = Date.now();
           await tx.put('entries', {
             ...current,

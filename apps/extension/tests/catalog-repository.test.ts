@@ -1,8 +1,19 @@
 import 'fake-indexeddb/auto';
 import {describe,expect,it,vi} from 'vitest';
-import {catalog,openCatalog} from '../src/comics/repositories';
+import {catalog,openCatalog,idbCompleted} from '../src/comics/repositories';
 import {seedComic} from './comic-fixture';
+import {loadEntry} from '../src/comics/application/library-service';
 describe('single-source catalog and stale-write protection',()=>{
+ it('loads and replaces every PDF page beyond the former 1500-page boundary',async()=>{
+  const {entry,page}=await seedComic({format:'pdf',pageCount:1501});
+  const database=await openCatalog(),tx=database.transaction('pageDescriptors','readwrite'),done=idbCompleted(tx);
+  for(let ordinal=0;ordinal<1501;ordinal++)tx.objectStore('pageDescriptors').put(page(ordinal));
+  await done;
+  const reading=await loadEntry(entry.id);expect(reading.pages).toHaveLength(1501);expect(reading.pages.at(-1)?.id).toBe(page(1500).pageId);
+  const contentId=entry.contentId+':new';
+  await catalog.replaceContent(entry.id,1,{contentId,format:'pdf'},[{...page(0),contentId}],true);
+  expect(await catalog.count('pageDescriptors',{index:'contentId',range:entry.contentId})).toBe(0);
+ },30000);
  it('has a fresh baseline without old management tables',async()=>{const db=await openCatalog();for(const table of ['works','units','documents','bindings','revisions','acquisitionTasks'])expect(db.objectStoreNames.contains(table)).toBe(false);expect([...db.objectStoreNames]).toContain('comics');expect([...db.objectStoreNames]).toContain('entries');});
  it('paginates page metadata and retains stable page identity on index retries',async()=>{
   const {entry,page}=await seedComic();await catalog.putPages(entry.id,entry.contentId,Array.from({length:205},(_,i)=>page(i)),1);expect(await catalog.listPages(entry.contentId)).toHaveLength(100);expect((await catalog.listPages(entry.contentId,{offset:100}))[0].ordinal).toBe(100);await catalog.putPages(entry.id,entry.contentId,[{...page(20),pageId:'incorrect-new-id',width:800}],1);expect(await catalog.get('pageDescriptors',[entry.contentId,page(20).pageId])).toMatchObject({width:800});expect(await catalog.count('pageDescriptors',{index:'contentId',range:entry.contentId})).toBe(205);

@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { catalog } from '../src/comics/repositories';
+import { catalog, openCatalog, idbCompleted } from '../src/comics/repositories';
+import { descriptors } from '../src/comics/application/import-service';
 import { registerSourceDriver } from '../src/comics/sources/registry';
 import { openFileSource } from '../src/comics/sources/runtime';
 import type {
@@ -959,6 +960,28 @@ describe('remote library capability integration', () => {
       currentProfile.mockRestore();
     }
   });
+
+  it('retains the content identity, container and reading position when reloading a 1501-page PDF', async () => {
+    const f=fixture('download-file');f.plan.format='pdf';
+    const connection=await f.connect(),contentId=crypto.randomUUID();
+    const container=await importContainer(new File(['%PDF-',crypto.randomUUID()],'large.pdf'),undefined,undefined,contentId);
+    const result=await registerRemoteContainer({connection,plan:f.plan},container,contentId);
+    const pages=Array.from({length:1501},(_,ordinal)=>({ordinal,name:`Page ${ordinal+1}`,locator:{entryIndex:ordinal}}));
+    // Bulk fixture setup avoids thousands of fake IndexedDB roundtrips before the actual reload.
+    const database=await openCatalog(),tx=database.transaction('pageDescriptors','readwrite'),done=idbCompleted(tx);
+    for(const page of descriptors(contentId,pages))tx.objectStore('pageDescriptors').put(page);
+    await done;await catalog.patch('entries',result.entryId,{pageCount:pages.length,knownTotal:pages.length});
+    const index=vi.spyOn(formats,'indexFile').mockResolvedValue({kind:'images',pages});
+    try {
+      const last=(await catalog.listPages(contentId,{offset:1500,limit:1}))[0];
+      await catalog.savePosition({id:result.entryId,entryId:result.entryId,comicId:result.comicId,contentId,pageId:last.pageId,relativeOffset:.4,updatedAt:Date.now()});
+      await prepareEntryContent(result.entryId,undefined,{reload:true});
+      expect(await catalog.get('entries',result.entryId)).toMatchObject({contentId,containerId:container.id,pageCount:1501});
+      expect(await catalog.get('positions',result.entryId)).toMatchObject({contentId,pageId:last.pageId,relativeOffset:.4});
+      expect(await catalog.count('pageDescriptors',{index:'contentId',range:contentId})).toBe(1501);
+      expect(f.open).not.toHaveBeenCalled();
+    } finally { index.mockRestore(); }
+  },30000);
 
   it('never rolls back a published container reference when temporary-reference cleanup fails', async () => {
     const f = fixture('download-file');

@@ -1,4 +1,4 @@
-import type {PageReference} from '../../../../comics/pages/identity';
+import {PDF_RENDER_PROFILE,type PageReference} from '../../../../comics/pages/identity';
 import {hashFile,Sha256} from '../../../../importers/hash';
 import {msg} from '../../../../i18n/runtime';
 import {Api,ApiError} from '../../../../api';
@@ -22,7 +22,7 @@ const policyKey=(rights:Entitlements|undefined)=>rights?new Sha256().update(new 
 export function translationJob(snapshot:TranslationSnapshot,record?:LocalOperation):Job{
   const unavailable=['TRANSLATION_UNAVAILABLE','RESULT_EXPIRED'].includes(snapshot.error?.code??'');
   const result=snapshot.state==='succeeded'&&snapshot.result&&!unavailable?{key:snapshot.result.artifact?.sha256??snapshot.id,recoverable:true}:undefined;
-  return {id:snapshot.id,result,delivery:snapshot.result??undefined,model:snapshot.model,requested_model_id:snapshot.requested_model_id??record?.modelId,font_id:snapshot.font_id===undefined?record?.fontId:snapshot.font_id,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,source_image_sha256:record?.sourceSha256,input_profile:record?.inputProfile,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
+  return {id:snapshot.id,result,delivery:snapshot.result??undefined,model:snapshot.model,requested_model_id:snapshot.requested_model_id??record?.modelId,font_id:snapshot.font_id===undefined?record?.fontId:snapshot.font_id,mode:snapshot.mode,target_language:snapshot.target_language,status:snapshot.state==='needs_input'?'awaiting_upload':snapshot.state==='needs_attention'?'outcome_unknown':snapshot.state==='succeeded'&&snapshot.result?.kind==='no_text'?'no_text':snapshot.state,phase:snapshot.state,created_at:snapshot.created_at??new Date(record?.createdAt??Date.now()).toISOString(),updated_at:snapshot.updated_at,version:1,quota_pages:0,cache_hit:false,error:snapshot.error??undefined,image_sha256:snapshot.image_sha256??record?.image.sha256,source_image_sha256:record?.sourceSha256,source_page:record?.pageRef?.renderProfileId===PDF_RENDER_PROFILE?record.pageRef:undefined,input_profile:record?.inputProfile,quality_flags:snapshot.result?.quality_flags,result_available:!!snapshot.result&&!unavailable,result_expired:unavailable};
 }
 /** Bounded reading lookahead is local scheduling, never a server reading session. */
 export class TranslationCoordinator {
@@ -45,7 +45,7 @@ export class TranslationCoordinator {
       const ref=target.page.blobKey;
       return ref?this.options.getBlob(ref,signal):undefined;
     },current,this.options.limits?.(),!!action||!!this.options.tiles?.(),signal);
-    if(action&&previous&&target.page.imageSha256&&prepared.sourceSha256!==target.page.imageSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
+    if(action&&previous&&target.page.renderProfileId!==PDF_RENDER_PROFILE&&target.page.imageSha256&&prepared.sourceSha256!==target.page.imageSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     if(!action&&Math.max(prepared.width,prepared.height)>16383){
       if(!this.options.tiles?.())throw new ApiError(msg('翻译服务暂不可用'),'RESULT_FORMAT_UNAVAILABLE',503);
       prepared.resultFormat='overlay-tiles-v1';
@@ -80,11 +80,12 @@ export class TranslationCoordinator {
   private remember(record:LocalOperation){this.records=this.records.filter(r=>r.id!==record.id);if(this.wanted.has(record.id)){this.records.push(record);this.options.onChange();}}
   private async save(record:LocalOperation){this.current();if(await updateOperation(record))this.remember(record);}
   private async restoreHistory(targets:ReadingTarget[]){
+    const pageRecords=(await Promise.all(targets.filter(target=>target.page.renderProfileId===PDF_RENDER_PROFILE).map(target=>this.pageOperation(target)))).filter((record):record is LocalOperation=>!!record);
     const hashes=targets.flatMap(target=>target.page.imageSha256?[target.page.imageSha256]:[]);
-    const ids=[...targets.flatMap(target=>target.page.translationScope===this.scope?target.page.jobs.map(job=>job.id):[]),...this.records.map(record=>record.requestId)];
+    const ids=[...targets.flatMap(target=>target.page.translationScope===this.scope?target.page.jobs.map(job=>job.id):[]),...this.records.map(record=>record.requestId),...pageRecords.map(record=>record.requestId)];
     const key=JSON.stringify([hashes,ids,this.records.map(record=>record.result)]);if(this.historyKey===key)return;
     const jobs=await readJobs(this.scope,hashes,ids);this.current();
-    await this.options.onJobs(jobs);this.historyKey=key;
+    await this.options.onJobs(jobs.map(job=>{const record=pageRecords.find(record=>record.requestId===job.id);return record?{...job,source_page:record.pageRef}:job;}));this.historyKey=key;
   }
   async restore(targets:ReadingTarget[]){await this.init();await this.restoreHistory(targets);}
   private async receive(record:LocalOperation,result:TranslationSnapshot){
@@ -110,7 +111,7 @@ export class TranslationCoordinator {
         },this.options.api.isCurrent);
       }finally{lease?.release();}
       if(!blob)throw new ApiError(msg('本地原图尚未就绪，请重新采集。'),'LOCAL_IMAGE_MISSING');
-      if(blob.size!==record.image.byte_size||await hashFile(blob)!==record.image.sha256)throw new ApiError(msg('原图内容已变化，请重新加载后翻译。'),'SOURCE_CHANGED');
+      if(blob.size!==record.image.byte_size||await hashFile(blob)!==record.image.sha256)throw new InputChangedError();
       await this.receive(record,await this.options.api.translationInput(record.requestId,blob));
     }catch(error){if(!this.options.api.isCurrent())return;record.error=(error as Error).message;record.errorCode=error instanceof ApiError||error instanceof InputChangedError?error.code:undefined;if(record.errorCode==='SOURCE_CHANGED'){record.state='blocked';record.retryAt=undefined;}else{record.state='uncertain';record.retryAt=Date.now()+15000;}await this.save(record);}finally{this.uploads.delete(record.requestId);this.options.onChange();}});
     this.uploads.set(record.requestId,work);

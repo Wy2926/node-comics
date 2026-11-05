@@ -124,7 +124,8 @@ async function read(request:RasterRequest,signal:AbortSignal,preview:PagePreview
     ? {blob,width:known.width,height:known.height,imageSha256:known.imageSha256}
     : await prepareComicPage({name:descriptor.name,blob},signal);
   const identity:PageMaterialization={id,pageId:request.pageId,contentId:request.contentId,renderProfileId:request.renderProfileId,imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
-  if(known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新载入当前内容。');
+  // PDF rasters are derived bytes, not document identity. Frozen translation inputs are checked by their task.
+  if(doc.format!=='pdf'&&known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新载入当前内容。');
   signal.throwIfAborted();
   // Deleted source content may not be resurrected by a late parser/network completion.
   if((await catalog.get('entries',request.entryId))?.contentId!==request.contentId)throw Error('来源内容已变化，请重新打开。');

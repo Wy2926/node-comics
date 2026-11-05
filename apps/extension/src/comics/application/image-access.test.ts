@@ -5,7 +5,7 @@ vi.mock('../pages/service',()=>({acquirePage:mocks.acquire,acquireDisplayPage:mo
 vi.mock('../../storage/translations/results',()=>({resultInMemory:mocks.memory,readMaterializedResult:mocks.readResult,validateMaterializedResult:mocks.validateResult}));
 vi.mock('../../storage/translations',()=>({translationCache:{get:mocks.cache}}));
 vi.mock('../../storage/source-pages',()=>({sourcePageCache:{get:mocks.source}}));
-import {acquireImage,promoteImage,processingInput} from './image-access';
+import {acquireImage,readImage,promoteImage,processingInput} from './image-access';
 
 const reference={entryId:'entry',contentId:'content',pageId:'page',renderProfileId:RENDER_PROFILE};
 beforeEach(()=>{vi.clearAllMocks();mocks.acquire.mockResolvedValue({blob:new Blob(['pixels']),release:vi.fn()});});
@@ -37,6 +37,11 @@ describe('image acquisition priority',()=>{
   expect(mocks.acquire).not.toHaveBeenCalled();
   await acquireImage(key,controller.signal);
   expect(mocks.acquire).toHaveBeenCalledOnce();
+ });
+ it('never silently routes PDF display to canonical translation bytes',async()=>{
+  const key=pageReference({...reference,renderProfileId:PDF_RENDER_PROFILE});
+  await expect(acquireImage(key)).rejects.toThrow('显示尺寸');expect(mocks.acquire).not.toHaveBeenCalled();
+  await readImage(key);expect(mocks.acquire).toHaveBeenCalledWith(expect.objectContaining({purpose:'translation'}));
  });
  it('does not access a cached result when the speculative consumer was already canceled',async()=>{
   const controller=new AbortController();controller.abort();

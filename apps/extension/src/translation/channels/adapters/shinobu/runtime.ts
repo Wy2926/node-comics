@@ -1,5 +1,5 @@
 import {hashFile,Sha256} from '../../../../importers/hash';
-import {parsePageReference} from '../../../../comics/pages/identity';
+import {PDF_RENDER_PROFILE,parsePageReference} from '../../../../comics/pages/identity';
 import {readImageTranslationBinding} from '../../../../comics/repositories/translation-bindings';
 import type {Job} from '../../../../types';
 import {probeImageMetadata} from '../../../../comics/pages/image-metadata';
@@ -50,7 +50,10 @@ export class ShinobuRuntime implements ChannelRuntime{
   async restore(targets:ReadingTarget[]){
     for(const target of targets.slice(0,MAX_READER_TARGETS)){
       const id=this.id(target),record=await readOperation(id);
-      if(record){await this.adopt(await this.recover(record));continue;}
+      if(record){
+        const recovered=await this.recover(record),reference=target.page.blobKey?parsePageReference(target.page.blobKey):undefined;
+        await this.adopt(reference?.renderProfileId===PDF_RENDER_PROFILE?{...recovered,job:{...recovered.job,source_page:reference},previousResult:recovered.previousResult?{...recovered.previousResult,source_page:reference}:undefined}:recovered);continue;
+      }
       // Identical source pages can share a delivered image without sharing a page operation.
       // Read the exact binding before admission; reader hydration may still show another channel.
       if(!target.page.imageSha256)continue;
@@ -104,9 +107,10 @@ export class ShinobuRuntime implements ChannelRuntime{
         if(!requestCurrent())return;
         const metadata=await probeImageMetadata(source);
         if(!metadata)throw Error('SOURCE_CHANGED');
-        const sha=await hashFile(source);if(target.page.imageSha256&&target.page.imageSha256!==sha)throw Error('SOURCE_CHANGED');
+        const pdf=reference?.renderProfileId===PDF_RENDER_PROFILE;
+        const sha=await hashFile(source);if(!pdf&&target.page.imageSha256&&target.page.imageSha256!==sha)throw Error('SOURCE_CHANGED');
         if(!requestCurrent())return;
-        record.job.image_sha256=sha;record.fingerprint=digest([fingerprint,sha]);
+        record.job.image_sha256=sha;record.job.source_page=pdf?reference:undefined;record.fingerprint=digest([fingerprint,sha]);
         if(previous?.fingerprint===record.fingerprint){
           const checkpoint=await readCheckpoint(previous.job.id);
           if(checkpoint?.state==='succeeded'&&checkpoint.updatedAt>Date.now()-86400000)await saveCheckpoint({...checkpoint,id:record.job.id});

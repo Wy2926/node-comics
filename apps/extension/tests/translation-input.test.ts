@@ -16,6 +16,7 @@ import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
 import * as png from '../../../backend/shared/translation-images/png';
 import {fixture,target,snapshot,originalInput,originalBytes} from './translation-fixture';
 import {jpegWithSize,pngWithSize} from './image-encoding-fixture';
+import {PDF_RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';
 
 const encoded=new Blob(['RIFF',new Uint8Array([14,0,0,0]),'WEBPVP8 ',new Uint8Array([2,0,0,0]),'ok'],{type:'image/webp'}),close=vi.fn(),draw=vi.fn(),encode=vi.fn(async()=>encoded);
 const inputs=new ByteCache({name:'translation-inputs-v1',budgetBytes:INPUT_BUDGET_BYTES});
@@ -38,6 +39,23 @@ it('reuses unchanged bytes without reading, decoding or saving another input',as
   const read=vi.fn(),prepared=await prepareTranslationInput(target(1).page,read,()=>true);
   expect(prepared.image.sha256).toBe(target(1).page.imageSha256);expect(prepared.blob).toBeUndefined();
   expect(read).not.toHaveBeenCalled();expect(createImageBitmap).not.toHaveBeenCalled();
+});
+it('freezes actual PDF bytes despite stale raster metadata and restores them without rerendering',async()=>{
+  const f=fixture(),ref={entryId:'book',contentId:'pdf-content',pageId:'pdf-page',renderProfileId:PDF_RENDER_PROFILE};
+  const t={...target(1),entryId:ref.entryId,page:{...target(1).page,...ref,id:ref.pageId,blobKey:pageReference(ref)}};
+  const source=pngWithSize(800,1200),sha=await hashFile(source),read=vi.fn(async()=>source);
+  const core=new TranslationCoordinator({...f.core.options,getBlob:read});
+  await core.submit([t]);const record=(await readOperation(operationId(core.scope,'zh-Hans',t)))!;
+  expect(read).toHaveBeenCalledOnce();expect(record.image.sha256).toBe(sha);expect(record.inputProfile).toBeUndefined();
+  expect(await hashFile((await readInput(core.scope,sha))!)).toBe(sha);
+  const restore=vi.fn(async()=>{throw Error('must not rerender');});
+  expect(await hashFile((await loadTranslationInput(core.scope,{sha256:sha},restore,()=>true))!)).toBe(sha);
+  expect(restore).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+  const changed={...t,page:{...t.page,imageSha256:'f'.repeat(64)}};
+  const reopened=new TranslationCoordinator({...f.core.options,getBlob:restore});await reopened.submit([changed]);
+  expect(f.submit).toHaveBeenCalledOnce();expect((await readOperation(record.id))?.requestId).toBe(record.requestId);
+  expect(matchesPage(changed.page,translationJob(record.result!,record))).toBe(true);
+  expect(matchesPage({...changed.page,contentId:'different-content'},translationJob(record.result!,record))).toBe(false);
 });
 it.each([[900,1300],[0,0],[900,100001]])('uses actual source dimensions instead of unmaterialized layout %s x %s',async(width,height)=>{
   const source=jpegWithSize(800,20687,2*1024*1024),output=jpegWithSize(800,20687,128);
@@ -111,7 +129,7 @@ it('restores a frozen PNG input with PNG directly and still rejects different by
   const source=originalBytes(1),output=pngWithSize(1800,3600);encode.mockResolvedValue(output);
   const restored=await restoreTranslationInput(source,1800,3600,await hashFile(source),await hashFile(output),()=>true,PNG_INPUT_PROFILE);
   expect(restored).toBe(output);expect(encode).toHaveBeenCalledExactlyOnceWith({type:'image/png'});
-  await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),'0'.repeat(64),()=>true,PNG_INPUT_PROFILE)).rejects.toThrow('原图内容已变化');
+  await expect(restoreTranslationInput(source,1800,3600,await hashFile(source),'0'.repeat(64),()=>true,PNG_INPUT_PROFILE)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
 });
 it.each([INPUT_PROFILE,LEGACY_INPUT_PROFILE])('does not change frozen WebP profile %s to PNG during recovery',async profile=>{
   const source=originalBytes(1);encode.mockResolvedValue(pngWithSize(1800,3600));
@@ -205,12 +223,12 @@ it.each([
 it('recovery verifies the frozen output hash instead of assuming deterministic encoders',async()=>{
   const source=new Blob(['source']),sha=await hashFile(source);
   expect(await restoreTranslationInput(source,1800,3600,sha,await hashFile(encoded),()=>true)).toBe(encoded);
-  await expect(restoreTranslationInput(source,1800,3600,sha,'a'.repeat(64),()=>true)).rejects.toThrow('变化');
+  await expect(restoreTranslationInput(source,1800,3600,sha,'a'.repeat(64),()=>true)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
 });
-it('shared input loading returns unprocessed source bytes without cache or encoding work',async()=>{
+it('shared input loading checks frozen bytes before reading an unprocessed source',async()=>{
   const source=originalBytes(0),read=vi.fn(async()=>source),get=vi.spyOn(ByteCache.prototype,'get');
   expect(await loadTranslationInput('scope',{sha256:originalInput(0).image.sha256},read,()=>true)).toBe(source);
-  expect(read).toHaveBeenCalledOnce();expect(get).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();
+  expect(read).toHaveBeenCalledOnce();expect(get).toHaveBeenCalledOnce();expect(encode).not.toHaveBeenCalled();
 });
 it('shared input loading rebuilds once and then skips the source on a cache hit',async()=>{
   const scope=crypto.randomUUID(),source=originalBytes(0),read=vi.fn(async()=>source);

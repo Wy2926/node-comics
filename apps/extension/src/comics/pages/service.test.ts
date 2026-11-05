@@ -151,6 +151,11 @@ describe('page leases and trusted source routing', () => {
       expect(metadata).toHaveBeenCalledTimes(2);
       expect(metadata.mock.calls.every(([value])=>value.width===100&&value.height===200&&!('imageSha256' in value))).toBe(true);
       const again=await acquirePage(current);leases.push(again);expect(again.blob).toBe(original);expect(again.identity).toEqual(stable.identity);
+      stable.release();again.release();
+      mocks.prepare.mockResolvedValueOnce({blob:new Blob(['new PNG encoding']),width:100,height:200,imageSha256:'b'.repeat(64)});
+      const regenerated=await acquirePage(current);leases.push(regenerated);
+      expect(regenerated.identity.imageSha256).toBe('b'.repeat(64));
+      expect(mocks.records.get(JSON.stringify(['materializations',materializationId(current)]))).toMatchObject({imageSha256:'b'.repeat(64)});
       put('connections','connection',{id:'connection',generation:2,provider:'local',status:'revoked'});
       await expect(acquireDisplayPage(current,2048)).rejects.toThrow('来源');
       await expect(acquireOriginalPdfImage(current)).rejects.toThrow('来源');expect(originalImage).toHaveBeenCalledOnce();

@@ -61,7 +61,7 @@ export interface ContainerStreamOptions {
 /** Network input is consumed once; only one fixed-size staging buffer is retained. */
 export async function importContainerStream(stream: ReadableStream<Uint8Array>, options: ContainerStreamOptions): Promise<ManagedContainer> {
   const {name, size, signal, referenceId, onProgress} = options;
-  const maximum = 512 * CHUNK_SIZE;
+  const maximum = detectFormat(name) === 'pdf' ? Infinity : 512 * CHUNK_SIZE;
   try {
     throwIfAborted(signal);
     if (size !== undefined && (!Number.isSafeInteger(size) || size <= 0 || size > maximum))

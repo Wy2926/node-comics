@@ -24,6 +24,22 @@ export interface CatalogMutation {
   put<T extends CatalogTable>(table: T, record: CatalogTables[T]): Promise<void>;
   remove(table: CatalogTable, id: IDBValidKey): Promise<void>;
 }
+/** Complete, bounded cleanup inside the caller's catalog transaction. */
+export async function removeContentPages(tx:CatalogMutation,contentId:string,removalConnectionId?:string):Promise<void> {
+  for (;;) {
+    const batch = await tx.list('pageDescriptors', {index:'contentId',range:contentId,limit:100});
+    for (const page of batch) await tx.remove('pageDescriptors',[page.contentId,page.pageId]);
+    if (batch.length < 100) break;
+  }
+  for (;;) {
+    const batch = await tx.list('materializations', {index:'contentId',range:contentId,limit:100});
+    for (const value of batch) {
+      if(removalConnectionId)await tx.put('metadata',{id:sourceCleanupKey('image',removalConnectionId,value.imageSha256),imageSha256:value.imageSha256});
+      await tx.remove('materializations',value.id);
+    }
+    if (batch.length < 100) break;
+  }
+}
 const schema: Record<Exclude<CatalogTable,'translationBindings'>, [string, string | string[], boolean?][]> = {
   comics: [['sourceKey', 'sourceKey', true], ['connectionId', 'source.connectionId'], ['updatedAt', 'updatedAt'], ['lastReadAt', 'lastReadAt']],
   entries: [['comicId', 'comicId'], ['comicOrder', ['comicId', 'order']], ['sourceEntry', ['comicId', 'sourceEntryId'], true], ['contentId', 'contentId', true]],
@@ -246,8 +262,7 @@ export const catalog = {
       if (!entry || entry.generation !== generation) throw new StaleCatalogWriteError();
       const comic = await tx.get('comics', entry.comicId), connection = comic && await tx.get('connections', comic.source.connectionId);
       if (!comic || comic.source.status !== 'active' || !connection || connection.status !== 'connected') throw new StaleCatalogWriteError();
-      for (const page of await tx.list('pageDescriptors', {index: 'contentId', range: entry.contentId, limit: 1500})) await tx.remove('pageDescriptors', [page.contentId, page.pageId]);
-      for (const value of await tx.list('materializations', {index: 'contentId', range: entry.contentId, limit: 5000})) await tx.remove('materializations', value.id);
+      await removeContentPages(tx,entry.contentId);
       for (const page of pages) {if (page.contentId !== content.contentId) throw new StaleCatalogWriteError(); await tx.put('pageDescriptors', page);}
       await tx.put('entries', {...entry, ...content, generation: entry.generation + 1, indexState: 'ready', error: undefined, readAt: undefined, pageCount: pages.length, knownTotal: total ?? (complete ? pages.length : undefined), discoveryComplete: complete, coverPageId: pages[0]?.pageId, updatedAt: Date.now()});
       const position = await tx.get('positions', entryId);
@@ -328,19 +343,7 @@ export const catalog = {
           const id=sourceCleanupKey('entry',removalConnectionId,entry.id);
           if(!await tx.get('metadata',id))await tx.put('metadata',{id,entryId:entry.id,contentId:entry.contentId,containerId:entry.containerId});
         }
-        for(;;){
-          const batch=await tx.list('pageDescriptors',{index:'contentId',range:entry.contentId,limit:100});
-          for(const page of batch)await tx.remove('pageDescriptors',[page.contentId,page.pageId]);
-          if(batch.length<100)break;
-        }
-        for(;;){
-          const batch=await tx.list('materializations',{index:'contentId',range:entry.contentId,limit:100});
-          for(const value of batch){
-            if(removalConnectionId)await tx.put('metadata',{id:sourceCleanupKey('image',removalConnectionId,value.imageSha256),imageSha256:value.imageSha256});
-            await tx.remove('materializations',value.id);
-          }
-          if(batch.length<100)break;
-        }
+        await removeContentPages(tx,entry.contentId,removalConnectionId);
         for(const table of ['positions','tasks'] as const)for(;;){
           const batch=await tx.list(table,{index:'entryId',range:entry.id,limit:100});
           for(const value of batch)await tx.remove(table,value.id);

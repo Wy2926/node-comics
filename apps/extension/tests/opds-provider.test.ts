@@ -1135,6 +1135,28 @@ describe('OPDS transport security', () => {
     }
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
+  it('downloads PDFs without the archive byte cap or deadline and still supports cancellation', async () => {
+    const cancel = vi.fn();
+    const size = 513 * 1024 * 1024;
+    const transport = new OpdsTransport(vi.fn<typeof fetch>(async () => new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new Uint8Array([1])); },
+        cancel,
+      }),
+      { headers: { 'Content-Length': String(size) } },
+    )));
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const file = await transport.download(connection, ROOT, undefined, { format: 'pdf', size });
+      expect(file.size).toBe(size);
+      expect(timeout).not.toHaveBeenCalled();
+      await file.stream.cancel();
+      expect(cancel).toHaveBeenCalledOnce();
+      await expect(transport.download(connection, ROOT, undefined, { format: 'cbz', size }))
+        .rejects.toMatchObject({ code: 'too-large' });
+      expect(timeout).toHaveBeenCalledWith(300000);
+    } finally { timeout.mockRestore(); }
+  });
   it('binds full downloads with If-Match and rejects changed or truncated bodies', async () => {
     const cancel = vi.fn(),
       responses = [

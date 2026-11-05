@@ -908,6 +908,7 @@ export function createOpdsProvider(
           etag: opening.etag,
           lastModified: opening.lastModified,
           size: opening.size,
+          format: opening.format,
         });
         return {
           ...result,

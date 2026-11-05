@@ -1,4 +1,4 @@
-import {parsePageReference} from '../../../comics/pages/identity';
+import {PDF_RENDER_PROFILE,pageReference,parsePageReference} from '../../../comics/pages/identity';
 import {hashFile} from '../../../importers/hash';
 import {msg} from '../../../i18n/runtime';
 import {pageTranslation} from '../../../reader/presentation';
@@ -22,6 +22,7 @@ export interface DirectImageDriver {
 export class DirectImageRuntime implements ChannelRuntime {
   private initialization?: Promise<void>;
   private records = new Map<string, DirectOperation>();
+  private pdfOperations = new Map<string,string>();
   private targets: ReadingTarget[] = [];
   private requestCurrent: (target: ReadingTarget) => boolean = () => true;
   private stopped = false;
@@ -32,7 +33,15 @@ export class DirectImageRuntime implements ChannelRuntime {
   constructor(readonly scope: TranslationScope, private options: RuntimeOptions, private driver: DirectImageDriver) {}
   private current = () => !this.stopped && this.options.isCurrent();
   private id(target: ReadingTarget) {
-    const image = target.page.imageSha256 ? ['sha256', target.page.imageSha256] : ['page', targetKey(target.entryId, target.page, target.mode)];
+    const pdf=target.page.renderProfileId===PDF_RENDER_PROFILE;
+    if(pdf){
+      // Preserve pre-existing receipts/UUIDs; a derived raster change is not a new translation intent.
+      const existing=this.pdfOperations.get(JSON.stringify([this.options.language,target.mode,target.page.blobKey]));
+      if(existing)return existing;
+      const legacy=target.page.imageSha256?JSON.stringify([this.scope.key,this.options.language,target.mode,['sha256',target.page.imageSha256]]):undefined;
+      if(legacy&&this.records.has(legacy))return legacy;
+    }
+    const image = !pdf&&target.page.imageSha256 ? ['sha256', target.page.imageSha256] : ['page', targetKey(target.entryId, target.page, target.mode)];
     return JSON.stringify([this.scope.key, this.options.language, target.mode, image]);
   }
   private needsStart(target: ReadingTarget) {
@@ -59,7 +68,11 @@ export class DirectImageRuntime implements ChannelRuntime {
   async restore(targets:ReadingTarget[]) {
     await this.init();
     for(const target of targets){
-      const record=await readDirectOperation(this.id(target));
+      let record=await readDirectOperation(this.id(target));
+      const reference=target.page.blobKey?parsePageReference(target.page.blobKey):undefined;
+      if(record&&!record.job.source_page&&reference?.renderProfileId===PDF_RENDER_PROFILE){
+        record=await updateDirectOperation({...record,job:{...record.job,source_page:reference}});
+      }
       // An operation may still be between saving its intent and starting the driver.
       if(record&&(record.job.status!=='running'||await readTransferReceipt(record.job.id)))await this.adopt(record);
     }
@@ -72,6 +85,7 @@ export class DirectImageRuntime implements ChannelRuntime {
   private async adopt(record: DirectOperation) {
     const previous = this.records.get(record.id);
     this.records.set(record.id, record);
+    if(record.job.source_page)this.pdfOperations.set(JSON.stringify([record.job.target_language,record.job.mode,pageReference(record.job.source_page)]),record.id);
     if (previous?.job.id !== record.job.id || previous.job.status !== record.job.status || previous.job.updated_at !== record.job.updated_at) {
       if (this.current()) await this.options.onJobs([record.job]);
       this.changed();
@@ -129,6 +143,8 @@ export class DirectImageRuntime implements ChannelRuntime {
     // Only the unstarted tail is replaced. An already submitted image retains its receipt.
     this.requestCurrent = isCurrent;
     this.targets = targets.slice(0, MAX_READER_TARGETS).filter(isCurrent); this.runtimeError = undefined;
+    const pdfs=this.targets.filter(target=>target.page.renderProfileId===PDF_RENDER_PROFILE);
+    if(pdfs.length)await this.restore(pdfs);
     void this.pump();
   }
   private async pump() {
@@ -180,10 +196,11 @@ export class DirectImageRuntime implements ChannelRuntime {
       if (!requestCurrent()) return;
       if (!blob) throw new ImageTransferError('SOURCE_MISSING');
       const sha = await hashFile(blob);
-      if (target.page.imageSha256 && sha !== target.page.imageSha256 || target.page.imageByteSize && blob.size !== target.page.imageByteSize)
+      const pdf=reference?.renderProfileId===PDF_RENDER_PROFILE;
+      if (!pdf&&(target.page.imageSha256 && sha !== target.page.imageSha256 || target.page.imageByteSize && blob.size !== target.page.imageByteSize))
         throw new ImageTransferError('SOURCE_CHANGED');
       if (!requestCurrent()) return;
-      record = {...record, job: {...record.job, image_sha256: sha}};
+      record = {...record, job: {...record.job, image_sha256: sha,source_page:pdf?reference:undefined}};
       await saveDirectOperation(record); saved = true; this.records.set(record.id, record);
       if (!requestCurrent()) return;
       // No asynchronous gap between the final admission check and starting the transfer.
@@ -245,5 +262,5 @@ export class DirectImageRuntime implements ChannelRuntime {
     return undefined;
   }
   async refresh() {await this.init(); await this.reconcile(true); this.changed(); void this.pump();}
-  dispose() {this.stopped = true; clearTimeout(this.timer); this.targets = []; for (const listener of this.listeners) listener(); this.listeners.clear();}
+  dispose() {this.stopped = true; clearTimeout(this.timer); this.targets = []; this.pdfOperations.clear(); for (const listener of this.listeners) listener(); this.listeners.clear();}
 }

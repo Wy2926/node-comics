@@ -18,6 +18,7 @@ export interface RequestOptions {
   method?: 'GET' | 'HEAD';
   maxBytes?: number;
   status?: number;
+  /** Zero disables the deadline for an explicitly downloaded PDF. */
   timeoutMs?: number;
 }
 type TransportRequestOptions = Omit<RequestOptions, 'method'> &
@@ -140,7 +141,7 @@ export class OpdsTransport {
     const signal = AbortSignal.any([
       controller.signal,
       ...(options.signal ? [options.signal] : []),
-      AbortSignal.timeout(options.timeoutMs ?? 30000),
+      ...(options.timeoutMs === 0 ? [] : [AbortSignal.timeout(options.timeoutMs ?? 30000)]),
     ]);
     let leave: (() => void) | undefined;
     const release = () => {
@@ -297,11 +298,13 @@ export class OpdsTransport {
     connection: PrivateConnection,
     url: string,
     signal?: AbortSignal,
-    binding?: { etag?: string; lastModified?:string; size?: number },
+    binding?: { etag?: string; lastModified?:string; size?: number; format?: string },
   ) {
+    const pdf = binding?.format === 'pdf';
+    const limit = pdf ? Infinity : DOWNLOAD_LIMIT;
     const { response, release } = await this.response(connection, url, {
       signal,
-      timeoutMs: 300000,
+      timeoutMs: pdf ? 0 : 300000,
       headers: binding?.etag ? { 'If-Match': binding.etag } : binding?.lastModified ? {'If-Unmodified-Since':binding.lastModified} : undefined,
     });
     const reader = response.body?.getReader();
@@ -316,7 +319,7 @@ export class OpdsTransport {
       release();
       throw new OpdsError('source-changed', 'OPDS 文件在下载前已改变，请重新打开。');
     }
-    if (!reader || (size && size > DOWNLOAD_LIMIT)) {
+    if (!reader || (size && size > limit)) {
       await reader?.cancel();
       release();
       throw new OpdsError('too-large', '下载文件为空或超过 512 MiB 上限。');
@@ -336,7 +339,7 @@ export class OpdsTransport {
             return;
           }
           total += result.value.byteLength;
-          if (total > DOWNLOAD_LIMIT)
+          if (total > limit)
             throw new OpdsError('too-large', '下载文件超过 512 MiB 上限。');
           if (binding?.size && total > binding.size)
             throw new OpdsError('source-changed', 'OPDS 文件下载大小已改变。');

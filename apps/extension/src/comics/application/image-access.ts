@@ -31,6 +31,7 @@ export async function acquireImage(key:string,signal?:AbortSignal,priority:'curr
   const reference=parsePageReference(key);
   if(reference){
     const request={...reference,signal,priority,purpose:'reading' as const,...(preview?{preview}:{})};
+    if(reference.renderProfileId===PDF_RENDER_PROFILE&&displayWidth===undefined)throw Error('PDF 阅读需要显示尺寸。');
     return displayWidth===undefined?acquirePage(request):acquireDisplayPage(request,displayWidth);
   }
   signal?.throwIfAborted();
@@ -40,7 +41,12 @@ export async function acquireImage(key:string,signal?:AbortSignal,priority:'curr
   if(!blob)throw Error('图片缓存已清理，请重新加载。');
   return {blob,release(){}};
 }
-export async function readImage(key:string,signal?:AbortSignal):Promise<Blob|undefined>{const lease=await acquireImage(key,signal);try{return lease.blob;}finally{lease.release();}}
+/** Translation/result recovery reads canonical bytes, never a reader's display variant. */
+export async function readImage(key:string,signal?:AbortSignal):Promise<Blob|undefined>{
+  const reference=parsePageReference(key);
+  const lease=reference?await acquirePage({...reference,signal,purpose:'translation'}):await acquireImage(key,signal);
+  try{return lease.blob;}finally{lease.release();}
+}
 export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob>{
   signal?.throwIfAborted();
   const reference=parsePageReference(key);
@@ -51,7 +57,7 @@ export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob
   return thumbnails.run(async()=>{
     signal?.throwIfAborted();
     await source?.validate();
-    const lease=source?{blob:await source.read(signal),release(){}}:reference?await acquirePage({...reference,signal,priority:'background',purpose:'thumbnail'}):await acquireImage(key,signal);
+    const lease=source?{blob:await source.read(signal),release(){}}:reference?await acquireDisplayPage({...reference,signal,priority:'background',purpose:'thumbnail'},240):await acquireImage(key,signal);
     try{
       signal?.throwIfAborted();
       const bitmap=await createImageBitmap(lease.blob,{resizeWidth:240,resizeQuality:'medium'});

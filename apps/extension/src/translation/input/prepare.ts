@@ -1,4 +1,5 @@
 import {msg} from '../../i18n/runtime';
+import {PDF_RENDER_PROFILE} from '../../comics/pages/identity';
 import {abortable,assertCurrent} from '../../concurrency';
 import type {Capabilities,Page,TranslationImage} from '../../types';
 import {hashFile} from '../../importers/hash';
@@ -11,7 +12,7 @@ import ResizeWorker from './resize.worker?worker';
 export interface PreparedInput {image:TranslationImage;sourceSha256:string;width:number;height:number;profile?:InputProfile;blob?:Blob;resultFormat?:'overlay-tiles-v1';}
 export class InputChangedError extends Error {
   readonly code='SOURCE_CHANGED';
-  constructor(){super(msg('原图内容已变化，请重新加载后翻译。'));}
+  constructor(){super(msg('无法恢复此翻译任务的原始输入，不会自动重新翻译。'));}
 }
 function resized(blob:Blob,width:number,height:number,profile?:InputProfile,signal?:AbortSignal):Promise<{blob:Blob;sha256:string;profile?:InputProfile}> {
   // An extension service worker is already off the UI thread and has no Worker constructor.
@@ -46,6 +47,7 @@ export async function restoreTranslationInput(source:Blob,width:number,height:nu
 }
 export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|undefined>,current:()=>boolean,limits?:Capabilities['limits'],supportsLong=true,signal?:AbortSignal):Promise<PreparedInput> {
   signal?.throwIfAborted();
+  const pdf=page.renderProfileId===PDF_RENDER_PROFILE;
   function plan(width:number,height:number,mime?:string){
     const size=translationSize(width,height);
     if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||!Number.isSafeInteger(width*height)
@@ -59,7 +61,7 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     return {size,required,encodable};
   }
   // A digest identifies materialized dimensions; descriptor/layout placeholders do not.
-  const known=page.imageSha256?plan(page.width,page.height,page.imageMime):undefined;
+  const known=!pdf&&page.imageSha256?plan(page.width,page.height,page.imageMime):undefined;
   const maxBytes=Math.min(TRANSLATION_MAX_BYTES,limits?.max_bytes??Infinity);
   if(known&&!known.required&&page.imageSha256&&page.imageByteSize&&page.imageByteSize<=TRANSLATION_REENCODE_BYTES){
     if(page.imageByteSize>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
@@ -86,7 +88,7 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     const {size,required,encodable}=resolved;
     const sourceSha256=await hashFile(source);
     assertCurrent(current);
-    if(page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
+    if(!pdf&&page.imageSha256&&page.imageSha256!==sourceSha256)throw Error(msg('原图内容已变化，请重新加载后翻译。'));
     let encoded:Awaited<ReturnType<typeof resized>>|undefined;
     if(encodable&&(required||source.size>TRANSLATION_REENCODE_BYTES)){
       try{encoded=await resized(source,size.width,size.height,undefined,signal);}
@@ -100,7 +102,7 @@ export async function prepareTranslationInput(page:Page,read:()=>Promise<Blob|un
     const prepared=result.blob!==source;
     assertCurrent(current);
     if(result.blob.size>maxBytes)throw Error(msg('图片超过翻译服务的大小限制。'));
-    return {...size,sourceSha256,profile:prepared?encoded?.profile??INPUT_PROFILE:undefined,blob:prepared?result.blob:undefined,
+    return {...size,sourceSha256,profile:prepared?encoded?.profile??INPUT_PROFILE:undefined,blob:prepared||pdf?result.blob:undefined,
       image:{sha256:result.sha256,byte_size:result.blob.size,content_type:result.blob.type,normalization_version:1}};
   }),signal);}finally{
     // Cancelled queue entries must not retain old windows' compressed originals.

@@ -7,11 +7,10 @@ export async function originalPdfImage(page, {EvaluatorPreprocessor, JpegStream,
   stream.reset();
   const parser = new EvaluatorPreprocessor(stream, page.xref);
   const operation = {fn: 0, args: []}, modes = [];
-  let image, textMode = 0, count = 0;
+  let image, textMode = 0;
   while (true) {
     operation.args = [];
     if (!parser.read(operation)) break;
-    if (++count > 10000) return null;
     const {fn, args} = operation;
     switch (fn) {
       case OPS.save: modes.push(textMode); break;

@@ -323,6 +323,13 @@ describe('saved source file export', () => {
     expect(source.readAt).not.toHaveBeenCalled();
     expect(source.close).toHaveBeenCalledOnce();
   });
+  it('does not impose the buffered export ceiling on an original PDF and releases failed reads',async()=>{
+    const {entry}=await fixture();await catalog.patch('entries',entry.id,{format:'pdf'});
+    source.snapshot.size=MAX_EXPORT_BYTES+1;
+    vi.mocked(source.readAt).mockRejectedValueOnce(new Error('controlled read failure'));
+    await expect(exportOriginalFile(entry.id,{signal:new AbortController().signal})).rejects.toThrow('controlled read failure');
+    expect(source.readAt).toHaveBeenCalledOnce();expect(source.close).toHaveBeenCalledOnce();
+  });
 
   it('closes the source if the destination is already locked', async () => {
     const {entry} = await fixture();

@@ -7,6 +7,8 @@ import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference} from '../src/comics/pag
 import {fixture,target,originalBytes,originalInput,job,origin,snapshot} from './translation-fixture';
 import {loadResultBlob,resultInMemory,resultBlobKey} from '../src/storage/translations/results';
 import {setTranslationCacheLimitMb,translationCache} from '../src/storage/translations';
+import {pngWithSize} from './image-encoding-fixture';
+import {hashFile} from '../src/importers/hash';
 
 describe('content identity and recoverable source references',()=>{
  it('silently drops preparation that left the reading window without an account error',async()=>{
@@ -47,11 +49,12 @@ describe('content identity and recoverable source references',()=>{
   const previous=makeOperation(oldTarget,f.core.scope,'zh-Hans',originalInput(0));
   previous.state='accepted';previous.result=snapshot(previous.requestId,previous.request);await saveOperation(previous);
   expect(operationId(f.core.scope,'zh-Hans',{...oldTarget,page:{...oldTarget.page,renderProfileId:undefined}})).toBe(previous.id);
-  const core=new TranslationCoordinator({...f.core.options,getBlob:async()=>originalBytes(1)});
+  const bytes=pngWithSize(800,1200),sha=await hashFile(bytes);
+  const core=new TranslationCoordinator({...f.core.options,getBlob:async()=>bytes});
   await core.submit([current]);await core.submit([current]);
   expect(f.api.translations).not.toHaveBeenCalled();expect(f.submit).toHaveBeenCalledOnce();
   expect(f.submit.mock.calls[0][0]).not.toBe(previous.requestId);
-  expect(f.submit.mock.calls[0][1]).toMatchObject({image:{sha256:current.page.imageSha256}});
+  expect(f.submit.mock.calls[0][1]).toMatchObject({image:{sha256:sha}});
   expect(await readOperation(operationId(core.scope,'zh-Hans',current))).toMatchObject({pageRef:currentRef});
   expect(await readOperation(previous.id)).toEqual(previous);
  });

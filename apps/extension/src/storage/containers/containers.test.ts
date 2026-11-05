@@ -15,6 +15,16 @@ function file(size = CHUNK_SIZE + 19) {
 const rows = (table: string) => bytesTransaction([table], 'readonly', tx => idbRequest(tx.objectStore(table).getAll()));
 
 describe('immutable local containers', () => {
+  it('admits a PDF above 512 MiB without allocating the whole file and remains cancellable',async()=>{
+    const controller=new AbortController(),cancel=vi.fn(),bytes=new Uint8Array(CHUNK_SIZE);
+    bytes.set(new TextEncoder().encode('%PDF-1.7'));
+    const progress=vi.fn(()=>controller.abort());
+    const stream=new ReadableStream<Uint8Array>({start(control){control.enqueue(bytes);},cancel});
+    await expect(importContainerStream(stream,{name:'large.pdf',size:513*CHUNK_SIZE,signal:controller.signal,onProgress:progress})).rejects.toMatchObject({name:'AbortError'});
+    expect(progress).toHaveBeenCalledExactlyOnceWith(CHUNK_SIZE,513*CHUNK_SIZE);
+    expect(cancel).toHaveBeenCalledOnce();expect(await rows('chunks')).toEqual([]);expect(await rows('objects')).toEqual([]);
+    await expect(importContainerStream(new ReadableStream(),{name:'large.cbz',size:513*CHUNK_SIZE})).rejects.toThrow('512 MB');
+  });
   it('copies one bounded stream, hashes its written bytes, and reads across chunk boundaries after reopening', async () => {
     const input = file();
     const container = await importContainer(input, undefined, undefined, 'revision-a');

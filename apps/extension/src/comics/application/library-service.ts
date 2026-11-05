@@ -80,14 +80,15 @@ export async function loadEntry(id:string,scope?:TranslationScope):Promise<Readi
   // A quick exit/reopen must wait for the last local save, independently of remote sync.
   await savingReaderStates.get(id);
   const entry=await catalog.get('entries',id);if(!entry)throw Error('漫画已移除。');
-  const [descriptors,position,comic]=await Promise.all([entry.format==='epub'?Promise.resolve([]):catalog.listPages(entry.contentId,{limit:1500}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
+  const [descriptors,position,comic]=await Promise.all([entry.format==='epub'?Promise.resolve([]):catalog.listPages(entry.contentId,{limit:Math.max(entry.pageCount??0,1500)}),catalog.get('positions',id),catalog.get('comics',entry.comicId)]);
   if(entry.format==='epub')return {...readingEntry(entry,[],position),document:entry.document,documentLocation:position?.contentId===entry.contentId?position.documentLocation:undefined};
   const pages=await loadPageViews(entry,descriptors,scope?.key);
   return {...readingEntry(entry,pages,position),catalogUpdateRevision:comic?.catalogUpdates?.revision};
 }
 /** Image readers and EPUB artwork share materialization and account-scoped result recovery. */
 export async function loadPageViews(entry:Entry,descriptors:PageDescriptor[],scopeKey?:string):Promise<Page[]> {
-  return Promise.all(descriptors.map(async descriptor=>{
+  const pages:Page[]=[];
+  for(let offset=0;offset<descriptors.length;offset+=100)pages.push(...await Promise.all(descriptors.slice(offset,offset+100).map(async descriptor=>{
     const identity=await catalog.get('materializations',materializationId({entryId:entry.id,contentId:entry.contentId,pageId:descriptor.pageId,renderProfileId:pageRenderProfile(entry.format)}));
     const page=descriptorView(entry,descriptor,identity);
     if(scopeKey&&identity){
@@ -98,7 +99,8 @@ export async function loadPageViews(entry:Entry,descriptors:PageDescriptor[],sco
       }
     }
     savedPages.set(page,JSON.stringify(payload(page)));return page;
-  }));
+  })));
+  return pages;
 }
 export interface DirectoryEntry {id:string;title:string;tags:string[];current:boolean;read:boolean;readable:boolean;total?:number;status:string;error?:string;contentLanguage?:string;sourceRemoved?:boolean}
 export interface DirectoryGroup {id:string;title:string;entryIds:string[];parentId?:string}
