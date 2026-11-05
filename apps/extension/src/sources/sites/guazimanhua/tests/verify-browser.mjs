@@ -18,7 +18,7 @@ assert(!Object.hasOwn(manifest,'optional_host_permissions'));
 const bgPath=path.join(extension,'background.js');
 await writeFile(bgPath,`globalThis.sourceRequests=[];chrome.webRequest.onBeforeRequest.addListener(details=>{if(details.initiator?.startsWith('chrome-extension://'))globalThis.sourceRequests.push(details.url);},{urls:['https://www.guazimanhua.com/*']});\n`+await readFile(bgPath,'utf8'));
 const source = path.join(root, 'apps/extension/src').replaceAll('\\', '/'), probe = path.join(extension, 'probe.js');
-await writeFile(probe, `export {catalog} from '${source}/comics/repositories/index.ts';export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';export {readNetworkPages} from '${source}/sources/runtime/network.ts';export {readSourceImage} from '${source}/sources/runtime/source-image.ts';`);
+await writeFile(probe, `export {checkCatalogUpdates} from '${source}/comics/application/catalog-sync.ts';export {catalog} from '${source}/comics/repositories/index.ts';export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';export {readNetworkPages} from '${source}/sources/runtime/network.ts';export {readSourceImage} from '${source}/sources/runtime/source-image.ts';`);
 const {build} = createRequire(path.join(root, 'apps/extension/package.json'))('vite');
 await build({configFile: false, root: path.join(root, 'apps/extension'), logLevel: 'error', build: {outDir: extension, emptyOutDir: false, lib: {entry: probe, formats: ['es'], fileName: () => 'verify-source.js'}}});
 const context = await chromium.launchPersistentContext(profile, {headless: true, executablePath: process.env.TEST_CHROMIUM,
@@ -95,10 +95,8 @@ try {
   await site.close();
   const started = Date.now();
   await reader.evaluate(async id => {
-    const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));
-    const comic = await catalog.get('comics', id);
-    await catalog.put('comics', {...comic, catalogSync: {...comic.catalogSync, nextCheckAt: 0, lastSuccessAt: 0, lastAttemptAt: 0}});
-    await chrome.runtime.sendMessage({type: 'NC_CHECK_DUE_CATALOGS'});
+    const {checkCatalogUpdates} = await import(chrome.runtime.getURL('verify-source.js'));
+    await checkCatalogUpdates(id,{manual:true});
   }, details.comicId);
   await waitState(reader, async ({id, started}) => {
     const {catalog} = await import(chrome.runtime.getURL('verify-source.js'));

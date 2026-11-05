@@ -36,6 +36,10 @@ export function Preferences({ settings, setSettings, caps, modelSelection, fontS
     <section className="settings-card">
       <h3>
         <Icon name="book" />{msg("阅读偏好")}</h3>
+      <SettingRow title={msg('自动检查漫画更新')} description={msg('默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。')}>
+        <button type="button" className={'switch '+(settings.autoCheckComicUpdates?'on':'')} role="switch" aria-label={msg('自动检查漫画更新')} aria-checked={settings.autoCheckComicUpdates}
+          onClick={()=>setSettings(s=>({...s,autoCheckComicUpdates:!s.autoCheckComicUpdates}))}><i/></button>
+      </SettingRow>
       <SettingRow title={msg("默认阅读布局")} description={msg("未单独设置布局的漫画使用此默认值。")}>
         <Select aria-label={msg("默认阅读布局")} value={settings.layout} onChange={e => {const layout=e.target.value as Settings['layout'];setSettings(s => ({...s,layout}));}}>
           <option value="continuous">{msg("连续")}</option>

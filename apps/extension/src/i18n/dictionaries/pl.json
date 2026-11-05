@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Automatycznie sprawdzaj aktualizacje komiksów",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Domyślnie wyłączone. Po włączeniu sprawdza tylko otwierany komiks z witryny, co najmniej 12 godzin po ostatnim sprawdzeniu. Nie skanuje całej biblioteki; można sprawdzić ręcznie w dowolnej chwili.",
+  "正在检查更新…": "Sprawdzanie aktualizacji…",
+  "发现新章节，已更新目录。": "Znaleziono nowe rozdziały. Spis treści zaktualizowany.",
+  "已检查，暂无新章节。": "Sprawdzono. Brak nowych rozdziałów.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Nie udało się sprawdzić aktualizacji. Dotychczasowy spis treści zachowano; spróbuj ponownie później.",
+  "检查更新": "Sprawdź aktualizacje",
+  "后台检查，不影响阅读。": "Sprawdzanie w tle bez przerywania czytania.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "Nie można przywrócić oryginalnych danych wejściowych tego tłumaczenia. Nie zostanie ono automatycznie przetłumaczone ponownie.",
   "翻译字体": "Czcionka tłumaczenia",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Czcionki są dobierane do języka docelowego. Zmiany dotyczą tylko nowych zadań; istniejące obrazy trzeba ręcznie przetłumaczyć ponownie.",

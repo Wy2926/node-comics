@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Vérifier automatiquement les mises à jour des BD",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Désactivé par défaut. Vérifie uniquement la BD web que vous ouvrez, au moins 12 heures après la dernière vérification. Ne parcourt pas toute la bibliothèque ; vérification manuelle possible à tout moment.",
+  "正在检查更新…": "Recherche de mises à jour…",
+  "发现新章节，已更新目录。": "Nouveaux chapitres trouvés. Sommaire mis à jour.",
+  "已检查，暂无新章节。": "Vérification terminée. Aucun nouveau chapitre.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Impossible de vérifier les mises à jour. Le sommaire existant est conservé ; réessayez plus tard.",
+  "检查更新": "Rechercher des mises à jour",
+  "后台检查，不影响阅读。": "Vérification en arrière-plan sans interrompre la lecture.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "L’entrée d’origine de cette traduction ne peut pas être restaurée. Aucune nouvelle traduction automatique ne sera lancée.",
   "翻译字体": "Police de traduction",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Les polices dépendent de la langue cible. Les changements ne concernent que les nouvelles tâches ; retraduisez manuellement les images existantes.",

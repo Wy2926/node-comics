@@ -8,7 +8,7 @@ import {catalog} from '../src/comics/repositories';
 import {importCatalog,importManifest} from '../src/comics/application/import-service';
 import {importWebsiteLink,resumeWebsiteCatalog} from '../src/comics/application/website-import';
 import {comicDirectory,continueEntry} from '../src/comics/application/library-service';
-import {syncNextCatalog} from '../src/comics/application/catalog-sync';
+import {checkCatalogUpdates} from '../src/comics/application/catalog-sync';
 
 function snapshot():SourceCatalogSnapshot {
   const slug='progress-'+crypto.randomUUID(),id='mangacopy:'+slug,url='https://mangacopy.com/comic/'+slug;
@@ -53,7 +53,7 @@ describe('progressive website directory import',()=>{
     expect(await comicDirectory(comic.id,entry.id)).toMatchObject({complete:false});
     expect((await catalog.get('comics',comic.id))?.catalogSync?.lastSuccessAt).toBeUndefined();
     const backgroundRead=vi.fn();
-    expect(await syncNextCatalog(backgroundRead)).toBe(false);expect(backgroundRead).not.toHaveBeenCalled();
+    expect(await checkCatalogUpdates(comic.id,{},backgroundRead)).toEqual({status:'skipped'});expect(backgroundRead).not.toHaveBeenCalled();
     await importManifest({id:'progress-manifest',revision:1,title:'Chapter zero',url:source.entries[0].url,adapter:source.sourceId,
       direction:'rtl',discoveryComplete:true,knownTotal:1,note:'',items:[{id:'page-1',url:'https://images.example/progress.png',width:800,height:1200,order:0}]});
     const [page]=await catalog.listPages(entry.contentId);

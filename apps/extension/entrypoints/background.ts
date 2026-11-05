@@ -1,7 +1,6 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { registerSourceBackground } from '../src/sources/runtime/background';
 import {registerDriveBackground} from '../src/comics/sources/google-drive/background';
-import {registerCatalogSyncBackground} from '../src/comics/application/catalog-sync-background';
 import {readWebsiteCatalog} from '../src/comics/application/website-catalog';
 import {registerOptionalSourceContent} from '../src/sources/runtime/optional-content';
 import {registerAnalyticsBackground} from '../src/analytics/background';
@@ -13,5 +12,7 @@ export default defineBackground(() => {
     if (reason === 'install') void chrome.tabs.create({url: chrome.runtime.getURL('/reader.html')}).catch(() => {});
   });
   registerLocalHostBackground();
-  registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerCatalogSyncBackground(); registerAnalyticsBackground(); registerUninstallFeedback(); registerWebShortcutsBackground();
+  // Retire older versions' shelf-wide checks; opening a book now owns automatic checks.
+  for (const name of ['nc-catalog-sync','nc-catalog-sync-continue']) void chrome.alarms.clear(name).catch(() => {});
+  registerSourceBackground(readWebsiteCatalog); registerOptionalSourceContent(); registerDriveBackground(); registerAnalyticsBackground(); registerUninstallFeedback(); registerWebShortcutsBackground();
 });

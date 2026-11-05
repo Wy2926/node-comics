@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Controlla automaticamente gli aggiornamenti dei fumetti",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Disattivato per impostazione predefinita. Controlla solo il fumetto web che apri, almeno 12 ore dopo l’ultimo controllo. Non esamina tutta la libreria; puoi controllare manualmente in qualsiasi momento.",
+  "正在检查更新…": "Ricerca aggiornamenti…",
+  "发现新章节，已更新目录。": "Trovati nuovi capitoli. Indice aggiornato.",
+  "已检查，暂无新章节。": "Controllo completato. Nessun nuovo capitolo.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Impossibile cercare aggiornamenti. L’indice esistente è conservato; riprova più tardi.",
+  "检查更新": "Cerca aggiornamenti",
+  "后台检查，不影响阅读。": "Controllo in background senza interrompere la lettura.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "Non è possibile ripristinare l’input originale di questa traduzione. Non verrà tradotto di nuovo automaticamente.",
   "翻译字体": "Carattere della traduzione",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "I caratteri dipendono dalla lingua di destinazione. Le modifiche valgono solo per le nuove attività; ritraduci manualmente le immagini esistenti.",

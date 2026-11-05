@@ -13,7 +13,7 @@ const source = path.join(root, 'apps/extension/src').replaceAll('\\', '/'), prob
 await writeFile(probe, `export {catalog} from '${source}/comics/repositories/index.ts';
 export {readWebsiteCatalog} from '${source}/comics/application/website-catalog.ts';
 export {applyCatalogRefresh} from '${source}/comics/application/catalog-service.ts';
-export {syncNextCatalog} from '${source}/comics/application/catalog-sync.ts';`);
+export {checkCatalogUpdates} from '${source}/comics/application/catalog-sync.ts';`);
 const {build} = createRequire(path.join(root, 'apps/extension/package.json'))('vite');
 await build({configFile: false, root: path.join(root, 'apps/extension'), logLevel: 'error', build: {outDir: extension, emptyOutDir: false,
   lib: {entry: {probe, fixtures: path.join(source, 'sources/sites/pixiv/tests/fixtures.ts')}, formats: ['es'], fileName: (_f, name) => name + '.mjs'}}});
@@ -97,9 +97,8 @@ try {
   reader = await context.newPage(); await reader.goto(home); await reader.getByRole('button', {name: '打开漫画 ' + comic.title, exact: true}).click(); await waitImage(savedPage);
   assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), String(savedPage)); assert.equal(await refresh(comic.id), imported.entries.length);
   const synced = await reader.evaluate(async comicId => {const p = await import(chrome.runtime.getURL('probe.mjs'));
-    await p.catalog.mutate(['comics'], async tx => {const c = await tx.get('comics', comicId); await tx.put('comics', {...c, catalogSync: {...c.catalogSync, nextCheckAt: 0}});});
-    await p.syncNextCatalog(); return (await p.catalog.get('comics', comicId)).catalogSync;}, comic.id);
-  assert(synced.lastSuccessAt && synced.nextCheckAt > Date.now()); checks.push('Reopen restores saved page; existing scheduled refresh completes without source tabs');
+    await p.checkCatalogUpdates(comicId,{manual:true}); return (await p.catalog.get('comics', comicId)).catalogSync;}, comic.id);
+  assert(synced.lastSuccessAt && synced.nextCheckAt > Date.now()); checks.push('Reopen restores saved page; manual refresh completes without source tabs');
   if (!live) {
     const before = await state(); failCatalog = true; await assert.rejects(refresh(comic.id)); assert.deepEqual((await state()).entries, before.entries);
     failCatalog = false; addArtwork = true; await refresh(comic.id); await refresh(comic.id);

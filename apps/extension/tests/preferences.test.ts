@@ -8,6 +8,14 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) });
 });
 afterEach(() => vi.unstubAllGlobals());
+it('defaults automatic comic checks off for new, old and malformed settings and persists an explicit choice', async () => {
+  expect(settings().autoCheckComicUpdates).toBe(false);
+  for(const value of [{language:'en'},{autoCheckComicUpdates:'true'},{autoCheckComicUpdates:1}]){
+    localStorage.setItem('nc-settings',JSON.stringify(value));expect(settings().autoCheckComicUpdates).toBe(false);
+  }
+  await saveSettings({...defaults,autoCheckComicUpdates:true});expect(settings().autoCheckComicUpdates).toBe(true);
+  await saveSettings({...settings(),autoCheckComicUpdates:false});expect(settings().autoCheckComicUpdates).toBe(false);
+});
 it('persists and removes site favorites independently of search scope and reader settings', () => {
   saveSearchSiteSelection({'a:a': false});
   expect(readSiteFavorites()).toEqual([]);

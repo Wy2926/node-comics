@@ -6,7 +6,7 @@ import {validateSourceCatalog} from '../../..';
 import {readSourceCatalog} from '../../../runtime/catalog-reader';
 import {catalog} from '../../../../comics/repositories';
 import {importCatalog} from '../../../../comics/application/import-service';
-import {syncNextCatalog} from '../../../../comics/application/catalog-sync';
+import {checkCatalogUpdates} from '../../../../comics/application/catalog-sync';
 
 const slug = 'http-fixture', url = 'https://www.mangacopy.com/comic/' + slug;
 const secret = 'fixture-key-1234', iv = 'fixture-iv-12345';
@@ -100,12 +100,11 @@ describe('MangaCopy HTTP directory', () => {
   });
   it('detects additions once and retains the old directory and schedule after a failed HTTP check', async () => {
     const first = await network.catalog!(url, {request: requestFor(payload([1]))}), comic = await importCatalog(first);
-    const due = async () => {const current = (await catalog.get('comics', comic.id))!; await catalog.put('comics', {...current, catalogSync: {...current.catalogSync, nextCheckAt: 0}});};
     const read = () => network.catalog!(url, {request: requestFor()});
-    await due(); await syncNextCatalog(read); await due(); await syncNextCatalog(read);
+    await checkCatalogUpdates(comic.id,{manual:true},read); await checkCatalogUpdates(comic.id,{manual:true},read);
     expect((await catalog.get('comics', comic.id))?.catalogUpdates?.count).toBe(1);
     const previous = await catalog.get('catalogs', first.id), broken = payload([1, 2, 3]); broken.groups.default.count++;
-    await due(); await syncNextCatalog(() => network.catalog!(url, {request: requestFor(broken)}));
+    await expect(checkCatalogUpdates(comic.id,{manual:true},() => network.catalog!(url, {request: requestFor(broken)}))).rejects.toThrow();
     expect(await catalog.get('catalogs', first.id)).toEqual(previous);
     expect((await catalog.get('comics', comic.id))?.catalogSync?.nextCheckAt).toBeGreaterThan(Date.now() + 719 * 60_000);
   });

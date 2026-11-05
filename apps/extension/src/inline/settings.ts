@@ -13,7 +13,7 @@ export function initialReaderSettings():Settings {
 const restoredSettings=(value?:unknown):Settings=>{
   if(value==null)return initialReaderSettings();
   const saved=typeof value==='object'?value as Partial<Settings>:{};
-  return {...defaults,...saved,autoTranslateSites:normalizeAutoTranslateSites(saved.autoTranslateSites)};
+  return {...defaults,...saved,autoCheckComicUpdates:saved.autoCheckComicUpdates===true,autoTranslateSites:normalizeAutoTranslateSites(saved.autoTranslateSites)};
 };
 export const translationLanguageChanged=(before?:unknown,after?:unknown)=>restoredSettings(before).language!==restoredSettings(after).language;
 async function settingsLock<T>(run:()=>Promise<T>):Promise<T> {

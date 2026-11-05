@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Verificar atualizações de quadrinhos automaticamente",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Desativado por padrão. Quando ativado, verifica apenas o quadrinho de site que você abre, pelo menos 12 horas após a última verificação. Não examina toda a biblioteca; você pode verificar manualmente a qualquer momento.",
+  "正在检查更新…": "Verificando atualizações…",
+  "发现新章节，已更新目录。": "Novos capítulos encontrados. Sumário atualizado.",
+  "已检查，暂无新章节。": "Verificado. Nenhum capítulo novo.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Não foi possível verificar atualizações. O sumário anterior foi mantido; tente novamente mais tarde.",
+  "检查更新": "Verificar atualizações",
+  "后台检查，不影响阅读。": "Verifica em segundo plano sem interromper a leitura.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "Não é possível restaurar a entrada original desta tradução. Ela não será traduzida novamente de forma automática.",
   "翻译字体": "Fonte da tradução",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "As fontes dependem do idioma de destino. As alterações só valem para novas tarefas; traduza novamente as imagens existentes manualmente.",

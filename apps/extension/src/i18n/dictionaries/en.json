@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Automatically check for comic updates",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Off by default. When enabled, checks only the website comic you open, at least 12 hours after its last check. No shelf-wide scans; you can check manually anytime.",
+  "正在检查更新…": "Checking for updates…",
+  "发现新章节，已更新目录。": "New chapters found. Contents updated.",
+  "已检查，暂无新章节。": "Checked. No new chapters.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Could not check for updates. Your existing contents are safe; try again later.",
+  "检查更新": "Check for updates",
+  "后台检查，不影响阅读。": "Checks in the background without interrupting reading.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "The original input for this translation cannot be restored. It will not be translated again automatically.",
   "翻译字体": "Translation font",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Fonts are offered by target language. Changes apply only to new tasks; retranslate existing images manually.",

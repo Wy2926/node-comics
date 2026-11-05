@@ -1,4 +1,12 @@
 {
+  "自动检查漫画更新": "Çizgi roman güncellemelerini otomatik kontrol et",
+  "默认关闭。开启后，仅在打开网站漫画且距上次检查满 12 小时时后台检查，不扫描整个书架；也可随时手动检查。": "Varsayılan olarak kapalıdır. Açıldığında yalnızca açtığınız web çizgi romanını, son kontrolden en az 12 saat sonra kontrol eder. Tüm kitaplığı taramaz; istediğiniz zaman elle kontrol edebilirsiniz.",
+  "正在检查更新…": "Güncellemeler kontrol ediliyor…",
+  "发现新章节，已更新目录。": "Yeni bölümler bulundu. İçindekiler güncellendi.",
+  "已检查，暂无新章节。": "Kontrol edildi. Yeni bölüm yok.",
+  "检查更新失败，已保留原目录，请稍后重试。": "Güncellemeler kontrol edilemedi. Mevcut içindekiler korundu; daha sonra tekrar deneyin.",
+  "检查更新": "Güncellemeleri kontrol et",
+  "后台检查，不影响阅读。": "Okumayı kesintiye uğratmadan arka planda kontrol eder.",
   "无法恢复此翻译任务的原始输入，不会自动重新翻译。": "Bu çeviri görevinin özgün girdisi geri yüklenemiyor. Otomatik olarak yeniden çevrilmeyecek.",
   "翻译字体": "Çeviri yazı tipi",
   "字体按目标语言提供；更换仅影响新任务，已有译图需手动重新翻译。": "Yazı tipleri hedef dile göre sunulur. Değişiklikler yalnızca yeni görevleri etkiler; mevcut görselleri elle yeniden çevirin.",

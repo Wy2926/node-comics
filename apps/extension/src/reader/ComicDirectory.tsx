@@ -14,7 +14,7 @@ export function matchesDirectoryChapter(chapter:DirectoryChapter,entries:Map<str
 }
 
 /** A source reading position is one row; its publications remain explicit, secondary choices. */
-export function ComicDirectory({directory,index,pageCount,onNavigate,children,catalogLoading=false,onContinueCatalog,bookmarks,bookmarkCount=0,showBookmarks=false,onShowBookmarks}:{bookmarks?:ReactNode;bookmarkCount?:number;showBookmarks?:boolean;onShowBookmarks?:(value:boolean)=>void;directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode;catalogLoading?:boolean;onContinueCatalog?:()=>void}){
+export function ComicDirectory({directory,index,pageCount,onNavigate,children,checkingUpdates=false,onCheckUpdates,catalogLoading=false,onContinueCatalog,bookmarks,bookmarkCount=0,showBookmarks=false,onShowBookmarks}:{bookmarks?:ReactNode;bookmarkCount?:number;showBookmarks?:boolean;onShowBookmarks?:(value:boolean)=>void;directory:ReadingDirectory;index:number;pageCount:number;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;children?:ReactNode;checkingUpdates?:boolean;onCheckUpdates?:()=>void;catalogLoading?:boolean;onContinueCatalog?:()=>void}){
  const directoryId=useId();
  const cached=useCachedEntries(showBookmarks?undefined:directory.comicId,showBookmarks?[]:directory.entries.map(entry=>entry.id));
  const cacheState=(entry:DirectoryEntry)=>cached.has(entry.id)&&<span className="nc-chapter-cached" data-cache-status="complete"><Icon name="check" size={13}/>{msg('已缓存')}</span>;
@@ -82,6 +82,12 @@ export function ComicDirectory({directory,index,pageCount,onNavigate,children,ca
  },[tab,singleFile,shownLimit,visible.length,query,descending]);
  return <><div className="nc-comic-directory-heading"><h3>{directory.title}</h3>{directory.sourceUrl&&<a className="text-link nc-directory-source" href={directory.sourceUrl} target="_blank" rel="noreferrer">{msg('打开来源')}</a>}
   </div>
+  {onCheckUpdates&&<div className="nc-directory-update-bar">
+    <span className="nc-muted">{msg('后台检查，不影响阅读。')}</span>
+    <button type="button" className="text-link" disabled={checkingUpdates||catalogLoading} onClick={onCheckUpdates}>
+      {checkingUpdates?<span className="spinner"/>:<Icon name="refresh" size={15}/>}{checkingUpdates?msg('正在检查更新…'):msg('检查更新')}
+    </button>
+  </div>}
   {directory.complete===false&&<div className="nc-directory-loading" role="status">
     <div>{catalogLoading&&<span className="spinner"/>}<b>{catalogLoading?msg('正在获取全部章节…'):msg('目录尚未完整加载')}</b></div>
     <p>{msg('已加载的章节可以继续阅读。')}</p>

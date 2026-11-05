@@ -2,7 +2,7 @@
 
 - 作品：`https://www.guazimanhua.com/comic.php?id=<作品 ID>`。
 - 章节：`https://www.guazimanhua.com/chapter.php?id=<章节 ID>`。
-- HTTP 读取完整目录、正文页清单与专门封面；每 12 小时通过公共调度更新目录。具备浏览器网站访问权限时在作品页、章节页嵌入 `NodeLane Comics · 导入/管理漫画`。导入、阅读、目录同步不创建来源采集标签页。
+- HTTP 读取完整目录、正文页清单与专门封面；目录检查遵循[公共更新规则](../../../../../../docs/SIMPLE_COMIC_READING_DESIGN.md#网站更新与自动同步)。具备浏览器网站访问权限时在作品页、章节页嵌入 `NodeLane Comics · 导入/管理漫画`。导入、阅读、目录同步不创建来源采集标签页。
 - 章节 URL 不含作品 ID。弹窗、章节页按钮和粘贴链接统一通过 `Article.isPartOf` 解析作品，再核对完整目录包含当前章节。目录内链接以 `#nodelane-guazimanhua=<作品 ID>` 保存本地绑定，片段不发送到源站；取图时再次校验作品与章节归属。归属解析的章节 HTML 可通过公共短期会话交接复用，不重复请求。
 - 使用服务器输出的 `.all-chapter-grid`，将源站倒序目录转为阅读顺序，不按章节 ID 数值排序。读取数量必须等于源站章节总数，重复、截断或失败响应不能替换已接受目录。
 - 正文取自 `.reader-images`，按 `data-page` 和 `page-N` 核对页序及总数。JSON-LD `ItemList` 只列前 20 张，`numberOfItems` 是全章数量；逐项核对前 20 张后读取完整正文，不能把 SEO 预览当成全章。远程脚本仅作为 JSON 数据解析，不执行。

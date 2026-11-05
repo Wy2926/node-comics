@@ -17,7 +17,7 @@ const source = path.join(root, 'apps/extension/src').replaceAll('\\', '/'), prob
 await writeFile(probe, `export {readSourceCatalog} from '${source}/sources/runtime/catalog-reader.ts';
 export {readNetworkPages} from '${source}/sources/runtime/network.ts';
 export {catalog} from '${source}/comics/repositories/index.ts';
-export {syncNextCatalog} from '${source}/comics/application/catalog-sync.ts';`);
+export {checkCatalogUpdates} from '${source}/comics/application/catalog-sync.ts';`);
 const {build} = createRequire(path.join(root, 'apps/extension/package.json'))('vite');
 await build({configFile: false, root: path.join(root, 'apps/extension'), logLevel: 'error', build: {
   outDir: extension, emptyOutDir: false, lib: {entry: probe, formats: ['es'], fileName: () => 'verify-source.js'},
@@ -71,14 +71,13 @@ try {
   assert.equal(saved.ordinal, 9); assert(saved.count > 100); checks.push({closedSourceReadingAndReopen: saved});
   await reader.screenshot({path: path.join(out, 'reader-reopened.png')});
   const refreshed = await reader.evaluate(async comicId => {
-    const {catalog, syncNextCatalog} = await import(chrome.runtime.getURL('verify-source.js'));
-    await catalog.mutate(['comics'], async tx => {const comic = await tx.get('comics', comicId); await tx.put('comics', {...comic, catalogSync: {...comic.catalogSync, nextCheckAt: 0}});});
-    await syncNextCatalog();
+    const {catalog, checkCatalogUpdates} = await import(chrome.runtime.getURL('verify-source.js'));
+    await checkCatalogUpdates(comicId,{manual:true});
     const comic = await catalog.get('comics', comicId);
     return {lastSuccess: comic.catalogSync.lastSuccessAt, nextCheck: comic.catalogSync.nextCheckAt,
       chapters: (await catalog.get('catalogs', comic.source.providerItemId)).entries.length};
   }, state.comicId);
-  assert(refreshed.nextCheck > Date.now()); assert.equal(refreshed.chapters, state.chapters); checks.push({scheduledRefresh: refreshed});
+  assert(refreshed.nextCheck > Date.now()); assert.equal(refreshed.chapters, state.chapters); checks.push({requestedRefresh: refreshed});
   const other = await reader.evaluate(async () => {
     const {readSourceCatalog, readNetworkPages} = await import(chrome.runtime.getURL('verify-source.js'));
     const rows = [];

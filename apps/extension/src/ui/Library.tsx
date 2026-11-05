@@ -11,10 +11,11 @@ import {ConfirmationDialog,DialogNotice} from './ConfirmationDialog';
 import {ShelfGrid,type ShelfView} from './ShelfGrid';
 import {ShelfCard} from './ShelfCard';
 import {ShelfUpdates} from './ShelfUpdates';
+import {catalogSyncPolicy} from '../comics/application/catalog-service';
 import type {BookDownloadsController} from './downloads/useBookDownloads';
 import './shelf.css';
-type Props={active:boolean;notice?:ReactNode;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
-export function Library({active,notice,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
+type Props={loadingCatalogIds?:readonly string[];checkingCatalogId?:string;onCheckUpdates?:(comicId:string)=>void;active:boolean;notice?:ReactNode;downloads?:BookDownloadsController;onFind?:(comic:Comic)=>void;library:LibraryViewModel;onOpen:(comicId:string)=>void;onImport:()=>void;onSource:(providerId:string)=>void;sourceActions:{id:string;label:string}[];onChanged:()=>void|Promise<void>;notify:(message:string)=>void;onExport:(entry:Entry)=>void;shelfView:RefObject<ShelfView>};
+export function Library({loadingCatalogIds,checkingCatalogId,onCheckUpdates,active,notice,downloads,onFind,library,onOpen,onImport,onSource,sourceActions,onChanged,notify,onExport,shelfView}:Props){
  const menu=useContextMenu(active),[removing,setRemoving]=useState<Comic[]>(),[busy,setBusy]=useState(false),[removalError,setRemovalError]=useState(''),removalRunning=useRef(false);
  const [managing,setManaging]=useState(false),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [search,setSearch]=useState(shelfView.current.search),[sort,setSort]=useState(shelfView.current.sort);
@@ -45,6 +46,7 @@ export function Library({active,notice,downloads,onFind,library,onOpen,onImport,
   const retained=downloads?.books.some(book=>book.comic.id===comic.id)||downloads?.files.some(file=>file.intent.comicId===comic.id);
   return [
   {icon:'book',label:comic.lastReadAt?msg('继续阅读'):msg('开始阅读'),onSelect:()=>open(comic.id)},
+  ...(onCheckUpdates&&catalogSyncPolicy(comic)?[{icon:'refresh',label:checkingCatalogId===comic.id?msg('正在检查更新…'):msg('检查更新'),disabled:!!checkingCatalogId||loadingCatalogIds?.includes(comic.id),onSelect:()=>onCheckUpdates(comic.id)}]:[]),
   ...(comic.sourceUrl?[{icon:'external',label:msg('打开来源'),onSelect:()=>window.open(comic.sourceUrl,'_blank','noopener,noreferrer')}]:[]),
   ...(downloads?[
    {icon:'download',label:msg('已保存在本机'),disabled:true,visible:async()=>await offline()==='local',onSelect:()=>{}},

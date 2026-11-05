@@ -59,7 +59,7 @@ node scripts/verify_simple_reading.mjs
 | `verify_shelf_performance.mjs` | 隔离 MV3 书架的重复切换、封面复用、数据库读取量、菜单与滚动位置；`SHELF_PERF_BOOKS=17` 指定漫画数，`SHELF_PERF_LABEL=before` 记录基准，默认 `after` 检查读取范围与封面复用，`SHELF_PERF_EXTENSION` 可指定对照构建 |
 | `apps/extension/tests/site-directory.html` | 在插件目录运行 `npm run dev -- --port 5205`，用 Chrome 打开 `http://127.0.0.1:5205/tests/site-directory.html`；真实目录组件、隔离导入失败与禁用网络请求。检查名称／域名搜索、组合筛选、收藏、空结果恢复、语言切换及离开返回位置；`?performance=1` 显示可重置的 React 提交数、渲染耗时、日期格式器创建数、卡片数与滚动位置。先重置计数，再逐字输入 `abcdefghij` 或切换单张卡片收藏；开发模式耗时只供同机对比。沿用 `locale=en`／`locale=de`、`appearance=dark` 与 `brokenIcon` 参数，不代表真实网站导入或 MV3 权限验收 |
 | `verify_source_export.mjs` / `verify_website_source_lifecycle.mjs` | 导出、网站导入、按需读取与主动下载 |
-| `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 目录更新、失败保留与封面；后者 `RUN_LIVE_COVERS=1` 读取公开来源 |
+| `verify_catalog_sync.mjs` / `verify_source_covers.mjs` | 前者用隔离 MV3 与合成源站验证更新开关默认关闭／持久化、仅打开到期漫画才自动检查、手动检查、慢响应期间翻页、失败与取消后保留位置，截图写入 `output/playwright/catalog-sync/`；后者检查封面，`RUN_LIVE_COVERS=1` 读取公开来源 |
 | `verify_image_transport.mjs` | [公共取图](../docs/IMAGE_ACCESS.md)、权限、Referer、重定向与默认 HTTP 缓存复用 |
 | `verify_drive_import.mjs` | 模拟 Google／Drive 的连接、导入、重启与撤权；构建需配置连接页，`TEST_DRIVE_FORMAT=mobi` 切换 MOBI 样本 |
 | `verify_opds_live.mjs` | 真实公开 Komga OPDS 1/2；隔离 MV3 中验证授权失败、目录／封面／原图、重复打开、位置、53 页整本保存、清普通缓存后断网读取、断开重连、CBZ 整包和离线读取。不伪造 OPDS 响应，不写服务端进度，不调用翻译；沿用 PLAYWRIGHT_MODULE／TEST_CHROMIUM／TEST_EXTENSION_DIR，输出至 artifacts/opds-live。默认使用官方公开演示账户，可用 OPDS_TEST_ORIGIN／OPDS_TEST_USERNAME／OPDS_TEST_PASSWORD 指定自有 Komga 测试服务，凭据仅通过环境传入；公网可用性及书目随时变化 |

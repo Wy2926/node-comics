@@ -5,7 +5,9 @@ import type {SourceCatalog} from './types';
 
 export function catalogSyncPolicy(comic:Comic) {
   if (!comic.sourceUrl || comic.source.status !== 'active') return;
-  const {definition, location} = sourceFor(comic.sourceUrl);
+  let source:ReturnType<typeof sourceFor>;
+  try {source=sourceFor(comic.sourceUrl);} catch {return;}
+  const {definition, location} = source;
   if (!definition.catalogSync || !definition.capabilities.importable || !definition.capabilities.catalog ||
       location.kind !== 'catalog' || comic.source.connectionId !== 'website:' + definition.id ||
       comic.source.providerItemId !== location.catalog?.key) return;

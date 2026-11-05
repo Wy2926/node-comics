@@ -252,7 +252,7 @@ describe('production background listeners share the runtime message channel', ()
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]); expect(result.response).toBeUndefined();
   });
 
-  it.each(['NC_SOURCE_IMAGE','NC_CHECK_DUE_CATALOGS','NC_TRANSLATE_REGION'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
+  it.each(['NC_SOURCE_IMAGE','NC_TRANSLATE_REGION'])('keeps extension-only %s operations inaccessible to a website tab', async type => {
     const result = await dispatch({type, manifestId: 'book', pageId: 'page-1'}, {id: extensionId, url: 'https://example.test/book', frameId: 0, tab: {id: 1} as chrome.tabs.Tab});
     expect(result.claimed).toEqual([]); expect(result.responses).toEqual([]);
   });

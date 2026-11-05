@@ -24,6 +24,6 @@
 
 ## 验证
 
-插件目录运行 `npm test -- src/sources/sites/mangacopy/tests tests/catalog-sync.test.ts tests/catalog-reader.test.ts`。按[脚本说明](../../../../../../scripts/README.md)配置隔离浏览器并构建后，运行根目录的 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`、`scripts/verify_source_covers.mjs`；覆盖 HTTP 目录、零目录标签页、后台 alarm、更新／失败保留、封面和阅读位置。原位回归设置 `INLINE_SITE_ONLY=mangacopy` 后运行 `scripts/verify_inline_translation.mjs`，使用合成网页和模拟译图。
+插件目录运行 `npm test -- src/sources/sites/mangacopy/tests tests/catalog-sync.test.ts tests/catalog-reader.test.ts`。按[脚本说明](../../../../../../scripts/README.md)配置隔离浏览器并构建后，运行根目录的 `scripts/verify_catalog_sync.mjs`、`scripts/verify_website_source_lifecycle.mjs`、`scripts/verify_source_covers.mjs`；覆盖 HTTP 目录、零目录标签页、按需检查与更新开关、更新／失败保留、封面和阅读位置。原位回归设置 `INLINE_SITE_ONLY=mangacopy` 后运行 `scripts/verify_inline_translation.mjs`，使用合成网页和模拟译图。
 
 根目录运行 `node apps/extension/src/sources/sites/mangacopy/tests/verify-search-http.mjs`，验证两个入口的实时第一页／下一页及空结果；产物位于忽略的 `artifacts/mangacopy/search-http/`。`search.test.ts` 覆盖合成协议、身份、编码、取消及作品种子；HTTP 探针不验证浏览器安装权限与撤权恢复、搜索 UI、导入或名称模型。

@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {catalog} from '../src/comics/repositories';
 import {importCatalog, importManifest} from '../src/comics/application/import-service';
 import {acknowledgeCatalogUpdates, applyCatalogRefresh, catalogSyncPolicy} from '../src/comics/application/catalog-service';
-import {syncNextCatalog} from '../src/comics/application/catalog-sync';
+import {checkCatalogUpdates} from '../src/comics/application/catalog-sync';
 import {comicDirectory, continueEntry, loadEntry, readerSequence} from '../src/comics/application/library-service';
 import type {SourceCatalogSnapshot} from '../src/sources';
 
@@ -16,7 +16,7 @@ function append(value:SourceCatalogSnapshot):SourceCatalogSnapshot {
   const remoteId=crypto.randomUUID(),entry={id:value.id+':'+remoteId,catalogId:value.id,remoteId,url:value.url+'/chapter/'+remoteId,title:'第'+(value.entries.length+1)+'话',groupIds:['default'],rawTypes:['话'],order:value.entries.length,related:false,sequenceId:'default:话'};
   return {...value,observedAt:value.observedAt+1,entries:[...value.entries,entry],groups:[{...value.groups[0],entryIds:[...value.groups[0].entryIds,entry.id]}],defaultEntryId:value.defaultEntryId??entry.id};
 }
-afterEach(async()=>{vi.useRealTimers();for(const comic of await catalog.list('comics',{limit:10000}))await catalog.deleteComic(comic.id);});
+afterEach(async()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();for(const comic of await catalog.list('comics',{limit:10000}))await catalog.deleteComic(comic.id);});
 
 describe('automatic source directory reconciliation',()=>{
   it('establishes a quiet baseline, detects additions once, and keeps images and reading positions',async()=>{
@@ -62,33 +62,65 @@ describe('automatic source directory reconciliation',()=>{
   });
 });
 
-describe('persistent periodic and opening checks',()=>{
-  it('skips repeated openings and unsupported sources, checks all due comics only after twelve hours',async()=>{
+describe('on-demand directory checks',()=>{
+  it('checks only the requested book after twelve hours without scanning the shelf',async()=>{
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-23T00:00:00Z'));
-    const first=snapshot(),second=snapshot();await importCatalog(first);await importCatalog(second);
+    const first=snapshot(),second=snapshot(),comic=await importCatalog(first),other=await importCatalog(second);
     await catalog.put('comics',{id:'other',sourceKey:'other',title:'Other',sourceName:'Local',source:{connectionId:'local',providerItemId:'other',locator:{},generation:1,status:'active'},createdAt:Date.now(),updatedAt:Date.now()});
     const sources=new Map([first,second].map(value=>[value.url,append(value)])),read=vi.fn(async(url:string)=>sources.get(url)!);
-    await syncNextCatalog(read);expect(read).not.toHaveBeenCalled();
-    vi.setSystemTime(Date.now()+12*60*60_000);while(await syncNextCatalog(read)){}expect(read).toHaveBeenCalledTimes(2);
-    await syncNextCatalog(read);expect(read).toHaveBeenCalledTimes(2);
-    while(await syncNextCatalog(read)){}expect(read).toHaveBeenCalledTimes(2);
-    vi.setSystemTime(Date.now()+12*60*60_000-1);await syncNextCatalog(read);expect(read).toHaveBeenCalledTimes(2);
-    vi.setSystemTime(Date.now()+1);while(await syncNextCatalog(read)){}expect(read).toHaveBeenCalledTimes(4);
+    const scan=vi.spyOn(catalog,'search'),list=vi.spyOn(catalog,'list');
+    expect(await checkCatalogUpdates(comic.id,{},read)).toEqual({status:'skipped'});expect(read).not.toHaveBeenCalled();
+    vi.setSystemTime(Date.now()+12*60*60_000);
+    expect(await checkCatalogUpdates(comic.id,{},read)).toEqual({status:'checked',hasUpdates:true});
+    expect(read).toHaveBeenCalledExactlyOnceWith(first.url,undefined);
+    expect((await catalog.get('comics',other.id))?.catalogUpdates).toBeUndefined();
+    await checkCatalogUpdates('other',{manual:true},read);await checkCatalogUpdates('missing',{},read);
+    vi.setSystemTime(Date.now()+12*60*60_000-1);await checkCatalogUpdates(comic.id,{},read);expect(read).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now()+1);await checkCatalogUpdates(comic.id,{},read);expect(read).toHaveBeenCalledTimes(2);
+    expect(scan).not.toHaveBeenCalled();expect(list).not.toHaveBeenCalled();
   });
-  it('persists the check time before requests and retains the twelve-hour gate after failure or worker interruption',async()=>{
+  it('deduplicates manual/automatic work, persists attempts, and lets manual retry bypass the interval',async()=>{
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-23T00:00:00Z'));
     const first=snapshot(),comic=await importCatalog(first);vi.setSystemTime(Date.now()+12*60*60_000);
     let finish!:(value:SourceCatalogSnapshot)=>void;const read=vi.fn(()=>new Promise<SourceCatalogSnapshot>(resolve=>{finish=resolve;}));
-    const startedAt=Date.now(),running=syncNextCatalog(read);await vi.waitFor(()=>expect(read).toHaveBeenCalledOnce());
+    const startedAt=Date.now(),running=checkCatalogUpdates(comic.id,{},read);await vi.waitFor(()=>expect(read).toHaveBeenCalledOnce());
     expect((await catalog.get('comics',comic.id))?.catalogSync).toMatchObject({lastAttemptAt:startedAt,nextCheckAt:startedAt+12*60*60_000});
-    await syncNextCatalog(read);expect(read).toHaveBeenCalledOnce();finish(append(first));await running;
+    expect(await checkCatalogUpdates(comic.id,{manual:true},read)).toEqual({status:'busy'});
+    expect(read).toHaveBeenCalledOnce();finish(append(first));await running;
     const successAt=(await catalog.get('comics',comic.id))?.catalogSync?.lastSuccessAt;
-    vi.setSystemTime(Date.now()+12*60*60_000);await syncNextCatalog(async()=>{throw Error('offline');});
+    vi.setSystemTime(Date.now()+12*60*60_000);await expect(checkCatalogUpdates(comic.id,{},async()=>{throw Error('offline');})).rejects.toThrow('offline');
     expect((await catalog.get('comics',comic.id))?.catalogSync).toMatchObject({lastAttemptAt:Date.now(),lastSuccessAt:successAt,nextCheckAt:Date.now()+12*60*60_000});
     expect((await comicDirectory(comic.id)).entries).toHaveLength(2);
     await catalog.patch('comics',comic.id,{catalogSync:{lease:'abandoned',lastAttemptAt:Date.now(),nextCheckAt:Date.now()+12*60*60_000}});
-    const recovered=vi.fn(async()=>append(first));await syncNextCatalog(recovered);expect(recovered).not.toHaveBeenCalled();
-    vi.setSystemTime(Date.now()+120_000);await syncNextCatalog(recovered);expect(recovered).not.toHaveBeenCalled();
-    vi.setSystemTime(Date.now()+12*60*60_000);await syncNextCatalog(recovered);expect(recovered).toHaveBeenCalledOnce();
+    const recovered=vi.fn(async()=>append(first));await checkCatalogUpdates(comic.id,{},recovered);expect(recovered).not.toHaveBeenCalled();
+    await checkCatalogUpdates(comic.id,{manual:true},recovered);expect(recovered).toHaveBeenCalledOnce();
+    expect((await catalog.get('comics',comic.id))?.catalogSync?.lease).toBeUndefined();
+  });
+  it('shares a non-waiting book lock across tabs and skips revoked or unsupported sources',async()=>{
+    const first=snapshot(),comic=await importCatalog(first),read=vi.fn(async()=>append(first));
+    const request=vi.fn(async(_name:string,_options:unknown,callback:(lock:null)=>unknown)=>callback(null));
+    vi.stubGlobal('navigator',{locks:{request}});
+    expect(await checkCatalogUpdates(comic.id,{manual:true},read)).toEqual({status:'busy'});
+    expect(request).toHaveBeenCalledWith('nc-catalog-check:'+comic.id,{ifAvailable:true},expect.any(Function));
+    expect(read).not.toHaveBeenCalled();vi.unstubAllGlobals();
+    const connection=(await catalog.get('connections',comic.source.connectionId))!;
+    await catalog.put('connections',{...connection,status:'disconnected'});
+    expect(await checkCatalogUpdates(comic.id,{manual:true},read)).toEqual({status:'unavailable'});
+    await catalog.put('connections',connection);
+    expect(catalogSyncPolicy({...comic,sourceUrl:'https://unadapted.example/book'})).toBeUndefined();
+    expect(read).not.toHaveBeenCalled();
+  });
+  it.each(['cancel','remove','disconnect'] as const)('ignores a late result after %s and preserves retained content',async action=>{
+    const first=snapshot(),comic=await importCatalog(first),controller=new AbortController();
+    let finish!:(value:SourceCatalogSnapshot)=>void;const read=vi.fn(()=>new Promise<SourceCatalogSnapshot>(resolve=>{finish=resolve;}));
+    const running=checkCatalogUpdates(comic.id,{manual:true,signal:controller.signal},read);
+    await vi.waitFor(()=>expect(read).toHaveBeenCalledOnce());
+    if(action==='cancel')controller.abort();
+    else if(action==='remove')await catalog.deleteComic(comic.id);
+    else {const connection=(await catalog.get('connections',comic.source.connectionId))!;await catalog.put('connections',{...connection,status:'disconnected'});}
+    const result=action==='cancel'?expect(running).rejects.toMatchObject({name:'AbortError'}):expect(running).resolves.toEqual({status:'unavailable'});
+    finish(append(first));await result;
+    expect(await catalog.listEntries(comic.id)).toHaveLength(action==='remove'?0:1);
+    expect((await catalog.get('comics',comic.id))?.catalogSync?.lease).toBeUndefined();
   });
 });
