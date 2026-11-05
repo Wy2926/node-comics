@@ -20,7 +20,7 @@ import {pageFrame} from './geometry';
 import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
 import {ORIGINAL_PREFETCH_PAGES} from '../image-resources';
 import {READER_PREFETCH_PAGES} from '../reading-window';
-import {pageSpreads,spreadAt,spreadFrames,pageTurnIndex} from './pagination';
+import {pageSpreads,spreadAt,spreadFrames,spreadStartingAt,pageTurnIndex} from './pagination';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
 import type {ReadingTarget,TranslationState} from '../translation/automatic';
 import {useChapterStream,pageKey,completeManifest} from './useChapterStream';
@@ -42,6 +42,7 @@ import {usePagedNavigation} from './usePagedNavigation';
 import {useSpreadZoom} from './useSpreadZoom';
 import {ignoreReaderClick} from './reader-input';
 import {useReaderPrefetch} from './useReaderPrefetch';
+import {pdfDisplayWidth} from './usePdfDisplayWidth';
 import type {ChapterLoadOptions} from './chapter-resources';
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
 type Props={onBookmarkNavigate?:(location:BookmarkLocation)=>Promise<boolean>;progressStatus?:ReadingProgressStatus;backLabel?:string;backText?:string;onFind?:()=>void;searchOpen?:boolean;onOpenShortcuts:()=>void;onSourceLanguageChange?:(language:string|undefined)=>void;viewKey:string;directory?:ReadingDirectory;catalogLoading?:boolean;onContinueCatalog?:()=>void;onReload?:(entryId:string)=>void;onMarkRead:(id:string)=>Promise<void>;sequence:ReadingEntry[];onActiveEntry:(id:string)=>void;onLoadEntry:(id:string,options?:ChapterLoadOptions)=>void|Promise<void>;sourceStatus?:string;onNavigate:(id:string,pageId?:string,rememberChoice?:boolean)=>void;copy:ReadingEntry;settings:Settings;setSettings:(s:Settings|((s:Settings)=>Settings))=>void;update:(copy:ReadingEntry)=>void;onBack:()=>void;onRetry:(page:Page,mode:Mode,entryId?:string)=>void|Promise<void>;onUpgrade:()=>void;onLogin:()=>void;translationState:(entryId:string,page:Page,mode:Mode)=>TranslationState|undefined;onImport:()=>void;notify:(message:string)=>void;onReadingWindow:(targets:ReadingTarget[],visiblePages:Page[],immediate?:boolean)=>void;caps?:Capabilities;modelSelection?:import('../translation/channels/contracts').ModelSelection;fontSelection?:import('../translation/channels/contracts').FontSelection;channelOptions?:import('../translation/channels/contracts').ChannelOptions;translationScope?:string;busy:boolean;};
@@ -168,9 +169,28 @@ const windowReady=!!imageWindows.length&&imageWindows.every(({copy:chapter,start
  return imagePrefetchReady(identity,actual[key],imageLoad(chapter,p,target.key))&&(!compare||original?.key===p.blobKey&&imagePrefetchReady(`${identity}:compare`,undefined,original));
 }));
 const prefetchIdentities=new Map<string,string>();
-for(const {copy:chapter,start,end} of imageWindows)for(const p of chapter.pages.slice(start,end+ORIGINAL_PREFETCH_PAGES))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,chapter));
-if(aheadChapter)for(const p of aheadChapter.pages.slice(0,ORIGINAL_PREFETCH_PAGES))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,aheadChapter));
-useReaderPrefetch({scope:JSON.stringify([viewKey,scopeBase]),identities:prefetchIdentities,
+const prefetchWidths=new Map<string,number>();
+function preparePrefetch(chapter:ReadingEntry,start:number,end:number){
+ if(chapter.source!=='pdf'){
+  for(const p of chapter.pages.slice(start,end))if(p.blobKey)prefetchIdentities.set(p.blobKey,scope(p,chapter));
+  return;
+ }
+ for(let n=start;n<Math.min(end,chapter.pages.length);){
+  const group=settings.layout==='double'?spreadStartingAt(chapter.pages,n)!:{start:n,end:n+1};
+  const pages=chapter.pages.slice(group.start,group.end);
+  const sizes=settings.layout==='double'?spreadFrames(pages,viewportSize,compare):pages.map(p=>pageFrame(p,viewportSize,fit,zoom,compare));
+  for(const [offset,p] of pages.entries())if(p.blobKey&&n+offset<end){
+   prefetchIdentities.set(p.blobKey,scope(p,chapter));
+   // Turning a zoomed spread resets it; prepare later groups at their fitted size.
+   const scale=settings.layout==='double'&&chapter.id===copy.id&&group.start===spread?.start?spreadZoom.zoom/100:1;
+   prefetchWidths.set(p.blobKey,pdfDisplayWidth(sizes[offset].width/(compare?2:1)*scale));
+  }
+  n=group.end;
+ }
+}
+for(const {copy:chapter,start,end} of imageWindows)preparePrefetch(chapter,start,end+ORIGINAL_PREFETCH_PAGES);
+if(aheadChapter)preparePrefetch(aheadChapter,0,ORIGINAL_PREFETCH_PAGES);
+useReaderPrefetch({scope:JSON.stringify([viewKey,scopeBase]),identities:prefetchIdentities,widths:prefetchWidths,
  current:imageWindows.flatMap(({copy:chapter,start,end})=>chapter.pages.slice(start,end).flatMap(p=>p.blobKey?[p.blobKey]:[])),
  next:aheadPages.flatMap(p=>p.blobKey?[p.blobKey]:[]),enabled:resources.ready(copy),ready:windowReady&&!moving,
 });
@@ -283,8 +303,8 @@ return <ReaderShell ref={root} background={settings.readerBackground} immersive=
 <div className="nc-reading-clip" style={{minWidth:contentWidth}}><div className="nc-reading-surface" ref={surface} style={{minWidth:contentWidth}}>{!page?<div className="nc-empty"><h1>{copy.title}</h1><h2>{sourceStatus??msg("页面尚未就绪")}</h2>{sourceActions}<button className="button secondary" onClick={()=>setPanel('directory')}>{msg("查看作品目录")}</button></div>:windows.map(({copy:chapter,start,end,before,after},chapterIndex)=>{const continuation=completeManifest(chapter)&&!!nextOf(chapter);return <div className="nc-stream-chapter" key={chapter.id} data-copy-id={chapter.id}>{chapterIndex>0&&<div className="nc-chapter-heading"><h2 title={chapter.title}>{chapter.title}</h2></div>}<div className="nc-page-stack" data-direction={settings.direction} ref={node=>{if(node)stacks.current.set(chapter.id,node);else stacks.current.delete(chapter.id);if(chapter.id===copy.id)spreadStack.current=node;}}>{settings.layout==='continuous'&&<div aria-hidden="true" style={{height:before}}/>}{chapter.pages.slice(start,end).map((p,localIndex)=>{const n=start+localIndex;const pageView=view;const identity=scope(p,chapter);const cellKey=pageKey(chapter,p.id);const wantTranslation=pageView.preference!=='original';const {key:targetKey,job:targetJob}=readingImage(p,pageView.mode,wantTranslation,settings.language,translationScope);
 const priority=settings.layout!=='continuous'||chapter.id===copy.id&&n===index?'current':'prefetch';
 const load=imageLoad(chapter,p,targetKey),state=displayTranslationState(translationState(chapter.id,p,pageView.mode),load,targetJob?targetKey:undefined);
-const {width,height}=frame(p);return <div className="nc-manga-page" key={cellKey} ref={node=>{if(node)cells.current.set(cellKey,node);else cells.current.delete(cellKey);}} data-page-id={p.id} data-page-index={n} style={{width}}>
-<div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture priority={priority} scope={`${identity}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined} onLoadState={state=>recordLoad(`${cellKey}:compare`,state)}/></div>}<div className="nc-comparison-pane"><BlobPicture priority={priority} scope={identity} originalKey={p.blobKey} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}
+const {width,height}=frame(p),displayWidth=chapter.source==='pdf'?width/(compare?2:1)*(settings.layout==='double'?spreadZoom.zoom/100:1):undefined;return <div className="nc-manga-page" key={cellKey} ref={node=>{if(node)cells.current.set(cellKey,node);else cells.current.delete(cellKey);}} data-page-id={p.id} data-page-index={n} style={{width}}>
+<div className={`nc-page-picture ${compare?'comparison':''}`} style={{height}}>{decodedSet.has(cellKey)?<>{compare&&<div className="nc-comparison-pane"><BlobPicture displayWidth={displayWidth} priority={priority} scope={`${identity}:compare`} blobKey={p.blobKey} alt={msg("第 {0} 页", {"0": n+1})} onImport={onImport} error={p.fetchError} sourceUrl={chapter.sourceUrl} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined} onLoadState={state=>recordLoad(`${cellKey}:compare`,state)}/></div>}<div className="nc-comparison-pane"><BlobPicture displayWidth={displayWidth} priority={priority} scope={identity} originalKey={p.blobKey} blobKey={targetKey} job={targetJob} alt={msg("第 {0} 页", {"0": n+1})} error={p.fetchError} sourceUrl={chapter.sourceUrl} onImport={onImport} reloadBusy={busy} onReload={onReload?()=>reloadContent(chapter):undefined}
 enhancement={enhancedImages.get(cellKey)}
 onLoadState={state=>recordLoad(cellKey,state)}
 onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellKey]?.key===image?.key&&prev[cellKey]?.scope===image?.scope)return prev;const next={...prev};if(image)next[cellKey]=image;else delete next[cellKey];return next;});}}/></div></>:<div className="nc-image-placeholder"><Icon name="image"/><span>{msg("正在准备页面…")}</span></div>}</div>

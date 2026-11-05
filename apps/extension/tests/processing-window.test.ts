@@ -18,6 +18,16 @@ beforeEach(() => {
 afterEach(() => {window.clear(); vi.useRealTimers();});
 
 describe('headless enhancement reading window', () => {
+  it('keeps skipped pages neutral without retrying or blocking the next page', async () => {
+    enhance.mockResolvedValueOnce(undefined);
+    const pages=targets(0,1);
+    window.update(pages,profile,undefined,true);
+    await vi.advanceTimersByTimeAsync(150);
+    expect(window.image(pages[0],profile)).toMatchObject({blob:undefined,state:undefined});
+    expect(window.image(pages[1],profile)?.state?.phase).toBe('ready');
+    window.update(pages,profile);await vi.advanceTimersByTimeAsync(500);
+    expect(requests()).toEqual(['result:0','result:1']);
+  });
   it('starts the current image immediately and the next three after the shared warmup, without display reads', async () => {
     const pages = targets(0, 1, 2, 3);
     window.update(pages, profile, undefined, true);

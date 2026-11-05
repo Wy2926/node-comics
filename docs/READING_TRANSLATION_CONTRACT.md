@@ -8,7 +8,7 @@
 
 插件的官方翻译设置可按目标语言选择嵌字字体；下拉列表及收起后的当前选项直接用对应字体渲染该目标语言的字体名，不另设预览区，不附加语言名，也不跟随界面语言。未展开时仅加载已选字体，展开后按需加载当前语言的选项字体。预览只展示字体形态，不代表最终气泡的字号、换行或描边。能力响应 `translation_fonts:[{id,languages}]` 给出中心支持的字体与语言；客户端按目标语言过滤，不向本地 MTU 渠道发送官方字体 ID。每种语言都有具体默认字体，不提供空值或“保留原字体”选项；尚未保存选择或已存选择不再受支持时，使用该语言的默认字体。服务未支持该默认字体时，使用同语言受支持清单的首项；没有交集或未提供字体能力时不发送字体 ID。字体文件及许可、固定摘要见[字体资产清单](../services/compute-node/assets.json)，ID、语言及默认映射见[字体目录](../backend/app/translation_fonts.json)；更换字体字形或版本需使用新 ID，不替换已有 ID 的文件。
 
-采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。客户端页面库使用 `node-comics-reading-v2-*`；原图使用 `original-v2-static-srgb` 渲染身份，固定 144 dpi 的 PDF 使用 `pdf-v3-static-srgb`，隔离旧缩放缓存、页面摘要与本地送译操作并保留书架和阅读进度。官方请求使用独立的 `translation-requests-overlay-v1` 库及带 `overlay-v1` 的账户 scope。升级与数据库基线遵循[部署规范](DEPLOYMENT.md)，不兼容旧资产下载协议。
+采用逐图翻译资源，机器契约见 [OpenAPI](../contracts/openapi.json)。客户端页面库使用 `node-comics-reading-v2-*`；原图使用 `original-v2-static-srgb` 渲染身份，固定 144 dpi 的 PDF 送译图片使用 `pdf-v3-static-srgb`，隔离旧缩放缓存、页面摘要与本地送译操作并保留书架和阅读进度。PDF 的阅读图片不参与送译身份，原件导出与阅读渲染规则见[格式规范](IMPORT_FORMATS_AND_CACHE.md)。官方请求使用独立的 `translation-requests-overlay-v1` 库及带 `overlay-v1` 的账户 scope。升级与数据库基线遵循[部署规范](DEPLOYMENT.md)，不兼容旧资产下载协议。
 
 ## 1. 翻译流程
 

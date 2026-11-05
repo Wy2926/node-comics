@@ -20,10 +20,10 @@ export function ReaderTurnPreview({ref,chapter,index,ready,viewport,layout,direc
  const frames=layout==='double'?spreadFrames(pages,viewport,compare):pages.map(page=>pageFrame(page,viewport,fit,zoom,compare));
  return <div ref={ref} className="nc-reading-turn-preview" aria-hidden="true" inert style={{width:viewport.width,height:viewport.height,top}}>
   <div className="nc-page-stack" data-direction={direction}>{pages.map((page,n)=>{
-   const identity=scope(page,chapter!),image=readingImage(page,mode,translated,language,translationScope),frame=frames[n];
+   const identity=scope(page,chapter!),image=readingImage(page,mode,translated,language,translationScope),frame=frames[n],displayWidth=chapter?.source==='pdf'?frame.width/(compare?2:1):undefined;
    return <div className="nc-manga-page" key={page.id} style={{width:frame.width}}><div className={`nc-page-picture ${compare?'comparison':''}`} style={{height:frame.height}}>
-    {compare&&<div className="nc-comparison-pane"><BlobPicture shareForTurn priority="prefetch" scope={`${identity}:compare`} blobKey={page.blobKey} alt="" error={page.fetchError} onImport={noAction}/></div>}
-    <div className="nc-comparison-pane"><BlobPicture shareForTurn priority="prefetch" scope={identity} originalKey={page.blobKey} blobKey={image.key} job={image.job} alt="" error={page.fetchError} onImport={noAction}/></div>
+    {compare&&<div className="nc-comparison-pane"><BlobPicture displayWidth={displayWidth} shareForTurn priority="prefetch" scope={`${identity}:compare`} blobKey={page.blobKey} alt="" error={page.fetchError} onImport={noAction}/></div>}
+    <div className="nc-comparison-pane"><BlobPicture displayWidth={displayWidth} shareForTurn priority="prefetch" scope={identity} originalKey={page.blobKey} blobKey={image.key} job={image.job} alt="" error={page.fetchError} onImport={noAction}/></div>
    </div></div>;
   })}</div>
   {!pages.length&&<div className="nc-image-placeholder"><span className="spinner"/>{msg('正在准备页面…')}</div>}

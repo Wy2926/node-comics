@@ -80,7 +80,22 @@ describe('reader byte-only prefetch window', () => {
     f.update({current: ['one'], next: ['two', 'three']}); await advance(49);
     expect(f.acquire).not.toHaveBeenCalled();
     await advance(1);
-    expect(f.acquire).toHaveBeenCalledExactlyOnceWith('two', expect.any(AbortSignal), 'prefetch');
+    expect(f.acquire).toHaveBeenCalledExactlyOnceWith('two', expect.any(AbortSignal), 'prefetch', undefined);
+  });
+
+  it('prefetches PDF display pixels after zoom settles and replaces stale sizes before handoff', async () => {
+    const f=fixture(),widths=new Map([['two',2048],['three',1024]]);
+    f.update({widths});await advance(349);expect(f.acquire).not.toHaveBeenCalled();
+    await advance(1);expect(f.acquire).toHaveBeenLastCalledWith('two',expect.any(AbortSignal),'prefetch',2048);
+    const held=lease();f.calls[0].resolve(held);await advance();
+    expect(f.acquire).toHaveBeenLastCalledWith('three',expect.any(AbortSignal),'prefetch',1024);
+    widths.set('two',3072);widths.set('three',2048);f.update({widths});
+    expect(held.release).toHaveBeenCalledOnce();expect(f.calls[1].signal.aborted).toBe(true);
+    await advance(350);expect(f.acquire).toHaveBeenLastCalledWith('two',expect.any(AbortSignal),'prefetch',3072);
+    f.update({current:['two'],next:['three'],ready:false});
+    expect(f.calls[2].signal.aborted).toBe(false);
+    const fresh=lease();f.calls[2].resolve(fresh);await advance();expect(fresh.release).not.toHaveBeenCalled();
+    f.update({ready:true});expect(fresh.release).toHaveBeenCalledOnce();
   });
 
   it('restarts the readiness delay after loading or the visible group changes', async () => {

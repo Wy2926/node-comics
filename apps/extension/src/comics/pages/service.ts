@@ -17,7 +17,8 @@ import {PagePreview,type PagePreviewTarget} from './preview';
 
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; preview?:PagePreviewTarget; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
-interface Value { blob: Blob; identity: PageMaterialization; validate():Promise<void>; }
+type RasterRequest = PageRequest & {render?: number | 'original'};
+interface Value { blob?: Blob; identity?: PageMaterialization; validate():Promise<void>; }
 interface Work { controller: AbortController; promise: Promise<Value>; users: number; promote(priority:number):void; preview:PagePreview; }
 /** Preview dimensions are transient metadata; only a full materialization has a digest. */
 export type PageImageMetadata=Pick<PageMaterialization,'contentId'|'pageId'|'renderProfileId'|'width'|'height'>|PageMaterialization;
@@ -60,13 +61,14 @@ async function pageContext(request:PageReference){
 }
 /** Validates catalog identity and access without opening the source or reading image bytes. */
 export async function pageAccess(request:PageReference){return (await pageContext(request)).assertSourceCurrent;}
-async function read(request:PageRequest,signal:AbortSignal,preview:PagePreview):Promise<Value>{
+async function read(request:RasterRequest,signal:AbortSignal,preview:PagePreview):Promise<Value>{
   signal.throwIfAborted();
   const {descriptor,doc,binding,connection,assertSourceCurrent}=await pageContext(request);
-  const cachePages=getSourceDriver(connection.provider)?.cachePages!==false;
+  const render=doc.format==='pdf'?request.render:undefined;
+  const cachePages=render===undefined&&getSourceDriver(connection.provider)?.cachePages!==false;
   const cacheToken=cachePages&&request.purpose!=='download'?await sourcePageCache.token(doc.id).catch(cacheUnavailable):undefined;
-  const id=materializationId(request),known=await catalog.get('materializations',id);
-  let blob=await downloadStore.get(downloadKey(request.contentId,request.pageId,request.renderProfileId)).catch(cacheUnavailable);
+  const id=materializationId(request),known=render===undefined?await catalog.get('materializations',id):undefined;
+  let blob=render===undefined?await downloadStore.get(downloadKey(request.contentId,request.pageId,request.renderProfileId)).catch(cacheUnavailable):undefined;
   if(!blob&&cachePages)blob=await sourcePageCache.get(pageReference(request)).catch(cacheUnavailable);
   // These repositories contain already-normalized output from this service, keyed by current content identity/profile.
   const trustedCache=!!blob;
@@ -99,7 +101,20 @@ async function read(request:PageRequest,signal:AbortSignal,preview:PagePreview):
         if(doc.format==='epub')blob=await (await import('../formats/epub')).readEpubImage(source,descriptor.locator.epubImage as string,signal);
         else {
           const session=await openDocument(doc.format as ComicFormat,source,signal);
-          try{blob=await session.materialize({...descriptor,locator:descriptor.locator} as IndexedPage,signal);}finally{await session.close();}
+          try{
+            if(render!==undefined){
+              if(render==='original'){
+                const blob=await session.originalImage!(descriptor as IndexedPage,signal);
+                signal.throwIfAborted();await assertSourceCurrent();
+                return {blob,validate:assertSourceCurrent};
+              }
+              const rendered=await session.renderForDisplay!(descriptor as IndexedPage,render,signal);
+              signal.throwIfAborted();await assertSourceCurrent();
+              publishMetadata({contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,width:rendered.width,height:rendered.height});
+              return {blob:rendered.blob,validate:assertSourceCurrent};
+            }
+            blob=await session.materialize(descriptor as IndexedPage,signal);
+          }finally{await session.close();}
         }
       }finally{await source.close();}
     }
@@ -122,9 +137,25 @@ async function read(request:PageRequest,signal:AbortSignal,preview:PagePreview):
   return {blob:prepared.blob,identity,validate:assertSourceCurrent};
 }
 /** Every consumer releases its own lease; a cancelled thumbnail cannot cancel an active reader. */
+const workKey=(request:PageReference,render?:number|'original')=>pageReference(request)+(render===undefined?'':render==='original'?':embedded-image':`:display:${render}`);
 export async function acquirePage(request:PageRequest):Promise<PageLease>{
+  const lease=await acquire({...request,render:undefined});
+  // Translation materializations never contain display variants.
+  return {...lease,blob:lease.blob!,identity:lease.identity!};
+}
+export async function acquireDisplayPage(request:PageRequest,width:number):Promise<Pick<PageLease,'blob'|'release'>>{
+  const lease=await acquire({...request,render:width});
+  return {...lease,blob:lease.blob!};
+}
+/** Embedded bytes bypass raster caches and never update translation identity or reading geometry. */
+export async function acquireOriginalPdfImage(request:PageRequest):Promise<Pick<PageLease,'blob'|'release'>|undefined>{
+  const lease=await acquire({...request,render:'original'});
+  if(!lease.blob){lease.release();return;}
+  return {blob:lease.blob,release:lease.release};
+}
+async function acquire(request:RasterRequest){
   request.signal?.throwIfAborted();
-  const key=pageReference(request);let work=pending.get(key);
+  const key=workKey(request,request.render);let work=pending.get(key);
   const joining=!!work;
   const priority=request.priority==='background'?2:request.priority==='prefetch'?1:0;
   if(!work){
@@ -147,4 +178,4 @@ export async function acquirePage(request:PageRequest):Promise<PageLease>{
   try{const value=await Promise.race([chosen.promise,cancelled]);await Promise.race([value.validate(),cancelled]);request.signal?.throwIfAborted();return {blob:value.blob,identity:value.identity,release};}catch(error){release();throw error;}
 }
 /** Reprioritize an existing reader lease without acquiring another consumer or restarting its source. */
-export function promotePage(request:PageReference){const work=pending.get(pageReference(request));work?.promote(0);work?.preview.refresh();}
+export function promotePage(request:PageReference,displayWidth?:number){const work=pending.get(workKey(request,displayWidth));work?.promote(0);work?.preview.refresh();}

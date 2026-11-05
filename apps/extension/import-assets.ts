@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import type { Plugin } from "vite";
 import { readablePdf } from './pdfjs-csp';
+import { pdfOriginalImageWorker } from './pdfjs-original-image';
 
 /** Package-local format assets and licenses, also used by the offline MV3 reader. */
 export function importAssets(): Plugin {
@@ -19,6 +20,7 @@ export function importAssets(): Plugin {
   files.set("import-assets/licenses/pdfjs.txt", new URL("LICENSE", root));
   const pdfWorker = 'import-assets/pdf/pdf.worker.mjs';
   files.set(pdfWorker, new URL('legacy/build/pdf.worker.mjs', root));
+  files.set('import-assets/pdf/original-image.mjs', new URL('./src/comics/formats/pdf-original-image.mjs', import.meta.url));
   files.set(
     "import-assets/licenses/zip-js.txt",
     new URL("./node_modules/@zip.js/zip.js/LICENSE", import.meta.url),
@@ -71,7 +73,7 @@ export function importAssets(): Plugin {
     );
   }
   const readAsset = (name: string, file: URL) => name === pdfWorker
-    ? readablePdf(readFileSync(file, 'utf8')) : readFileSync(file);
+    ? readablePdf(pdfOriginalImageWorker(readFileSync(file, 'utf8'))) : readFileSync(file);
   return {
     name: "local-comic-import-assets",
     configureServer(server) {

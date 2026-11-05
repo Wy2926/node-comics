@@ -6,20 +6,22 @@ export interface ReaderPrefetchOptions {
   next: readonly string[];
   /** Per-page source identity; normal chapter handoff keeps the reader scope stable. */
   identities?: ReadonlyMap<string, string>;
+  /** PDF reading pixels use the same size as their upcoming display. */
+  widths?: ReadonlyMap<string, number>;
   /** Current sources have been acquired/failed or readable pixels are displayed; never wait on translated pixels. */
   ready: boolean;
   enabled: boolean;
 }
 
 export interface PrefetchLease {blob: Blob; release(): void}
-export type PrefetchAcquire = (key: string, signal: AbortSignal, priority: 'prefetch') => Promise<PrefetchLease>;
+export type PrefetchAcquire = (key: string, signal: AbortSignal, priority: 'prefetch', width?: number) => Promise<PrefetchLease>;
 type Window = Omit<ReaderPrefetchOptions, 'enabled'>;
-type Pending = {key: string; controller: AbortController};
+type Pending = {key: string; width?: number; controller: AbortController};
 const budget = 64 * 1024 * 1024;
 const keys = (values: readonly string[]) => [...new Set(values.filter(key => key && !key.startsWith('result:')))];
 const equal = (left: readonly string[], right: readonly string[]) => left.length === right.length && left.every((key, index) => key === right[index]);
 
-/** Five extra originals, without display pixels. Each displayed image validates its own lease. */
+/** Five extra pages held as compressed bytes. Each displayed image validates its own lease. */
 export class ReaderImagePrefetch {
   private window?: Window;
   private held = new Map<string, PrefetchLease>();
@@ -38,20 +40,23 @@ export class ReaderImagePrefetch {
     const next = keys(options.next).filter(key => !current.includes(key)).slice(0, ORIGINAL_PREFETCH_PAGES);
     // Own a bounded snapshot so a caller reusing its map cannot hide an identity change.
     const identities = new Map<string, string>();
+    const widths = new Map<string, number>();
     for (const key of [...current, ...next]) {
       const identity = options.identities?.get(key);
       if (identity !== undefined) identities.set(key, identity);
+      const width = options.widths?.get(key);
+      if (width !== undefined) widths.set(key, width);
     }
     const previous = this.window;
     const nextChanged = !previous || !equal(previous.next, next);
-    const changed = new Set([...current, ...next].filter(key => previous?.identities?.get(key) !== identities.get(key)));
+    const changed = new Set([...current, ...next].filter(key => previous?.identities?.get(key) !== identities.get(key)||previous?.widths?.get(key)!==widths.get(key)));
     if (nextChanged) this.attempted.clear();
     else for (const key of changed) this.attempted.delete(key);
     if (!previous || nextChanged || changed.size || !equal(previous.current, current) || previous.ready !== options.ready) {
       this.clearTimer();
       this.stable = false;
     }
-    this.window = {scope: options.scope, current, next, identities, ready: options.ready};
+    this.window = {scope: options.scope, current, next, identities, widths, ready: options.ready};
     for (const [key, lease] of this.held) {
       if (!changed.has(key) && this.wanted(key)) continue;
       this.held.delete(key);
@@ -62,11 +67,12 @@ export class ReaderImagePrefetch {
     if (this.pending && next.includes(this.pending.key)) this.attempted.add(this.pending.key);
     if (!options.ready || !next.length) return;
     if (this.stable) this.start();
+    // PDF display settles zoom for 200 ms before acquiring. Let it claim the foreground slot first.
     else if (this.timer === undefined) this.timer = setTimeout(() => {
       this.timer = undefined;
       this.stable = true;
       this.start();
-    }, 150);
+    }, widths.size ? 350 : 150);
   }
 
   private wanted(key: string): boolean {
@@ -80,14 +86,14 @@ export class ReaderImagePrefetch {
     const key = this.window.next.find(key => !this.held.has(key) && !this.attempted.has(key));
     if (!key) return;
     this.attempted.add(key);
-    const pending = {key, controller: new AbortController()};
+    const pending = {key, width: this.window.widths?.get(key), controller: new AbortController()};
     this.pending = pending;
     void this.read(pending);
   }
 
   private async read(pending: Pending): Promise<void> {
     try {
-      const lease = await this.acquire(pending.key, pending.controller.signal, 'prefetch');
+      const lease = await this.acquire(pending.key, pending.controller.signal, 'prefetch', pending.width);
       if (this.pending !== pending || pending.controller.signal.aborted || !this.wanted(pending.key)) {
         lease.release();
       } else if (this.bytes + lease.blob.size > budget) {

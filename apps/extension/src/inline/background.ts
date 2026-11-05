@@ -211,7 +211,9 @@ function scheduleEnhancements(ctx:Context) {
     },profile,signal,{retry,onParent:blob=>{if(!signal.aborted){work.parent=blob;publish(ctx);}},onState:state=>{
       if(!signal.aborted){work.state=state;publish(ctx);}
     }}).then(blob=>{
-      signal.throwIfAborted();work.blob=blob;work.parent=undefined;work.state={phase:'ready'};publish(ctx);
+      signal.throwIfAborted();
+      if(!blob){ctx.enhancements.delete(image.id);publish(ctx);return;}
+      work.blob=blob;work.parent=undefined;work.state={phase:'ready'};publish(ctx);
     }).catch(error=>{
       if(!signal.aborted){work.state={phase:'error',message:(error as Error).message};publish(ctx);}
     });

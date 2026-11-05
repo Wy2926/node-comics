@@ -18,6 +18,10 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
   try {
     const {scope,signal}=context;
     const binding=await entrySource(entryId,undefined,signal);
+    // An original PDF export is the source document, independent of page-image output options.
+    if(binding.entry.format==='pdf'&&options.images==='original'&&options.range!=='directory'){
+      return await exportOriginalFile(entryId,context);
+    }
     const assertChannel=()=>{
       signal.throwIfAborted();
       if(options.images==='translation'&&context.isCurrent?.()===false)throw Error(msg('翻译渠道已切换，本次导出已停止。'));
@@ -43,7 +47,8 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
       }
       if(!page.job||!scope||!context.readResult)throw Error('已有译图身份缺失，请重新打开导出面板。');
       const blob=await context.readResult(page.job,readSignal,async()=>{
-        const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
+        // Restoring an existing overlay requires its original translation pixels and digest.
+        const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'translation',priority:'background'});
         try{return lease.blob;}finally{lease.release();}
       });
       readSignal.throwIfAborted();await assertCurrent(page);return {blob,release(){}};
@@ -110,7 +115,7 @@ export async function exportOriginalFile(
     return {
       name,
       bytes: source.snapshot.size,
-      ...(!target ? {blob: new Blob(chunks, {type: 'application/octet-stream'})} : {}),
+      ...(!target ? {blob: new Blob(chunks, {type: binding.entry.format==='pdf'?'application/pdf':'application/octet-stream'})} : {}),
     };
   } catch (error) {
     if (!closed) await target?.abort(error).catch(() => {});

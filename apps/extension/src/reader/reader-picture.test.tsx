@@ -79,6 +79,21 @@ beforeEach(() => {
 afterEach(() => {cleanup(); vi.restoreAllMocks();});
 
 describe('shared reader pixel presentation', () => {
+  it('keeps the readable PDF during resolution changes, ignores stale pixels and retries without changing page identity',async()=>{
+    const {acquire,reads}=controlledReads(),onShown=vi.fn();
+    render({acquire,onShown,renderWidth:1024});reads[0].resolve();await flush();displayed();
+    const original=images(tree).find(image=>image.className==='nc-page-image')!.src;
+    render({renderWidth:2048});expect(reads[0].release).toHaveBeenCalledOnce();
+    expect(images(tree).find(image=>image.className==='nc-page-image')!.src).toBe(original);
+    render({renderWidth:2560});expect(reads[1].signal.aborted).toBe(true);
+    reads[1].resolve();reads[2].reject(Error('display failed'));await flush();
+    expect(images(tree)).toHaveLength(1);expect(images(tree)[0].src).toBe(original);
+    render({renderWidth:3072});reads[3].resolve();await flush();displayed();
+    expect(images(tree)[0].src).not.toBe(original);expect(URL.revokeObjectURL).toHaveBeenCalledWith(original);
+    expect(acquire.mock.calls.map(call=>call[3])).toEqual([1024,2048,2560,3072]);
+    expect(onShown.mock.calls.filter(([value])=>value)).toHaveLength(1);
+    expect(onShown).toHaveBeenCalledWith(expect.objectContaining({scope:'slot-1',key:'original'}));
+  });
   it('validates a foreground lease before reusing prepared turn-preview pixels without another decode',async()=>{
     const url=createReaderImageURL(new Blob(['prepared'])),id=JSON.stringify(['slot-1','original',undefined]),unpublish=shareReaderImageURL(id,url);
     const {acquire,reads}=controlledReads();render({acquire});expect(images(tree)).toHaveLength(0);expect(acquire).toHaveBeenCalledOnce();
@@ -227,9 +242,9 @@ describe('shared reader pixel presentation', () => {
     expect(release).toHaveBeenCalledOnce();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
-  it('shows a cold original independently while a selected remote result is pending',async()=>{
+  it('shows and resizes a cold original independently while a selected remote result is pending',async()=>{
     const {acquire,reads}=controlledReads(),shown=vi.fn(),state=vi.fn();
-    render({acquire,originalKey:'original',blobKey:'translated',job:translatedJob,onShown:shown,onLoadState:state});
+    render({acquire,originalKey:'original',blobKey:'translated',job:translatedJob,onShown:shown,onLoadState:state,renderWidth:1024});
     expect(reads.map(read=>read.key)).toEqual(['original','translated']);
     reads[0].resolve();await flush();displayed();
     expect(images(tree)).toHaveLength(1);
@@ -238,11 +253,20 @@ describe('shared reader pixel presentation', () => {
     expect(state).toHaveBeenLastCalledWith(expect.objectContaining({key:'translated',phase:'reading',originalSettled:true}));
     expect(reads[0].signal.aborted).toBe(false);
     expect(reads[0].release).not.toHaveBeenCalled();
+    const original=images(tree)[0].src;
+    render({renderWidth:2048});
+    expect(images(tree)[0].src).toBe(original);
+    expect(reads.map(read=>read.key)).toEqual(['original','translated','original']);
+    expect(acquire.mock.calls.map(call=>call[3])).toEqual([1024,undefined,2048]);
+    expect(reads[1].signal.aborted).toBe(false);
+    reads[2].resolve();await flush();displayed();
+    expect(images(tree)[0].src).not.toBe(original);
     reads[1].resolve();await flush();
     expect(shown).toHaveBeenLastCalledWith(expect.objectContaining({key:'original'}));
     displayed();
     expect(shown).toHaveBeenLastCalledWith(expect.objectContaining({key:'translated',job:translatedJob}));
     expect(reads[0].release).toHaveBeenCalledOnce();
+    expect(reads[2].release).toHaveBeenCalledOnce();
     expect(state).toHaveBeenLastCalledWith(expect.objectContaining({phase:'ready'}));
   });
   it('does not let a failed result prevent a cold original from displaying or count as original settlement',async()=>{
@@ -347,6 +371,9 @@ describe('shared reader pixel presentation', () => {
     expect(images(tree)[0].src).not.toBe(translated);
     expect(reads[1].release).toHaveBeenCalledOnce();
     expect(shown.mock.calls.filter(([image])=>image?.job?.id==='translated-job')).toHaveLength(1);
+    const enhanced=images(tree)[0].src;
+    render({renderWidth:3072});await flush();
+    expect(images(tree)[0].src).toBe(enhanced);expect(acquire).toHaveBeenCalledTimes(2);
   });
   it('does not cancel an original decode when an enhanced result arrives',async()=>{
     const originalDecode=deferred<void>(),enhancedDecode=deferred<void>(),{acquire,reads}=controlledReads();let originalSignal!:AbortSignal;
@@ -390,7 +417,8 @@ describe('shared reader pixel presentation', () => {
   it('does not start a newly provided fallback when the selected result is already displayed',async()=>{
     const acquire=vi.fn(async()=>({blob:new Blob(['translated']),release:vi.fn()}));
     render({acquire,blobKey:'translated',job:translatedJob});await flush();displayed();
-    render({originalKey:'original'});await flush();
+    render({originalKey:'original',renderWidth:1536});await flush();
+    render({renderWidth:3072});await flush();
     expect(acquire).toHaveBeenCalledOnce();
     expect(images(tree)[0]['data-result-job']).toBe('translated-job');
   });

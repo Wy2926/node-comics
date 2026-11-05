@@ -31,5 +31,6 @@ export interface ProcessingInput {
   owner: string;
   /** Metadata/authorization only. Cache hits must not materialize the parent image. */
   validate(): Promise<void>;
-  load(signal: AbortSignal): Promise<{blob: Blob; release(): void}>;
+  /** Undefined skips inputs that cannot be supplied as an original image. */
+  load(signal: AbortSignal): Promise<{blob: Blob; release(): void} | undefined>;
 }

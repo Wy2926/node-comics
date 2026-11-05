@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {describe, expect, it} from 'vitest';
 import {readablePdf} from '../pdfjs-csp';
+import {pdfOriginalImageWorker} from '../pdfjs-original-image';
 
 const checksums = JSON.parse(readFileSync(new URL('../public/import-assets/licenses/dependency-checksums.json', import.meta.url), 'utf8'));
 describe('reviewable PDF.js legacy bundles', () => {
@@ -24,4 +25,10 @@ describe('reviewable PDF.js legacy bundles', () => {
       expect(() => readablePdf(original + original)).toThrow('fallback changed');
     });
   }
+});
+
+it('adds original-image extraction only to the verified PDF.js worker version',()=>{
+  const code=readFileSync(new URL('../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',import.meta.url),'utf8');
+  expect(readablePdf(pdfOriginalImageWorker(code))).toContain('handler.on("NodeComicsOriginalImage"');
+  expect(()=>pdfOriginalImageWorker(code+'\n')).toThrow('worker command changed');
 });

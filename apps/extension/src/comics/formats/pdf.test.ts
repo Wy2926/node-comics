@@ -37,13 +37,34 @@ describe('PDF range and page-render contract',()=>{
     try{pdf.options.range.requestDataRange(0,17*1024*1024);expect(pdf.destroy).toHaveBeenCalledOnce();expect(readAt).toHaveBeenCalledTimes(1);}
     finally{await session.close();}
   });
-  it('renders large pages at 144 dpi without the former pixel and edge ceilings',async()=>{
+  it('keeps frozen translation pixels while bounding only temporary display canvases',async()=>{
     pdf.getPage.mockImplementation(async()=>({getViewport:({scale}:{scale:number})=>({width:5000*scale,height:6000*scale}),render:pdf.render,cleanup:pdf.cleanup}));
-    const canvas={width:0,height:0,toBlob:(done:(blob:Blob)=>void)=>{expect([canvas.width,canvas.height]).toEqual([10000,12000]);done(new Blob(['rendered'],{type:'image/png'}));}};
+    const sizes:number[][]=[];
+    const canvas={width:0,height:0,toBlob:(done:(blob:Blob)=>void)=>{sizes.push([canvas.width,canvas.height]);done(new Blob(['rendered'],{type:'image/png'}));}};
     vi.stubGlobal('document',{createElement:()=>canvas});
     const session=await openPdfDocument(source().value);
-    try { const [page]=await session.index();expect((await session.materialize(page)).type).toBe('image/png'); }
+    try {
+      const [page]=await session.index();expect((await session.materialize(page)).type).toBe('image/png');
+      const displayed=await session.renderForDisplay!(page,20000);
+      expect(sizes[0]).toEqual([10000,12000]);expect(displayed).toMatchObject({width:10000,height:12000});
+      expect(sizes[1][0]*sizes[1][1]).toBeLessThanOrEqual(16*1024*1024);
+      expect(Math.max(...sizes[1])).toBeLessThanOrEqual(16384);
+    }
     finally { await session.close(); }
+  });
+  it('separates display rasters from frozen translation bytes and geometry',async()=>{
+    const canvas={width:0,height:0,toBlob:(done:(blob:Blob)=>void)=>done(new Blob([`${canvas.width}x${canvas.height}`],{type:'image/png'}))};
+    vi.stubGlobal('document',{createElement:()=>canvas});
+    const session=await openPdfDocument(source().value);
+    try{
+      const [page]=await session.index(),before=await session.materialize(page);
+      for(const width of [768,1536]){
+        const display=await session.renderForDisplay!(page,width);
+        expect(display).toMatchObject({width:600,height:1000});
+        expect(await display.blob.text()).toBe(`${width}x${Math.floor(width*500/300)}`);
+      }
+      expect(await (await session.materialize(page)).text()).toBe(await before.text());
+    }finally{await session.close();}
   });
   it('honors cancellation before the initial header read',async()=>{
     const {value,readAt}=source(),controller=new AbortController();controller.abort();await expect(openPdfDocument(value,controller.signal)).rejects.toThrow();expect(readAt).not.toHaveBeenCalled();

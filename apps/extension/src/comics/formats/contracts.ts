@@ -29,6 +29,10 @@ export interface DocumentSession {
   readonly capabilities: FormatCapabilities;
   index(signal?: AbortSignal): Promise<IndexedPage[]>;
   materialize(page: IndexedPage, signal?: AbortSignal): Promise<Blob>;
+  /** Display pixels are transient; dimensions retain the stable materialization's geometry. */
+  renderForDisplay?(page: IndexedPage, width: number, signal?: AbortSignal): Promise<{blob: Blob; width: number; height: number}>;
+  /** Original embedded image bytes when they represent the entire page without conversion. */
+  originalImage?(page: IndexedPage, signal?: AbortSignal): Promise<Blob | undefined>;
   close(): Promise<void>;
 }
 export function throwIfAborted(signal?: AbortSignal) { signal?.throwIfAborted(); }

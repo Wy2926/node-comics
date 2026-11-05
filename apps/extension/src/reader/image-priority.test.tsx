@@ -3,6 +3,7 @@ const hooks=vi.hoisted(()=>({cursor:0,effect:0,refs:[] as any[],effects:[] as an
 const access=vi.hoisted(()=>({acquire:vi.fn(),promote:vi.fn()}));
 vi.mock('../comics/application/image-access',()=>({acquireImage:access.acquire,promoteImage:access.promote}));
 vi.mock('react',async original=>({...await original<typeof import('react')>(),
+ useState:(initial:unknown)=>{const state=hooks.refs[hooks.cursor++]??= {current:typeof initial==='function'?initial():initial};return [state.current,(value:unknown)=>{state.current=typeof value==='function'?value(state.current):value;}];},
  useRef:(current:unknown)=>hooks.refs[hooks.cursor++]??= {current},
  useCallback:(callback:unknown)=>(hooks.refs[hooks.cursor++]??= {current:callback}).current,
  useEffect:(effect:()=>void,deps:unknown[])=>{
@@ -36,14 +37,14 @@ describe('mounted image reading priority',()=>{
   await page.initial.acquire('original',controller.signal);access.promote.mockClear();
   const visible=page.render({priority:'current'});
   expect(visible.acquire).toBe(page.initial.acquire);expect(access.acquire).toHaveBeenCalledOnce();
-  expect(access.promote.mock.calls).toEqual([['translated'],['original']]);
+  expect(access.promote.mock.calls).toEqual([['translated',undefined],['original',undefined]]);
   page.render({priority:'current'});expect(access.promote).toHaveBeenCalledTimes(2);
   const neighbor=page.render({priority:'prefetch'});expect(neighbor.acquire).toBe(visible.acquire);expect(controller.signal.aborted).toBe(false);
  });
  it('uses the latest priority if navigation overtakes a deferred neighbor read',async()=>{
   const page=picture({priority:'prefetch'}),pending=page.initial.acquire('original',new AbortController().signal);
   page.render({priority:'current'});await pending;
-  expect(access.acquire).toHaveBeenCalledExactlyOnceWith('original',expect.any(AbortSignal),'current',undefined);
+  expect(access.acquire).toHaveBeenCalledExactlyOnceWith('original',expect.any(AbortSignal),'current',undefined,undefined);
  });
  it('preserves cancellation before deferred acquisition and does not promote an absent target',async()=>{
   const page=picture({priority:'prefetch',blobKey:undefined}),controller=new AbortController();

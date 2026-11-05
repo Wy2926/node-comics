@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Icon} from '../icons';
 import {acquireImage,promoteImage,readThumbnail,type PagePreviewTarget} from '../comics/application/image-access';
+import {usePdfDisplayWidth} from './usePdfDisplayWidth';
 import './image-notices.css';
 
 type ThumbnailKeyResolver=(signal:AbortSignal)=>Promise<string|undefined>;
@@ -23,16 +24,17 @@ export function Thumbnail({blobKey,resolveKey,alt='',className='',retryKey=0,onE
 }
 export {type ShownImage} from './ReaderPicture';
 import {ReaderPicture,type ReaderPictureProps} from './ReaderPicture';
-export type BlobPictureProps=Omit<ReaderPictureProps,'acquire'>;
-export function BlobPicture({priority='current',...props}:BlobPictureProps){
+export type BlobPictureProps=Omit<ReaderPictureProps,'acquire'|'renderWidth'>&{displayWidth?:number};
+export function BlobPicture({priority='current',displayWidth,...props}:BlobPictureProps){
+  const renderWidth=usePdfDisplayWidth(props.scope,displayWidth);
   const current=useRef(priority);current.current=priority;
-  const acquire=useCallback(async(key:string,signal:AbortSignal,preview?:PagePreviewTarget)=>{
+  const acquire=useCallback(async(key:string,signal:AbortSignal,preview?:PagePreviewTarget,width?:number)=>{
     // Let the current page claim a source slot before earlier DOM neighbors from the same commit.
     if(current.current==='prefetch')await Promise.resolve();
-    return acquireImage(key,signal,current.current,preview);
+    return acquireImage(key,signal,current.current,preview,width);
   },[]);
   useEffect(()=>{
-    if(priority==='current')for(const key of new Set([props.blobKey,props.originalKey]))if(key)promoteImage(key);
-  },[priority,props.blobKey,props.originalKey]);
-  return <ReaderPicture {...props} priority={priority} acquire={acquire}/>;
+    if(priority==='current')for(const key of new Set([props.blobKey,props.originalKey]))if(key)promoteImage(key,key===(props.originalKey??props.blobKey)?renderWidth:undefined);
+  },[priority,props.blobKey,props.originalKey,renderWidth]);
+  return <ReaderPicture {...props} priority={priority} acquire={acquire} renderWidth={renderWidth}/>;
 }

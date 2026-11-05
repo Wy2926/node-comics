@@ -227,6 +227,7 @@
     "pdfjs-dist/legacy/build/pdf.worker.mjs": "df3bf6bf6b8b8dac8a4042d8c4ecf1cf21e1d197e0fe231c192122409eba656b",
     "pdfjs-dist/legacy/build/pdf.mjs": "91e29f812c593904e8d48d022db5ddf93e3443575d4765ac9bfbb42494cfbd8d"
   },
+  "pdfjs_original_image_patch": "pdfjs-original-image.ts verifies the complete upstream worker SHA-256 and adds a single-page extraction command using the project-owned pdf-original-image.mjs; reuses PDF.js parsing and range reads, without decoding or changing JPEG bytes",
   "pdfjs_csp_patch": "pdfjs-csp.ts replaces the SHA-256-verified core-js Object.create fallback with native Object.create in the legacy main module and unminified worker; other compatibility polyfills and PDF decoding are unchanged",
   "core_js": {
     "version": "3.50.0",

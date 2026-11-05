@@ -13,9 +13,9 @@ import './image-notices.css';
 /** Pixel presentation owns URLs and decoding; its caller owns source access and persistence. */
 export type ShownImage={scope:string;key:string;job?:Job};
 type PreparedImage=ShownImage&{id:string;url:string};
-type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;unshare?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
-export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal,preview?:PagePreviewTarget)=>Promise<{blob:Blob;release():void}>;priority?:'current'|'prefetch';shareForTurn?:boolean;scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
-export function ReaderPicture({acquire,priority='current',shareForTurn=false,scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
+type ImageRequest={id:string;scope:string;key:string;job?:Job;blob?:Blob;width?:number;attempt:number;acquire:ReaderPictureProps['acquire'];controller:AbortController;url:string;release?:()=>void;unshare?:()=>void;phase:'reading'|'decoding'|'displaying';image?:PreparedImage;error?:string};
+export type ReaderPictureProps={acquire:(key:string,signal:AbortSignal,preview?:PagePreviewTarget,width?:number)=>Promise<{blob:Blob;release():void}>;renderWidth?:number;priority?:'current'|'prefetch';shareForTurn?:boolean;scope:string;blobKey?:string;originalKey?:string;job?:Job;alt:string;onShown?:(image:ShownImage|undefined)=>void;onLoadState?:(state:ImageLoadState|undefined)=>void;onImport:()=>void;onReload?:()=>void;reloadBusy?:boolean;error?:string;sourceUrl?:string;enhancement?:ProcessingImage};
+export function ReaderPicture({acquire,renderWidth,priority='current',shareForTurn=false,scope,blobKey,originalKey=blobKey,job,alt,onShown,onLoadState,onImport,onReload,reloadBusy=false,error,sourceUrl,enhancement}:ReaderPictureProps){
   const [loaded,setLoaded]=useState<PreparedImage>();const [displayError,setDisplayError]=useState('');const [retry,setRetry]=useState(0);const [revision,setRevision]=useState(0);const urls=useRef(new Set<string>());
   const displayed=useRef(loaded);displayed.current=loaded;
   // At most one original, one selected result and one ready enhancement share this loader.
@@ -32,9 +32,10 @@ export function ReaderPicture({acquire,priority='current',shareForTurn=false,sco
   const [dismissed,setDismissed]=useState<string>();const retryButton=useRef<HTMLButtonElement>(null);
   const callback=useRef(onShown);callback.current=onShown;
   const loadCallback=useRef(onLoadState);loadCallback.current=onLoadState;
-  const targetId=blobKey?JSON.stringify([scope,blobKey,job?.id]):undefined;
-  const originalId=originalKey===blobKey?targetId:originalKey?JSON.stringify([scope,originalKey,undefined]):undefined;
-  const enhancedId=targetId&&enhancement?.blob?JSON.stringify([targetId,enhancement.identity]):undefined;
+  const imageId=(key:string,result?:Job)=>JSON.stringify([scope,key,result?.id,...(key===originalKey&&renderWidth!==undefined?[renderWidth]:[])]);
+  const targetId=blobKey?imageId(blobKey,job):undefined;
+  const originalId=originalKey===blobKey?targetId:originalKey?imageId(originalKey):undefined;
+  const enhancedId=blobKey&&enhancement?.blob?JSON.stringify([scope,blobKey,job?.id,enhancement.identity]):undefined;
   const reloadAction=useRef({onReload,reloadBusy});reloadAction.current={onReload,reloadBusy};
   const reload=useCallback(()=>{if(reloadAction.current.reloadBusy)return;if(!blobKey&&reloadAction.current.onReload)reloadAction.current.onReload();else setRetry(value=>value+1);},[blobKey]);
   const shown=loaded?.scope===scope?loaded:undefined;
@@ -58,12 +59,12 @@ export function ReaderPicture({acquire,priority='current',shareForTurn=false,sco
   useEffect(()=>{setLoaded(current=>current?.scope===scope?current:undefined);setDisplayError('');setDismissed(undefined);},[scope,targetId,enhancedId,retry]);
   useEffect(()=>{if(dismissed===failureSignature)retryButton.current?.focus({preventScroll:true});},[dismissed,failureSignature]);
   useEffect(()=>{
-    const desired=new Map<string,{key:string;job?:Job;blob?:Blob}>();
+    const desired=new Map<string,{key:string;job?:Job;blob?:Blob;width?:number}>();
     const enhancedFailed=!!enhancedId&&!!requests.current.get(enhancedId)?.error;
     const enhancedShown=!!enhancedId&&shown?.id===enhancedId;
     // An already displayed result needs no fallback. An in-flight original survives target changes.
-    if(originalId&&originalKey&&originalId!==targetId&&(!shown||shown.id===originalId||!shown.job&&shown.key!==originalKey)&&(!enhancedId||enhancedFailed||requests.current.has(originalId)))desired.set(originalId,{key:originalKey});
-    if(targetId&&blobKey&&(!enhancedId||enhancedFailed||!enhancedShown&&requests.current.has(targetId)))desired.set(targetId,{key:blobKey,job});
+    if(originalId&&originalKey&&originalId!==targetId&&(!shown||!shown.job)&&(!enhancedId||enhancedFailed||requests.current.has(originalId)))desired.set(originalId,{key:originalKey,width:renderWidth});
+    if(targetId&&blobKey&&(!enhancedId||enhancedFailed||!enhancedShown&&requests.current.has(targetId)))desired.set(targetId,{key:blobKey,job,width:blobKey===originalKey?renderWidth:undefined});
     if(enhancedId&&blobKey)desired.set(enhancedId,{key:blobKey,job,blob:enhancement?.blob});
     let changed=false;
     for(const request of requests.current.values()){
@@ -87,7 +88,7 @@ export function ReaderPicture({acquire,priority='current',shareForTurn=false,sco
             },
             clear:()=>clearPreview(request),
           }:undefined;
-          const lease=await request.acquire(request.key,request.controller.signal,preview);
+          const lease=await request.acquire(request.key,request.controller.signal,preview,request.width);
           if(!active(request)){lease.release();return;}
           request.release=lease.release;blob=lease.blob;
         }
@@ -102,7 +103,7 @@ export function ReaderPicture({acquire,priority='current',shareForTurn=false,sco
       })().catch(reason=>{if(active(request)){clearPreview(request);request.error=(reason as Error).message;request.image=undefined;setRevision(value=>value+1);}request.unshare?.();revoke(request.url);request.url='';});
     }
     if(changed)setRevision(value=>value+1);
-  },[scope,originalKey,targetId,enhancedId,enhancement?.blob,retry,acquire,shown,revision]);
+  },[scope,originalKey,originalId,targetId,enhancedId,enhancement?.blob,retry,acquire,shown,revision]);
   useEffect(()=>{for(const url of urls.current)if(url!==loaded?.url&&![...requests.current.values()].some(request=>request.url===url))revoke(url);},[loaded,revision]);
   useEffect(()=>()=>{for(const request of requests.current.values())retire(request);for(const url of urls.current)releaseReaderImageURL(url);urls.current.clear();},[]);
   const isCurrent=(image:PreparedImage)=>candidate.current===image&&requests.current.get(image.id)?.image===image&&!requests.current.get(image.id)?.controller.signal.aborted;

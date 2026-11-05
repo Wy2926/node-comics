@@ -179,7 +179,8 @@ export class EpubImageWindow {
         const blob = await enhanceImage(processingInput(key, this.owner, this.pages.get(epubImageId(href))?.blobKey), this.profile!, signal, {retry, onParent: show, onState: state => {
           if (!signal.aborted && state.phase !== 'ready') this.setEnhancementState(result, state);
         }});
-        await show(blob); this.setEnhancementState(result, {phase: 'ready'});
+        if(blob)await show(blob);
+        this.setEnhancementState(result, blob ? {phase: 'ready'} : undefined);
       } else {
         const lease = await acquireImage(key, signal);
         try {await show(lease.blob);} finally {lease.release();}

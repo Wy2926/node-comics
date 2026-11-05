@@ -12,6 +12,7 @@ import {exportDocument,exportOriginalFile} from '../src/comics/application/expor
 import type {Job} from '../src/types';
 import {translationCache} from '../src/storage/translations';
 import {loadResultBlob,resultBlobKey} from '../src/storage/translations/results';
+import {acquirePage} from '../src/comics/pages/service';
 vi.mock('../src/comics/pages/service',()=>({acquirePage:vi.fn(),materializationId:(ref:{contentId:string;pageId:string;renderProfileId:string})=>JSON.stringify([ref.contentId,ref.pageId,ref.renderProfileId])}));
 const scope={key:'selected-channel'};
 const options:ExportOptions={format:'cbz',images:'original',mode:'classic',language:'zh-Hans'};
@@ -26,8 +27,25 @@ async function bind(s:Awaited<ReturnType<typeof sample>>,jobs:Job[],outputBlobs:
   const identity={id:JSON.stringify([s.contentId,'page-0',RENDER_PROFILE]),contentId:s.contentId,pageId:'page-0',renderProfileId:RENDER_PROFILE,imageSha256:'a'.repeat(64),byteSize:12,mime:'image/png',width:100,height:100,updatedAt:Date.now()};
   expect(await catalog.putMaterialization(identity,1)).toBe(true);
   await catalog.put('translationBindings',{id:JSON.stringify([scope.key,identity.imageSha256]),scope:scope.key,imageSha256:identity.imageSha256,payload:{translationScope:scope.key,jobs,outputBlobs},updatedAt:Date.now()});
+  return identity;
 }
 describe('document export through page leases',()=>{
+  it('uses original pixels for export and frozen translation pixels when restoring an existing overlay',async()=>{
+    vi.mocked(acquirePage).mockClear();
+    const s=await sample(2),result=job('restore-overlay'),identity=await bind(s,[result]);
+    const original=image(),release=vi.fn();
+    vi.mocked(acquirePage).mockResolvedValue({blob:original,release,identity});
+    vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:100,height:100,close(){}})));
+    try{
+      const readResult=vi.fn(async(_job:Job,_signal?:AbortSignal,readOriginal?:()=>Promise<Blob|undefined>)=>{
+        expect(await readOriginal!()).toBe(original);return image();
+      });
+      await exportDocument(s.id,{...options,images:'translation'},{scope,readResult,signal:new AbortController().signal});
+      expect(acquirePage).toHaveBeenCalledWith(expect.objectContaining({pageId:'page-0',purpose:'translation'}));
+      expect(acquirePage).toHaveBeenCalledWith(expect.objectContaining({pageId:'page-1',purpose:'export'}));
+      expect(release).toHaveBeenCalledTimes(2);
+    }finally{vi.unstubAllGlobals();}
+  });
   it('exports a decoded page beyond the former 32 million pixel ceiling',async()=>{
     const close=vi.fn();vi.stubGlobal('createImageBitmap',async()=>({width:8000,height:6000,close}));
     try { const blob=image();expect(await exportImage(blob)).toMatchObject({blob,width:8000,height:6000});expect(close).toHaveBeenCalledOnce(); }

@@ -59,7 +59,7 @@ export class ProcessingWindow {
     };
     void enhanceImage(work.target.input!, work.profile, controller.signal, {retry,
       onState: state => {if (state.phase !== 'ready') change({state});},
-    }).then(blob => change({blob, state: {phase: 'ready'}}))
+    }).then(blob => change({blob, state: blob ? {phase: 'ready'} : undefined}))
       .catch(error => change({state: {phase: 'error', message: (error as Error).message}}));
   }
 

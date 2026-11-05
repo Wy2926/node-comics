@@ -17,7 +17,7 @@ vi.mock('../../storage/downloads', async original => ({...await original<typeof 
 vi.mock('../../storage/source-pages', () => ({sourcePageCache: {
   token: mocks.token, get: mocks.cacheGet, put: mocks.cachePut,
 }}));
-import {acquirePage,promotePage,downloadKey,materializationId,onPageImageMetadata,type PageLease} from './service';
+import {acquirePage,acquireDisplayPage,acquireOriginalPdfImage,promotePage,materializationId,onPageImageMetadata,type PageLease} from './service';
 import {PagePreview,type PagePreviewTarget} from './preview';
 import {PDF_RENDER_PROFILE,RENDER_PROFILE,pageReference,parsePageReference} from './identity';
 import {ReaderImagePrefetch} from '../../reader/image-prefetch';
@@ -126,22 +126,36 @@ describe('page leases and trusted source routing', () => {
     put('connections', 'connection', {id:'connection',generation:2,provider:'local',status:'revoked'});
     await expect(acquirePage(ref)).rejects.toThrow('来源访问已断开');
   });
-  it('materializes the current PDF profile without reusing retained bytes or metadata from the old profile',async()=>{
+  it('shares PDF display requests separately without changing translation bytes, metadata or persistent caches',async()=>{
     put('entries','document',{id:'document',comicId:'comic',contentId:'revision',containerId:'container',generation:1,format:'pdf'});
     put('connections','connection',{id:'connection',generation:1,provider:'local',status:'connected'});
-    const current={...request,renderProfileId:PDF_RENDER_PROFILE},oldBlob=new Blob(['old'],{type:'image/png'}),newBlob=new Blob(['new'],{type:'image/png'});
-    const oldId=materializationId(request),oldIdentity={id:oldId,imageSha256:'b'.repeat(64),width:100,height:200,byteSize:oldBlob.size,mime:oldBlob.type};
-    put('materializations',oldId,oldIdentity);mocks.cache.set(pageReference(request),oldBlob);
-    mocks.downloadGet.mockImplementation(async key=>key===downloadKey(request.contentId,request.pageId)?oldBlob:undefined);
-    const close=vi.fn().mockResolvedValue(undefined),materialize=vi.fn().mockResolvedValue(newBlob);
+    const current={...request,renderProfileId:PDF_RENDER_PROFILE},original=new Blob(['stable']),metadata=vi.fn();
+    const close=vi.fn().mockResolvedValue(undefined),materialize=vi.fn().mockResolvedValue(original);
+    const renderForDisplay=vi.fn(async(_page,width:number)=>({blob:new Blob([String(width)]),width:100,height:200}));
+    const originalImage=vi.fn(async()=>new Blob(['embedded JPEG'],{type:'image/jpeg'}));
     mocks.openContainer.mockResolvedValue({snapshot:{identity:'source',version:'1',size:100,local:true},close});
-    vi.mocked(openDocument).mockResolvedValue({capabilities:{access:'random',remote:false,encrypted:false,multiVolume:false,indexComplete:true},index:vi.fn(),materialize,close:vi.fn().mockResolvedValue(undefined)});
-    const lease=await acquirePage(current);try{expect(lease.blob).toBe(newBlob);expect(lease.identity.renderProfileId).toBe(PDF_RENDER_PROFILE);expect(materialize).toHaveBeenCalledOnce();}
-    finally{lease.release();}
-    expect(mocks.downloadGet).toHaveBeenCalledWith(downloadKey(request.contentId,request.pageId,PDF_RENDER_PROFILE));
-    expect(mocks.records.get(JSON.stringify(['materializations',oldId]))).toBe(oldIdentity);expect(mocks.cache.get(pageReference(request))).toBe(oldBlob);
-    expect(mocks.records.get(JSON.stringify(['materializations',materializationId(current)]))).toMatchObject({imageSha256:'a'.repeat(64)});
-    await expect(acquirePage(request)).rejects.toThrow('渲染版本');
+    vi.mocked(openDocument).mockResolvedValue({capabilities:{access:'random',remote:false,encrypted:false,multiVolume:false,indexComplete:true},index:vi.fn(),materialize,renderForDisplay,originalImage,close});
+    const stable=await acquirePage(current),unsubscribe=onPageImageMetadata(metadata);
+    const stored=mocks.records.get(JSON.stringify(['materializations',materializationId(current)]));
+    const leases:Pick<PageLease,'blob'|'release'>[]=[];
+    try{
+      leases.push(...await Promise.all([acquireDisplayPage(current,2048),acquireDisplayPage(current,2048),acquireDisplayPage(current,3072)]));
+      const embedded=await acquireOriginalPdfImage(current);expect(await embedded!.blob.text()).toBe('embedded JPEG');leases.push(embedded!);
+      const shared=await acquireOriginalPdfImage(current);expect(shared!.blob).toBe(embedded!.blob);leases.push(shared!);
+      expect(originalImage).toHaveBeenCalledOnce();
+      expect(leases[0].blob).toBe(leases[1].blob);expect(await leases[2].blob.text()).toBe('3072');
+      expect(renderForDisplay).toHaveBeenCalledTimes(2);expect(materialize).toHaveBeenCalledOnce();
+      expect(mocks.prepare).toHaveBeenCalledOnce();expect(mocks.put).toHaveBeenCalledOnce();expect(mocks.downloadGet).toHaveBeenCalledOnce();
+      expect(mocks.cachePut).not.toHaveBeenCalled();
+      expect(mocks.records.get(JSON.stringify(['materializations',materializationId(current)]))).toBe(stored);
+      expect(metadata).toHaveBeenCalledTimes(2);
+      expect(metadata.mock.calls.every(([value])=>value.width===100&&value.height===200&&!('imageSha256' in value))).toBe(true);
+      const again=await acquirePage(current);leases.push(again);expect(again.blob).toBe(original);expect(again.identity).toEqual(stable.identity);
+      put('connections','connection',{id:'connection',generation:2,provider:'local',status:'revoked'});
+      await expect(acquireDisplayPage(current,2048)).rejects.toThrow('来源');
+      await expect(acquireOriginalPdfImage(current)).rejects.toThrow('来源');expect(originalImage).toHaveBeenCalledOnce();
+      expect(renderForDisplay).toHaveBeenCalledTimes(2);
+    }finally{unsubscribe();stable.release();leases.forEach(lease=>lease.release());}
   });
   it('validates manifest membership and reuses normalized cached pixels without decoding or hashing again', async () => {
     renewable();

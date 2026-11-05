@@ -78,7 +78,7 @@ it('sends the full parent bytes unchanged, deduplicates concurrent readers and r
   const reads = vi.spyOn(original.blob, 'slice');
   vi.stubGlobal('fetch', fetcher);
   const results = await Promise.all([enhanceImage(original,profile,signal()), enhanceImage(original,profile,signal())]);
-  expect(await results[0].text()).toBe('enhanced pixels');
+  expect(await results[0]!.text()).toBe('enhanced pixels');
   await enhanceImage(original,profile,signal());
   expect(fetcher).toHaveBeenCalledOnce();
   expect(reads).toHaveBeenCalledOnce();
@@ -89,7 +89,7 @@ it('uses stable parent identity without reopening bytes, and isolates account, l
   await enhanceImage(original,profile,signal());
   await enhanceImage({...original,key:'complete-translation:other-account:language:job'},profile,signal());
   const unavailable={...original,load:vi.fn(async()=>{throw Error('parent no longer available');})};
-  expect(await(await enhanceImage(unavailable,profile,signal())).text()).toBe('enhanced pixels');
+  expect(await(await enhanceImage(unavailable,profile,signal()))!.text()).toBe('enhanced pixels');
   expect(unavailable.load).not.toHaveBeenCalled();
   await enhanceImage({...original,owner:crypto.randomUUID()},profile,signal());
   expect(fetcher).toHaveBeenCalledTimes(3);
@@ -150,7 +150,7 @@ it('does not erase uncertain service protection when clearing processing records
 it('delivers once when disk admission fails, then reports missing cache without repeating the service',async()=>{
   const profile=await selected(),original=input(),fetcher=vi.fn(async()=>output());vi.stubGlobal('fetch',fetcher);
   const put=vi.spyOn(processingCache,'put').mockResolvedValue(false);
-  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  expect(await(await enhanceImage(original,profile,signal()))!.text()).toBe('enhanced pixels');
   await expect(enhanceImage(original,profile,signal())).rejects.toMatchObject({code:'RESULT_MISSING'});
   expect(fetcher).toHaveBeenCalledOnce();expect(original.load).toHaveBeenCalledOnce();put.mockRestore();
 });
@@ -173,7 +173,7 @@ it('keeps an accepted request alive when the reader leaves, then joins it instea
   const stopped = expect(work).rejects.toMatchObject({name:'AbortError'});
   await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce()); controller.abort(); await stopped;
   const recovered = enhanceImage(original,profile,signal());
-  pending.resolve(output()); expect(await (await recovered).text()).toBe('enhanced pixels');
+  pending.resolve(output()); expect(await (await recovered)!.text()).toBe('enhanced pixels');
   expect(fetcher).toHaveBeenCalledOnce();
 });
 it('stops automatic admission to an uncertain service until a manual retry confirms it', async () => {
@@ -199,7 +199,7 @@ it('publishes after every UI leaves and survives receipt expiry without rereadin
   await saveTransferReceipt({...receipt,updatedAt:Date.now()-25*60*60*1000});await trimTransferReceipts();
   expect(await readTransferReceipt(lane.requestId)).toBeUndefined();
   original.load.mockRejectedValue(Error('parent unavailable'));
-  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  expect(await(await enhanceImage(original,profile,signal()))!.text()).toBe('enhanced pixels');
   expect(original.load).toHaveBeenCalledOnce();expect(fetcher).toHaveBeenCalledOnce();
   expect((await readServiceLane(service))?.settled).toBe(true);
 });
@@ -221,7 +221,7 @@ it('recovers a terminal receipt after publication failed, without loading or res
   const lookup=await hashFile(new Blob([JSON.stringify([original.owner,original.key,profile.id,profile.revision])]));
   expect((await findProcessingRecord(lookup))?.state).toBe('running');
   original.load.mockRejectedValue(Error('parent unavailable'));
-  expect(await(await enhanceImage(original,profile,signal())).text()).toBe('enhanced pixels');
+  expect(await(await enhanceImage(original,profile,signal()))!.text()).toBe('enhanced pixels');
   expect(original.load).toHaveBeenCalledOnce();expect(fetcher).toHaveBeenCalledOnce();
 });
 it('stops a large input digest between chunks on cancellation', async () => {
@@ -240,7 +240,7 @@ it('removes only the deleted profile cache and leaves other in-flight profile re
   await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
   await removeProcessingProfile(inactive.id);
   pending.resolve(output());
-  expect(await (await work).text()).toBe('enhanced pixels');
+  expect(await (await work)!.text()).toBe('enhanced pixels');
   expect(await processingCache.inventory([prior.owner])).toHaveLength(0);
   await enhanceImage(original,active,signal());
   expect(fetcher).toHaveBeenCalledTimes(2);
@@ -276,4 +276,15 @@ it.each(['owner','profile'] as const)('fences late results and future uploads af
   expect(await processingCache.inventory([original.owner])).toHaveLength(0);
   await expect(enhanceImage(original,profile,signal(),{retry:true})).rejects.toBeDefined();
   expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it('skips unavailable embedded images without posting or recording a model task',async()=>{
+  const profile=await selected(),original=input(),fetcher=vi.fn(async()=>output()),onParent=vi.fn();
+  vi.stubGlobal('fetch',fetcher);
+  const skipped={...original,load:vi.fn(async()=>undefined)};
+  expect(await enhanceImage(skipped,profile,signal(),{onParent})).toBeUndefined();
+  expect(skipped.load).toHaveBeenCalledOnce();expect(onParent).not.toHaveBeenCalled();expect(fetcher).not.toHaveBeenCalled();
+  const lookup=await hashFile(new Blob([JSON.stringify([original.owner,original.key,profile.id,profile.revision])]));
+  expect(await findProcessingRecord(lookup)).toBeUndefined();
+  await enhanceImage(original,profile,signal());expect(fetcher).toHaveBeenCalledOnce();
 });

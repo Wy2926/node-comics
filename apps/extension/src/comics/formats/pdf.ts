@@ -43,34 +43,53 @@ export async function openPdfDocument(source: RandomAccessSource, signal?: Abort
     const pdf = await task.promise;
     if (!pdf.numPages || pdf.numPages > MAX_PAGES) throw new Error('PDF 单卷最多支持 1500 页。');
     const pages: IndexedPage[] = Array.from({length: pdf.numPages}, (_, ordinal) => ({ordinal, name: `第 ${ordinal + 1} 页`, locator: {page: ordinal + 1}}));
+    async function readPage<T>(descriptor: IndexedPage, signal: AbortSignal | undefined, action: (number: number) => Promise<T>): Promise<T> {
+      throwIfAborted(signal);
+      const number = descriptor.locator.page;
+      if (typeof number !== 'number' || !Number.isInteger(number) || number < 1 || number > pdf.numPages) throw new Error('PDF 页码无效。');
+      activeSignal = signal; read = 0; budget = source.snapshot.size + 16 * MiB;
+      const cancelDocument = () => { void task.destroy(); };
+      signal?.addEventListener('abort', cancelDocument, {once: true});
+      const timeout = setTimeout(cancelDocument, 60_000);
+      try {
+        const result = await action(number);
+        throwIfAborted(signal);
+        return result;
+      } catch (error) { throw failure ?? pdfDiagnostic(error); }
+      finally { clearTimeout(timeout); signal?.removeEventListener('abort', cancelDocument); }
+    }
+    const renderPage = (descriptor: IndexedPage, signal?: AbortSignal, displayWidth?: number) => readPage(descriptor, signal, async number => {
+      let page;
+      const canvas = document.createElement('canvas');
+      try {
+        page = await pdf.getPage(number);
+        const base = page.getViewport({scale: 1});
+        if (!Number.isFinite(base.width * base.height) || base.width <= 0 || base.height <= 0) throw new Error('PDF 页面尺寸无效。');
+        if (displayWidth !== undefined && (!Number.isFinite(displayWidth) || displayWidth <= 0)) throw new Error('PDF 显示尺寸无效。');
+        // Translation keeps its frozen bytes. Display rasters have a temporary 64 MiB RGBA budget.
+        const scale = displayWidth === undefined ? 2 : Math.min(displayWidth / base.width,
+          Math.sqrt(16 * 1024 * 1024 / (base.width * base.height)), 16384 / Math.max(base.width, base.height));
+        const viewport = page.getViewport({scale});
+        canvas.width = Math.max(1, Math.floor(viewport.width)); canvas.height = Math.max(1, Math.floor(viewport.height));
+        const render = page.render({canvas, viewport, background: '#ffffff'});
+        const cancel = () => render.cancel();
+        signal?.addEventListener('abort', cancel, {once: true});
+        try { await render.promise; } finally { signal?.removeEventListener('abort', cancel); }
+        const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('PDF 页面转换失败。')), 'image/png'));
+        return {blob, width: Math.max(1, Math.floor(base.width * 2)), height: Math.max(1, Math.floor(base.height * 2))};
+      } finally { canvas.width = canvas.height = 1; page?.cleanup(); }
+    });
     return {
       capabilities: {access: 'random', remote: false, encrypted: false, multiVolume: false, indexComplete: true},
       async index(signal) { throwIfAborted(signal); return pages; },
-      async materialize(descriptor, signal) {
-        throwIfAborted(signal);
-        const number = descriptor.locator.page;
-        if (typeof number !== 'number' || !Number.isInteger(number) || number < 1 || number > pdf.numPages) throw new Error('PDF 页码无效。');
-        activeSignal = signal; read = 0; budget = source.snapshot.size + 16 * MiB;
-        const cancelDocument = () => { void task.destroy(); };
-        signal?.addEventListener('abort', cancelDocument, {once: true});
-        const timeout = setTimeout(cancelDocument, 60_000);
-        let page;
-        const canvas = document.createElement('canvas');
-        try {
-          page = await pdf.getPage(number);
-          const base = page.getViewport({scale: 1});
-          if (!Number.isFinite(base.width * base.height) || base.width <= 0 || base.height <= 0) throw new Error('PDF 页面尺寸无效。');
-          const viewport = page.getViewport({scale: 2});
-          canvas.width = Math.max(1, Math.floor(viewport.width)); canvas.height = Math.max(1, Math.floor(viewport.height));
-          const render = page.render({canvas, viewport, background: '#ffffff'});
-          const cancel = () => render.cancel();
-          signal?.addEventListener('abort', cancel, {once: true});
-          try { await render.promise; } finally { signal?.removeEventListener('abort', cancel); }
-          const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('PDF 页面转换失败。')), 'image/png'));
-          throwIfAborted(signal); return blob;
-        } catch (error) { throw failure ?? pdfDiagnostic(error); }
-        finally { clearTimeout(timeout); signal?.removeEventListener('abort', cancelDocument); canvas.width = canvas.height = 1; page?.cleanup(); }
-      },
+      async materialize(descriptor, signal) { return (await renderPage(descriptor, signal)).blob; },
+      renderForDisplay(descriptor, width, signal) { return renderPage(descriptor, signal, width); },
+      originalImage: (descriptor, signal) => readPage(descriptor, signal, async number => {
+        // This command is installed by our version-checked PDF.js worker extension.
+        const transport = (pdf as unknown as {_transport: {messageHandler: {sendWithPromise(name: string, data: {pageIndex: number}): Promise<Uint8Array<ArrayBuffer> | null>}}})._transport;
+        const bytes = await transport.messageHandler.sendWithPromise('NodeComicsOriginalImage', {pageIndex: number - 1});
+        return bytes ? new Blob([bytes], {type: 'image/jpeg'}) : undefined;
+      }),
       async close() { lifetime.abort(); await destroy(); },
     };
   } catch (error) { await destroy(); throw failure ?? pdfDiagnostic(error); }

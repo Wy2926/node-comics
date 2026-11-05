@@ -60,9 +60,9 @@ interface Options {
 /** Metadata first. Only a new, admitted request reads/hashes the complete parent image.
  * Accepted work is finalized by its execution host even when this caller leaves.
  */
-export async function enhanceImage(input: ProcessingInput, profile: ProcessingProfile, signal: AbortSignal, options: Options = {}): Promise<Blob> {
+export async function enhanceImage(input: ProcessingInput, profile: ProcessingProfile, signal: AbortSignal, options: Options = {}): Promise<Blob | undefined> {
   const {onState = () => {}, onParent, retry = false} = options;
-  let parent: Awaited<ReturnType<ProcessingInput['load']>> | undefined;
+  let parent: Awaited<ReturnType<ProcessingInput['load']>>;
   const validate = async () => {signal.throwIfAborted(); await input.validate(); signal.throwIfAborted();};
   const selected = async () => {
     const active = activeProcessingProfile(await readProcessingSettings());
@@ -74,9 +74,9 @@ export async function enhanceImage(input: ProcessingInput, profile: ProcessingPr
       await validate();
       parent = await input.load(signal);
       await validate();
-      await onParent?.(parent.blob);
+      if(parent)await onParent?.(parent.blob);
     }
-    return parent.blob;
+    return parent?.blob;
   };
   try {
     await validate();
@@ -104,6 +104,7 @@ export async function enhanceImage(input: ProcessingInput, profile: ProcessingPr
         await selected();
         await requireHostAccess([new URL(request.url).origin + '/*']);
         const blob = await load();
+        if(!blob)return;
         const inputSha256 = await hashFile(blob, undefined, signal);
         const id = 'enhanced:' + await hashFile(new Blob([JSON.stringify([lookupKey, inputSha256])]), undefined, signal);
         await validate(); await selected();

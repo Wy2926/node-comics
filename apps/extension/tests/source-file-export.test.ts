@@ -5,9 +5,11 @@ import type {CatalogTable, Comic, Entry, SourceConnection} from '../src/comics/d
 import type {RandomAccessSource} from '../src/comics/formats/contracts';
 import {MAX_EXPORT_BYTES} from '../src/export/plan';
 import {
+  exportDocument,
   exportOriginalFile,
   originalFileInfo,
 } from '../src/comics/application/export-service';
+import {acquirePage} from '../src/comics/pages/service';
 
 const mocks = vi.hoisted(() => ({openContainer: vi.fn()}));
 vi.mock('../src/storage/containers', () => ({openContainer: mocks.openContainer}));
@@ -105,6 +107,19 @@ function destination() {
 }
 
 describe('saved source file export', () => {
+  it('exports original PDF bytes without indexing or materializing pages', async () => {
+    const {comic, entry} = await fixture();
+    await catalog.patch('entries', entry.id, {format: 'pdf', indexState: 'pending'});
+    await catalog.patch('comics', comic.id, {source: {...comic.source, locator: {name: 'Original.pdf'}}});
+    const result = await exportDocument(entry.id, {
+      format: 'pdf', images: 'original', mode: 'classic', language: 'zh-Hans',
+    }, {signal: new AbortController().signal});
+    expect(result.name).toBe('Original.pdf');
+    expect(result.blob?.type).toBe('application/pdf');
+    expect(new Uint8Array(await result.blob!.arrayBuffer())).toEqual(new Uint8Array(8).fill(7));
+    expect(acquirePage).not.toHaveBeenCalled();
+    expect(source.close).toHaveBeenCalledOnce();
+  });
   it.each(['local', 'opds'])('copies %s saved bytes without a provider request', async (provider) => {
     const {entry} = await fixture(provider);
     expect(await originalFileInfo(entry.id)).toEqual({name: 'Original.epub'});

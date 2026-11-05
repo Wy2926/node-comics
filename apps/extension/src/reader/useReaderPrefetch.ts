@@ -4,7 +4,7 @@ import {ReaderImagePrefetch, type ReaderPrefetchOptions} from './image-prefetch'
 
 export function useReaderPrefetch(options: ReaderPrefetchOptions): void {
   const manager = useRef<ReaderImagePrefetch | undefined>(undefined);
-  if (!manager.current) manager.current = new ReaderImagePrefetch(acquireImage);
+  if (!manager.current) manager.current = new ReaderImagePrefetch((key,signal,priority,width)=>acquireImage(key,signal,priority,undefined,width));
   const latest = useRef(options);
   latest.current = options;
 

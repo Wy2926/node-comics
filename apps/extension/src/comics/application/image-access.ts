@@ -1,5 +1,5 @@
-import { acquirePage, pageAccess, promotePage, type PageLease } from '../pages/service';
-import { parsePageReference } from '../pages/identity';
+import { acquirePage, acquireDisplayPage, acquireOriginalPdfImage, pageAccess, promotePage, type PageLease } from '../pages/service';
+import { PDF_RENDER_PROFILE, parsePageReference } from '../pages/identity';
 import { resultInMemory,readMaterializedResult,validateMaterializedResult } from '../../storage/translations/results';
 import type {ProcessingInput} from '../../image-processing/contracts';
 import { translationCache } from '../../storage/translations';
@@ -12,22 +12,27 @@ import type {PagePreviewTarget} from '../pages/preview';
 export type {PagePreviewTarget} from '../pages/preview';
 
 const thumbnails=new RequestPool(2);
-export function promoteImage(key:string){
+export function promoteImage(key:string,displayWidth?:number){
   // Acquisition reports malformed identities through the page error UI; scheduling must not crash an effect.
   let reference;try{reference=parsePageReference(key);}catch{return;}
-  if(reference)promotePage(reference);
+  if(reference)promotePage(reference,displayWidth);
 }
 export function processingInput(key:string,owner:string,sourceKey=key):ProcessingInput{
-  const reference=parsePageReference(sourceKey);
+  const reference=parsePageReference(sourceKey),original=key===sourceKey?reference:parsePageReference(key);
+  const pdf=original?.renderProfileId===PDF_RENDER_PROFILE?original:undefined;
   let access:Promise<()=>Promise<void>>|undefined;
-  return {key,owner,load:signal=>acquireImage(key,signal),async validate(){
+  return {key:pdf?JSON.stringify([key,'pdf-embedded-jpeg-v1']):key,owner,
+    load:signal=>pdf?acquireOriginalPdfImage({...pdf,signal,priority:'background'}):acquireImage(key,signal),async validate(){
     if(reference)await(await(access??=pageAccess(reference)))();
     if(key.startsWith('result:'))await validateMaterializedResult(key);
   }};
 }
-export async function acquireImage(key:string,signal?:AbortSignal,priority:'current'|'prefetch'|'background'='current',preview?:PagePreviewTarget):Promise<Pick<PageLease,'blob'|'release'>>{
+export async function acquireImage(key:string,signal?:AbortSignal,priority:'current'|'prefetch'|'background'='current',preview?:PagePreviewTarget,displayWidth?:number):Promise<Pick<PageLease,'blob'|'release'>>{
   const reference=parsePageReference(key);
-  if(reference)return acquirePage({...reference,signal,priority,purpose:'reading',...(preview?{preview}:{})});
+  if(reference){
+    const request={...reference,signal,priority,purpose:'reading' as const,...(preview?{preview}:{})};
+    return displayWidth===undefined?acquirePage(request):acquireDisplayPage(request,displayWidth);
+  }
   signal?.throwIfAborted();
   const blob=key.startsWith('inline-original:')?await sourcePageCache.get(key)
     :key.startsWith('result:')?await readMaterializedResult(key,signal):resultInMemory(key)??await translationCache.get(key);
