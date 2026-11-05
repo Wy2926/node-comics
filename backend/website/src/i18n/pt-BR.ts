@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Traduza com facilidade, leia melhor",
+        "items": [
+          "Tradução automática por site: Ative nos sites favoritos ou limite a pastas específicas. Gerencie ou pause a tradução nas configurações.",
+          "Confira novos capítulos: Confira na estante ou no índice sem interromper a leitura. A verificação automática vem desativada e só verifica quadrinhos web compatíveis que você abre.",
+          "Leitura e exportação PDF melhores: A nitidez acompanha o zoom e a carga fica mais estável ao rolar ou virar páginas rapidamente. A exportação original preserva o PDF de origem.",
+          "Status da conta mais confiável: Corrigidas saídas da conta por certos erros do serviço. Falhas ao carregar benefícios exibem um aviso e permitem tentar novamente."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Tradução no navegador",

@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Terjemahan lebih mudah, membaca nyaman",
+        "items": [
+          "Terjemahan otomatis per situs: Aktifkan di situs favorit atau batasi ke direktori tertentu. Kelola atau jeda lewat pengaturan.",
+          "Periksa bab baru: Periksa lewat rak atau daftar isi tanpa mengganggu membaca. Pemeriksaan otomatis awalnya nonaktif dan hanya memeriksa komik web didukung yang dibuka.",
+          "Membaca dan mengekspor PDF lebih baik: Ketajaman mengikuti zoom, dengan pemuatan lebih stabil saat menggulir atau membalik halaman cepat. Ekspor asli mempertahankan PDF sumber.",
+          "Status akun lebih andal: Memperbaiki keluar akun akibat sebagian galat layanan. Jika manfaat akun gagal dimuat, muncul pesan galat dan Anda dapat mencoba lagi."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Terjemahan di browser",

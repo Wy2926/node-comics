@@ -4,7 +4,10 @@ import {version} from '../../../package.json';
 export const releaseNotes = {
   version,
   highlights: [
-    {icon: 'translate', title: 'releaseNotes.browserTranslation.title', description: 'releaseNotes.browserTranslation.description'},
+    {icon: 'translate', title: 'releaseNotes.siteTranslation.title', description: 'releaseNotes.siteTranslation.description'},
+    {icon: 'refresh', title: 'releaseNotes.comicUpdates.title', description: 'releaseNotes.comicUpdates.description'},
+    {icon: 'book', title: 'releaseNotes.pdfReading.title', description: 'releaseNotes.pdfReading.description'},
+    {icon: 'user', title: 'releaseNotes.accountStability.title', description: 'releaseNotes.accountStability.description'},
   ],
 } as const;
 

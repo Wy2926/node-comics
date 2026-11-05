@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Einfacher übersetzen, flüssiger lesen",
+        "items": [
+          "Automatisch nach Website übersetzen: Aktiviere die Übersetzung für Lieblingsseiten oder bestimmte Verzeichnisse. Verwalte und pausiere sie in den Einstellungen.",
+          "Neue Kapitel prüfen: Prüfe Updates im Regal oder Inhaltsverzeichnis, ohne das Lesen zu unterbrechen. Automatik ist zunächst aus und prüft nur geöffnete, unterstützte Webcomics.",
+          "PDF besser lesen und exportieren: Die Schärfe folgt dem Zoom; schnelles Blättern und Scrollen laden stabiler. Beim Originalexport bleibt die Quell-PDF erhalten.",
+          "Zuverlässigerer Kontostatus: Ungewollte Abmeldungen bei manchen Dienstfehlern behoben. Laden Kontoleistungen nicht, erscheint ein Fehler mit erneuter Versuchsmöglichkeit."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Übersetzung im Browser",

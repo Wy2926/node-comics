@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Daha kolay çeviri, daha rahat okuma",
+        "items": [
+          "Siteye göre otomatik çeviri: Sevdiğiniz sitelerde veya belirli dizinlerde otomatik çeviriyi açın. Ayarlardan yönetin ya da duraklatın.",
+          "Yeni bölümleri kontrol edin: Okumayı bölmeden kitaplık veya içindekilerden kontrol edin. Otomatik kontrol başlangıçta kapalıdır; yalnızca açılan, desteklenen web çizgi romanlarına bakar.",
+          "Daha iyi PDF okuma ve dışa aktarma: Netlik yakınlaştırmaya uyum sağlar; hızlı kaydırma ve sayfa çevirme daha kararlı yüklenir. Orijinal dışa aktarma kaynak PDF’yi korur.",
+          "Daha güvenilir hesap durumu: Bazı hizmet hatalarında istemsiz oturum kapanması düzeltildi. Hesap hakları yüklenemezse hata gösterilir ve yeniden deneyebilirsiniz."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Tarayıcıda çeviri",

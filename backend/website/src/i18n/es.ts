@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Traduce con facilidad, lee con comodidad",
+        "items": [
+          "Traducción automática por sitio: Actívala en tus sitios favoritos o limita su alcance a ciertas carpetas. Adminístrala o ponla en pausa desde los ajustes.",
+          "Consulta nuevos capítulos: Consulta desde tu biblioteca o el índice sin dejar de leer. La revisión automática viene desactivada y solo revisa cómics web compatibles abiertos.",
+          "Mejor lectura y exportación PDF: La nitidez se adapta al zoom y la carga es más estable al pasar páginas o desplazarte rápido. La exportación original conserva el PDF fuente.",
+          "Estado de cuenta más fiable: Corregidos cierres de sesión por ciertos errores del servicio. Si no cargan los beneficios de la cuenta, se muestra un error y puedes reintentar."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Traducción en el navegador",

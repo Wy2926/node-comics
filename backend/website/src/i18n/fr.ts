@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Traduire simplement, lire sereinement",
+        "items": [
+          "Traduction auto par site: Activez la traduction sur vos sites favoris ou certains répertoires. Gérez les règles et mettez-la en pause dans les réglages.",
+          "Vérifier les nouveaux chapitres: Vérifiez depuis la bibliothèque ou le sommaire sans interrompre la lecture. L’option automatique est désactivée et ne vise que les BD web compatibles ouvertes.",
+          "Lecture et export PDF améliorés: La netteté suit le zoom et le chargement reste plus stable lors des défilements rapides. L’export original conserve le PDF source.",
+          "État du compte plus fiable: Correction de déconnexions liées à certaines erreurs de service. Si les droits ne se chargent pas, un message permet de réessayer."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Traduction dans le navigateur",

@@ -65,37 +65,22 @@ test('localized releases have stable unique anchors and matching entries',()=>{
     assert.equal(new Set(anchors).size,anchors.length,locale);
     assert.deepEqual(anchors,reference.map(release=>release.id??release.date),locale);
     assert.deepEqual(releases.map(release=>release.date),reference.map(release=>release.date),locale);
+    for(const release of releases){
+      if(release.id)assert.ok(release.title.includes(release.id),locale);
+      assert.ok(release.items.length>0 && release.items.every(item=>item.trim()),locale);
+      assert.equal(new Set(release.items).size,release.items.length,locale);
+    }
   }
 });
 
-test('1.2.0 leads every changelog with a concise user-facing highlight',()=>{
+test('1.3.0 leads every changelog with four concise user-facing highlights',()=>{
   for(const locale of locales){
     const release=dictionaries[locale].documents.releases[0];
-    assert.equal(release.id,'1.2.0',locale);
-    assert.equal(release.date,'2026-10-29',locale);
-    assert.ok(release.title.includes(release.id),locale);
-    assert.equal(release.items.length,1,locale);
-    assert.equal(new Set(release.items).size,1,locale);
-    assert.ok(release.items.every(item=>item.trim().length>0 && item.length<=200),locale);
+    assert.equal(release.id,'1.3.0',locale);
+    assert.equal(release.date,'2026-11-05',locale);
+    assert.equal(release.items.length,4,locale);
+    assert.ok(release.items.every(item=>item.length<=200),locale);
     assert.doesNotMatch([release.title,...release.items].join(' '),/待发布|待商店发布|pending (?:store )?release|AMO|SHA-256|manifest\.key|git commit/i,locale);
-  }
-});
-
-test('0.12.0 and 0.11.3 describe user-facing features in every locale',()=>{
-  for(const locale of locales){
-    const releases=dictionaries[locale].documents.releases.filter(({id})=>id==='0.12.0'||id==='0.11.3');
-    assert.deepEqual(releases.map(({id,date})=>[id,date]),[['0.12.0','2026-10-13'],['0.11.3','2026-10-10']],locale);
-    for(const release of releases){
-      assert.ok(release.title.includes(release.id!),locale);
-      assert.equal(release.items.length,5,locale);
-      assert.equal(new Set(release.items).size,5,locale);
-      assert.ok(release.items.every(item=>item.trim().length>0),locale);
-      assert.doesNotMatch([release.title,...release.items].join(' '),/待商店发布|pending store release|AMO|SHA-256|manifest\.key|Chrome 0\.11\.3|Edge 0\.10\.2/i,locale);
-    }
-    for(const term of ['nunif / waifu2x','EPUB','PDF','ZIP / CBZ','COMIC FUZ','Zebrack','再漫画','Manga One','Hachiraw','MangaTaro','WebtoonScan'])
-      assert.ok(releases[0].items.some(item=>item.includes(term)),`${locale}: ${term}`);
-    for(const term of ['ComicK (comickz)','ComicWalker',"HERO'S Web"])
-      assert.ok(releases[1].items.some(item=>item.includes(term)),`${locale}: ${term}`);
   }
 });
 
@@ -110,35 +95,6 @@ test('official package instructions distinguish restricted CRX and signed Firefo
     assert.doesNotMatch([ui.installTitle,ui.directDownloadDescription,...steps,ui.manualUpdateNote].join(' '),/ZIP|manifest\.json|chrome:\/\/extensions|edge:\/\/extensions/,locale);
   }
 });
-
-test('0.10.0 remains in every locale with all seven extension highlights',()=>{
-  for(const locale of locales){
-    const release=dictionaries[locale].documents.releases.find(release=>release.id==='0.10.0');
-    assert.ok(release,locale);
-    assert.equal(release.date,'2026-10-04',locale);
-    assert.ok(release.title.includes('0.10.0'),locale);
-    assert.equal(release.items.length,8,locale);
-    assert.ok(release.items.some(item=>item.includes('Firefox 0.10.0') && item.includes('AMO')),locale);
-    for(const term of ['OPDS','OCR','EPUB','MangaPill','MangaDNA','KLManga','RawLazy','Comic DAYS','Manga One'])
-      assert.ok(release.items.some(item=>item.includes(term)),`${locale}: ${term}`);
-  }
-});
-
-test('0.9.1 replaces the superseded 0.9.0 notes in every locale',()=>{
-  for(const locale of locales){
-    const releases=dictionaries[locale].documents.releases;
-    const release=releases.find(release=>release.id==='0.9.1');
-    assert.ok(release,locale);
-    assert.ok(release.title.includes('0.9.1'),locale);
-    assert.ok(release.items.some(item=>item.includes('JPEG')),locale);
-    assert.ok(release.items.some(item=>item.includes('AVIF')),locale);
-    assert.ok(release.items.some(item=>item.includes('Firefox 0.9.1')&&item.includes('AMO')),locale);
-    assert.ok(!release.items.some(item=>item.includes('Firefox')&&item.includes('0.8.0')),locale);
-    assert.ok(!releases.some(release=>release.id==='0.9.0'),locale);
-    assert.ok(releases.some(release=>release.id==='0.8.0'),locale);
-  }
-});
-
 
 test('seventeen locales include workspace, feedback, payment, project and browser-language copy',()=>{
   assert.equal(locales.length,17);

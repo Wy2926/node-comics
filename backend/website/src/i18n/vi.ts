@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Dịch dễ hơn, đọc thuận tiện hơn",
+        "items": [
+          "Dịch tự động theo trang web: Bật dịch tự động trên trang yêu thích hoặc giới hạn theo thư mục. Quản lý hay tạm dừng trong phần cài đặt.",
+          "Kiểm tra chương mới: Kiểm tra từ kệ sách hoặc mục lục mà không gián đoạn đọc. Tự kiểm tra mặc định tắt, chỉ áp dụng cho truyện web được hỗ trợ mà bạn mở.",
+          "Cải thiện đọc và xuất PDF: Độ nét thay đổi theo mức thu phóng, tải ổn định hơn khi cuộn và lật trang nhanh. Xuất bản gốc giữ nguyên PDF nguồn.",
+          "Trạng thái tài khoản ổn định hơn: Sửa lỗi tự đăng xuất do một số sự cố dịch vụ. Nếu không tải được quyền lợi tài khoản, ứng dụng báo lỗi và cho phép thử lại."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Dịch trong trình duyệt",

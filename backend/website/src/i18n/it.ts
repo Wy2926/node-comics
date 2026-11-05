@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Traduzione semplice, lettura più comoda",
+        "items": [
+          "Traduzione automatica per sito: Attivala sui siti preferiti o limitane l’uso a cartelle specifiche. Gestiscila o mettila in pausa nelle impostazioni.",
+          "Controlla i nuovi capitoli: Controlla da libreria o indice senza interrompere la lettura. Il controllo automatico è disattivato e riguarda solo i fumetti web supportati che apri.",
+          "Lettura ed esportazione PDF migliori: La nitidezza segue lo zoom e il caricamento è più stabile scorrendo o cambiando pagina rapidamente. L’esportazione originale conserva il PDF sorgente.",
+          "Stato dell’account più affidabile: Corretti accessi persi per alcuni errori del servizio. Se i vantaggi dell’account non si caricano, un messaggio consente di riprovare."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Traduzione nel browser",

@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Wygodniejsze tłumaczenie i czytanie",
+        "items": [
+          "Automatyczne tłumaczenie według witryny: Włącz tłumaczenie na ulubionych witrynach lub w wybranych katalogach. Zarządzaj nim i wstrzymuj je w ustawieniach.",
+          "Sprawdzaj nowe rozdziały: Sprawdzaj z półki lub spisu treści bez przerywania lektury. Domyślnie wyłączony automat sprawdza tylko otwarte, obsługiwane komiksy internetowe.",
+          "Lepsze czytanie i eksport PDF: Ostrość dostosowuje się do powiększenia, a szybkie przewijanie i zmiana stron są stabilniejsze. Eksport oryginału zachowuje źródłowy PDF.",
+          "Pewniejszy stan konta: Naprawiono wylogowania przy niektórych błędach usługi. Jeśli uprawnienia konta się nie wczytają, zobaczysz błąd i możesz ponowić próbę."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Tłumaczenie w przeglądarce",

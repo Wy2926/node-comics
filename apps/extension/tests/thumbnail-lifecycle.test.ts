@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { thumbnailCache } from '../src/storage/thumbnails';
 import { pageReference, RENDER_PROFILE } from '../src/comics/pages/identity';
 const mocks = vi.hoisted(() => ({ acquire: vi.fn(), encode: vi.fn(), release: vi.fn(), close: vi.fn() }));
-vi.mock('../src/comics/pages/service', () => ({ acquirePage: mocks.acquire }));
+vi.mock('../src/comics/pages/service', () => ({ acquireDisplayPage: mocks.acquire }));
 import { readThumbnail } from '../src/comics/application/image-access';
 beforeEach(async () => {
   await thumbnailCache.clear(); mocks.acquire.mockReset().mockResolvedValue({ blob: new Blob(['original']), release: mocks.release });

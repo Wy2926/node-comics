@@ -654,6 +654,17 @@ export default {
     ],
     "releases": [
       {
+        "id": "1.3.0",
+        "date": "2026-11-05",
+        "title": "1.3.0 · Easier translation, smoother reading",
+        "items": [
+          "Translate automatically on chosen sites: Enable automatic translation for favorite sites or selected folders. Manage or pause it in settings.",
+          "Check for new chapters: Check from your shelf or chapter list without interrupting reading. Auto-checks are off by default and only check supported web comics you open.",
+          "Better PDF reading and export: Pages adapt to zoom, with steadier loading during fast scrolling and page turns. Original export keeps the source PDF.",
+          "More reliable account status: Fixes unwanted sign-outs caused by some service errors. Failed account benefit loads now show an error and let you retry."
+        ]
+      },
+      {
         "id": "1.2.0",
         "date": "2026-10-29",
         "title": "1.2.0 · Browser translation",
