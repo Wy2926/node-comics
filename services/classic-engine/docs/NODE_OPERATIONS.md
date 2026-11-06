@@ -19,7 +19,7 @@
 - 看门狗独立检查状态新鲜度与主循环进展，超过阈值后恢复计算进程。人工停止保留恢复日志，最长等待 75 秒；正常停止不触发自启。
 - `supervisor.json`、`state/status.json` 提供状态；`logs/supervisor.log`、`state/logs/node.log` 在 10 MiB 时轮转，各自保留当前文件及最多 5 份备份。诊断日志不保存令牌、正文或图片；私有恢复数据库按上一项单独保护。
 - `check` 输出、启动日志与 `state/status.json` 的 `cpu_resources` 显示逻辑 CPU、亲和性、可见 cgroup 配额、解析后的线程／进程预算及告警。探测在启动时进行，修改 CPU 限额后须排空重启。既有显式整数不自动改为 `auto`；`event=render_local_fallback` 按原因各告警一次：`page_budget` 表示页预算不足，`shared_memory` 表示共享段分配失败，需核查 `/dev/shm` 和内存上限。本地回退共享分析进程的原生线程，混合峰值可能高于常态预算；`mixed_render_cpu_slots` 显示此保守估计，不代表实际 CPU 利用率或硬隔离。
-- 单页失败记录 `event=page_failed`、租约 ID、阶段、错误码、异常类型及文件／函数／行号，不记录原始异常消息、源码行或局部变量。本地绘字异常映射为 `CLASSIC_RENDER_FAILED`，子进程异常／退出为 `CLASSIC_RENDER_WORKER_FAILED`，检查点不一致为 `CLASSIC_RENDER_MISMATCH`；输出仍区分 `CLASSIC_OUTPUT_ENCODE_FAILED` 和 `CLASSIC_OUTPUT_TOO_LARGE`，不会被改成通用 worker 错误。这些确定性错误不自动重试；未知异常保留当前阶段的通用错误码。
+- 单页失败记录 `event=page_failed`、租约 ID、阶段、错误码、异常类型及文件／函数／行号，不记录原始异常消息、源码行或局部变量。渲染子进程只回传这份脱敏异常定位信息，由父进程关联租约写入同一日志；子进程退出时记录进程池异常。本地绘字异常映射为 `CLASSIC_RENDER_FAILED`，子进程异常／退出为 `CLASSIC_RENDER_WORKER_FAILED`，检查点不一致为 `CLASSIC_RENDER_MISMATCH`；输出仍区分 `CLASSIC_OUTPUT_ENCODE_FAILED` 和 `CLASSIC_OUTPUT_TOO_LARGE`，不会被改成通用 worker 错误。这些确定性错误不自动重试；未知异常保留当前阶段的通用错误码。
 - `render_layout` 记录绘字，`render_diff`／`render_encode` 记录输出；大图提前分块时各块的差分、编码和校验并发执行，统一计入 `render_encode` 墙钟时间，`render_diff` 仅记录分块前规划，应以两项之和计算输出成本。子进程计时合并回父进程，不写入结果身份。整段 `render` 还包括 CPU 配额等待、共享输入分配、复制、IPC 和清理，不能仅用三个子项之和代替它；对比测量须保持计时边界一致。更多分析细分、缓存命中／预算等本地指标见[测量命令](../README.md#验证)，不向中心新增字段。
 
 运行数据复用已有机制，不新增数据库、监控服务或中心协议。`event=execution_settings data={...}` 仅在启动时记录有效本地资源参数，不包含凭据、路径、正文或签名地址。生产执行阶段的收集器只启用原有协议及文件任务计时白名单，跳过新增的 OCR／取色细分计数；原有缓存规划、渲染子进程计时、失败日志、文件任务状态日志和健康状态保留。不增加逐阶段 JSON 日志、GPU／进程资源采样或峰值重置，也不向生产增加后台采样线程。

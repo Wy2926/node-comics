@@ -77,11 +77,13 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
             line_spacing_multiplier=block.line_spacing,
             letter_spacing_multiplier=block.letter_spacing, config=config, anchor_mode='center')
 
-    if mask is None or labels is None:
-        raise ValueError('No safe bubble layout')
     points = native.resize_regions_to_font_size(image, blocks, config, original,
         bubble_mask=mask, skip_text_replacements=True)
     points = [cap_source_font(block, polygon) for block, polygon in zip(blocks, points)]
+    # Bubble segmentation is a layout hint, not a condition for publishing text.
+    # MTU already falls back to the source box when no usable mask is present.
+    if mask is None or labels is None:
+        return blocks, points
     height, width = image.shape[:2]
     boxes = np.array([np.concatenate((np.asarray(p).reshape(-1, 2).min(axis=0),
                                      np.asarray(p).reshape(-1, 2).max(axis=0)))
@@ -256,9 +258,21 @@ def fit_bubbles(image, original, blocks, texts, config, mask, labels, occupied=(
             chosen, chosen_points = fit_rectangle(block, texts[index], (x+rx, y+ry, rw, rh),
                 reference, obstacles, recover=recover, best=(chosen, chosen_points))
         if chosen_points is None:
-            # Existing page-failure handling preserves the original. Never
-            # publish a cleaned page with missing or clipped translated text.
-            raise ValueError('No safe bubble layout')
+            # A bad mask can reduce the native candidate to one-pixel text.
+            # Refit the original text/size to its source box without that mask.
+            chosen = copy(block)
+            rich = chosen.translation_rich
+            chosen.translation = texts[index]
+            chosen.translation_rich = rich
+            chosen.font_size = block.original_font_size
+            mode = config.render.layout_mode
+            config.render.layout_mode = 'smart_scaling'
+            try:
+                chosen_points = native.resize_regions_to_font_size(image, [chosen], config, None,
+                    skip_text_replacements=True)[0]
+            finally:
+                config.render.layout_mode = mode
+            chosen_points = cap_source_font(chosen, chosen_points)
         blocks[index], points[index] = chosen, chosen_points
         vertices = np.asarray(chosen_points).reshape(-1, 2)
         boxes[index] = np.concatenate((vertices.min(axis=0), vertices.max(axis=0)))

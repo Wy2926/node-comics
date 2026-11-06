@@ -189,13 +189,25 @@ def test_prepared_component_arrays_cross_shared_memory_readonly(pool, inputs):
         np.testing.assert_array_equal(before, after)
 
 
-def test_worker_errors_are_sanitized_and_pool_survives(pool, inputs):
+def test_worker_errors_are_sanitized_and_pool_survives(pool, inputs, monkeypatch):
+    from classic_node.operations import LOG, report_page_failure
+
     instance, names = pool
     with pytest.raises(rp.RenderPoolError) as failure:
         render(instance, inputs, 'error')
     detail = ''.join(traceback.format_exception(failure.value))
     assert failure.value.code == 'CLASSIC_RENDER_WORKER_FAILED'
     assert 'private OCR' not in detail
+    logged = []
+    monkeypatch.setattr(LOG, 'error', lambda message, *args: logged.append(message % args))
+    try:
+        raise rp.NodeFailure(failure.value.code) from failure.value
+    except rp.NodeFailure as wrapped:
+        report_page_failure('lease-test', 'render', wrapped.code, wrapped)
+    assert len(logged) == 1
+    assert 'type=ValueError' in logged[0] and 'test_render_pool.py:' in logged[0]
+    assert 'lease_id=lease-test stage=render code=CLASSIC_RENDER_WORKER_FAILED' in logged[0]
+    assert 'private OCR' not in logged[0] and str(Path(__file__).parent) not in logged[0]
     assert_removed(names)
     render(instance, inputs)
 
@@ -274,7 +286,9 @@ def test_worker_only_forwards_whitelisted_output_errors(pool, inputs, language, 
     with pytest.raises(expected_type) as failure:
         render(instance, inputs, language)
     assert failure.value.code == code
+    assert failure.value.worker_diagnostic[0] == 'NodeFailure'
     assert 'PRIVATE_FIXTURE_DETAIL' not in ''.join(traceback.format_exception(failure.value))
+    assert 'PRIVATE_FIXTURE_DETAIL' not in repr(failure.value.worker_diagnostic)
     assert_removed(names)
     render(instance, inputs)
 
@@ -346,8 +360,9 @@ def test_broken_pool_is_joined_and_next_call_rebuilds(pool, inputs):
     instance.warmup()
     old = instance._pool
     processes = list(old._processes.values())
-    with pytest.raises(rp.RenderPoolError, match='CLASSIC_RENDER_WORKER_FAILED'):
+    with pytest.raises(rp.RenderPoolError, match='CLASSIC_RENDER_WORKER_FAILED') as failure:
         render(instance, inputs, 'crash')
+    assert failure.value.worker_diagnostic[0] == 'BrokenProcessPool'
     assert instance._pool is None
     assert all(not process.is_alive() for process in processes)
     assert_removed(names)

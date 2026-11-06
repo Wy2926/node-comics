@@ -58,8 +58,11 @@ def test_shared_tracker_checks_actual_segment_removal():
     original = module.SharedMemory
     with SharedTracker(module) as tracker:
         segment = module.SharedMemory(create=True, size=64)
-        assert tracker.peak == 64
-        module._dispose(segment)
+        try:
+            # macOS rounds shared allocations up to a memory page.
+            assert tracker.peak == segment.size
+        finally:
+            module._dispose(segment)
         assert tracker.cleaned == 1 and not tracker.live
     assert module.SharedMemory is original
 

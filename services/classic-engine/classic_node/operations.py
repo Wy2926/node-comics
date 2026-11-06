@@ -30,19 +30,22 @@ def configure_logging(directory):
     return handler
 
 
-def report_fatal(error):
+def exception_details(error):
     # Messages, source lines and local variables can contain image text or URLs.
-    frames = traceback.extract_tb(error.__traceback__)
+    frames = traceback.StackSummary.extract(traceback.walk_tb(error.__traceback__), lookup_lines=False)
     locations = ','.join(f'{Path(f.filename).name}:{f.lineno}:{f.name}' for f in frames[-8:])
-    LOG.error('event=fatal type=%s stack=%s', type(error).__name__, locations)
+    return type(error).__name__, locations
+
+
+def report_fatal(error):
+    LOG.error('event=fatal type=%s stack=%s', *exception_details(error))
 
 
 def report_page_failure(lease_id, stage, code, error):
     cause = error.__cause__ or error
-    frames = traceback.extract_tb(cause.__traceback__)
-    locations = ','.join(f'{Path(f.filename).name}:{f.lineno}:{f.name}' for f in frames[-8:])
+    details = getattr(cause, 'worker_diagnostic', None) or exception_details(cause)
     LOG.error('event=page_failed lease_id=%s stage=%s code=%s type=%s stack=%s',
-              lease_id, stage, code, type(cause).__name__, locations)
+              lease_id, stage, code, *details)
 
 
 class NetworkLog:

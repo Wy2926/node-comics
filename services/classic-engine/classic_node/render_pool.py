@@ -11,6 +11,7 @@ from threading import BoundedSemaphore, Condition, Lock, Thread
 from time import perf_counter
 
 from .protocol import NodeFailure, pack_result, pack_full_image, tiled_output
+from .operations import exception_details
 from .timing import collect, record
 
 
@@ -18,8 +19,9 @@ _OUTPUT_ERRORS = {'CLASSIC_OUTPUT_TOO_LARGE', 'CLASSIC_OUTPUT_ENCODE_FAILED'}
 
 
 class RenderPoolError(RuntimeError):
-    def __init__(self, code='CLASSIC_RENDER_WORKER_FAILED'):
+    def __init__(self, code='CLASSIC_RENDER_WORKER_FAILED', *, worker_diagnostic=None):
         self.code = code
+        self.worker_diagnostic = worker_diagnostic
         super().__init__(code)
 
 
@@ -160,6 +162,7 @@ def _render_shared(name, shape, regions, translations, language, mask_cache_byte
                    version, analysis, translated, allow_tiles, bubble_prepared=False, components=0,
                    full_image_max_bytes=None, font_id=None):
     segment, arrays, packed, timings, error_code = None, {}, None, {}, None
+    diagnostic = None
     try:
         segment = SharedMemory(name=name)
         arrays = _views(segment, shape, components)
@@ -175,8 +178,10 @@ def _render_shared(name, shape, regions, translations, language, mask_cache_byte
                 output_budget=_output_cpu, full_image_max_bytes=full_image_max_bytes, font_id=font_id)
     except NodeFailure as error:
         error_code = error.code if error.code in _OUTPUT_ERRORS else 'CLASSIC_RENDER_WORKER_FAILED'
-    except BaseException:
+        diagnostic = exception_details(error)
+    except BaseException as error:
         error_code = 'CLASSIC_RENDER_WORKER_FAILED'
+        diagnostic = exception_details(error)
     finally:
         # Drop traceback and ndarray references before closing the mapping.
         arrays.clear()
@@ -184,7 +189,8 @@ def _render_shared(name, shape, regions, translations, language, mask_cache_byte
             segment.close()
     # Never pickle original exceptions, tracebacks, or image arrays. Operational
     # timing is transported separately from the immutable protocol result.
-    return {'packed': packed, 'timings': timings, 'error_code': error_code}
+    return {'packed': packed, 'timings': timings, 'error_code': error_code,
+            'worker_diagnostic': diagnostic}
 
 
 def _reserve_backing(segment):
@@ -361,16 +367,18 @@ class RenderPool:
                     break
                 except TimeoutError:
                     continue
-                except Exception:
-                    raise RenderPoolError() from None
+                except Exception as error:
+                    raise RenderPoolError(worker_diagnostic=exception_details(error)) from None
             if check_cancelled is not None:
                 check_cancelled()
             for name, seconds in reply['timings'].items():
                 record(name, seconds)
             if reply['error_code'] is not None:
                 if reply['error_code'] in _OUTPUT_ERRORS:
-                    raise NodeFailure(reply['error_code'])
-                raise RenderPoolError()
+                    error = NodeFailure(reply['error_code'])
+                    error.worker_diagnostic = reply['worker_diagnostic']
+                    raise error
+                raise RenderPoolError(worker_diagnostic=reply['worker_diagnostic'])
             return reply['packed']
         finally:
             try:
