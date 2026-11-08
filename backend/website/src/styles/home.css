@@ -12,12 +12,6 @@ html[lang=ko] .product-home { word-break: keep-all; }
 .home-description { margin: 20px auto 26px; color: var(--muted); font-size: 1.12rem; line-height: 1.7; }
 .home-install { --control-bg: var(--action-bg); --control-ink: var(--action-ink); --control-hover-bg: var(--action-hover); min-height: 56px; gap: 14px; padding: 12px 28px; font-size: 1.05rem; }
 .home-install img { flex: none; width: 28px; height: 28px; object-fit: contain; }
-.product-home .hero-stores { display: flex; justify-content: center; align-items: flex-start; flex-wrap: wrap; gap: 20px 30px; margin: 28px auto 0; }
-.product-home .hero-store { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 68px; max-width: 130px; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: .85rem; }
-.product-home .hero-store:is(:hover, :active) { background: transparent; color: var(--accent); transform: none; box-shadow: none; }
-.product-home .hero-store img { width: 36px; height: 36px; object-fit: contain; }
-.product-home .hero-store strong { font-weight: 400; }
-.product-home .hero-store small { color: var(--muted); font-size: .66rem; line-height: 1.5; }
 .home-access { max-width: 680px; margin: 18px auto 0; color: var(--muted); font-size: .72rem; line-height: 1.7; }
 .home-preview { position: relative; margin: 34px auto 0; max-width: 1280px; scroll-margin-top: 120px; }
 .home-screenshot { display: block; overflow: hidden; border: 1px solid var(--line); border-radius: var(--comic-card-radius); box-shadow: var(--site-elevation); }
@@ -101,10 +95,6 @@ html[lang=ko] .product-home { word-break: keep-all; }
 }
 @media (max-width: 600px) {
   .home-description { font-size: 1rem; }
-  .product-home .hero-stores { column-gap: 12px; row-gap: 18px; }
-  .product-home .hero-store { flex: 1 1 0; min-width: 0; max-width: none; font-size: .73rem; }
-  .product-home .hero-store img { width: 30px; height: 30px; }
-  .product-home .hero-store small { max-width: 100%; overflow-wrap: anywhere; font-size: .6rem; }
   .home-preview { margin-top: 24px; }
   .home-comparison { padding-block: 10px 36px; }
   .home-comparison-heading { gap: 18px; margin-bottom: 18px; }
@@ -167,5 +157,3 @@ html[lang=ko] .product-home { word-break: keep-all; }
   .home-feature-copy h3 { margin-bottom: 10px; }
   .home-features > header { align-items: start; flex-direction: column; gap: 14px; margin-bottom: 32px; }
 }
-
-.hero-store[data-platform="ios"] img { filter: var(--monochrome-filter); }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { browserStoreUrl, desktopBrowser, installIconBrowser } from '../src/lib/browser-store';
+import { browserStoreUrl, desktopBrowser, installIconBrowser, mobileGuidePath } from '../src/lib/browser-store';
 import { site } from '../src/data/site';
 
 const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -47,4 +47,19 @@ test('mobile, unknown and unsupported browsers keep the download chooser', () =>
     { userAgent: '' },
   ]) assert.equal(browserStoreUrl(identity, site.stores), undefined);
   assert.equal(browserStoreUrl({ userAgent: chrome }, { ...site.stores, chrome: '' }), undefined);
+});
+
+test('mobile actions route to guides including iPad desktop user agents', () => {
+  for (const [identity, path] of [
+    [{ userAgent: 'Mozilla/5.0 (Android 15; Mobile; rv:142.0) Gecko/142.0 Firefox/142.0' }, '/guides/android-firefox/'],
+    [{ userAgent: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/140 Mobile' }, '/guides/android-firefox/'],
+    [{ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) AppleWebKit/605.1.15 Mobile Safari/604.1' }, '/guides/ios-orion/'],
+    [{ userAgent: 'Mozilla/5.0 (iPad) Mobile Safari/604.1' }, '/guides/ios-orion/'],
+    [{ userAgent: 'Mozilla/5.0 (Macintosh) Version/18.0 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 5 }, '/guides/ios-orion/'],
+  ] as const) {
+    assert.equal(mobileGuidePath(identity), path);
+    assert.equal(desktopBrowser(identity), undefined);
+  }
+  assert.equal(mobileGuidePath({ userAgent: 'Mozilla/5.0 (Macintosh) Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 0 }), undefined);
+  assert.equal(mobileGuidePath({ userAgent: '', userAgentData: { mobile: true } }), undefined);
 });

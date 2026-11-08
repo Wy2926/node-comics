@@ -138,7 +138,7 @@ Komga EPUB 位置联调使用 `$env:OPDS_LIVE_PROGRESS='1'; npx vitest run tests
 | `verify_website_guides.mjs` | 构建预览中的 17 语教程目录及六篇图文教程、桌面／320px 窄屏、四语截图源文件摘要匹配与放大链接、中日韩英桌面／手机截图、无 JavaScript 与断图降级；不调用身份、计费或翻译服务 |
 | `verify_website_sites.mjs` | 构建预览中的 17 语支持站点目录、图标、三行首页轮播、1920–320px／RTL、无暂停勾选、悬停暂停、导航保留下载且正文不重复、键盘与重复轨道点击、返回、无 JavaScript 和减少动画；记录 HTML gzip 大小，禁止第三方请求。使用 `WEBSITE_PREVIEW_URL` 和 `PLAYWRIGHT_MODULE` 指定预览地址及现有 Playwright，不调用漫画源站或翻译服务 |
 | `verify_website_assets.mjs` | 国旗关闭菜单仅加载当前语言、展开加载与跨页同 URL；指向公开服务时验证一年 immutable 缓存及真实浏览器零传输复用（不拦截缓存测试请求）。检查中／英／阿拉伯语手机截图响应式 WebP、原图仅点击下载、320px 展开菜单、RTL、无 JS 与图片失败降级；截图与结果写入 `output/playwright/website-assets`，可用 `WEBSITE_ASSETS_OUTPUT` 指定目录 |
-| `verify_website_download.mjs` | 17 语下载页；指向公开服务时真实下载并核对摘要 |
+| `verify_website_download.mjs` | 17 语下载与 Android App 教程、iOS IPA 状态、正式清单版本、默认 arm64 APK 直达导航与默认折叠的其他架构下载、320／390px、亮暗／RTL、模拟失败／重试／超时、无 JS 与断图降级；APK 导航拦截后核对 URL，不下载大包。读取真实公开更新清单，不调用身份或模型；指向公开服务时另行真实下载插件并核对摘要 |
 | `verify_website_pricing.mjs` | 17 语有／无 JavaScript 的套餐卡与权益提示、PLUS 季付／年付报价及每月额度、模拟 API 报价／额度接管与周期切换、加载／空目录／失败保留价格、桌面和手机布局 |
 | `backend/tests/manual_website_translation_server.py` | 构建后的同源选图／工作台、模拟游客验证与 OIDC、覆盖层合成、本地历史及回执丢失；运行方式见官网 README，不调用真实供应商 |
 | `verify_website_translation_tiles.mjs` | 先构建官网并启动上述夹具 `--port 4323`；验证单边 100000 的长／宽图、分块跨边界文字像素、完整下载、本地历史恢复、同 UUID 重放、能力缺失及普通翻译；仅允许本机回环地址 |

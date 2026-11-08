@@ -7,6 +7,8 @@ import { browserStores, site } from '../src/data/site';
 import { homeSamples, homeSampleLanguage, homeSampleLanguages, type HomeSampleKind } from '../src/data/home-samples';
 import { mobilePlatforms } from '../src/data/mobile';
 import { mobileCopy } from '../src/i18n/mobile';
+import { appCopy } from '../src/i18n/apps';
+import { appRelease } from '../src/data/app';
 import { homeCopy } from '../src/i18n/home';
 import { sitesCopy } from '../src/i18n/sites';
 import { publishedAmount } from '../src/components/PublishedPlanPricing';
@@ -193,30 +195,29 @@ for (const file of htmlFiles) {
     const software = JSON.parse($('script[type="application/ld+json"]').text())['@graph'].find((entry: Record<string, unknown>) => entry['@type'] === 'SoftwareApplication');
     if (software?.offers?.description !== $('.home-access').text() || software?.offers?.price !== '0')
       errors.push(`${label}: free installation structured data must match visible content`);
-    const platforms = $('.hero-stores > a').toArray().map(node => $(node).attr('data-browser') ?? $(node).attr('data-platform'));
-    if (platforms.join(',') !== 'android,chrome,edge,firefox,ios')
-      errors.push(`${label}: mobile platforms must flank the desktop browsers`);
+    if ($('.extension-options .hero-store').length !== 4 || $('.app-group [data-app]').length !== 2)
+      errors.push(`${label}: extensions and standalone apps must be separate groups`);
     if ($('main input[type=file], main astro-island, .gallery-switches, .product-sources').length) errors.push(`${label}: homepage must keep a focused static extension journey`);
     if ($('.home-copy a[data-install-extension]').length !== 1 || !$(`.home-hero a[data-install-extension][href="${localPath('/download/',locale)}"]`).length) errors.push(`${label}: homepage must have one primary installation action`);
     if ($('main .home-plan, main .home-price, main .home-cycle, main a[href$="/pricing/"]').length) errors.push(`${label}: pricing belongs on the separate pricing page`);
     if ($('main .home-translator-link[href$="/translate/"]').length !== 1 || $(`.site-header nav a[href="${localPath('/translate/',locale)}"]`).length !== 2) errors.push(`${label}: translator must be in desktop and mobile navigation`);
     if ($('main [data-install-icon][src="/browsers/chrome.svg"]').length !== 2) errors.push(`${label}: installation icons need a Chrome no-script fallback`);
     for (const store of browserStores) {
-      const entrance = $(`.hero-store[data-browser="${store.id}"]`);
+      const entrance = $(`.hero-store[data-store="${store.id}"]`);
       const target = store.url || `${localPath('/download/', locale)}#${store.id}`;
       if (entrance.length !== 1 || entrance.attr('href') !== target) errors.push(`${label}: missing configured ${store.id} platform entrance`);
     }
-    for (const platform of mobilePlatforms) {
-      const entrance = $(`.hero-store[data-platform="${platform.id}"]`);
-      if (entrance.length !== 1 || entrance.attr('href') !== localPath(`/guides/${platform.slug}/`, locale)
-        || entrance.attr('download') !== undefined || entrance.attr('target') || !entrance.text().includes(platform.id === 'ios' ? mobileCopy[locale].iosStatus : mobileCopy[locale].label))
-        errors.push(`${label}: mobile entrance must be a localized tutorial or compatibility status ${platform.id}`);
-    }
+    const firefoxAndroid = $('.hero-store[data-platform="android"]');
+    if (firefoxAndroid.attr('href') !== localPath('/guides/android-firefox/', locale)
+      || !firefoxAndroid.text().includes(mobileCopy[locale].label)
+      || !firefoxAndroid.find('img[src="/browsers/firefox.svg"]').length
+      || !firefoxAndroid.find('img[src="/browsers/android.svg"]').length)
+      errors.push(`${label}: Android Firefox must retain its route and distinguish browser from app`);
     if ($('.home-screenshot img').length !== 1 || !$('.home-screenshot img').attr('srcset')) errors.push(`${label}: expected one responsive in-tab screenshot`);
     if ($('[data-inline-comparison] input[type=range][hidden]').length !== 1 || $('[data-inline]').length) errors.push(`${label}: in-tab comparison must use an accessible progressively enhanced slider`);
     const scripts = await Promise.all($('script[type=module]').toArray().map(node => $(node).attr('src') ? readFile(join(root, $(node).attr('src')!), 'utf8') : $(node).text()));
     const showcaseScript = scripts.find(text => text.includes('[data-home-showcase]'));
-    if (!showcaseScript || gzipSync(showcaseScript).byteLength > 4 * 1024) errors.push(`${label}: homepage interaction script exceeds its 4 KiB gzip budget`);
+    if (!showcaseScript || scripts.filter(text => text.includes('[data-home-showcase]') || text.includes('[data-app-release]')).reduce((bytes, text) => bytes + gzipSync(text).byteLength, 0) > 4 * 1024) errors.push(`${label}: homepage interaction script exceeds its 4 KiB gzip budget`);
     if ($('.home-image-pair img[loading="lazy"]').length !== 2 || $('.home-feature-row').length !== 4 || $('.home-feature-image img[loading="lazy"][srcset][width][height]').length !== 4) errors.push(`${label}: expected lazy comparison images and four plugin features with responsive screenshots`);
     if ($('.home-image-pair input[type=range][hidden]').length !== 1 || $('[data-view-choice]').length) errors.push(`${label}: mobile comparison must use a slider rather than original/translated buttons`);
     if ($('button[data-sample]').length !== 2 || $('[data-language-choice]').length !== locales.length || $('[data-language-choice]:not([hidden])').length !== 16)
@@ -294,15 +295,42 @@ for (const file of htmlFiles) {
         if (!url.endsWith('.webp') || (await stat(join(root, url))).size > 200_000) errors.push(`${label}: mobile preview exceeds its 200 kB WebP budget`);
       }
     }
-    if (mobilePlatform.id === 'ios' && !$('h1').text().includes(mobileCopy[locale].iosStatus))
-      errors.push(`${label}: missing iOS compatibility status`);
     if ($('.mobile-platform[aria-current=page]').length !== 1 || !$(`a[href="${mobilePlatform.sourceUrl}"]`).length)
       errors.push(`${label}: missing mobile navigation or official reference`);
   }
   if (['/download/', '/help/'].includes(basePath(route))) {
     for (const platform of mobilePlatforms) {
-      if (!$(`.mobile-platform[href="${localPath(`/guides/${platform.slug}/`, locale)}"]`).length)
+      if (!$(`main a[href="${localPath(`/guides/${platform.slug}/`, locale)}"]`).length)
         errors.push(`${label}: missing mobile setup guide ${platform.id}`);
+    }
+  }
+  if (['/', '/download/', '/help/', `/guides/${appRelease.androidSlug}/`].includes(basePath(route))) {
+    const release = $('[data-app-release]');
+    const isTutorial = basePath(route) === `/guides/${appRelease.androidSlug}/`;
+    const expected = isTutorial ? appRelease.architectures : [appRelease.architectures[0]];
+    if (release.length !== 1 || release.find('[data-app-download]').toArray().map(link => $(link).attr('data-app-arch')).join(',') !== expected.join(','))
+      errors.push(`${label}: app downloads must default to arm64, with other architectures only in the tutorial`);
+    if (release.find('select').length || (isTutorial && (!release.find('.app-alternatives:not([open])').length || release.find('.app-alternatives [data-app-download]').length !== 2)))
+      errors.push(`${label}: device choices must be optional, without a dropdown`);
+    if (release.find('[data-app-download][href]').length || release.find('[data-app-download][hidden]').length !== expected.length
+      || (isTutorial ? release.find('.release-notes').attr('href') !== appRelease.latest : !release.find('noscript').text().includes(appRelease.latest)))
+      errors.push(`${label}: APK destination must come from the live manifest; keep a labeled release-page fallback`);
+
+  }
+  if (basePath(route) === `/guides/${appRelease.iosSlug}/`) {
+    if ($('[data-app-download], [data-app-release], .guide-screenshot').length || !$('h1').text().includes(appCopy[locale].iosStatus))
+      errors.push(`${label}: iOS must show IPA adaptation without a download or installation tutorial`);
+  }
+  if (basePath(route) === `/guides/${appRelease.androidSlug}/`) {
+    if ($('.guide-screenshot img[loading="lazy"][srcset]').length !== 3 || !$('.guide-prose').text().includes(appCopy[locale].screenshots))
+      errors.push(`${label}: app guide needs three lazy screenshots and accurate provenance`);
+    for (const element of $('.guide-screenshot img').toArray()) {
+      const img = $(element), full = img.parent('a').attr('href') ?? '';
+      for (const candidate of (img.attr('srcset') ?? '').split(',')) {
+        const url = candidate.trim().split(/\s+/)[0];
+        if (!url.endsWith('.webp') || (await stat(join(root, url))).size > 200_000) errors.push(`${label}: app preview exceeds 200 kB`);
+      }
+      if (!full.endsWith('.png')) errors.push(`${label}: app screenshot must retain its original PNG link`);
     }
   }
   if (basePath(route) === '/manga-translator/') errors.push(`${label}: removed advertising landing page remains in output`);

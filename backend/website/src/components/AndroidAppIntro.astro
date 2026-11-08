@@ -1,0 +1,43 @@
+---
+import AppDownload from './AppDownload.astro';
+import { dictionaries, localPath } from '../i18n';
+import type { Guide, Locale } from '../i18n/types';
+import { appCopy } from '../i18n/apps';
+import { appRelease } from '../data/app';
+interface Props { guide: Guide; locale: Locale }
+const { guide, locale } = Astro.props;
+const c = appCopy[locale];
+const t = dictionaries[locale].ui;
+const href = (path: string) => localPath(path, locale);
+const titleParts = guide.title.match(/^(.*?[:：])\s*(.*)$/);
+---
+<header class="container android-app-intro">
+  <p class="eyebrow"><span aria-hidden="true"></span>{guide.category}</p>
+  <h1>{titleParts ? <><span>{titleParts[1]}</span>{' '}<span>{titleParts[2]}</span></> : guide.title}</h1>
+  <p class="app-description">{guide.description}</p>
+  <AppDownload locale={locale}/>
+  <nav class="app-platform-links" aria-label={c.downloads}>
+    <a href={href('/guides/android-firefox/')}><img src="/browsers/firefox.svg" alt="" aria-hidden="true" width="18" height="18"/><span>{c.firefoxAndroid} · {c.extensions}</span><span aria-hidden="true">↗</span></a>
+    <a href={href(`/guides/${appRelease.iosSlug}/`)}><img class="apple" src="/browsers/apple.svg" alt="" aria-hidden="true" width="18" height="18"/><span>iOS App · {c.iosStatus}</span><span aria-hidden="true">↗</span></a>
+  </nav>
+  <div class="app-meta"><time datetime={guide.updated}>{t.updated}: {guide.updated}</time><span>{guide.minutes} {t.minutes}</span></div>
+</header>
+<style>
+  .android-app-intro { padding-block: 30px 36px; text-align: center; }
+  .eyebrow { justify-content: center; }
+  h1 { max-width: 1000px; margin: 16px auto; font-size: clamp(2rem, 3.8vw, 3.2rem); line-height: 1.3; letter-spacing: -.035em; text-wrap: balance; overflow-wrap: anywhere; }
+  .app-description { max-width: 680px; margin: 0 auto 24px; color: var(--muted); font-size: 1rem; line-height: 1.8; text-wrap: pretty; }
+  .app-platform-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; margin-top: 22px; }
+  .app-platform-links a { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+  .app-platform-links a:hover { color: var(--accent); }
+  .app-platform-links img { flex: none; width: 18px; height: 18px; object-fit: contain; }
+  .apple { filter: var(--monochrome-filter); }
+  .app-meta { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; color: var(--muted); font-size: .7rem; }
+  @media (max-width: 600px) {
+    .android-app-intro { padding-block: 24px 28px; }
+    h1 { font-size: clamp(1.8rem, 6.5vw, 2.3rem); }
+    h1 span { display: block; }
+    .app-description { font-size: .9rem; margin-bottom: 20px; }
+    .app-platform-links { gap: 10px 20px; margin-top: 18px; }
+  }
+</style>

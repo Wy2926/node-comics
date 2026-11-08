@@ -1,0 +1,52 @@
+---
+import { browserStores } from '../data/site';
+import { appRelease } from '../data/app';
+import { appCopy } from '../i18n/apps';
+import { mobileCopy } from '../i18n/mobile';
+import { dictionaries, localPath, type Locale } from '../i18n';
+import PlatformIcon from './PlatformIcon.astro';
+import AppDownload from './AppDownload.astro';
+import '../styles/downloads.css';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const c = appCopy[locale];
+const href = (path: string) => localPath(path, locale);
+---
+<div class="download-options" aria-label={dictionaries[locale].ui.download}>
+  <section class="download-group extension-group" aria-label={c.extensions}>
+    <h2>{c.extensions}</h2>
+    <nav class="hero-stores extension-options" aria-label={c.extensions}>
+      {browserStores.map(store => <a class="hero-store" data-store={store.id} href={store.url} target="_blank" rel="noopener noreferrer" aria-label={`${store.name} · ${c.store}`}>
+        <PlatformIcon kind={store.id}/>
+        <strong>{store.name.replace(/^(Google|Microsoft|Mozilla) /, '')}</strong>
+      </a>)}
+      <a class="hero-store" data-platform="android" href={href('/guides/android-firefox/')}>
+        <PlatformIcon kind="android-firefox"/>
+        <strong>{c.firefoxAndroid}</strong><small>{mobileCopy[locale].label}</small>
+      </a>
+    </nav>
+  </section>
+  <section class="download-group app-group" aria-label={c.apps}>
+    <h2>{c.apps}</h2>
+    <div class="hero-stores app-options">
+      <AppDownload locale={locale} variant="compact"/>
+      <a class="hero-store" data-app="ios" href={href(`/guides/${appRelease.iosSlug}/`)}>
+        <PlatformIcon kind="ios-app"/>
+        <strong>iOS App</strong><small>{c.iosStatus}</small>
+      </a>
+    </div>
+  </section>
+</div>
+<style>
+  .download-options { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 24px 36px; margin: 30px auto 0; text-align: center; }
+  .download-group { min-width: 0; }
+  .download-group h2, :global(.product-home) .download-group h2 { margin: 0 0 16px; color: var(--muted); font-family: inherit; font-size: .73rem; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
+  .hero-stores { display: flex; justify-content: center; align-items: flex-start; gap: 24px; }
+  .app-group { padding-inline-start: 36px; border-inline-start: 1px solid var(--line); }
+  @media (max-width: 760px) {
+    .download-options { gap: 24px; }
+    .extension-group { width: 100%; }
+    .extension-options { gap: 12px; }
+    .app-group { padding-inline-start: 0; border-inline-start: 0; }
+  }
+</style>

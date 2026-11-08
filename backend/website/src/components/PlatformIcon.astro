@@ -1,0 +1,18 @@
+---
+interface Props { kind: 'chrome' | 'edge' | 'firefox' | 'android-firefox' | 'android-app' | 'ios-app' }
+const { kind } = Astro.props;
+const app = kind.endsWith('-app');
+const src = app ? '/icon-128.png' : kind === 'edge' ? '/browsers/edge.png' : `/browsers/${kind === 'android-firefox' ? 'firefox' : kind}.svg`;
+const badge = kind === 'android-firefox' || kind === 'android-app' ? 'android' : kind === 'ios-app' ? 'apple' : undefined;
+---
+<span class="platform-icon" aria-hidden="true">
+  <img src={src} width="40" height="40" alt="" aria-hidden="true" />
+  {badge && <span class="platform-badge"><img class:list={{ apple: badge === 'apple' }} src={`/browsers/${badge}.svg`} width="18" height="18" alt="" aria-hidden="true" /></span>}
+</span>
+<style>
+  .platform-icon { position: relative; display: inline-flex; flex: none; width: 44px; height: 44px; align-items: center; justify-content: center; }
+  .platform-icon > img { width: 40px; height: 40px; object-fit: contain; }
+  .platform-badge { position: absolute; inset-inline-end: -6px; bottom: -3px; display: grid; place-items: center; width: 24px; height: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 50%; }
+  .platform-badge img { width: 16px; height: 16px; object-fit: contain; }
+  .apple { filter: var(--monochrome-filter); }
+</style>

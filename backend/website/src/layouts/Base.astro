@@ -119,7 +119,7 @@ const graph = [
       import { localPath, localeFromPath } from '../i18n/locales';
       const stores = JSON.parse(document.body.dataset.installStores ?? '{}');
       const iconBrowser = installIconBrowser(navigator);
-      const iconSource = document.querySelector<HTMLImageElement>(`.hero-store[data-browser="${iconBrowser}"] img`)?.src;
+      const iconSource = document.querySelector<HTMLImageElement>(`.hero-store[data-store="${iconBrowser}"] img`)?.src;
       document.querySelectorAll<HTMLImageElement>('[data-install-icon]').forEach(icon => {
         if (iconSource) icon.src = iconSource;
       });

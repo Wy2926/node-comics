@@ -22,8 +22,11 @@ class Scripts(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=False)
         self.parts, self.hashes, self.collect = [], [], False
+        self.app_downloads = False
 
     def handle_starttag(self, tag, attrs):
+        if 'data-app-release' in dict(attrs):
+            self.app_downloads = True
         if tag == 'script':
             self.collect, self.parts = not dict(attrs).get('src'), []
 
@@ -141,10 +144,11 @@ def prepare(kind, source, destination, release, nginx_root, *, admin_path='', oi
                 challenge = ' https://challenges.cloudflare.com' if 'translate' in segments else ''
                 blobs = ' blob:' if 'translate' in segments else ''
                 documents = ' ' + document_r2_origin if document_r2_origin and 'translate' in segments else ''
+                app_updates = ' https://comics-updates.nodelane.net' if parser.app_downloads else ''
                 frames = challenge.strip() or "'none'"
                 csp = (f"default-src 'self'; script-src 'self'{challenge} " + ' '.join(parser.hashes) +
                        f"; style-src 'self' 'unsafe-inline'; img-src 'self' data:{blobs}; font-src 'self'; worker-src 'self'; " +
-                       f"connect-src 'self' {oidc_origin}{challenge}{documents}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
+                       f"connect-src 'self' {oidc_origin}{challenge}{documents}{app_updates}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; frame-src {frames}")
                 response_headers = headers(release, private=private, csp=csp)
                 canonical = uri[:-10] if relative.endswith('index.html') else uri
                 if relative == '404.html' or '404' in segments:

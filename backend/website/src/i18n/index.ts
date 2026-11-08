@@ -16,7 +16,8 @@ import vi from './vi';
 import id from './id';
 import ar from './ar';
 import type { Locale, Dictionary } from './types';
-import { mobileCopy, mobileGuides } from './mobile';
+import { mobileGuides } from './mobile';
+import { appCopy, appAvailability, androidAppGuide } from './apps';
 import {quotaPurchase,quotaPurchasePolicy} from './quota-purchase';
 import {prepaidMembershipCopy} from './prepaid-membership';
 import { findMangaGuide } from './guides/find-manga';
@@ -31,7 +32,7 @@ export const dictionaries = Object.fromEntries(Object.entries(baseDictionaries).
   const prepaidPolicy={title:prepaid.status,paragraphs:[prepaid.notice,prepaid.quotaRule]};
   const localized:Dictionary={
     ...dictionary,
-    ui: { ...dictionary.ui, downloadDescription: mobileCopy[locale].availability },
+    ui: { ...dictionary.ui, downloadTitle: appCopy[locale].downloads, seoDownloadTitle: appCopy[locale].downloads, downloadDescription: appAvailability(locale) },
     documents: {
       ...dictionary.documents,
       policies:{...dictionary.documents.policies,
@@ -39,9 +40,9 @@ export const dictionaries = Object.fromEntries(Object.entries(baseDictionaries).
         refund:{...dictionary.documents.policies.refund,sections:[prepaidPolicy,...dictionary.documents.policies.refund.sections,{title:quotaPurchase[locale].title,paragraphs:[quotaPurchasePolicy[locale],quotaPurchase[locale].once,quotaPurchase[locale].subscription]}]}},
       guides: [...dictionary.documents.guides.map(guide => guide.slug === 'local-comics'
         ? { ...guide, updated: '2026-10-10', sections: guide.sections.map((section, index) => index === 0 ? { ...section, steps: localImportSteps[locale] } : section) }
-        : guide), findMangaGuide(locale, dictionary.ui.guides), builtinTranslationGuide(locale, dictionary.ui.guides), ...mobileGuides(locale, dictionary.ui)],
+        : guide), findMangaGuide(locale, dictionary.ui.guides), builtinTranslationGuide(locale, dictionary.ui.guides), ...mobileGuides(locale, dictionary.ui), androidAppGuide(locale)],
       faqs: dictionary.documents.faqs.map(faq => faq.id === 'browsers'
-        ? { ...faq, answer: `${mobileCopy[locale].availability} ${mobileCopy[locale].notices[1]}` } : faq.id==='cancel-subscription'?{...faq,answer:`${prepaid.notice} ${faq.answer}`}:faq),
+        ? { ...faq, answer: `${appAvailability(locale)} ${appCopy[locale].iosNotice}` } : faq.id==='cancel-subscription'?{...faq,answer:`${prepaid.notice} ${faq.answer}`}:faq),
     },
   };
   return [locale,localized];

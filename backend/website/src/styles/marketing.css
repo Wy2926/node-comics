@@ -17,7 +17,7 @@ body .site-footer { background: var(--canvas); border-top: 1px solid var(--line)
 body .footer-bottom { line-height: 1.7; }
 body .directory-track img[src$='toolpilot-logo-black.svg'] { background: #f3f6fc; padding: 7px; border-radius: 5px; }
 body :is(.feature-card, .store-card, .login-passport, .feature-ribbon, table) { background: var(--surface); }
-body .page-intro h1 { font-family: Georgia, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif; font-weight: 400; }
+body :is(.page-intro, .android-app-intro) h1 { font-family: Georgia, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif; font-weight: 400; }
 .ui-icon { display: inline-block; flex: none; width: 20px; height: 20px; background: currentColor; mask: var(--ui-icon) center / contain no-repeat; }
 .icon-check { --ui-icon: url('/icons/check.svg'); color: var(--accent); }
 .icon-arrow { --ui-icon: url('/icons/arrow-right.svg'); }

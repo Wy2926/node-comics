@@ -217,6 +217,20 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("worker-src 'self'", page)
             self.assertIn("connect-src 'self'  https://challenges.cloudflare.com;", page)
 
+    def test_app_updates_csp_only_allows_the_public_manifest_on_download_surfaces(self):
+        source = self.root / 'build'
+        app_pages = ('', 'download', 'help', 'guides/android-app', 'en/download', 'ar/guides/android-app')
+        for path in (*app_pages, 'account', 'translate', 'guides/ios-orion'):
+            page = source / path / 'index.html'
+            page.parent.mkdir(parents=True, exist_ok=True)
+            page.write_text('<div data-app-release></div>' if path in app_pages else '<h1>Page</h1>', encoding='utf-8')
+        config = prepare('website', source, self.root / 'static', 'v1', '/www/node-comics').read_text()
+        for path in (*app_pages, 'account', 'translate', 'guides/ios-orion'):
+            uri = f'/{path}/' if path else '/'
+            page = config.split(f'location = {uri} {{', 1)[1].split('\n}', 1)[0]
+            sources = [directive.strip() for directive in page.split(';') if 'comics-updates.nodelane.net' in directive]
+            self.assertEqual(sources, ["connect-src 'self'  https://comics-updates.nodelane.net"] if path in app_pages else [])
+
     def test_document_r2_csp_is_exact_and_confined_to_translate_connect(self):
         source = self.root / 'build'
         source.mkdir()

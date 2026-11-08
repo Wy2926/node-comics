@@ -1,0 +1,44 @@
+---
+import AppDownload from './AppDownload.astro';
+import PlatformIcon from './PlatformIcon.astro';
+import { appCopy } from '../i18n/apps';
+import { appRelease } from '../data/app';
+import { localPath, type Locale } from '../i18n';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const c = appCopy[locale];
+const href = (slug: string) => localPath(`/guides/${slug}/`, locale);
+---
+<section class="app-download-cards" aria-labelledby="app-download-heading">
+  <h2 id="app-download-heading">{c.apps}</h2>
+  <div class="store-grid app-store-grid">
+    <article class="store-card" data-app="android">
+      <div class="app-store-icon"><PlatformIcon kind="android-app"/></div>
+      <h2>Android App</h2>
+      <p>{c.requirements}</p>
+      <div class="store-actions">
+        <AppDownload locale={locale} variant="card"/>
+        <div class="platform-download"><a class="button secondary" href={href(appRelease.androidSlug)}>{c.guide} ↗</a></div>
+      </div>
+    </article>
+    <article class="store-card" data-app="ios">
+      <div class="app-store-icon"><PlatformIcon kind="ios-app"/></div>
+      <h2>iOS App</h2>
+      <p>{c.iosNotice}</p>
+      <div class="store-actions">
+        <a class="button secondary" href={href(appRelease.iosSlug)}>{c.status} ↗</a>
+      </div>
+    </article>
+  </div>
+</section>
+<style>
+  .app-download-cards > h2 { margin-bottom: 24px; font-size: 1.4rem; }
+  .app-store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .store-card { min-width: 0; }
+  .app-store-icon { display: flex; align-items: center; height: 48px; margin-bottom: 28px; }
+  .button { white-space: normal; text-align: center; }
+  @media (max-width: 760px) {
+    .app-store-grid { grid-template-columns: 1fr; }
+    .app-store-icon { margin-bottom: 20px; }
+  }
+</style>

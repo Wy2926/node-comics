@@ -1,7 +1,7 @@
 ---
 import { getImage, Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
-import BrowserStores from './BrowserStores.astro';
+import DownloadOptions from './DownloadOptions.astro';
 import SitesCarousel from './SitesCarousel.astro';
 import { browserStores } from '../data/site';
 import { guideImage } from '../data/guide-media';
@@ -68,7 +68,7 @@ const chromeIcon = browserStores.find(store => store.id === 'chrome')!.icon;
         {h.install}<span class="ui-icon icon-arrow" aria-hidden="true"></span>
       </a>
       <a class="home-translator-link" href={href('/translate/')}>{c.translator}<span aria-hidden="true">↗</span></a>
-      <BrowserStores locale={locale} />
+      <DownloadOptions locale={locale} />
       <p class="home-access">{h.readerAccess}</p>
     </div>
     <figure class="home-preview" id="see-it">

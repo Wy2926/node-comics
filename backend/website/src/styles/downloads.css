@@ -1,0 +1,26 @@
+/* Match the original homepage's lightweight icon links, using site tokens. */
+.download-options { --download-entry-width: 116px; }
+.download-options .hero-store {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: var(--download-entry-width);
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: .85rem;
+  text-align: center;
+}
+.download-options .hero-store:is(:hover, :active) { background: transparent; color: var(--accent); transform: none; box-shadow: none; }
+.download-options .hero-store strong { font-weight: 400; line-height: 1.5; }
+.download-options .hero-store small { color: var(--muted); font-size: .66rem; line-height: 1.5; }
+@media (max-width: 1000px) { .download-options { --download-entry-width: 96px; } }
+@media (max-width: 760px) {
+  .download-options { --download-entry-width: 112px; }
+  .download-options .extension-options .hero-store { flex: 1 1 0; width: auto; max-width: 100px; font-size: .73rem; }
+}

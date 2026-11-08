@@ -82,7 +82,7 @@
 
 首页和下载页使用 Google Chrome、Microsoft Edge 和 Mozilla Firefox 的原始彩色标识，本地提供资源，用于标识对应浏览器及商店入口。商标归各品牌所有，不表示合作或背书，不作为本站原创素材重新授权。
 
-Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simple-icons/simple-icons/tree/16.0.0) 的 Android／Apple 标识，保留原始路径，仅分别添加绿色和浅色填充以适配官网深色背景。[CC0 1.0 许可](public/licenses/simple-icons.txt)随静态产物分发；许可不授予商标权。iOS 当前为“适配中”状态页，不使用模拟截图。
+Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simple-icons/simple-icons/tree/16.0.0) 的 Android／Apple 标识，保留原始路径，仅分别添加绿色和浅色填充以适配官网深色背景。[CC0 1.0 许可](public/licenses/simple-icons.txt)随静态产物分发；许可不授予商标权。Android Firefox 入口用原有 Firefox 标识与 Android 角标组合；独立 App 入口复用本站 `icon-128.png` 品牌图形与 Android／Apple 角标，不重画商标。iOS 下载入口保持 IPA 适配状态，不展示已发行安装包。
 
 ## 桌面教程截图
 
@@ -177,3 +177,17 @@ Android 和 iOS 教程入口使用 [Simple Icons 16.0.0](https://github.com/simp
 | [public/browsers/chrome.svg](public/browsers/chrome.svg) | [官方来源](https://www.google.com/chrome/static/images/chrome-logo.svg) | `2bb1a2c9b9ae4d36f62ea53811554636cf3c5b74d9845e1dbacca0ce62dc7880` |
 | [public/browsers/firefox.svg](public/browsers/firefox.svg) | [官方来源](https://raw.githubusercontent.com/mozilla/protocol-assets/master/logos/firefox/browser/logo.svg) | `f8301ac5f5dd3ca962db4283c1148e9a90ffcebe690ec83cedad88107d449f79` |
 | [public/browsers/edge.png](public/browsers/edge.png) | [官方来源](https://edgecdn-embza6g8cacagcbn.z01.azurefd.net/welcome/static/favicon.png) | `4d755ac02a070a1b4bb1b6f1c88ab493440109a8ac1e314aaced92f94cdc98e9` |
+
+## 独立 App 教程截图
+
+以下 PNG 原样复制自 [node-comics-app](https://github.com/Wy2926/node-comics-app) 提交 `52d8723f30ff5b036c97db6aa2b5a9b8c07780cd` 的 `docs/images/`，为用户确认复用的 iOS 模拟器中文界面。它们仅作为 Android 教程的共用 App 界面示意，不冒充 Android 实机截图，不证明 APK 安装、账号登录或翻译效果已经验证。界面可能随平台变化；漫画内容与封面归各自权利人，不随软件许可重新授权。
+
+上游应用基于 Mangayomi，保留 [Apache-2.0 许可](https://github.com/Wy2926/node-comics-app/blob/52d8723f30ff5b036c97db6aa2b5a9b8c07780cd/LICENSE)与[来源声明](https://github.com/Wy2926/node-comics-app/blob/52d8723f30ff5b036c97db6aa2b5a9b8c07780cd/UPSTREAM.md)；NodeLane 品牌图形沿用本仓库 `GPL-3.0-only`，见上游[素材记录](https://github.com/Wy2926/node-comics-app/blob/52d8723f30ff5b036c97db6aa2b5a9b8c07780cd/docs/design/nodelane-brand-assets.md)。本次不复制应用运行时代码、字体或构建输出。
+
+官网自身持有源 PNG；构建输出宽度 320／540／720 的 WebP（质量 85），正文与目录复用，按需懒加载，原图仅从查看链接打开。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| [src/assets/guides/app/ios-library.png](src/assets/guides/app/ios-library.png) | `75c3f5c1d95dea6d8f695ebbb2ab4adf5ed46d8e46daa58cb4cf40dd00decf08` |
+| [src/assets/guides/app/ios-reader.png](src/assets/guides/app/ios-reader.png) | `911d4d0272c3761d139776d9441f964f7764363a3151ffd0179054016e4d322e` |
+| [src/assets/guides/app/ios-sources.png](src/assets/guides/app/ios-sources.png) | `3d71edc1747fdb44337f7f8c5796317e5f0704298801c5ab289bc1805b358e4e` |

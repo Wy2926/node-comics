@@ -1,0 +1,66 @@
+---
+import { appRelease } from '../data/app';
+import { appCopy, releaseCopy } from '../i18n/apps';
+import { localPath, type Locale } from '../i18n';
+import PlatformIcon from './PlatformIcon.astro';
+interface Props { locale: Locale; variant?: 'guide' | 'compact' | 'card' }
+const { locale, variant = 'guide' } = Astro.props;
+const compact = variant === 'compact';
+const c = appCopy[locale];
+const r = releaseCopy[locale];
+---
+<div class:list={['app-release', { 'app-entry': compact, 'app-download-section': variant === 'guide', 'app-card-download': variant === 'card' }]} data-app={compact ? 'android' : undefined} data-app-release data-loading={r.loading} data-error={r.error}>
+  {compact ? <a class="hero-store" href={localPath(`/guides/${appRelease.androidSlug}/`, locale)} aria-label={`Android App · ${c.guide}`}>
+    <PlatformIcon kind="android-app"/><strong>Android App</strong>
+  </a> : null}
+  <div class="release-action">
+    <a class:list={[compact ? 'app-download-link' : 'button']} data-app-download data-app-arch="arm64-v8a" aria-label={c.download} hidden>
+      {compact ? <>APK · <span data-app-version></span></> : <>{variant === 'guide' && <img src="/browsers/android.svg" width="24" height="24" alt="" aria-hidden="true"/>}{c.download}<span data-app-version></span></>}<span aria-hidden="true">↓</span>
+    </a>
+    <div class="release-feedback"><p role="status" aria-live="polite" data-release-status></p><button class="button secondary compact" type="button" data-release-retry hidden>{r.retry}</button></div>
+  </div>
+  {variant !== 'guide' ? <noscript><a class="release-notes" href={appRelease.latest}>{r.notes} ↗</a></noscript> : <>
+    <p class="requirements">{c.requirements}</p>
+    <div class="release-options">
+      <details class="app-alternatives">
+        <summary>{r.otherDownloads}</summary>
+        <p>{c.choose}</p>
+        <ul>{appRelease.architectures.slice(1).map((arch, index) => <li>
+          <span>{c.devices[index]}</span>
+          <a class="button secondary compact" data-app-download data-app-arch={arch} hidden><bdi>{arch}</bdi><span data-app-version></span><span aria-hidden="true">↓</span></a>
+        </li>)}</ul>
+      </details>
+      <a class="release-notes" href={appRelease.latest} target="_blank" rel="noopener noreferrer">{r.notes} ↗</a>
+    </div>
+  </>}
+
+</div>
+<script>
+  import { setupAppDownloads } from '../lib/app-release';
+  setupAppDownloads();
+</script>
+<style>
+  .app-release { min-width: 0; text-align: center; }
+  .app-entry { width: var(--download-entry-width); max-width: 100%; }
+  .app-download-section { max-width: 680px; margin-inline: auto; }
+  .app-download-section .release-action { min-height: var(--comic-control-height); }
+  .release-action > .button { max-width: 100%; flex-wrap: wrap; }
+  .app-card-download .release-action > .button { width: 100%; }
+  .release-action > .button img { flex: none; width: 24px; height: 24px; object-fit: contain; }
+  .requirements { margin: 12px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.7; }
+  .app-download-link { display: inline-flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; color: var(--accent); font-size: .7rem; line-height: 1.5; }
+  .app-download-link:hover, .release-notes:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .release-feedback { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+  .release-feedback p { margin: 8px 0; color: var(--muted); font-size: .73rem; line-height: 1.6; overflow-wrap: anywhere; }
+  .release-feedback p:empty { display: none; }
+  .release-notes { display: inline-block; font-size: .73rem; color: var(--muted); }
+  .release-options { margin-top: 14px; }
+  .app-alternatives { margin-bottom: 8px; color: var(--muted); font-size: .78rem; }
+  .app-alternatives summary { width: fit-content; margin-inline: auto; cursor: pointer; color: var(--accent); }
+  .app-alternatives[open] { max-width: 560px; margin: 0 auto 12px; padding-block: 14px; border-block: 1px solid var(--line); }
+  .app-alternatives p { margin-block: 14px; text-align: start; line-height: 1.8; }
+  .app-alternatives ul { display: grid; gap: 12px; list-style: none; margin: 18px 0 4px; padding: 0; text-align: start; }
+  .app-alternatives li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+  .app-alternatives .button { max-width: 100%; flex-wrap: wrap; }
+  [hidden] { display: none !important; }
+</style>

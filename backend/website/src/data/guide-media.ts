@@ -7,7 +7,7 @@ export const screenshotNames = ['library', 'reader-directory', 'reader-settings'
 export type GuideImage = typeof screenshotNames[number];
 
 const images = import.meta.glob<{ default: ImageMetadata }>('../assets/guides/*/*.webp', { eager: true });
-const mobileImages = import.meta.glob<{ default: ImageMetadata }>('../assets/guides/firefox/*/*.png', { eager: true });
+const mobileImages = import.meta.glob<{ default: ImageMetadata }>(['../assets/guides/firefox/*/*.png', '../assets/guides/app/*.png'], { eager: true });
 
 export function mobileGuideImage(source: string): ImageMetadata {
   const image = mobileImages[`../assets${source}`]?.default;
@@ -27,7 +27,7 @@ export function guideImage(name: GuideImage, locale: Locale): ImageMetadata {
 }
 
 // Only substantial, actionable workflows lead the tutorial directory.
-export const featuredGuides = ['manga-translation', 'builtin-translation', 'local-comics', 'find-manga', 'remote-library', 'local-translation', 'android-firefox'];
+export const featuredGuides = ['manga-translation', 'builtin-translation', 'local-comics', 'find-manga', 'remote-library', 'local-translation', 'android-firefox', 'android-app'];
 
 export const guideCovers: Record<string, GuideImage> = {
   'manga-translation': 'translation-settings', 'local-comics': 'library', 'find-manga': 'search',

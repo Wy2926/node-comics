@@ -8,6 +8,11 @@ import ArticleSection from './ArticleSection.astro';
 import GuideDirectory from './GuideDirectory.astro';
 import GuideArticle from './GuideArticle.astro';
 import MobilePlatforms from './MobilePlatforms.astro';
+import DownloadOptions from './DownloadOptions.astro';
+import AppDownloadCards from './AppDownloadCards.astro';
+import AndroidAppIntro from './AndroidAppIntro.astro';
+import { appRelease } from '../data/app';
+import { appCopy } from '../i18n/apps';
 import { mobilePlatforms } from '../data/mobile';
 import { guideCovers, guideImage } from '../data/guide-media';
 import Account from './Account';
@@ -27,7 +32,8 @@ const href=(target:string)=>localPath(target,locale);
 const key=path.split('/')[1];
 const guide=path.startsWith('/guides/')?d.guides.find(item=>`/guides/${item.slug}/`===path):undefined;
 const articleImage=guide&&guideCovers[guide.slug]?guideImage(guideCovers[guide.slug],locale).src:'/social-cover.webp';
-const mobileGuide=mobilePlatforms.some(platform=>platform.slug===guide?.slug);
+const androidGuide=guide?.slug===appRelease.androidSlug;
+const mobileGuide=mobilePlatforms.some(platform=>platform.slug===guide?.slug)||guide?.slug===appRelease.androidSlug;
 const policy=d.policies[key];
 const article=guide??policy;
 const updated=article?.updated??site.updated;
@@ -44,16 +50,17 @@ if(guide)schema.push({'@type':'Article',headline:guide.title,description:guide.d
 const stores=browserStores;
 ---
 <Base title={title} description={description} image={articleImage} imageAlt={articleImage!=='/social-cover.webp'?guide?.title:undefined} schema={schema} noindex={['account','auth'].includes(key)}>
-  {path==='/' ? <HomePage locale={locale}/> : <PageIntro eyebrow={guide?.category??'NODELANE COMICS / '+key.toUpperCase()} title={article?.title??intros[key]?.[0]??title} description={description}>{article&&<div class="meta"><span>{t.editor}</span><time datetime={updated}>{t.updated}: {updated}</time>{guide&&<span>{guide.minutes} {t.minutes}</span>}</div>}</PageIntro>}
+  {path==='/' ? <HomePage locale={locale}/> : androidGuide&&guide ? <AndroidAppIntro guide={guide} locale={locale}/> : <PageIntro eyebrow={guide?.category??'NODELANE COMICS / '+key.toUpperCase()} title={article?.title??intros[key]?.[0]??title} description={description}>{article&&<div class="meta"><span>{t.editor}</span><time datetime={updated}>{t.updated}: {updated}</time>{guide&&<span>{guide.minutes} {t.minutes}</span>}</div>}</PageIntro>}
 
-  {mobileGuide&&<div class="container"><MobilePlatforms locale={locale} selected={guide?.slug}/></div>}
+  {mobileGuide&&!androidGuide&&<div class="container"><MobilePlatforms locale={locale} selected={guide?.slug}/></div>}
 
   {guide && <GuideArticle guide={guide} locale={locale} related={relatedGuides} />}
   {policy&&<div class="container content-section prose-layout"><nav class="toc" aria-label={t.contents}><strong>{t.contents}</strong>{policy.sections.map((section,i)=><a href={`#section-${i+1}`}>{section.title}</a>)}</nav><article class="prose">{policy.sections.map((section,i)=><ArticleSection section={section} index={i} locale={locale}/>)}<aside class="note"><a href={href('/download/')}>{t.download}</a> · <a href={href('/pricing/')}>{t.pricing}</a> · <a href={href('/privacy/')}>{t.privacy}</a> · <a href={href('/help/')}>{t.help}</a></aside></article></div>}
   {key==='features'&&<><section class="container content-section"><div class="feature-grid">{t.featureTitles.map((item,i)=><article class="feature-card"><span class="number">0{i+1} / NODELANE COMICS</span><h2>{item}</h2><p style="margin-top:18px">{t.featureBodies[i]}</p><a class="text-link" href={href(`/guides/${featureGuides[i]}/`)}>{t.readGuide} ↗</a></article>)}</div></section><section class="reading-band"><div class="container section split"><div class="split-copy"><p class="eyebrow">A LITTLE LESS FRICTION</p><h2>{t.readingTitle}</h2><p>{t.readingDescription}</p><a class="text-link" href={href('/guides/local-comics/')}>{t.readGuide} ↗</a></div><div class="reading-art"><Image src={reading} width={720} format="webp" alt={t.readingAlt} loading="lazy"/></div></div></section><div class="section"></div></>}
   {key==='pricing'&&<section class="container content-section"><BillingOffers client:load locale={locale} accountHref={href('/account/')} downloadHref={href('/download/')} checkoutCopy={{busy:accountText('正在确认登录结果，请稍候…'),error:accountText('操作暂未完成，请重试或重新登录。'),before:accountText('继续前请阅读'),refund:accountText('订阅与退款说明'),renewal:accountText('，了解自动续费规则。'),resume:accountText('继续原结账')}} free={{name:t.freePlan,description:t.freePlanDescription,action:t.freeStart,note:t.freeNote,priceLabel:t.free}}/><div class="faq-list"><h2>{t.pricing}</h2><p class="note">{t.quotaNote}</p><a class="text-link" href={href('/refund/')}>{t.refund} ↗</a></div></section>}
   {key==='download'&&<section class="container content-section">
-    <MobilePlatforms locale={locale}/>
+    <AppDownloadCards locale={locale}/>
+    <div class="package-header"><h2 class="package-heading">{appCopy[locale].extensions} · {t.directDownloadTitle}</h2><a class="text-link" href={href('/guides/android-firefox/')}>{appCopy[locale].firefoxAndroid} · {t.readGuide} ↗</a></div>
     <div class="store-grid">{stores.map(store=>{const release=site.extensionPackages[store.id],format=release.filename.split('.').at(-1)!.toUpperCase(),downloadLabel=store.id==='firefox'?t.downloadXpi:t.downloadZip.replace('ZIP',format);return <article class="store-card" id={store.id} data-browser={store.id}>
       <img class="store-icon" src={store.icon} alt={store.name} width="48" height="48" loading="lazy"/>
       <h2>{store.name}</h2><p>{t.storeDescription}</p>
@@ -75,7 +82,7 @@ const stores=browserStores;
   {path==='/guides/'&&<GuideDirectory locale={locale}/>}
   {key==='faq'&&<section class="container content-section"><nav class="faq-topics" aria-label={t.contents}>{d.faqs.map(item=><a href={`#${item.id}`}>{item.question}</a>)}</nav><FaqList locale={locale} items={d.faqs} headingLevel="h2"/><p class="note faq-contact"><a class="text-link" href={href('/help/')}>{t.help} ↗</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p></section>}
   {key==='help'&&<section class="container content-section project-help">
-    <MobilePlatforms locale={locale}/>
+    <DownloadOptions locale={locale}/>
     <SupportChannels locale={locale}/>
     <section class="project-guides" aria-labelledby="support-guides-title">
       <h2 id="support-guides-title">{projectCopy[locale].guidesTitle}</h2>
@@ -89,6 +96,9 @@ const stores=browserStores;
   {['features','about','guides'].includes(key)&&!guide&&<section class="container cta-section"><div><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>{t.ctaTitle}</h2><p>{t.ctaDescription}</p></div><a class="button light" data-install-extension href={href('/download/')}>{t.ctaButton} ↗</a><span class="cta-star" aria-hidden="true">✦</span></section>}
 </Base>
 <style>
+  .package-header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 24px; margin-block: 36px 24px; }
+  .package-header .package-heading { margin: 0; font-size: 1.4rem; }
+  .package-header > a { font-size: .8rem; }
   .prose { min-width: 0; font-size: 1rem; }
   .meta { flex-wrap: wrap; }
 </style>

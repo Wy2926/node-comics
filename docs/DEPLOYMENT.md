@@ -167,7 +167,7 @@ python scripts/prepare_static_release.py admin --source artifacts/admin-export/s
   --oidc-origin https://auth.nodelane.net
 ```
 
-产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，保留账户页面 no-store、规范 URL、多语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 复用独立位置。
+产物在 `releases/<website|admin>/<版本>/site`，对应 `release.inc` 仅含静态路由；版本目录禁止覆盖。脚本拒绝私密文件、符号链接和保留 API 路径，按页面生成 CSP，仅含 App 下载控件的页面允许连接公开更新域名 `https://comics-updates.nodelane.net`；保留账户页面 no-store、规范 URL、多语 404 与下载 308。后台使用当前非保留的私有 `/name/` 入口，不更改 OIDC 回调。`design-tokens.css` 与 Picker 复用独立位置。
 
 将候选 `release.inc` 通过同一切换脚本激活：
 
