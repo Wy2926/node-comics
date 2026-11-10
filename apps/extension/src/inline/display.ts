@@ -29,7 +29,11 @@ export class ImageDisplay {
     // Intrinsic geometry comes from the original even if the translated bitmap differs.
     for(const [name,value] of [['width',width],['height',height]] as const){
       if(image.hasAttribute(name))continue;
-      const applied=String(value);image.setAttribute(name,applied);
+      const before=image.getBoundingClientRect(),applied=String(value);image.setAttribute(name,applied);
+      const after=image.getBoundingClientRect();
+      // A presentation hint can fix an otherwise automatic axis (e.g. height-only fit-to-screen).
+      // Keep that axis automatic; the original aspect ratio below already preserves its sizing.
+      if(Math.abs(after.width-before.width)>.5||Math.abs(after.height-before.height)>.5){image.removeAttribute(name);continue;}
       this.undo.push(()=>{if(image.getAttribute(name)===applied)image.removeAttribute(name);});
     }
     for(const [property,value] of properties){

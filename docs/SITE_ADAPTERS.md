@@ -115,6 +115,7 @@ npm run build
 
 | 适配器 | 能力与说明 |
 | --- | --- |
+| [KOOBONE](../apps/extension/src/sources/sites/koobone/README.md) | 桌面标签页翻译：单页／双页及滚动阅读器的同源 iframe Blob 正文、换页失效与原图恢复；不提供漫画导入或完整目录 |
 | [Asura Scans](../apps/extension/src/sources/sites/asurascans/README.md) | 英语漫画名称分页搜索、HTTP 完整目录／公开正文／封面及 12 小时更新；作品／章节浮动导入、轻量作品名交接与通用原位识图，不解锁会员提前阅读内容 |
 | [MangaCopy](../apps/extension/src/sources/sites/mangacopy/README.md) | HTTP 完整目录、网页章节发现与 HTTP 图片；动态只读分类、完整性核对、12 小时无目录标签页同步 |
 | [Comix](../apps/extension/src/sources/sites/comix/README.md) | 网页会话完整目录与章节清单、按需协议材料发现、手动导入与离线缓存，不定时同步目录；图片还原与已加载正文原位翻译，在详情页与章节页嵌入导入／管理入口 |

@@ -2,7 +2,7 @@ import { msg, subscribeLocale } from '../i18n/runtime';
 import { RequestPool } from '../concurrency';
 import { safeImageUrl, sourceImage } from '../sources';
 import type { ComicElement, PageImage } from '../sources/page';
-import { pageImageReferrerPolicy, renderedImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
+import { pageImageReferrerPolicy, inlineImageRect, MAX_COMIC_IMAGES, sourceDocument } from '../sources/page';
 import { ReadingProgress, ReadingWindow } from '../reading-window';
 import { translationNotice } from '../translation/notice';
 import { languageLabel, modeLabels } from '../types';
@@ -178,21 +178,21 @@ export function installInline() {
     if(!document.hidden&&document.hasFocus()&&translatedView?.analyticsChannel){
       for(const item of windowImages){
         if(!item.resultKey||item.display.key!==item.resultKey)continue;
-        const rect=renderedImageRect(item.image);
+        const rect=inlineImageRect(item.image);
         if(!rect||rect.bottom<=0||rect.top>=innerHeight||rect.right<=0||rect.left>=innerWidth)continue;
         analytics.shown({channel:translatedView.analyticsChannel,mode:item.resultMode??translatedView.mode,language:translatedView.language});
       }
     }
     const visible = new Set<string>();
     for (const item of windowImages) {
-      const rect = item.image.getBoundingClientRect(),
+      const rect = inlineImageRect(item.image),
         state = item.loadError ?? (item.loading ? { kind: 'translating' as const, message: msg('正在读取译图') }
           : item.enhancement && item.enhancement.phase !== 'ready'
             ? item.enhancement.phase === 'error'
               ? {kind:'error' as const,message:item.enhancement.message ?? msg('增强失败，保留当前图片。'),retryLabel:msg('重试增强')}
               : {kind:'waiting' as const,message:item.enhancement.phase === 'running' ? msg('增强中…') : msg('等待增强')}
             : item.state);
-      if (!state || rect.bottom <= 0 || rect.top >= innerHeight || rect.right <= 0 || rect.left >= innerWidth)
+      if (!state || !rect || rect.bottom <= 0 || rect.top >= innerHeight || rect.right <= 0 || rect.left >= innerWidth)
         continue;
       visible.add(item.id);
       let entry = visibleBadges.get(item.id);
@@ -284,7 +284,7 @@ export function installInline() {
       const previous = tracked.get(image);
       if (previous && previous.url === target.url && previous.sourceKey === target.key)
         previous.display.sync();
-      const rect = renderedImageRect(image);
+      const rect = inlineImageRect(image);
       if (!rect) continue;
       const url = target.url;
       let item = tracked.get(image);
@@ -642,7 +642,7 @@ export function installInline() {
       preparedSelection = undefined;
       const snapshot = message.pageUrl===location.href&&(typeof message.srcUrl==='string'||message.dataImage===true)
         ? selectedImage(document,message.srcUrl,message.dataImage===true) : undefined;
-      if (!snapshot || !renderedImageRect(snapshot.element)) { respond({ok:false}); return; }
+      if (!snapshot || !inlineImageRect(snapshot.element)) { respond({ok:false}); return; }
       const {element,url,pageUrl}=snapshot;
       const localBlob=url.startsWith('blob:')&&new URL(url).origin===new URL(pageUrl).origin;
       if (!localBlob&&!/^data:image\/(?:png|jpeg|webp|gif|avif);/i.test(url)&&safeImageUrl(url,pageUrl)!==url) {

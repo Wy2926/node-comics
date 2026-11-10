@@ -8,7 +8,7 @@ export type * from './contracts/page';
 export type * from './contracts/source';
 export { PageImageRegistry } from './core/resources';
 export { canvasImage } from './shared/canvas';
-export { comicImageRect, renderedImageRect, MAX_COMIC_IMAGES } from './shared/geometry';
+export { comicImageRect, renderedImageRect, inlineImageRect, MAX_COMIC_IMAGES } from './shared/geometry';
 export const createSourceNavigation = (
   doc: Document,
   invalidated?: () => void,

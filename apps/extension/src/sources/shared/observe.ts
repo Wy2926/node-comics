@@ -6,8 +6,9 @@ export function observeImages(
   containers?: string,
 ) {
   const selector = ['img', 'canvas', 'picture', 'source', containers].filter(Boolean).join(',');
-  const relevant = (node: Node) =>
-    node instanceof Element && (node.matches(selector) || !!node.querySelector(selector));
+  // Same-origin reader frames have their own Element constructor.
+  const relevant = (node: EventTarget | null) =>
+    node instanceof (doc.defaultView?.Element ?? Element) && (node.matches(selector) || !!node.querySelector(selector));
   const observer = new MutationObserver((records) => {
     if (
       records.some((record) =>
@@ -25,7 +26,7 @@ export function observeImages(
     attributeFilter: ['src', 'srcset', 'sizes', 'style', 'class', 'hidden', 'width', 'height', ...extra],
   });
   const loaded = (event: Event) => {
-    if (event.target instanceof Node && relevant(event.target)) changed();
+    if (relevant(event.target)) changed();
   };
   doc.addEventListener('load', loaded, true);
   return () => {
