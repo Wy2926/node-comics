@@ -3,7 +3,7 @@ import json
 
 import pytest
 from app.adapters.llm import TextError
-from app.adapters.text import groups, input_bound, messages, parse_translations, response_schema
+from app.adapters.text import groups, input_bound, messages, output_token_limit, parse_translations, response_schema
 
 
 @pytest.mark.parametrize('value', [
@@ -138,3 +138,12 @@ def test_full_page_keeps_compact_ids_without_renumbering_groups():
                           'required': list(expected), 'additionalProperties': False}
         restored.update(parse_translations(content, batch))
     assert restored == {segment['id']: segment['source'] for segment in segments}
+
+
+def test_output_budget_covers_utf8_and_escaped_ids_with_floor_and_provider_ceiling():
+    # Each source is ten UTF-8 bytes; each escaped ID adds seventeen skeleton bytes.
+    segments = [{'id': f'quote"\\{index:02}', 'source': 'A好한。'} for index in range(30)]
+    assert output_token_limit(segments[:1], 32768) == 256
+    assert output_token_limit(segments, 32768) == 2 * 300 + 511 + 64
+    assert output_token_limit(segments, 128) == 128
+    assert output_token_limit(segments, 512) == 512

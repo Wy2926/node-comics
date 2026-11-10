@@ -87,13 +87,14 @@ def test_frozen_guidance_and_ocr_ids_survive_repair_and_paid_replay(text_case, m
     configure_system_limits(comic_translation_prompt='A changed instruction only for future jobs.')
     calls = []
 
-    def invoke(messages, profile, *, json_schema):
+    def invoke(messages, profile, *, json_schema, limits):
         calls.append(messages)
         assert messages[0]['content'] == ('Translate every input text into 简体中文 (Simplified Chinese).\n'
                                           'Write all translation values in the target language.\n\n' + frozen['text_prompt'])
         assert [row['role'] for row in messages] == ['system', 'user']
         assert json.loads(messages[1]['content']) == {row['id']: row['source'] for row in segments}
         assert json_schema['schema']['required'] == ['comic_title', 'b001']
+        assert limits.max_output_tokens == page_text.output_token_limit(segments, profile['max_output_tokens'])
         if repair and len(calls) == 1:
             configure_system_limits(comic_translation_prompt='Changed again during format repair.')
             return TextResponse('invalid', None, 'format-repair')
@@ -106,7 +107,8 @@ def test_frozen_guidance_and_ocr_ids_survive_repair_and_paid_replay(text_case, m
     assert classic.run_text_stage(job_id, lease_id) == {'translations': translated}
     assert len(calls) == (2 if repair else 1)
     bound = page_text.input_bound(segments, 'zh-Hans', frozen['text_prompt'])
-    expected_cost = classic._cost_micros(frozen['text'], bound, frozen['text']['max_output_tokens'])
+    expected_cost = classic._cost_micros(frozen['text'], bound,
+                                       page_text.output_token_limit(segments, frozen['text']['max_output_tokens']))
     with session_factory()() as db:
         records = db.scalars(select(TextCall).where(TextCall.job_id == job_id)).all()
         assert len(records) == len(calls) and all(row.reserved_micros == expected_cost for row in records)

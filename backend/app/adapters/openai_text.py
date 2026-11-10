@@ -54,8 +54,8 @@ def call_messages(messages: list[Message], profile: dict, api_key: str, *,
     timeout = limits.timeout_seconds if limits else profile['timeout_seconds']
     output_tokens = limits.max_output_tokens if limits else profile['max_output_tokens']
     response_bytes = limits.max_response_bytes if limits else MAX_RESPONSE_BYTES
-    # Documents have one bounded whole-request budget. Existing single-image /
-    # title callers retain their prior per-read plus bounded-body timeout.
+    # Explicit workflow limits cover the whole request, including header wait.
+    # Generic/title callers retain their per-read plus bounded-body timeout.
     deadline = time.monotonic() + timeout if limits else None
     chat = profile["protocol"] == "chat_completions"
     payload = {"model": profile["model"], "stream": False, "store": False}

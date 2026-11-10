@@ -376,8 +376,9 @@ def test_title_requests_use_selected_supplier_and_preserve_shared_cache(admin_ca
 def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_case, monkeypatch):
     from app.translation_channels import CHANNELS, TranslationChannel
     seen = []
-    def call(messages, profile, api_key, *, json_schema=None):
+    def call(messages, profile, api_key, *, json_schema=None, limits=None):
         assert json_schema['strict'] is True
+        assert limits.max_output_tokens == 256
         seen.append((messages, profile['channel'], api_key))
         return TextResponse('{}', {'input_tokens': 1, 'output_tokens': 1}, 'synthetic')
     monkeypatch.setitem(CHANNELS, 'synthetic', TranslationChannel('Test channel', LLMConfig, (), call))
@@ -389,8 +390,8 @@ def test_channel_registry_accepts_a_new_source_without_changing_worker(admin_cas
     assert seen == [(messages([], 'en'), 'synthetic', 'isolated-new-key')]
 
 
-def test_output_limit_update_preserves_old_revision_and_wire_limit(admin_case, monkeypatch):
-    first = create(admin_case, body(max_output_tokens=8192))
+def test_output_limit_update_preserves_revision_ceiling_under_dynamic_budget(admin_case, monkeypatch):
+    first = create(admin_case, body(max_output_tokens=128))
     with session_factory()() as db:
         before = snapshot(db)
     client, auth = admin_case
@@ -409,7 +410,7 @@ def test_output_limit_update_preserves_old_revision_and_wire_limit(admin_case, m
     monkeypatch.setattr(openai_text, 'CheckedTransport', lambda: httpx.MockTransport(handler))
     for profile in [before, after, before]:
         call_text([], 'en', profile['text'])
-    assert seen == [8192, 32768, 8192]
+    assert seen == [128, 256, 128]
     assert client.put(PATH + '/' + first['id'], headers=auth, json=body(max_output_tokens=32769)).status_code == 422
 
 

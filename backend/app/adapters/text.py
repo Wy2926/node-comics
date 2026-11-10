@@ -1,7 +1,7 @@
 """Body translation: grouping, JSON messages and strict translation parsing."""
 import json
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from .llm import TextError, call_messages
+from .llm import RequestLimits, TextError, call_messages
 from ..translation_prompts import COMIC_TRANSLATION_PROMPT, target_instructions
 
 PROMPT_VERSION = 'comic-json-v14'
@@ -73,6 +73,15 @@ def input_bound(segments, language, system=SYSTEM, language_names=True):
     return len(json.dumps(payload, ensure_ascii=False).encode()) + 256
 
 
+def output_token_limit(segments, maximum):
+    # A provider-neutral budget, not a token count. Allow cross-language expansion
+    # from source UTF-8 bytes plus JSON framing; prompts/schema do not earn output.
+    source_bytes = sum(len(segment['source'].encode()) for segment in segments)
+    framing = len(json.dumps({segment['id']: '' for segment in segments},
+                             ensure_ascii=False, separators=(',', ':')).encode())
+    return min(maximum, max(256, 2 * source_bytes + framing + 64))
+
+
 def groups(segments, limit):
     result, current, size = [], [], 0
     for segment in segments:
@@ -119,4 +128,6 @@ def parse_translations(content, segments):
 
 def call_text(segments, language, profile, system=SYSTEM, language_names=True):
     return call_messages(messages(segments, language, system, language_names), profile,
-                         json_schema=response_schema(segments))
+                         json_schema=response_schema(segments), limits=RequestLimits(
+                             profile['timeout_seconds'],
+                             output_token_limit(segments, profile['max_output_tokens']), 1024 * 1024))

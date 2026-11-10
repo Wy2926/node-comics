@@ -45,9 +45,10 @@ def test_inflight_llm_does_not_hold_scheduler_or_image_resources(text_case, monk
 
 
 def test_parallel_groups_meter_every_call_without_cost_cap(text_case):
+    segments = [{'id': 'b001', 'source': 'Hello! ' * 100}]
     def reserve(index):
         try:
-            return classic.reserve_call(*text_case, index, SEGMENTS, 'zh-Hans')[0]
+            return classic.reserve_call(*text_case, index, segments, 'zh-Hans')[0]
         except TextError as error:
             return error.code
     with ThreadPoolExecutor(max_workers=2) as pool:

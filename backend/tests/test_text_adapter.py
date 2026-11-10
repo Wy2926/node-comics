@@ -28,7 +28,7 @@ def test_chat_payload_sends_only_text_and_bounds_output(profile, monkeypatch, la
         data = json.loads(request.content)
         seen.append(data)
         assert request.url == 'https://text.example/v1/chat/completions'
-        assert data['max_completion_tokens'] == 1024 and data['stream'] is False
+        assert data['max_completion_tokens'] == 256 and data['stream'] is False
         assert data['reasoning_effort'] == 'none' and 'reasoning' not in data
         assert data['response_format'] == {'type': 'json_schema', 'json_schema': text.response_schema([
             {'id': 'b1'}])}
@@ -54,7 +54,7 @@ def test_responses_protocol(profile, monkeypatch, language):
     def handler(request):
         data = json.loads(request.content)
         assert request.url.path == '/v1/responses'
-        assert data['store'] is False and data['max_output_tokens'] == 1024
+        assert data['store'] is False and data['max_output_tokens'] == 256
         assert data['reasoning'] == {'effort': 'none'} and 'reasoning_effort' not in data
         assert data['text'] == {'format': {'type': 'json_schema', **text.response_schema([])}}
         assert 'response_format' not in data and 'provider' not in data
@@ -154,11 +154,41 @@ def test_http_failures_do_not_retry_inside_transport(profile, monkeypatch, statu
     assert 'untrusted' not in exc.value.message
 
 
-def test_truncation_preserves_usage_for_retry_accounting(profile, monkeypatch):
-    install(monkeypatch, lambda request: httpx.Response(200, json={'choices': [{'message': {'content': '{'}, 'finish_reason': 'length'}], 'usage': {'prompt_tokens': 14, 'completion_tokens': 1024}}))
-    with pytest.raises(text.TextError) as exc:
-        text.call_text([], 'en', profile)
-    assert exc.value.retryable and exc.value.usage['output_tokens'] == 1024
+@pytest.mark.parametrize('protocol', ['chat_completions', 'responses'])
+def test_repeated_ocr_has_one_source_sized_budget_without_changing_profile(profile, monkeypatch, protocol):
+    import json
+    from copy import deepcopy
+    segments = [{'id': '0', 'source': '강' * 40 + ' ~' * 30},
+                {'id': '1', 'source': 'あああ！ドキドキ ' * 8}]
+    original = deepcopy(segments)
+    with session_factory()() as db:
+        configure_text_provider(db, profile['provider_id'], protocol=protocol, max_output_tokens=32768)
+        revised = snapshot(db, profile['provider_id'])['text']
+    frozen_profile = deepcopy(revised)
+    budgets = []
+
+    def handler(request):
+        data = json.loads(request.content)
+        prompt = data['messages' if protocol == 'chat_completions' else 'input']
+        budget = data['max_completion_tokens' if protocol == 'chat_completions' else 'max_output_tokens']
+        budgets.append(budget)
+        assert 256 < budget < 2048
+        assert json.loads(prompt[1]['content']) == {row['id']: row['source'] for row in segments}
+        result = {'choices': [{'message': {'content': '{'}, 'finish_reason': 'length'}]} if protocol == 'chat_completions' else {
+            'status': 'incomplete', 'incomplete_details': {'reason': 'max_output_tokens'}, 'output': []}
+        usage = {'prompt_tokens': 358, 'completion_tokens': budget} if protocol == 'chat_completions' else {
+            'input_tokens': 358, 'output_tokens': budget}
+        return httpx.Response(200, json={**result, 'id': 'limited-reply', 'usage': usage})
+
+    install(monkeypatch, handler)
+    for guidance in (text.SYSTEM, text.system_prompt('Custom guidance. ' * 100)):
+        with pytest.raises(text.TextError) as exc:
+            text.call_text(segments, 'zh-Hans', revised, guidance)
+        assert exc.value.code == 'TEXT_INCOMPLETE' and exc.value.retryable
+        assert exc.value.usage == {'input_tokens': 358, 'output_tokens': budgets[-1]}
+        assert exc.value.request_id == 'limited-reply'
+    assert budgets[0] == budgets[1] == text.output_token_limit(segments, 32768)
+    assert segments == original and revised == frozen_profile
 
 
 def test_missing_usage_is_not_zero_cost(profile, monkeypatch):

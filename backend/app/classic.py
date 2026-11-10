@@ -7,7 +7,7 @@ import math
 import time
 from sqlalchemy import func, or_, select
 from .adapters.llm import TextError
-from .adapters.text import LANGUAGE_CODE_VERSIONS, LEGACY_SYSTEM, call_text, groups, input_bound, parse_translations
+from .adapters.text import LANGUAGE_CODE_VERSIONS, LEGACY_SYSTEM, call_text, groups, input_bound, output_token_limit, parse_translations
 from .assets import available
 from .db import session_factory
 from .errors import ProcessingError, node_error
@@ -116,7 +116,7 @@ def reserve_call(job_id, lease_id, group_index, segments, language):
         prompt = job.config.get('text_prompt', LEGACY_SYSTEM)
         language_names = job.config.get('prompt_version', 'comic-json-v9') not in LANGUAGE_CODE_VERSIONS
         reserved = _cost_micros(profile, input_bound(segments, language, prompt, language_names),
-                               profile['max_output_tokens'])
+                               output_token_limit(segments, profile['max_output_tokens']))
         call = TextCall(id=uid(), job_id=job_id, attempt_id=job.attempt_id, execution_lease_id=lease_id,
                         group_index=group_index, sequence=sequence + 1,
                         provider_id=profile['provider_id'], model=profile['model'], reserved_micros=reserved, accounted_micros=reserved)

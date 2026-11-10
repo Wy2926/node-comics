@@ -146,7 +146,7 @@ def test_page_retry_and_checkpoint_replay_use_frozen_prompt_and_exact_cost(text_
     assert calls == [expected, expected]
     expected_cost = classic._cost_micros(frozen['text'], page_text.input_bound(
         SEGMENTS, 'zh-Hans', expected, generation == 'current'),
-                                       frozen['text']['max_output_tokens'])
+                                       page_text.output_token_limit(SEGMENTS, frozen['text']['max_output_tokens']))
     with session_factory()() as db:
         records = db.scalars(select(TextCall).where(TextCall.job_id == job_id).order_by(TextCall.sequence)).all()
         assert len(records) == 2 and all(call.reserved_micros == expected_cost for call in records)

@@ -229,7 +229,7 @@ def test_saved_all_empty_group_is_not_revalidated_or_called_again(text_case, mon
         assert db.scalar(select(func.count()).select_from(TextCall)) == 0
 
 
-def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case):
+def test_dynamic_output_reserves_schema_cost_then_accounts_actual_usage(text_case):
     import json
     from app.adapters.text import messages, response_schema
     from app.classic_config import snapshot
@@ -244,7 +244,7 @@ def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case
         call = db.get(TextCall, call_id)
         sent_bytes = len(json.dumps({'messages': messages(SEGMENTS, 'zh-Hans'), 'response_format': {
             'type': 'json_schema', 'json_schema': response_schema(SEGMENTS)}}, ensure_ascii=False).encode())
-        assert call.reserved_micros >= sent_bytes * 5 + 32768 * 30
+        assert call.reserved_micros == (sent_bytes + 256) * 5 + 256 * 30
         assert call.accounted_micros == call.reserved_micros and call.cost_state == 'unknown'
     classic.complete_call(call_id, lease_id, response=TextResponse(
         '{}', {'input_tokens': 100, 'output_tokens': 20}, 'actual-usage'))
@@ -257,7 +257,7 @@ def test_larger_output_reserves_schema_cost_then_accounts_actual_usage(text_case
     ({'input_tokens': 6, 'output_tokens': 7}, 2),  # Binary float arithmetic would exceed 2.
     ({'input_tokens': 1, 'output_tokens': 1}, 1),
     ({'input_tokens': 0, 'output_tokens': 0}, 0),
-    (None, 206),
+    (None, 52),
 ])
 def test_decimal_metering_keeps_integer_costs_and_frozen_prices(text_case, monkeypatch, usage, expected):
     from app.classic_config import snapshot
@@ -274,8 +274,8 @@ def test_decimal_metering_keeps_integer_costs_and_frozen_prices(text_case, monke
     assert frozen == profile
     with session_factory()() as db:
         call = db.get(TextCall, call_id)
-        assert type(call.reserved_micros) is int and call.reserved_micros == 206
-        assert call.accounted_micros == 206 and call.cost_state == 'unknown'
+        assert type(call.reserved_micros) is int and call.reserved_micros == 52
+        assert call.accounted_micros == 52 and call.cost_state == 'unknown'
     classic.complete_call(call_id, lease_id, response=TextResponse('{}', usage, 'decimal'))
     # Completion replay must never replace the original accounting.
     classic.complete_call(call_id, lease_id, response=TextResponse('{}', {'input_tokens': 1000, 'output_tokens': 1000}, 'replay'))
@@ -331,6 +331,9 @@ def test_invalid_json_never_saves_partial_translations_and_stops_at_attempt_limi
 
 
 def test_unknown_call_keeps_metering_without_cost_cap_and_stops_at_attempt_limit(text_case, monkeypatch):
+    with session_factory()() as db:
+        db.get(ClassicState, text_case[0]).analysis = analysis([{'id': 'b001', 'source': 'Hello! ' * 100}])
+        db.commit()
     calls = []
     def timeout(*args):
         calls.append(1)
