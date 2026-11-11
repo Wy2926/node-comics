@@ -1,1 +1,1 @@
-export * from '../../../../../backend/shared/translation-images/image-metadata';
+export * from '../../../../../shared/translation-images/image-metadata';

@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const catalog=JSON.parse(await readFile(new URL('../backend/shared/translation-fonts.json',import.meta.url),'utf8'));
+const catalog=JSON.parse(await readFile(new URL('../shared/translation-fonts.json',import.meta.url),'utf8'));
 const web='http://127.0.0.1:5176',out=path.resolve(process.env.FONT_VALIDATION_OUTPUT||'artifacts/translation-fonts-validation');
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROMIUM||process.env.CHROMIUM_PATH});

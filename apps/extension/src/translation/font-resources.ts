@@ -1,5 +1,5 @@
 import manifest from './font-resources.json';
-import {TRANSLATION_FONTS} from '../../../../backend/shared/translation-fonts';
+import {TRANSLATION_FONTS} from '../../../../shared/translation-fonts';
 import type {LocalAsset} from '../storage/local-assets/store';
 export const localFonts=TRANSLATION_FONTS.flatMap(font=>{const asset=manifest.find(asset=>asset.id===font.id);return asset?[{...font,languages:asset.languages}]:[];});
 export function fullFont(id:string):LocalAsset&{weight:number}{

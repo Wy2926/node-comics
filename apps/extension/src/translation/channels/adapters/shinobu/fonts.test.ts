@@ -4,7 +4,7 @@ import {drawTypeset} from '../../../../../third_party/shinobu/packages/image-pip
 import type {PlatformProvider,PipelineCanvas} from '../../../../../third_party/shinobu/packages/image-pipeline/src/runtime/platform';
 import {localFonts} from '../../../font-resources';
 import coverage from '../../../font-coverage.json';
-import catalog from '../../../../../../../backend/shared/translation-fonts.json';
+import catalog from '../../../../../../../shared/translation-fonts.json';
 
 it('has full-font coverage for every advertised language and localized specimen',()=>{
   expect(localFonts).toHaveLength(10);

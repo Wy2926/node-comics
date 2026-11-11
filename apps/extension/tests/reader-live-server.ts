@@ -114,7 +114,7 @@ export function createReaderLiveHandler(loadNetwork:()=>Promise<SourceNetwork>, 
       const sample = url.pathname.match(/^\/__reader_live\/sample\/(mono|color)\/(original|translated)$/);
       if (sample) {
         const pair = pairs.find(pair=>pair.id===sample[1])!, file = pair[sample[2] as 'original'|'translated'];
-        const body = await readFile(new URL(`../../../backend/website/src/assets/home/${file}`,import.meta.url));
+        const body = await readFile(new URL(`./fixtures/translation/home/${file}`,import.meta.url));
         if (body.length>imageLimit) throw Error('Sample byte limit');
         const type = file.endsWith('.png')?'image/png':file.endsWith('.jpg')?'image/jpeg':'image/webp';
         return new Response(new Uint8Array(body),{headers:{...headers,'Content-Type':type}});

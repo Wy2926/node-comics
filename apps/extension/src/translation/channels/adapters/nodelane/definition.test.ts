@@ -14,7 +14,7 @@ import {resultBlobKey} from '../../../../storage/translations/results';
 import {cacheInput,readInput} from '../../../input/cache';
 import {hashFile} from '../../../../importers/hash';
 import {readChannelSettings,writeChannelSettings} from '../../configuration';
-import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../../../../../backend/shared/translation-fonts';
+import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../../../../../shared/translation-fonts';
 
 const auth=vi.hoisted(()=>({value:{session:null} as AuthState,listeners:new Set<()=>void>()}));
 vi.mock('../../../../auth/storage',()=>({

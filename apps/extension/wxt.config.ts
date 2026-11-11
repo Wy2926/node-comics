@@ -13,7 +13,7 @@ export default defineConfig({
   zip: {
     // Preserve relative imports to shared image and model code in review sources.
     sourcesRoot: fileURLToPath(new URL('../../', import.meta.url)),
-    includeSources: ['apps/extension/{entrypoints,public,scripts,src,third_party}/**/*', 'apps/extension/*.{ts,html,json,md}', 'backend/shared/translation-images/**/*.ts', 'backend/shared/translation-models.ts', 'backend/shared/translation-fonts.{ts,json}', 'LICENSE'],
+    includeSources: ['apps/extension/{entrypoints,public,scripts,src,third_party}/**/*', 'apps/extension/*.{ts,html,json,md}', 'shared/translation-images/**/*.ts', 'shared/translation-models.ts', 'shared/translation-fonts.{ts,json}', 'LICENSE'],
   },
   vite:()=>({
     plugins:[shinobuAssets(),importAssets(),unrarCsp(),pdfjsCsp(),flipbookClip()],

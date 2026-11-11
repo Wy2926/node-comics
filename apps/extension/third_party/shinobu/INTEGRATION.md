@@ -14,4 +14,4 @@ node apps/extension/scripts/vendor-shinobu.mjs ../ShinobuTranslator
 
 模型描述、上游原有许可与发布材料记录保留在 `packages/model-manifest/`。这些记录不作为插件安装或运行门禁；普通构建支持手动下载全部模型，不需要开发开关。
 
-完整字体沿用 NodeLane 的字体目录与 `services/compute-node/assets.json`。其来源、版本、摘要和大小在 `src/translation/font-resources.json`，许可在已随插件发布的 `public/fonts/translation/`。`scripts/prepare_local_translation_fonts.py`（fonttools 4.59.1）从已校验完整字体生成该描述及 Unicode 覆盖表，不把完整字体复制进插件。
+字体清单为仓库根 `shared/font-assets.json`。来源、版本、摘要与大小在插件 `src/translation/font-resources.json`，许可在 `public/fonts/translation/`；根脚本 `prepare_local_translation_fonts.py` 从已校验字体生成描述和覆盖表。

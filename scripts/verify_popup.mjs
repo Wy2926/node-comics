@@ -7,7 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const {fonts}=JSON.parse(await readFile('backend/shared/translation-fonts.json','utf8'));
+const {fonts}=JSON.parse(await readFile('shared/translation-fonts.json','utf8'));
 const out=path.resolve('artifacts/popup-validation',randomUUID());await mkdir(out,{recursive:true});
 const extension=path.join(out,'extension');await cp('apps/extension/.output/chrome-mv3',extension,{recursive:true});
 const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));

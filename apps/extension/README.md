@@ -1,54 +1,34 @@
-# Node Comics 插件
+# 浏览器插件
 
-WXT + React + TypeScript，提供桌面及手机布局的浏览器阅读器、单来源书架与[网页原位翻译](../../docs/IN_PAGE_TRANSLATION.md)。手机适配面向 Firefox Android 与 iOS Orion，界面共用视觉令牌及业务流程；浏览器 API 和真机验收边界见[手机布局](../../docs/POPUP_AND_THEME.md#手机布局与浏览器能力)。
+WXT、React、TypeScript。需要 Node.js 22.12+；命令在本目录运行。
 
-iOS Safari 技术验证版的环境、构建和验证入口见 [Safari 模拟器](../../docs/SAFARI_PROTOTYPE.md)。它尚不属于已发布或已完成真机验收的平台。
-
-## 运行与构建
-
-需要 Node.js 22.23+、npm 10+，在本目录执行：
-
-```powershell
+```sh
 npm ci
-npm run dev          # 网页预览，http://127.0.0.1:5173
-npm run dev:extension
+npm run dev                 # 网页调试，127.0.0.1:5173
+npm run dev:extension       # 扩展调试
 npm run check
 npm test
-npm run build        # .output/chrome-mv3
+npm run build               # Chrome MV3
+npm run zip:chrome:store
+npm run zip:edge:store
+npx wxt zip --browser firefox --mv3
 ```
 
-Chrome／Edge 在扩展管理页加载对应的 `.output/<browser>-mv3`。网页预览不能替代扩展权限、后台和登录验证。
+`VITE_API_BASE` 指定 API，`VITE_DRIVE_CONNECT_URL` 指定 Drive 连接页。正式构建前核对地址；浏览器本机翻译可独立使用。
 
-插件在安装时统一声明对所有 HTTP/HTTPS 网站及图片域名的访问权限，使用功能时不逐站或逐域名申请。浏览器手动限制访问后，需在扩展设置恢复“所有网站”访问；运行时仍检查访问范围。网站访问权限不替代源站登录、Google Drive OAuth 或翻译服务的账户授权。配置与校验规则见[网站适配](../../docs/SITE_ADAPTERS.md#必须保持的约束)。
+## 代码入口
 
-官方 API 默认由 [service.ts](src/service.ts) 指向产品服务；本地预览沿用该地址。使用隔离后端时，在启动或构建前设置 `VITE_API_BASE`，结束后清除。Drive 构建需要 `VITE_DRIVE_CONNECT_URL`，配置见[连接页](../drive-connect/README.md)。
-
-| 产物 | 命令 |
+| 目录 | 职责 |
 | --- | --- |
-| Chrome 手动安装包 | `npm run zip` |
-| Edge 手动安装包 | `npm run zip:edge` |
-| Chrome／Edge 商店包 | `npm run zip:chrome:store` / `npm run zip:edge:store` |
-| Firefox MV3 审核包／Orion 本地 ZIP | `npm run zip -- --browser firefox --mv3` |
-| Safari 技术验证资源 | `npm run build:safari` |
-| 网页预览构建 | `npm run build:web` |
+| `src/comics`、`src/storage` | 漫画、导入、字节缓存与进度 |
+| `src/reader` | 阅读窗口与交互 |
+| `src/sources` | 站点发现、目录与取图 |
+| `src/translation` | 渠道、任务与结果 |
+| `src/ui`、`src/i18n` | 通用界面与字典 |
+| `../../shared` | 本仓库使用的图像协议、模型和字体数据 |
 
-商店包不含 `manifest.key`；Firefox 公开下载使用 AMO 签名 XPI。包校验、上传与发布见[部署规范](../../docs/DEPLOYMENT.md)。
+测试在 `tests/` 和模块相邻的 `*.test.ts`。浏览器夹具使用各自的 `*.config.ts`；需要扩展权限的行为使用构建后的 MV3 验证。
 
-扩展构建关闭 JavaScript 压缩以便审核；预构建依赖不会因此自动恢复可读性。PDF.js 使用同版本未压缩 Worker，并移除不适用于现有浏览器的旧 IE 回退，来源、许可与修改见[格式依赖规范](../../docs/IMPORT_FORMATS_AND_CACHE.md#依赖与可重复验证)。Chrome／Edge 商店打包后自动扫描最终 ZIP，拒绝再次包含该回退或预压缩 PDF Worker。
+官网站点清单更新：`node scripts/export-website-catalog.mjs <新输出目录>`，将产物替换后端仓库的 `contracts/extension/`。普通构建不访问其他仓库。
 
-Orion 本地安装复用 Firefox MV3 ZIP，不另设浏览器业务分支。打包前配置上述正式 API 与 Drive 连接地址；把生成的扩展 ZIP 保存到 iPhone“文件”，在 Orion 的“扩展 → ＋ → 从文件安装”选择它，无需解压。不是带 `-sources` 的源码包，也不是供 Firefox 正式安装的签名 XPI。文件安装入口见 [Orion 官方说明](https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html#ios-extensions-management)；本地包仍需 iOS 真机验证扩展 API 与授权流程。
-
-## 开发入口
-
-| 工作 | 规范 |
-| --- | --- |
-| 网站适配 | [适配器边界与站点入口](../../docs/SITE_ADAPTERS.md) |
-| 导入、远程书库、阅读、缓存与导出 | [来源架构与 OPDS](../../docs/COMIC_SOURCE_ARCHITECTURE.md)、[格式模块](src/comics/formats/README.md)、[导出](../../docs/COMIC_EXPORT_DESIGN.md) |
-| 翻译 | [渠道](../../docs/TRANSLATION_CHANNELS.md)、[官方契约](../../docs/READING_TRANSLATION_CONTRACT.md)、[原位翻译](../../docs/IN_PAGE_TRANSLATION.md)、[浏览器本地翻译](../../docs/SHINOBU_TRANSLATION_DESIGN.md) |
-| 清晰度优化 | [图像增强协议、顺序与缓存](../../docs/IMAGE_ENHANCEMENT.md) |
-| 漫画阅读与翻页 | [阅读布局、翻页动画、书签与性能边界](../../docs/SIMPLE_COMIC_READING_DESIGN.md#阅读与恢复) |
-| UI | [共享主题](../../docs/POPUP_AND_THEME.md)、[快捷键](../../docs/POPUP_AND_THEME.md#快捷键)、[国际化](../../docs/UI_INTERNATIONALIZATION.md) |
-| 发现与搜索 | [AniList 发现](../../docs/DISCOVERY.md)、[跨语言网站搜索](../../docs/COMIC_SEARCH_DESIGN.md) |
-| 身份与账户 | [身份配置](../../docs/PRODUCTION_IDENTITY.md)、[会员规则](../../docs/MEMBERSHIP_AND_QUOTAS.md) |
-
-浏览器夹具和启动顺序见[脚本入口](../../scripts/README.md)；使用隔离 profile，检查加载、失败、重复操作与阅读位置恢复。
+[站点规则](../../docs/SITE_ADAPTERS.md) · [翻译规则](../../docs/TRANSLATION.md) · [Shinobu 来源](third_party/shinobu/THIRD_PARTY_NOTICES.md)

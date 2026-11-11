@@ -4,7 +4,7 @@ import {supportsLanguage,type Page,type Mode,type Capabilities,type Entitlements
 import type {TranslationState} from '../../../automatic';
 import {quotaErrors,exhausted} from './operations';
 import {translationScope,type LocalOperation} from './store';
-import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
+import {selectedModelAvailable} from '../../../../../../../shared/translation-models';
 import {selectedFontAvailable} from '../../../fonts';
 
 const upgradeState=(reason:'not_allowed'|'quota_exhausted'):TranslationState=>({kind:'upgrade',message:reason==='not_allowed'?msg('当前权益不支持'):msg('额度不足')});

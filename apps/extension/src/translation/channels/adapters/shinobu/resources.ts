@@ -4,7 +4,7 @@ import {fullFont,localFonts} from '../../../font-resources';
 import {localHostRequest} from '../../host-client';
 import type {ChannelResources,FontDownload,FontDownloads} from '../../contracts';
 import {msg} from '../../../../i18n/runtime';
-import {translationFontName} from '../../../../../../../backend/shared/translation-fonts';
+import {translationFontName} from '../../../../../../../shared/translation-fonts';
 import {fallbackLanguages} from '../../../../types';
 import {effectiveTranslationFont} from '../../../fonts';
 import {localLanguages,supportsLocalLanguage} from './languages';

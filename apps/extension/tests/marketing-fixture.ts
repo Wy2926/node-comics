@@ -1,8 +1,8 @@
 import {hashFile} from '../src/importers/hash';
 /** Screenshot-only local harness. Real product components; recorded sample output; no cloud calls. */
 import {BlobReader, BlobWriter, ZipWriter} from '@zip.js/zip.js/index-native.js';
-import originalUrl from '../../../backend/website/src/assets/journey-original.webp?url';
-import translatedUrl from '../../../backend/website/src/assets/journey-en.webp?url';
+import originalUrl from './fixtures/translation/journey-original.webp?url';
+import translatedUrl from './fixtures/translation/journey-en.webp?url';
 import {saveSession} from '../src/auth/storage';
 import {saveSettings} from '../src/comics/application/preferences';
 import {importLocalFile} from '../src/comics/application/import-service';

@@ -4,7 +4,7 @@ import {pricingUrl} from '../billing';
 import {Icon} from '../icons';
 import {SettingRow} from './components';
 import type {ModelSelection} from '../translation/channels/contracts';
-import {selectedModelAvailable, translationModelChoices} from '../../../../backend/shared/translation-models';
+import {selectedModelAvailable, translationModelChoices} from '../../../../shared/translation-models';
 import {menuPosition, visibleViewport} from './visual-viewport';
 import './select.css';
 import './translation-models.css';

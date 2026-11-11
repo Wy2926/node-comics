@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createImageCanvas, imageCanvasBlob} from '../../../backend/shared/translation-images/canvas';
+import {createImageCanvas, imageCanvasBlob} from '../../../shared/translation-images/canvas';
 afterEach(() => vi.unstubAllGlobals());
 describe('document canvas capability fallback', () => {
   it('retains the offscreen fast path and encoding options', async () => {

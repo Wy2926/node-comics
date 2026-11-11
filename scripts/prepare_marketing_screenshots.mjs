@@ -5,7 +5,7 @@ import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-const require=createRequire(new URL('../backend/website/package.json',import.meta.url));
+const require=createRequire(import.meta.url);
 const sharp=require('sharp');
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const out=path.join(root,'artifacts/marketing/2026-09-24/screenshots');

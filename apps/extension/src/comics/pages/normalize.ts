@@ -3,8 +3,8 @@ import {Sha256} from '../../importers/hash';
 import {imageMimeFromBytes} from '../formats/identify';
 import HashWorker from './hash.worker?worker';
 import {needsNormalization,probeImageMetadata} from './image-metadata';
-import {bitmapPng} from '../../../../../backend/shared/translation-images/png';
-import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
+import {bitmapPng} from '../../../../../shared/translation-images/png';
+import {createImageCanvas, imageCanvasBlob} from '../../../../../shared/translation-images/canvas';
 export interface PageInput {name: string; blob: Blob; width?: number; height?: number}
 
 async function digestPage(blob: Blob, signal?: AbortSignal): Promise<string> {

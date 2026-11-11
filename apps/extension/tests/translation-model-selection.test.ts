@@ -10,7 +10,7 @@ import {ApiError} from '../src/api';
 import {TranslationCoordinator,translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {makeOperation,operationId} from '../src/translation/channels/adapters/nodelane/operations';
 import {readOperation,readPageOperations,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
-import {selectedModelAvailable} from '../../../backend/shared/translation-models';
+import {selectedModelAvailable} from '../../../shared/translation-models';
 import {fixture,originalInput,snapshot,target} from './translation-fixture';
 
 afterEach(()=>vi.restoreAllMocks());

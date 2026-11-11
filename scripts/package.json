@@ -1,0 +1,6 @@
+{
+  "name": "@node-comics/tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {"sharp": "0.35.4"}
+}

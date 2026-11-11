@@ -6,7 +6,7 @@ import {createServer} from 'node:http';
 import {createHash, randomUUID} from 'node:crypto';
 import {cp, mkdir, readFile, readdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {probeImageMetadata} from '../backend/shared/translation-images/image-metadata.ts';
+import {probeImageMetadata} from '../shared/translation-images/image-metadata.ts';
 
 const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const out = path.resolve('artifacts/region-validation', randomUUID());

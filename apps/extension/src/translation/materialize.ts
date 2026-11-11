@@ -1,5 +1,5 @@
 import {msg} from '../i18n/runtime';
-import {InvalidArtifactError, OriginalUnavailableError, materializeResult as materialize, validateResult as validate} from '../../../../backend/shared/translation-images/materialize';
+import {InvalidArtifactError, OriginalUnavailableError, materializeResult as materialize, validateResult as validate} from '../../../../shared/translation-images/materialize';
 export {OriginalUnavailableError, InvalidArtifactError};
 
 function localized(error: unknown) {

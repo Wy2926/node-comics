@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {probeImageMetadata} from '../backend/shared/translation-images/image-metadata.ts';
+import {probeImageMetadata} from '../shared/translation-images/image-metadata.ts';
 
 const api = 'http://127.0.0.1:4737', site = 'http://localhost:4737';
 const source = await readFile(fileURLToPath(new URL('../artifacts/import-validation/1.png', import.meta.url)));

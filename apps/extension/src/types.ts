@@ -1,11 +1,11 @@
 import {msg} from './i18n/runtime';
 import type {UiLanguage} from './i18n/locales';
 import type {EpubIndex, EpubLocation} from './comics/formats/contracts';
-import type {TranslationResult} from '../../../backend/shared/translation-images/types';
-import type {InputProfile} from '../../../backend/shared/translation-images/limits';
-import type {TranslationModel,TranslationModelChoice} from '../../../backend/shared/translation-models';
-export type {TranslationModel,TranslationModelChoice} from '../../../backend/shared/translation-models';
-export type {TranslationArtifact,TranslationResult} from '../../../backend/shared/translation-images/types';
+import type {TranslationResult} from '../../../shared/translation-images/types';
+import type {InputProfile} from '../../../shared/translation-images/limits';
+import type {TranslationModel,TranslationModelChoice} from '../../../shared/translation-models';
+export type {TranslationModel,TranslationModelChoice} from '../../../shared/translation-models';
+export type {TranslationArtifact,TranslationResult} from '../../../shared/translation-images/types';
 export type Mode = 'classic';
 export interface MembershipGift {starts_at:string|null;ends_at:string|null;days:number;state:'pending'|'scheduled'|'active'|'expired'}
 export type JobStatus = 'awaiting_upload' | 'validating_upload' | 'queued' | 'running' | 'succeeded' | 'no_text' | 'failed' | 'cancelled' | 'outcome_unknown' | 'unknown_released';

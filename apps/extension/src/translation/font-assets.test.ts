@@ -2,9 +2,9 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {describe,expect,it} from 'vitest';
-import {TRANSLATION_FONTS,defaultTranslationFont,translationFontName,translationFontPreview} from '../../../../backend/shared/translation-fonts';
-import catalog from '../../../../backend/shared/translation-fonts.json';
-import assets from '../../../../services/compute-node/assets.json';
+import {TRANSLATION_FONTS,defaultTranslationFont,translationFontName,translationFontPreview} from '../../../../shared/translation-fonts';
+import catalog from '../../../../shared/translation-fonts.json';
+import assets from '../../../../shared/font-assets.json';
 import previews from '../../public/fonts/translation/sources.json';
 
 const root=new URL('../../public/fonts/translation/',import.meta.url);

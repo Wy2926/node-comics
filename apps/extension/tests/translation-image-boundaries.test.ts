@@ -6,7 +6,7 @@ import * as metadata from '../src/comics/pages/image-metadata';
 import {hashFile} from '../src/importers/hash';
 import {materializeResult} from '../src/translation/materialize';
 import type {Page,TranslationResult} from '../src/types';
-import * as png from '../../../backend/shared/translation-images/png';
+import * as png from '../../../shared/translation-images/png';
 import {resizeInput} from '../src/translation/input/resize';
 import {jpegWithSize} from './image-encoding-fixture';
 

@@ -13,7 +13,7 @@ import {loadDeliveredResult,resultBlobKey} from '../../../../storage/translation
 import {TRANSLATION_MAX_BYTES,TRANSLATION_MAX_DIMENSION,TRANSLATION_MAX_PIXELS} from '../../../input/limits';
 import {loadTranslationInput} from '../../../input/load';
 import {readChannelSettings,updateChannelSettings} from '../../configuration';
-import {selectedModelAvailable} from '../../../../../../../backend/shared/translation-models';
+import {selectedModelAvailable} from '../../../../../../../shared/translation-models';
 import {pageTranslation} from '../../../../reader/presentation';
 import {effectiveTranslationFont,selectedFontAvailable} from '../../../fonts';
 

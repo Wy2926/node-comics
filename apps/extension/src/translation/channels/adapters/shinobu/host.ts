@@ -2,7 +2,7 @@ import type {ChannelLocalHost} from '../../contracts';
 import DownloadWorker from '../../../../storage/local-assets/download.worker?worker';
 import {recheckAsset,recordAssetFailure,removeAsset,type LocalAsset} from '../../../../storage/local-assets/store';
 import {saveResultBlob} from '../../../../storage/translations/results';
-import {defaultTranslationFont} from '../../../../../../../backend/shared/translation-fonts';
+import {defaultTranslationFont} from '../../../../../../../shared/translation-fonts';
 import {fullFont} from '../../../font-resources';
 import {modelAssets,resourceAssets,resourceEvents} from './resources';
 import {readOperation,readInput,releaseInput,saveOperation,clearCheckpoint,expireCheckpoints} from './operations';

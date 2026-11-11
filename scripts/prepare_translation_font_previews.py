@@ -21,8 +21,8 @@ def digest(path):
 
 
 def prepare(source, output):
-    catalog = json.loads((ROOT / 'backend/shared/translation-fonts.json').read_text(encoding='utf-8'))
-    assets = json.loads((ROOT / 'services/compute-node/assets.json').read_text(encoding='utf-8'))['fonts']
+    catalog = json.loads((ROOT / 'shared/translation-fonts.json').read_text(encoding='utf-8'))
+    assets = json.loads((ROOT / 'shared/font-assets.json').read_text(encoding='utf-8'))['fonts']
     assets = {font['id']: font for font in assets if 'id' in font}
     defaults = catalog['defaults']
     choices_by_id = {font['id']: font for font in catalog['fonts']}
@@ -74,17 +74,6 @@ def prepare(source, output):
                           'license': asset['license'], 'notice': notice.name,
                           'notice_sha256': asset['notice_sha256']})
     (output / 'sources.json').write_text(json.dumps({'fonts': generated}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    # Both deployable Python packages carry their own small runtime catalog;
-    # the browser catalog and checksum-pinned asset registry remain the source.
-    choices = [{'id': font['id'], 'file': assets[font['id']]['name'], 'languages': font['languages'],
-                'default_languages': [language for language, font_id in defaults.items() if font_id == font['id']]}
-               for font in catalog['fonts']]
-    for path, value in (
-        (ROOT / 'services/classic-engine/mtu_engine/fonts.json', choices),
-        (ROOT / 'backend/app/translation_fonts.json', {'fonts': [
-            {'id': font['id'], 'languages': font['languages']} for font in choices], 'defaults': defaults}),
-    ):
-        path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(json.dumps({'fonts': len(generated), 'woff2_bytes': sum(font['bytes'] for font in generated)}, indent=2))
 
 

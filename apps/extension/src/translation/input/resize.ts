@@ -1,1 +1,1 @@
-export * from '../../../../../backend/shared/translation-images/resize';
+export * from '../../../../../shared/translation-images/resize';

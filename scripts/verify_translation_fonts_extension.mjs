@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
-const catalog=JSON.parse(await readFile(new URL('../backend/shared/translation-fonts.json',import.meta.url),'utf8'));
+const catalog=JSON.parse(await readFile(new URL('../shared/translation-fonts.json',import.meta.url),'utf8'));
 const out=path.resolve('artifacts/translation-fonts-mv3',randomUUID()),extension=path.join(out,'extension');
 await mkdir(out,{recursive:true});await cp(process.env.TEST_EXTENSION_DIR||'apps/extension/.output/chrome-mv3',extension,{recursive:true});
 await writeFile(path.join(extension,'font-probe.html'),'<!doctype html><meta charset="utf-8"><title>Isolated MV3 font verification</title><main id="samples"></main>');

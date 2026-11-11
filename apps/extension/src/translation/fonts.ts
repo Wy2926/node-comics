@@ -1,4 +1,4 @@
-import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../../backend/shared/translation-fonts';
+import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../../shared/translation-fonts';
 import type {TranslationFontChoice} from '../types';
 
 /** A shipped preview is not evidence that the connected service can render that font. */

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(new URL('../backend/website/package.json', import.meta.url));
+const require = createRequire(import.meta.url);
 const sharp = require('sharp');
 const out = path.resolve(root, process.argv[3] || 'output/chrome-web-store-current/screenshots');
 const background = path.resolve(root, process.argv[2] || 'output/imagegen/blue-manga-store/background.png');

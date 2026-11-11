@@ -13,7 +13,7 @@ import {readOperation,saveOperation,saveReceipt,readJobs} from '../src/translati
 import {operationId,makeOperation} from '../src/translation/channels/adapters/nodelane/operations';
 import {ApiError} from '../src/api';
 import {canvasJpeg,canvasWebp} from '../src/translation/input/resize';
-import * as png from '../../../backend/shared/translation-images/png';
+import * as png from '../../../shared/translation-images/png';
 import {fixture,target,snapshot,originalInput,originalBytes} from './translation-fixture';
 import {jpegWithSize,pngWithSize} from './image-encoding-fixture';
 import {PDF_RENDER_PROFILE,pageReference} from '../src/comics/pages/identity';

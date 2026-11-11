@@ -6,7 +6,7 @@ import {pathToFileURL} from 'node:url';
 
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=path.resolve(process.argv[2]||'artifacts/translation-fonts/preview');
-const catalog=JSON.parse(await readFile('backend/shared/translation-fonts.json','utf8'));
+const catalog=JSON.parse(await readFile('shared/translation-fonts.json','utf8'));
 const sources=JSON.parse(await readFile('apps/extension/public/fonts/translation/sources.json','utf8'));
 const labels={'zh-Hans':'简体中文','zh-Hant':'繁體中文',ja:'日本語',ko:'한국어',en:'English',fr:'Français',es:'Español','pt-BR':'Português (Brasil)',de:'Deutsch',it:'Italiano',ru:'Русский',pl:'Polski',uk:'Українська',tr:'Türkçe',vi:'Tiếng Việt',id:'Bahasa Indonesia',ar:'العربية'};
 const escape=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

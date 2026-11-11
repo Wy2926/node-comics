@@ -49,7 +49,7 @@ const server=createServer({key:await readFile(path.join(profile,'fixture-key.pem
     if(request.method==='OPTIONS'){response.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Authorization,Range','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});response.end();return;}
     if(host===bridge.hostname){
       const sharedAssets={'/design-tokens.css':'text/css','/icon-128.png':'image/png','/favicon.ico':'image/x-icon'};
-      if(Object.hasOwn(sharedAssets,url.pathname)){response.writeHead(200,{'Content-Type':sharedAssets[url.pathname]});response.end(await readFile(path.join(root,'backend/website/public',url.pathname.slice(1))));return;}
+      if(Object.hasOwn(sharedAssets,url.pathname)){response.writeHead(200,{'Content-Type':sharedAssets[url.pathname]});response.end(await readFile(path.join(root,'apps/drive-connect/public',url.pathname.slice(1))));return;}
       const base=new URL('.',bridge).pathname,name=url.pathname===bridge.pathname?'index.html':url.pathname.startsWith(base)?url.pathname.slice(base.length):'';
       if(name==='config.js'){response.writeHead(200,{'Content-Type':'text/javascript'});response.end('globalThis.NODE_COMICS_DRIVE_CONFIG={clientId:"fixture-client.apps.googleusercontent.com"};');return;}
       if(['index.html','connect.js','style.css'].includes(name)){response.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html;charset=utf-8':name.endsWith('.js')?'text/javascript':'text/css'});response.end(await readFile(path.join(root,'apps/drive-connect',name)));return;}

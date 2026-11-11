@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(dir, '../../..');
-const require = createRequire(path.join(root, 'backend/website/package.json'));
+const require = createRequire(path.join(root, 'scripts/package.json'));
 const sharp = require('sharp');
 const ink = '#202D43', blue = '#1769B3', pink = '#E879A4';
 const source = path.join(dir, 'generated-master.png');

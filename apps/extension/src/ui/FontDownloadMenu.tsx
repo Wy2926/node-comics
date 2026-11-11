@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
-import {translationFontName} from '../../../../backend/shared/translation-fonts';
+import {translationFontName} from '../../../../shared/translation-fonts';
 import type {FontDownload,FontDownloads} from '../translation/channels/contracts';
 import type {availableTranslationFonts} from '../translation/fonts';
 import {msg} from '../i18n/runtime';

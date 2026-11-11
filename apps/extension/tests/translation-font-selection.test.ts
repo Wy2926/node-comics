@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createElement} from 'react';
-import {TRANSLATION_FONTS,defaultTranslationFont,translationFontName,translationFontPreview} from '../../../backend/shared/translation-fonts';
+import {TRANSLATION_FONTS,defaultTranslationFont,translationFontName,translationFontPreview} from '../../../shared/translation-fonts';
 import {TranslationFontPicker} from '../src/ui/TranslationFontPicker';
 import {Select,SelectOption} from '../src/ui/Select';
 import {availableTranslationFonts,effectiveTranslationFont,selectedFontAvailable} from '../src/translation/fonts';

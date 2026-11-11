@@ -7,14 +7,15 @@ import path from 'node:path';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(process.argv[2]||'artifacts/overlay-tiles-validation');
 const web=process.env.OVERLAY_TEST_WEB||'http://127.0.0.1:5181';
-const python=process.env.PYTHON||(process.platform==='win32'?path.resolve('services/classic-engine/.venv-lama/Scripts/python.exe'):'python3');
+if (!process.env.COMICS_COMPUTE_ROOT) throw new Error('Set COMICS_COMPUTE_ROOT for the node codec integration check');
+const python=process.env.PYTHON||(process.platform==='win32'?'python':'python3');
 execFileSync(python,['-c',String.raw`
-import hashlib, json, sys
+import hashlib, json, sys, os
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from PIL.ImageCms import ImageCmsProfile, createProfile
-sys.path.insert(0, 'services/classic-engine')
+sys.path.insert(0, str(Path(os.environ['COMICS_COMPUTE_ROOT']) / 'services/classic-engine'))
 from classic_node.protocol import pack_result
 root = Path(sys.argv[1]); root.mkdir(parents=True, exist_ok=True)
 for name, size in [('long', (64, 100000)), ('wide', (100000, 64)), ('alpha', (64, 100000)), ('single', (64, 100000)), ('single-wide', (100000, 64))]:
@@ -247,14 +248,14 @@ try{
     try{if(avifBitmap.width!==800||avifBitmap.height!==1200)throw Error('Small AVIF conversion changed dimensions');}finally{avifBitmap.close();}
     checks.push('A real sub-1-MiB AVIF keeps its source identity and produces a supported same-size official upload MIME');
     return {checks,cases,boundaries,avif:{sourceBytes:avif.size,uploadBytes:avifInput.image.byte_size,uploadMime:avifInput.image.content_type},encoding:{width:800,height:30000,inputBytes:representative.size,baselineBytes:baseline.size,optimizedBytes:optimized.size,mime:optimized.type,baselineMs,optimizedMs,rmse,textRmse},largeOriginal:{sourceBytes:large.size,width:readable.width,height:readable.height,sourceMs,inputBytes:translated.image.byte_size},synthetic:true,realProvider:false};
-  },'/@fs/'+path.resolve('backend/shared/translation-images').replaceAll('\\','/'));
+  },'/@fs/'+path.resolve('shared/translation-images').replaceAll('\\','/'));
   // Lower only translation-input encoding's budget; original normalization and result composition stay unrestricted.
   const limited=await browser.newContext();
   try{
     await limited.route(web+'/tiles-validation',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Bounded PNG input errors</title>'}));
     await limited.route(web+'/tile-fixture/*',serveFixture);
     let injected=0;
-    await limited.route(/\/backend\/shared\/translation-images\/resize\.ts(?:\?|$)/,async route=>{
+    await limited.route(/\/shared\/translation-images\/resize\.ts(?:\?|$)/,async route=>{
       const response=await route.fetch(),source=await response.text();
       const replacement=source.replace(/bitmapPng\(\s*bitmap\s*,\s*\[\s*\]\s*,\s*TRANSLATION_MAX_BYTES\s*\)/,'bitmapPng(bitmap, [], 1024)');
       assert.notEqual(replacement,source,'Upload PNG test budget injection did not match');injected++;

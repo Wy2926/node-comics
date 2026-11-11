@@ -3,7 +3,7 @@ import {saveSession} from '../src/auth/storage';
 import {API_ORIGIN} from '../src/service';
 import {defaults,languageLabels,type Job,type Entitlements,type TranslationInput,type TranslationSnapshot} from '../src/types';
 import {saveSettings,settings} from '../src/comics/application/preferences';
-import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../backend/shared/translation-fonts';
+import {TRANSLATION_FONTS,defaultTranslationFont} from '../../../shared/translation-fonts';
 import {seedReaderFixture} from './reader-fixture-data';
 import {saveProcessingProfile,updateProcessingSettings} from '../src/image-processing/settings';
 import {hashFile} from '../src/importers/hash';

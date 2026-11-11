@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {describe,expect,it} from 'vitest';
-import {readTiles,TILES_MIME} from '../../../backend/shared/translation-images/tiles';
+import {readTiles,TILES_MIME} from '../../../shared/translation-images/tiles';
 
 const sha=(data:Uint8Array)=>createHash('sha256').update(data).digest('hex');
 const image='a'.repeat(64),bytes=new TextEncoder().encode('frozen WebP bytes');

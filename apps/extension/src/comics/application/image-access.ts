@@ -7,7 +7,7 @@ import { sourcePageCache } from '../../storage/source-pages';
 import { thumbnailCache } from '../../storage/thumbnails';
 import { RequestPool } from '../../concurrency';
 import {openSourceCover} from './cover-access';
-import {createImageCanvas, imageCanvasBlob} from '../../../../../backend/shared/translation-images/canvas';
+import {createImageCanvas, imageCanvasBlob} from '../../../../../shared/translation-images/canvas';
 import type {PagePreviewTarget} from '../pages/preview';
 export type {PagePreviewTarget} from '../pages/preview';
 

@@ -1,6 +1,6 @@
 """Generate full-font descriptors and Unicode coverage, without copying font bytes.
 
-Requires fonttools==4.59.1. Source fonts must match services/compute-node/assets.json;
+Requires fonttools==4.59.1. Source fonts must match shared/font-assets.json;
 license notices are checked against the already shipped preview notices.
 """
 import argparse
@@ -17,8 +17,8 @@ def digest(path):
 
 
 def prepare(source):
-    assets = json.loads((ROOT / 'services/compute-node/assets.json').read_text())['fonts']
-    catalog = json.loads((ROOT / 'backend/shared/translation-fonts.json').read_text())['fonts']
+    assets = json.loads((ROOT / 'shared/font-assets.json').read_text())['fonts']
+    catalog = json.loads((ROOT / 'shared/translation-fonts.json').read_text())['fonts']
     languages = {'zh-Hans', 'zh-Hant', 'ja', 'ko'}
     ids = {font['id'] for font in catalog if languages.intersection(font['languages'])}
     resources, coverage = [], {}

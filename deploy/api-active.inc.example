@@ -1,2 +1,0 @@
-# Initial active API. Install as /www/node-comics/active/api.inc.
-server 127.0.0.1:18088;

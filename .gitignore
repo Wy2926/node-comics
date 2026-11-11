@@ -1,8 +1,6 @@
 .env
-deploy/engine.json
 .env.*
 !.env.example
-!deploy/.env.server.example
 node_modules/
 .venv/
 __pycache__/
@@ -14,10 +12,7 @@ __pycache__/
 dist/
 dist-web/
 .astro/
-backend/app/website_dist/
 data/
-!backend/website/src/data/
-!backend/website/src/data/*.ts
 artifacts/
 document-spool/
 test-results/
@@ -36,3 +31,8 @@ private-test-data/
 /output/imagegen/blue-manga-store/
 /output/imagegen/blue-manga-store-kit.zip
 /output/playwright/reader-performance/
+# Local state left behind after repository extraction.
+/backend/
+/services/
+/deploy/
+/contracts/

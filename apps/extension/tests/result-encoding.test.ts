@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {compositeImage} from '../../../backend/shared/translation-images/composite';
-import * as png from '../../../backend/shared/translation-images/png';
+import {compositeImage} from '../../../shared/translation-images/composite';
+import * as png from '../../../shared/translation-images/png';
 import {jpegWithSize} from './image-encoding-fixture';
 
 const convert=vi.fn(async ({type}:{type:string})=>new Blob(['encoded'],{type}));

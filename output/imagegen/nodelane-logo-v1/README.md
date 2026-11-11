@@ -10,6 +10,6 @@
 | `generated-master.png` / `prompt.txt` | 生成源图和提示词 |
 | `asset-manifest.json` / `export-assets.mjs` | 素材来源、摘要和导出工具 |
 
-在仓库根目录运行 `node output/imagegen/nodelane-logo-v1/export-assets.mjs` 可重新导出；需要官网 Sharp 依赖与 Windows 系统字体，不调用图片接口。
+先在 `scripts/` 执行 `npm ci`，再从仓库根运行 `node output/imagegen/nodelane-logo-v1/export-assets.mjs`。需要 Windows 系统字体。
 
-产品使用 `apps/extension/public/brand`、`apps/extension/src/assets/brand` 和官网内的资源副本，构建不读取本目录。名称与文案见[品牌规范](../../../docs/BRAND_AND_STORE_LISTING.md)。
+插件与官网各自持有资源副本，构建不读取本目录。

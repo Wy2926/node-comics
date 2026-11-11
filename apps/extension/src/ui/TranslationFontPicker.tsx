@@ -1,5 +1,5 @@
 import {useEffect,useId,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
-import {translationFontName,translationFontPreview} from '../../../../backend/shared/translation-fonts';
+import {translationFontName,translationFontPreview} from '../../../../shared/translation-fonts';
 import {msg} from '../i18n/runtime';
 import type {FontSelection} from '../translation/channels/contracts';
 import {availableTranslationFonts,effectiveTranslationFont} from '../translation/fonts';

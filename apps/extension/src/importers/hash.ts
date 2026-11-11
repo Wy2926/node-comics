@@ -1,6 +1,6 @@
 import {msg} from '../i18n/runtime';
-import {Sha256 as CoreSha256} from '../../../../backend/shared/translation-images/hash';
-export {hashFile} from '../../../../backend/shared/translation-images/hash';
+import {Sha256 as CoreSha256} from '../../../../shared/translation-images/hash';
+export {hashFile} from '../../../../shared/translation-images/hash';
 function localized(error: unknown) {
   if (error instanceof Error && error.message === 'SHA-256 已结束。') error.message = msg('SHA-256 已结束。');
   return error;

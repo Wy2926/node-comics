@@ -7,7 +7,7 @@ import {createServer} from 'node:http';
 import {createHash, randomUUID} from 'node:crypto';
 import {cp, mkdir, readFile, writeFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
-import {probeImageMetadata} from '../backend/shared/translation-images/image-metadata.ts';
+import {probeImageMetadata} from '../shared/translation-images/image-metadata.ts';
 const sitesDirectory=path.resolve('apps/extension/src/sources/sites');
 const siteChecks=[];
 for(const site of await readdir(sitesDirectory,{withFileTypes:true})) {

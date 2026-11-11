@@ -4,9 +4,11 @@ param([switch]$Apply)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Git emits UTF-8 paths, including on Windows PowerShell 5.1.
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new()
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')
 $comparison = [StringComparison]::OrdinalIgnoreCase
-$artifactRoots = @('artifacts', 'services/classic-engine/artifacts', 'services/compute-node/artifacts')
+$artifactRoots = @('artifacts')
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'apps/extension/wxt.config.ts'))) {
     throw 'Keep this script in the node-comics scripts directory.'
 }
@@ -96,13 +98,6 @@ $suites = @(
         'probe_amd_full_gpu_fixed.py', 'probe_amd_full_gpu_warm.py', 'probe_amd_gpu_decoder.py',
         'probe_lama_crop_processes.py', 'probe_single_page.py', 'profile_amd_components.py',
         'profile_panels.py', 'shrink_engine.py', 'simplify_docs.py', 'simplify_module_docs.py'
-    )},
-    @{Root = 'services/classic-engine/artifacts'; Names = @(
-        'lama-validation', 'managed-node-validation', 'task-tests', 'v2-smoke'
-    )},
-    @{Root = 'services/compute-node/artifacts'; Names = @(
-        'acceptance-utf8', 'assets', 'clean-build', 'toolchain-research',
-        'cleanup-old-builds.ps1', 'runtime-requirements.txt'
     )},
     @{Root = 'artifacts/firefox-release-2026-09-25'; Names = @(
         'source-rebuild', 'build.log', 'fetch-store.py', 'lint.json', 'nodelane-comics-0.1.0-signed.xpi',

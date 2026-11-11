@@ -337,7 +337,7 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         const pixel=canvas.getContext('2d');pixel.drawImage(decoded,0,19999,1,1,0,0,1,1);
         return {width:decoded.width,height:decoded.height,bottom:[...pixel.getImageData(0,0,1,1).data]};
       }finally{bitmap?.close();decoded?.close();canvas.width=canvas.height=1;if(original)Object.defineProperty(window,'OffscreenCanvas',original);else delete window.OffscreenCanvas;}
-    },'/@fs/'+path.resolve('backend/shared/translation-images/png.ts').replaceAll('\\','/'));
+    },'/@fs/'+path.resolve('shared/translation-images/png.ts').replaceAll('\\','/'));
     assert.deepEqual(longImage,{width:64,height:20000,bottom:[0,0,255,255]});
     check('20000px image uses bounded document canvases without OffscreenCanvas and retains bottom pixels');
     await page.evaluate(()=>{const settings=JSON.parse(localStorage.getItem('nc-settings'));localStorage.setItem('nc-settings',JSON.stringify({...settings,appearance:'dark',textScale:1.25}));});
