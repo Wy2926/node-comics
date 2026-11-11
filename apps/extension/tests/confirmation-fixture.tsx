@@ -16,6 +16,7 @@ import type {ShelfView} from '../src/ui/ShelfGrid';
 import {BookDownloads} from '../src/ui/downloads/BookDownloads';
 import {FileDownloadPrompt} from '../src/ui/downloads/FileDownloads';
 import type {BookDownloadsController} from '../src/ui/downloads/useBookDownloads';
+import {readDownloadSettings,saveDownloadConcurrency} from '../src/comics/acquisition/preferences';
 import {RemoteLibrary} from '../src/ui/remote-library/RemoteLibrary';
 import {RemoveConnectionDialog} from '../src/ui/remote-library/RemoveConnectionDialog';
 import {Scrollbars} from '../src/ui/Scrollbars';
@@ -47,17 +48,24 @@ const exportEntry=(await catalog.get('entries',imported.id))!;
 const partialEntry:Entry={...exportEntry,id:'dialog-incomplete',contentId:'dialog-incomplete',format:'image-sequence',containerId:undefined,discoveryComplete:false,pageCount:1};
 const epubEntry:Entry={...exportEntry,id:'dialog-epub',contentId:'dialog-epub',format:'epub',containerId:undefined};
 await catalog.put('entries',partialEntry);await catalog.put('entries',epubEntry);
+const initialDownloadSettings=await readDownloadSettings();
 
 function Fixture(){
   const [kind,setKind]=useState(''),[items,setItems]=useState(comics),[notice,setNotice]=useState(''),[attempts,setAttempts]=useState(0);
+  const [downloadSettings,setDownloadSettings]=useState(initialDownloadSettings);
   const shelfView=useRef<ShelfView>({scrollTop:0,search:'',sort:'recent',updatesOnly:false});
   const close=()=>setKind('');
   const controller:BookDownloadsController={books:[{comic:comics[0],plan:{id:'book-download:'+comics[0].id,comicId:comics[0].id,sourceGeneration:1,generation:1,status:'paused',languages:null,entryIds:[],createdAt:1,updatedAt:1},status:'paused',bytes:12*1024**2,total:10,completed:4,hasPendingTasks:true,newChapters:0,availableLanguages:['zh-Hans']}],
     files:[{intent:{id:'file-download:dialog',connectionId:account.id,connectionGeneration:1,publicationId:'file',representationId:'file',title:'星海漫游 · 完整文件.cbz',contentId:'file',generation:1,status:kind==='complete-file'?'complete':'paused',createdAt:1,updatedAt:1,bytes:5*1024**2,totalBytes:24*1024**2,sourceRemovalVersion:0}}],activeCount:0,
-    languagePicker:undefined,focusedComicId:undefined,open:()=>{},close:()=>{},start:async()=>{},promptFileDownload:()=>{},refresh:()=>{},closeFilePrompt:close,
+    downloadSettings,setConcurrency:async(value,source)=>{await saveDownloadConcurrency(value,source);setDownloadSettings(await readDownloadSettings());},languagePicker:undefined,focusedComicId:undefined,open:()=>{},close:()=>{},start:async()=>{},promptFileDownload:()=>{},refresh:()=>{},closeFilePrompt:close,
     filePrompt:kind==='download'?{connectionId:account.id,plan:{publication:{id:'new-file',title:'星海漫游 · 下载后阅读'},kind:'download-file',representationId:'file',format:'cbz',locator:{},snapshot:{},size:24*1024**2}}:undefined,
     confirmFile:async()=>{setAttempts(value=>value+1);await new Promise(resolve=>setTimeout(resolve,600));if(attempts===0)throw Error('模拟下载失败，请重试');close();},
   };
+  if(query.has('multisite'))for(const order of [1,2]){
+    const status=order===1?'running':'complete',comic={...comics[order],title:order===1?'星海漫游 · 第二卷':'雨后的书店',sourceName:'Comix',sourceUrl:'https://comix.to/title/test',source:{...comics[order].source,connectionId:'website:comix'}};
+    controller.books.push({...controller.books[0],comic,plan:{...controller.books[0].plan,id:'book-download:'+comic.id,comicId:comic.id,status},status,completed:order===1?7:10,hasPendingTasks:order===1});
+  }
+  controller.activeCount=controller.books.filter(book=>book.status==='running').length;
   return <div className="nc-app" style={{minHeight:2000,padding:24}}><Scrollbars/><h1>操作弹窗隔离夹具</h1><p>合成数据，不访问外部服务。</p>
     <nav style={{display:'flex',flexWrap:'wrap',gap:10,marginBlock:24}}>{['export','incomplete','epub','library','downloads','complete-file','download','remote','remove-source'].map(id=><button key={id} id={'open-'+id} className="button secondary" onClick={()=>setKind(id)}>{id}</button>)}</nav>
     <output id="attempts">{attempts}</output><output id="notice">{notice}</output>

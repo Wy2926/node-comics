@@ -17,9 +17,11 @@ vi.mock('../src/comics/application/import-service', () => ({
   },
 }));
 import { discoverEntryContent, listDownloads, pauseDownloads, queueDownloads, runDownloads, stopDownloads } from '../src/comics/acquisition';
+import {saveDownloadConcurrency} from '../src/comics/acquisition/preferences';
 
 beforeEach(async () => {
   stopDownloads(); mocks.acquire.mockReset(); mocks.discover.mockReset();
+  await saveDownloadConcurrency(1);
   for (const task of await catalog.list('tasks', { limit: 10000 })) await catalog.remove('tasks', task.id);
   mocks.acquire.mockImplementation(async () => ({ blob: new Blob(['image']), release: vi.fn(), identity: {} }));
 });

@@ -27,7 +27,9 @@ const listeners=new Set<(metadata:PageImageMetadata)=>void>();
 let active=0;
 const queue:{priority:number;run:()=>void}[]=[];
 function cacheUnavailable(error:unknown):undefined{if(error instanceof SourceDatabaseSchemaError)throw error;return undefined;}
-function schedule<T>(priority:number,action:()=>Promise<T>){
+function schedule<T>(priority:number,action:()=>Promise<T>,download=false){
+  // Explicit downloads already have bounded per-source workers. They must not occupy the reader's two slots.
+  if(download)return {promise:Promise.resolve().then(action),promote(_next:number){}};
   let queued:typeof queue[number]|undefined;
   const promise=new Promise<T>((resolve,reject)=>{
     queued={priority,run:()=>{queued=undefined;active++;action().then(resolve,reject).finally(()=>{active--;drain();});}};
@@ -161,7 +163,7 @@ async function acquire(request:RasterRequest){
   const priority=request.priority==='background'?2:request.priority==='prefetch'?1:0;
   if(!work){
     const controller=new AbortController(),preview=new PagePreview(size=>publishMetadata({contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,...size}));
-    work={controller,preview,...schedule(priority,()=>read(request,controller.signal,preview)),users:0};pending.set(key,work);
+    work={controller,preview,...schedule(priority,()=>read(request,controller.signal,preview),request.purpose==='download'),users:0};pending.set(key,work);
     void work.promise.then(()=>preview.finish(),()=>preview.finish(true));
     void work.promise.catch(()=>{});
   }else work.promote(priority);

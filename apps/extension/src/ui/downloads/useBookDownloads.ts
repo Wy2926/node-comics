@@ -16,6 +16,7 @@ import {
   type FileDownloadView,
 } from '../../comics/acquisition/files';
 import type { RemoteReadingPlan } from '../../comics/sources/contracts';
+import {downloadSettingsId,readDownloadSettings,saveDownloadConcurrency,defaultDownloadSettings,type DownloadConcurrency} from '../../comics/acquisition/preferences';
 
 export function useBookDownloads(notify: (message: string) => void, onOpenCenter: () => void) {
   const [books, setBooks] = useState<BookDownloadView[]>([]),
@@ -23,6 +24,7 @@ export function useBookDownloads(notify: (message: string) => void, onOpenCenter
   const [files, setFiles] = useState<FileDownloadView[]>([]),
     [filePrompt, setFilePrompt] = useState<{ connectionId: string; plan: RemoteReadingPlan }>();
   const [focusedComicId, setFocusedComicId] = useState<string>();
+  const [downloadSettings,setDownloadSettings]=useState(defaultDownloadSettings);
   const navigate = useRef(onOpenCenter);
   navigate.current = onOpenCenter;
   const refreshRef = useRef<() => void>(() => {}),
@@ -40,9 +42,10 @@ export function useBookDownloads(notify: (message: string) => void, onOpenCenter
       loading = true;
       dirty = false;
       try {
-        const [next, nextFiles] = await Promise.all([
+        const [next, nextFiles, nextSettings] = await Promise.all([
           listBookDownloads(),
           listRemoteFileDownloads(),
+          readDownloadSettings(),
         ]);
         if (disposed) return;
         const ids = new Set(next.map((item) => item.comic.id));
@@ -71,6 +74,7 @@ export function useBookDownloads(notify: (message: string) => void, onOpenCenter
         initialized = true;
         setBooks(next);
         setFiles(nextFiles);
+        setDownloadSettings(nextSettings);
       } catch (error) {
         if (!disposed) notice.current((error as Error).message);
       } finally {
@@ -88,7 +92,7 @@ export function useBookDownloads(notify: (message: string) => void, onOpenCenter
           change.ids.some(
             (id) =>
               typeof id === 'string' &&
-              (id.startsWith(prefix) ||
+              (id===downloadSettingsId || id.startsWith(prefix) ||
                 (change.table === 'metadata' && id.startsWith('file-download:'))),
           )
         )
@@ -169,6 +173,8 @@ export function useBookDownloads(notify: (message: string) => void, onOpenCenter
   return {
     books,
     files,
+    downloadSettings,
+    setConcurrency:async(value:DownloadConcurrency,source?:string)=>{await saveDownloadConcurrency(value,source);setDownloadSettings(await readDownloadSettings());},
     activeCount:
       books.filter((book) => isBookDownloadActive(book.status)).length +
       files.filter((file) => file.intent.status === 'queued' || file.intent.status === 'running')

@@ -37,6 +37,7 @@ import {
   runRemoteFileDownloadCycle,
   stopRemoteFileDownloads,
 } from '../src/comics/acquisition/files';
+import {runBookDownloadCycle} from '../src/comics/acquisition/books';
 
 const unregister: (() => void)[] = [];
 const byteTables = ['objects', 'chunks', 'operations', 'references', 'leases', 'settings'];
@@ -123,7 +124,7 @@ async function fixture(providerId = 'file-fixture', publicationId = crypto.rando
   return { connectionId, plan, bytes, download, resolve };
 }
 const cycle = () => runRemoteFileDownloadCycle(new AbortController().signal, 'test-host');
-async function pausedStream(f: Awaited<ReturnType<typeof fixture>>) {
+async function pausedStream(f: Awaited<ReturnType<typeof fixture>>,runCycle=cycle) {
   const bytes = await archive(CHUNK_SIZE),
     progress = Promise.withResolvers<void>(),
     cancel = vi.fn();
@@ -151,7 +152,7 @@ async function pausedStream(f: Awaited<ReturnType<typeof fixture>>) {
         if (current?.bytes === CHUNK_SIZE) progress.resolve();
       });
   });
-  const run = cycle();
+  const run = runCycle();
   await progress.promise;
   unsubscribe();
   return { intent, run, cancel };
@@ -172,6 +173,17 @@ async function retainedSource(
 }
 
 describe('confirmed remote file intents', () => {
+  it('runs complete-file transfers from different connections in the shared host without waiting for a stalled stream',async()=>{
+    const slow=await fixture('slow-files'),fast=await fixture('fast-files');
+    const fastIntent=await queueRemoteFileDownload(fast.connectionId,fast.plan,{confirmed:true});
+    const blocked=await pausedStream(slow,()=>runBookDownloadCycle(new AbortController().signal,'test-host'));
+    try{
+      await vi.waitFor(async()=>expect((await readRemoteFileDownload(fastIntent.id))?.status).toBe('complete'));
+      expect((await readRemoteFileDownload(blocked.intent.id))?.status).toBe('running');
+      expect(fast.download).toHaveBeenCalledOnce();
+    }finally{await pauseRemoteFileDownload(blocked.intent.id);await blocked.run;}
+    expect(blocked.cancel).toHaveBeenCalledOnce();
+  });
   it('requires confirmation and queues once without network, a comic, or page-download tasks', async () => {
     const f = await fixture();
     await expect(

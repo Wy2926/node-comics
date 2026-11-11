@@ -10,9 +10,9 @@ import {msg} from '../../i18n/runtime';
 import {sourceFor} from '../../sources';
 import {track} from '../../analytics';
 import {getSourceDriver} from '../sources/registry';
-import {recoverRemoteFileDownloads,runRemoteFileDownloadCycle,stopRemoteFileDownloads} from './files';
-import {bookDownloadId,downloadTaskId,listBookPlans,readBookPlan,selectDownloadScope,suspendBook,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan,type DownloadLanguages,type DownloadScope} from './book-model';
-export {type BookDownloadPlan,type DownloadLanguages,type DownloadScope,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,isEntryFullyCached} from './book-model';
+import {listRemoteFileDownloads,recoverRemoteFileDownloads,runRemoteFileDownloadCycle,stopRemoteFileDownloads} from './files';
+import {bookDownloadId,bookDownloadSource,downloadTaskId,listBookPlans,readBookPlan,selectDownloadScope,suspendBook,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan,type DownloadLanguages,type DownloadScope} from './book-model';
+export {type BookDownloadPlan,type DownloadLanguages,type DownloadScope,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,isEntryFullyCached,bookDownloadSource} from './book-model';
 
 const preferencesId=(id:string)=>'download-languages:'+id;
 const hostId='download-host';
@@ -190,8 +190,8 @@ export async function clearBookDownloads(comicId:string,expectedGeneration?:numb
   });
 }
 
-async function settleBooks(){
-  const running=new Set((await listBookPlans()).filter(plan=>plan.status==='running').map(plan=>plan.comicId));
+async function settleBooks(comicId:string){
+  const running=new Set((await listBookPlans()).filter(plan=>plan.comicId===comicId&&plan.status==='running').map(plan=>plan.comicId));
   if(!running.size)return;
   for(const view of await listBookDownloads(true,running)){
     if(view.status!=='running')continue;
@@ -210,14 +210,37 @@ async function settleBooks(){
     }
   }
 }
-/** A host iteration; production callers hold the book host lock for their full lifetime. */
+const executions=new Map<string,Promise<void>>();
+/** One book per source, independent directory/image/file lifetimes across sources. */
+async function dispatchBookDownloads(signal:AbortSignal,owner:string):Promise<Promise<void>[]>{
+  const jobs:{source:string;createdAt:number;run:()=>Promise<void>}[]=[];
+  for(const plan of await listBookPlans()){
+    if(!['queued','running'].includes(plan.status))continue;
+    const comic=await catalog.get('comics',plan.comicId);if(!comic)continue;
+    jobs.push({source:bookDownloadSource(comic),createdAt:plan.createdAt,run:async()=>{
+      try{
+        // Recheck after dispatch: another worker may have paused this source.
+        if(!active(await readBookPlan(plan.comicId),plan.generation))return;
+        if(plan.status==='queued')await prepareBook(plan,owner,signal);
+        if(signal.aborted)return;
+        await runDownloads(signal,plan.comicId);await settleBooks(plan.comicId);
+      }catch(error){await suspendBook(plan.comicId,'paused',signal.aborted?'interrupted':undefined,downloadErrorMessage(error),plan.generation);}
+    }});
+  }
+  for(const {intent} of await listRemoteFileDownloads())if(['queued','clearing'].includes(intent.status))
+    jobs.push({source:intent.connectionId,createdAt:intent.createdAt,run:()=>runRemoteFileDownloadCycle(signal,owner,intent.id)});
+  const started:Promise<void>[]=[];
+  for(const job of jobs.sort((a,b)=>a.createdAt-b.createdAt)){
+    if(signal.aborted)break;
+    if(executions.has(job.source))continue;
+    const run=job.run().finally(()=>{if(executions.get(job.source)===run)executions.delete(job.source);});
+    executions.set(job.source,run);started.push(run);void run.catch(()=>{});
+  }
+  return started;
+}
+/** Await the work dispatched by one iteration; the live host keeps dispatching while slow sources run. */
 export async function runBookDownloadCycle(signal:AbortSignal,owner:string){
-  await runRemoteFileDownloadCycle(signal,owner);
-  if(signal.aborted)return;
-  const queued=(await listBookPlans()).filter(plan=>plan.status==='queued').sort((a,b)=>a.createdAt-b.createdAt)[0];
-  if(queued)await prepareBook(queued,owner,signal);
-  if(signal.aborted)return;
-  await runDownloads(signal);await settleBooks();
+  await Promise.all(await dispatchBookDownloads(signal,owner));
 }
 const sleep=(signal:AbortSignal)=>new Promise<void>(resolve=>{const done=()=>{clearTimeout(timer);signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,1000);signal.addEventListener('abort',done,{once:true});if(signal.aborted)done();});
 /** One visible extension page owns the host lock. Other tabs only register intents and observe. */
@@ -250,10 +273,11 @@ export async function hostBookDownloads(signal:AbortSignal){
           try{await startBookDownload(plan.comicId,undefined,false,plan.generation);}
           catch(error){await suspendBook(plan.comicId,'paused',undefined,downloadErrorMessage(error),plan.generation);}
         }
-        await runBookDownloadCycle(signal,owner);await sleep(signal);
+        await dispatchBookDownloads(signal,owner);await sleep(signal);
       }
     }finally{
       stopDownloads();stopRemoteFileDownloads();
+      await Promise.allSettled([...executions.values()]);
       for(const plan of await listBookPlans())if(plan.owner===owner&&isBookDownloadActive(plan.status))
         await suspendBook(plan.comicId,'paused','interrupted',undefined,plan.generation);
     }

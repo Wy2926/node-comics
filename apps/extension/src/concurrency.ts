@@ -20,7 +20,7 @@ export function abortable<T>(work:Promise<T>,signal?:AbortSignal):Promise<T>{
   });
 }
 
-/** FIFO pool used by uploads, control requests and thumbnail work. Downloads bypass it. */
+/** Bounded FIFO pool with live limit changes; callers own cancellation of queued work. */
 export class RequestPool {
   private active = 0;
   private waiting: (() => void)[] = [];

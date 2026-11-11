@@ -6,20 +6,24 @@ import type {SourceCatalog} from '../src/comics/application/types';
 import {downloadKey,downloadStore} from '../src/storage/downloads';
 import {sourceDatabaseName} from '../src/storage/database';
 import {SourceProtocolError} from '../src/sources/contracts/network';
-const mocks=vi.hoisted(()=>({acquire:vi.fn(),discover:vi.fn(),directory:vi.fn(),track:vi.fn()}));
+const mocks=vi.hoisted(()=>({acquire:vi.fn(),discover:vi.fn(),directory:vi.fn(),track:vi.fn(),source:vi.fn()}));
 vi.mock('../src/analytics',()=>({track:mocks.track}));
 vi.mock('../src/comics/pages/service',()=>({acquirePage:mocks.acquire}));
-vi.mock('../src/sources',()=>({discoverEntry:mocks.discover,ImagePermissionsRequired:class extends Error{},sourceFor:vi.fn(),validateSourceCatalog:(value:unknown)=>value}));
+vi.mock('../src/sources',()=>({discoverEntry:mocks.discover,ImagePermissionsRequired:class extends Error{},sourceFor:mocks.source,validateSourceCatalog:(value:unknown)=>value}));
 vi.mock('../src/comics/application/import-service',()=>({publishWebsiteManifest:vi.fn()}));
 vi.mock('../src/comics/application/website-catalog',()=>({readWebsiteCatalog:mocks.directory}));
 import {discoverEntryContent,queueDownloads,stopDownloads} from '../src/comics/acquisition';
 import {cancelBookDownload,clearBookDownloads,downloadLanguages,hostBookDownloads,listBookDownloads,pauseBookDownload,readDownloadScope,runBookDownloadCycle,saveDownloadLanguages,startBookDownload} from '../src/comics/acquisition/books';
-import {bookDownloadId,readBookPlan,selectDownloadScope} from '../src/comics/acquisition/book-model';
+import {bookDownloadId,bookDownloadSource,readBookPlan,selectDownloadScope} from '../src/comics/acquisition/book-model';
+import {downloadSettingsId,readDownloadSettings,saveDownloadConcurrency} from '../src/comics/acquisition/preferences';
 
 beforeEach(async()=>{
   stopDownloads();vi.clearAllMocks();await downloadStore.clear();
   for(const row of await catalog.list('tasks',{limit:Number.MAX_SAFE_INTEGER}))await catalog.remove('tasks',row.id);
-  for(const row of await catalog.list('metadata',{limit:Number.MAX_SAFE_INTEGER}))if(row.id!=='download-host')await catalog.remove('metadata',row.id);
+  for(const row of await catalog.list('metadata',{limit:Number.MAX_SAFE_INTEGER}))if(!['download-host',downloadSettingsId].includes(row.id))await catalog.remove('metadata',row.id);
+  // Keep lifecycle regressions deterministic; concurrent behavior is exercised explicitly below.
+  await catalog.put('metadata',{id:downloadSettingsId,concurrency:1,sites:{}});
+  mocks.source.mockReset().mockReturnValue({definition:{}});
   mocks.acquire.mockImplementation(async()=>({blob:new Blob(['original']),release:vi.fn(),identity:{}}));
 });
 async function fixture(count=3,pages=2,discovered=true){
@@ -39,6 +43,109 @@ const cycle=()=>runBookDownloadCycle(new AbortController().signal,'test-host');
 const view=async(id:string)=>(await listBookDownloads(true)).find(book=>book.comic.id===id)!;
 
 describe('whole comic retained downloads',()=>{
+  it('defaults to three images per site, completes a fast site independently, and keeps same-site books queued',async()=>{
+    await catalog.patch('metadata',downloadSettingsId,{concurrency:undefined});
+    expect((await readDownloadSettings()).concurrency).toBe('auto');
+    const slow=await fixture(1,8),same=await fixture(1,1),fast=await fixture(1,4);
+    await catalog.patch('comics',same.comic.id,{source:{...same.comic.source,connectionId:slow.comic.source.connectionId}});
+    mocks.acquire.mockImplementation(async(request:{entryId:string;signal:AbortSignal})=>{
+      if(request.entryId===slow.entries[0].id)await new Promise((_,reject)=>request.signal.addEventListener('abort',()=>reject(request.signal.reason),{once:true}));
+      return {blob:new Blob(['original']),release:vi.fn(),identity:{}};
+    });
+    for(const [order,f] of [slow,same,fast].entries()){
+      await startBookDownload(f.comic.id);await catalog.patch('metadata',bookDownloadId(f.comic.id),{createdAt:order+1});
+    }
+    const run=cycle();
+    try{
+      await vi.waitFor(async()=>expect((await readBookPlan(fast.comic.id))?.status).toBe('complete'));
+      expect(mocks.acquire.mock.calls.filter(([request])=>request.entryId===slow.entries[0].id)).toHaveLength(3);
+      expect((await readBookPlan(same.comic.id))?.status).toBe('queued');
+      expect((await view(fast.comic.id)).bytes).toBe(32);
+    }finally{await pauseBookDownload(slow.comic.id);await run;}
+    expect((await view(slow.comic.id)).bytes).toBe(0);
+    await cycle();expect((await view(same.comic.id)).status).toBe('complete');
+  });
+  it('applies manual increases and decreases to an active chapter without restarting its saved pages',async()=>{
+    const f=await fixture(1,8),pending=new Map<string,()=>void>();
+    mocks.acquire.mockImplementation(async(request:{pageId:string;signal:AbortSignal})=>{
+      await new Promise<void>((resolve,reject)=>{pending.set(request.pageId,resolve);request.signal.addEventListener('abort',()=>reject(request.signal.reason),{once:true});});
+      return {blob:new Blob(['original']),release:vi.fn(),identity:{}};
+    });
+    await startBookDownload(f.comic.id);const run=cycle();
+    try{
+      await vi.waitFor(()=>expect(mocks.acquire).toHaveBeenCalledTimes(1));
+      await saveDownloadConcurrency(4);
+      await vi.waitFor(()=>expect(mocks.acquire).toHaveBeenCalledTimes(4));
+      await saveDownloadConcurrency(1);
+      for(let ordinal=0;ordinal<3;ordinal++)pending.get(f.entries[0].id+':page:'+ordinal)!();
+      await vi.waitFor(async()=>expect((await catalog.get('tasks','download:'+f.entries[0].id))?.completed).toBe(3));
+      expect(mocks.acquire).toHaveBeenCalledTimes(4);
+      pending.get(f.entries[0].id+':page:3')!();
+      await vi.waitFor(()=>expect(mocks.acquire).toHaveBeenCalledTimes(5));
+    }finally{await pauseBookDownload(f.comic.id);await run;}
+    expect(await view(f.comic.id)).toMatchObject({status:'paused',bytes:32});
+    mocks.acquire.mockImplementation(async()=>({blob:new Blob(['original']),release:vi.fn(),identity:{}}));
+    await saveDownloadConcurrency(6);await startBookDownload(f.comic.id);await cycle();
+    expect(await view(f.comic.id)).toMatchObject({status:'complete',bytes:64});
+    expect(mocks.acquire).toHaveBeenCalledTimes(9);
+  });
+  it('restores each adapter recommendation in auto mode and changes only the manually selected site',async()=>{
+    const a=await fixture(1,8),b=await fixture(1,8),fallback=await fixture(1,8);
+    await catalog.patch('comics',a.comic.id,{sourceUrl:'https://a.test/comic'});
+    await catalog.patch('comics',b.comic.id,{sourceUrl:'https://b.test/comic'});
+    mocks.source.mockImplementation((url:string)=>({definition:{downloadConcurrency:url.includes('a.test')?2:url.includes('b.test')?4:undefined}}));
+    mocks.acquire.mockImplementation((request:{signal:AbortSignal})=>new Promise((_,reject)=>request.signal.addEventListener('abort',()=>reject(request.signal.reason),{once:true})));
+    for(const f of [a,b,fallback])await startBookDownload(f.comic.id);
+    const counts=()=>[a,b,fallback].map(f=>mocks.acquire.mock.calls.filter(([request])=>request.entryId===f.entries[0].id).length),run=cycle();
+    try{
+      await vi.waitFor(()=>expect(counts()).toEqual([1,1,1]));
+      await saveDownloadConcurrency('auto');
+      await vi.waitFor(()=>expect(counts()).toEqual([2,4,3]));
+      const selected=(await catalog.get('comics',a.comic.id))!;
+      await saveDownloadConcurrency(6,bookDownloadSource(selected));
+      await vi.waitFor(()=>expect(counts()).toEqual([6,4,3]));
+      expect(mocks.acquire.mock.calls.every(([request])=>!request.signal.aborted)).toBe(true);
+    }finally{for(const f of [a,b,fallback])await pauseBookDownload(f.comic.id);await run;}
+  });
+  it('dispatches a newly added site while another site is still discovering its directory',async()=>{
+    const slow=await fixture(1),fast=await fixture(1),ready=Promise.withResolvers<void>();
+    await catalog.patch('catalogs',slow.source.id,{complete:false});
+    mocks.directory.mockImplementationOnce((_url:string,signal:AbortSignal)=>new Promise((_,reject)=>{ready.resolve();signal.addEventListener('abort',()=>reject(signal.reason),{once:true});}));
+    const previous=await catalog.get('metadata','download-host'),controller=new AbortController(),host=hostBookDownloads(controller.signal);
+    try{
+      await vi.waitFor(async()=>expect((await catalog.get('metadata','download-host'))?.owner).not.toBe(previous?.owner));
+      await startBookDownload(slow.comic.id);await ready.promise;
+      await startBookDownload(fast.comic.id);
+      await vi.waitFor(async()=>expect((await readBookPlan(fast.comic.id))?.status).toBe('complete'),{timeout:4000});
+      expect((await readBookPlan(slow.comic.id))?.status).toBe('preparing');
+    }finally{controller.abort();await host;}
+    expect((await readBookPlan(slow.comic.id))?.status).toBe('paused');
+  });
+  it('isolates sites sharing an adapter when one origin is rate limited',async()=>{
+    const a=await fixture(1),b=await fixture(1);
+    await catalog.patch('comics',b.comic.id,{source:{...b.comic.source,connectionId:a.comic.source.connectionId},sourceUrl:'https://another.test/comic'});
+    mocks.acquire.mockImplementation(async(request:{entryId:string})=>{
+      if(request.entryId===a.entries[0].id)throw Object.assign(Error('Rate limited'),{details:{status:429,retryAfter:60}});
+      return {blob:new Blob(['original']),release:vi.fn(),identity:{}};
+    });
+    await startBookDownload(a.comic.id);await startBookDownload(b.comic.id);await cycle();
+    expect(await readBookPlan(a.comic.id)).toMatchObject({status:'paused',reason:'source'});
+    expect((await view(b.comic.id)).status).toBe('complete');
+    await expect(startBookDownload(a.comic.id)).rejects.toThrow('限制请求');
+  });
+  it('aborts sibling image workers on a source block before taking more pages',async()=>{
+    await saveDownloadConcurrency(6);
+    const f=await fixture(1,12),blocked=Promise.withResolvers<void>();
+    mocks.acquire.mockImplementation(async(request:{pageId:string;signal:AbortSignal})=>{
+      if(request.pageId.endsWith(':page:1')){await blocked.promise;throw new SourceProtocolError('Source protocol changed');}
+      return new Promise((_,reject)=>request.signal.addEventListener('abort',()=>reject(request.signal.reason),{once:true}));
+    });
+    await startBookDownload(f.comic.id);const run=cycle();
+    try{await vi.waitFor(()=>expect(mocks.acquire).toHaveBeenCalledTimes(6));}finally{blocked.resolve();await run;}
+    expect(mocks.acquire).toHaveBeenCalledTimes(6);
+    expect(mocks.acquire.mock.calls.every(([request])=>request.signal.aborted)).toBe(true);
+    expect(await view(f.comic.id)).toMatchObject({status:'paused',bytes:0,plan:{reason:'source',error:'Source protocol changed'}});
+  });
   it('does not treat an indexed EPUB document as an empty image download', async () => {
     const fixtureBook = await fixture(1, 0);
     const entry: Entry = {
@@ -188,9 +295,7 @@ describe('whole comic retained downloads',()=>{
     expect((await readBookPlan(f.comic.id))!.generation).toBeGreaterThan(previous.generation);
     await queueDownloads([f.entries[0].id],{comicId:f.comic.id,generation:previous.generation});
     expect(await catalog.list('tasks')).toEqual([]);
-    const resumed=cycle();
-    await vi.waitFor(async()=>expect((await readBookPlan(f.comic.id))?.status).toBe('running'));
-    pending.resolve({blob:new Blob(['late']),release:vi.fn(),identity:{}});await Promise.all([run,resumed]);
+    pending.resolve({blob:new Blob(['late']),release:vi.fn(),identity:{}});await run;await cycle();
     expect(await view(f.comic.id)).toMatchObject({status:'complete',completed:1,bytes:16});
     expect(await (await downloadStore.get(downloadKey(f.entries[0].contentId,f.entries[0].id+':page:0')))!.text()).toBe('original');
   });
@@ -301,7 +406,8 @@ describe('whole comic retained downloads',()=>{
     await startBookDownload(a.comic.id);await startBookDownload(b.comic.id);await startBookDownload(other.comic.id);
     for(const [order,f] of [a,b,other].entries())await catalog.patch('metadata',bookDownloadId(f.comic.id),{createdAt:order+1});
     await cycle();expect((await readBookPlan(a.comic.id))?.reason).toBe('source');expect((await readBookPlan(b.comic.id))?.status).toBe('paused');
-    expect(mocks.acquire).toHaveBeenCalledTimes(1);
+    expect(mocks.acquire.mock.calls.filter(([request])=>request.entryId!==other.entries[0].id)).toHaveLength(1);
+    expect((await view(other.comic.id)).status).toBe('complete');
     await expect(startBookDownload(a.comic.id)).rejects.toThrow('限制请求');await cycle();expect((await view(other.comic.id)).status).toBe('complete');
   });
   it('pauses a changed protocol across the same source, retains saved pages and resumes only missing pages',async()=>{
@@ -317,7 +423,7 @@ describe('whole comic retained downloads',()=>{
     await cycle();
     expect(await readBookPlan(a.comic.id)).toMatchObject({status:'paused',reason:'source',error:'Source protocol changed'});
     expect(await readBookPlan(b.comic.id)).toMatchObject({status:'paused',reason:'source'});
-    expect(mocks.acquire).toHaveBeenCalledTimes(2);
+    expect(mocks.acquire.mock.calls.filter(([request])=>request.entryId!==other.entries[0].id)).toHaveLength(2);
     expect(await downloadStore.get(downloadKey(a.entries[0].contentId,a.entries[0].id+':page:0'))).toBeDefined();
     await cycle();expect((await view(other.comic.id)).status).toBe('complete');
     const calls=mocks.acquire.mock.calls.length;
@@ -330,7 +436,7 @@ describe('whole comic retained downloads',()=>{
   it('stops all queued books when retained storage is full',async()=>{
     const a=await fixture(1),b=await fixture(1);await startBookDownload(a.comic.id);await startBookDownload(b.comic.id);
     const full=vi.spyOn(downloadStore,'put').mockRejectedValueOnce(new DOMException('Storage full','QuotaExceededError'));
-    try{await cycle();expect((await readBookPlan(a.comic.id))?.reason).toBe('space');expect((await readBookPlan(b.comic.id))?.reason).toBe('space');expect(mocks.acquire).toHaveBeenCalledTimes(1);}
+    try{await cycle();expect((await readBookPlan(a.comic.id))?.reason).toBe('space');expect((await readBookPlan(b.comic.id))?.reason).toBe('space');expect(mocks.acquire).toHaveBeenCalledTimes(2);}
     finally{full.mockRestore();}
   });
   it('does not automatically restart a network-paused plan in a new page',async()=>{

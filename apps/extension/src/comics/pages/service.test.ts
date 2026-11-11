@@ -65,6 +65,20 @@ beforeEach(() => {
 });
 afterEach(()=>{unregisterLocal?.();});
 describe('page leases and trusted source routing', () => {
+  it('keeps source-isolated download workers out of the reader queue and still shares page leases',async()=>{
+    const reads=controlledReads(),controller=new AbortController(),requests:Promise<PageLease>[]=[];
+    try{
+      for(const id of ['site-a-1','site-a-2','site-a-3','site-b'])requests.push(acquirePage({...queuedPage(id),purpose:'download',priority:'background',signal:controller.signal}));
+      requests.push(acquirePage({...queuedPage('reader'),purpose:'reading',signal:controller.signal}));
+      requests.push(acquirePage({...queuedPage('site-a-1'),purpose:'reading',signal:controller.signal}));
+      await vi.waitFor(()=>expect(reads.started).toHaveLength(5));
+      expect(reads.started).toContain('site-b');expect(reads.started).toContain('reader');
+      for(const id of reads.started)reads.finish(id);
+      const leases=await Promise.all(requests);
+      expect(leases[0].blob).toBe(leases[5].blob);
+      for(const lease of leases)lease.release();
+    }finally{controller.abort();await Promise.allSettled(requests);}
+  });
   it('publishes preview dimensions before pixels without persisting or inventing a materialized identity',async()=>{
     const download=Promise.withResolvers<Blob>(),metadata=vi.fn(),preview:PagePreviewTarget={active:()=>true,draw:vi.fn(),clear:vi.fn()};
     const unsubscribe=onPageImageMetadata(metadata),brokenSubscriber=onPageImageMetadata(()=>{throw Error('Detached UI');});

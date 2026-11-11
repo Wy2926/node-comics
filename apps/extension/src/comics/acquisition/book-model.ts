@@ -1,10 +1,18 @@
 import {catalog} from '../repositories';
-import {entryContentKind, type CatalogRecord, type Entry} from '../domain';
+import {entryContentKind, type CatalogRecord, type Comic, type Entry} from '../domain';
 import type {DownloadTask, SourceCatalog} from '../application/types';
 import {downloadStore} from '../../storage/downloads';
 
 export const bookDownloadId = (comicId:string) => 'book-download:' + comicId;
 export const downloadTaskId = (entryId:string) => 'download:' + entryId;
+/** Generic adapters can serve unrelated websites; their queues and failures stay origin-scoped. */
+export function bookDownloadSource(comic:Pick<Comic,'source'|'sourceUrl'>):string{
+  const connectionId=comic.source.connectionId;
+  if(connectionId.startsWith('website:')){
+    try{return JSON.stringify([connectionId,new URL(comic.sourceUrl??String(comic.source.locator.url)).origin]);}catch{/* Older records may only have a connection. */}
+  }
+  return connectionId;
+}
 export const unknownDownloadLanguage = 'und';
 export type DownloadLanguages = string[] | null;
 export interface BookDownloadPlan extends CatalogRecord {

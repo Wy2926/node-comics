@@ -85,6 +85,45 @@ test('offline page/file actions expose distinct impacts and cancellation never s
   assert.equal(await dialog().getAttribute('aria-label'),'取消缓存');await action('取消').click();
 });
 
+test('offline concurrency groups sites, preserves overrides across default changes and reloads, and supports keyboard reset',async()=>{
+  await load('?multisite');await open('downloads');
+  const global=page.getByRole('combobox',{name:'默认并发',exact:true}),comix=page.getByRole('combobox',{name:'Comix 的缓存并发',exact:true}),synthetic=page.getByRole('combobox',{name:'Synthetic 的缓存并发',exact:true});
+  const value=async(control,text)=>{await control.getByText(text,{exact:true}).waitFor();};
+  const choose=async(control,text)=>{await control.click();await page.getByRole('option',{name:text,exact:true}).click();};
+  assert.equal(await page.locator('.nc-download-source-group').count(),2);
+  assert.equal(await page.getByRole('region',{name:'Comix',exact:true}).locator('article').count(),2);
+  await value(comix,'自动 · 2 张并发');await value(synthetic,'自动 · 3 张并发');
+  await comix.focus();await page.keyboard.press('End');await page.keyboard.press('Escape');
+  assert.equal(await comix.getAttribute('data-value'),'auto');
+  assert(await comix.evaluate(node=>node===document.activeElement));
+  await page.keyboard.press('End');await page.keyboard.press('Enter');await value(comix,'手动 · 6 张并发');
+  await value(synthetic,'自动 · 3 张并发');
+  await choose(global,'手动 · 每站 4 张');await value(synthetic,'默认 · 4 张并发');await value(comix,'手动 · 6 张并发');
+  await page.reload();await open('downloads');await value(comix,'手动 · 6 张并发');await value(synthetic,'默认 · 4 张并发');
+  await comix.focus();await page.keyboard.press('Home');await page.keyboard.press('Enter');await value(comix,'默认 · 4 张并发');
+  await choose(global,'自动 · 按站点建议');await value(comix,'自动 · 2 张并发');await value(synthetic,'自动 · 3 张并发');
+  await page.locator('.nc-download-center').screenshot({path:output+'downloads-sites-light.png'});
+});
+
+test('offline concurrency controls and menus fit all 16 languages at 320px with large text',async()=>{
+  await page.setViewportSize({width:320,height:740});
+  for(const locale of ['zh-CN','zh-TW','en','ja','ko','fr','es','pt-BR','de','it','ru','pl','uk','tr','vi','id']){
+    await load(`?multisite&theme=dark&scale=1.25&locale=${locale}`);await open('downloads');
+    const issues=await page.locator('.nc-download-center').evaluate(element=>[element,...element.querySelectorAll('.nc-download-source-group,.nc-download-source-heading,.nc-download-book,button.nc-select')].filter(node=>node.scrollWidth>node.clientWidth+1).map(node=>node.className));
+    assert.deepEqual(issues,[],locale+' has no horizontal overflow');
+    const controls=page.locator('.nc-download-center button.nc-select');
+    for(const control of await controls.all()){
+      assert((await control.boundingBox()).height>=44,locale+' keeps touch targets');
+      await control.click();
+      const menu=page.getByRole('listbox'),bounds=await menu.boundingBox();
+      assert(bounds.x>=0&&bounds.x+bounds.width<=320&&bounds.y>=0&&bounds.y+bounds.height<=741,locale+' keeps the menu on screen');
+      assert(await menu.evaluate(node=>node.scrollWidth<=node.clientWidth+1),locale+' menu wraps labels');
+      await page.keyboard.press('Escape');assert(await control.evaluate(node=>node===document.activeElement));
+    }
+    if(locale==='de')await page.locator('.nc-download-center').screenshot({path:output+'downloads-sites-dark-320-de.png'});
+  }
+});
+
 test('download failure is inline, busy guards prevent duplicate clicks and closing, then retry succeeds',async()=>{
   await load();await open('download');await fits();await snapshot('download-prompt');
   await action('下载后阅读').click();await page.keyboard.press('Escape');assert(await dialog().isVisible());

@@ -10,15 +10,21 @@ import {Thumbnail} from '../../reader/Images';
 import {coverReference} from '../../comics/application/library-service';
 import {contentLanguageLabel} from '../../reader/ComicDirectory';
 import {openHostAccessSettings} from '../../host-permissions';
-import {clearBookDownloads,downloadLanguages,readDownloadScope,saveDownloadLanguages,startBookDownload,pauseBookDownload,cancelBookDownload,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,type BookDownloadView,type DownloadLanguages,type DownloadScope} from '../../comics/acquisition/books';
+import {clearBookDownloads,downloadLanguages,readDownloadScope,saveDownloadLanguages,startBookDownload,pauseBookDownload,cancelBookDownload,downloadLanguage,unknownDownloadLanguage,isBookDownloadActive,bookDownloadSource,type BookDownloadView,type DownloadLanguages,type DownloadScope} from '../../comics/acquisition/books';
 import type {BookDownloadsController} from './useBookDownloads';
 import './downloads.css';
 import {FileDownloadRows} from './FileDownloads';
 import {visibleViewport} from '../visual-viewport';
+import {Select} from '../Select';
+import {downloadConcurrencyOptions,downloadConcurrencyLimit,type DownloadConcurrency} from '../../comics/acquisition/preferences';
 
 const cacheSize=(bytes:number)=>bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GB`:`${(bytes/1024**2).toFixed(1)} MB`;
 const languageName=(id:string)=>id===unknownDownloadLanguage?msg('语言未标注'):contentLanguageLabel(id);
 const supportedSites=listSupportedSites();
+function downloadSite(book:BookDownloadView){
+  const sites=supportedSites.filter(site=>'website:'+site.adapterId===book.comic.source.connectionId);
+  return sites.find(site=>{try{return new URL(site.url).hostname===new URL(book.comic.sourceUrl??'').hostname;}catch{return false;}})??sites[0];
+}
 function bookDownloadLabel(book:BookDownloadView){
   if(book.status==='complete'&&book.newChapters)return msg('有新章节未缓存');
   switch(book.status){
@@ -37,14 +43,44 @@ function useDownloadAction(controller:BookDownloadsController){
   return {busy,error,act};
 }
 export function BookDownloads({controller,onRead,onManageStorage}:{controller:BookDownloadsController;onRead:(comicId:string)=>void;onManageStorage:()=>void}){
+  const {busy,error,act}=useDownloadAction(controller);
   const totalBooks=controller.books.length+controller.files.length,totalBytes=controller.books.reduce((sum,book)=>sum+book.bytes,0)+controller.files.reduce((sum,file)=>sum+file.intent.bytes,0);
+  const sources=new Map<string,BookDownloadView[]>();
+  for(const book of controller.books){const key=bookDownloadSource(book.comic);if(!sources.has(key))sources.set(key,[]);sources.get(key)!.push(book);}
+  const concurrency=controller.downloadSettings.concurrency;
+  const mode=concurrency==='auto'?msg('自动'):msg('每站 {0} 张',{'0':concurrency});
   return <section className="nc-download-center" aria-label={msg('离线中心')}>
-    <div className="nc-page-heading"><div><h1>{msg('离线中心')}</h1><p>{msg('共 {0} 部漫画 · {1} 部缓存中 · 已保留 {2}',{'0':totalBooks,'1':controller.activeCount,'2':cacheSize(totalBytes)})}</p></div></div>
+    <div className="nc-page-heading"><div className="nc-download-heading-copy"><h1>{msg('离线中心')}</h1><p>{msg('共 {0} 部漫画 · {1} 部缓存中 · 已保留 {2}',{'0':totalBooks,'1':controller.activeCount,'2':cacheSize(totalBytes)})}</p></div>
+      {(controller.books.length>0||!totalBooks)&&<Select className="nc-download-mode" aria-label={msg('默认并发')} title={msg('自动按站点建议；单站设置优先于这里的默认值。')} value={String(concurrency)} aria-busy={busy} aria-disabled={busy} placement="end" menuWidth={260}
+        onClick={event=>{if(busy)event.preventDefault();}} onKeyDown={event=>{if(busy)event.preventDefault();}}
+        trigger={<><Icon name="settings" size={16}/><span>{msg('默认并发')}</span><strong>{mode}</strong><Icon name="chevron" size={14} className="nc-select-chevron"/></>}
+        onChange={event=>{const value=event.target.value;void act(()=>controller.setConcurrency(value==='auto'?'auto':Number(value) as DownloadConcurrency));}}>
+        <option value="auto">{msg('自动 · 按站点建议')}</option>{downloadConcurrencyOptions.map(value=><option key={value} value={value}>{msg('手动 · 每站 {0} 张',{'0':value})}</option>)}
+      </Select>}
+    </div>
     <p className="nc-download-lifetime"><Icon name="info" size={16}/>{msg('请保持此插件页打开，可切换到其他标签页。')}</p>
-    {!totalBooks?<div className="nc-empty"><Icon name="download" size={40}/><h2>{msg('暂无离线缓存')}</h2><p>{msg('从漫画的更多菜单选择“缓存整本”。')}</p></div>:<div className="nc-download-books">
-      {controller.books.map(book=><BookRow key={book.comic.id} book={book} controller={controller} focused={controller.focusedComicId===book.comic.id} onRead={()=>onRead(book.comic.id)} onManageStorage={onManageStorage}/>)}
+    {error&&<p className="nc-download-feedback" role="alert">{error}</p>}
+    {!totalBooks?<div className="nc-empty"><Icon name="download" size={40}/><h2>{msg('暂无离线缓存')}</h2><p>{msg('从漫画的更多菜单选择“缓存整本”。')}</p></div>:!!sources.size&&<div className="nc-download-sources">
+      {[...sources].map(([key,books])=><SourceDownloads key={key} sourceKey={key} books={books} controller={controller} onRead={onRead} onManageStorage={onManageStorage}/>)}
     </div>}
     <FileDownloadRows controller={controller} onRead={onRead}/>
+  </section>;
+}
+function SourceDownloads({sourceKey,books,controller,onRead,onManageStorage}:{sourceKey:string;books:BookDownloadView[];controller:BookDownloadsController;onRead:(comicId:string)=>void;onManageStorage:()=>void}){
+  const {busy,error,act}=useDownloadAction(controller),first=books[0],site=downloadSite(first),settings=controller.downloadSettings;
+  const override=settings.sites[sourceKey],limit=downloadConcurrencyLimit(settings,first.comic),inherited=downloadConcurrencyLimit({...settings,sites:{}},first.comic);
+  const label=override?msg('手动 · {0} 张并发',{'0':limit}):settings.concurrency==='auto'?msg('自动 · {0} 张并发',{'0':limit}):msg('默认 · {0} 张并发',{'0':limit});
+  return <section className="nc-download-source-group" aria-label={first.comic.sourceName} data-active={books.some(book=>isBookDownloadActive(book.status))||undefined}>
+    <header className="nc-download-source-heading"><div><SearchSiteIcon icon={site?.icon}/><h2>{first.comic.sourceName}</h2><span className="nc-download-source-count">{books.length}</span></div>
+      <Select className="nc-download-source-mode" aria-label={msg('{0} 的缓存并发',{'0':first.comic.sourceName})} value={String(override??'auto')} aria-busy={busy} aria-disabled={busy} placement="end" menuWidth={260}
+        onClick={event=>{if(busy)event.preventDefault();}} onKeyDown={event=>{if(busy)event.preventDefault();}}
+        trigger={<><span className="nc-download-slots" aria-hidden="true">{Array.from({length:6},(_,index)=><i key={index} data-filled={index<limit||undefined}/>)}</span><span>{label}</span><Icon name="chevron" size={14} className="nc-select-chevron"/></>}
+        onChange={event=>{const value=event.target.value;void act(()=>controller.setConcurrency(value==='auto'?'auto':Number(value) as DownloadConcurrency,sourceKey));}}>
+        <option value="auto">{msg('跟随默认 · {0} 张并发',{'0':inherited})}</option>{downloadConcurrencyOptions.map(value=><option key={value} value={value}>{msg('手动 · {0} 张并发',{'0':value})}</option>)}
+      </Select>
+    </header>
+    {error&&<p className="nc-download-feedback nc-download-source-error" role="alert">{error}</p>}
+    <div className="nc-download-books">{books.map(book=><BookRow key={book.comic.id} book={book} controller={controller} focused={controller.focusedComicId===book.comic.id} onRead={()=>onRead(book.comic.id)} onManageStorage={onManageStorage}/>)}</div>
   </section>;
 }
 function BookRow({book,controller,focused,onRead,onManageStorage}:{book:BookDownloadView;controller:BookDownloadsController;focused:boolean;onRead:()=>void;onManageStorage:()=>void}){
@@ -52,8 +88,6 @@ function BookRow({book,controller,focused,onRead,onManageStorage}:{book:BookDown
   const isActive=isBookDownloadActive(book.status),cleaning=book.status==='clearing',disabled=busy||cleaning&&!book.plan.error,comicId=book.comic.id;
   useEffect(()=>{if(focused){ref.current?.scrollIntoView({block:'nearest'});ref.current?.focus({preventScroll:true});}},[focused]);
   const languages=book.plan.languages??book.availableLanguages;
-  const sites=supportedSites.filter(site=>'website:'+site.adapterId===book.comic.source.connectionId);
-  const site=sites.find(site=>{try{return new URL(site.url).hostname===new URL(book.comic.sourceUrl??'').hostname;}catch{return false;}})??sites[0];
   const supplement=()=>void act(()=>startBookDownload(comicId,book.plan.languages,true,undefined,book.plan.generation));
   const resume=()=>void act(()=>startBookDownload(comicId,undefined,false,undefined,book.plan.generation));
   const clear=()=>setConfirmation({kind:'clear',generation:book.plan.generation});
@@ -72,11 +106,11 @@ function BookRow({book,controller,focused,onRead,onManageStorage}:{book:BookDown
   if(book.status!=='complete'&&!cleaning)actions.push({icon:'close',label:msg('取消缓存'),danger:true,disabled,onSelect:()=>book.bytes?setConfirmation({kind:'cancel',generation:book.plan.generation}):void act(()=>cancelBookDownload(comicId,book.plan.generation))});
   if(book.bytes>0||cleaning&&book.plan.error)actions.push({icon:'trash',label:msg('清除离线内容'),danger:true,disabled,onSelect:clear});
   const tone=isActive?'active':book.status==='complete'&&!book.newChapters?'complete':book.status==='partial'||book.newChapters||book.plan.error||book.plan.reason?'attention':'neutral';
-  return <><article ref={ref} tabIndex={-1} className="nc-download-book" data-comic-id={comicId} {...menu.bind(book.comic.title,actions)}>
+  return <><article ref={ref} tabIndex={-1} className="nc-download-book" data-comic-id={comicId} data-tone={tone} {...menu.bind(book.comic.title,actions)}>
     <button className="nc-download-cover" onClick={onRead} aria-label={msg('打开漫画 {0}',{'0':book.comic.title})}><Thumbnail blobKey={coverReference(book.comic)} alt={msg('{0}封面',{'0':book.comic.title})}/></button>
     <div className="nc-download-info">
-      <div className="nc-download-title"><h2><button onClick={onRead}>{book.comic.title}</button></h2><span className="nc-download-status" data-state={book.status} data-tone={tone}><Icon name={tone==='complete'?'check':tone==='attention'?'info':'download'} size={14}/>{bookDownloadLabel(book)}</span></div>
-      <div className="nc-download-meta"><span className="nc-download-source"><SearchSiteIcon icon={site?.icon}/>{book.comic.sourceName}</span><span className="nc-download-flags" aria-label={msg('缓存语言')}>{languages.map(language=><span key={language} role="img" title={languageName(language)} aria-label={languageName(language)}><LanguageFlag language={language}/></span>)}</span></div>
+      <div className="nc-download-title"><h3><button onClick={onRead}>{book.comic.title}</button></h3><span className="nc-download-status" data-state={book.status} data-tone={tone}><Icon name={tone==='complete'?'check':tone==='attention'?'info':'download'} size={14}/>{bookDownloadLabel(book)}</span></div>
+      {!!languages.length&&<div className="nc-download-meta"><span className="nc-download-flags" aria-label={msg('缓存语言')}>{languages.map(language=><span key={language} role="img" title={languageName(language)} aria-label={languageName(language)}><LanguageFlag language={language}/></span>)}</span></div>}
       <div className="nc-download-progress"><span>{msg('已完整缓存 {0} / {1} 章',{'0':book.completed,'1':book.total})}</span>{book.total>0?<><span>{Math.floor(book.completed/book.total*100)}%</span><progress aria-label={msg('章节缓存进度')} value={book.completed} max={book.total}/></>:<progress aria-label={msg('章节缓存进度')}/>}</div>
       {(book.plan.error||book.status==='partial'||book.plan.reason==='interrupted')&&<p className="nc-download-feedback" role="status">{book.plan.error||(book.plan.reason==='interrupted'?msg('上次缓存已中断，已保存的页面会继续保留。'):msg('未完成的章节可重试，已缓存内容会保留。'))}</p>}
       {!!book.plan.missingLanguages&&<p className="nc-download-feedback">{msg('来源中有 {0} 话缺少所选语言',{'0':book.plan.missingLanguages})}</p>}

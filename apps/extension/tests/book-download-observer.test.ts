@@ -20,6 +20,8 @@ const source = vi.hoisted(() => ({
   files: vi.fn<() => Promise<FileDownloadView[]>>(),
   host: vi.fn<(signal: AbortSignal) => Promise<void>>(),
   queue: vi.fn(),
+  concurrency:vi.fn(),
+  saveConcurrency:vi.fn(),
   unsubscribe: vi.fn(),
 }));
 vi.mock('react', () => ({
@@ -73,6 +75,7 @@ vi.mock('../src/comics/acquisition/files', () => ({
   queueRemoteFileDownload: source.queue,
   prepareRemoteFileDownload: vi.fn(),
 }));
+vi.mock('../src/comics/acquisition/preferences',()=>({downloadSettingsId:'download-settings',defaultDownloadSettings:{concurrency:'auto',sites:{}},readDownloadSettings:source.concurrency,saveDownloadConcurrency:source.saveConcurrency}));
 vi.mock('../src/i18n/runtime', () => ({
   msg: (value: string, params: Record<string, unknown> = {}) =>
     value.replace(/\{(\d+)\}/g, (_, key) => String(params[key] ?? '')),
@@ -153,6 +156,8 @@ beforeEach(() => {
   source.read.mockReset().mockResolvedValue([]);
   source.files.mockReset().mockResolvedValue([]);
   source.queue.mockReset().mockResolvedValue(undefined);
+  source.concurrency.mockReset().mockResolvedValue({concurrency:'auto',sites:{}});
+  source.saveConcurrency.mockReset().mockResolvedValue(undefined);
   source.host
     .mockReset()
     .mockImplementation(
@@ -168,6 +173,18 @@ afterEach(async () => {
 });
 
 describe('book download observer', () => {
+  it('saves manual concurrency and follows settings changed by another page',async()=>{
+    render();await flush();expect(render().downloadSettings.concurrency).toBe('auto');
+    source.concurrency.mockResolvedValue({concurrency:6,sites:{}});
+    await render().setConcurrency(6);
+    expect(source.saveConcurrency).toHaveBeenCalledExactlyOnceWith(6,undefined);expect(render().downloadSettings.concurrency).toBe(6);
+    source.concurrency.mockResolvedValue({concurrency:2,sites:{other:4}});change('metadata','download-settings');
+    await vi.advanceTimersByTimeAsync(750);expect(render().downloadSettings).toEqual({concurrency:2,sites:{other:4}});
+    source.concurrency.mockResolvedValue({concurrency:2,sites:{other:4,chosen:1}});
+    await render().setConcurrency(1,'chosen');
+    expect(source.saveConcurrency).toHaveBeenLastCalledWith(1,'chosen');
+    expect(render().downloadSettings.sites).toEqual({other:4,chosen:1});
+  });
   it('shares the remote-library file prompt without downloading until the user confirms', async () => {
     const plan: RemoteReadingPlan = {
       publication: { id: 'publication', title: 'Remote comic' },

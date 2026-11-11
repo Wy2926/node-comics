@@ -3,6 +3,7 @@
 站点位于 `apps/extension/src/sources/sites/<站点>/`，同协议复用 `shared/`。具体解析、URL 和限制以该站代码及测试为准。
 
 - `definition.ts`：纯元数据、URL 识别和能力声明；不引用浏览器运行时。
+- `definition.downloadConcurrency`：可选的整本缓存图片并发建议（1–6）。优先级：单站手动设置 → 全局手动设置 → 站点建议 → 全局自动默认；单站选择“跟随默认”会移除该站覆盖值。
 - `network.ts`、`search.ts`：目录、分页与名称搜索；使用公共请求上下文。
 - `page.ts`：页面识别与导入入口；`image.ts`：站点专属取图策略。
 - 注册表统一发现模块。公共层不导入具体站点、不按站点 ID 分支。

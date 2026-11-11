@@ -21,7 +21,7 @@ export function FileDownloadRows({
 }) {
   if (!controller.files.length) return null;
   return (
-    <section aria-label={msg('完整文件下载')}>
+    <section className="nc-download-files" aria-label={msg('完整文件下载')}>
       <h2>{msg('完整文件下载')}</h2>
       <div className="nc-download-books">
         {controller.files.map((file) => (
@@ -51,6 +51,7 @@ function FileRow({
   const [confirmation, setConfirmation] = useState<'resume' | 'clear'>();
   const running = intent.status === 'running' || intent.status === 'queued',
     complete = intent.status === 'complete';
+  const tone = complete ? 'complete' : running ? 'active' : intent.status === 'failed' || intent.error || intent.reason ? 'attention' : 'neutral';
   const label = complete
     ? msg('已缓存')
     : intent.status === 'queued'
@@ -78,7 +79,7 @@ function FileRow({
   }
   return (
     <>
-      <article className="nc-download-book" data-file-download-id={intent.id}>
+      <article className="nc-download-book" data-file-download-id={intent.id} data-tone={tone}>
         <button
           className="nc-download-cover"
           disabled={!comic}
@@ -95,18 +96,19 @@ function FileRow({
         </button>
         <div className="nc-download-info">
           <div className="nc-download-title">
-            <h2>
+            <h3>
               {comic ? (
                 <button onClick={() => onRead(comic.id)}>{intent.title}</button>
               ) : (
                 intent.title
               )}
-            </h2>
+            </h3>
             <span
               className="nc-download-status"
               data-state={intent.status}
-              data-tone={complete ? 'complete' : running ? 'active' : 'attention'}
+              data-tone={tone}
             >
+              <Icon name={tone === 'complete' ? 'check' : tone === 'attention' ? 'info' : 'download'} size={14}/>
               {label}
             </span>
           </div>

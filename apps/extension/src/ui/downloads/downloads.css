@@ -1,40 +1,74 @@
 .nc-download-center {min-width:0}
-.nc-download-center .nc-page-heading {display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:18px}
+.nc-download-center .nc-page-heading {display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;margin-bottom:12px}
 .nc-download-center .nc-page-heading h1 {margin-top:0}
+.nc-download-heading-copy {min-width:0;flex:1 1 280px}
+.nc-download-heading-copy p {margin-bottom:0}
+.nc-download-center button.nc-download-mode {flex:none;gap:8px;min-height:40px;margin-top:2px;padding:8px 10px;border:var(--comic-input-border);border-radius:var(--comic-control-radius);background:var(--surface);box-shadow:var(--comic-shadow-small);font-size:var(--text-small);color:var(--muted)}
+.nc-download-mode strong {font-weight:750;color:var(--accent);padding-inline-start:8px;border-inline-start:1px dashed var(--line)}
+.nc-download-mode>span,.nc-download-mode strong {min-width:0;overflow-wrap:anywhere}
+.nc-download-mode svg {flex:none}
+.nc-download-center button.nc-download-mode:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
 .nc-download-lifetime {display:flex;gap:8px;align-items:flex-start;font-size:var(--text-small);color:var(--muted);margin:0 0 24px}
 .nc-download-lifetime svg {flex-shrink:0;margin-top:2px}
+.nc-download-sources {display:grid;gap:24px}
+.nc-download-source-group {min-width:0;border:var(--comic-border);border-radius:var(--comic-card-radius);background:var(--surface);box-shadow:var(--comic-shadow-small)}
+.nc-download-source-heading {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;padding:14px 20px;border-bottom:var(--comic-perforation);background:var(--surface) var(--comic-dot-pattern);background-size:var(--comic-dot-size);border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.nc-download-source-group[data-active]>.nc-download-source-heading {background-color:var(--accent-soft)}
+.nc-download-source-heading>div {display:flex;align-items:center;gap:9px;min-width:0}
+.nc-download-source-heading h2 {margin:0;font-size:var(--text-small);font-weight:750;overflow-wrap:anywhere}
+.nc-download-source-count {display:inline-grid;place-items:center;min-width:22px;min-height:22px;padding:0 5px;border:var(--comic-badge-border);border-radius:var(--comic-badge-radius);background:var(--surface);font-size:var(--text-caption);font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;transform:rotate(-4deg)}
+.nc-download-source-heading button.nc-download-source-mode {min-height:36px;padding:6px 8px;margin:-6px -8px -6px 0;border:1px solid var(--line);background:var(--surface);gap:8px;font-size:var(--text-caption);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
+.nc-download-source-mode>span {min-width:0}
+.nc-download-source-heading button.nc-download-source-mode:not([data-value=auto]) {border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.nc-download-source-heading button.nc-download-source-mode:is(:hover,:focus-visible,[aria-expanded=true]) {background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.nc-download-source-heading button.nc-download-source-mode:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+.nc-download-slots {display:inline-flex;align-items:center;gap:2px;flex:none}
+.nc-download-slots i {width:3px;height:10px;border-radius:var(--comic-badge-radius);background:var(--line)}
+.nc-download-slots i[data-filled] {background:var(--accent)}
+.nc-download-source-error {padding-inline:20px}
 .nc-download-books {display:grid;gap:18px}
-.nc-download-book {display:grid;grid-template-columns:88px minmax(0,1fr) minmax(160px,200px);gap:24px;align-items:start;padding:22px;border:var(--comic-border);border-radius:var(--comic-card-radius);background:var(--surface);box-shadow:var(--comic-shadow-small);scroll-margin:100px}
+.nc-download-files {margin-top:24px}
+.nc-download-files>h2 {display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:var(--text-body)}
+.nc-download-files>h2::after {content:"";flex:1;border-top:var(--comic-perforation)}
+.nc-download-source-group .nc-download-books {gap:0}
+.nc-download-book {--download-tone:var(--muted);display:grid;grid-template-columns:76px minmax(0,1fr) minmax(140px,200px);gap:20px;align-items:start;padding:20px;border:var(--comic-border);border-radius:var(--comic-card-radius);background:var(--surface);box-shadow:var(--comic-shadow-small);scroll-margin:100px}
+.nc-download-book[data-tone=active] {--download-tone:var(--accent)}
+.nc-download-book[data-tone=complete] {--download-tone:var(--success)}
+.nc-download-book[data-tone=attention] {--download-tone:var(--warning)}
+.nc-download-source-group .nc-download-book {border:0;border-radius:0;background:transparent;box-shadow:none}
+.nc-download-source-group .nc-download-book+.nc-download-book {border-top:1px solid var(--line)}
 .nc-download-book:focus {outline:2px solid var(--accent);outline-offset:4px}
-.nc-download-cover {display:block;width:88px;height:124px;padding:0;background:var(--canvas);border:1px solid var(--line);border-radius:var(--comic-cover-radius);overflow:hidden;cursor:pointer}
+.nc-download-cover {display:block;width:76px;height:108px;padding:0;background:var(--surface-soft);border:var(--comic-input-border);border-radius:var(--comic-cover-radius);box-shadow:var(--comic-shadow-small);overflow:hidden;cursor:pointer}
 .nc-download-cover .nc-thumbnail {display:flex;width:100%;height:100%;align-items:center;justify-content:center}
 .nc-download-cover img {width:100%;height:100%;object-fit:cover}
 .nc-download-info {min-width:0}
 .nc-download-title {display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap}
-.nc-download-title h2 {min-width:0;margin:0;font-size:var(--text-title);line-height:1.4;overflow-wrap:anywhere}
-.nc-download-title h2 button {border:0;padding:0;background:transparent;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
-.nc-download-status {display:inline-flex;gap:5px;align-items:center;max-width:100%;padding:4px 8px;border:var(--comic-border);border-radius:var(--comic-control-radius);box-shadow:2px 2px 0 var(--comic-shadow-color);font-size:var(--text-caption);font-weight:750;line-height:1.4;background:var(--surface-soft);color:var(--muted)}
+.nc-download-title h3 {min-width:0;margin:0;font-size:var(--text-body);line-height:1.4;overflow-wrap:anywhere}
+.nc-download-title h3 button {border:0;padding:0;background:transparent;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.nc-download-title h3 button:hover {color:var(--accent)}
+.nc-download-status {--icon-stroke:currentColor;display:inline-flex;gap:5px;align-items:center;max-width:100%;padding:3px 7px;border:var(--comic-badge-border);border-color:color-mix(in srgb,var(--download-tone) 35%,var(--line));border-radius:var(--comic-badge-radius);font-size:var(--text-caption);font-weight:650;line-height:1.4;background:color-mix(in srgb,var(--download-tone) 8%,var(--surface));color:var(--download-tone)}
 .nc-download-status svg {flex:none}
-.nc-download-status[data-tone=active] {color:var(--accent);background:var(--accent-soft)}
-.nc-download-status[data-tone=complete] {color:var(--success);background:color-mix(in srgb,var(--success) 10%,var(--surface))}
-.nc-download-status[data-tone=attention] {color:var(--warning);background:color-mix(in srgb,var(--warning) 10%,var(--surface))}
 .nc-download-meta {display:flex;flex-wrap:wrap;gap:8px 16px;color:var(--muted);font-size:var(--text-small);margin:10px 0 16px}
 .nc-download-meta>span {display:inline-flex;align-items:center;gap:5px}
 .nc-download-meta svg {flex-shrink:0}
-.nc-download-progress {display:grid;grid-template-columns:1fr auto;gap:8px;font-size:var(--text-small)}
-.nc-download-progress>span:nth-child(2) {font-variant-numeric:tabular-nums;color:var(--muted)}
-.nc-download-progress progress {grid-column:1/-1;display:block;width:100%;height:6px;accent-color:var(--accent);border:0;border-radius:8px;overflow:hidden}
-.nc-download-progress progress::-webkit-progress-bar {background:var(--line)}
-.nc-download-progress progress::-webkit-progress-value {background:var(--accent)}
-.nc-download-progress progress::-moz-progress-bar {background:var(--accent)}
+.nc-download-progress {display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px;font-size:var(--text-small)}
+.nc-download-progress>span:nth-child(2) {font-variant-numeric:tabular-nums;font-weight:650;color:var(--download-tone)}
+.nc-download-progress progress {grid-column:1/-1;display:block;width:100%;height:8px;accent-color:var(--download-tone);background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--comic-badge-radius);overflow:hidden}
+.nc-download-progress progress[value] {appearance:none}
+.nc-download-progress progress::-webkit-progress-bar {background:var(--surface-soft)}
+.nc-download-progress progress::-webkit-progress-value {background:var(--download-tone)}
+.nc-download-progress progress::-moz-progress-bar {background:var(--download-tone)}
+.nc-download-book[data-tone=active] progress::-webkit-progress-value {background:repeating-linear-gradient(120deg,transparent 0 6px,color-mix(in srgb,var(--surface) 30%,transparent) 6px 8px),var(--download-tone)}
+.nc-download-book[data-tone=active] progress::-moz-progress-bar {background:repeating-linear-gradient(120deg,transparent 0 6px,color-mix(in srgb,var(--surface) 30%,transparent) 6px 8px),var(--download-tone)}
 .nc-download-feedback {font-size:var(--text-small);color:var(--muted);margin:10px 0 0;overflow-wrap:anywhere}
 .nc-download-feedback[role=alert] {color:var(--danger)}
 .nc-download-actions {display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;align-self:stretch;gap:18px;min-width:0}
-.nc-download-controls {display:flex;align-items:center;justify-content:flex-end;gap:10px;max-width:100%}
+.nc-download-controls {display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;max-width:100%}
+.nc-download-controls .button {max-width:100%}
 .nc-download-controls .icon-button {flex:none}
 .nc-download-size {display:grid;gap:3px;text-align:right}
 .nc-download-size>span {display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:var(--text-caption);color:var(--muted)}
-.nc-download-size strong {font-size:var(--text-title);font-weight:750;font-variant-numeric:tabular-nums;line-height:1.3;white-space:nowrap;color:var(--ink)}
+.nc-download-size strong {font-size:var(--text-body);font-weight:650;font-variant-numeric:tabular-nums;line-height:1.3;white-space:nowrap;color:var(--ink)}
 .nc-cache-actions {display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap}
 .nc-download-languages {padding:4px 0 12px;margin:12px 0;border-bottom:1px dashed var(--line)}
 .nc-download-languages label {display:flex;gap:10px;align-items:center;padding:9px 0;cursor:pointer}
@@ -56,13 +90,14 @@
 .nc-download-language-popover .nc-download-languages label>span {min-width:0;overflow-wrap:anywhere}
 .nc-download-language-popover .nc-download-languages small {white-space:nowrap}
 .nc-download-language-popover .nc-cache-actions {margin-top:18px}
-.nc-download-source {padding:4px 8px;border:1px solid var(--line);border-radius:var(--comic-control-radius);background:var(--surface-soft);color:var(--ink);font-size:var(--text-caption)}
-.nc-download-source .nc-search-site-icon {display:grid;position:relative;place-items:center;width:20px;height:20px;flex:none}
-.nc-download-source .nc-search-site-icon img {position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.nc-download-source-heading .nc-search-site-icon {display:grid;position:relative;place-items:center;width:30px;height:30px;flex:none;border:var(--comic-badge-border);border-radius:var(--comic-control-radius);background:var(--surface);box-shadow:var(--comic-shadow-small)}
+.nc-download-source-heading .nc-search-site-icon img {position:absolute;inset:5px;width:18px;height:18px;object-fit:contain}
 .nc-download-meta>.nc-download-flags {gap:10px}
 .nc-download-flags>span {display:inline-flex;align-items:center}
-.nc-download-flags .nc-flag-icon,.nc-download-languages .nc-flag-icon {width:28px;height:21px}
-.nc-download-flags .nc-language-globe,.nc-download-languages .nc-language-globe {width:28px;height:24px}
+.nc-download-flags .nc-flag-icon {width:20px;height:15px}
+.nc-download-flags .nc-language-globe {width:20px;height:18px}
+.nc-download-languages .nc-flag-icon {width:28px;height:21px}
+.nc-download-languages .nc-language-globe {width:28px;height:24px}
 .nc-download-trigger {position:relative}
 .nc-download-trigger small {position:absolute;right:-6px;top:-6px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px;box-sizing:border-box;border-radius:10px;background:var(--accent);color:var(--accent-on);font-size:11px;font-weight:750;line-height:1}
 .nc-download-trigger[aria-current=page] {background:var(--accent-soft);border-color:var(--accent)}
@@ -73,12 +108,15 @@
  .nc-download-controls {justify-content:flex-start}
 }
 @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse), (max-width: 1000px) and (max-height: 500px) and (hover: none) {
- .nc-download-center .nc-page-heading {align-items:flex-start;flex-direction:column;gap:14px}
+ .nc-download-center .nc-page-heading {gap:12px}
+ .nc-download-heading-copy {flex-basis:100%}
+ .nc-download-center button.nc-download-mode {min-height:44px;margin:0}
+ .nc-download-source-heading {padding:12px 16px;gap:8px 12px}
+ .nc-download-source-heading button.nc-download-source-mode {min-height:44px}
  .nc-download-book {padding:16px;grid-template-columns:60px minmax(0,1fr);gap:14px;scroll-margin-block:80px calc(96px + env(safe-area-inset-bottom,0px))}
  .nc-download-cover {width:60px;height:86px;grid-row:1}
  .nc-download-actions {grid-column:1/-1;align-items:flex-start;flex-wrap:wrap;gap:14px}
  .nc-download-meta {gap:8px;margin:8px 0 12px}
- .nc-download-title h2 {font-size:var(--text-body)}
  .nc-download-controls {flex:1;min-width:0;flex-wrap:wrap}
  .nc-download-controls .button {min-height:44px;white-space:normal;flex:1}
  .nc-download-controls .icon-button {min-width:44px;width:44px;height:44px}

@@ -1,5 +1,5 @@
 import { catalog } from '../repositories';
-import {entryContentKind, type Entry} from '../domain';
+import {entryContentKind, type Comic, type Entry} from '../domain';
 import type { DownloadTask } from '../application/types';
 import {prepareEntryContent} from '../application/entry-content';
 import { acquirePage } from '../pages/service';
@@ -7,13 +7,14 @@ import { pageRenderProfile } from '../pages/identity';
 import { downloadKey, downloadStore } from '../../storage/downloads';
 import {blockingReason, downloadErrorMessage, downloadRetryAt} from './errors';
 import { ImagePermissionsRequired } from '../../sources';
-import {bookDownloadId,downloadTaskId as taskId,bookTaskActive,suspendBook,listBookPlans,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan} from './book-model';
+import {bookDownloadId,bookDownloadSource,downloadTaskId as taskId,bookTaskActive,suspendBook,listBookPlans,isBookDownloadActive,isEntryFullyCached,type BookDownloadPlan} from './book-model';
+import {RequestPool} from '../../concurrency';
+import {downloadSettingsId,downloadConcurrencyLimit,readDownloadSettings,defaultDownloadSettings} from './preferences';
 
 const controllers = new Map<string, AbortController>();
 const sameTask=(current:DownloadTask|undefined,expected:DownloadTask)=>current?.generation===expected.generation&&current.bookId===expected.bookId&&current.bookGeneration===expected.bookGeneration;
 const LEASE_MS = 90_000;
-let running: Promise<void> | undefined;
-let runController: AbortController | undefined;
+const running=new Map<string,{promise:Promise<void>;controller:AbortController}>();
 const message=downloadErrorMessage;
 const aborted = () => new DOMException('下载已暂停或文档已移除。', 'AbortError');
 const retainedPages=async(document:Entry)=>(await downloadStore.inventory([document.id],true)).filter(item=>item.contentId===document.contentId);
@@ -61,9 +62,10 @@ export async function pauseDownloads(ids: string[]): Promise<void> {
 }
 export async function listDownloads(): Promise<DownloadTask[]> { return await catalog.list('tasks', { limit: Number.MAX_SAFE_INTEGER }) as DownloadTask[]; }
 
-async function recoverInterrupted(holdsLock: boolean): Promise<void> {
+async function recoverInterrupted(holdsLock: boolean, bookId?:string): Promise<void> {
   const tasks = await catalog.list('tasks', { index: 'status', range: 'running', limit: Number.MAX_SAFE_INTEGER }) as DownloadTask[];
   for (const old of tasks) {
+    if(bookId!==undefined&&old.bookId!==bookId)continue;
     if (!holdsLock && typeof old.leaseUntil === 'number' && old.leaseUntil > Date.now()) continue;
     const paused = await catalog.editTask(old.id, old.entryId, record => {
       const current = record as DownloadTask | undefined;
@@ -75,6 +77,10 @@ async function recoverInterrupted(holdsLock: boolean): Promise<void> {
 async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<void> {
   const controller = new AbortController(); controllers.set(task.entryId, controller);
   const signal = outerSignal ? AbortSignal.any([outerSignal, controller.signal]) : controller.signal;
+  const pool=new RequestPool(downloadConcurrencyLimit(defaultDownloadSettings));
+  let comic:Comic|undefined;
+  const updateLimit=async()=>pool.setLimit(downloadConcurrencyLimit(await readDownloadSettings(),comic));
+  let workerFailed=false;
   const active = async () => {
     signal.throwIfAborted();
     const [current, document] = await Promise.all([catalog.get('tasks', task.id), catalog.get('entries', task.entryId)]);
@@ -86,12 +92,14 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
     return current?.status === 'running' && sameTask(current,task) ? { ...current, ...values, updatedAt: Date.now(), leaseUntil: values.status && values.status !== 'running' ? undefined : Date.now() + LEASE_MS } : undefined;
   });
   const unsubscribe = catalog.subscribe(change => {
+    if(change.table==='metadata'&&change.ids.includes(downloadSettingsId))void updateLimit().catch(error=>controller.abort(error));
     if (change.table==='tasks'&&change.ids.includes(task.id)||change.table==='entries'&&change.ids.includes(task.entryId)||
       task.bookId&&change.table==='metadata'&&change.ids.includes(bookDownloadId(task.bookId))) void active().catch(error => controller.abort(error));
   });
   const heartbeat = setInterval(() => { void active().then(() => patch({})).catch(error => controller.abort(error)); }, 20_000);
   try {
     let document=await active();
+    comic=await catalog.get('comics',document.comicId);await updateLimit();
     const retained=await retainedPages(document);
     await prepareEntryContent(document.id,signal,{refreshResources:true,retainedPages:{contentId:document.contentId,count:retained.length}});
     document=await active();
@@ -109,33 +117,39 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
       document = await active();
       const pages = await catalog.listPages(document.contentId, { offset, limit: 100 });
       if (!pages.length) break;
-      for (const page of pages) {
-        await active();
-        const renderProfileId=pageRenderProfile(document.format),key = downloadKey(document.contentId, page.pageId,renderProfileId);
-        const size=saved.get(key);
-        if (size!==undefined) { completed++; bytes+=size; continue; }
-        try {
-          let attempt=0;
-          const read=()=>acquirePage({ entryId: document.id, contentId: document.contentId, pageId: page.pageId, renderProfileId, signal, priority: 'background', purpose: 'download' });
-          const lease = await (async()=>{
-            for(;;){try{return await read();}catch(error){
-              await active();
-              if(!task.bookId||blockingReason(error)||attempt++>=1)throw error;
-              await new Promise(resolve=>setTimeout(resolve,300));await active();
-            }}
-          })();
-          try {
-            await active();
-            if (!await downloadStore.put(key, lease.blob, { owner: document.id, contentId: document.contentId, token })) throw aborted();
-            await active(); completed++; bytes+=lease.blob.size;
-          } finally { lease.release(); }
-        } catch (error) {
+      // Bound both network work and queued descriptors. Every worker finishes before settling the chapter.
+      let failure:unknown;
+      const results=await Promise.allSettled(pages.map(page=>pool.run(async()=>{
+        try{
           await active();
-          if (blockingReason(error) || (error instanceof DOMException && error.name === 'AbortError')) throw error;
-          errors[page.pageId] = message(error); failed++;
-        }
-        await patch({ completed, bytes,pageErrors: { ...errors } });
-      }
+          const renderProfileId=pageRenderProfile(document.format),key = downloadKey(document.contentId, page.pageId,renderProfileId);
+          const size=saved.get(key);
+          if (size!==undefined) { completed++; bytes+=size; return; }
+          try {
+            let attempt=0;
+            const read=()=>acquirePage({ entryId: document.id, contentId: document.contentId, pageId: page.pageId, renderProfileId, signal, priority: 'background', purpose: 'download' });
+            const lease = await (async()=>{
+              for(;;){try{return await read();}catch(error){
+                await active();
+                if(!task.bookId||blockingReason(error)||attempt++>=1)throw error;
+                await new Promise(resolve=>setTimeout(resolve,300));await active();
+              }}
+            })();
+            try {
+              await active();
+              if (!await downloadStore.put(key, lease.blob, { owner: document.id, contentId: document.contentId, token })) throw aborted();
+              await active(); completed++; bytes+=lease.blob.size;
+            } finally { lease.release(); }
+          } catch (error) {
+            await active();
+            if (blockingReason(error) || (error instanceof DOMException && error.name === 'AbortError')) throw error;
+            errors[page.pageId] = message(error); failed++;
+          }
+          await patch({ completed, bytes,pageErrors: { ...errors } });
+        }catch(error){if(!signal.aborted){failure=error;workerFailed=true;controller.abort(error);}throw error;}
+      })));
+      const rejected=results.find(result=>result.status==='rejected');
+      if(rejected?.status==='rejected')throw failure??rejected.reason;
       offset += pages.length;
     }
     await active();
@@ -143,16 +157,16 @@ async function execute(task: DownloadTask, outerSignal?: AbortSignal): Promise<v
     await patch({ status: failed ? 'failed' : complete ? 'complete' : 'paused', completed,bytes, total: document.pageCount, error: failed ? `${failed} 页下载失败，已完成页面可以阅读。` : complete ? undefined : '来源仍有待发现页面，请打开来源后继续。', leaseUntil: undefined });
   } catch (error) {
     const reason=blockingReason(error);
-    if(task.bookId&&reason&&!signal.aborted)await pauseBlockedDownloads(task.bookId,error);
-    const paused = signal.aborted || error instanceof ImagePermissionsRequired || error instanceof DOMException && (error.name === 'AbortError' || error.name === 'QuotaExceededError');
+    if(task.bookId&&reason&&!outerSignal?.aborted)await pauseBlockedDownloads(task.bookId,error);
+    const paused = signal.aborted&&!workerFailed || outerSignal?.aborted || error instanceof ImagePermissionsRequired || error instanceof DOMException && (error.name === 'AbortError' || error.name === 'QuotaExceededError');
     await patch({ status: paused ? 'paused' : 'failed', reason,error: message(error), leaseUntil: undefined });
   } finally { clearInterval(heartbeat); unsubscribe(); if (controllers.get(task.entryId) === controller) controllers.delete(task.entryId); }
 }
 
-async function drain(holdsLock: boolean, signal?: AbortSignal): Promise<void> {
-  await recoverInterrupted(holdsLock);
+async function drain(holdsLock: boolean, signal?: AbortSignal, bookId?:string): Promise<void> {
+  await recoverInterrupted(holdsLock,bookId);
   while (!signal?.aborted) {
-    const tasks = await catalog.list('tasks', { index: 'status', range: 'queued', limit: Number.MAX_SAFE_INTEGER }) as DownloadTask[];
+    const tasks = (await catalog.list('tasks', { index: 'status', range: 'queued', limit: Number.MAX_SAFE_INTEGER }) as DownloadTask[]).filter(task=>bookId===undefined||task.bookId===bookId);
     if (!tasks.length) break;
     tasks.sort((a, b) => Number(a.queuedAt ?? a.updatedAt) - Number(b.queuedAt ?? b.updatedAt) || Number(a.queueOrder ?? 0) - Number(b.queueOrder ?? 0) || a.id.localeCompare(b.id));
     // Read the queue once per batch, while rechecking each intent before claiming it.
@@ -174,18 +188,20 @@ export async function pauseBlockedDownloads(comicId:string,error:unknown){
   for(const plan of await listBookPlans()){
     if(!isBookDownloadActive(plan.status))continue;
     const other=await catalog.get('comics',plan.comicId);
-    if(reason==='space'||other?.source.connectionId===comic?.source.connectionId)await suspendBook(plan.comicId,'paused',reason,message(error),plan.generation,downloadRetryAt(error));
+    if(reason==='space'||comic&&other&&bookDownloadSource(other)===bookDownloadSource(comic))await suspendBook(plan.comicId,'paused',reason,message(error),plan.generation,downloadRetryAt(error));
   }
 }
 /** The visible extension page owns this lifetime; reopening never auto-resumes interrupted work. */
-export function runDownloads(signal?: AbortSignal): Promise<void> {
-  if (running) return running;
-  const controller = new AbortController(); runController = controller;
+export function runDownloads(signal?: AbortSignal,bookId?:string): Promise<void> {
+  const key=bookId??'legacy',existing=running.get(key);
+  if(existing)return existing.promise;
+  const controller = new AbortController();
   const lifetime = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   const execute = async () => {
-    if (typeof navigator !== 'undefined' && navigator.locks) await navigator.locks.request('nc-website-downloads', { ifAvailable: true }, lock => lock ? drain(true, lifetime) : Promise.resolve());
-    else await drain(false, lifetime);
+    if (typeof navigator !== 'undefined' && navigator.locks) await navigator.locks.request('nc-website-downloads:'+key, { ifAvailable: true }, lock => lock ? drain(true, lifetime,bookId) : Promise.resolve());
+    else await drain(false, lifetime,bookId);
   };
-  running = execute().finally(() => { running = undefined; if (runController === controller) runController = undefined; }); return running;
+  const promise=execute().finally(()=>{if(running.get(key)?.controller===controller)running.delete(key);});
+  running.set(key,{promise,controller});return promise;
 }
-export function stopDownloads(): void { runController?.abort(aborted()); for (const controller of controllers.values()) controller.abort(aborted()); }
+export function stopDownloads(): void { for(const run of running.values())run.controller.abort(aborted());for (const controller of controllers.values()) controller.abort(aborted()); }

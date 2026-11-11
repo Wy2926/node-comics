@@ -523,9 +523,10 @@ async function execute(intent: FileDownloadIntent, outer: AbortSignal): Promise<
 export async function runRemoteFileDownloadCycle(
   signal: AbortSignal,
   owner: string,
+  id?: string,
 ): Promise<void> {
   signal.throwIfAborted();
-  const pending = await intents();
+  const pending = (await intents()).filter(intent=>id===undefined||intent.id===id);
   for (const clearing of pending.filter((intent) => intent.status === 'clearing')) {
     signal.throwIfAborted();
     await clearRemoteFileDownload(clearing.id, clearing.generation).catch(() => {});

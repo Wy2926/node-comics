@@ -44,6 +44,8 @@ export interface SourceDefinition {
   inlineRecognition?: 'generic';
   /** Explicit opt-in: only adapters with a verified complete directory may refresh it automatically. */
   catalogSync?: { intervalMinutes: number };
+  /** Default parallel images for whole-book caching (1–6); an explicit user setting takes precedence. */
+  downloadConcurrency?: number;
   installation: {
     /** Content-script placement only; network access uses the extension's host permissions. */
     autoContentMatches: readonly string[];
