@@ -105,7 +105,7 @@ describe('generic recognition is independent of import classification', () => {
   it.each([
     ['comicfuz', 'https://comic-fuz.com/manga/2062'],
     ['comickz', 'https://comickz.co.uk/comic/fixture'],
-    ['klmanga', 'https://klmanga.toys/manga-raw/fixture/'],
+    ['klmanga', 'https://klmanga.autos/manga-raw/fixture/'],
     ['rawlazy', 'https://rawlazy.io/manga-lazy/fixture/'],
     ['pixiv', 'https://www.pixiv.net/users/123/artworks'],
   ])('%s retains real catalog identity, import routing and generic dimensions', (id, url) => {

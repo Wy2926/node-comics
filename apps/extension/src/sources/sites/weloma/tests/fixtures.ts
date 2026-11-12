@@ -22,3 +22,8 @@ export const searchCard = (id = work) => `<div class="thumb-item-flow" id="bm_${
 export const searchHtml = (count = 1, page = 1, more = false) => `<div id="history">${Array.from({length: count}, (_, i) => searchCard(work + i)).join('')}</div>
   <ul class="pagination pagination-v4">${count ? `<li><a class="active">${page}</a></li>` : ''}${more
     ? `<li><a href="/l/0Next">${page + 1}</a></li><li><a href="/l/0Last">9</a></li>` : ''}</ul>`;
+export const searchDatabaseError = `<div class="btn-group"><button>Page 1 of 1</button>
+  <a href="Duplicate entry 'query-fixture' for key 'w_manga_seo_links.type_value' | Query: INSERT INTO w_manga_seo_links`;
+export const suggestion = {url: '/m/' + work, primary: 'Sample &amp; Book', secondary: 'Last chapter: 1', image: cover,
+  onclick: 'throw new Error("Source scripts must not run")'};
+export const suggestions = (rows = [suggestion]) => JSON.stringify([{header: {title: 'Manga', num: rows.length, limit: 10}, data: rows}]);

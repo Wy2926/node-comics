@@ -5,7 +5,8 @@ import {parseSearch, searchUrl} from '../search';
 import {decodeBase64} from '../html';
 import {validateCatalog} from '../../../core/catalog';
 import {validatePages} from '../../../core/pages';
-import {catalogHtml, chapter, chapterRow, cover, encoded, identity, image, reader, readerHtml, searchCard, searchHtml, url, work} from './fixtures';
+import {catalogHtml, chapter, chapterRow, cover, encoded, identity, image, reader, readerHtml, searchCard, searchDatabaseError,
+  searchHtml, suggestion, suggestions, url, work} from './fixtures';
 
 describe('WeLoMa', () => {
   it('uses stable case-sensitive identities, floating import and generic tab recognition', () => {
@@ -122,5 +123,54 @@ describe('WeLoMa', () => {
   it.each([{siteId: 'other', query: 'x'}, {siteId: 'weloma', query: ''}, {siteId: 'weloma', query: 'x\n'},
     {siteId: 'weloma', query: 'x', cursor: 'https://evil.test'}, {siteId: 'weloma', query: 'x', cursor: 'page:1:0AbCd'}])('rejects invalid search input', input => {
     expect(() => searchUrl(input)).toThrow();
+  });
+  it('recovers a source SEO database error through native suggestions without changing the query', async () => {
+    const input = {siteId: 'weloma', query: 'キングダム & 日本語'};
+    const request = vi.fn().mockResolvedValueOnce(searchDatabaseError).mockResolvedValueOnce(suggestions());
+    expect(await network.search(input, {request})).toEqual({items: [{catalogId: catalogKey(work), catalogUrl: url,
+      title: 'Sample & Book', cover: {url: cover}, latestLabel: 'Last chapter: 1'}]});
+    expect(request.mock.calls).toEqual([[searchUrl(input)],
+      [origin + '/app/manga/controllers/search.single.php?' + new URLSearchParams({q: input.query})]]);
+    request.mockReset().mockResolvedValueOnce(searchDatabaseError).mockResolvedValueOnce(suggestions([]));
+    expect(await network.search(input, {request})).toEqual({items: []});
+    request.mockReset().mockResolvedValueOnce(searchDatabaseError).mockResolvedValueOnce(suggestions([{...suggestion, image: '', secondary: ''}]));
+    expect((await network.search(input, {request})).items[0]).toEqual({catalogId: catalogKey(work), catalogUrl: url, title: 'Sample & Book'});
+  });
+  it.each(['json', 'shape', 'count', 'limit', 'host', 'chapter', 'duplicate', 'image', 'title'])('rejects invalid %s suggestions', async kind => {
+    let body = suggestions();
+    if (kind === 'json') body = '<title>Just a moment...</title>';
+    if (kind === 'shape') body = '[null]';
+    if (kind === 'count') body = body.replace('"num":1', '"num":2');
+    if (kind === 'limit') body = suggestions(Array.from({length: 11}, (_, i) => ({...suggestion, url: '/m/Work' + i})));
+    if (kind === 'host') body = suggestions([{...suggestion, url: 'https://weloma.net.evil.test/m/Work'}]);
+    if (kind === 'chapter') body = suggestions([{...suggestion, url: '/c/' + chapter}]);
+    if (kind === 'duplicate') body = suggestions([suggestion, suggestion]);
+    if (kind === 'image') body = suggestions([{...suggestion, image: 'javascript:alert(1)'}]);
+    if (kind === 'title') body = suggestions([{...suggestion, primary: ''}]);
+    const request = vi.fn().mockResolvedValueOnce(searchDatabaseError).mockResolvedValueOnce(body);
+    await expect(network.search({siteId: 'weloma', query: 'キングダム'}, {request})).rejects.toThrow();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it('does not mask other failures or restart a continuation with suggestions', async () => {
+    const input = {siteId: 'weloma', query: 'sample'};
+    for (const body of ['<title>Just a moment...</title>', '<div id="history">', searchHtml().replace(cover, 'javascript:alert(1)')]) {
+      const request = vi.fn().mockResolvedValue(body);
+      await expect(network.search(input, {request})).rejects.toThrow(); expect(request).toHaveBeenCalledTimes(1);
+    }
+    const request = vi.fn().mockResolvedValue(searchDatabaseError);
+    await expect(network.search({...input, cursor: 'page:2:0Next'}, {request})).rejects.toThrow(); expect(request).toHaveBeenCalledTimes(1);
+    request.mockReset().mockRejectedValue(Error('unavailable'));
+    await expect(network.search(input, {request})).rejects.toThrow('unavailable'); expect(request).toHaveBeenCalledTimes(1);
+  });
+  it('honors cancellation before and after the suggestions request', async () => {
+    for (const cancelAt of [1, 2]) {
+      const controller = new AbortController(); let calls = 0;
+      const request = vi.fn(async () => {
+        if (++calls === cancelAt) controller.abort(Error('cancelled'));
+        return calls === 1 ? searchDatabaseError : suggestions();
+      });
+      await expect(network.search({siteId: 'weloma', query: 'キングダム'}, {request, signal: controller.signal})).rejects.toThrow('cancelled');
+      expect(request).toHaveBeenCalledTimes(cancelAt);
+    }
   });
 });

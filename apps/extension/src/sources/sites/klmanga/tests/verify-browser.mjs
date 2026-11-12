@@ -1,7 +1,7 @@
 import {setReaderProgress} from '../../../../../tests/reader-progress-driver.mjs';
 // Real public source/CDN in an isolated built MV3 extension; no translation provider calls.
 // Defaults to ONE PIECE's first chapter. For the merged long-page regression set
-// KLMANGA_READER_URL=https://klmanga.works/manga-raw/hunter-x-hunter-raw-free/chapter-420/
+// KLMANGA_READER_URL=https://klmanga.autos/manga-raw/hunter-x-hunter-raw-free/chapter-420/
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {cp, mkdir, mkdtemp, writeFile} from 'node:fs/promises';
@@ -54,7 +54,7 @@ try {
   }, process.env.KLMANGA_SEARCH_QUERY || 'キングダム');
   assert(found.registered && found.hits > 0 && found.owned && found.coverBytes > 1000 && found.comics === 0);
   checks.push(`Live public search returns ${found.hits} validated candidates and artwork without creating a library record`);
-  let chapter = process.env.KLMANGA_READER_URL || 'https://klmanga.works/manga-raw/' + encodeURIComponent('ワンピース-raw-free') + '/chapter-1/';
+  let chapter = process.env.KLMANGA_READER_URL || 'https://klmanga.autos/manga-raw/' + encodeURIComponent('ワンピース-raw-free') + '/chapter-1/';
   if (process.env.KLMANGA_CATALOG_URL && !process.env.KLMANGA_READER_URL) {
     chapter = await setup.evaluate(async url => {
       const p = await import(chrome.runtime.getURL('verify-source.js')), snapshot = await p.readWebsiteCatalog(url);
@@ -161,7 +161,7 @@ try {
   assert(details.beforeFailure.position?.pageId && details.beforeFailure.lastEntryId === details.entryId);
   await reader.evaluate(() => {
     globalThis.klmangaFailureFetch = globalThis.fetch;
-    globalThis.fetch = (input, options) => new URL(typeof input === 'string' ? input : input.url ?? input).hostname === 'klmanga.works'
+    globalThis.fetch = (input, options) => new URL(typeof input === 'string' ? input : input.url ?? input).hostname === 'klmanga.autos'
       ? Promise.resolve(new Response('Unavailable', {status: 503})) : globalThis.klmangaFailureFetch(input, options);
   });
   try {

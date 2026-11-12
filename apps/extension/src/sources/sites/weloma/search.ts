@@ -59,7 +59,33 @@ export function parseSearch(html: string, input: SourceSearchRequest): SourceSea
   if ((maxPage > page) !== !!nextCursor) throw invalid();
   return {items, ...(nextCursor ? {nextCursor} : {})};
 }
+function parseSuggestions(body: string): SourceSearchPage {
+  let groups: Array<{header: {title: string; num: number; limit: number};
+    data: Array<{url: string; primary: string; secondary: string; image: string}>}>;
+  try {groups = JSON.parse(body);} catch {throw invalid();}
+  if (!Array.isArray(groups) || groups.length !== 1) throw invalid();
+  const group = groups[0];
+  if (group?.header?.title !== 'Manga' || group.header.limit !== 10 || !Array.isArray(group.data) ||
+    group.data.length > 10 || group.header.num !== group.data.length) throw invalid();
+  const seen = new Set<string>();
+  return {items: group.data.map(row => {
+    if (!row || [row.url, row.primary, row.secondary, row.image].some(value => typeof value !== 'string')) throw invalid();
+    const loc = location(row.url);
+    if (!loc.work || loc.chapter || seen.has(loc.work)) throw invalid();
+    seen.add(loc.work);
+    const cover = row.image ? imageUrl(row.image) : undefined;
+    return {catalogId: catalogKey(loc.work), catalogUrl: catalogUrl(loc.work), title: text(textContent(row.primary)),
+      ...(cover && cover !== origin + '/app/manga/themes/dark/assets/images/no-cover.png' ? {cover: {url: cover}} : {}),
+      ...(row.secondary ? {latestLabel: text(textContent(row.secondary))} : {})};
+  })};
+}
 export async function search(input: SourceSearchRequest, context: SourceNetworkContext) {
   context.signal?.throwIfAborted(); const html = await context.request(searchUrl(input));
-  context.signal?.throwIfAborted(); return parseSearch(html, input);
+  context.signal?.throwIfAborted();
+  // Some Unicode queries crash the source's SEO pagination links. Its native suggestions remain available.
+  if (input.cursor === undefined && /Duplicate entry [^\r\n]*for key ['"]w_manga_seo_links\.type_value['"]/.test(html)) {
+    const body = await context.request(`${origin}/app/manga/controllers/search.single.php?${new URLSearchParams({q: input.query})}`);
+    context.signal?.throwIfAborted(); return parseSuggestions(body);
+  }
+  return parseSearch(html, input);
 }
