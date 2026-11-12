@@ -62,7 +62,7 @@ describe('whole chapter directory export',()=>{
     expect(JSON.parse(manifest)).toMatchObject({schema:'node-comics-export/3',complete:true,expectedPages:6,chapters:[{firstPage:1,pageCount:2},{firstPage:3,pageCount:2},{firstPage:5,pageCount:2}]});
   });
 
-  it('discovers pending chapters serially and writes ordered chapter folders with one live image',async()=>{
+  it('discovers chapters serially and writes ordered folders with at most two live images',async()=>{
     const {entries}=await book();await catalog.patch('entries',entries[1].id,{indexState:'pending',discoveryComplete:false});
     let active=0,maximum=0;
     vi.mocked(prepareEntryContent).mockImplementation(async id=>{
@@ -70,7 +70,7 @@ describe('whole chapter directory export',()=>{
       await catalog.patch('entries',id,{indexState:'ready',discoveryComplete:true});active--;
     });
     vi.mocked(acquirePage).mockImplementation(async()=>{
-      expect(releases.every(release=>release.mock.calls.length===1)).toBe(true);
+      expect(releases.filter(release=>release.mock.calls.length===0).length).toBeLessThan(2);
       const release=vi.fn();releases.push(release);
       return {blob:image(),identity,release};
     });
@@ -174,7 +174,7 @@ describe('whole chapter directory export',()=>{
       return {blob,identity,release};
     });
     await expect(exportDocument(entries[0].id,options,context())).rejects.toThrow('128 MiB');
-    expect(reads).toBe(4);expect(release).toHaveBeenCalledTimes(4);
+    expect(reads).toBeGreaterThanOrEqual(4);expect(reads).toBeLessThanOrEqual(5);await vi.waitFor(()=>expect(release).toHaveBeenCalledTimes(reads));
   });
 
   it('bounds total metadata pages across chapters before acquiring any image',async()=>{

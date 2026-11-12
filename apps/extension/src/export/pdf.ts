@@ -2,7 +2,7 @@ import {msg} from '../i18n/runtime';
 import {PDFDocument} from 'pdf-lib';
 import {exportImage} from './images';
 
-/** PDF images are normalized to JPEG to bound retained decoded PNG data. */
+/** Preserve ordinary JPEGs; convert other images to bound retained decoded PNG data. */
 export async function pdfWriter(title: string) {
   const doc = await PDFDocument.create();
   doc.setTitle(title); doc.setCreator(msg("NodeLane Comics")); doc.setProducer('NodeLane Comics / pdf-lib');

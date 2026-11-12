@@ -37,20 +37,16 @@ export function exportPageName(plan: ExportPlan, page: ExportPage, extension: st
   return `${folder}${String(page.ordinal-(chapter?.firstPage??0)+1).padStart(5,'0')}.${extension}`;
 }
 
-/** Freeze metadata only. The explicit write command acquires one requested page at a time. */
+/** Freeze bounded metadata only; the write command acquires page bytes on demand. */
 export async function planExport(entryId: string, options: ExportOptions, scope?: TranslationScope, signal?: AbortSignal): Promise<ExportPlan> {
   signal?.throwIfAborted();
   const document = await catalog.get('entries',entryId);
   if (!document || document.indexState !== 'ready') throw new Error('文档尚未建立可读目录，请先完成索引。');
   if (document.format === 'epub') throw new Error('EPUB 请使用保存完整源文件。');
   if (options.images === 'translation' && !scope) throw new Error(msg('请先选择已有译图所属的翻译渠道。'));
-  const descriptors = [];
-  for (let offset = 0;; offset += 100) {
-    signal?.throwIfAborted();
-    const batch = await catalog.listPages(document.contentId,{offset,limit:100}); descriptors.push(...batch);
-    if (descriptors.length > MAX_EXPORT_PAGES) throw new Error('单次导出最多支持 10000 页，请拆分文档。');
-    if (batch.length < 100) break;
-  }
+  const descriptors = await catalog.listPages(document.contentId,{limit:MAX_EXPORT_PAGES+1});
+  signal?.throwIfAborted();
+  if (descriptors.length > MAX_EXPORT_PAGES) throw new Error('单次导出最多支持 10000 页，请拆分文档。');
   if (!descriptors.length) throw new Error('文档没有可导出的页面。');
   const expectedPages = document.knownTotal ?? document.pageCount;
   const incomplete = document.discoveryComplete === false || (expectedPages !== undefined && expectedPages !== descriptors.length);

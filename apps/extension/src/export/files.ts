@@ -22,16 +22,24 @@ export async function writeExport(plan:ExportPlan,dependencies:ExportDependencie
     async write(chunk){signal.throwIfAborted();bytes+=chunk.byteLength;if(buffered&&bytes>MAX_EXPORT_BYTES)throw new Error('此浏览器的导出文件最多 128 MiB，请分批导出或使用支持直接写入文件的浏览器。');if(target)await target.write(chunk);else chunks.push(new Uint8Array(chunk));},
     async close(){if(closed)return;closed=true;try{await target?.close();}finally{target?.releaseLock();}},abort,
   });
+  const reads=new AbortController(),readSignal=AbortSignal.any([signal,reads.signal]),pending:Promise<ExportImageLease>[]=[];
+  const prefetch=(page:ExportPage)=>{
+    const request=check(page).then(()=>{readSignal.throwIfAborted();return dependencies.acquire(page,readSignal);});
+    pending.push(request);void request.catch(()=>{});
+  };
   try{
     const pdf=plan.options.format==='pdf'?await(await import('./pdf')).pdfWriter(plan.title):undefined;
     const zip=pdf?undefined:new ZipWriter(output,{useWebWorkers:false,useCompressionStream:true,level:0});
+    // Two reads at most; write in order and refill only after releasing a page.
+    for(const page of plan.pages.slice(0,2))prefetch(page);
     for(const [index,page] of plan.pages.entries()){
       const chapter=page.chapter===undefined?undefined:plan.chapters?.[page.chapter];
       const file=chapter?msg('第 {0} / {1} 章 · {2}',{'0':page.chapter!+1,'1':plan.chapters!.length,'2':chapter.title}):plan.title;
-      await check(page);dependencies.progress?.({completed:index,total:plan.pages.length,file,phase:msg('读取第 {0} 页',{'0':page.ordinal+1})});
+      const progress={completed:index,total:plan.pages.length,file,phase:msg('处理中…')};
+      dependencies.progress?.(progress);
       let lease:ExportImageLease|undefined;
       try{
-        lease=await dependencies.acquire(page,signal);
+        lease=await pending.shift()!;
         await check(page);sourceBytes+=lease.blob.size;
         if((buffered||pdf)&&sourceBytes>MAX_EXPORT_BYTES)throw new Error('本次有界导出图片超过 128 MiB，请使用流式 CBZ / ZIP 或拆分文件。');
         if(pdf)await pdf.add(lease.blob,signal);
@@ -43,11 +51,15 @@ export async function writeExport(plan:ExportPlan,dependencies:ExportDependencie
         if(!chapter||signal.aborted||error instanceof Error&&error.name==='AbortError')throw error;
         throw Error(msg('章节「{0}」导出失败：{1}',{'0':chapter.title,'1':error instanceof Error?error.message:String(error)}));
       }finally{lease?.release();}
-      await check(page);dependencies.progress?.({completed:index+1,total:plan.pages.length,file,phase:msg('已处理第 {0} 页',{'0':page.ordinal+1})});
+      dependencies.progress?.({...progress,completed:index+1});
+      if(plan.pages[index+2])prefetch(plan.pages[index+2]);
     }
     await check();const manifest=JSON.stringify(exportManifest(plan),null,2);
     if(pdf){const blob=await pdf.close(manifest);if(blob.size>MAX_EXPORT_BYTES)throw new Error('PDF 文件超过 128 MiB，请改用流式 CBZ / ZIP。');await check();const writer=output.getWriter();await writer.write(new Uint8Array(await blob.arrayBuffer()));await writer.close();writer.releaseLock();}
     else{await zip!.add('export-manifest.json',new TextReader(manifest),{signal});await check();await zip!.close();}
     return {name:exportName(plan.title,plan.options),bytes,...(buffered?{blob:new Blob(chunks,{type:pdf?'application/pdf':'application/zip'})}:{})};
-  }catch(error){await abort(error);throw error;}
+  }catch(error){
+    reads.abort(error);for(const request of pending)void request.then(lease=>lease.release(),()=>{});
+    await abort(error);throw error;
+  }
 }

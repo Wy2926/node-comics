@@ -276,8 +276,6 @@
   "已连接账户，可以开始翻译了": "The account has been connected and translation can begin.",
   "登录未完成，请重试。": "Login not completed, please try again.",
   "账户或服务已切换，本次操作已停止。": "The account or service has been switched and this operation has been stopped.",
-  "读取第 {0} 页": "Reading page {0}",
-  "已处理第 {0} 页": "Page {0} processed",
   "浏览器无法创建图片画布。": "The browser cannot create the image canvas.",
   "NodeLane Comics": "NodeLane Comics",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "A single PDF image exceeds 128 MiB, please use CBZ or image ZIP instead.",

@@ -303,8 +303,6 @@
   "已连接账户，可以开始翻译了": "Tài khoản đã được kết nối và quá trình dịch có thể bắt đầu.",
   "登录未完成，请重试。": "Đăng nhập chưa hoàn tất, vui lòng thử lại.",
   "账户或服务已切换，本次操作已停止。": "Tài khoản hoặc dịch vụ đã được chuyển đổi và hoạt động này đã bị dừng.",
-  "读取第 {0} 页": "Đọc trang {0}",
-  "已处理第 {0} 页": "Trang {0} được xử lý",
   "浏览器无法创建图片画布。": "Trình duyệt không thể tạo canvas hình ảnh.",
   "NodeLane Comics": "Truyện tranh NodeLane",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "Một hình ảnh PDF vượt quá 128 MiB, vui lòng sử dụng CBZ hoặc ZIP hình ảnh thay thế.",

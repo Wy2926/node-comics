@@ -276,8 +276,6 @@
   "已连接账户，可以开始翻译了": "La cuenta se ha conectado y puede comenzar la traducción.",
   "登录未完成，请重试。": "Inicio de sesión no completado, inténtelo de nuevo.",
   "账户或服务已切换，本次操作已停止。": "Se cambió la cuenta o servicio y se detuvo esta operación.",
-  "读取第 {0} 页": "Leyendo página {0}",
-  "已处理第 {0} 页": "Página {0} procesada",
   "浏览器无法创建图片画布。": "El navegador no puede crear el lienzo de imágenes.",
   "NodeLane Comics": "Cómics de NodeLane",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "Una sola imagen PDF supera los 128 MiB; utilice CBZ o imagen ZIP en su lugar.",

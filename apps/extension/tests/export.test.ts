@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import {seedComic} from './comic-fixture';
+import {readFile} from 'node:fs/promises';
 import {describe,expect,it,vi} from 'vitest';
 import {BlobReader,BlobWriter,ZipReader} from '@zip.js/zip.js/index-native.js';
 import {catalog} from '../src/comics/repositories';
@@ -7,6 +8,8 @@ import {RENDER_PROFILE} from '../src/comics/pages/identity';
 import {exportManifest,MAX_EXPORT_BYTES,planExport,safeName,type ExportOptions} from '../src/export/plan';
 import {writeExport} from '../src/export/files';
 import {exportImage} from '../src/export/images';
+import {pdfWriter} from '../src/export/pdf';
+import {PDFDocument} from 'pdf-lib';
 import {importContainer,releaseContainer} from '../src/storage/containers';
 import {exportDocument,exportOriginalFile} from '../src/comics/application/export-service';
 import type {Job} from '../src/types';
@@ -51,6 +54,26 @@ describe('document export through page leases',()=>{
     try { const blob=image();expect(await exportImage(blob)).toMatchObject({blob,width:8000,height:6000});expect(close).toHaveBeenCalledOnce(); }
     finally { vi.unstubAllGlobals(); }
   });
+  it('keeps supported archive images and PDF JPEGs without decoding or recompressing pixels',async()=>{
+    const png=new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAYAAACAcVaiAAAAFElEQVR4nGMUsYmqZoACJhiDBA4ASGUBLySXec0AAAAASUVORK5CYII=','base64')],{type:'image/png'});
+    const jpeg=new Blob([await readFile(new URL('./fixtures/translation/home/color-original.jpg',import.meta.url))],{type:'image/jpeg'});
+    const decode=vi.fn(()=>{throw Error('Unexpected pixel decoding');});vi.stubGlobal('createImageBitmap',decode);
+    try{
+      expect(await exportImage(png)).toMatchObject({blob:png,width:3,height:5});
+      const image=await exportImage(jpeg,true);expect(image.blob).toBe(jpeg);expect(image.extension).toBe('jpg');
+      const writer=await pdfWriter('JPEG export');await writer.add(jpeg);
+      const pdf=await PDFDocument.load(await(await writer.close('{}')).arrayBuffer());
+      expect(pdf.getPageCount()).toBe(1);expect(pdf.getPage(0).getWidth()/pdf.getPage(0).getHeight()).toBeCloseTo(image.width/image.height);
+      expect(decode).not.toHaveBeenCalled();
+    }finally{vi.unstubAllGlobals();}
+  });
+  it('still normalizes oriented JPEGs before embedding them in PDF',async()=>{
+    const jpeg=new Blob([await readFile(new URL('./fixtures/normalization/orientation-6.jpg',import.meta.url))],{type:'image/jpeg'}),encoded=new Blob(['normalized'],{type:'image/jpeg'}),close=vi.fn();
+    vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:200,height:100,close})));
+    vi.stubGlobal('OffscreenCanvas',class {width=200;height=100;getContext(){return {fillRect(){},drawImage(){}};}async convertToBlob(){return encoded;}});
+    try{expect(await exportImage(jpeg,true)).toMatchObject({blob:encoded,width:200,height:100});expect(close).toHaveBeenCalledOnce();}
+    finally{vi.unstubAllGlobals();}
+  });
   it('exports through the injected channel reader and reuses existing result bytes without network access',async()=>{
     const s=await sample(1),result=job('export-cached');await bind(s,[result]);
     await translationCache.put(resultBlobKey(scope,result),image(),{owner:scope.key});
@@ -92,13 +115,22 @@ describe('document export through page leases',()=>{
     const manifest=JSON.stringify(exportManifest(plan));expect(JSON.parse(manifest).complete).toBe(false);
     for(const secret of ['private.example','token','secret','alice','api.example','private-result','sourceUrl','cacheKey'])expect(manifest).not.toContain(secret);
   });
-  it('writes a real archive incrementally with at most one live page lease and includes its manifest',async()=>{
-    const s=await sample(),plan=await planExport(s.id,options);let active=0,maximum=0,released=0;
-    const result=await writeExport(plan,{assertCurrent(){},async acquire(){active++;maximum=Math.max(maximum,active);return {blob:image(),width:100,height:100,release(){active--;released++;}};}},new AbortController().signal);
-    expect(maximum).toBe(1);expect(released).toBe(3);expect(result.blob).toBeDefined();
+  it('prefetches at most two pages and writes ordered original bytes and a manifest',async()=>{
+    const s=await sample(),plan=await planExport(s.id,options),progress=vi.fn(),started:number[]=[],released:number[]=[];let maximum=0;
+    let first!:()=>void,second!:()=>void;
+    const firstReady=new Promise<void>(resolve=>{first=resolve;}),secondStarted=new Promise<void>(resolve=>{second=resolve;});
+    const images=plan.pages.map(page=>new Blob([image(),String(page.ordinal)],{type:'image/png'}));
+    const pending=writeExport(plan,{assertCurrent(){},progress,async acquire(page){
+      started.push(page.ordinal);maximum=Math.max(maximum,started.length-released.length);
+      if(page.ordinal===0)await firstReady;if(page.ordinal===1)second();
+      return {blob:images[page.ordinal],width:100,height:100,release(){released.push(page.ordinal);}};
+    }},new AbortController().signal);
+    await secondStarted;expect(started).toEqual([0,1]);expect(released).toEqual([]);first();
+    const result=await pending;expect(maximum).toBe(2);expect(released).toEqual([0,1,2]);
+    expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({completed:3,total:3}));
     const reader=new ZipReader(new BlobReader(result.blob!));
     try{const entries=await reader.getEntries();expect(entries.map(entry=>entry.filename)).toEqual(['00001.png','00002.png','00003.png','export-manifest.json']);
-      const entry=entries[0];if(entry.directory)throw Error('unexpected directory');expect(await(await entry.getData(new BlobWriter())).arrayBuffer()).toEqual(await image().arrayBuffer());
+      for(const [index,entry] of entries.slice(0,3).entries()){if(entry.directory)throw Error('unexpected directory');expect(await(await entry.getData(new BlobWriter())).arrayBuffer()).toEqual(await images[index].arrayBuffer());}
     }finally{await reader.close();}
   });
   it('streams directly to a supplied file destination without returning an in-memory archive',async()=>{
@@ -111,7 +143,22 @@ describe('document export through page leases',()=>{
     const s=await sample(),plan=await planExport(s.id,options);let current=true;const released=vi.fn(),aborted=vi.fn(),closed=vi.fn();
     const stream=new WritableStream<Uint8Array>({write(){},close:closed,abort:aborted});
     await expect(writeExport(plan,{assertCurrent(){if(!current)throw Error('账户已变化');},async acquire(){current=false;return {blob:image(),release:released};}},new AbortController().signal,stream)).rejects.toThrow('账户已变化');
-    expect(released).toHaveBeenCalledOnce();expect(aborted).toHaveBeenCalledOnce();expect(closed).not.toHaveBeenCalled();
+    expect(released).toHaveBeenCalledTimes(2);expect(aborted).toHaveBeenCalledOnce();expect(closed).not.toHaveBeenCalled();
+  });
+  it.each(['cancel','failure'])('cleans up a late prefetched lease after %s without waiting for it',async(mode)=>{
+    const s=await sample(4),plan=await planExport(s.id,options),controller=new AbortController(),release=vi.fn(),lateRelease=vi.fn();
+    let first!:()=>void,second!:()=>void,late!:(lease:{blob:Blob;release():void})=>void,readSignal:AbortSignal|undefined;
+    const firstReady=new Promise<void>(resolve=>{first=resolve;}),secondStarted=new Promise<void>(resolve=>{second=resolve;});
+    const acquire=vi.fn(async(page,signal)=>{
+      if(page.ordinal===0){await firstReady;return {blob:image(),width:100,height:100,release};}
+      readSignal=signal;second();return new Promise<{blob:Blob;release():void}>(resolve=>{late=resolve;});
+    });
+    const destination=new WritableStream<Uint8Array>({write(){if(mode==='cancel'){controller.abort();controller.signal.throwIfAborted();}throw Error('disk failed');}});
+    const result=writeExport(plan,{assertCurrent(){},acquire},controller.signal,destination);
+    const failed=expect(result).rejects.toThrow(mode==='cancel'?/abort/i:'disk failed');
+    await secondStarted;first();await failed;
+    expect(readSignal?.aborted).toBe(true);expect(acquire).toHaveBeenCalledTimes(2);expect(release).toHaveBeenCalledOnce();expect(destination.locked).toBe(false);
+    late({blob:image(),release:lateRelease});await vi.waitFor(()=>expect(lateRelease).toHaveBeenCalledOnce());
   });
   it('enforces the 128 MiB fallback ceiling before copying the large page into output',async()=>{
     const s=await sample(1),plan=await planExport(s.id,options),blob=image(),release=vi.fn();Object.defineProperty(blob,'size',{value:MAX_EXPORT_BYTES+1});

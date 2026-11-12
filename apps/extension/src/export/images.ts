@@ -1,12 +1,17 @@
 import {msg} from '../i18n/runtime';
-/** Decode one page at a time; keep archive JPEG/PNG/WebP bytes unchanged. */
+import {needsNormalization,probeImageMetadata} from '../comics/pages/image-metadata';
+/** Keep supported bytes unchanged; decode only for conversion or unrecognized metadata. */
 export async function exportImage(blob: Blob, pdf = false, known?: {width: number; height: number}, signal?: AbortSignal): Promise<{blob: Blob; extension: string; width: number; height: number}> {
   signal?.throwIfAborted();
   const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
   const extension = bytes[0] === 0xff && bytes[1] === 0xd8 ? 'jpg'
     : bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 ? 'png'
     : String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP' ? 'webp' : undefined;
-  if (!pdf && extension && known) return {blob,extension,...known};
+  if (extension && (!pdf || extension==='jpg'&&!await needsNormalization(blob.slice(0,blob.size,'image/jpeg')))) {
+    const dimensions=known??await probeImageMetadata(blob);
+    signal?.throwIfAborted();
+    if(dimensions)return {blob,extension,width:dimensions.width,height:dimensions.height};
+  }
   const bitmap = await createImageBitmap(blob);
   try {
     signal?.throwIfAborted();

@@ -303,8 +303,6 @@
   "已连接账户，可以开始翻译了": "Konto zostało połączone i można rozpocząć tłumaczenie.",
   "登录未完成，请重试。": "Logowanie nie zostało zakończone, spróbuj ponownie.",
   "账户或服务已切换，本次操作已停止。": "Konto lub usługa zostały przełączone i ta operacja została zatrzymana.",
-  "读取第 {0} 页": "Czytanie strony {0}",
-  "已处理第 {0} 页": "Strona {0} przetworzona",
   "浏览器无法创建图片画布。": "Przeglądarka nie może utworzyć obszaru roboczego obrazu.",
   "NodeLane Comics": "Komiksy NodeLane",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "Rozmiar pojedynczego obrazu PDF przekracza 128 MiB. Zamiast tego użyj CBZ lub obrazu ZIP.",

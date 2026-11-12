@@ -303,8 +303,6 @@
   "已连接账户，可以开始翻译了": "A conta foi conectada e a tradução pode começar.",
   "登录未完成，请重试。": "Login não concluído, tente novamente.",
   "账户或服务已切换，本次操作已停止。": "A conta ou serviço foi trocada e esta operação foi interrompida.",
-  "读取第 {0} 页": "Lendo página {0}",
-  "已处理第 {0} 页": "Página {0} processada",
   "浏览器无法创建图片画布。": "O navegador não pode criar a tela da imagem.",
   "NodeLane Comics": "Quadrinhos NodeLane",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "Uma única imagem PDF excede 128 MiB; em vez disso, use CBZ ou imagem ZIP.",

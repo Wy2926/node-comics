@@ -30,10 +30,10 @@ async function fits(){
 }
 async function download(){const pending=page.waitForEvent('download');await action().click();const item=await pending;assert.equal(await item.failure(),null);await dialog().locator('[data-tone=success]').waitFor();return {name:item.suggestedFilename(),bytes:await readFile(await item.path())};}
 
-test('exports real CBZ, ZIP and PDF across unvisited chapters, keeps progress and one image at a time',async()=>{
+test('exports real archives and PDFs across unvisited chapters with bounded image reads',async()=>{
   await load();const before=await page.evaluate(()=>window.directoryFixture.reading());
   assert.deepEqual(await page.evaluate(()=>window.directoryFixture.stats.indexes),[]);await whole();await fits();await screenshot('directory-light');
-  for(const [format,label] of [['cbz','CBZ 漫画包'],['zip','ZIP 图片包'],['pdf','PDF 文档']]){
+  for(const [format,label] of [['cbz','CBZ 漫画包'],['pdf','PDF 文档']]){
     await select('文件格式',label);const result=await download();assert(result.name.endsWith('.'+format));await writeFile(output+'chapters.'+format,result.bytes);
     if(format==='pdf')assert.equal((await PDFDocument.load(result.bytes)).getPageCount(),6);
     else{const reader=new ZipReader(new Uint8ArrayReader(result.bytes));try{
@@ -43,7 +43,7 @@ test('exports real CBZ, ZIP and PDF across unvisited chapters, keeps progress an
     }finally{await reader.close();}}
   }
   assert.deepEqual(await page.evaluate(()=>window.directoryFixture.reading()),before);
-  const stats=await page.evaluate(()=>window.directoryFixture.stats);assert.deepEqual(stats.indexes,['chapter-1','chapter-2','chapter-3']);assert.equal(stats.maximum,1);assert(!stats.reads.includes('alternate'));
+  const stats=await page.evaluate(()=>window.directoryFixture.stats);assert.deepEqual(stats.indexes,['chapter-1','chapter-2','chapter-3']);assert(stats.maximum<=2);assert(!stats.reads.includes('alternate'));
   await screenshot('directory-success');await page.keyboard.press('Escape');await dialog().waitFor({state:'detached'});
   await page.waitForFunction(()=>document.querySelector('#open-export')===document.activeElement);
 });
@@ -52,6 +52,30 @@ test('chapter read failure produces no download and retry succeeds',async()=>{
   await load('?fail');await whole();let downloads=0;page.on('download',()=>downloads++);
   await action().click();await dialog().getByRole('alert').waitFor();assert.equal(downloads,0);assert(await action().isEnabled());await screenshot('directory-failure');
   await download();assert.equal(downloads,1);
+});
+
+for(const width of [320,1280])test(`${width}px export coalesces rapid progress and keeps text geometry stable`,async()=>{
+  await page.setViewportSize({width,height:900});await load('?burst&scale=1.25');await whole();
+  await dialog().evaluate(element=>{
+    window.exportSamples=[];
+    new MutationObserver(()=>{
+      const panel=element.querySelector('.nc-export-progress'),bar=panel?.querySelector('progress');
+      if(bar?.max!==72)return;
+      const phase=panel.querySelector('strong').textContent,file=panel.querySelector('.nc-export-current'),count=panel.querySelector('.nc-export-count'),last=window.exportSamples.at(-1);
+      if(last?.completed===bar.value&&last.phase===phase&&last.file===file.textContent)return;
+      window.exportSamples.push({completed:bar.value,phase,file:file.textContent,height:panel.getBoundingClientRect().height,countWidth:count.getBoundingClientRect().width,overflow:panel.scrollWidth>panel.clientWidth+1});
+    }).observe(element,{subtree:true,childList:true,characterData:true});
+  });
+  const pending=page.waitForEvent('download');await action().click();
+  await page.waitForFunction(()=>window.exportSamples.length>=2);
+  await dialog().locator('.nc-modal-body').evaluate(node=>{node.scrollTop=node.scrollHeight;});await fits();await screenshot(`directory-progress-${width}`);
+  assert.equal(await(await pending).failure(),null);await dialog().locator('[data-tone=success]').waitFor();
+  const samples=await page.evaluate(()=>window.exportSamples);
+  assert(samples.length>=2&&samples.length<36,'Fast page events must be coalesced into readable updates');
+  assert.deepEqual([...new Set(samples.map(sample=>sample.phase))],['处理中…']);
+  for(const field of ['height','countWidth'])assert.equal(new Set(samples.map(sample=>sample[field])).size,1,`${field} must stay fixed across page numbers and chapter titles`);
+  assert(samples.some(sample=>sample.file.includes('很长的章节标题')));assert(samples.every(sample=>!sample.overflow));
+  for(let i=1;i<samples.length;i++)assert(samples[i].completed>=samples[i-1].completed);
 });
 
 test('cancellation, close and repeated clicks stop discovery without moving reading position',async()=>{

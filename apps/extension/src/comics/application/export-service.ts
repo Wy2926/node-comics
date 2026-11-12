@@ -40,7 +40,7 @@ export async function exportDocument(entryId:string,options:ExportOptions,contex
       }
     };
     return await writeExport(plan,{assertCurrent,progress:context.progress,async acquire(page,readSignal){
-      await assertCurrent(page);
+      assertChannel();
       if(page.kind!=='translation'){
         const lease=await acquirePage({...page.reference,signal:readSignal,purpose:'export',priority:'background'});
         return {blob:lease.blob,width:lease.identity.width,height:lease.identity.height,release:lease.release};

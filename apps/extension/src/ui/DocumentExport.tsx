@@ -35,16 +35,23 @@ export function DocumentExport({document:doc,channel,settings,onClose}:DocumentE
     if(active.current||busy||sourceLoading||original&&!source)return;setBusy(true);setError('');setDone('');setProgress(undefined);
     const controller=new AbortController();active.current=controller;
     let destination:WritableStream<Uint8Array>|undefined;
+    let pending:ExportProgress|undefined,progressTimer:ReturnType<typeof setTimeout>|undefined;
+    // Coalesce page/chunk updates without slowing down the export itself.
+    const reportProgress=(value:ExportProgress)=>{
+      if(controller.signal.aborted)return;
+      pending=value;
+      progressTimer??=setTimeout(()=>{progressTimer=undefined;if(!controller.signal.aborted)setProgress(pending);},200);
+    };
     try{
       destination=await chooseExportDestination(original?source!.name:exportName(wholeDirectory?directory!.title:doc.title,options));
       controller.signal.throwIfAborted();
-      const context={signal:controller.signal,scope:channel?.scope,readResult:channel?.readResult.bind(channel),destination,progress:(value:ExportProgress)=>{if(!controller.signal.aborted)setProgress(value);},isCurrent:()=>identity.current===channel&&channel?.isCurrent()!==false};
+      const context={signal:controller.signal,scope:channel?.scope,readResult:channel?.readResult.bind(channel),destination,progress:reportProgress,isCurrent:()=>identity.current===channel&&channel?.isCurrent()!==false};
       const result=original?await exportOriginalFile(doc.id,context):await exportDocument(doc.id,options,context);
       controller.signal.throwIfAborted();
       const file=saveBufferedExport(result);
       if(file)setPrepared(file);else setDone(msg('已导出 {0}',{'0':result.name}));
     }catch(failure){await destination?.abort(failure).catch(()=>{});if((failure as Error).name!=='AbortError')setError((failure as Error).message);}
-    finally{setBusy(false);active.current=null;}
+    finally{clearTimeout(progressTimer);setBusy(false);active.current=null;}
   };
   return <Modal title={msg("导出漫画")} icon="download" onClose={()=>{active.current?.abort();onClose();}} footer={
     <div className="nc-dialog-footer">{prepared?<button className="button primary" disabled={busy} onClick={()=>void save()}><Icon name="folder" size={18}/>{msg('保存')}</button>:<>{source&&!wholeDirectory&&!originalPdf&&<button className="button secondary" disabled={busy||sourceLoading} onClick={()=>void run(true)}><Icon name="folder" size={18}/>{msg("保存完整源文件")}</button>}{busy?<button className="button secondary" onClick={()=>active.current?.abort()}>{msg("取消导出")}</button>:doc.format!=='epub'&&<button className="button primary" disabled={sourceLoading||originalPdf&&!source||!originalPdf&&incomplete&&!options.allowIncomplete||options.images==='translation'&&!channel?.available} onClick={()=>void run()}><Icon name="download" size={18}/>{originalPdf?msg('保存完整源文件'):wholeDirectory?msg('导出整个章节目录'):incomplete?msg('导出已发现页面'):msg("导出全部页面")}</button>}</>}</div>
@@ -62,7 +69,7 @@ export function DocumentExport({document:doc,channel,settings,onClose}:DocumentE
       {!originalPdf&&<DialogNotice title={msg('保存方式')}>{msg("支持文件选择器时，CBZ / ZIP 直接逐页写入文件；其他浏览器与 PDF 导出限制为 128 MiB。")}</DialogNotice>}
       </>}
       {(doc.format==='epub'||originalPdf)&&!source&&!error&&<DialogNotice role="status">{sourceLoading?msg('加载中…'):msg('完整源文件不可用，请重新获取后再导出。')}</DialogNotice>}
-      {busy&&<div className="nc-export-progress" role="status"><div><strong>{progress?.phase??msg('处理中…')}</strong>{!!progress?.total&&<span>{progress.completed} / {progress.total}</span>}</div>{wholeDirectory&&progress?.file&&<span className="nc-export-current">{progress.file}</span>}<progress aria-label={msg('导出漫画')} value={progress?.total?progress.completed:undefined} max={Math.max(1,progress?.total??1)}/></div>}
+      {busy&&<div className="nc-export-progress" role="status"><div><strong title={progress?.phase}>{progress?.phase??msg('处理中…')}</strong><span className="nc-export-count" style={progress?.total?{width:`${String(progress.total).length*2+3}ch`}:undefined}>{progress?.total?`${progress.completed} / ${progress.total}`:'\u00a0'}</span></div>{wholeDirectory&&<span className="nc-export-current" title={progress?.file}>{progress?.file??'\u00a0'}</span>}<progress aria-label={msg('导出漫画')} value={progress?.total?progress.completed:undefined} max={Math.max(1,progress?.total??1)}/></div>}
       {prepared&&<DialogNotice role="status" title={prepared.name}>{msg('文件已准备好，请点击“保存”选择位置。')}</DialogNotice>}
       {error&&<DialogNotice tone="danger" role="alert">{error}</DialogNotice>}{done&&<DialogNotice tone="success" role="status">{done}</DialogNotice>}
     </div>

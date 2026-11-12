@@ -303,8 +303,6 @@
   "已连接账户，可以开始翻译了": "Akun telah terhubung dan terjemahan dapat dimulai.",
   "登录未完成，请重试。": "Login belum selesai, silakan coba lagi.",
   "账户或服务已切换，本次操作已停止。": "Akun atau layanan telah dialihkan dan operasi ini telah dihentikan.",
-  "读取第 {0} 页": "Halaman bacaan {0}",
-  "已处理第 {0} 页": "Halaman {0} diproses",
   "浏览器无法创建图片画布。": "Browser tidak dapat membuat kanvas gambar.",
   "NodeLane Comics": "Komik NodeLane",
   "单份 PDF 图片超过 128 MiB，请改用 CBZ 或图片 ZIP。": "Satu gambar PDF melebihi 128 MiB, silakan gunakan CBZ atau ZIP gambar sebagai gantinya.",

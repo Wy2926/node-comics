@@ -16,12 +16,14 @@ import '../src/ui/theme/surfaces.css';
 
 if(location.hostname!=='127.0.0.1'||location.port!=='5181')throw Error('Use the isolated 127.0.0.1:5181 fixture origin.');
 const query=new URLSearchParams(location.search),locale=query.get('locale') as UiLocale|null;
+const pagesPerChapter=query.has('burst')?24:2,delay=query.has('slow')?350:query.has('burst')?12:0;
 if(locale)installDictionary(locale,await fetch(`/i18n/${locale}.json`).then(response=>response.json()));
 document.documentElement.dataset.appearance=query.get('theme')??'light';
 document.documentElement.style.setProperty('--text-scale',query.get('scale')??'1');
 const connection:SourceConnection={id:'directory-fixture',provider:'directory-fixture',displayName:'Synthetic',status:'connected',generation:1,createdAt:1,updatedAt:1};
 const comic:Comic={id:'directory-book',title:'星海漫游 · 完整章节目录',sourceName:'Synthetic',sourceKey:'directory-fixture',source:{connectionId:connection.id,providerItemId:'book',locator:{},status:'active',generation:1},createdAt:1,updatedAt:1,lastEntryId:'chapter-2',lastReadAt:123,lastPage:2,lastPageCount:2};
 const entries:Entry[]=Array.from({length:3},(_,order)=>({id:`chapter-${order+1}`,contentId:`content-${order+1}`,comicId:comic.id,title:`第 ${order+1} 话 · 星海漫游`,order,sequenceId:'main',readingSlotId:String(order),contentLanguage:'zh-Hans',format:'image-sequence',generation:1,indexState:'pending',createdAt:1,updatedAt:1}));
+if(query.has('burst'))entries[1].title+=' · '+'很长的章节标题'.repeat(12);
 entries.push({...entries[1],id:'alternate',contentId:'alternate',title:'Chapter 2 · English',contentLanguage:'en',sourceOrder:10});
 await catalog.put('connections',connection);await catalog.put('comics',comic);
 for(const entry of entries)await catalog.put('entries',entry);
@@ -34,17 +36,17 @@ for(let i=0;i<6;i++){
 }
 let fail=query.has('fail');
 const pause=async(signal?:AbortSignal)=>{
-  if(query.has('slow'))await new Promise<void>((resolve,reject)=>{
-    const timer=setTimeout(()=>{signal?.removeEventListener('abort',cancel);resolve();},350);
+  if(delay)await new Promise<void>((resolve,reject)=>{
+    const timer=setTimeout(()=>{signal?.removeEventListener('abort',cancel);resolve();},delay);
     const cancel=()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));};
     signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();
   });
   signal?.throwIfAborted();
 };
 registerSourceDriver({id:connection.provider,label:'Synthetic',cachePages:false,cacheRanges:false,pages:{
-  async index(context){stats.indexes.push(context.entryId);await pause(context.signal);return {complete:true,total:2,pages:[0,1].map(ordinal=>({ordinal,name:`${ordinal+1}.png`,locator:{ordinal}}))};},
+  async index(context){stats.indexes.push(context.entryId);await pause(context.signal);return {complete:true,total:pagesPerChapter,pages:Array.from({length:pagesPerChapter},(_,ordinal)=>({ordinal,name:`${ordinal+1}.png`,locator:{ordinal}}))};},
   async read(context,page){stats.reads.push(context.entryId);stats.active++;stats.maximum=Math.max(stats.maximum,stats.active);
-    try{await pause(context.signal);if(fail&&context.entryId===entries[1].id){fail=false;throw Error('模拟章节图片读取失败，请重试');}return pages[entries.find(entry=>entry.id===context.entryId)!.order*2+page.ordinal];}finally{stats.active--;}
+    try{await pause(context.signal);if(fail&&context.entryId===entries[1].id){fail=false;throw Error('模拟章节图片读取失败，请重试');}return pages[entries.find(entry=>entry.id===context.entryId)!.order*2+page.ordinal%2];}finally{stats.active--;}
   },
 }});
 Object.assign(window,{directoryFixture:{stats,async reading(){const saved=(await catalog.get('comics',comic.id))!;return {lastEntryId:saved.lastEntryId,lastReadAt:saved.lastReadAt,lastPage:saved.lastPage,lastPageCount:saved.lastPageCount,position:await catalog.get('positions',entries[1].id)};}}});
