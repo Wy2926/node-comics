@@ -1,5 +1,5 @@
-// Reduced public protocol shapes. IDs, titles, UUIDs and image signatures are synthetic.
-export const seriesId = '1000000001', secondId = '1000000002', thirdId = '1000000003';
+// Public regression series ID; other IDs, titles, UUIDs and image signatures are synthetic.
+export const seriesId = '4921002551', secondId = '1000000002', thirdId = '1000000003';
 export const cellId = '00000000-0000-4000-8000-000000000001';
 export const row = (bookId: string, title = '테스트 1화') => ({bookId, title, badges: ['FREE']});
 export const list = (books = [row(seriesId)], nextPage: object | null = {order: 'SEQUENTIAL', offset: 1, limit: 100}) => ({
