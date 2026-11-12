@@ -84,7 +84,7 @@ async function assertNativePopup(){
  // Native action views are not ordinary Playwright tabs: never force their viewport.
  await popup.evaluate(()=>chrome.action.openPopup());
  try{
-  await popup.waitForFunction(()=>chrome.extension.getViews({type:'popup'})[0]?.document.querySelector('.nc-popup-tool-grid'));
+  await popup.waitForFunction(()=>chrome.extension.getViews({type:'popup'})[0]?.document.querySelector('.nc-popup-library kbd'));
   nativeGeometry=await popup.evaluate(async()=>{
    const view=chrome.extension.getViews({type:'popup'})[0];
    await new Promise(resolve=>view.requestAnimationFrame(()=>view.requestAnimationFrame(resolve)));
@@ -130,11 +130,21 @@ try{
  assert.deepEqual(await shortcutTexts('.nc-comic-action'),nativeHint(nativeTranslateShortcut));assert.deepEqual(await shortcutTexts('.nc-popup-library'),[]);assert.deepEqual(await tools.nth(2).locator('kbd').allTextContents(),['Alt + B']);assert.deepEqual(await tools.nth(3).locator('kbd').allTextContents(),['Alt + Shift + U','Ctrl + Alt + K']);await assertPopupLayout();await screenshot('popup-custom-shortcuts');check('本地快捷键跟随当前偏好、替代键和禁用状态，原生翻译快捷键保持浏览器配置');
  await worker.evaluate(async()=>chrome.storage.local.set({'nc-shortcuts':{version:1,overrides:{}}}));await popup.waitForFunction(()=>document.querySelector('.nc-popup-library kbd')?.textContent==='Alt + 1');
  await popup.close();
- for(const fixture of [{url:'https://mangapill.com/',name:'adapted-home',importable:false,notice:true},{url:'https://manga-one.com/',name:'adapted-home-mangaone',importable:false,notice:true},{url:'https://mangapill.com/manga/1/one-piece',name:'adapted-comic',importable:true,notice:false}]){
-  await source.goto(fixture.url);await openPopup();assert.equal(await popup.locator('.nc-popup-adapted').innerText(),'已适配');assert.equal(await popup.getByRole('button',{name:'开始阅读',exact:true}).count(),fixture.importable?1:0);assert.equal(await popup.getByText('进入漫画详情页或章节页后，可开始阅读。',{exact:true}).count(),fixture.notice?1:0);
+ for(const fixture of [
+  {url:'https://mangapill.com/',name:'adapted-home',importable:false,notice:true},
+  {url:'https://manga-one.com/',name:'adapted-home-mangaone',importable:false,notice:true},
+  {url:'https://mangapill.com/manga/1/one-piece',name:'adapted-comic',importable:true,notice:false},
+  {url:'https://www.pixiv.net/',name:'pixiv-home',importable:false,notice:false},
+  {url:'https://www.pixiv.net/artworks/101',name:'pixiv-artwork',importable:false,notice:false},
+  {url:'https://www.pixiv.net/en/',name:'pixiv-localized-home',importable:false,notice:false},
+  {url:'https://www.pixiv.net/users/7/artworks',name:'pixiv-author',importable:true,notice:false},
+  {url:'https://www.pixiv.net/artworks/101#nodelane-pixiv=7',name:'pixiv-bound-artwork',importable:true,notice:false},
+  {url:'https://www.pixiv.net.evil.test/',name:'unadapted-lookalike',adapted:false,importable:false,notice:false},
+ ]){
+  await source.goto(fixture.url);await openPopup();assert.deepEqual(await popup.locator('.nc-popup-adapted').allTextContents(),fixture.adapted===false?[]:['已适配']);assert.equal(await popup.getByRole('button',{name:'开始阅读',exact:true}).count(),fixture.importable?1:0);assert.equal(await popup.getByText('进入漫画详情页或章节页后，可开始阅读。',{exact:true}).count(),fixture.notice?1:0);assert.equal(await popup.getByText('此网站尚未专门适配，不能导入漫画。',{exact:true}).count(),fixture.adapted===false?1:0);
   const text=await popup.locator('main').innerText();assert(!text.includes('ADAPTED SOURCE TITLE'));assert(!(await popup.locator('.nc-popup-header').innerText()).includes(new URL(fixture.url).hostname));assert.equal((await messages()).length,0);const geometry=await assertPopupLayout();if(fixture.importable){const scroll=await popup.locator('.nc-popup-scroll').boundingBox();assert(geometry.tools.every(tool=>tool.y>=scroll.y&&tool.y+tool.height<=scroll.y+scroll.height+.5),'Adapted comic tools must all be visible before scrolling at the default text scale');}await screenshot('popup-'+fixture.name);await popup.close();
  }
- check('不同适配网站的主页和漫画详情页均有文字标志，按页面能力提供阅读入口');
+ check('已适配标志覆盖 Pixiv 首页、作品页及作者页，阅读入口按页面能力显示，近似域名不误判');
  await source.goto(site);await openPopup();const requestSize=await popup.locator('.nc-popup-request').boundingBox();assert(requestSize.height<40);assert(requestSize.width<180);const requestPageEvent=context.waitForEvent('page'),requestClosing=popup.waitForEvent('close');await popup.getByRole('button',{name:'申请适配网站',exact:true}).evaluate(button=>{button.click();button.click();button.click();});await requestClosing;const requestPage=await requestPageEvent;
  const isRequestPage=url=>url.protocol+'//'+url.host===origin&&url.pathname==='/reader.html'&&url.hash==='#sites/request';
  await requestPage.waitForURL(isRequestPage);await requestPage.getByRole('textbox',{name:'网站名称',exact:true}).waitFor();await requestPage.waitForFunction(()=>document.activeElement===document.querySelector('.nc-site-request .nc-support-form fieldset input'));

@@ -7,7 +7,7 @@ import { Icon } from '../../src/icons';
 import { connectReaderSettings } from '../../src/inline/settings';
 import { saveSettings, settings } from '../../src/comics/application/preferences';
 import '../../src/redesign.css';
-import { sourceFor, sourceMessage } from '../../src/sources';
+import { listSupportedSites, sourceFor, sourceMessage } from '../../src/sources';
 import '../../src/styles.css';
 import { useAppearance } from '../../src/ui/Appearance';
 import { AutoTranslateTabs } from '../../src/ui/AutoTranslateTabs';
@@ -23,6 +23,7 @@ import {formatBinding} from '../../src/shortcuts/keys';
 import {browserShortcutBinding,readBrowserShortcuts,type BrowserShortcuts} from '../../src/shortcuts/native';
 
 type Discovery={kind:'catalog'|'pages';id:string};
+const supportedOrigins=new Set(listSupportedSites().map(site=>new URL(site.url).origin));
 function Popup({initialError=''}:{initialError?:string}){
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
  const [error,setError]=useState(initialError),[discoveryError,setDiscoveryError]=useState('');
@@ -35,7 +36,7 @@ function Popup({initialError=''}:{initialError?:string}){
  const bindings=useMemo(()=>activeBindings(shortcuts.overrides),[shortcuts.overrides]);
  const disabled=busy||opening||!!translating||saving;
  const resolved=source?.url?sourceFor(source.url):undefined;
- const adapted=!!resolved&&resolved.definition.id!=='generic';
+ const adapted=!!resolved&&(resolved.definition.id!=='generic'||supportedOrigins.has(new URL(resolved.location.url).origin));
  const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
  async function readSource(){
   if(!source?.url||!importable||disabled||lock.current)return;lock.current=true;setBusy(true);setDiscoveryError('');
