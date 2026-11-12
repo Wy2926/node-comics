@@ -80,6 +80,10 @@ describe('opt-in search page transport', () => {
   });
 });
 describe('opt-in source-page catalog transport', () => {
+  it('passes authorized JSON encoding through the source-page request', async () => {
+    expect(await withPageNetworkContext(url, new AbortController().signal, context => context.request(target, {json: {book_id: '1'}}))).toBe('source');
+    expect(inject.mock.calls[1][0].args[0]).toMatchObject({body: '{"book_id":"1"}', json: true});
+  });
   it('creates one background tab, pins the document and performs all requests there', async () => {
     expect(await withPageNetworkContext(url, new AbortController().signal, async (context) => {
       await context.request(target);
@@ -317,6 +321,11 @@ describe('serialized source-page request function', () => {
     vi.stubGlobal('document', { [Symbol.for('nc-source-page-document')]: 'fixture-document' });
   });
   const input = () => ({ pageUrl: url, url: target, cancelEvent: 'fixture-cancel', documentToken: 'fixture-document' });
+  it('preserves the JSON content type and body in the serialized page function', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('data')));
+    expect(await requestInSourcePage({...input(), body: '{"book_id":"1"}', json: true})).toMatchObject({status: 200});
+    expect(fetch).toHaveBeenCalledWith(target, expect.objectContaining({method: 'POST', body: '{"book_id":"1"}', headers: expect.objectContaining({'Content-Type': 'application/json'})}));
+  });
   it('uses ordinary same-origin credentials and returns bounded text', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('data')));
     expect(await requestInSourcePage(input())).toMatchObject({ status: 200, body: 'data', challenge: false });

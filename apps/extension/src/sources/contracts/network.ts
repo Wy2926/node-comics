@@ -11,6 +11,8 @@ export interface SourceRequestOptions {
   referer?:string;
   acceptStatuses?:readonly number[];
   form?:Readonly<Record<string,string>>;
+  /** Bounded JSON POST; mutually exclusive with form. */
+  json?:Readonly<Record<string,unknown>>;
   /** This parser consumes desktop HTML even on iPhone Safari. */
   desktop?:boolean;
   /** Verified public GET only; Safari native requests do not carry source cookies. */
@@ -22,7 +24,7 @@ export interface SourceNetworkContext {
   previous?: SourceCatalogSnapshot;
   /** Optional, validated partial observations; completion still comes from catalog's final result. */
   onCatalogProgress?(snapshot: SourceCatalogSnapshot): Promise<void>;
-  /** Adapter-selected Referer, parseable error statuses and bounded form POST apply only to this request. */
+  /** Adapter-selected Referer, parseable error statuses and bounded form/JSON POST apply only to this request. */
   request(url:string, options?:SourceRequestOptions):Promise<string>;
   /** Direct HTTP only: binary response to GET, binary POST or form POST; never replayed or sent through a page session. */
   requestBytes?(url:string, options:{referer:string; body?:Uint8Array; form?:Readonly<Record<string,string>>}):Promise<Uint8Array>;

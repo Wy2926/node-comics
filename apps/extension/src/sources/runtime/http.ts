@@ -44,6 +44,14 @@ function encodeForm(form: Readonly<Record<string, string>>): string {
   if (encoded.length > limit) return invalid();
   return encoded;
 }
+function encodeJson(value: Readonly<Record<string, unknown>>): string {
+  try {
+    if (!value || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw Error();
+    const body = JSON.stringify(value);
+    if (typeof body !== 'string' || new TextEncoder().encode(body).length > 1024 * 1024) throw Error();
+    return body;
+  } catch {throw new SourceHttpError('request-denied', '来源 JSON 请求无效或超过限制。');}
+}
 /** Shared authorization for extension HTTP and source-page requests. */
 export async function authorizeSourceRequest(url: string, options: Parameters<SourceNetworkContext['request']>[1], signal?: AbortSignal) {
   signal?.throwIfAborted();
@@ -56,6 +64,10 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
   }
   if (options?.referer !== undefined && safeImageUrl(options.referer, options.referer) !== options.referer)
     throw new SourceHttpError('request-denied', '来源请求 Referer 地址无效。');
+  if (options?.json !== undefined) {
+    if (options.form !== undefined) throw new SourceHttpError('request-denied', '来源请求不能同时包含表单和 JSON。');
+    return encodeJson(options.json);
+  }
   return options?.form === undefined ? undefined : encodeForm(options.form);
 }
 /** Packaged adapters choose request hosts; the transport checks browser access and resource budgets. */
@@ -103,7 +115,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       const binary = body instanceof Uint8Array;
       return consume(await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
         ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),
-        ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
+        ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : options?.json !== undefined ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})}));
     });
   }

@@ -32,6 +32,35 @@ beforeEach(() => {
 });
 afterEach(() => {vi.unstubAllGlobals();});
 
+describe('bounded source JSON POST', () => {
+  it('posts nested JSON with credentials and Referer, without consuming GET replay', async () => {
+    const replay = [{url: endpoint, referer: source, body: 'GET replay'}], json = {query: '회차', variables: {offset: 8, ids: ['1']}};
+    const context = createSourceNetworkContext(undefined, replay);
+    expect(await context.request(endpoint, {referer: source, json})).toBe('source response');
+    expect(fetcher.mock.calls[0][1]).toMatchObject({method: 'POST', body: JSON.stringify(json), credentials: 'include', headers: {'Content-Type': 'application/json'}});
+    expect(fixture.headers).toHaveBeenCalledWith(endpoint, {referer: source});
+    expect(replay).toHaveLength(1);
+    expect(await context.request(endpoint, {referer: source})).toBe('GET replay');
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it('rejects conflicting bodies, circular JSON and oversized UTF-8 before fetching', async () => {
+    const circular: Record<string, unknown> = {}; circular.self = circular;
+    const context = createSourceNetworkContext();
+    for (const json of [null, [], circular, {text: '日'.repeat(350000)}])
+      await expect(context.request(endpoint, {json: json as Record<string, unknown>})).rejects.toMatchObject({kind: 'request-denied'});
+    await expect(context.request(endpoint, {json: {}, form: {}})).rejects.toMatchObject({kind: 'request-denied'});
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('excludes JSON responses from the GET parent-resolution handoff', async () => {
+    fixture.networks.fixture = {resolveCatalog: async (_url, context) => {
+      await context.request(endpoint, {json: {book_id: '1'}});
+      return 'https://fixture.test/book';
+    }};
+    expect(await resolveNetworkCatalog('https://fixture.test/unbound')).toBe('https://fixture.test/book');
+    expect(fixture.remember).toHaveBeenCalledWith(expect.anything(), 'fixture:book', [], expect.any(AbortSignal));
+  });
+});
+
 it('requests desktop HTML only when the adapter selects it in Safari',async()=>{
   chrome.runtime.getURL=()=> 'safari-web-extension://fixture/';
   const context=createSourceNetworkContext();

@@ -3,6 +3,7 @@ export interface PageNetworkRequest extends PageRequestInput {
   url: string;
   referer?: string;
   body?: string;
+  json?: boolean;
 }
 export interface PageNetworkResponse {
   pageUrl: string;
@@ -25,7 +26,7 @@ export async function requestInSourcePage(input: PageNetworkRequest): Promise<Pa
   try {
     const response = await fetch(input.url, {
       credentials: 'include', signal: controller.signal,
-      headers: { Accept: 'application/json, text/html', ...(input.body === undefined ? {} : { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }) },
+      headers: { Accept: 'application/json, text/html', ...(input.body === undefined ? {} : { 'Content-Type': input.json ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8' }) },
       ...(input.body === undefined ? {} : { method: 'POST', body: input.body }),
       ...(input.referer ? { referrer: input.referer, referrerPolicy: 'unsafe-url' as ReferrerPolicy } : {})
     });
