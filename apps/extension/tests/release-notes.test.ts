@@ -7,20 +7,18 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('release notes first use', () => {
-  it('ships 1.3.0 with one version and four concise localized highlights', async () => {
+  it('ships 1.4.0 with one version and four concise localized highlights', async () => {
     const {releaseNotes} = await import('../src/ui/release-notes/content');
-    expect(version).toBe('1.3.0');
+    expect(version).toBe('1.4.0');
     expect(releaseNotes.version).toBe(version);
     expect(lock.version).toBe(version);
     expect(lock.packages[''].version).toBe(version);
     expect(releaseNotes.highlights.map(item => item.title)).toEqual([
-      'releaseNotes.siteTranslation.title',
-      'releaseNotes.comicUpdates.title',
-      'releaseNotes.pdfReading.title',
-      'releaseNotes.accountStability.title',
+      'releaseNotes.siteSupport.title',
+      'releaseNotes.offlineCache.title',
+      'releaseNotes.export.title',
+      'releaseNotes.stability.title',
     ]);
-    expect(zh['releaseNotes.comicUpdates.description']).toContain('默认关闭');
-    expect(zh['releaseNotes.pdfReading.description']).toContain('原始 PDF');
     const dictionaries = import.meta.glob<Record<string, string>>('../src/i18n/dictionaries/*.json', {eager: true, import: 'default'});
     expect(Object.keys(dictionaries)).toHaveLength(16);
     const keys = Object.keys(zh).filter(key => key.startsWith('releaseNotes.'));
@@ -33,7 +31,7 @@ describe('release notes first use', () => {
     }
   });
 
-  it.each([null, '1.2.0', 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
+  it.each([null, '1.3.0', 'invalid'])('offers the current release for an unseen version (%s)', async saved => {
     const setItem = vi.fn();
     vi.stubGlobal('localStorage', {getItem: () => saved, setItem});
     const notes = await import('../src/ui/release-notes/content');
