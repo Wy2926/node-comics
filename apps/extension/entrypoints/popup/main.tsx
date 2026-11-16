@@ -22,7 +22,7 @@ import {activeBindings,resolveBindings} from '../../src/shortcuts/model';
 import {formatBinding} from '../../src/shortcuts/keys';
 import {browserShortcutBinding,readBrowserShortcuts,type BrowserShortcuts} from '../../src/shortcuts/native';
 
-type Discovery={kind:'catalog'|'pages';id:string};
+type Discovery={kind:'catalog'|'pages'|'file';id:string};
 const supportedOrigins=new Set(listSupportedSites().map(site=>new URL(site.url).origin));
 function Popup({initialError=''}:{initialError?:string}){
  const [source,setSource]=useState<chrome.tabs.Tab>(),[sourceNotice,setSourceNotice]=useState(msg("正在读取当前标签页…"));
@@ -42,7 +42,7 @@ function Popup({initialError=''}:{initialError?:string}){
   if(!source?.url||!importable||disabled||lock.current)return;lock.current=true;setBusy(true);setDiscoveryError('');
   try{await requireHostAccess();
    const discovered=await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:source.id});
-   await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
+   await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='file'?'sourceFile':discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
  async function findComic(){

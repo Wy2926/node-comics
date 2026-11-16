@@ -16,7 +16,7 @@ import {ReaderProgress, progressPreviewPosition} from '../src/reader/ReaderProgr
 type Props = Parameters<typeof ReaderProgress>[0];
 let props: Props;
 const bounds = {left: 32, right: 60, top: 200, bottom: 440, width: 28, height: 240} as DOMRect;
-const input = {closest: () => ({}), getBoundingClientRect: vi.fn(() => bounds)};
+const input = {closest: (selector: string) => selector === '.nc-reader' ? {} : null, getBoundingClientRect: vi.fn(() => bounds)};
 function render() {
   hooks.cursor = hooks.refCursor = hooks.effectCursor = 0;
   const node = ReaderProgress(props);

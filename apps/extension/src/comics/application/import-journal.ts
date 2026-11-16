@@ -4,7 +4,7 @@ export interface LocalImportJournal {
   state:'copying'|'bytes-ready';updatedAt:number;[key:string]:unknown;
 }
 export const importJournalId=(contentId:string)=>'local-import:'+contentId;
-export async function beginImportJournal(contentId:string,file:File):Promise<LocalImportJournal> {
+export async function beginImportJournal(contentId:string,file:Pick<File,'name'|'size'>):Promise<LocalImportJournal> {
   const journal:LocalImportJournal={id:importJournalId(contentId),contentId,file:{name:file.name,size:file.size},state:'copying',updatedAt:Date.now()};
   await catalog.put('metadata',journal);return journal;
 }

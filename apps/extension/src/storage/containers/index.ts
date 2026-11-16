@@ -144,7 +144,7 @@ export async function importContainerStream(stream: ReadableStream<Uint8Array>, 
   } finally { signal?.removeEventListener('abort', abort); reader.releaseLock(); }
 }
 /** Local files use the same streaming writer and retain their existing public API. */
-export async function importContainer(file: File, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, referenceId?: string): Promise<ManagedContainer> {
+export async function importContainer(file: Pick<File, 'name' | 'size' | 'stream'>, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, referenceId?: string): Promise<ManagedContainer> {
   return importContainerStream(file.stream(), {name: file.name, size: file.size, signal, referenceId,
     onProgress: onProgress ? done => onProgress(done, file.size) : undefined});
 }

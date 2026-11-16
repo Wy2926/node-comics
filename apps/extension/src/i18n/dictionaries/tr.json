@@ -413,6 +413,7 @@
   "连续": "Sürekli",
   "单页": "Tek sayfa",
   "双页": "İki sayfa",
+  "双页间距": "Sayfa aralığı",
   "阅读方向": "Okuma yönü",
   "从右向左": "Sağdan sola",
   "从左向右": "Soldan sağa",
@@ -675,7 +676,6 @@
   "来源详情页已变化。": "Kaynak ayrıntıları sayfası değişti.",
   "来源页面已变化，请重新发现。": "Kaynak sayfa değişti, lütfen yeniden keşfedin.",
   "翻译当前页面": "Geçerli sayfayı çevir",
-  "目录读取失败，请通过插件弹窗重试。": "Dizin okuma başarısız oldu, lütfen eklenti açılır penceresinden tekrar deneyin.",
   "当前标签页不可用，请重新打开插件。": "Geçerli sekme kullanılamıyor, lütfen eklentiyi yeniden açın.",
   "请在普通网页中使用翻译。": "Lütfen çeviriyi normal web sayfalarında kullanın.",
   "当前网页已变化，请重新打开插件后翻译。": "Geçerli web sayfası değişti, lütfen eklentiyi yeniden açın ve çevirin.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Kapsamı ayarla",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "Henüz site yok. Bir site ekleyin veya web sayfasında uzantıyı açıp etkinleştirin.",
   "选择目录": "Dizin seç",
-  "高级：正则匹配": "Gelişmiş: düzenli ifade"
+  "高级：正则匹配": "Gelişmiş: düzenli ifade",
+  "请返回来源书架重新打开漫画，再导入。": "İçe aktarmadan önce kaynak kitaplığa dönüp çizgi romanı yeniden açın.",
+  "请等待来源阅读器完成下载后重试。": "Kaynak okuyucunun indirmeyi tamamlamasını bekleyip yeniden deneyin."
 }

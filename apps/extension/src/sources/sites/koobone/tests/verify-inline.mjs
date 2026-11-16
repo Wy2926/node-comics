@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {verifyFile} from './verify-file.mjs';
 
 /** Real MV3 pipeline, synthetic source EPUB images and translation service; no source account or provider. */
 export async function verifyInline({browser, page, activate, button, source, out, check}) {
@@ -107,6 +108,7 @@ export async function verifyInline({browser, page, activate, button, source, out
   await page.locator('#exit').click();
   check('KOOBONE double pages and scrolling: cross-realm mutations and scrolls refresh the visible window, inactive readers restore, distant pages stay untouched, scroll survives toggling and explicit reactivation rebinds reloaded frames.');
   await button('关闭');
+  await verifyFile({browser, page, worker, source, out, check});
   await browser.unroute(origin + '/**');
   return {liveSource:false};
 }

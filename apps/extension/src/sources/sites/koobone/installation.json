@@ -1,3 +1,4 @@
 {
-  "autoContentMatches": []
+  "autoContentMatches": [],
+  "optionalContentMatches": ["https://koobone.com/web.htm*"]
 }

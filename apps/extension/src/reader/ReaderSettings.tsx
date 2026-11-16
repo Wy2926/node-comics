@@ -10,7 +10,7 @@ import {TranslationFontPicker} from '../ui/TranslationFontPicker';
 import type {ModelSelection,FontSelection} from '../translation/channels/contracts';
 import {EnhancementToggle} from '../ui/EnhancementSettings';
 import {ReaderDisplaySettings} from './ReaderOptions';
-export {ReaderChoice, ReaderScale} from './ReaderOptions';
+export {ReaderChoice, ReaderScale, ReaderGap} from './ReaderOptions';
 
 export function ReaderTranslationSettings({settings, setSettings, caps, modelSelection, fontSelection, channelOptions, note}: {
   settings: Settings;
@@ -34,7 +34,7 @@ export function ReaderTranslationSettings({settings, setSettings, caps, modelSel
 
 /** Format-specific sizing and actions are slots, not a second settings implementation. */
 export function ReaderSettings({settings, setSettings, layout, direction, onLayout, onDirection, sizing, animation, children, immersive, onImmersive, onFullscreen,
-  onShortcuts, onReload, busy, extraActions, allowDouble = false}: {
+  onShortcuts, onReload, busy, extraActions}: {
   settings: Settings;
   setSettings(value: Settings | ((previous: Settings) => Settings)): void;
   layout?: Settings['layout'];
@@ -51,10 +51,9 @@ export function ReaderSettings({settings, setSettings, layout, direction, onLayo
   onReload?: () => void;
   busy?: boolean;
   extraActions?: ReactNode;
-  allowDouble?: boolean;
 }) {
   return <>
-    <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing} allowDouble={allowDouble}/>
+    <ReaderDisplaySettings settings={settings} setSettings={setSettings} layout={layout} direction={direction} onLayout={onLayout} onDirection={onDirection} sizing={sizing}/>
     {animation}
     <div className="nc-reader-option"><div><b>{msg('沉浸阅读')}</b><p>{msg('空闲时收起工具，轻点空白处唤回。')}</p></div>
       <button className={`switch ${immersive ? 'on' : ''}`} role="switch" aria-label={msg('沉浸阅读')} aria-checked={immersive} onClick={onImmersive}><i/></button>

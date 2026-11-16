@@ -3,7 +3,7 @@ import type {PageView} from './presentation';
 import type {Page,Settings} from '../types';
 import type {PageTurnAnimation} from './page-turn';
 
-export type ReadingView = PageView & {zoom:number;fit:Settings['fit'];layout?:Settings['layout'];direction?:Settings['direction'];animation?:PageTurnAnimation};
+export type ReadingView = PageView & {zoom:number;fit:Settings['fit'];layout?:Settings['layout'];direction?:Settings['direction'];animation?:PageTurnAnimation;spreadGap?:number};
 
 /** Image defaults follow input capabilities, including tablets in either orientation. */
 function isTouchReaderDevice():boolean{
@@ -32,8 +32,9 @@ export function readStoredReadingView(key:string):ReadingView|undefined{
     const layout:Settings['layout']|undefined=value?.layout==='continuous'||value?.layout==='single'||value?.layout==='double'?value.layout:undefined;
     const direction:Settings['direction']|undefined=value?.direction==='ltr'||value?.direction==='rtl'?value.direction:undefined;
     const animation:PageTurnAnimation|undefined=['curl','slide','fade','none'].includes(value?.animation)?value.animation:undefined;
+    const spreadGap=typeof value?.spreadGap==='number'&&Number.isInteger(value.spreadGap)&&value.spreadGap>=0&&value.spreadGap<=100?value.spreadGap:undefined;
     const preference=value?.mode==='classic'&&value.preference==='translation'?'translation':'original';
-    return {mode:'classic',preference,zoom,fit,...(layout?{layout}:{}),...(direction?{direction}:{}),...(animation?{animation}:{})};
+    return {mode:'classic',preference,zoom,fit,...(layout?{layout}:{}),...(direction?{direction}:{}),...(animation?{animation}:{}),...(spreadGap!==undefined?{spreadGap}:{})};
   }catch{/* Missing or corrupt preferences never opt a comic into translation. */}
   return readingViewDefaults();
 }

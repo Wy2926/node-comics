@@ -18,8 +18,8 @@ export function progressPreviewPosition({bounds, width, height}: Omit<PreviewAnc
 }
 
 /** Scrubbing owns only a local preview; the reader receives one completed destination. */
-export function ReaderProgress({value, min, max, disabled, valueText, percentage = false, onCommit}: {
-  value: number; min: number; max: number; disabled?: boolean;
+export function ReaderProgress({label = msg('阅读进度'), value, min, max, disabled, valueText, percentage = false, onCommit}: {
+  label?: string; value: number; min: number; max: number; disabled?: boolean;
   valueText(value: number): string; percentage?: boolean; onCommit(value: number): void;
 }) {
   const [draft, setDraft] = useState<number>();
@@ -30,7 +30,11 @@ export function ReaderProgress({value, min, max, disabled, valueText, percentage
   function preview(input: HTMLInputElement) {
     clearPreview();
     const root = input.closest('.nc-reader');
-    if (root) previewAnchor.current = {root, bounds: input.getBoundingClientRect(), width: window.innerWidth, height: window.innerHeight};
+    if (root) {
+      const bounds = input.getBoundingClientRect();
+      // Drawer scrollbars live in the top layer; keep the lens inside the field.
+      previewAnchor.current = {root, bounds, width: input.closest('.nc-reader-drawer') ? Math.min(bounds.right, window.innerWidth) : window.innerWidth, height: window.innerHeight};
+    }
   }
   function cancel() {
     if (!gesture.current || gesture.current.canceled) return;
@@ -60,7 +64,7 @@ export function ReaderProgress({value, min, max, disabled, valueText, percentage
   const anchor = previewAnchor.current;
   const position = anchor && draft !== undefined ? progressPreviewPosition(anchor, draft, min, max) : undefined;
   return <span className="nc-reader-progress-control">
-    <input className="nc-reader-progress" type="range" aria-label={msg('阅读进度')}
+    <input className="nc-reader-progress" type="range" aria-label={label}
       aria-valuetext={valueText(draft ?? value)} min={min} max={max} step={1} value={draft ?? value} disabled={disabled}
       onPointerDown={event => {
         if (disabled || event.button !== 0 || !event.isPrimary) return;
@@ -87,7 +91,7 @@ export function ReaderProgress({value, min, max, disabled, valueText, percentage
     {anchor && position && createPortal(<output className="nc-reader-progress-preview" aria-hidden="true"
       data-axis={position.vertical ? 'vertical' : 'horizontal'} data-long={String(draft).length > 3}
       style={{left: position.left, top: position.top, width: lensWidth, height: lensHeight, '--thumb-offset': `${position.offset}px`} as CSSProperties}>
-      <span>{msg('阅读进度')}</span><strong>{draft}{percentage && <small>%</small>}</strong>
+      <span>{label}</span><strong>{draft}{percentage && <small>%</small>}</strong>
       {!percentage && <span>/ {max}</span>}
     </output>, anchor.root)}
   </span>;

@@ -25,6 +25,7 @@ import {registerSourceTabRecovery} from './source-tabs';
 import {registerDocumentManifest} from './manifests';
 import {readSourceCatalog} from './catalog-reader';
 import {openSearchFromTab} from './search-entry';
+import {registerSourceFile} from './file';
 import type {DocumentSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 const sourceMessageTypes = new Set([
   'NC_IMPORT_CURRENT',
@@ -53,6 +54,7 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
     throw Error(msg('来源页面已变化，请重新发现。'));
   const { definition, location: loc } = sourceFor(tab.url);
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
+  if (definition.capabilities.file) {await inject(tabId); return registerSourceFile(tabId);}
   if(definition.capabilities.catalog&&sourceNetworks[definition.id]?.catalog){
     // Reader owns this cancellable operation; a popup or worker must not wait for the entire directory first.
     const id=crypto.randomUUID(),url=loc.url;
@@ -175,10 +177,10 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
       }
       void discover(sender.tab!.id!,readCatalog,sender.url)
         .then((result) =>
-          chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
+          chrome.tabs.create({ url: chrome.runtime.getURL('/reader.html?'+(result.kind==='file'?'sourceFile':result.kind==='catalog'?'catalog':'manifest')+'=' + result.id) }),
         )
         .then(() => respond({ ok: true }))
-        .catch(() => respond({ ok: false, error: msg('目录读取失败，请通过插件弹窗重试。') }));
+        .catch(error => respond({ ok: false, error: sourceFailure(error).error }));
       return true;
     }
     if (!trusted(sender)) return;

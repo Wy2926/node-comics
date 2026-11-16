@@ -3,6 +3,20 @@ import {initialReadingView,readingViewKey,readReadingView,readStoredReadingView,
 
 afterEach(()=>vi.unstubAllGlobals());
 describe('comic viewing choices',()=>{
+  it('restores the gap per comic and rejects invalid stored values independently',()=>{
+    const saved=new Map<string,string>();
+    vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});
+    for(const spreadGap of [0,37,100]){
+      saveReadingView('comic-a',{...readReadingView('comic-a'),spreadGap,layout:'double'});
+      expect(readReadingView('comic-a').spreadGap).toBe(spreadGap);
+      expect(readReadingView('comic-b').spreadGap??0).toBe(0);
+    }
+    for(const spreadGap of [-1,101,1.5,'50',null]){
+      saved.set('comic-a',JSON.stringify({spreadGap,layout:'double',zoom:140}));
+      expect(readReadingView('comic-a')).toMatchObject({layout:'double',zoom:140});
+      expect(readReadingView('comic-a').spreadGap??0).toBe(0);
+    }
+  });
   it.each(['curl','slide','fade','none'] as const)('restores the %s animation only for its own comic',animation=>{
     const saved=new Map<string,string>();
     vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value)});

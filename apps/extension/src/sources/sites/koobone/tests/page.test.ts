@@ -14,21 +14,21 @@ function fixture() {
     getBoundingClientRect: () => ({width: 800, height: 600})};
   doc.defaultView.frameElement = frame;
   const controller = new AbortController();
-  const document = {title: 'KOOBONE', querySelector: (selector: string) => selector === 'iframe#iframe_page' ? frame : null} as unknown as Document;
+  const document = {title: 'KOOBONE', addEventListener() {}, removeEventListener() {}, querySelector: (selector: string) => selector === 'iframe#iframe_page' ? frame : null} as unknown as Document;
   const page = createPage({document, location: definition.identify(new URL(url))!, signal: controller.signal});
   return {page, frame, doc, images};
 }
 
 describe('KOOBONE inline reader', () => {
-  it('claims only the HTTPS desktop reader and declares no import or full-book acquisition', async () => {
+  it('claims only the HTTPS desktop reader and imports files without pretending to offer page discovery', async () => {
     expect(definition.identify(new URL(url + '?v=1#reader'))?.kind).toBe('reader');
     for (const target of ['http://koobone.com/web.htm', 'https://koobone.com.evil.test/web.htm',
       'https://user@koobone.com/web.htm', 'https://koobone.com:444/web.htm',
       'https://kxo.moe/c/10281.htm', 'https://koobone.com/login.php', 'https://koobone.com/wpage.htm']) {
       expect(definition.identify(new URL(target))).toBeNull();
     }
-    expect(definition.capabilities).toMatchObject({inline: true, importable: false, catalog: false, pages: false, completePageList: false});
-    expect(definition.installation).toEqual({autoContentMatches: []});
+    expect(definition.capabilities).toMatchObject({inline: true, importable: true, file: true, catalog: false, pages: false, completePageList: false});
+    expect(definition.installation.optionalContentMatches).toEqual(['https://koobone.com/web.htm*']);
     const {page} = fixture();
     expect(await page.discoverPages()).toEqual({status: 'unsupported', code: 'SOURCE_PAGE_UNSUPPORTED'});
     expect(page.snapshot()).toMatchObject({items: [], discoveryComplete: false}); page.dispose();

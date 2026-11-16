@@ -37,7 +37,7 @@ export interface SourceDefinition {
   name: string;
   sites?: readonly SourceSite[];
   identify(url: URL): SourceLocation | null;
-  capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean; findAlternatives?: boolean };
+  capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean; file?: boolean; findAlternatives?: boolean };
   /** Use the shared floating import entry when the site has no stable inline anchor. */
   embeddedEntry?: 'floating';
   /** Reuse generic recognition on every claimed page, independently of its import kind; HTTP catalog/pages remain authoritative. */

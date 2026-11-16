@@ -12,7 +12,7 @@ import { msg } from './i18n/runtime';
 import { Icon } from './icons';
 import { COMIC_ACCEPT } from './comics/formats/limits';
 import {isSafariExtension} from './platform';
-import { LocalImportQueue } from './comics/application/import-queue';
+import { LocalImportQueue, type ImportFile } from './comics/application/import-queue';
 import { emptyLibrary, type SourceCatalog } from './comics/application/types';
 import { listShelfIndex, loadEntry as readEntry, continueEntry, getEntry, getComic, readerSequence, selectReadingEntry, saveReaderState, subscribeLibrary, markRead, coverReference, setSourceLanguagePreference, type Comic, type ReadingDirectory } from './comics/application/library-service';
 import { importSourceFiles, importManifest } from './comics/application/import-service';
@@ -26,7 +26,7 @@ import { Reader } from './reader/Reader';
 import type {ChapterLoadOptions} from './reader/chapter-resources';
 import { readingViewKey } from './reader/view';
 import { API_BASE } from './service';
-import { inExtension, sourceFor, canFindAlternatives, consumeSearchSeed, type SourceSearchResult, type PageManifest } from './sources';
+import { inExtension, sourceFor, canFindAlternatives, consumeSearchSeed, consumeSourceFile, type SourceSearchResult, type PageManifest } from './sources';
 import {importWebsiteCatalog,importWebsiteLink,resumeWebsiteCatalog} from './comics/application/website-import';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import {useTranslationChannel} from './translation/channels/useChannel';
@@ -153,6 +153,7 @@ export function App(){
  const leaveReader=useCallback(()=>{readingOpen.current?.abort();void readingProgress.close();readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[readingProgress]);
  const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));if(currentRef.current===copy.id)readingProgress.update(copy);},[readingProgress]);
  const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false,requestIsCurrent?:()=>boolean,bookmark?:BookmarkLocation)=>{
+   const api=apiRef.current;
    readingOpen.current?.abort();const controller=new AbortController();readingOpen.current=controller;
    const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>!controller.signal.aborted&&request===readingEpoch.current&&api.isCurrent()&&(requestIsCurrent?.()??true);setReadingBusy(true);setError('');
    try{
@@ -165,7 +166,7 @@ export function App(){
      if(selected){const restored=await readingProgress.open(selected,controller.signal);if(!isCurrent())return false;const opened=bookmark?{...applyBookmark(restored,bookmark)!,lastReadAt:Date.now()}:pageId?{...restored,pageId,relativeOffset:0}:restored;result.copies=result.copies.map(copy=>copy.id===id?opened:copy);if(opened!==selected)await saveReaderState(opened);}
      if(!isCurrent())return false;setCopies(result.copies);setDirectory(result.directory);currentRef.current=id;setCurrentId(id);if(!bookmark)setNavigationKey(n=>n+1);return true;
    }catch(e){if(isCurrent())setError((e as Error).message);return false;}finally{if(request===readingEpoch.current)setReadingBusy(false);}
- },[api,readingProgress]);
+ },[readingProgress]);
  function activateEntry(id:string){
    const request=++readingEpoch.current;currentRef.current=id;setCurrentId(id);setReadingBusy(false);
    void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
@@ -235,7 +236,7 @@ export function App(){
    const entry=await continueEntry(comicId,settingsRef.current.language);if(epoch!==readingEpoch.current)return;if(!entry)throw Error(msg('无法打开来源。'));await openEntry(entry.id);
  }
  function beginImport(){const state=localImport.getSnapshot();if(state.running||state.phase==='paused'){setImportExpanded(true);return;}input.current?.click();}
- function chooseFiles(files:File[]){
+ function chooseFiles(files:ImportFile[]){
   if(input.current)input.current.value='';if(!files.length)return;
   const state=localImport.getSnapshot();if(state.running||state.phase==='paused'){setImportExpanded(true);return;}
   const request=readingEpoch.current;setImportExpanded(false);
@@ -307,11 +308,12 @@ export function App(){
  useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);setCapsLoading(true);void(async()=>{try{const value=await api.capabilities();if(live){setCaps(value);setUsage(value.entitlements??undefined);}}catch{/* Keep local reading available; the account page offers a retry. */}finally{if(live)setCapsLoading(false);}})();return()=>{live=false;};},[api]);
  useEffect(()=>{
   if(sourceQueryHandled.current||typeof chrome==='undefined'||!chrome.storage?.local)return;
-  const query=new URLSearchParams(location.search),manifestId=query.get('manifest'),catalogId=query.get('catalog');if(!manifestId&&!catalogId)return;
+  const query=new URLSearchParams(location.search),manifestId=query.get('manifest'),catalogId=query.get('catalog'),fileId=query.get('sourceFile');if(!manifestId&&!catalogId&&!fileId)return;
   sourceQueryHandled.current=true;const request=readingEpoch.current,openingMessage=msg('正在打开漫画');let sourceImportComicId:string|undefined;
   const releaseBusy=()=>setBusy(value=>value===openingMessage?'':value);setBusy(openingMessage);
   void (async()=>{
-   if(manifestId){const data=await chrome.storage.local.get('manifest:'+manifestId),manifest=data['manifest:'+manifestId] as PageManifest|undefined;if(!manifest)throw Error(msg('来源清单已失效，请重新发现。'));
+   if(fileId){chooseFiles([await consumeSourceFile(fileId)]);setImportExpanded(true);}
+   else if(manifestId){const data=await chrome.storage.local.get('manifest:'+manifestId),manifest=data['manifest:'+manifestId] as PageManifest|undefined;if(!manifest)throw Error(msg('来源清单已失效，请重新发现。'));
     const result=await observeImport('website','website',()=>importManifest(manifest));sourceImportComicId=result.comicId;await reloadLibrary();if(readingEpoch.current===request)await openEntry(result.id);
     if(result.catalogUrl)await trackWebsiteImport(options=>resumeWebsiteCatalog(result.comicId,options),()=>{},result.comicId);
    }else if(catalogId){
@@ -327,7 +329,7 @@ export function App(){
        const comic=await observeImport('website','website',()=>importWebsiteCatalog(source.catalog!,source.selectedEntryId));sourceImportComicId=comic.id;await reloadLibrary();if(readingEpoch.current===request)await openComic(comic.id);
      }
    }
-  })().catch(e=>{if(readingEpoch.current===request||copiesRef.current.some(copy=>copy.id===currentRef.current&&copy.comicId===sourceImportComicId))setError(e.message);}).finally(()=>{releaseBusy();const currentQuery=new URLSearchParams(location.search);if(currentQuery.get('manifest')===manifestId)currentQuery.delete('manifest');if(currentQuery.get('catalog')===catalogId)currentQuery.delete('catalog');history.replaceState(null,'',location.pathname+(currentQuery.size?'?'+currentQuery:'')+location.hash);});
+  })().catch(e=>{if(readingEpoch.current===request||copiesRef.current.some(copy=>copy.id===currentRef.current&&copy.comicId===sourceImportComicId))setError(e.message);}).finally(()=>{releaseBusy();const currentQuery=new URLSearchParams(location.search);if(currentQuery.get('manifest')===manifestId)currentQuery.delete('manifest');if(currentQuery.get('catalog')===catalogId)currentQuery.delete('catalog');if(currentQuery.get('sourceFile')===fileId)currentQuery.delete('sourceFile');history.replaceState(null,'',location.pathname+(currentQuery.size?'?'+currentQuery:'')+location.hash);});
  },[api]);
  useEffect(()=>{
   if(!inExtension())return;

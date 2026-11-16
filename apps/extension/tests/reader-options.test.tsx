@@ -10,8 +10,8 @@ import {defaults, type Settings} from '../src/types';
 
 const settings: Settings = {...defaults, layout: 'double'};
 const noop = () => {};
-const display = (allowDouble?: boolean) => <ReaderDisplaySettings settings={settings} setSettings={noop}
-  layout={settings.layout} direction={settings.direction} onLayout={noop} onDirection={noop} sizing={null} allowDouble={allowDouble}/>;
+const display = () => <ReaderDisplaySettings settings={settings} setSettings={noop}
+  layout={settings.layout} direction={settings.direction} onLayout={noop} onDirection={noop} sizing={null}/>;
 const displayOptions = {settings, setSettings: noop, layout: settings.layout, direction: settings.direction, onLayout: noop, onDirection: noop, sizing: null};
 
 function nodes(value: unknown): ReactElement<Record<string, unknown>>[] {
@@ -25,31 +25,20 @@ function choice(tree: unknown, label: string) {
 }
 
 describe('reader layout choices', () => {
-  it('offers and selects double-page reading only for image readers', () => {
-    const html = renderToStaticMarkup(display(true));
+  it('offers and selects double-page reading for image and EPUB readers', () => {
+    const html = renderToStaticMarkup(display());
     expect(html).toContain('双页');
     expect(html).toMatch(/aria-pressed="true"[^>]*>[^]*?<span>双页<\/span><\/button>/);
     const onLayout = vi.fn();
-    const layout = choice(ReaderDisplaySettings({...displayOptions, onLayout, allowDouble: true}), '阅读布局');
+    const layout = choice(ReaderDisplaySettings({...displayOptions, onLayout}), '阅读布局');
     expect(layout.props.options.map(option => option.id)).toEqual(['default', 'continuous', 'single', 'double']);
     layout.props.onChange('double');
     expect(onLayout).toHaveBeenCalledWith('double');
   });
 
-  it.each([undefined, false])('keeps EPUB controls single-page when image layout is double and allowDouble is %s', allowDouble => {
-    const html = renderToStaticMarkup(display(allowDouble));
-    expect(html).not.toContain('双页');
-    const onLayout = vi.fn();
-    const layout = choice(ReaderDisplaySettings({...displayOptions, onLayout, allowDouble}), '阅读布局');
-    expect(layout.props.options.map(option => option.id)).toEqual(['default', 'continuous', 'single']);
-    expect(layout.props.value).toBe('single');
-    expect(settings.layout).toBe('double');
-    expect(onLayout).not.toHaveBeenCalled();
-  });
-
   it.each(['continuous', 'single', 'double'] as const)('selects Default for an unset comic override when the global layout is %s', layout => {
     const globalSettings = {...settings, layout};
-    const tree = ReaderDisplaySettings({...displayOptions, settings: globalSettings, layout: undefined, allowDouble: true});
+    const tree = ReaderDisplaySettings({...displayOptions, settings: globalSettings, layout: undefined});
     expect(choice(tree, '阅读布局').props.value).toBe('default');
     expect(renderToStaticMarkup(tree)).toContain('仅对此漫画生效；选择默认时跟随全局阅读布局。');
     const epub = ReaderDisplaySettings({...displayOptions, settings: globalSettings, layout: undefined});
@@ -58,7 +47,7 @@ describe('reader layout choices', () => {
 
   it('changes and clears only the comic layout, routes direction separately, and leaves global settings untouched', () => {
     const onLayout = vi.fn(), onDirection = vi.fn(), setSettings = vi.fn();
-    const tree = ReaderDisplaySettings({...displayOptions, layout: 'single', direction: 'rtl', onLayout, onDirection, setSettings, allowDouble: true});
+    const tree = ReaderDisplaySettings({...displayOptions, layout: 'single', direction: 'rtl', onLayout, onDirection, setSettings});
     const layout = choice(tree, '阅读布局'), direction = choice(tree, '阅读方向');
     expect(layout.props.value).toBe('single');
     expect(direction.props.value).toBe('rtl');
@@ -92,17 +81,17 @@ describe('reader layout choices', () => {
   });
 
   it('shares concise layout labels between reader controls and global preferences', () => {
-    const layout = choice(ReaderDisplaySettings({...displayOptions, allowDouble: true}), '阅读布局');
+    const layout = choice(ReaderDisplaySettings({...displayOptions}), '阅读布局');
     expect(layout.props.options.map(option => option.label)).toEqual(['默认', '连续', '单页', '双页']);
     expect(layout.props.variant).toBe('cards');
     const preference = nodes(Preferences({settings, setSettings: noop})).find(node => node.props['aria-label'] === '默认阅读布局')!;
     expect(nodes(preference.props.children).map(option => option.props.children)).toEqual(['连续', '单页', '双页']);
-    expect(renderToStaticMarkup(display(true))).not.toMatch(/连续阅读|单页阅读|双页阅读/);
+    expect(renderToStaticMarkup(display())).not.toMatch(/连续阅读|单页阅读|双页阅读/);
   });
 
   it('uses the same layout selection semantics in icon cards, with complete labels and only one active option', () => {
     const onLayout = vi.fn();
-    const displayTree = ReaderDisplaySettings({...displayOptions, layout: 'single', onLayout, allowDouble: true});
+    const displayTree = ReaderDisplaySettings({...displayOptions, layout: 'single', onLayout});
     const layout = ReaderChoice(choice(displayTree, '阅读布局').props);
     const group = nodes(layout).find(node => node.props.role === 'group')!;
     expect(group.props['aria-label']).toBe('阅读布局');
@@ -145,7 +134,7 @@ describe('reader settings hierarchy and action cards', () => {
   it.each(['缩放', '字号'])('places %s before layout, direction and background controls without changing its handler', label => {
     const onSize = vi.fn();
     const sizing = <ReaderScale label={label} value={100} min={40} max={200} onChange={onSize}/>;
-    const tree = ReaderDisplaySettings({...displayOptions, sizing, allowDouble: label === '缩放'});
+    const tree = ReaderDisplaySettings({...displayOptions, sizing});
     const controls = nodes(tree).filter(node => node.type === ReaderScale || node.type === ReaderChoice);
     expect(controls.map(node => node.props.label)).toEqual([label, '阅读布局', '阅读方向', '阅读背景']);
     expect(controls[0]).toBe(sizing);

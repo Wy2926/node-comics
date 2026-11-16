@@ -11,6 +11,7 @@ export type * from './contracts/search';
 export type * from './contracts/work';
 export type {SourceImageProgress,SourceImageProgressListener} from './contracts/image';
 export {consumeSearchSeed} from './runtime/search-entry';
+export {consumeSourceFile} from './runtime/file';
 export {SourceSearchError} from './contracts/search';
 export {normalizeSearchLanguage, sourceSearchLimits} from './core/search';
 export {listSearchSites, searchSource, readSearchCover, releaseSourceSearchSession} from './runtime/search';

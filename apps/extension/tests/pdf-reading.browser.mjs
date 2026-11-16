@@ -93,7 +93,7 @@ for(const dpr of [1,2])test(`PDF reading at DPR ${dpr} keeps translation bytes s
     await page.locator('.nc-image-failure').waitFor({state:'hidden'});
     await openSettings();await settings().getByRole('group',{name:'阅读布局',exact:true}).getByRole('button',{name:'双页',exact:true}).click();await closeSettings();
     await page.keyboard.press('ArrowRight');await page.waitForFunction(()=>document.querySelectorAll('.nc-page-image').length===2);await sharp();
-    await openSettings();for(let n=0;n<5;n++)await settings().getByRole('button',{name:'放大',exact:true}).click();await closeSettings();await sharp();
+    await openSettings();for(let n=0;n<5;n++)await settings().getByRole('group',{name:'缩放',exact:true}).getByRole('button',{name:'放大',exact:true}).click();await closeSettings();await sharp();
     await page.screenshot({path:outputPath(`${engine}-${dpr}-double.png`)});
     await openSettings();await settings().getByRole('group',{name:'阅读布局',exact:true}).getByRole('button',{name:'连续',exact:true}).click();await closeSettings();await sharp();
     const neighbor=page.locator('.nc-manga-page').nth(1),neighborId=await neighbor.getAttribute('data-page-id'),neighborSrc=await neighbor.locator('.nc-page-image').getAttribute('src');

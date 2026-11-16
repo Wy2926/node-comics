@@ -413,6 +413,7 @@
   "连续": "Fortlaufend",
   "单页": "Einzelseite",
   "双页": "Doppelseite",
+  "双页间距": "Seitenabstand",
   "阅读方向": "Leserichtung",
   "从右向左": "Von rechts nach links",
   "从左向右": "Von links nach rechts",
@@ -675,7 +676,6 @@
   "来源详情页已变化。": "Die Seite mit den Quellendetails hat sich geändert.",
   "来源页面已变化，请重新发现。": "Die Quellseite hat sich geändert. Bitte suchen Sie sie erneut.",
   "翻译当前页面": "Aktuelle Seite übersetzen",
-  "目录读取失败，请通过插件弹窗重试。": "Das Lesen des Verzeichnisses ist fehlgeschlagen. Bitte versuchen Sie es erneut über das Plug-in-Popup-Fenster.",
   "当前标签页不可用，请重新打开插件。": "Die aktuelle Registerkarte ist nicht verfügbar. Bitte öffnen Sie das Plug-in erneut.",
   "请在普通网页中使用翻译。": "Bitte verwenden Sie die Übersetzung auf normalen Webseiten.",
   "当前网页已变化，请重新打开插件后翻译。": "Die aktuelle Webseite hat sich geändert. Bitte öffnen Sie das Plug-in erneut und übersetzen Sie es.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Bereich anpassen",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "Noch keine Websites. Fügen Sie eine hinzu oder aktivieren Sie die Erweiterung auf einer Webseite.",
   "选择目录": "Verzeichnis auswählen",
-  "高级：正则匹配": "Erweitert: regulärer Ausdruck"
+  "高级：正则匹配": "Erweitert: regulärer Ausdruck",
+  "请返回来源书架重新打开漫画，再导入。": "Kehre zum Bücherregal der Quelle zurück und öffne den Comic vor dem Import erneut.",
+  "请等待来源阅读器完成下载后重试。": "Warte, bis der Quellreader den Download abgeschlossen hat, und versuche es erneut."
 }

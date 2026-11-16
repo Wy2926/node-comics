@@ -24,7 +24,7 @@ import type {ReadingTarget, TranslationState} from '../translation/automatic';
 import { useShortcuts } from "../shortcuts/react";
 import type {ReadingProgressStatus} from '../comics/application/reading-progress';
 import {ReaderShell, ReaderNavigation, ReaderDrawer, ReaderPosition} from './ReaderChrome';
-import {ReaderSettings, ReaderScale, ReaderTranslationSettings} from './ReaderSettings';
+import {ReaderSettings, ReaderScale, ReaderGap, ReaderTranslationSettings} from './ReaderSettings';
 import {PageTranslationBar} from './PageTranslationBar';
 import {EpubDirectory} from './EpubDirectory';
 import {ImageTranslationStatus} from './ImageTranslationStatus';
@@ -99,8 +99,7 @@ export function EpubReader({
   progressStatus,
 }: Props) {
   const [view, setView] = useState(() => readReadingView(viewKey));
-  const requestedLayout = view.layout ?? globalSettings.layout;
-  const layout = requestedLayout === 'double' ? 'single' : requestedLayout;
+  const layout = view.layout ?? globalSettings.layout;
   const settings = {...globalSettings, direction: view.direction ?? globalSettings.direction};
   const viewport = useRef<HTMLDivElement>(null);
   const session = useRef<EpubSession | undefined>(undefined);
@@ -116,8 +115,8 @@ export function EpubReader({
   const setFontSize = (value: number | ((previous: number) => number)) => {if (!fixedLayout) setView(previous => ({...previous, zoom: Math.max(70, Math.min(200, typeof value === 'function' ? value(previous.zoom) : value))}));};
   const {root, panel, setPanel, togglePanel, closePanel, immersive, setImmersive, hidden, reveal, toggleControls, fullscreen} = useReaderControls<'bookmarks' | 'directory' | 'settings' | 'translation'>({blocked: controlsBlocked, notify, settings: globalSettings, setSettings});
   const images = useEpubImages({copy, update, translated: view.preference === 'translation', mode: view.mode, language: settings.language, scope: translationScope, onReadingWindow});
-  const latest = useRef({ copy, update, settings, layout, fontSize, images, toggleControls });
-  latest.current = { copy, update, settings, layout, fontSize, images, toggleControls };
+  const latest = useRef({ copy, update, settings, layout, fontSize, images, toggleControls, spreadGap: view.spreadGap ?? 0 });
+  latest.current = { copy, update, settings, layout, fontSize, images, toggleControls, spreadGap: view.spreadGap ?? 0 };
   const [position, setPosition] = useState<Location>();
   const [tocHref, setTocHref] = useState<string>();
   const leaveReader = () => {capturePosition.current?.();onBack();};
@@ -182,7 +181,7 @@ export function EpubReader({
       "reader.translation": () => selectView('classic'),
       "reader.immersive": () => setImmersive(value => !value),
       "reader.fullscreen": () => {void fullscreen();},
-      "reader.layout": () => changeLayout(layout === 'continuous' ? 'single' : 'continuous'),
+      "reader.layout": () => changeLayout(layout === 'continuous' ? 'single' : layout === 'single' ? 'double' : 'continuous'),
       "reader.zoomIn": () => setFontSize((value) => Math.min(200, value + 10)),
       "reader.zoomOut": () => setFontSize((value) => Math.max(70, value - 10)),
       "reader.zoomReset": () => setFontSize(100),
@@ -246,7 +245,9 @@ export function EpubReader({
         // can otherwise clear an iframe before its first navigation finishes.
         width: element.clientWidth,
         height: element.clientHeight,
-        spread: "none",
+        spread: latest.current.layout === 'double' ? 'always' : 'none',
+        minSpreadWidth: 0,
+        spreadGap: () => latest.current.spreadGap,
         defaultDirection: latest.current.settings.direction,
         flow:
           latest.current.layout === "continuous"
@@ -441,6 +442,10 @@ export function EpubReader({
     reflow.current?.();
   }, [fontSize, settings.readerBackground, settings.textScale, settings.appearance, settings.accentTheme]);
 
+  useEffect(() => {
+    rendition.current?.views().forEach(frame => (frame as import('epubjs/src/managers/views/iframe.js').default).expand());
+  }, [view.spreadGap]);
+
   const disabled = loading || !!error || bookmarks.busy;
   return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
     <ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} onBack={leaveReader}
@@ -466,7 +471,7 @@ export function EpubReader({
     <PageTranslationBar selectedView={view.preference === 'original' ? 'original' : view.mode} onView={selectView}
       modes={caps?.modes.filter(mode => mode.enabled).map(mode => mode.id)}
       translationLabel={msg('默认翻译 · {0} · {1}', {'0': modeLabels.classic, '1': language})} panel={panel} onPanel={togglePanel}/>
-    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'}>
+    <main className="nc-reading-viewport nc-epub-stage" data-epub-flow={layout === 'continuous' ? 'scrolled-continuous' : 'paginated'} data-epub-layout={layout}>
       <div ref={viewport} className="nc-epub-viewport" aria-busy={loading}/>
       {loading && <div className="nc-epub-status" role="status"><span className="spinner"/>{msg('加载中…')}</div>}
       {error && <div className="nc-epub-status" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>{msg('重试')}</button></div>}
@@ -484,7 +489,8 @@ export function EpubReader({
           ? <ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} modelSelection={modelSelection} fontSelection={fontSelection} channelOptions={channelOptions}
             note={msg('仅翻译 EPUB 内的图片，正文文字保持原文。选择译图后，随读翻译可见图片与最多三张后续图片。')}/>
           : <ReaderSettings settings={globalSettings} setSettings={setSettings} layout={view.layout} direction={settings.direction} onLayout={changeLayout} onDirection={changeDirection}
-            sizing={fixedLayout ? null : <ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}
+            sizing={fixedLayout ? layout === 'double' && <ReaderGap value={view.spreadGap??0} disabled={disabled} onChange={spreadGap => setView(previous => ({...previous, spreadGap}))}/>
+              : <ReaderScale label={msg('字号')} value={fontSize} min={70} max={200} disabled={disabled} onChange={setFontSize}/>}
             immersive={immersive} onImmersive={() => setImmersive(value => !value)} onFullscreen={() => void fullscreen()}
             onShortcuts={() => {setPanel(undefined); reveal(); onOpenShortcuts();}} onReload={() => {capturePosition.current?.(); setRetry(value => value + 1);}}
             busy={loading}/>}</div>}

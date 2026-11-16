@@ -59,3 +59,8 @@ export function spreadFrames(pages: readonly PageSize[], viewport: {width: numbe
   const height = Math.min(availableHeight, availableWidth / ratios.reduce((sum, ratio) => sum + ratio, 0));
   return ratios.map(ratio => ({width: height * ratio, height}));
 }
+
+/** Redistribute fitted horizontal whitespace without shrinking or re-decoding the pages. */
+export function spreadGap(frames: readonly {width: number}[], viewportWidth: number, value: number): number {
+  return frames.length === 2 ? Math.max(0, viewportWidth - frames[0].width - frames[1].width) * value / 100 : 0;
+}

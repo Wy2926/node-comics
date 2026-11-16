@@ -467,6 +467,7 @@
   "连续": "Berkelanjutan",
   "单页": "Satu halaman",
   "双页": "Dua halaman",
+  "双页间距": "Jarak antarhalaman",
   "阅读方向": "Arah membaca",
   "从右向左": "Kanan ke kiri",
   "从左向右": "Dari kiri ke kanan",
@@ -684,7 +685,6 @@
   "来源详情页已变化。": "Halaman detail sumber telah berubah.",
   "来源页面已变化，请重新发现。": "Halaman sumber telah berubah, harap temukan kembali.",
   "翻译当前页面": "Terjemahkan halaman saat ini",
-  "目录读取失败，请通过插件弹窗重试。": "Pembacaan direktori gagal, coba lagi melalui jendela pop-up plug-in.",
   "当前标签页不可用，请重新打开插件。": "Tab saat ini tidak tersedia, silakan buka kembali plugin.",
   "请在普通网页中使用翻译。": "Silakan gunakan terjemahan di halaman web normal.",
   "当前网页已变化，请重新打开插件后翻译。": "Halaman web saat ini telah berubah, silakan buka kembali plugin dan terjemahkan.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Sesuaikan cakupan",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "Belum ada situs. Tambahkan situs atau buka ekstensi di halaman untuk mengaktifkan.",
   "选择目录": "Pilih direktori",
-  "高级：正则匹配": "Lanjutan: ekspresi reguler"
+  "高级：正则匹配": "Lanjutan: ekspresi reguler",
+  "请返回来源书架重新打开漫画，再导入。": "Kembali ke rak buku sumber dan buka ulang komik sebelum mengimpor.",
+  "请等待来源阅读器完成下载后重试。": "Tunggu pembaca sumber selesai mengunduh, lalu coba lagi."
 }

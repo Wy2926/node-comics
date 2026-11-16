@@ -29,7 +29,7 @@ export interface EpubSession {
   readonly signal?: AbortSignal;
   render(
     element: Element,
-    options?: RenditionOptions,
+    options?: RenditionOptions & {spreadGap?: () => number},
   ): ReturnType<Book["renderTo"]>;
   close(): Promise<void>;
 }
@@ -245,8 +245,9 @@ export async function openEpub(
           method: string;
         } = {
           ...options,
-          manager: EpubContinuousManager,
-          view: epubView(view => {void rendition.hooks.unloaded.trigger(view, rendition);}),
+          // The paginated manager honors fixed-layout covers and page pairs.
+          manager: options.spread === 'always' ? 'default' : EpubContinuousManager,
+          view: epubView(view => {void rendition.hooks.unloaded.trigger(view, rendition);}, options.spreadGap),
           // Preserve XML parsing semantics; srcdoc would reparse untrusted XHTML as HTML.
           method: "blobUrl",
           script: undefined,

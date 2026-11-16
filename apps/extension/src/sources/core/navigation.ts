@@ -31,7 +31,8 @@ export class SourceNavigation {
     if (
       (!factory && definition.capabilities.inline) ||
       (definition.capabilities.inline && !session.inlineTargets) ||
-      (definition.capabilities.pages && !session.discoverPages)
+      (definition.capabilities.pages && !session.discoverPages) ||
+      (definition.capabilities.file && !session.openFile)
     ) {
       session.dispose();
       throw Error('SOURCE_CAPABILITY_MISMATCH');

@@ -91,6 +91,11 @@ it('centers a fixed viewport regardless of spread-edge hints, without stretching
   css.mockClear(); centerFixedPage(contents, 600, 1000);
   expect(css).toHaveBeenCalledWith('margin-left', '0px', true);
   expect(css).toHaveBeenCalledWith('margin-top', '100px', true);
+  for (const alignment of [0, .25, .5, 1]) {
+    css.mockClear(); centerFixedPage(contents, 1000, 800, alignment);
+    expect(css).toHaveBeenCalledWith('margin-left', `${400 * alignment}px`, true);
+    expect(css).toHaveBeenCalledWith('margin-top', '0px', true);
+  }
 });
 
 it('unloads original and translation resources before frame disposal and invalidates recycled HTML', () => {

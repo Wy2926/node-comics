@@ -2,16 +2,16 @@ import {useMemo,type RefObject} from 'react';
 import type {Mode,ReadingEntry,Settings} from '../types';
 import {BlobPicture} from './Images';
 import {pageFrame} from './geometry';
-import {pageSpreads,spreadAt,spreadFrames} from './pagination';
+import {pageSpreads,spreadAt,spreadFrames,spreadGap as fittedGap} from './pagination';
 import {readingImage} from './presentation';
 import {msg} from '../i18n/runtime';
 
 const noAction=()=>{};
 /** One inert destination group. It shares the image loader, never reading evidence or translation work. */
-export function ReaderTurnPreview({ref,chapter,index,ready,viewport,layout,direction,compare,mode,translated,language,translationScope,scope,fit,zoom,top}: {
+export function ReaderTurnPreview({ref,chapter,index,ready,viewport,layout,direction,compare,mode,translated,language,translationScope,scope,fit,zoom,spreadGap,top}: {
  ref:RefObject<HTMLDivElement|null>;chapter?:ReadingEntry;index:number|'last';ready:boolean;viewport:{width:number;height:number};
  layout:Settings['layout'];direction:Settings['direction'];compare:boolean;mode:Mode;translated:boolean;language:string;translationScope?:string;
- scope:(page:ReadingEntry['pages'][number],chapter:ReadingEntry)=>string;fit:Settings['fit'];zoom:number;top:number;
+ scope:(page:ReadingEntry['pages'][number],chapter:ReadingEntry)=>string;fit:Settings['fit'];zoom:number;spreadGap:number;top:number;
 }){
  const at=index==='last'?Math.max(0,(chapter?.pages.length??0)-1):index;
  const spreads=useMemo(()=>layout==='double'&&chapter?pageSpreads(chapter.pages):[],[layout,chapter?.pages]);
@@ -19,7 +19,7 @@ export function ReaderTurnPreview({ref,chapter,index,ready,viewport,layout,direc
  const pages=ready&&chapter?chapter.pages.slice(spread?spread.start:at,spread?spread.end:at+1):[];
  const frames=layout==='double'?spreadFrames(pages,viewport,compare):pages.map(page=>pageFrame(page,viewport,fit,zoom,compare));
  return <div ref={ref} className="nc-reading-turn-preview" aria-hidden="true" inert style={{width:viewport.width,height:viewport.height,top}}>
-  <div className="nc-page-stack" data-direction={direction}>{pages.map((page,n)=>{
+  <div className="nc-page-stack" data-direction={direction} style={{gap:layout==='double'?fittedGap(frames,viewport.width,spreadGap):0}}>{pages.map((page,n)=>{
    const identity=scope(page,chapter!),image=readingImage(page,mode,translated,language,translationScope),frame=frames[n],displayWidth=chapter?.source==='pdf'?frame.width/(compare?2:1):undefined;
    return <div className="nc-manga-page" key={page.id} style={{width:frame.width}}><div className={`nc-page-picture ${compare?'comparison':''}`} style={{height:frame.height}}>
     {compare&&<div className="nc-comparison-pane"><BlobPicture displayWidth={displayWidth} shareForTurn priority="prefetch" scope={`${identity}:compare`} blobKey={page.blobKey} alt="" error={page.fetchError} onImport={noAction}/></div>}

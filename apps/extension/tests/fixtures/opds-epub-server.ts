@@ -3,6 +3,22 @@ import { randomFillSync } from 'node:crypto';
 import { BlobReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js/index-native.js';
 import {cover} from './remote-library-ui-server';
 
+export async function fixedEpubFixture() {
+  const writer = new ZipWriter(new Uint8ArrayWriter(), {useWebWorkers: false, level: 0});
+  const pages = Array.from({length: 5}, (_, i) => i + 1);
+  const files = {
+    mimetype: 'application/epub+zip',
+    'META-INF/container.xml': '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="OPS/book.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+    'OPS/book.opf': `<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Fixed EPUB fixture</dc:title><dc:identifier id="uid">fixed-epub-fixture</dc:identifier><dc:language>en</dc:language><meta property="rendition:layout">pre-paginated</meta></metadata><manifest>${pages.map(i => `<item id="p${i}" href="${i}.xhtml" media-type="application/xhtml+xml"/><item id="art${i}" href="${i}.svg" media-type="image/svg+xml"/>`).join('')}</manifest><spine>${pages.map(i => `<itemref idref="p${i}"/>`).join('')}</spine></package>`,
+    ...Object.fromEntries(pages.flatMap(i => [
+      [`OPS/${i}.xhtml`, `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Page ${i}</title><meta name="viewport" content="width=600,height=900"/><style>html,body {margin:0;padding:0} img {display:block;width:600px;height:900px}</style></head><body><img src="${i}.svg" alt="Page ${i}"/></body></html>`],
+      [`OPS/${i}.svg`, `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="600" height="900" fill="${i%2?'#bfdbe8':'#e8d4bf'}"/><text x="100" y="450" font-size="60">Page ${i}</text></svg>`],
+    ])),
+  };
+  for (const [name, value] of Object.entries(files)) await writer.add(name, new BlobReader(new Blob([value])));
+  return writer.close();
+}
+
 /** Synthetic EPUB served over real loopback HTTP; no external service or private credentials. */
 export async function epubRangeFixture(level: 0 | 6 = 0) {
   const writer = new ZipWriter(new Uint8ArrayWriter(), { useWebWorkers: false, level });

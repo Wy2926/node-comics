@@ -127,6 +127,65 @@ async function globalPreference(name, value) {
 }
 const globalLayout = value => globalPreference('默认阅读布局', value);
 const globalDirection = value => globalPreference('翻页方向', value);
+
+test('double page gap moves fitted images from touching to outer edges and survives reopening', async () => {
+  await page.setViewportSize({width: 1600, height: 800});
+  await reader(); await layout('双页');
+  await setReaderProgress(pageNumber(), 3); await shown(3, [2, 3]);
+  const geometry = () => viewport().evaluate(element => {
+    const area = element.getBoundingClientRect();
+    const pages = [...element.querySelectorAll('.nc-manga-page')].map(page => page.getBoundingClientRect()).sort((a,b) => a.left-b.left);
+    return {left: pages[0].left-area.left, right: area.right-pages[1].right, gap: pages[1].left-pages[0].right, widths: pages.map(p=>p.width)};
+  });
+  const before = await geometry();
+  assert(before.left > 0); assert(Math.abs(before.gap) < 1);
+  const urls = await viewport().locator('img.nc-page-image').evaluateAll(images=>images.map(image=>image.src));
+  for (const value of [50, 100]) {
+    await openSettings();
+    const slider = settings().getByRole('slider', {name: '双页间距', exact: true});
+    await slider.fill(String(value));
+    assert.equal(await slider.inputValue(), String(value));
+    assert.equal(await settings().locator('.nc-reader-gap button').count(), 0);
+    assert.equal(await settings().getByText('0：两页贴合；100：左右靠边', {exact: true}).count(), 0);
+    if (value === 100) {
+      await slider.press('Home'); assert.equal(await slider.inputValue(), '0');
+      await slider.press('ArrowRight'); assert.equal(await slider.inputValue(), '1');
+      await page.keyboard.down('End');
+      const preview = page.locator('.nc-reader-progress-preview');
+      assert.equal(await preview.locator(':scope > span').textContent(), '双页间距');
+      assert.equal(await preview.locator('strong').textContent(), '100%');
+      assert.equal(await settings().locator('.nc-reader-gap > output').textContent(), '1%');
+      const previewBox = await preview.boundingBox(), sliderBox = await slider.boundingBox();
+      assert(previewBox.x + previewBox.width <= sliderBox.x + sliderBox.width, 'gap preview stays clear of the drawer scrollbar');
+      await page.screenshot({path: resolve(artifacts, 'double-gap-preview.png')});
+      await page.keyboard.up('End'); assert.equal(await slider.inputValue(), '100');
+      assert.equal(await settings().locator('.nc-reader-gap > output').textContent(), '100%');
+      await page.screenshot({path: resolve(artifacts, 'double-gap-settings.png')});
+    }
+    await closeSettings();
+    const after = await geometry();
+    assert.deepEqual(after.widths, before.widths);
+    assert(Math.abs(after.gap - (before.left + before.right) * value / 100) < 1);
+    assert(Math.abs(after.left - before.left * (1-value/100)) < 1);
+  }
+  assert.deepEqual(await viewport().locator('img.nc-page-image').evaluateAll(images=>images.map(image=>image.src)), urls);
+  await direction('从右向左');
+  assert(Math.abs((await geometry()).left) < 1);
+  await page.screenshot({path: resolve(artifacts, 'double-gap-100.png')});
+  await page.getByRole('button', {name: '关闭并保存位置', exact: true}).click();
+  await page.getByRole('button', {name: '重开阅读器', exact: true}).click(); await shown(3, [2, 3]);
+  assert(Math.abs((await geometry()).left) < 1);
+  await openSettings(); assert.equal(await settings().getByRole('slider', {name:'双页间距',exact:true}).inputValue(), '100');
+  await closeSettings(); await page.setViewportSize({width:390,height:844}); await shown(3,[2,3]); await assertFits('gap on narrow viewport');
+  await wheelAt(-300); assert((await zoomMetrics()).scale > 100);
+  await openSettings();
+  await settings().getByRole('slider', {name:'双页间距',exact:true}).fill('50');
+  await page.screenshot({path: resolve(artifacts, 'double-gap-mobile.png')});
+  await closeSettings();
+  assert.equal((await zoomMetrics()).scale, 100, 'changing the gap resets inspection even with no spare width');
+  await assertFits('gap change restores the whole spread');
+});
+
 async function switchComic(comic) {
   await page.getByRole('button', {name: `漫画 ${comic}`, exact: true}).click();
   await viewport().waitFor(); await page.keyboard.press('Escape'); await pageNumber().waitFor(); await settle();
@@ -243,11 +302,11 @@ test('direct jumps, layout changes and reopen preserve the selected page identit
 test('double inspection zoom leaves saved single-page fit and zoom intact', async () => {
   await reader(); await openSettings();
   await settings().getByRole('group', {name: '图片适应方式', exact: true}).getByRole('button', {name: '铺满宽度', exact: true}).click();
-  await settings().getByRole('button', {name: '放大', exact: true}).click();
+  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
   await closeSettings(); await layout('双页'); await shown(1, [1]);
   await openSettings();
   assert.equal(await settings().getByRole('group', {name: '图片适应方式', exact: true}).count(), 0);
-  await settings().getByRole('button', {name: '放大', exact: true}).click();
+  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
   assert(Math.abs(Number(await viewport().getAttribute('data-spread-zoom')) - 110) < .01);
   await closeSettings();
   await page.keyboard.press('0'); await page.keyboard.press('w');
@@ -339,7 +398,7 @@ for (const scenario of [
   await openSettings();
   await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('50%', {exact: true}).waitFor();
   if (scenario.target === 'continuous' && scenario.number === 1) await page.screenshot({path: resolve(artifacts, 'spread-zoom-reset-continuous-50.png')});
-  await settings().getByRole('button', {name: '放大', exact: true}).click();
+  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
   await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('60%', {exact: true}).waitFor();
   await closeSettings(); await assertNormalZoom(scenario.target, scenario.number, 60, mounted);
   await page.screenshot({path: resolve(artifacts, `spread-zoom-reset-${scenario.target}-${scenario.number}-${scenario.shortcut ? 'shortcut' : scenario.choice === '默认' ? 'default' : 'choice'}.png`)});

@@ -90,6 +90,97 @@ async function mobileGeometry(page) {
 }
 
 for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').split(',')) {
+  for (const fixed of [false, true]) test(`${engine}: desktop EPUB double ${fixed ? 'fixed' : 'text'}`, {timeout: 90_000}, async () => {
+    const profile = await mkdtemp(path.join(output, `${engine}-double-`));
+    const context = await playwright[engine].launchPersistentContext(profile, {headless: true,
+      ...(engine === 'chromium' && process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}),
+      viewport: {width: 1600, height: 800}, locale: 'zh-CN', reducedMotion: 'reduce'});
+    const page = await context.newPage(), errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    const loaded = async () => {
+      await page.locator('.nc-epub-viewport[aria-busy="false"]').waitFor();
+      await page.waitForFunction(() => !!document.querySelector('output[aria-label="保存位置"]')?.textContent);
+    };
+    const choice = async (name, value) => {
+      await showTools(page); await page.getByRole('button', {name: '阅读设置', exact: true}).click();
+      await page.getByRole('group', {name, exact: true}).getByRole('button', {name: value, exact: true}).click();
+      await loaded();
+      await page.getByRole('button', {name: '关闭面板', exact: true}).click();
+    };
+    const turn = async name => {
+      await showTools(page); const before = await location(page);
+      await page.getByRole('button', {name, exact: true}).click();
+      await page.waitForFunction(cfi => JSON.parse(document.querySelector('output[aria-label="保存位置"]').textContent).cfi !== cfi, before.cfi);
+    };
+    const pictures = () => page.locator('.nc-epub-viewport').evaluate(element => [...element.querySelectorAll('iframe')].flatMap(frame => {
+      const box = frame.getBoundingClientRect();
+      return [...frame.contentDocument.querySelectorAll('img')].map(image => {
+        const rect = image.getBoundingClientRect();
+        return {alt: image.alt, left: box.left+rect.left, right: box.left+rect.right, width: rect.width, src: image.src};
+      });
+    }).sort((a,b)=>a.left-b.left));
+    try {
+      await page.goto(origin + '/tests/epub-reader-fixture.html' + (fixed ? '?fixed' : ''));
+      await page.addStyleTag({content: '.nc-app > details {display:none!important}'});
+      await loaded();
+      await choice('阅读布局', '双页');
+      assert.equal(await page.locator('.nc-epub-stage').getAttribute('data-epub-layout'), 'double');
+      if (fixed) {
+        await turn('下一页');
+        const before = await pictures();
+        assert.deepEqual(before.map(p=>p.alt), ['Page 2','Page 3']);
+        assert(Math.abs(before[1].left-before[0].right) < 1, 'zero gap joins the fixed pages');
+        for (const value of [50, 100]) {
+          await showTools(page); await page.getByRole('button', {name:'阅读设置',exact:true}).click();
+          await page.getByRole('slider', {name:'双页间距',exact:true}).fill(String(value));
+          await page.getByRole('button', {name:'关闭面板',exact:true}).click();
+          const after = await pictures();
+          assert.deepEqual(after.map(p=>p.src), before.map(p=>p.src), 'gap changes reuse the existing frames and images');
+          assert.deepEqual(after.map(p=>p.width), before.map(p=>p.width));
+          assert(Math.abs(after[0].left-before[0].left*(1-value/100)) < 1);
+          assert(Math.abs(1600-after[1].right-(1600-before[1].right)*(1-value/100)) < 1);
+        }
+        await turn('下一页'); assert.deepEqual((await pictures()).map(p=>p.alt), ['Page 4','Page 5']);
+        await turn('上一页'); assert.deepEqual((await pictures()).map(p=>p.alt), ['Page 2','Page 3']);
+      } else {
+        const columns = () => page.locator('.nc-epub-viewport iframe').first().evaluate(frame => {
+          const css = frame.contentWindow.getComputedStyle(frame.contentDocument.body);
+          return {width: parseFloat(css.columnWidth), gap: parseFloat(css.columnGap)};
+        });
+        const first = await columns(); assert(first.width > 0 && first.width*2+first.gap <= 1600);
+        const before = await location(page); await turn('下一页'); await turn('上一页');
+        assert.equal((await location(page)).cfi, before.cfi);
+        await page.setViewportSize({width:780,height:800});
+        await page.waitForFunction(() => {
+          const frame=document.querySelector('.nc-epub-viewport iframe');
+          return frame && parseFloat(frame.contentWindow.getComputedStyle(frame.contentDocument.body).columnWidth) < 390;
+        });
+        await page.setViewportSize({width:1600,height:800});
+      }
+      await choice('阅读方向', '从右向左');
+      if (fixed) {
+        const rtl = await pictures();
+        assert.deepEqual(rtl.map(p=>p.alt), ['Page 3','Page 2']);
+        assert(Math.abs(rtl[0].left) < 1 && Math.abs(rtl[1].right-1600) < 1);
+      }
+      await page.screenshot({path: path.join(output, `${engine}-double-${fixed?'fixed':'text'}.png`)});
+      await showTools(page);
+      await page.getByRole('button', {name:'关闭阅读器',exact:true}).click();
+      const saved = await location(page);
+      await page.getByRole('button', {name:'重开阅读器',exact:true}).click(); await loaded();
+      assert.equal((await location(page)).href, saved.href);
+      assert.equal((await location(page)).cfi.split(':')[0], saved.cfi.split(':')[0]);
+      assert.equal(await page.locator('.nc-epub-stage').getAttribute('data-epub-layout'), 'double');
+      if (fixed) assert(Math.abs((await pictures())[0].left) < 1);
+      await choice('阅读布局', '单页'); await choice('阅读布局', '双页');
+      assert.equal((await location(page)).href, saved.href);
+      assert.deepEqual(errors, []);
+    } finally {await context.close(); await rm(profile, {recursive: true, force: true});}
+  });
+}
+
+for (const engine of (process.env.EPUB_ENGINES || 'chromium,firefox,webkit').split(',')) {
   for (const scenario of ['navigation-and-reopen', 'close-while-loading', 'single-image-failure', 'original-enhancement-failure', 'prefetched-enhancement-failure']) {
     test(`${engine}: mobile EPUB ${scenario}`, {timeout: 180_000}, async t => {
       // macOS WebKit's ephemeral data store rejects IndexedDB Blob writes.

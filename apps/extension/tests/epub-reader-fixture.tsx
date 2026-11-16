@@ -35,10 +35,11 @@ if (import.meta.hot) import.meta.hot.dispose(unregister);
 if (import.meta.hot) import.meta.hot.dispose(unregisterLocal);
 const failFirst = new URLSearchParams(location.search).has('failure');
 const localSample = new URLSearchParams(location.search).get('local');
-const marker = 'epub-reader-artwork-fixture' + (localSample ? ':local:' + localSample : failFirst ? '-failure' : '');
+const fixedSample = new URLSearchParams(location.search).has('fixed');
+const marker = 'epub-reader-artwork-fixture' + (localSample ? ':local:' + localSample : fixedSample ? ':fixed' : failFirst ? '-failure' : '');
 let entryId = (await catalog.get('metadata', marker))?.entryId as string | undefined;
-if (!entryId && localSample) {
-  const response = await fetch('/local.epub');
+if (!entryId && (localSample || fixedSample)) {
+  const response = await fetch(fixedSample ? '/fixed.epub' : '/local.epub');
   if (!response.ok) throw Error('Set NC_EPUB_SAMPLE to an explicitly selected local EPUB.');
   entryId = (await importLocalFile(new File([await response.blob()], 'sample.epub'))).id;
   await catalog.put('metadata', {id: marker, entryId});

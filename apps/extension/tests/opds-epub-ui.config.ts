@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from 'vite';
 import base from '../vite.config';
-import { epubRangeFixture } from './fixtures/opds-epub-server';
+import { epubRangeFixture, fixedEpubFixture } from './fixtures/opds-epub-server';
 import {createReadStream} from 'node:fs';
 import {stat} from 'node:fs/promises';
 
@@ -11,12 +11,15 @@ export default mergeConfig(base, defineConfig({
     name: 'epub-range-fixture',
     async configureServer(server) {
       const fixture = await epubRangeFixture();
+      const fixed = await fixedEpubFixture();
       // Explicit local-only sample, never copied into the repository or sent to a channel.
       const sample = process.env.NC_EPUB_SAMPLE;
       const sampleSize = sample ? (await stat(sample)).size : 0;
       server.middlewares.use((req, res, next) => {
         const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-        if (path === '/local.epub' && sample) {
+        if (path === '/fixed.epub') {
+          res.writeHead(200, {'Content-Type': 'application/epub+zip', 'Content-Length': fixed.length, 'Cache-Control': 'no-store'}).end(fixed);
+        } else if (path === '/local.epub' && sample) {
           res.writeHead(200, {'Content-Type': 'application/epub+zip', 'Content-Length': sampleSize, 'Cache-Control': 'no-store'});
           createReadStream(sample).pipe(res);
         } else if (/^\/(opds|metrics|[\w-]+\.epub|progress\/[\w-]+)$/.test(path)) fixture.handle(req, res);

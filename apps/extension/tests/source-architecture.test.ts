@@ -93,6 +93,7 @@ describe('source composition and identity', () => {
       expect(typeof session.discoverPages).toBe('function');
       expect(typeof session.inlineTargets).toBe('function');
       expect(!!session.discoverCatalog||!!sourceNetworks[definition.id]?.catalog).toBe(definition.capabilities.catalog);
+      expect(!!session.openFile).toBe(!!definition.capabilities.file);
       session.dispose();
     }
   });

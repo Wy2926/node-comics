@@ -14,4 +14,6 @@
 
 浏览器脚本使用 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright，`TEST_CHROMIUM` 或 `CHROMIUM_PATH` 指定浏览器。MV3 测试先构建插件，网页夹具先启动对应 Vite 配置。
 
+插件 `tests/epub-reader-fixture.html?fixed` 提供五页固定版式样本；`tests/epub-reader.browser.mjs` 的 `desktop EPUB double` 验证双栏、固定双页、0／50／100 中缝、RTL 与重开恢复。`tests/reader-pagination.browser.mjs` 验证图片中缝、尺寸和 URL 稳定、窄屏与保存恢复；均使用本地合成样本。
+
 `verify_overlay_tiles.mjs` 需要 `COMICS_COMPUTE_ROOT` 和安装了 NumPy、Pillow 的 `PYTHON`，用于真实节点编码联调。其他服务端工具在 `node-comics-backend/scripts/`。

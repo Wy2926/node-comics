@@ -101,7 +101,7 @@ describe('EPUB comic-specific reading options', () => {
     storage.set(props.viewKey, JSON.stringify({...savedBase, layout, direction: 'rtl'}));
     const tree = render(props);
     expect(flow(tree)).toBe(layout === 'continuous' ? 'scrolled-continuous' : 'paginated');
-    expect(choice(tree, '阅读布局').props.value).toBe(layout === 'double' ? 'single' : layout);
+    expect(choice(tree, '阅读布局').props.value).toBe(layout);
     expect(choice(tree, '阅读方向').props.value).toBe('rtl');
     flushEffects(); expect(saved(props)).toEqual({...savedBase, layout, direction: 'rtl'});
     expect(props.setSettings).not.toHaveBeenCalled();
@@ -109,8 +109,8 @@ describe('EPUB comic-specific reading options', () => {
 
   it('saves a layout button choice only for this comic and restores it on reopening', () => {
     const props = fixture(); const originalSettings = {...props.settings};
-    clickChoice(render(props), '阅读布局', '单页');
-    render(props); flushEffects(); expect(saved(props).layout).toBe('single');
+    clickChoice(render(props), '阅读布局', '双页');
+    render(props); flushEffects(); expect(saved(props).layout).toBe('double');
     expect(props.settings).toEqual(originalSettings); expect(props.setSettings).not.toHaveBeenCalled();
     hooks.states = []; expect(flow(render(props))).toBe('paginated');
     hooks.states = []; const other = fixture({}, 'book-two');
@@ -118,13 +118,15 @@ describe('EPUB comic-specific reading options', () => {
     expect(view()).not.toHaveProperty('layout');
   });
 
-  it('cycles EPUB shortcuts between single and continuous without changing global defaults or saved sizing', () => {
+  it('cycles all three EPUB layouts without changing global defaults or saved sizing', () => {
     const props = fixture({layout: 'double'});
     storage.set(props.viewKey, JSON.stringify({...savedBase, direction: 'rtl'}));
     render(props); hooks.handlers['reader.layout']();
     expect(view()).toEqual({...savedBase, direction: 'rtl', layout: 'continuous'});
     render(props); hooks.handlers['reader.layout']();
     expect(view()).toEqual({...savedBase, direction: 'rtl', layout: 'single'});
+    render(props); hooks.handlers['reader.layout']();
+    expect(view()).toEqual({...savedBase, direction: 'rtl', layout: 'double'});
     render(props); flushEffects(); expect(saved(props)).toEqual(view());
     expect(props.settings.layout).toBe('double'); expect(props.setSettings).not.toHaveBeenCalled();
   });

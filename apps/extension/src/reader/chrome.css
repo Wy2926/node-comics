@@ -11,6 +11,10 @@
 .nc-reader-sizing > .nc-reader-option:last-child { padding-top: 0; padding-bottom: 14px; }
 .nc-reader-scale { flex-wrap: wrap; }
 .nc-reader-scale > .nc-scale-control { margin-inline-start: auto; }
+.nc-reader-gap { --reader-range-size: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--settings-description-gap) var(--settings-field-gap); }
+.nc-reader-sizing > .nc-reader-gap:last-child { padding-block: var(--settings-row-padding); }
+.nc-reader-gap > output { color: var(--accent); font-variant-numeric: tabular-nums; }
+.nc-reader-gap > .nc-reader-progress-control { grid-column: 1 / -1; }
 .nc-app .nc-reader-choice-cards button { flex-direction: row; justify-content: flex-start; min-height: 44px; padding: 8px; text-align: start; }
 .nc-reader-choice-cards button > .nc-icon { flex: none; }
 .nc-reader-primary-actions { grid-template-columns: minmax(0, 1fr); }

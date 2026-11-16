@@ -25,6 +25,8 @@ export interface SourcePageSession {
   direction: 'ltr' | 'rtl';
   snapshot(): SourceSnapshot;
   discoverPages(): Promise<Discovery<SourceSnapshot>>;
+  /** A selected, complete local container; never a credential or remote download URL. */
+  openFile?(): Promise<{id: string; file: File}>;
   discoverCatalog?(): Discovery<SourceCatalogSnapshot>;
   describeWork?(): Discovery<SourceWorkReference>;
   inlineTargets(): PageImage[];

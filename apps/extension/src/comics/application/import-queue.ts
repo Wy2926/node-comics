@@ -2,7 +2,8 @@ import {msg} from '../../i18n/runtime';
 import {importLocalFile} from './import-service';
 
 export type ImportStatus='queued'|'importing'|'created'|'duplicate'|'failed'|'cancelled';
-export interface ImportItem {id:string;title:string;file:File;bytes:number;status:ImportStatus;entryId?:string;message:string;progress?:{done?:number;total?:number};}
+export type ImportFile=Pick<File,'name'|'size'|'stream'>;
+export interface ImportItem {id:string;title:string;file:ImportFile;bytes:number;status:ImportStatus;entryId?:string;message:string;progress?:{done?:number;total?:number};}
 export interface ImportSnapshot {items:ImportItem[];running:boolean;pauseRequested:boolean;phase:'idle'|'running'|'paused'|'done';}
 export const importSummary=(items:ImportItem[])=>msg('{0} 份已导入 · {1} 份需要处理',{'0':items.filter(i=>i.status==='created'||i.status==='duplicate').length,'1':items.filter(i=>i.status==='failed').length});
 /** Picking files is the only import decision. Each file owns an independent comic. */
@@ -15,7 +16,7 @@ export class LocalImportQueue {
  private patch(id:string,value:Partial<ImportItem>){this.update({items:this.state.items.map(i=>i.id===id?{...i,...value}:i)});}
  activate(){this.disposed=false;}
  dispose(){this.disposed=true;this.controller?.abort();this.stopRemaining();}
- async add(files:File[]):Promise<ImportItem[]>{
+ async add(files:ImportFile[]):Promise<ImportItem[]>{
   if(this.disposed||this.state.running||this.state.phase==='paused')return [];
   const items=files.map(file=>({id:crypto.randomUUID(),title:file.name,file,bytes:file.size,status:'queued' as const,message:msg('等待导入')}));
   this.update({items:[...this.state.items,...items]});await this.run();

@@ -413,6 +413,7 @@
   "连续": "Continuous",
   "单页": "Single page",
   "双页": "Two pages",
+  "双页间距": "Page gap",
   "阅读方向": "Reading direction",
   "从右向左": "Right to left",
   "从左向右": "Left to right",
@@ -675,7 +676,6 @@
   "来源详情页已变化。": "The source details page has changed.",
   "来源页面已变化，请重新发现。": "The source page has changed, please rediscover it.",
   "翻译当前页面": "Translate the current page",
-  "目录读取失败，请通过插件弹窗重试。": "Directory reading failed, please try again through the plug-in pop-up window.",
   "当前标签页不可用，请重新打开插件。": "The current tab is unavailable, please reopen the plug-in.",
   "请在普通网页中使用翻译。": "Please use translation in normal web pages.",
   "当前网页已变化，请重新打开插件后翻译。": "The current webpage has changed, please reopen the plug-in and translate it.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Adjust scope",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "No sites added. Add a site or open the extension on a webpage to enable it.",
   "选择目录": "Choose a directory",
-  "高级：正则匹配": "Advanced: regular expression"
+  "高级：正则匹配": "Advanced: regular expression",
+  "请返回来源书架重新打开漫画，再导入。": "Return to the source bookshelf and reopen the comic before importing.",
+  "请等待来源阅读器完成下载后重试。": "Wait for the source reader to finish downloading, then try again."
 }

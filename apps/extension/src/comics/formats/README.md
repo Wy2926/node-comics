@@ -5,6 +5,7 @@
 - 只依赖 `RandomAccessSource`，不访问云盘、书架或翻译任务。
 - 按页/章节读取，不预展开整书；图片页码与 EPUB CFI 分开保存。
 - EPUB 资源经本地归档桥与隔离器，不能直接联网；窗口淘汰时释放文档和 Blob URL。
+- EPUB 双页使用 EPUB.js 分页 manager；文字两栏重排，固定版式按声明的 viewport 等比缩放，支持中缝调节。
 - 格式限制见 [limits.ts](limits.ts)，读取协议见 [contracts.ts](contracts.ts)。
 
 插件目录验证：`npx vitest run src/comics/formats src/storage/containers src/comics/pages/service.test.ts tests/export.test.ts`。

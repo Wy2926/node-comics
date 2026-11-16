@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {pageSpreads, spreadAt, spreadFrames} from '../src/reader/pagination';
+import {pageSpreads, spreadAt, spreadFrames, spreadGap} from '../src/reader/pagination';
 
 const portrait = {width: 800, height: 1200};
 const landscape = {width: 1600, height: 1000};
@@ -49,6 +49,15 @@ describe('manga page spreads', () => {
 });
 
 describe('whole-spread frames', () => {
+  it('distributes only spare width, preserving image sizes and centering standalone pages', () => {
+    const frames = spreadFrames([portrait, portrait], {width: 1600, height: 900});
+    expect(frames.map(frame => frame.width)).toEqual([600, 600]);
+    expect([0, 50, 100].map(value => spreadGap(frames, 1600, value))).toEqual([0, 200, 400]);
+    expect(spreadGap(frames, 1000, 100)).toBe(0);
+    expect(spreadGap(frames.slice(0, 1), 1600, 100)).toBe(0);
+    expect(spreadGap([], 1600, 100)).toBe(0);
+  });
+
   it('has no frames for an empty chapter', () => {
     expect(spreadFrames([], {width: 1200, height: 800})).toEqual([]);
   });

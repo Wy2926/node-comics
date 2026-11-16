@@ -14,7 +14,7 @@ function encode(bytes: Uint8Array) {
     parts.push(String.fromCharCode(...bytes.subarray(at, at + 16384)));
   return btoa(parts.join(''));
 }
-function decode(value: unknown, length: number) {
+export function decodeBlobChunk(value: unknown, length: number) {
   if (typeof value !== 'string' || value.length > chunkCharacters || value.length !== 4 * Math.ceil(length / 3)) throw failure();
   const binary = atob(value);
   if (binary.length !== length) throw failure();
@@ -58,7 +58,7 @@ export function receiveImage(port: chrome.runtime.Port, request: unknown, signal
         } else {
           if (value?.type !== 'chunk' || value.offset !== offset) throw failure();
           const length = Math.min(IMAGE_CHUNK_BYTES, size - offset);
-          parts.push(new Blob([decode(value.data, length)])); offset += length;
+          parts.push(new Blob([decodeBlobChunk(value.data, length)])); offset += length;
           if (offset === size) { finish(); return; }
         }
         arm(chunkTimeout); port.postMessage({type: 'pull', offset});

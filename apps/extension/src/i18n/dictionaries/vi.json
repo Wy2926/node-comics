@@ -413,6 +413,7 @@
   "连续": "Liên tục",
   "单页": "Một trang",
   "双页": "Hai trang",
+  "双页间距": "Khoảng cách giữa hai trang",
   "阅读方向": "Hướng đọc",
   "从右向左": "Phải sang trái",
   "从左向右": "Từ trái sang phải",
@@ -675,7 +676,6 @@
   "来源详情页已变化。": "Trang chi tiết nguồn đã thay đổi.",
   "来源页面已变化，请重新发现。": "Trang nguồn đã thay đổi, vui lòng tìm lại.",
   "翻译当前页面": "Dịch trang hiện tại",
-  "目录读取失败，请通过插件弹窗重试。": "Đọc thư mục không thành công, vui lòng thử lại thông qua cửa sổ bật lên của plug-in.",
   "当前标签页不可用，请重新打开插件。": "Tab hiện tại không khả dụng, vui lòng mở lại plug-in.",
   "请在普通网页中使用翻译。": "Vui lòng sử dụng bản dịch trong các trang web thông thường.",
   "当前网页已变化，请重新打开插件后翻译。": "Trang web hiện tại đã thay đổi, vui lòng mở lại plug-in và dịch nó.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Điều chỉnh phạm vi",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "Chưa có trang web. Hãy thêm hoặc mở tiện ích trên trang để bật.",
   "选择目录": "Chọn thư mục",
-  "高级：正则匹配": "Nâng cao: biểu thức chính quy"
+  "高级：正则匹配": "Nâng cao: biểu thức chính quy",
+  "请返回来源书架重新打开漫画，再导入。": "Quay lại thư viện nguồn và mở lại truyện trước khi nhập.",
+  "请等待来源阅读器完成下载后重试。": "Chờ trình đọc nguồn tải xong rồi thử lại."
 }

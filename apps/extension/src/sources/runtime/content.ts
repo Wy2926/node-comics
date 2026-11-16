@@ -5,6 +5,7 @@ import { sourceFor, validateSourceCatalog } from '../index';
 import { PageImageRegistry, sourceDocument } from '../page';
 import { sourceFailure } from './diagnostics';
 import { mountSourceImportButton } from './import-button';
+import {SOURCE_FILE_PORT, serveSourceFile, sourceFileInfo} from './file';
 export function installSourceContent() {
   const state = globalThis as typeof globalThis & { __nodeComics?: boolean };
   if (state.__nodeComics) return;
@@ -25,6 +26,11 @@ export function installSourceContent() {
     }
     return page;
   };
+  chrome.runtime.onConnect.addListener(port => {
+    if (port.name !== SOURCE_FILE_PORT) return;
+    if (port.sender?.id !== chrome.runtime.id || !port.sender.url?.startsWith(chrome.runtime.getURL(''))) {port.disconnect(); return;}
+    serveSourceFile(port, current);
+  });
   lifecycle.subscribe({
     invalidated() {
       pageImages.clear();
@@ -47,10 +53,14 @@ export function installSourceContent() {
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
-    if (!['NC_NAVIGATION', 'NC_CATALOG_SNAPSHOT', 'NC_PAGE_IMAGE', 'NC_DISCOVER', 'NC_DESCRIBE_WORK'].includes(message?.type))
+    if (!['NC_NAVIGATION', 'NC_CATALOG_SNAPSHOT', 'NC_PAGE_IMAGE', 'NC_DISCOVER', 'NC_DESCRIBE_WORK', 'NC_FILE_INFO'].includes(message?.type))
       return;
     const page = current(),
       { navigationId, session, controller } = page;
+    if (message.type === 'NC_FILE_INFO') {
+      void sourceFileInfo(page).then(value => {if (current() !== page) throw Error('SOURCE_SESSION_EXPIRED'); respond(value);}).catch(error => respond(sourceFailure(error)));
+      return true;
+    }
     if (message?.type === 'NC_NAVIGATION') {
       respond({ navigationId, url: location.href });
       return;

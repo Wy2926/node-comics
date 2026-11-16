@@ -3,6 +3,7 @@ import {renderedImages} from '../../shared/dom-images';
 import {observeImages} from '../../shared/observe';
 import {imageSession} from '../../shared/session';
 import {origin} from './definition';
+import {selectedFile} from './file';
 
 const readers = [
   {id: 'iframe_page', path: '/wpage.htm', selector: '#div_onepic img#img_full, #div_twopic img#img_left, #div_twopic img#img_right'},
@@ -16,6 +17,7 @@ function readerUrl(value: string, reader: Reader) {
 
 export const createPage: CreateSourcePage = context => {
   const lifetime = new AbortController(), signal = AbortSignal.any([context.signal, lifetime.signal]);
+  const file = selectedFile({...context, signal});
   const cleanups = new Set<() => void>();
   function frameDocument(frame: HTMLIFrameElement, reader: Reader) {
     try {
@@ -64,8 +66,10 @@ export const createPage: CreateSourcePage = context => {
     }),
   });
   return {...session,
+    openFile: file.openFile,
     async discoverPages() {session.snapshot(); return {status: 'unsupported', code: 'SOURCE_PAGE_UNSUPPORTED'};},
     observe(changed) {
+      file.observe();
       const observed = new Map<Document, () => void>();
       const sync = () => {
         const present = new Set(frames().map(({doc}) => doc));
@@ -88,6 +92,6 @@ export const createPage: CreateSourcePage = context => {
       cleanups.add(stop);
       return stop;
     },
-    dispose() {lifetime.abort(); for (const stop of [...cleanups]) stop(); session.dispose();},
+    dispose() {lifetime.abort(); file.dispose(); for (const stop of [...cleanups]) stop(); session.dispose();},
   };
 };

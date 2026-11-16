@@ -413,6 +413,7 @@
   "连续": "Continu",
   "单页": "Une page",
   "双页": "Deux pages",
+  "双页间距": "Espacement des pages",
   "阅读方向": "Sens de lecture",
   "从右向左": "De droite à gauche",
   "从左向右": "De gauche à droite",
@@ -684,7 +685,6 @@
   "来源详情页已变化。": "La page de détails de la source a changé.",
   "来源页面已变化，请重新发现。": "La page source a changé, merci de la redécouvrir.",
   "翻译当前页面": "Traduire la page actuelle",
-  "目录读取失败，请通过插件弹窗重试。": "Échec de la lecture du répertoire. Veuillez réessayer via la fenêtre contextuelle du plug-in.",
   "当前标签页不可用，请重新打开插件。": "L'onglet actuel n'est pas disponible, veuillez rouvrir le plug-in.",
   "请在普通网页中使用翻译。": "Veuillez utiliser la traduction dans les pages Web normales.",
   "当前网页已变化，请重新打开插件后翻译。": "La page Web actuelle a changé, veuillez rouvrir le plug-in et le traduire.",
@@ -1346,5 +1346,7 @@
   "调整范围": "Modifier le périmètre",
   "还没有自动翻译的网站，请添加网站或在网页打开插件开启。": "Aucun site ajouté. Ajoutez-en un ou ouvrez l’extension sur une page pour l’activer.",
   "选择目录": "Choisir un répertoire",
-  "高级：正则匹配": "Avancé : expression régulière"
+  "高级：正则匹配": "Avancé : expression régulière",
+  "请返回来源书架重新打开漫画，再导入。": "Retournez à la bibliothèque source et rouvrez la BD avant de l’importer.",
+  "请等待来源阅读器完成下载后重试。": "Attendez la fin du téléchargement dans le lecteur source, puis réessayez."
 }
