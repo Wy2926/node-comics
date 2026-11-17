@@ -51,5 +51,7 @@ export interface SourceDefinition {
     autoContentMatches: readonly string[];
     /** Register embedded entries only after the matching host permission is granted. */
     optionalContentMatches?: readonly string[];
+    /** Rotating hosts cannot use browser match patterns; inject identified tabs after checking host access. */
+    optionalContentByIdentity?: boolean;
   };
 }

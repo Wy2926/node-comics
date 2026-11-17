@@ -3,7 +3,8 @@ import installation from './installation.json';
 import icon from './icon.svg?inline';
 
 export const origin = 'https://www.goodtoon008.com';
-const isOrigin = (url: URL) => url.origin === origin && !url.username && !url.password;
+// shortcut: numbered .com migrations only; extend after verifying any new naming scheme.
+export const isOrigin = (url: URL) => /^https:\/\/www\.goodtoon\d{3,6}\.com$/.test(url.origin) && !url.username && !url.password;
 export interface MangaLocation {slug: string; chapter?: string}
 export function mangaLocation(url: URL): MangaLocation | null {
   if (!isOrigin(url) || url.hash || /%2f|%5c/i.test(url.pathname)) return null;
@@ -16,9 +17,9 @@ export function mangaLocation(url: URL): MangaLocation | null {
   return {slug: match[1], ...(match[2] ? {chapter: match[2]} : {})};
 }
 export const catalogKey = (slug: string) => `goodtoon:manga:${slug}`;
-export const catalogUrl = (slug: string) => `${origin}/manga/${slug}/`;
+export const catalogUrl = (slug: string, base = origin) => `${base}/manga/${slug}/`;
 export const chapterKey = (loc: MangaLocation) => `${catalogKey(loc.slug)}:${loc.chapter}`;
-export const chapterUrl = (loc: MangaLocation) => `${catalogUrl(loc.slug)}${loc.chapter}/`;
+export const chapterUrl = (loc: MangaLocation, base = origin) => `${catalogUrl(loc.slug, base)}${loc.chapter}/`;
 export const definition: SourceDefinition = {
   id: 'goodtoon', name: 'GoodToon', installation,
   sites: [{id: 'goodtoon', name: 'GoodToon', url: origin + '/', icon, adaptedOn: '2026-10-23',
@@ -30,6 +31,6 @@ export const definition: SourceDefinition = {
     const loc = mangaLocation(url);
     if (!loc) return {sourceId: this.id, pageKey: this.id + ':' + url.href, kind: 'other', url: url.href};
     return {sourceId: this.id, pageKey: loc.chapter ? chapterKey(loc) : catalogKey(loc.slug),
-      kind: loc.chapter ? 'reader' : 'catalog', url: url.href, catalog: {key: catalogKey(loc.slug), url: catalogUrl(loc.slug)}};
+      kind: loc.chapter ? 'reader' : 'catalog', url: url.href, catalog: {key: catalogKey(loc.slug), url: catalogUrl(loc.slug, url.origin)}};
   },
 };

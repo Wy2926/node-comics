@@ -1,7 +1,9 @@
 import type {SourceSearchPage, SourceSearchRequest} from '../../contracts/search';
 import {hasClass, inertHtml, tags, textContent} from '../../shared/html';
-import {catalogKey, catalogUrl, origin} from './definition';
-import {artwork, byClass, location, one, regions, text} from './html';
+import {catalogKey, isOrigin, origin} from './definition';
+import {goodtoonHtml} from './html';
+
+const {byClass, one, regions, text} = goodtoonHtml();
 
 export function searchRequest(input: SourceSearchRequest) {
   const query = text(input.query), page = input.cursor === undefined ? 1 : Number(input.cursor);
@@ -19,12 +21,13 @@ export function parseSearch(html: string, input: SourceSearchRequest): SourceSea
     throw Error('GoodToon 搜索列表不完整或结构已变化。');
   const seen = new Set<string>();
   const items = cards.map(card => {
+    const {site, location, artwork} = goodtoonHtml(new URL(text(card.attrs.href), origin).origin);
     const owner = location(card.attrs.href);
     if (owner.chapter || seen.has(owner.slug)) throw Error('GoodToon 搜索作品重复或归属错误。');
     seen.add(owner.slug);
     const title = text(textContent(byClass(card.body, 'div', 'subject')));
     const cover = one(tags(byClass(card.body, 'div', 'thumb'), 'img').filter(a => !hasClass(a, 'platform-icon')), '搜索封面');
-    return {catalogId: catalogKey(owner.slug), catalogUrl: catalogUrl(owner.slug), title,
+    return {catalogId: catalogKey(owner.slug), catalogUrl: site.catalogUrl(owner.slug), title,
       cover: artwork(cover['data-src'] || cover.src, owner.slug)};
   });
   const pagers = regions(safe, 'div', a => !!hasClass(a, 'pagination'));
@@ -38,7 +41,7 @@ export function parseSearch(html: string, input: SourceSearchRequest): SourceSea
   let current = 0, next = 0;
   for (const link of links) {
     const target = new URL(text(link.attrs.href), origin), n = Number(target.searchParams.get('pg')), label = textContent(link.body);
-    if (target.origin !== origin || target.username || target.password || target.pathname !== '/' || target.hash ||
+    if (!isOrigin(target) || target.pathname !== '/' || target.hash ||
         [...target.searchParams].length !== 2 || target.searchParams.get('q') !== query ||
         !Number.isSafeInteger(n) || n < 1 || n > 1000 || String(n) !== target.searchParams.get('pg') || !hasClass(link.attrs, 'page-numbers'))
       throw Error('GoodToon 搜索分页归属错误。');

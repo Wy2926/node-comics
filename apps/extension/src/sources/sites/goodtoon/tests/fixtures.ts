@@ -8,11 +8,16 @@ export const detail = `<body class="single postid-42"><link rel="canonical" href
 export const chapters = `<a href="#" class="btn-reverse-order">순서 변경</a><div class="listing-chapters_wrap"><ul class="main version-chap no-volumn">
   <li class="wp-manga-chapter"><a href="${workUrl}2/"><span class="up-badge-inline">UP</span>2화</a></li>
   <li class="wp-manga-chapter"><a href="${readerUrl}">1화</a></li></ul></div>`;
-export const pages = `<body class="postid-42"><link rel="canonical" href="${readerUrl}"><h1 id="chapter-heading">1화</h1>
-  <select class="chapter-select-nav"><option value="${workUrl}2/">2화</option><option value="${readerUrl}" selected>1화</option></select>
-  <div class="reading-content"><input id="wp-manga-current-chap" data-id="123" value="chapter-1">
+export const pages = `<div class="reading-content"><input id="wp-manga-current-chap" data-id="123" value="chapter-1">
   <img id="image-0" class="wp-manga-chapter-img" data-src="https://images.test/gt-42/1/01.jpg">
-  <img id="image-1" class="wp-manga-chapter-img" src="https://images.test/gt-42/1/01.jpg"></div></body>`;
+  <img id="image-1" class="wp-manga-chapter-img" src="https://images.test/gt-42/1/01.jpg"></div>`;
+export const nav = `<div class="chapters_selectbox_holder" data-manga="42" data-chapter="chapter-1" data-type="manga" data-style="list"></div>
+  <select class="reading-style-select"><option data-redirect="${readerUrl}?style=list" selected="selected">List</option>
+  <option data-redirect="${readerUrl}">Paged</option></select>`;
+export const navigation = `<select class="single-chapter-select">
+  <option value="2" data-redirect="${workUrl}2/">2화</option>
+  <option value="chapter-1" data-redirect="${readerUrl}" selected="selected">1화</option></select>`;
+export const apiPages = (content = pages, menu = nav) => JSON.stringify({success: true, data: {data: {content, nav: menu}}});
 export const card = (id: number) => `<a class="card" href="${catalogUrl('gt-' + id)}"><div class="thumb">
   <img class="platform-icon" src="/icon.png"><img src="https://images.test/gt-${id}/cover_123.jpg"></div>
   <div class="info"><div class="subject">테스트 ${id}</div></div></a>`;

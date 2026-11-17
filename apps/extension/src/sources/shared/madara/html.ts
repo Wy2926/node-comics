@@ -40,6 +40,7 @@ export function madaraHtml(site: MadaraSite) {
     const link = one(tags(html, 'link').filter(a => a.rel === 'canonical'), '规范地址');
     const actual = location(link.href);
     if (actual.slug !== expected.slug || actual.chapter !== expected.chapter) throw Error(`${site.name} 页面归属错误。`);
+    return link.href;
   }
   function cover(html: string, slug: string) {
     const link = one(regions(html, 'a', () => true), '封面作品');

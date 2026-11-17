@@ -113,7 +113,7 @@ describe('source composition and identity', () => {
   });
   it('keeps embedded script matches out of installation permissions', () => {
     for (const definition of definitions)
-      expect(Object.keys(definition.installation).every(key => ['autoContentMatches', 'optionalContentMatches'].includes(key))).toBe(true);
+      expect(Object.keys(definition.installation).every(key => ['autoContentMatches', 'optionalContentMatches', 'optionalContentByIdentity'].includes(key))).toBe(true);
     expect(sourceInstallation.autoContentMatches).toEqual([]);
     expect(sourceFor(sourceUrl).definition.installation.optionalContentMatches).toEqual([
       'https://*.mangacopy.com/comic/*',
