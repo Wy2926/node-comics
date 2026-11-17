@@ -126,6 +126,8 @@
   "暂无已购额度包": "Keine gekauften Seitenpakete",
   "付费权益": "Kostenpflichtiger Zugang",
   "翻译模型": "Übersetzungsmodell",
+  "额度消耗倍率：{rate}×": "Kontingentverbrauchsfaktor: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Der Kontingentverbrauch richtet sich nach dem Modellfaktor. Bei automatischer Auswahl gilt der Faktor des tatsächlich verwendeten Modells.",
   "自动选择（默认）": "Automatisch (Standard)",
   "可用": "Verfügbar",
   "不可用": "Nicht verfügbar",

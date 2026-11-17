@@ -126,6 +126,8 @@
   "暂无已购额度包": "Brak kupionych pakietów",
   "付费权益": "Płatny dostęp",
   "翻译模型": "Model tłumaczenia",
+  "额度消耗倍率：{rate}×": "Mnożnik zużycia limitu: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Zużycie limitu zależy od mnożnika modelu. Przy wyborze automatycznym obowiązuje mnożnik faktycznie użytego modelu.",
   "自动选择（默认）": "Automatycznie (domyślnie)",
   "可用": "Dostępny",
   "不可用": "Niedostępny",

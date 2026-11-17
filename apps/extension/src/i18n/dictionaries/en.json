@@ -126,6 +126,8 @@
   "暂无已购额度包": "No purchased page packs",
   "付费权益": "Paid access",
   "翻译模型": "Translation model",
+  "额度消耗倍率：{rate}×": "Quota usage multiplier: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Quota usage scales with the model multiplier. Automatic selection uses the rate of the model actually chosen.",
   "自动选择（默认）": "Automatic (default)",
   "可用": "Available",
   "不可用": "Unavailable",

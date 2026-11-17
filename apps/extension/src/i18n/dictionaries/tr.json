@@ -126,6 +126,8 @@
   "暂无已购额度包": "Satın alınmış paket yok",
   "付费权益": "Ücretli erişim",
   "翻译模型": "Çeviri modeli",
+  "额度消耗倍率：{rate}×": "Kota tüketim çarpanı: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Kota tüketimi model çarpanına göre hesaplanır. Otomatik seçimde kullanılan modelin çarpanı geçerlidir.",
   "自动选择（默认）": "Otomatik (varsayılan)",
   "可用": "Kullanılabilir",
   "不可用": "Kullanılamaz",

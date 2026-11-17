@@ -126,6 +126,8 @@
   "暂无已购额度包": "Nessun pacchetto acquistato",
   "付费权益": "Accesso a pagamento",
   "翻译模型": "Modello di traduzione",
+  "额度消耗倍率：{rate}×": "Moltiplicatore di consumo della quota: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Il consumo della quota dipende dal moltiplicatore del modello. La selezione automatica applica quello del modello effettivamente utilizzato.",
   "自动选择（默认）": "Automatico (predefinito)",
   "可用": "Disponibile",
   "不可用": "Non disponibile",

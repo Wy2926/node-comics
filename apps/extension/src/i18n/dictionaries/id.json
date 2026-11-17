@@ -126,6 +126,8 @@
   "暂无已购额度包": "Belum ada paket yang dibeli",
   "付费权益": "Akses berbayar",
   "翻译模型": "Model terjemahan",
+  "额度消耗倍率：{rate}×": "Pengali penggunaan kuota: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Penggunaan kuota mengikuti pengali model. Pemilihan otomatis memakai pengali model yang digunakan.",
   "自动选择（默认）": "Otomatis (default)",
   "可用": "Tersedia",
   "不可用": "Tidak tersedia",

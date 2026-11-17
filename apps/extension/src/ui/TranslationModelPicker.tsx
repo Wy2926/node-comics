@@ -13,6 +13,11 @@ export function TranslationModelPicker({selection}: {selection?: ModelSelection}
   return selection ? <ModelPicker selection={selection} /> : null;
 }
 
+function ModelRate({value}: {value?: number}) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  return <small className="nc-model-rate" title={msg('额度消耗倍率：{rate}×', {rate: value})}>{value}×</small>;
+}
+
 function ModelPicker({selection}: {selection: ModelSelection}) {
   const id = useId(),
     trigger = useRef<HTMLButtonElement>(null),
@@ -118,7 +123,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
         type="button"
         className="nc-select nc-model-trigger"
         aria-label={msg('翻译模型')}
-        aria-describedby={id+'-note'}
+        aria-describedby={id+'-selection '+id+'-note'}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
@@ -132,8 +137,13 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
           }
         }}
       >
-        <strong>{value ? (selected?.name ?? value) : msg('自动选择（默认）')}</strong>
-        <small data-available={available}>{available ? msg('可用') : msg('不可用')}</small>
+        <span className="nc-model-selection" id={id+'-selection'}>
+          <span className="nc-model-summary">
+            <strong>{value ? (selected?.name ?? value) : msg('自动选择（默认）')}</strong>
+            <small data-available={available}>{available ? msg('可用') : msg('不可用')}</small>
+          </span>
+          <ModelRate value={selected?.quota_multiplier} />
+        </span>
         <Icon name="chevron" size={16} className="nc-select-chevron" />
       </button>
       </SettingRow>
@@ -163,19 +173,22 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
           {choices.map((model) => {
             const content = (
               <>
-                <strong>
-                  {model.name}
+                <span className="nc-model-summary">
+                  <strong>{model.name}</strong>
+                  <span className="nc-model-badges">
+                    {model.id && (model.id !== value || selected) && (
+                      <small>{model.requires_paid ? msg('付费权益') : msg('免费')}</small>
+                    )}
+                    <small data-available={model.available}>{model.available ? msg('可用') : msg('不可用')}</small>
+                  </span>
+                </span>
+                <span className="nc-model-meta">
+                  <ModelRate value={model.quota_multiplier} />
                   {model.available ? (
                     (value ?? '') === model.id && <Icon name="check" size={16} />
                   ) : (
                     <small className="nc-model-upgrade">{msg('升级')} ↗</small>
                   )}
-                </strong>
-                <span className="nc-model-badges">
-                  {model.id && (model.id !== value || selected) && (
-                    <small>{model.requires_paid ? msg('付费权益') : msg('免费')}</small>
-                  )}
-                  <small data-available={model.available}>{model.available ? msg('可用') : msg('不可用')}</small>
                 </span>
               </>
             );
@@ -183,7 +196,6 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
               <div
                 className="nc-model-option"
                 key={model.id}
-                data-available={model.available}
                 data-paid={model.requires_paid}
               >
                 {model.available ? (
@@ -210,6 +222,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
             );
           })}
         </div>
+        <p className="nc-model-note">{msg('额度按模型倍率折算，自动选择以实际使用的模型为准。')}</p>
         {error && <p role="alert">{error}</p>}
       </div>
     </div>

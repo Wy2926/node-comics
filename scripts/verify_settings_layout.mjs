@@ -29,8 +29,8 @@ const mock = route => {
     limits: {max_bytes: 10000000, max_pixels: 100000000, max_dimension: 20000, max_translation_ids: 32},
     entitlements: null,
     translation_models: [
-      {id: 'fixture-model', name: modelName, available: true, requires_paid: false},
-      {id: 'locked-model', name: 'Locked fixture model', available: false, requires_paid: true, unavailable_reason: 'not_allowed'},
+      {id: 'fixture-model', name: modelName, available: true, requires_paid: false, quota_multiplier: 0.125},
+      {id: 'locked-model', name: 'Locked fixture model', available: false, requires_paid: true, quota_multiplier: 2.5, unavailable_reason: 'not_allowed'},
     ],
   }});
   return route.fulfill({status: 503, contentType: 'application/json', body: '{}'});
@@ -110,12 +110,15 @@ try {
   const box = await trigger.boundingBox(), menuBox = await menu.boundingBox();
   assert(Math.abs(box.width - menuBox.width) < 1, 'Model menu must match the trigger width');
   assert.equal(await menu.getByRole('link').count(), 1, 'Unavailable models remain upgrade links');
+  assert.deepEqual(await menu.locator('.nc-model-rate').allTextContents(), ['0.125×', '2.5×']);
+  assert.equal(await menu.getByRole('button').first().locator('.nc-model-rate').count(), 0, 'Automatic choice has no fixed rate');
   await shot('ja-model-menu');
   await menu.getByRole('button', {name: new RegExp(modelName)}).click();
   await page.waitForFunction(name => document.querySelector('.nc-model-trigger strong')?.textContent === name, modelName);
   await page.reload();
   await page.waitForFunction(name => document.querySelector('.nc-model-trigger strong')?.textContent === name, modelName);
-  check('long model choice saves across refresh; unavailable model remains a link');
+  assert.equal(await trigger.locator('.nc-model-rate').textContent(), '0.125×');
+  check('exact quota multipliers in choices and saved selection; unavailable model remains a link');
 
   await trigger.scrollIntoViewIfNeeded();
   await settle();
@@ -202,6 +205,7 @@ try {
     await phone.locator('.nc-model-trigger').tap();
     const phoneMenu = phone.locator('.nc-model-menu'), bounds = await phoneMenu.boundingBox();
     assert(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= height, 'Phone model menu outside viewport');
+    assert(await phoneMenu.evaluate(menu => menu.scrollWidth <= menu.clientWidth), 'Phone model menu content overflows');
     await phoneMenu.getByRole('button').first().tap();
     await phoneMenu.waitFor({state: 'hidden'});
   }

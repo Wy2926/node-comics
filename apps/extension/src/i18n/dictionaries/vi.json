@@ -126,6 +126,8 @@
   "暂无已购额度包": "Chưa mua gói trang nào",
   "付费权益": "Quyền truy cập trả phí",
   "翻译模型": "Mô hình dịch",
+  "额度消耗倍率：{rate}×": "Hệ số tiêu hao hạn mức: {rate}×",
+  "额度按模型倍率折算，自动选择以实际使用的模型为准。": "Mức tiêu hao hạn mức được tính theo hệ số của mô hình. Chế độ tự động áp dụng hệ số của mô hình thực tế được sử dụng.",
   "自动选择（默认）": "Tự động (mặc định)",
   "可用": "Khả dụng",
   "不可用": "Không khả dụng",

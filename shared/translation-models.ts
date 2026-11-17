@@ -4,6 +4,7 @@ export interface TranslationModel {
   name: string;
 }
 export interface TranslationModelChoice extends TranslationModel {
+  quota_multiplier?: number;
   requires_paid: boolean;
   available: boolean;
   unavailable_reason?: 'not_allowed' | 'quota_exhausted' | 'unavailable' | null;

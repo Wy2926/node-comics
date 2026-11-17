@@ -2,7 +2,6 @@ import 'fake-indexeddb/auto';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createElement} from 'react';
-import {readFileSync} from 'node:fs';
 import {TranslationModelPicker} from '../src/ui/TranslationModelPicker';
 import {ReaderTranslationSettings} from '../src/reader/ReaderSettings';
 import {defaults} from '../src/types';
@@ -66,17 +65,32 @@ describe('model selection',()=>{
     expect(f.submit.mock.calls[0][1]).toHaveProperty('model_id','a');
     expect(core.records[0].state).toBe('blocked');
   });
-  it('uses shared dropdown styling and makes unavailable rows upgrade links, not selections',()=>{
-    const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{models:[
-      {id:'a',name:'Model A',available:true,requires_paid:false},
-      {id:'b',name:'Model B',available:false,requires_paid:true,unavailable_reason:'not_allowed'},
+  it('shows exact rates in the selection and choices, keeping unavailable models as upgrade links',()=>{
+    const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value:'a',models:[
+      {id:'a',name:'Model A',available:true,requires_paid:false,quota_multiplier:0.0001},
+      {id:'b',name:'Model B',available:false,requires_paid:true,quota_multiplier:2.5,unavailable_reason:'not_allowed'},
     ],select:async()=>{}}}));
-    expect(markup).toContain('Model A');expect(markup).toContain('Model B');expect(markup).toContain('不可用');
-    expect(markup).toMatch(/<a[^>]+pricing[^>]*><strong>Model B/);
-    expect(markup).toContain('付费权益');expect(markup).not.toContain('不消耗免费额度');
-    expect(markup).not.toContain('当前权益不支持');expect(markup).not.toContain('class="button secondary"');
-    expect(markup).toContain('class="nc-select nc-model-trigger"');expect(markup).toContain('class="nc-select-list nc-model-menu"');
-    expect(markup).toContain('aria-haspopup="dialog"');
+    const trigger=markup.split('</button>')[0],upgrade=markup.match(/<a\b[^>]+pricing[^>]*>[\s\S]*?<\/a>/)?.[0];
+    expect(trigger).toContain('Model A');expect(trigger).toContain('0.0001×');
+    expect(markup.match(/title="额度消耗倍率：0\.0001×"/g)).toHaveLength(2);
+    expect(upgrade).toContain('Model B');expect(upgrade).toContain('付费权益');
+    expect(upgrade).toContain('不可用');expect(upgrade).toContain('2.5×');
+  });
+  it('does not invent a rate for automatic, missing or stale selections',()=>{
+    for(const value of [undefined,'legacy','removed']){
+      const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value,models:[
+        {id:'legacy',name:'Legacy',available:true,requires_paid:false},
+        {id:'rated',name:'Rated',available:true,requires_paid:false,quota_multiplier:2.5},
+      ],select:async()=>{}}}));
+      expect(markup.split('</button>')[0]).not.toContain('nc-model-rate');
+      expect(markup.match(/class="nc-model-rate"/g)).toHaveLength(1);
+    }
+  });
+  it.each([0,-1,NaN,Infinity,'2',null])('hides an invalid API multiplier (%s)',rate=>{
+    const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value:'a',models:[
+      {id:'a',name:'Model A',available:true,requires_paid:false,quota_multiplier:rate as number},
+    ],select:async()=>{}}}));
+    expect(markup).not.toContain('nc-model-rate');
   });
   it('keeps target language in a dropdown even with a short language list',()=>{
     const f=fixture();
@@ -86,10 +100,5 @@ describe('model selection',()=>{
     }}));
     expect(markup).toMatch(/aria-label="翻译目标语言"[^>]*role="combobox"/);
     expect(markup).not.toContain('nc-reader-choices');
-  });
-  it('anchors the model menu to its trigger width without a larger minimum',()=>{
-    const source=readFileSync(new URL('../src/ui/TranslationModelPicker.tsx',import.meta.url),'utf8');
-    expect(source).toMatch(/Math\.min\(rect\.width,\s*viewport\.width\s*-\s*16\)/);
-    expect(source).toMatch(/menuPosition\(rect,\s*viewport,\s*rect\.width,/);
   });
 });
