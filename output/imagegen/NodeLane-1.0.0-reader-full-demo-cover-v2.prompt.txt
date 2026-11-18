@@ -1,0 +1,24 @@
+Mode: built-in image_gen
+
+Use case: compositing
+Asset type: B站及其他横版视频平台的 16:9 中文封面，目标 2048×1152，一张完整成品。
+Input images:
+Image 1 is the edit target: the earlier NodeLane 1.0.0 release cover. Its hierarchy is WRONG for this revision; redesign it substantially while retaining brand color direction.
+Image 2 is supporting product content: a real NodeLane reader screenshot with chapter directory and two side toolbars. This is the main visual; preserve its real UI layout and screenshot content faithfully.
+Image 3 is supporting product content: the real reader's original/translated side-by-side comparison. Use a smaller inset that is clearly about 原译对照, not an example of two consecutive-page spread reading.
+Image 4 is the official brand icon. Preserve its exact blue speech-bubble silhouette, white N, dark outline and pink fold; no redesign.
+Primary request: 重新设计一张“漫画阅读器全功能演示”的视频封面。读者第一眼应看到这是漫画阅读器的完整演示，而不是版本号发布海报或单一翻译工具广告。主标题突出“漫画阅读器”“全功能演示”，1.0.0 正式版降为小标签。
+Composition/framing: 横版。左侧约 35% 为大字标题区，右侧约 65% 为阅读器的产品视觉。Image 2 在右侧占据最大完整面板，用近乎正面的轻微层次摆放，保持目录抽屉、漫画页面和左右工具栏可辨认，不把真实界面做成虚构浏览器。Image 3 作为较小的第二面板放在阅读器面板前下方，明确标记“原译对照”，不遮挡主面板目录与主要漫画画面。阅读器面板要大、干净、真实，不能退化成一张孤立漫画插画。只使用这两个产品画面，不添加其他截图、设备外壳或场景。阅读器本身就是主体。
+Scene/backdrop: 深海军蓝、黑、明亮品牌蓝和白色，少量漫画网点，平整、简洁、专业。去掉 Image 1 的城堡、夜景、海面、罗盘和巨大数字。背景安静，留出充分呼吸空间。
+Typography and visual hierarchy: 上方品牌“NodeLane 漫译”带 Image 4 官方小图标。主标题大字两行：“漫画阅读器”“全功能演示”。第二行用白字实心品牌蓝色条，视觉层级不低于第一行。小号发布标签“1.0.0 正式版”放品牌旁或标题下。标题区另外有两行较小卖点：“连续 · 单页 · 双页”“进度续读 · 边看边译”。主标题在手机缩略图上也必须能看清。图片截图内部原有文字保持来源，不要求另加密集小字。
+Text added by the cover (verbatim):
+“NodeLane 漫译”
+“漫画阅读器”
+“全功能演示”
+“1.0.0 正式版”
+“连续 · 单页 · 双页”
+“进度续读 · 边看边译”
+“原译对照”
+小字：“界面示意”
+Invariants: 官方图标不得变形；截图里的真实 UI 层次、侧边栏和漫画内容忠实保留，不把原译对照误标为双页阅读。不要发明新的产品功能控件或菜单文字。所有大标题字形准确，NodeLane 大小写准确。四周留 5% 安全边距，右下不放主要文字。
+Avoid: 无新漫画人物、无额外冒险场景、无巨大版本号、无满屏信息卡、无光污染、无水印、无播放按钮、无 B站或浏览器品牌图标。不要价格、免费、全网、无限、完美翻译等未经证实承诺。非透明背景。

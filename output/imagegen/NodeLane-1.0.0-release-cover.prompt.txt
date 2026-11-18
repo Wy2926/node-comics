@@ -1,0 +1,29 @@
+Mode: built-in image_gen
+
+Use case: ads-marketing
+Asset type: 一张完成的中文视频封面，横版 16:9，目标 2048×1152，供 B站及其他横版视频平台上传。不是多个方案拼图。
+Primary request: 为浏览器漫画阅读与 AI 翻译插件“NodeLane 漫译”的 1.0.0 正式版发布暨全功能演示制作封面。核心是一眼看清正式发布，同时一眼理解这是漫画翻译与阅读工具。
+Scene/backdrop: 深海军蓝与近黑色背景，品牌蓝色重点，极少量漫画网点肌理；底部微弱蓝光形成层次。干净、成熟、有发布感，不使用科技电路、光污染或大量散乱装饰。
+Subject: 一个简洁、可信的横向浏览器阅读窗口，占画面约右半边。窗口里是原创黑白漫画的并排双页，有清晰页面分界和精致网点、粗细有致的墨线；画面为原创漫画探险者与远景建筑，不使用任何现成漫画角色。页面中的一个白色对白气泡清楚显示“出发吧！”，旁边小型原文浮签显示“Let's go!”并用简洁箭头关联，作为翻译功能的概念示意。保持漫画主体有视觉张力，但让大标题占优先级。浏览器外框只做简洁三点与工具栏线条，不画复杂虚构菜单。不是产品真实截图，不伪造翻译质量对比。
+Style/medium: 精致漫画杂志编辑设计与现代软件发布海报结合。构图利落，具备专业视频缩略图的强层级和对比。避免廉价科技模板、堆满卡片、夸张爆炸字和炫目霓虹。
+Composition/framing: 文字和漫画窗口形成清晰的两大区域；画面上方放品牌。最大视觉元素为超大版本号“1.0.0”，其下大字“正式版发布”，再下方一个清晰但次一级的实心蓝色标牌“全功能演示”。功能概括“AI 漫画翻译 · 双页阅读 · 整本导出”以一行或两个短行放在标题区底部，可读但不与主标题抢重。所有文字平直，无透视扭曲。四周至少 6% 安全边距，右下角留给视频时长叠层，不放必要信息。
+Color palette: Navy #081423, near-black #080D14, brand blue #1769B3, brighter blue #83C1FF, white #F6FAFF. 微量粉色只能用于小装饰；总体保持蓝黑白。
+Text (verbatim):
+品牌：“NodeLane 漫译”
+最大字：“1.0.0”
+大标题：“正式版发布”
+次级标牌：“全功能演示”
+功能行：“AI 漫画翻译 · 双页阅读 · 整本导出”
+漫画对白：“出发吧！”
+原文浮签：“Let's go!”
+右侧示意画面旁小字：“功能示意”
+Typography: 特大号现代粗体中文无衬线，端正、紧凑、清晰。版本号用明亮蓝色，发布标题用白色。严格准确渲染以上文字，不添加任何别的文字。品牌大小写必须是 NodeLane，中文必须是“漫译”。
+Constraints: 只生成一张横版完整封面，不画手机、电脑整机或真人。无 B站官方标志、浏览器商标、价格、网址、水印、播放按钮。不得出现“免费”“全网”“无限”“秒翻”“完美翻译”等未经证实承诺。禁止乱码、英文伪界面和微小密集文字。非透明背景。
+
+Final targeted edit, built-in image_gen:
+Use case: compositing
+Asset type: final Chinese video release thumbnail, keep exactly the existing wide canvas dimensions and composition.
+Input images: Image 1 is the edit target, the already completed NodeLane 1.0.0 cover. Image 2 is a supporting insert: the official NodeLane brand icon, blue speech-bubble page with white letter N and pink folded corner.
+Primary request: Make ONLY ONE change to Image 1: replace the small blue open-book symbol immediately to the left of the top brand text “NodeLane 漫译” with the official icon from Image 2. Insert Image 2 faithfully, preserve its geometry, colors, white N, dark outline and pink fold; scale it down proportionally to fit the original symbol's area. Do not reinterpret or redesign the official icon. Its transparent surroundings must show the existing dark cover background.
+Invariants: Preserve every other pixel region as much as possible: all the exact Chinese and Latin text, all fonts and sizes, “1.0.0”, “正式版发布”, “全功能演示”, “AI 漫画翻译 · 双页阅读 · 整本导出”, original manga, the two-page browser window, scene, lighting, borders, colors and positions. Keep the current 16:9 landscape composition. Do not add other logos, text, badges or objects. Final cover background remains opaque; only the insert's existing alpha is respected.
+Output: one finished cover image, no comparison or collage.

@@ -1,0 +1,18 @@
+Generation mode: built-in image_gen
+
+Initial prompt
+
+Use case: ads-marketing
+Asset type: finished Chinese video tutorial thumbnail for Bilibili, YouTube and X, landscape 16:9, preferably 1920x1080.
+Primary request: Create one polished, immediately readable cover for a Chinese walkthrough showing how to install and use the NodeLane manga translation extension in Firefox on an Android phone.
+Scene/backdrop: warm off-white editorial background with very subtle manga halftone texture; crisp ink-black typography, energetic Firefox-orange highlights and small violet accents. Bright, confident, clean, not a busy neon technology poster.
+Subject and composition: typography is the dominant first focal point, occupying about 58 percent of the wide canvas, balanced by one large angled Android smartphone on the other side. Its screen shows an original black-and-white manga illustration with clearly legible simplified Chinese speech bubbles. A small floating original manga panel beside the phone shows the same scene with Japanese dialogue, and one short orange curved arrow points toward the translated phone screen. Use original non-franchise manga characters, tasteful everyday adventure imagery. Include a recognizable Firefox browser emblem beside the Firefox subheading as a browser identifier, not an endorsement. This is a stylized illustrative cover, not a claimed real product screenshot; avoid invented detailed app UI and controls.
+Text, render exactly and no typos: small brand wordmark "NodeLane 漫译"; huge headline on two lines "安卓手机" then "翻译漫画"; clear secondary line "Firefox 安装与使用教程"; small orange tag "中文全流程". Optional dialogue only: Japanese original "出発しよう！" and Chinese translated "出发吧！".
+Typography: exceptionally bold clean simplified Chinese sans-serif, designed professionally for small-size thumbnail readability. Make headline huge, with one orange underline or highlight. Brand spelled exactly N-o-d-e-L-a-n-e, no extra branding.
+Constraints: a complete edge-to-edge 16:9 graphic, strong hierarchy, generous safe margins at least 5 percent, keep all important text away from corners and bottom-right duration overlay area. No person presenting, no unrelated props, no QR code, no URLs, no pricing or free claims, no fake screenshot labels, no watermark, no platform logos, no tiny paragraphs, no more text than specified. Finished publication-ready bitmap.
+
+Targeted edit prompt
+
+Use case: precise-object-edit.
+Edit the provided tutorial thumbnail. Change ONLY the orange curved arrow between the Japanese manga panel at the upper-right and the Chinese manga on the phone: reverse its direction so its tail starts beside the Japanese panel on the RIGHT and its arrowhead points LEFT toward the Chinese phone screen, clearly communicating Japanese-to-Chinese translation.
+Preserve every other element exactly: same 16:9 dimensions, layout, illustration, smartphone, background, Firefox emblem, colors, typography and all Chinese and English text. Do not mirror the whole image or any lettering. Only reverse the orange arrow's direction.
