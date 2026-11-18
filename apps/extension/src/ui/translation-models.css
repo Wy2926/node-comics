@@ -21,10 +21,8 @@ button.nc-model-trigger {
   gap: 4px;
   min-width: 0;
 }
-.nc-model-selection .nc-model-summary {
-  flex: 1;
-}
 .nc-model-trigger strong {
+  flex: 1;
   min-width: 0;
   font-weight: 400;
   overflow: hidden;
@@ -89,8 +87,7 @@ button.nc-model-trigger {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.nc-model-choice [data-available='true'],
-.nc-model-trigger [data-available='true'] {
+.nc-model-choice [data-available='true'] {
   color: var(--success);
 }
 .nc-model-choice .nc-model-upgrade {

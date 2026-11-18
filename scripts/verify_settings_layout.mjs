@@ -30,6 +30,7 @@ const mock = route => {
     entitlements: null,
     translation_models: [
       {id: 'fixture-model', name: modelName, available: true, requires_paid: false, quota_multiplier: 0.125},
+      {id: 'legacy-model', name: 'Legacy fixture model', available: true, requires_paid: false},
       {id: 'locked-model', name: 'Locked fixture model', available: false, requires_paid: true, quota_multiplier: 2.5, unavailable_reason: 'not_allowed'},
     ],
   }});
@@ -105,12 +106,13 @@ try {
 
   await geometry('ja', 1440, 1);
   await shot('ja-desktop');
+  assert.equal(await trigger.locator('.nc-model-rate').count(), 0, 'Automatic selection has no rate when collapsed');
   await trigger.click();
   const menu = page.getByRole('dialog', {name: ja['翻译模型'], exact: true});
   const box = await trigger.boundingBox(), menuBox = await menu.boundingBox();
   assert(Math.abs(box.width - menuBox.width) < 1, 'Model menu must match the trigger width');
   assert.equal(await menu.getByRole('link').count(), 1, 'Unavailable models remain upgrade links');
-  assert.deepEqual(await menu.locator('.nc-model-rate').allTextContents(), ['0.125×', '2.5×']);
+  assert.deepEqual(await menu.locator('.nc-model-rate').allTextContents(), ['0.125×', '1×', '2.5×']);
   assert.equal(await menu.getByRole('button').first().locator('.nc-model-rate').count(), 0, 'Automatic choice has no fixed rate');
   await shot('ja-model-menu');
   await menu.getByRole('button', {name: new RegExp(modelName)}).click();
@@ -118,7 +120,7 @@ try {
   await page.reload();
   await page.waitForFunction(name => document.querySelector('.nc-model-trigger strong')?.textContent === name, modelName);
   assert.equal(await trigger.locator('.nc-model-rate').textContent(), '0.125×');
-  check('exact quota multipliers in choices and saved selection; unavailable model remains a link');
+  check('no automatic multiplier, 1× fallback for unrated models, and exact rates for explicit models');
 
   await trigger.scrollIntoViewIfNeeded();
   await settle();
@@ -145,6 +147,7 @@ try {
   await page.evaluate(() => window.restoreSettingsWrite());
   await menu.getByRole('button').first().click();
   await menu.waitFor({state: 'hidden'});
+  assert.equal(await trigger.locator('.nc-model-rate').count(), 0);
   check('failed model preference write retains selection; retry closes normally');
 
   assert(await page.getByRole('switch', {name: ja['标签页自动翻译'], exact: true}).isDisabled());

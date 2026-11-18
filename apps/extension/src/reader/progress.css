@@ -8,7 +8,8 @@
   .nc-reader :is(.nc-reading-viewport, .nc-reader-rail, .nc-drawer-content)::-webkit-scrollbar-thumb:hover { background: var(--accent-hover); }
   .nc-reader :is(.nc-reading-viewport, .nc-reader-rail, .nc-drawer-content)::-webkit-scrollbar-corner { background: var(--surface); }
 }
-:is(.nc-reader-navigation, .nc-reader-gap) .nc-reader-progress { appearance: none; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.nc-app :is(.nc-reader-navigation, .nc-reader-gap) .nc-reader-progress { appearance: none; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.nc-app .nc-reader-gap .nc-reader-progress:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .nc-reader-progress::-webkit-slider-runnable-track { width: 6px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }
 .nc-reader-progress::-webkit-slider-thumb { appearance: none; width: 12px; height: 24px; margin-left: -4px; background: var(--accent); border: 1px solid var(--comic-stroke); border-radius: 3px; box-shadow: var(--comic-shadow-small); }
 .nc-reader-progress::-moz-range-track { width: 6px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: var(--comic-control-radius); }

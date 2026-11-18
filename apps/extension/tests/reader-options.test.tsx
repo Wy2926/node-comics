@@ -131,22 +131,21 @@ describe('reader settings hierarchy and action cards', () => {
   const actionButtons = (tree: unknown) => nodes(tree).filter(node => node.type === 'button' && node.props.className === 'button secondary');
   const label = (button: ReactElement<Record<string, unknown>>) => nodes(button).find(node => node.type === 'span')?.props.children;
 
-  it.each(['缩放', '字号'])('places %s before layout, direction and background controls without changing its handler', label => {
+  it.each(['缩放', '字号'])('places %s after layout and direction, before background, without changing its handler', label => {
     const onSize = vi.fn();
     const sizing = <ReaderScale label={label} value={100} min={40} max={200} onChange={onSize}/>;
     const tree = ReaderDisplaySettings({...displayOptions, sizing});
     const controls = nodes(tree).filter(node => node.type === ReaderScale || node.type === ReaderChoice);
-    expect(controls.map(node => node.props.label)).toEqual([label, '阅读布局', '阅读方向', '阅读背景']);
-    expect(controls[0]).toBe(sizing);
-    (controls[0].props.onChange as (value: number) => void)(110);
+    expect(controls.map(node => node.props.label)).toEqual(['阅读布局', '阅读方向', label, '阅读背景']);
+    expect(controls[2]).toBe(sizing);
+    (controls[2].props.onChange as (value: number) => void)(110);
     expect(onSize).toHaveBeenCalledExactlyOnceWith(110);
     expect(nodes(tree).some(node => node.type === 'details')).toBe(false);
   });
 
-  it('omits the sizing block when the format has no sizing control', () => {
+  it('keeps layout, direction and background when the format has no sizing control', () => {
     const tree = ReaderDisplaySettings({...displayOptions, sizing: null});
-    expect(nodes(tree).some(node => node.props.className === 'nc-reader-sizing')).toBe(false);
-    expect(choice(tree, '阅读布局')).toBeDefined();
+    expect(nodes(tree).filter(node => node.type === ReaderChoice).map(node => node.props.label)).toEqual(['阅读布局', '阅读方向', '阅读背景']);
   });
 
   it('keeps reading controls and fullscreen direct while folding secondary settings into one native disclosure', () => {

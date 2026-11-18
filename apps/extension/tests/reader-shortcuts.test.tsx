@@ -36,7 +36,7 @@ vi.mock('../src/reader/useChapterStream',()=>({
 }));
 import {Reader} from '../src/reader/Reader';
 import {ReaderShell, ReaderDrawer, ReaderNavigation, ReaderSettingsButton, ReaderTools} from '../src/reader/ReaderChrome';
-import {ReaderSettings, ReaderScale, ReaderChoice, ReaderTranslationSettings} from '../src/reader/ReaderSettings';
+import {ReaderSettings, ReaderScale, ReaderGap, ReaderChoice, ReaderTranslationSettings} from '../src/reader/ReaderSettings';
 import {ReaderDisplaySettings} from '../src/reader/ReaderOptions';
 import {ComicDirectory} from '../src/reader/ComicDirectory';
 import {ThumbnailDirectory} from '../src/reader/ThumbnailDirectory';
@@ -224,11 +224,29 @@ describe('reader shortcut action integration',()=>{
   for(const action of ['reader.zoomIn','reader.zoomOut','reader.zoomReset'])hooks.handlers[action]();
   expect(spreadZoom.change.mock.calls.map(([value])=>typeof value==='function'?value(100):value)).toEqual([110,90,100]);
   expect(view()).toEqual(saved);expect(actions.preserve).not.toHaveBeenCalled();
-  hooks.handlers['reader.settings']();
-  const controls=nodes(render(props));
-  expect(controls.some(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式')).toBe(false);
-  expect(controls.find(node=>node.type===ReaderScale)?.props).toMatchObject({value:100,min:100,max:400});
- });
+  });
+  it.each(['single','continuous'] as const)('replaces %s fit and zoom with spread gap only in double settings',layout=>{
+   const props=fixture({settings:{...defaults,layout,readerZoom:120}});
+   render(props);hooks.handlers['reader.settings']();
+   const controls=()=>nodes(render(props));
+   const settings=()=>controls().find(node=>node.type===ReaderSettings)!.props as unknown as Parameters<typeof ReaderSettings>[0];
+   const fit=(items:ReturnType<typeof controls>)=>items.find(node=>node.type===ReaderChoice&&node.props.label==='图片适应方式');
+   const before=controls();
+   expect(fit(before)).toBeDefined();
+   expect(before.find(node=>node.type===ReaderScale)?.props).toMatchObject({value:120,min:40,max:200});
+   expect(before.some(node=>node.type===ReaderGap)).toBe(false);
+
+   settings().onLayout('double');
+   const double=controls(),gap=double.find(node=>node.type===ReaderGap);
+   expect(fit(double)).toBeUndefined();
+   expect(double.some(node=>node.type===ReaderScale)).toBe(false);
+   expect(gap?.props.value).toBe(0);
+   (gap!.props.onChange as (value:number)=>void)(45);
+   expect(view()).toMatchObject({zoom:120,spreadGap:45});
+
+   settings().onLayout(undefined);
+   expect(controls().find(node=>node.type===ReaderScale)?.props.value).toBe(120);
+  });
  it('starts translation lookahead at the first displayed page after jumping to the second page of a spread',()=>{
   const props=fixture({settings:{...defaults,layout:'double'}});render(props);hooks.handlers['reader.translation']();render(props);flushEffects();
   const [targets,visible]=vi.mocked(props.onReadingWindow).mock.calls.at(-1)!;

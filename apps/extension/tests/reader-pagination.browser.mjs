@@ -46,6 +46,7 @@ const viewport = () => page.locator('.nc-reading-viewport');
 const cells = () => viewport().locator('.nc-manga-page');
 const pageNumber = () => page.getByRole('slider', {name: '阅读进度', exact: true});
 const settings = () => page.getByRole('dialog', {name: '阅读设置', exact: true});
+const zoomControl = () => settings().getByRole('group', {name: '缩放', exact: true});
 const pageId = (number, chapter = 0) => `window-page-${chapter}-${number - 1}`;
 const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const snapshot = name => page.locator(`[data-testid="${name}"]`).textContent().then(JSON.parse);
@@ -299,21 +300,23 @@ test('direct jumps, layout changes and reopen preserve the selected page identit
   await assertFits('reopened third-page selection');
 });
 
-test('double inspection zoom leaves saved single-page fit and zoom intact', async () => {
+test('double settings show gap instead of zoom, and inspection leaves saved fit and zoom intact', async () => {
   await reader(); await openSettings();
   await settings().getByRole('group', {name: '图片适应方式', exact: true}).getByRole('button', {name: '铺满宽度', exact: true}).click();
-  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
+  await zoomControl().getByRole('button', {name: '放大', exact: true}).click();
   await closeSettings(); await layout('双页'); await shown(1, [1]);
   await openSettings();
   assert.equal(await settings().getByRole('group', {name: '图片适应方式', exact: true}).count(), 0);
-  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
-  assert(Math.abs(Number(await viewport().getAttribute('data-spread-zoom')) - 110) < .01);
+  assert.equal(await zoomControl().count(), 0);
+  await settings().getByRole('slider', {name: '双页间距', exact: true}).waitFor();
   await closeSettings();
+  await page.keyboard.press('=');
+  assert(Math.abs((await zoomMetrics()).scale - 110) < .01);
   await page.keyboard.press('0'); await page.keyboard.press('w');
   await assertFits('double reset restores its fitted size');
   await layout('单页'); await openSettings();
   assert.equal(await settings().getByRole('group', {name: '图片适应方式', exact: true}).locator('[aria-pressed="true"]').textContent(), '铺满宽度');
-  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('110%', {exact: true}).waitFor();
+  await zoomControl().getByText('110%', {exact: true}).waitFor();
 });
 
 const zoomMetrics = () => viewport().evaluate(element => {
@@ -396,10 +399,10 @@ for (const scenario of [
   assert.equal((await comicView('A')).layout, scenario.choice === '默认' ? undefined : scenario.target);
   assert.equal((await snapshot('global-reading-settings')).layout, 'single');
   await openSettings();
-  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('50%', {exact: true}).waitFor();
+  await zoomControl().getByText('50%', {exact: true}).waitFor();
   if (scenario.target === 'continuous' && scenario.number === 1) await page.screenshot({path: resolve(artifacts, 'spread-zoom-reset-continuous-50.png')});
-  await settings().getByRole('group', {name: '缩放', exact: true}).getByRole('button', {name: '放大', exact: true}).click();
-  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText('60%', {exact: true}).waitFor();
+  await zoomControl().getByRole('button', {name: '放大', exact: true}).click();
+  await zoomControl().getByText('60%', {exact: true}).waitFor();
   await closeSettings(); await assertNormalZoom(scenario.target, scenario.number, 60, mounted);
   await page.screenshot({path: resolve(artifacts, `spread-zoom-reset-${scenario.target}-${scenario.number}-${scenario.shortcut ? 'shortcut' : scenario.choice === '默认' ? 'default' : 'choice'}.png`)});
   await layout('双页'); await shown(scenario.number, scenario.number === 1 ? [1] : [2, 3]);
@@ -639,7 +642,7 @@ for (const device of [
   if (device.fit === 'window') await assertFits(device.name);
   else assert(Math.abs((await cells().first().boundingBox()).width - await viewport().evaluate(element => element.clientWidth) * expected.zoom / 100) < 2, 'Rendered width matches the opening zoom');
   await openSettings();
-  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByText(`${expected.zoom}%`, {exact: true}).waitFor();
+  await zoomControl().getByText(`${expected.zoom}%`, {exact: true}).waitFor();
   await page.screenshot({path: resolve(artifacts, `default-zoom-${device.name}.png`)});
   await closeSettings(); await jump(3); await shown(3, [3]);
   await globalPreference('默认缩放', '140%'); await shown(3, [3]);
@@ -661,7 +664,7 @@ test('first-open global zoom survives chapter switches, manual zoom, reopening, 
   await switchComic('B'); assert.equal((await comicView('B')).zoom, 130);
   await jump(4); await shown(4, [4]);
   await openSettings();
-  await settings().locator('.nc-reader-option').filter({hasText: '缩放'}).getByRole('button', {name: '放大', exact: true}).click();
+  await zoomControl().getByRole('button', {name: '放大', exact: true}).click();
   await closeSettings(); assert.equal((await comicView('B')).zoom, 140);
   await globalPreference('默认缩放', '70%'); await shown(4, [4]);
   assert.equal((await comicView('B')).zoom, 140);

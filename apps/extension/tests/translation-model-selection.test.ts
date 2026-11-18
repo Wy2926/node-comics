@@ -9,10 +9,13 @@ import {ApiError} from '../src/api';
 import {TranslationCoordinator,translationJob} from '../src/translation/channels/adapters/nodelane/coordinator';
 import {makeOperation,operationId} from '../src/translation/channels/adapters/nodelane/operations';
 import {readOperation,readPageOperations,saveOperation} from '../src/translation/channels/adapters/nodelane/store';
-import {selectedModelAvailable} from '../../../shared/translation-models';
+import {selectedModelAvailable,type TranslationModelChoice} from '../../../shared/translation-models';
 import {fixture,originalInput,snapshot,target} from './translation-fixture';
 
 afterEach(()=>vi.restoreAllMocks());
+const pickerMarkup=(models:TranslationModelChoice[],value?:string)=>
+  renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value,models,select:async()=>{}}}));
+
 describe('model selection',()=>{
   it('keeps automatic operation and request identities and separates explicit models',()=>{
     const page=target(0),automatic=makeOperation(page,'scope','en',originalInput(0));
@@ -66,30 +69,43 @@ describe('model selection',()=>{
     expect(core.records[0].state).toBe('blocked');
   });
   it('shows exact rates in the selection and choices, keeping unavailable models as upgrade links',()=>{
-    const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value:'a',models:[
+    const markup=pickerMarkup([
       {id:'a',name:'Model A',available:true,requires_paid:false,quota_multiplier:0.0001},
       {id:'b',name:'Model B',available:false,requires_paid:true,quota_multiplier:2.5,unavailable_reason:'not_allowed'},
-    ],select:async()=>{}}}));
+    ],'a');
     const trigger=markup.split('</button>')[0],upgrade=markup.match(/<a\b[^>]+pricing[^>]*>[\s\S]*?<\/a>/)?.[0];
     expect(trigger).toContain('Model A');expect(trigger).toContain('0.0001×');
+    expect(trigger).not.toContain('可用');
     expect(markup.match(/title="额度消耗倍率：0\.0001×"/g)).toHaveLength(2);
     expect(upgrade).toContain('Model B');expect(upgrade).toContain('付费权益');
     expect(upgrade).toContain('不可用');expect(upgrade).toContain('2.5×');
   });
-  it('does not invent a rate for automatic, missing or stale selections',()=>{
-    for(const value of [undefined,'legacy','removed']){
-      const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value,models:[
-        {id:'legacy',name:'Legacy',available:true,requires_paid:false},
+  it('shows no fixed multiplier for automatic selection in the trigger or menu',()=>{
+    const markup=pickerMarkup([{id:'a',name:'Model A',available:true,requires_paid:false,quota_multiplier:2.5}]);
+    const [trigger,automatic]=markup.split('</button>');
+    for(const part of [trigger,automatic]){
+      expect(part).toContain('自动选择（默认）');
+      expect(part).not.toContain('nc-model-rate');
+    }
+    expect(markup.match(/class="nc-model-rate"/g)).toHaveLength(1);
+  });
+  it.each([undefined,null])('defaults missing explicit rates (%s) to 1× in the selection and choices',rate=>{
+    for(const value of ['legacy','removed']){
+      const markup=pickerMarkup([
+        {id:'legacy',name:'Legacy',available:true,requires_paid:false,quota_multiplier:rate as number|undefined},
         {id:'rated',name:'Rated',available:true,requires_paid:false,quota_multiplier:2.5},
-      ],select:async()=>{}}}));
-      expect(markup.split('</button>')[0]).not.toContain('nc-model-rate');
-      expect(markup.match(/class="nc-model-rate"/g)).toHaveLength(1);
+      ],value);
+      const trigger=markup.split('</button>')[0];
+      expect(trigger).toContain('title="额度消耗倍率：1×"');
+      expect(trigger).not.toContain('可用');
+      expect(markup.match(/title="额度消耗倍率：1×"/g)).toHaveLength(value==='removed'?3:2);
+      expect(markup).toContain('title="额度消耗倍率：2.5×"');
     }
   });
-  it.each([0,-1,NaN,Infinity,'2',null])('hides an invalid API multiplier (%s)',rate=>{
-    const markup=renderToStaticMarkup(createElement(TranslationModelPicker,{selection:{value:'a',models:[
+  it.each([0,-1,NaN,Infinity,'2'])('hides an invalid API multiplier (%s)',rate=>{
+    const markup=pickerMarkup([
       {id:'a',name:'Model A',available:true,requires_paid:false,quota_multiplier:rate as number},
-    ],select:async()=>{}}}));
+    ],'a');
     expect(markup).not.toContain('nc-model-rate');
   });
   it('keeps target language in a dropdown even with a short language list',()=>{

@@ -4,7 +4,7 @@ import {pricingUrl} from '../billing';
 import {Icon} from '../icons';
 import {SettingRow} from './components';
 import type {ModelSelection} from '../translation/channels/contracts';
-import {selectedModelAvailable, translationModelChoices} from '../../../../shared/translation-models';
+import {translationModelChoices} from '../../../../shared/translation-models';
 import {menuPosition, visibleViewport} from './visual-viewport';
 import './select.css';
 import './translation-models.css';
@@ -13,9 +13,10 @@ export function TranslationModelPicker({selection}: {selection?: ModelSelection}
   return selection ? <ModelPicker selection={selection} /> : null;
 }
 
-function ModelRate({value}: {value?: number}) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
-  return <small className="nc-model-rate" title={msg('额度消耗倍率：{rate}×', {rate: value})}>{value}×</small>;
+function ModelRate({modelId, value}: {modelId: string; value?: number}) {
+  const rate = value ?? 1;
+  if (!modelId || typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) return null;
+  return <small className="nc-model-rate" title={msg('额度消耗倍率：{rate}×', {rate})}>{rate}×</small>;
 }
 
 function ModelPicker({selection}: {selection: ModelSelection}) {
@@ -26,9 +27,11 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
     [error, setError] = useState(''),
     [saving, setSaving] = useState(false);
   const {models, value} = selection,
-    selected = models?.find((model) => model.id === value);
-  const choices = translationModelChoices(models, msg('自动选择（默认）'), value);
-  const available = selectedModelAvailable(models, value);
+    selectedId = value ?? '',
+    selected = models?.find((model) => model.id === selectedId);
+  const automatic = msg('自动选择（默认）'),
+    description = msg('更换模型仅影响新任务；已有译图需手动重新翻译。'),
+    choices = translationModelChoices(models, automatic, selectedId);
   function close(restore = true) {
     setOpen(false);
     if (restore) trigger.current?.focus({preventScroll: true});
@@ -117,7 +120,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
   return (
     <div className="nc-model-picker">
       <SettingRow title={<span id={id + '-label'}>{msg('翻译模型')}</span>}
-        description={msg('更换模型仅影响新任务；已有译图需手动重新翻译。')} descriptionId={id+'-note'}>
+        description={description} descriptionId={id+'-note'}>
       <button
         ref={trigger}
         type="button"
@@ -127,7 +130,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
-        title={msg('更换模型仅影响新任务；已有译图需手动重新翻译。')}
+        title={description}
         onClick={() => setOpen(!open)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -138,11 +141,8 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
         }}
       >
         <span className="nc-model-selection" id={id+'-selection'}>
-          <span className="nc-model-summary">
-            <strong>{value ? (selected?.name ?? value) : msg('自动选择（默认）')}</strong>
-            <small data-available={available}>{available ? msg('可用') : msg('不可用')}</small>
-          </span>
-          <ModelRate value={selected?.quota_multiplier} />
+          <strong>{selected?.name ?? (selectedId || automatic)}</strong>
+          <ModelRate modelId={selectedId} value={selected?.quota_multiplier} />
         </span>
         <Icon name="chevron" size={16} className="nc-select-chevron" />
       </button>
@@ -171,21 +171,22 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
       >
         <div className="nc-model-options">
           {choices.map((model) => {
+            const isSelected = model.id === selectedId;
             const content = (
               <>
                 <span className="nc-model-summary">
                   <strong>{model.name}</strong>
                   <span className="nc-model-badges">
-                    {model.id && (model.id !== value || selected) && (
+                    {model.id && (!isSelected || selected) && (
                       <small>{model.requires_paid ? msg('付费权益') : msg('免费')}</small>
                     )}
                     <small data-available={model.available}>{model.available ? msg('可用') : msg('不可用')}</small>
                   </span>
                 </span>
                 <span className="nc-model-meta">
-                  <ModelRate value={model.quota_multiplier} />
+                  <ModelRate modelId={model.id} value={model.quota_multiplier} />
                   {model.available ? (
-                    (value ?? '') === model.id && <Icon name="check" size={16} />
+                    isSelected && <Icon name="check" size={16} />
                   ) : (
                     <small className="nc-model-upgrade">{msg('升级')} ↗</small>
                   )}
@@ -203,7 +204,7 @@ function ModelPicker({selection}: {selection: ModelSelection}) {
                     className="nc-select-option nc-model-choice"
                     type="button"
                     disabled={saving}
-                    aria-pressed={(value ?? '') === model.id}
+                    aria-pressed={isSelected}
                     onClick={() => void choose(model.id)}
                   >
                     {content}

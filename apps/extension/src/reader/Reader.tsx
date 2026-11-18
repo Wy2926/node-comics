@@ -80,7 +80,7 @@ const [viewportSize,setViewportSize]=useState({width:900,height:700});
 const preservePosition=useRef(preserve);preservePosition.current=preserve;
 const previousSearch=useRef(searchOpen);
 useEffect(()=>{if(previousSearch.current&&!searchOpen)root.current?.querySelector<HTMLButtonElement>('[data-reader-settings-trigger]')?.focus();previousSearch.current=searchOpen;},[searchOpen]);
-const {mode,preference,zoom,fit}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
+ const {mode,preference,zoom,fit,spreadGap:gapPercent=0}=view;const language=caps?.languages.find(l=>l.id===settings.language)?.label??languageLabel(settings.language);
 const scopeBase=`${translationScope??''}:${settings.language}`;const scope=(p:Page,c=copy)=>JSON.stringify([scopeBase,c.id,c.contentId,c.generation,p.id]);
 const shown=page&&actual[pageKey(copy,page.id)]?.scope===scope(page)?actual[pageKey(copy,page.id)]:undefined;
 function imageLoad(chapter:ReadingEntry,p:Page,key?:string){const load=loads[pageKey(chapter,p.id)];return load?.scope===scope(p,chapter)&&load.key===key?load:undefined;}
@@ -119,7 +119,7 @@ const spreads=useMemo(()=>settings.layout==='double'?pageSpreads(copy.pages):[],
 const spread=spreadAt(spreads,index);
 const spreadPages=useMemo(()=>spread?copy.pages.slice(spread.start,spread.end):[],[copy.pages,spread]);
 const frames=useMemo(()=>new Map(spreadFrames(spreadPages,viewportSize,compare).map((frame,n)=>[spreadPages[n].id,frame])),[spreadPages,viewportSize,compare]);
-const gap=spreadGap([...frames.values()],viewportSize.width,view.spreadGap??0);
+ const gap=spreadGap([...frames.values()],viewportSize.width,gapPercent);
 const frame=(p:Page)=>frames.get(p.id)??pageFrame(p,viewportSize,fit,zoom,compare);
 const geometryFrame=useMemo(()=>(p:Page)=>pageFrame(p,viewportSize,fit,zoom,compare),[viewportSize.width,viewportSize.height,fit,zoom,compare]);
 const previousGeometry=useRef<{frame:typeof geometryFrame;chapters:ChapterGeometry[]}|undefined>(undefined);
@@ -157,7 +157,7 @@ const contentWidth=spread?spreadPages.reduce((width,page)=>width+frame(page).wid
  :continuousGeometry.reduce((width,chapter)=>Math.max(width,chapter.width),0);
 const swipeBlocked=bookmarks.busy||!!searchOpen||!!analyticsBlocked||!!panel;
 const spreadZoom=useSpreadZoom({viewport,stack:spreadStack,enabled:settings.layout==='double'&&!!page,blocked:swipeBlocked||moving,
- resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,view.spreadGap??0,spreadPages.map(p=>[p.width,p.height])]),
+  resetKey:JSON.stringify([viewKey,copy.id,copy.contentId,copy.generation,spread?.start,spread?.end,settings.layout,settings.direction,viewportSize.width,viewportSize.height,compare,gapPercent,spreadPages.map(p=>[p.width,p.height])]),
 });
 const canTurn=(offset:-1|1)=>!!page&&(offset<0?(spread?.start??indexRef.current)>0||!!previous:(spread?.end??indexRef.current+1)<copy.pages.length||!!next);
 const imageWindows=useMemo(()=>windows.filter(({copy:chapter,start,end})=>end>start&&resources.ready(chapter)),[windows,resourceVersion]);
@@ -199,7 +199,7 @@ const previewChapter=previewRequest?(previewRequest.entryId===copy.id?copy:seque
 const swipe=usePagedSwipe({viewport,surface,preview:previewSurface,onPreviewChange:previewTurn,enabled:settings.layout!=='continuous',blocked:swipeBlocked||spreadZoom.zoomed,direction:settings.direction,
  animation:view.animation??'curl',
  identity:JSON.stringify([copy.id,copy.contentId,copy.generation,page?.id]),
- resetKey:JSON.stringify([viewKey,settings.layout,viewportSize.width,viewportSize.height,fit,zoom,compare,view.spreadGap??0,mode,preference,scopeBase]),
+  resetKey:JSON.stringify([viewKey,settings.layout,viewportSize.width,viewportSize.height,fit,zoom,compare,gapPercent,mode,preference,scopeBase]),
  canTurn,
  onTurn:movePage,onActivityChange:active=>{motion.current=active;setMoving(active);},onSettled:settleMotion,
 });
@@ -287,7 +287,12 @@ const readerPanel=panel&&<ReaderDrawer kind={panel} title={{bookmarks:msg('书�
 {panel==='directory'||panel==='bookmarks'?<ComicDirectory checkingUpdates={checkingUpdates} onCheckUpdates={onCheckUpdates} bookmarks={<BookmarkList bookmarks={bookmarks}/>} bookmarkCount={bookmarks.count} showBookmarks={panel==='bookmarks'} onShowBookmarks={value=>setPanel(value?'bookmarks':'directory')} catalogLoading={catalogLoading} onContinueCatalog={onContinueCatalog} directory={directory??{title:copy.title,entries:[],groups:[],chapters:[]}} index={index} pageCount={copy.pages.length} onNavigate={(id,pageId,rememberChoice)=>{swipe.cancel();preserve();persist();onNavigate(id,pageId,rememberChoice);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}><ThumbnailDirectory pages={resources.ready(copy)?copy.pages:[]} index={index} mode='classic' language={settings.language} translationScope={translationScope} onJump={n=>{jump(n);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}/></ComicDirectory>:<div className="nc-drawer-content">
 {panel==='translation'?<ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} modelSelection={modelSelection} fontSelection={fontSelection} channelOptions={channelOptions} note={msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}/>:<ReaderSettings settings={globalSettings} setSettings={setSettings} layout={view.layout} direction={settings.direction} onLayout={changeLayout} onDirection={changeDirection}
  animation={settings.layout!=='continuous'&&<Choice variant="cards" label={msg('翻页动画')} value={view.animation??'curl'} options={[{id:'curl',label:msg('仿真翻页')},{id:'slide',label:msg('左右滑动')},{id:'fade',label:msg('淡入淡出')},{id:'none',label:msg('无动画')}]} onChange={animation=>{swipe.cancel();updateView(view=>({...view,animation}));}}/>}
- sizing={<>{settings.layout!=='double'&&<Choice label={msg('图片适应方式')} value={fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/>}<ReaderScale label={msg('缩放')} value={settings.layout==='double'?Math.round(spreadZoom.zoom):zoom} min={settings.layout==='double'?100:40} max={settings.layout==='double'?400:200} onChange={changeZoom}/>{settings.layout==='double'&&<ReaderGap value={view.spreadGap??0} onChange={spreadGap=>{swipe.cancel();updateView(view=>({...view,spreadGap}));}}/>}</>}
+  sizing={settings.layout==='double'
+    ? <ReaderGap value={gapPercent} onChange={spreadGap=>{swipe.cancel();updateView(view=>({...view,spreadGap}));}}/>
+    : <>
+      <Choice label={msg('图片适应方式')} value={fit} options={[{id:'window',label:msg('适应窗口'),icon:<Icon name="expand" size={16}/>},{id:'width',label:msg('铺满宽度'),icon:<Icon name="split" size={16}/>}]} onChange={changeFit}/>
+      <ReaderScale label={msg('缩放')} value={zoom} min={40} max={200} onChange={changeZoom}/>
+    </>}
  immersive={immersive} onImmersive={()=>setImmersive(v=>!v)} onFullscreen={()=>void fullscreen()} onShortcuts={openShortcuts} onReload={onReload?()=>reloadContent(copy):undefined} busy={busy}
  extraActions={onFind&&<button className="button secondary" onClick={findComic}><Icon name="translate"/><span>{msg('寻找其他语言')}</span></button>}>
  <div className="nc-reader-option"><div><b>{msg('并排对照')}</b><p>{msg('原图与当前模式最新译图')}</p></div><button className={`switch ${compare?'on':''}`} role="switch" aria-label={msg('并排对照')} aria-checked={compare} onClick={toggleCompare}><i/></button></div>
@@ -315,7 +320,7 @@ onShown={image=>{if(image)pageShown(chapter,p.id);setActual(prev=>{if(prev[cellK
 {!chapter.pages.length?<><p>{directory?.entries.find(e=>e.id===chapter.id)?.error??directory?.entries.find(e=>e.id===chapter.id)?.status??msg("正在准备页面…")}</p><button className="button secondary" onClick={()=>{preserve();persist();onNavigate(chapter.id);}}>{msg("重试")}</button></>:!completeManifest(chapter)?<><p>{msg("当前已发现 {0} 页", {"0": chapter.pages.length})}</p><small>{msg("完整载入后可继续阅读")}</small></>:!continuation&&<p>{msg("已到当前内容末尾")}</p>}</>
  :!completeManifest(chapter)&&end===chapter.pages.length&&<div className="nc-paged-notice" role="status"><p>{msg("当前已发现 {0} 页", {"0": chapter.pages.length})}</p><small>{msg("完整载入后可继续阅读")}</small></div>}
 </div></div>;})}</div></div>
-{previewRequest&&<ReaderTurnPreview ref={previewSurface} chapter={previewChapter} index={previewRequest.index} ready={!!previewChapter&&resources.ready(previewChapter)} viewport={viewportSize} layout={settings.layout} direction={settings.direction} compare={compare} mode={mode} translated={preference!=='original'} language={settings.language} translationScope={translationScope} scope={scope} fit={fit} zoom={zoom} spreadGap={view.spreadGap??0} top={viewport.current?.scrollTop??0}/>}
+ {previewRequest&&<ReaderTurnPreview ref={previewSurface} chapter={previewChapter} index={previewRequest.index} ready={!!previewChapter&&resources.ready(previewChapter)} viewport={viewportSize} layout={settings.layout} direction={settings.direction} compare={compare} mode={mode} translated={preference!=='original'} language={settings.language} translationScope={translationScope} scope={scope} fit={fit} zoom={zoom} spreadGap={gapPercent} top={viewport.current?.scrollTop??0}/>}
 </div>
 {readerPanel}{panel!=='bookmarks'&&<BookmarkNotice bookmarks={bookmarks}/>}
 </ReaderShell>;
