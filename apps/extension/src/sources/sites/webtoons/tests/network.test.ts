@@ -1,45 +1,100 @@
 import {describe, expect, it, vi} from 'vitest';
 import {definition, languages} from '../definition';
-import {network, parseCatalog, parsePages} from '../network';
+import {network, parsePages} from '../network';
 import {parseSearch, searchUrl} from '../search';
 import {validateSourceCatalog, sourceFor} from '../../../index';
-import {catalogHtml, catalogUrl, episodeUrl, image, readerHtml, searchHtml} from './fixtures';
+import {catalogHtml, catalogUrl, episodePage, episodeUrl, image, readerHtml, searchHtml} from './fixtures';
+
+const endpoint = 'https://m.webtoons.com/api/v1/canvas/7/episodes?pageSize=100';
 
 describe('WEBTOON international', () => {
   it('isolates language, Originals and Canvas identities and rejects forged/ambiguous URLs', () => {
     for (const language of Object.keys(languages)) {
-      const url = catalogUrl.replace('/en/', `/${language}/`);
-      expect(definition.identify(new URL(url))?.pageKey).toBe(`webtoons:${language}:canvas:7`);
-      expect(definition.identify(new URL(url.replace('/canvas/', '/romance/')))?.pageKey).toBe(`webtoons:${language}:originals:7`);
+      for (const host of ['www', 'm']) {
+        const url = catalogUrl.replace('/en/', `/${language}/`).replace('www.', host + '.');
+        expect(definition.identify(new URL(url))).toMatchObject({pageKey: `webtoons:${language}:canvas:7`,
+          catalog: {url: catalogUrl.replace('/en/', `/${language}/`)}});
+        expect(definition.identify(new URL(url.replace('/canvas/', '/romance/')))?.pageKey).toBe(`webtoons:${language}:originals:7`);
+      }
     }
     expect(sourceFor(episodeUrl()).definition.id).toBe('webtoons');
-    for (const url of [catalogUrl.replace('www.webtoons.com', 'www.webtoons.com.evil.test'), catalogUrl.replace('https:', 'http:'), catalogUrl.replace('www.', 'user:pass@www.')])
+    for (const url of [catalogUrl.replace('www.webtoons.com', 'www.webtoons.com.evil.test'), catalogUrl.replace('www.', 'm.').replace('https:', 'http:'),
+      catalogUrl.replace('www.', 'm.').replace('.com', '.com:8443'), catalogUrl.replace('www.', 'm.').replace('.com', '.com.evil.test'),
+      catalogUrl.replace('www.', 'user:pass@m.')])
       expect(definition.identify(new URL(url))).toBeNull();
     for (const url of [catalogUrl + '&title_no=8', catalogUrl + '&episode_no=1', episodeUrl() + '&episode_no=2', catalogUrl.replace('=7', '=0'), catalogUrl.replace('/en/', '/xx/')])
       expect(definition.identify(new URL(url))?.kind).toBe('other');
     expect(definition.sites).toHaveLength(7);
     expect(definition.installation.optionalContentMatches).toContain('https://www.webtoons.com/*');
+    expect(definition.installation.optionalContentMatches).toContain('https://m.webtoons.com/*');
   });
-  it('reads every page, checks the head again, orders oldest first and accepts episode gaps', async () => {
-    const request = vi.fn(async (url: string) => catalogHtml(Number(new URL(url).searchParams.get('page')) || 1));
+  it.each(['canvas', 'romance'])('imports mobile %s links through the API with identical work, episode and page identities', async section => {
+    const mobile = (url: string) => url.replace('www.', 'm.');
+    const work = catalogUrl.replace('/canvas/', `/${section}/`), chapter = episodeUrl().replace('/canvas/', `/${section}/`);
+    const request = vi.fn(async (url: string) => (url.includes('/api/') ? JSON.stringify(episodePage([1]))
+      : new URL(url).pathname.endsWith('/viewer') ? readerHtml() : catalogHtml()).replaceAll('/canvas/', `/${section}/`));
+    const catalog = validateSourceCatalog(await network.catalog(mobile(work), {request}));
+    expect(catalog).toMatchObject({id: `webtoons:en:${section === 'canvas' ? 'canvas' : 'originals'}:7`, url: work});
+    expect(catalog.entries[0].url).toBe(chapter);
+    const url = mobile(chapter);
+    const result = await network.pages(url, {request});
+    expect(result).toEqual({...parsePages(readerHtml().replaceAll('/canvas/', `/${section}/`), chapter), url});
+    expect(sourceFor(url).location.pageKey).toBe(sourceFor(chapter).location.pageKey);
+    expect(request.mock.calls).toEqual([[work, {desktop: true}],
+      [endpoint.replace('/canvas/', section === 'canvas' ? '/canvas/' : '/webtoon/'), undefined], [chapter, {desktop: true}]]);
+  });
+  it('uses the returned episode cursor across gaps and keeps a short nonterminal page', async () => {
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(JSON.stringify(episodePage([1, 4], 4)))
+      .mockResolvedValueOnce(JSON.stringify(episodePage([9])));
     const result = validateSourceCatalog(await network.catalog(catalogUrl, {request}));
-    expect(result.entries.map(e => e.remoteId)).toEqual(['1', '2', '3']);
+    expect(result.entries.map(e => e.remoteId)).toEqual(['1', '4', '9']);
     expect(result.entries.map(e => e.order)).toEqual([0, 1, 2]);
-    expect(result.cover?.url).toBe(image); expect(request).toHaveBeenCalledTimes(3);
+    expect(result.cover?.url).toBe(image);
     expect(result.entries.every(e => e.contentLanguage === 'en')).toBe(true);
-    const gaps = await network.catalog(catalogUrl, {request: async () => catalogHtml(1, [9, 4, 1], 1)});
-    expect(gaps.entries.map(e => e.remoteId)).toEqual(['1', '4', '9']);
+    expect(request.mock.calls).toEqual([[catalogUrl, {desktop: true}], [endpoint, undefined], [endpoint + '&cursor=4', undefined]]);
   });
-  it('rejects partial, duplicate, wrong-work and moving catalog pages without mutating previous', async () => {
-    const previous = await network.catalog(catalogUrl, {request: async () => catalogHtml(1, [1], 1)}), saved = JSON.stringify(previous);
-    for (const bad of [catalogHtml(2, [2]), catalogHtml(1), catalogHtml(2).replace('data-episode-no="1"', 'data-episode-no="9"'),
-      catalogHtml(2).replaceAll('title_no=7', 'title_no=8'), catalogHtml(2).replace('</ul>', '')]) {
-      await expect(network.catalog(catalogUrl, {previous, request: async url => url.includes('page=2') ? bad : catalogHtml(1)})).rejects.toThrow();
-      expect(JSON.stringify(previous)).toBe(saved);
+  it('requires the explicit terminal cursor when a page is exactly full', async () => {
+    const ids = Array.from({length: 100}, (_, i) => i + 1);
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(JSON.stringify(episodePage(ids, 100)))
+      .mockResolvedValueOnce(JSON.stringify(episodePage([])));
+    expect((await network.catalog(catalogUrl, {request})).entries).toHaveLength(100);
+    expect(request).toHaveBeenLastCalledWith(endpoint + '&cursor=100', undefined);
+  });
+  it('rejects malformed, duplicate, wrong-owner and stalled pages without publishing a partial catalog', async () => {
+    const page = episodePage([3]), first = JSON.stringify(episodePage([1, 2], 2));
+    for (const bad of ['<html>Login</html>', 'null', '{}', JSON.stringify({...page, success: false}),
+      JSON.stringify({success: true, result: {episodeList: []}}), JSON.stringify(episodePage([], 2)),
+      JSON.stringify(episodePage([2, 3])), JSON.stringify(episodePage([3, 3])), JSON.stringify(episodePage([4, 3])),
+      JSON.stringify(episodePage([3], 2)), JSON.stringify(episodePage([3], 4)),
+      JSON.stringify({...page, result: {...page.result, nextCursor: '0'}}),
+      ...['title_no=8', 'title_no=7&title_no=7'].map(value => JSON.stringify(page).replace('title_no=7', value)),
+      JSON.stringify(page).replace('episode_no=3', 'episode_no=4'), JSON.stringify(page).replace('/en/canvas/', '/fr/canvas/'),
+      JSON.stringify(page).replace('/en/canvas/', '/en/romance/'), JSON.stringify(page).replace('Episode 3', ''),
+      JSON.stringify(page).replace('"/en/canvas/', '"https://evil.test/en/canvas/'),
+      JSON.stringify(episodePage(Array.from({length: 101}, (_, i) => i + 3)))]) {
+      const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(first).mockResolvedValue(bad);
+      await expect(network.catalog(catalogUrl, {request})).rejects.toThrow();
+      expect(request).toHaveBeenCalledTimes(3);
     }
-    let calls = 0;
-    await expect(network.catalog(catalogUrl, {request: async () => ++calls === 1 ? catalogHtml(1) : calls === 2 ? catalogHtml(2) : catalogHtml(1, [4, 3])})).rejects.toThrow();
-    expect(() => parseCatalog(catalogHtml(1).replace('&page=2', '&page=3'), catalogUrl, 1)).toThrow();
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml().replace('title_no=7', 'title_no=8'));
+    await expect(network.catalog(catalogUrl, {request})).rejects.toThrow(); expect(request).toHaveBeenCalledOnce();
+  });
+  it('preserves the previous catalog on transport failure and cancellation at every request boundary', async () => {
+    const previous = await network.catalog(catalogUrl, {request: async url => url === catalogUrl ? catalogHtml() : JSON.stringify(episodePage())});
+    const saved = JSON.stringify(previous), failure = new Error('offline');
+    for (const stage of [0, 1, 2, 3]) {
+      const controller = new AbortController(); if (!stage) controller.abort();
+      const request = vi.fn(async () => {
+        if (request.mock.calls.length === stage) controller.abort();
+        return request.mock.calls.length === 1 ? catalogHtml() : JSON.stringify(episodePage([1], 1));
+      });
+      await expect(network.catalog(catalogUrl, {previous, request, signal: controller.signal})).rejects.toThrow();
+      expect(request).toHaveBeenCalledTimes(stage);
+    }
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml()).mockResolvedValueOnce(JSON.stringify(episodePage([1], 1))).mockRejectedValue(failure);
+    await expect(network.catalog(catalogUrl, {previous, request})).rejects.toBe(failure);
+    await expect(network.catalog(catalogUrl, {previous, request: async url => url === catalogUrl ? catalogHtml() : JSON.stringify(episodePage([]))})).rejects.toThrow();
+    expect(JSON.stringify(previous)).toBe(saved);
   });
   it('preserves repeated images as distinct slots, excludes outside images and never runs scripts', () => {
     const result = parsePages(`<script>throw Error('never')</script><img src="https://evil.test/ad">` + readerHtml(), episodeUrl());

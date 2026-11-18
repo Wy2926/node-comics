@@ -6,8 +6,7 @@ import {withImageHeaders} from './image-headers';
 import type {ImportResponse} from './import-responses';
 import {isSafariExtension} from '../../platform';
 import {withSafariPublicResponse} from './safari-public-request';
-// Some packaged parsers consume a site's desktop HTML. iPhone Safari otherwise
-// follows a mobile redirect before those parsers can validate the response.
+// Desktop parsers must not receive mobile redirects.
 const desktopAgent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
 
 export class SourceHttpError extends Error {
@@ -111,7 +110,10 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       // Public GET only. A redirect is returned as an HTTP error, never followed natively.
       return withSafariPublicResponse(url,options.referer?{referer:options.referer}:{},lifetime,consume,'text');
     }
-    return withImageHeaders(url, options?.referer ? {referer: options.referer} : undefined, lifetime, async () => {
+    const headers = {...(options?.referer ? {referer: options.referer} : {}),
+      ...(options?.desktop && !isSafariExtension() && /Android|Mobile/i.test(navigator.userAgent) ? {'User-Agent': desktopAgent} : {})};
+    // Chromium drops fetch's User-Agent; use the existing exact-request rules.
+    return withImageHeaders(url, Object.keys(headers).length ? headers : undefined, lifetime, async () => {
       const binary = body instanceof Uint8Array;
       return consume(await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
         ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),

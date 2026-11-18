@@ -61,17 +61,21 @@ describe('bounded source JSON POST', () => {
   });
 });
 
-it('requests desktop HTML only when the adapter selects it in Safari',async()=>{
-  chrome.runtime.getURL=()=> 'safari-web-extension://fixture/';
+it.each(['safari-web-extension:', 'chrome-extension:', 'moz-extension:'])('requests desktop HTML only when selected in %s',async scheme=>{
+  vi.stubGlobal('navigator',{userAgent:'Mozilla/5.0 (Android 15) Mobile'});
+  chrome.runtime.getURL=()=> scheme + '//fixture/';
   const context=createSourceNetworkContext();
-  await context.request(endpoint,{desktop:true});
-  expect(fetcher.mock.calls[0][1]?.headers).toHaveProperty('User-Agent',expect.stringContaining('Macintosh'));
-  expect(fixture.headers).toHaveBeenLastCalledWith(endpoint,undefined);
+  await context.request(endpoint,{desktop:true,referer:source});
+  const safari=scheme==='safari-web-extension:';
+  if(safari)expect(fetcher.mock.calls[0][1]?.headers).toHaveProperty('User-Agent',expect.stringContaining('Macintosh'));
+  else expect(fetcher.mock.calls[0][1]?.headers).not.toHaveProperty('User-Agent');
+  expect(fixture.headers).toHaveBeenLastCalledWith(endpoint,{referer:source,...(safari?{}:{'User-Agent':expect.stringContaining('Macintosh')})});
   await context.request(endpoint);
   expect(fetcher.mock.calls[1][1]?.headers).not.toHaveProperty('User-Agent');
-  chrome.runtime.getURL=()=> 'chrome-extension://fixture/';
+  expect(fixture.headers).toHaveBeenLastCalledWith(endpoint,undefined);
+  vi.stubGlobal('navigator',{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'});
   await context.request(endpoint,{desktop:true});
-  expect(fetcher.mock.calls[2][1]?.headers).not.toHaveProperty('User-Agent');
+  expect(fixture.headers).toHaveBeenLastCalledWith(endpoint,undefined);
 });
 
 describe('bounded source binary POST', () => {

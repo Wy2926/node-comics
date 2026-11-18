@@ -13,7 +13,7 @@ export interface SourceRequestOptions {
   form?:Readonly<Record<string,string>>;
   /** Bounded JSON POST; mutually exclusive with form. */
   json?:Readonly<Record<string,unknown>>;
-  /** This parser consumes desktop HTML even on iPhone Safari. */
+  /** This parser consumes desktop HTML even in a mobile browser. */
   desktop?:boolean;
   /** Verified public GET only; Safari native requests do not carry source cookies. */
   safariTransport?:'public-native';

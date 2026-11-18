@@ -3,9 +3,10 @@ import installation from './installation.json';
 import icon from './icon.svg?inline';
 
 export const origin = 'https://www.webtoons.com';
+const isOrigin = (url: URL) => [origin, 'https://m.webtoons.com'].includes(url.origin) && !url.username && !url.password;
 export const languages = {en: 'en', 'zh-hant': 'zh-Hant', th: 'th', id: 'id', es: 'es', fr: 'fr', de: 'de'} as const;
 export function location(url: URL) {
-  if (url.origin !== origin || url.username || url.password) return null;
+  if (!isOrigin(url)) return null;
   const match = /^\/(en|zh-hant|th|id|es|fr|de)\/([^/]+)\/([^/]+)\/(?:(list)|([^/]+)\/viewer)$/.exec(url.pathname);
   const title = url.searchParams.get('title_no'), episode = url.searchParams.get('episode_no');
   const valid = (value: string | null): value is string => !!value && /^[1-9]\d{0,9}$/.test(value);
@@ -24,7 +25,7 @@ export const definition: SourceDefinition = {
   capabilities: {importable: true, catalog: true, pages: true, completePageList: true, inline: true},
   catalogSync: {intervalMinutes: 720},
   identify(url) {
-    if (url.origin !== origin || url.username || url.password) return null;
+    if (!isOrigin(url)) return null;
     const loc = location(url);
     return loc ? {sourceId: this.id, kind: loc.episode ? 'reader' : 'catalog', url: url.href,
       pageKey: loc.key + (loc.episode ? ':episode:' + loc.episode : ''), catalog: {key: loc.key, url: loc.catalogUrl}}

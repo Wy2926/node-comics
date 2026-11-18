@@ -1,4 +1,4 @@
 {
   "autoContentMatches": [],
-  "optionalContentMatches": ["https://www.webtoons.com/*"]
+  "optionalContentMatches": ["https://www.webtoons.com/*", "https://m.webtoons.com/*"]
 }

@@ -47,9 +47,18 @@ if (!live) {
     const url = new URL(route.request().url()); let html;
     if (url.pathname.includes('/search/')) html = fixture.searchHtml(url.pathname.split('/').at(-1), url.searchParams.get('keyword'));
     else if (url.pathname.endsWith('/viewer')) html = fixture.readerHtml(Number(url.searchParams.get('episode_no')));
-    else if (failCatalog) return route.fulfill({status: 503, body: 'Unavailable'});
-    else {const page = Number(url.searchParams.get('page')) || 1; html = fixture.catalogHtml(page, page === 1 ? (addChapter ? [4, 3, 2] : [3, 2]) : [1]);}
+    else html = fixture.catalogHtml();
     return route.fulfill({contentType: 'text/html', body: '<!doctype html><meta charset="utf-8">' + html});
+  });
+  await context.route('https://m.webtoons.com/**', route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/canvas/')) {
+      if (failCatalog) return route.fulfill({status: 503, body: 'Unavailable'});
+      const page = url.searchParams.has('cursor') ? fixture.episodePage(addChapter ? [3, 4] : [3]) : fixture.episodePage([1, 2], 2);
+      return route.fulfill({contentType: 'application/json', body: JSON.stringify(page)});
+    }
+    return route.fulfill({contentType: 'text/html', body: '<!doctype html><meta charset="utf-8">' +
+      (url.pathname.endsWith('/viewer') ? fixture.mobileReaderHtml(Number(url.searchParams.get('episode_no'))) : fixture.mobileCatalogHtml)});
   });
 }
 const state = () => reader.evaluate(async () => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs'));
@@ -64,7 +73,21 @@ try {
   if (!live) imageBytes = Buffer.from(await reader.evaluate(() => {const c = document.createElement('canvas'); c.width = 800; c.height = 1200;
     const ctx = c.getContext('2d'); ctx.fillStyle = '#25638a'; ctx.fillRect(0, 0, 800, 1200); ctx.fillStyle = 'white'; ctx.font = '40px sans-serif'; ctx.fillText('WEBTOON fixture', 100, 300); return c.toDataURL().split(',')[1];}), 'base64');
   await reader.evaluate(async () => {const settings = {uiLanguage: 'zh-CN', layout: 'single', fit: 'window', autoTranslateTabs: false};
-    localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
+     localStorage.setItem('nc-settings', JSON.stringify(settings)); await chrome.storage.local.set({'nc-reader-settings': settings});}); await reader.reload();
+  if (!live) {
+    const metadata = await reader.evaluate(async ({html, url}) => {
+      const {createPage, definition} = await import(chrome.runtime.getURL('probe.mjs'));
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const session = createPage({document: doc, location: definition.identify(new URL(url)), signal: new AbortController().signal});
+      const work = session.describeWork(), anchor = session.importAnchor()?.className;
+      doc.querySelector('link').href = url.replace('title_no=7', 'title_no=8');
+      const wrongOwner = session.describeWork(); session.dispose();
+      return {work, anchor, wrongOwner};
+    }, {html: fixture.mobileCatalogHtml, url: fixture.catalogUrl.replace('www.', 'm.')});
+    assert.equal(metadata.work.status, 'ready'); assert.equal(metadata.work.value.title, 'WEBTOON fixture');
+    assert.equal(metadata.work.value.catalogUrl, fixture.catalogUrl); assert.equal(metadata.anchor, 'info_area');
+    assert.equal(metadata.wrongOwner.status, 'not-ready'); checks.push('Mobile metadata uses canonical ownership and visible title');
+  }
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
   for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('WEBTOON · English'));
@@ -72,10 +95,10 @@ try {
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? liveTitle : 'WEBTOON fixture', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
   await hit.getByRole('button', {name: '导入并阅读', exact: true}).click();
-  await reader.getByLabel('阅读进度', {exact: true}).waitFor({timeout: 120000});
+  await reader.getByRole('slider', {name: '阅读进度', exact: true}).waitFor({timeout: 120000});
   const imported = await state(); assert.equal(imported.comics.length, 1); activeEntry = imported.entries.find(e => e.indexState === 'ready')?.id; assert(activeEntry);
   const active = imported.entries.find(e => e.id === activeEntry);
-  await waitImage(); await setReaderProgress(reader.getByLabel('阅读进度', {exact: true}), '3'); await waitImage(3);
+  await waitImage(); await setReaderProgress(reader.getByRole('slider', {name: '阅读进度', exact: true}), '3'); await waitImage(3);
   await reader.waitForFunction(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')), e = await catalog.get('entries', entry);
     return (await catalog.get('positions', entry))?.pageId === (await catalog.listPages(e.contentId))[2]?.pageId;}, activeEntry);
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Search -> full catalog -> real image decode -> page 3');
@@ -86,18 +109,26 @@ try {
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '我的漫画', exact: true}).click();
   await reader.locator('.nc-book .nc-thumbnail img').evaluate(img => img.decode());
   await reader.close(); reader = await context.newPage(); await reader.goto(home);
-  await reader.getByRole('button', {name: '继续阅读', exact: true}).click(); await waitImage(3);
-  assert.equal(await reader.getByLabel('阅读进度', {exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
+  await reader.getByRole('button', {name: '打开漫画 ' + imported.comics[0].title, exact: true}).click(); await waitImage(3);
+  assert.equal(await reader.getByRole('slider', {name: '阅读进度', exact: true}).inputValue(), '3'); assert.equal(await refresh(), imported.entries.length);
   checks.push('Cover decode, reopen and refresh preserve page 3');
   if (!live) {failCatalog = true; const before = await state(); await assert.rejects(refresh()); assert.deepEqual((await state()).entries, before.entries);
     failCatalog = false; addChapter = true; assert.equal(await refresh(), imported.entries.length + 1); await refresh();
     assert.equal((await state()).comics[0].catalogUpdates.count, 1); checks.push('Failed refresh preserves old entries; new chapter counts once');}
   await reader.getByRole('button', {name: '返回我的漫画', exact: true}).click(); await reader.getByRole('button', {name: '漫画网站', exact: true}).click();
-  await reader.getByLabel('通过链接添加漫画').fill(active.sourceUrl); await reader.getByRole('button', {name: '添加到书架', exact: true}).click(); await waitImage(3);
+  await reader.getByLabel('通过链接添加漫画').fill(active.sourceUrl.replace('www.', 'm.')); await reader.getByRole('button', {name: '添加到书架', exact: true}).click(); await waitImage(3);
   assert.equal((await state()).comics.length, 1); checks.push('Chapter import deduplicates and restores position');
   const site = await context.newPage(); await site.goto(active.sourceUrl, {waitUntil: 'domcontentloaded'});
   await site.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true}).waitFor({timeout: 60000});
   await site.screenshot({path: path.join(out, 'source-entry.png')}); await site.close(); checks.push('Source page import button mounted');
+  if (!live) {
+    const mobile = await context.newPage(); await mobile.setViewportSize({width: 390, height: 844});
+    for (const url of [fixture.catalogUrl, active.sourceUrl]) {
+      await mobile.goto(url.replace('www.', 'm.'));
+      await mobile.getByRole('button', {name: 'NodeLane Comics · 导入/管理漫画', exact: true}).waitFor();
+    }
+    await mobile.screenshot({path: path.join(out, 'mobile-entry.png')}); await mobile.close(); checks.push('Mobile catalog and reader import entries mounted');
+  }
   assert.deepEqual(errors, []); await writeFile(path.join(out, 'result.json'), JSON.stringify({live, checks, entries: imported.entries.length}, null, 2)); console.log(JSON.stringify({out, checks}));
 } catch (error) {if (reader && !reader.isClosed()) {await reader.screenshot({path: path.join(out, 'failure.png')}); console.log((await reader.locator('body').innerText()).slice(-2000));}
   console.log(JSON.stringify({out, checks, errors})); throw error;

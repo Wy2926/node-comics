@@ -46,7 +46,7 @@ export function parseSearch(html: string, request: SourceSearchRequest): SourceS
 }
 export async function search(request: SourceSearchRequest, context: SourceNetworkContext) {
   context.signal?.throwIfAborted();
-  const body = await context.request(searchUrl(request).url);
+  const body = await context.request(searchUrl(request).url, {desktop: true});
   context.signal?.throwIfAborted();
   const result = parseSearch(body, request);
   // An empty Originals result must still search Canvas; the shared UI hides empty result pagination.
