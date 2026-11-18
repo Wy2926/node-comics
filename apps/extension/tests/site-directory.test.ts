@@ -66,7 +66,9 @@ describe('adapter-owned website directory', () => {
       expect(['free', 'freemium'], site.key).toContain(site.pricing);
       expect(typeof site.isRaw).toBe('boolean');
       expect(site).not.toHaveProperty('isFree');
-      if(site.icon.startsWith('data:image/svg+xml,')) {
+      if (site.icon.startsWith('data:image/svg+xml;base64,')) {
+        expect(Buffer.from(site.icon.slice('data:image/svg+xml;base64,'.length), 'base64').toString('utf8')).toMatch(/^<svg\b/);
+      } else if (site.icon.startsWith('data:image/svg+xml,')) {
         expect(decodeURIComponent(site.icon.slice('data:image/svg+xml,'.length))).toMatch(/^<svg\b/);
       } else {
         expect(site.icon).toMatch(/^\/site-icons\/[a-z-]+\.svg$/);
