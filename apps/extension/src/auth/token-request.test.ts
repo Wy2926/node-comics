@@ -76,7 +76,7 @@ describe('OIDC token request Origin boundary', () => {
 
   it('removes the rule on failure and allows the next exchange', async () => {
     request.mockRejectedValueOnce(new TypeError('Network failed'));
-    await expect(requestOidcToken(endpoint, new URLSearchParams())).rejects.toThrow('Network failed');
+    await expect(requestOidcToken(endpoint, new URLSearchParams())).rejects.toMatchObject({code:'NETWORK_ERROR',message:'暂时连接不到登录服务，请检查网络后重试。'});
     const rule = update.mock.calls[0][0].addRules[0];
     expect(update.mock.calls[1][0]).toEqual({removeRuleIds: [rule.id]});
     await expect(requestOidcToken(endpoint, new URLSearchParams())).resolves.toBeInstanceOf(Response);

@@ -1,4 +1,5 @@
 import {msg} from '../i18n/runtime';
+import {ApiError} from '../api-error';
 import type {User} from '../types';
 
 export interface Session {
@@ -10,11 +11,22 @@ export interface Session {
   apiOrigin:string;
   credential:{kind:'development'}|{kind:'oidc';refreshToken:string;tokenEndpoint:string;clientId:string;resource:string};
   retryAt?:number;
+  retryReason?:RefreshFailure;
+  accessRejected?:boolean;
 }
 export interface AuthState {session:Session|null;reason?:'expired'|'signed_out';}
 export const expiredMessage=()=>msg("登录已过期，请重新登录。原图和阅读位置已保留。");
-export class SessionExpired extends Error {constructor(){super(expiredMessage());}}
-export class RefreshUnavailable extends Error {constructor(){super(msg("暂时无法续期登录，请检查网络后重试。原图仍可继续阅读。"));}}
+export class SessionExpired extends ApiError {constructor(){super(expiredMessage(),'AUTH_REQUIRED',401);}}
+type RefreshFailure='network'|'configuration'|'limited'|'service'|'response';
+export class RefreshUnavailable extends ApiError {
+  constructor(public reason:RefreshFailure='service'){
+    super(reason==='network'?msg('暂时无法续期登录，请检查网络后重试。原图仍可继续阅读。'):
+      reason==='configuration'?msg('身份服务尚未配置完整，请稍后重试或联系运营方。'):
+      reason==='limited'?msg('此网站暂时限制请求，请稍后重试。'):
+      reason==='response'?msg('身份服务未返回有效的访问令牌。'):msg('登录服务暂不可用'),
+      'AUTH_REFRESH_UNAVAILABLE',reason==='limited'?429:503,undefined,30);
+  }
+}
 export function secureIdentityUrl(value:string){
   const url=new URL(value);
   if(url.username||url.password||url.protocol!=='https:'&&!(['127.0.0.1','localhost'].includes(url.hostname)&&url.protocol==='http:'))throw Error(msg("身份服务必须使用 HTTPS。"));

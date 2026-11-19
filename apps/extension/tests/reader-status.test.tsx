@@ -99,11 +99,15 @@ describe('in-image retry status',()=>{
  it('explicitly names a new translation when local result bytes cannot be recovered',()=>{
   expect(translationNotice({kind:'error',message:'本地译图缓存已清理，请手动重新翻译。',retryAction:'translate'}).action).toBe('重新翻译');
  });
- it('replaces stale errors and pending tasks with the login action after sign-out',()=>{
+  it('replaces stale errors and pending tasks with the login action after sign-out',()=>{
   const page=fixture('running');page.translationError='旧账户下载失败';
   expect(translationState({page,mode:'classic',language:'zh-Hans',origin,active:true,error:'登录已过期'})).toEqual({kind:'login',message:'登录后自动翻译'});
   expect(translationState({page,mode:'classic',language:'zh-Hans',origin,active:false,error:'登录已过期'})).toBeUndefined();
- });
+  });
+  it('labels expired authorization as re-login rather than a connection retry',()=>{
+    const detail='登录已过期，请重新登录。原图和阅读位置已保留。';
+    expect(translationNotice({kind:'login',message:detail})).toMatchObject({message:'重新登录',detail,action:undefined});
+  });
  it('exposes a failed rerun even while the previous translation remains readable',()=>{
   const page=fixture('failed');
   expect(readingImage(page,'classic',true,'zh-Hans',JSON.stringify([origin,'reader','overlay-v1'])).key).toBe('translated');

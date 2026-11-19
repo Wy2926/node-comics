@@ -1,0 +1,1 @@
+export class ApiError extends Error { constructor(message: string, public code = 'REQUEST_FAILED', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }

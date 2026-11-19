@@ -8,11 +8,12 @@ export function translationNotice(state:TranslationState){
     const source=messageSource(state.message);
     message=/网站访问权限已被浏览器关闭|图片域名.*授权|网页与图片访问权限/.test(source)?msg('网站访问受限')
       :/核实|未知/.test(source)?msg("结果待核实")
+      :/登录服务暂不可用|身份服务/.test(source)?msg('登录服务暂不可用')
       :state.retryLabel?msg("加载失败")
       :/连接|网络|NETWORK|fetch/i.test(source)?msg("连接失败")
       :/原图|本地图片/.test(source)?msg("原图不可用")
       :state.retryable===false?msg("暂不可用"):msg("翻译失败");
-  }else if(state.kind==='login')message=msg("登录后翻译");
+  }else if(state.kind==='login')message=messageSource(state.message).startsWith('登录已过期')?msg('重新登录'):msg("登录后翻译");
   const action=state.kind==='error'&&state.retryable!==false?(state.retryAction==='translate'?msg('重新翻译'):msg("重试")):state.kind==='upgrade'?msg("升级"):undefined;
   return {message,action,label:action?`${message} · ${action}`:message,detail:state.message};
 }

@@ -5,7 +5,8 @@ import {assertCurrent, RequestPool, UPLOAD_CONCURRENCY} from './concurrency';
 import type {Authorization} from './auth/session';
 import {cachedRequest,cacheValue,peekCached} from './api-cache';
 import {serverEvents} from './sse';
-export class ApiError extends Error { constructor(message: string, public code = 'NETWORK_ERROR', public status = 0, public resetsAt?:string|null, public retryAfterSeconds?:number, public scope?:string) { super(message); } }
+import {ApiError} from './api-error';
+export {ApiError} from './api-error';
 /** Bound connection setup and gaps between result chunks, not the total transfer time. */
 function transferDeadline(signal?:AbortSignal){
   const controller=new AbortController();
@@ -33,10 +34,12 @@ export class Api {
       if(new URL(url,this.base).pathname.startsWith('/v1/translations'))headers.set('X-Translation-Protocol','overlay-v1');
       let response:Response;
       try{response=await fetch(url,{...init,headers,credentials:'omit'});}
-      catch{init.signal?.throwIfAborted();throw new ApiError(msg("暂时连接不到服务。请检查网络连接，原图仍可继续阅读。"));}
+      catch{init.signal?.throwIfAborted();throw new ApiError(msg("暂时连接不到服务。请检查网络连接，原图仍可继续阅读。"),'NETWORK_ERROR');}
       try{await this.assertAuthorized();}catch(error){await response.body?.cancel();throw error;}
       // A redirected asset host cannot invalidate the API session that authorized the initial request.
       if(response.status!==401||!this.authorization||response.url&&new URL(response.url).origin!==new URL(url,this.base).origin)return response;
+      const failure=await response.clone().json().catch(()=>null);
+      if(!['AUTH_REQUIRED','TOKEN_INVALID'].includes(failure?.error?.code))return response;
       await response.body?.cancel();
       if(attempt===1)await this.authorization.reject(token);
       else await this.authorization.token(token);

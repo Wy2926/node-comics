@@ -1,6 +1,6 @@
 import {msg} from '../i18n/runtime';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Api} from '../api';
+import {Api,ApiError} from '../api';
 import {API_BASE,API_ORIGIN} from '../service';
 import {finishOidc,isOidcCallback,startOidc,type AuthConfig} from './oidc';
 import {tokenLifetime,type Session} from './model';
@@ -21,7 +21,7 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
     if(configPending.current)return;
     configPending.current=true;setConfigLoading(true);setConfigError('');
     try{setConfig(await new Api(API_BASE).authConfig());}
-    catch{setConfig(undefined);setConfigError(msg("暂时连接不到登录服务，请检查网络后重试。"));}
+    catch(error){setConfig(undefined);setConfigError(error instanceof ApiError?loginError(error):msg('无法读取身份服务配置，请重试。'));}
     finally{configPending.current=false;setConfigLoading(false);}
   },[]);
   useEffect(()=>{void reloadConfig();},[reloadConfig]);
@@ -71,6 +71,7 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
 }
 
 function loginError(error:unknown){
-  if(error instanceof TypeError)return msg("暂时连接不到登录服务，请检查网络后重试。");
+  if(error instanceof ApiError&&error.code==='NETWORK_ERROR')return msg("暂时连接不到登录服务，请检查网络后重试。");
+  if(error instanceof TypeError||error instanceof SyntaxError)return msg('登录未完成，请重试。');
   return error instanceof Error?error.message:msg("登录未完成，请重试。");
 }

@@ -31,7 +31,7 @@ async function exchange(callback:string,pending:Pending):Promise<Session> {
     if(failure?.error==='invalid_grant')throw Error(msg("登录授权码已失效或校验失败，请重新登录。"));
     throw Error(msg("登录授权码交换失败（HTTP {0}），请重新登录；若仍失败，请联系管理员检查身份服务配置。", {"0": response.status}));
   }
-  const tokens=await response.json();if(typeof tokens.access_token!=='string'||!tokens.access_token||tokens.token_type?.toLowerCase()!=='bearer')throw Error(msg("身份服务未返回有效的访问令牌。"));
+  const tokens=await response.json().catch(()=>null);if(typeof tokens?.access_token!=='string'||!tokens.access_token||typeof tokens.token_type!=='string'||tokens.token_type.toLowerCase()!=='bearer')throw Error(msg("身份服务未返回有效的访问令牌。"));
   if(typeof tokens.refresh_token!=='string'||!tokens.refresh_token)throw Error(msg("身份服务未授予自动续期权限，请重新登录并授权离线访问；若仍失败，请联系管理员检查应用配置。"));
   const lifetime=tokenLifetime(tokens.expires_in,issuedAt);
   // Product API verifies signature, issuer, audience and expiry before trusting identity.

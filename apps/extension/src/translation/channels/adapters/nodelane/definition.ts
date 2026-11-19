@@ -1,6 +1,7 @@
 import {Api} from '../../../../api';
 import {readAuth,subscribeAuth} from '../../../../auth/storage';
 import {sessionAuthorization} from '../../../../auth/session';
+import {expiredMessage} from '../../../../auth/model';
 import {assertCurrent,RequestPool,UPLOAD_CONCURRENCY} from '../../../../concurrency';
 import {msg} from '../../../../i18n/runtime';
 import {API_BASE,API_ORIGIN} from '../../../../service';
@@ -60,7 +61,7 @@ export const definition:ChannelDefinition={
     return()=>{stopped=true;unsubscribe();};
   },
   async open(profile,_secrets,isCurrent,openOptions){
-    const {session}=await readAuth();let disposed=false;
+    const {session,reason}=await readAuth();let disposed=false;
     const live=()=>!disposed&&isCurrent();
     assertCurrent(live);
     const userId=session?.user.id,scope={key:translationScope(API_ORIGIN,userId??'signed-out')};
@@ -93,7 +94,7 @@ export const definition:ChannelDefinition={
         });
       }};},
       get capabilities(){return caps;},available:!!session,
-      unavailable:session?undefined:{kind:'login',message:msg('登录后自动翻译')},
+      unavailable:session?undefined:{kind:'login',message:reason==='expired'?expiredMessage():msg('登录后自动翻译')},
       requiresInternet:true,analyticsCategory:'official',isCurrent:live,
       async validateResult(){
         assertCurrent(live);if(!session)throw Error(msg('请先登录'));

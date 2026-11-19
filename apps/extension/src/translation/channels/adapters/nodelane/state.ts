@@ -12,6 +12,7 @@ const upgradeState=(reason:'not_allowed'|'quota_exhausted'):TranslationState=>({
 export function translationState({page,mode,language,modelId,fontId,userId,origin,active,caps,rights,error='',operation}:{page:Page;mode:Mode;language:string;modelId?:string;fontId?:string;userId?:string;origin:string;active:boolean;caps?:Capabilities;rights?:Entitlements|null;error?:string;operation?:LocalOperation}):TranslationState|undefined{
   if(!userId)return active?{kind:'login',message:msg("登录后自动翻译")}:undefined;
   const t=pageTranslation(page,mode,language,translationScope(origin,userId));
+  if(operation?.errorCode==='AUTH_REFRESH_UNAVAILABLE'&&operation.error)return {kind:'error',message:operation.error};
   if(operation?.state==='blocked'){
     const code=operation.errorCode??'';
     if(quotaErrors.has(code))return upgradeState(code==='TRANSLATION_MODEL_NOT_ALLOWED'?'not_allowed':'quota_exhausted');

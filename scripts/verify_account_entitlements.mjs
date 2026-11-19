@@ -193,7 +193,7 @@ try{
   assert(!(await requests()).some(value=>value.startsWith('/v1/billing/')));
   await page.evaluate(()=>window.accountFixture.setEntitlementError(true));
   await page.getByRole('button',{name:'刷新权益',exact:true}).click();
-  await page.getByRole('alert').filter({hasText:'暂时无法读取权益'}).waitFor();
+  await page.getByRole('alert').filter({hasText:'Synthetic entitlement failure'}).waitFor();
   assert.equal(await page.locator('.nc-rights-card').count(),3);
   await page.evaluate(()=>window.accountFixture.setEntitlementError(false));
   await page.getByRole('button',{name:'刷新权益',exact:true}).click();

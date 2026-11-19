@@ -48,7 +48,8 @@ const server=createServer({key:await readFile(path.join(profile,'key.pem')),cert
     if(url.pathname==='/fixture/token'){
       let body='';for await(const chunk of request)body+=chunk;const params=new URLSearchParams(body);
       if(params.get('grant_type')==='refresh_token'){
-        assert.equal(params.get('refresh_token'),'fixture-refresh');refreshRequests++;
+         assert.equal(params.get('refresh_token'),'fixture-refresh');refreshRequests++;
+         if(!accountFailure){json(response,{access_token:'fixture-renewed',token_type:'Bearer',expires_in:3600});return;}
         assert(['refresh-unavailable','revoked'].includes(accountFailure));
         json(response,{error:accountFailure==='revoked'?'invalid_grant':'temporarily_unavailable'},400);return;
       }
@@ -58,7 +59,7 @@ const server=createServer({key:await readFile(path.join(profile,'key.pem')),cert
     }
     if(url.pathname.endsWith('/v1/me')){assert.equal(request.headers.authorization,'Bearer fixture-access');json(response,{user:{id:'fixture-reader',name:'隔离测试读者',role:'reader'}});return;}
     if(['/v1/capabilities','/v1/me/entitlements'].includes(url.pathname)){
-      if(url.pathname==='/v1/me/entitlements'){assert.equal(request.headers.authorization,'Bearer fixture-access');entitlementRequests++;}
+      if(url.pathname==='/v1/me/entitlements'){assert(['Bearer fixture-access','Bearer fixture-renewed'].includes(request.headers.authorization));entitlementRequests++;}
       if(request.headers.authorization&&accountFailure){
         const unavailable=accountFailure==='api-unavailable';
         json(response,{error:{code:unavailable?'AUTH_UNAVAILABLE':'TOKEN_INVALID',message:unavailable?'暂时无法验证登录，请稍后重试':'登录已过期，请重新登录'}},unavailable?503:401);return;
@@ -139,27 +140,29 @@ try{
       else {assert(auth.session.retryAt>Date.now());assert.equal(refreshRequests,1);}
       checks.push(failure+': post-login service failure retains the account without a misleading expired-login prompt');
       phase=failure+'-account-load';
-      const accountError=reader.getByRole('alert').filter({hasText:'暂时无法读取权益'});
+      const accountError=reader.getByRole('alert').filter({hasText:failure==='api-unavailable'?'暂时无法验证登录':'登录服务暂不可用'});
       await accountError.waitFor({timeout:5000});
       assert.equal(await reader.getByText('正在读取会员权益…',{exact:true}).count(),0);
       assert.equal(await reader.getByText('权益读取中',{exact:true}).count(),0);
       await reader.screenshot({path:path.join(run,'account-'+failure+'.png')});
       const refresh=reader.getByRole('button',{name:'刷新权益',exact:true}),beforeRequests=entitlementRequests;
-      const failedRefresh=reader.waitForResponse(response=>new URL(response.url()).pathname==='/v1/me/entitlements');
+      const failedRefresh=failure==='api-unavailable'?reader.waitForResponse(response=>new URL(response.url()).pathname==='/v1/me/entitlements'):undefined;
       await refresh.click();await failedRefresh;await accountError.waitFor();
       assert.equal(await refresh.getAttribute('aria-busy'),'false');
       assert.equal(await reader.getByText('正在读取会员权益…',{exact:true}).count(),0);
-      assert.equal(entitlementRequests,beforeRequests+1);
+      const failureCalls=failure==='api-unavailable'?1:0;
+      assert.equal(entitlementRequests,beforeRequests+failureCalls);
       phase=failure+'-account-recovery';accountFailure='';
+      if(failure==='refresh-unavailable')await reader.clock.setFixedTime(new Date(auth.session.retryAt+1));
       await refresh.click();await reader.getByText('免费额度',{exact:true}).waitFor();
       assert.equal(await accountError.count(),0);assert.equal(await refresh.getAttribute('aria-busy'),'false');
-      assert.equal(entitlementRequests,beforeRequests+2);
+      assert.equal(entitlementRequests,beforeRequests+failureCalls+1);
       assert.equal((await reader.evaluate(()=>chrome.storage.local.get('nc-auth').then(value=>value['nc-auth']))).session.id,auth.session.id);
       checks.push(failure+': first-load and retry failures stop loading; one manual retry recovers balances in the same session');
     }
     await reader.screenshot({path:path.join(run,'reader-'+failure+'.png')});
   }
-  assert.equal(tokenRequests,4);assert.equal(refreshRequests,2);assert.deepEqual(pageErrors,[]);
+  assert.equal(tokenRequests,4);assert.equal(refreshRequests,3);assert.deepEqual(pageErrors,[]);
   const result={checks,tokenRequests,refreshRequests,entitlementRequests,pageErrors,browser:context.browser()?.version(),nativeIdentity:true,liveIdentityProvider:false};
   await writeFile(path.join(run,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }catch(error){

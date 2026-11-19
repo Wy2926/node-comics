@@ -10,22 +10,22 @@ import {AccountUsage} from './Usage';
 import {FeedbackInbox} from './Feedback';
 import './account.css';
 
-type AccountProps={api:Api;account:Session|null;rights?:Entitlements;rightsLoading:boolean;testing:boolean;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void};
+type AccountProps={api:Api;account:Session|null;rights?:Entitlements;rightsLoading:boolean;rightsError?:string;testing:boolean;onLogin:()=>void;onLogout:()=>void;onEntitlements:(value:Entitlements)=>void};
 
-function AccountContent({api,account,rights,rightsLoading,testing,onLogout,onEntitlements,onLogin}:AccountProps&{account:Session}){
+function AccountContent({api,account,rights,rightsLoading,rightsError,testing,onLogout,onEntitlements,onLogin}:AccountProps&{account:Session}){
   const member=!!rights&&rights.plan!=='free';
-  const [refreshing,setRefreshing]=useState(false),[error,setError]=useState(false),[activity,setActivity]=useState(false);
+  const [refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[activity,setActivity]=useState(false);
   const [revision,setRevision]=useState(0);
   const loading=rightsLoading||refreshing,failed=!loading&&(error||!rights);
   const pending=useRef(false),generation=useRef(0),fromPricing=useRef(false);
   async function refresh(){
     if(pending.current)return;
     const current=generation.current;
-    pending.current=true;setRefreshing(true);setError(false);
+    pending.current=true;setRefreshing(true);setError('');
     try{
       const value=await api.entitlements(true);
       if(current===generation.current&&api.isCurrent()){onEntitlements(value);setRevision(value=>value+1);}
-    }catch{if(current===generation.current&&api.isCurrent())setError(true);}
+    }catch(reason){if(current===generation.current&&api.isCurrent())setError(reason instanceof Error?reason.message:msg('暂时无法读取权益，请重试。'));}
     finally{if(current===generation.current){pending.current=false;setRefreshing(false);}}
   }
   useEffect(()=>{
@@ -50,7 +50,7 @@ function AccountContent({api,account,rights,rightsLoading,testing,onLogout,onEnt
         <a className="icon-button" href={pricingUrl(getLocale())} target="_blank" rel="noopener noreferrer" aria-label={msg('前往定价页面')} title={msg('前往定价页面')} onClick={()=>{fromPricing.current=true;}}><Icon name="pricing" size={28}/></a>
       </div>
     </header>
-    {failed&&<p className="nc-error" role="alert">{msg('暂时无法读取权益，请重试。')}</p>}
+    {failed&&<p className="nc-error" role="alert">{error||rightsError||msg('暂时无法读取权益，请重试。')}</p>}
     {(rights||!failed)&&<EntitlementCards api={api} data={rights} revision={revision}/>}
     <details className="nc-account-activity" onToggle={event=>setActivity(event.currentTarget.open)}>
       <summary>{msg('用量与反馈')}</summary>
