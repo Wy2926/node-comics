@@ -1,10 +1,28 @@
-import type { SourceNetworkContext } from '../contracts/network';
+import type { SourceDocumentProjection, SourceNetworkContext } from '../contracts/network';
 import { resolveSource } from '../core/resolve';
 import { definitions } from '../registry/definitions';
 import { authorizeSourceRequest, createSourceNetworkContext, SourceHttpError, sourceRetryAfter, sourceVerificationError } from './http';
 import { requestInSourcePage } from './page-request';
 import { withPageDocument, type PageDocument } from './page-document';
 import { msg } from '../../i18n/runtime';
+import { discoveryDelay } from '../core/discovery';
+
+/** Some SPAs expose the complete result only after their own session-bound request finishes. */
+export function exactDocumentReader(url: string, signal: AbortSignal) {
+  // Catalog bindings are extension metadata, not part of the site's SPA route.
+  url = url.split('#nodelane-', 1)[0];
+  const authorize = (lifetime: AbortSignal) => authorizeSourceRequest(url, undefined, lifetime);
+  return (project: SourceDocumentProjection) => withPageDocument({url, matches: target => target === url, authorize, exact: true},
+    AbortSignal.any([signal, AbortSignal.timeout(30_000)]), async page => {
+      for (;;) {
+        const value = await page.request(project, {});
+        if (value === null) {await discoveryDelay(250, page.signal); continue;}
+        if (typeof value !== 'string' || value.length > 4 * 1024 * 1024) throw Error('INVALID_SOURCE_DOCUMENT');
+        await authorize(page.signal);
+        return value;
+      }
+    });
+}
 /** One bounded source-page session per origin across extension pages; no HTTP-failure fallback. */
 export async function withPageNetworkContext<T>(url: string, signal: AbortSignal, read: (context: SourceNetworkContext) => Promise<T>): Promise<T> {
   await authorizeSourceRequest(url, undefined, signal);

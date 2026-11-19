@@ -21,6 +21,8 @@ export interface SourceRequestOptions {
 
 export interface SourceNetworkContext {
   signal?: AbortSignal;
+  /** A packaged, self-contained projection of the exact source document; null while the SPA loads. */
+  readDocument?(project: SourceDocumentProjection): Promise<string>;
   previous?: SourceCatalogSnapshot;
   /** Optional, validated partial observations; completion still comes from catalog's final result. */
   onCatalogProgress?(snapshot: SourceCatalogSnapshot): Promise<void>;
@@ -29,6 +31,7 @@ export interface SourceNetworkContext {
   /** Direct HTTP only: binary response to GET, binary POST or form POST; never replayed or sent through a page session. */
   requestBytes?(url:string, options:{referer:string; body?:Uint8Array; form?:Readonly<Record<string,string>>}):Promise<Uint8Array>;
 }
+export type SourceDocumentProjection = (input: {pageUrl: string; documentToken: string; cancelEvent: string}) => Promise<string | null>;
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {
   /** Operations that need a real source-page session; omitted operations retain direct HTTP. */

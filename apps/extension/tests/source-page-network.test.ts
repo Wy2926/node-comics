@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withPageNetworkContext, withSearchNetworkContext } from '../src/sources/runtime/page-network';
+import { exactDocumentReader, withPageNetworkContext, withSearchNetworkContext } from '../src/sources/runtime/page-network';
 import { requestInSourcePage, type PageNetworkResponse } from '../src/sources/runtime/page-request';
 import { readSourceCatalog } from '../src/sources/runtime/catalog-reader';
 import { readNetworkPages } from '../src/sources/runtime/network';
@@ -29,6 +29,20 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const read = (signal = new AbortController().signal) => withPageNetworkContext(url, signal, context => context.request(target));
+describe('exact source document projections', () => {
+  it('waits for a late SPA result on the exact route without touching another open chapter', async () => {
+    const project = async () => 'fixture';
+    vi.mocked(chrome.tabs.query).mockImplementation(async () => [{...tab, id:8, url:url + '/other'} as chrome.tabs.Tab]);
+    let reads = 0;
+    inject.mockImplementation(async options => [{frameId:0, documentId:'document-1',
+      result:options.func === project ? (++reads === 1 ? null : 'fixture') : tab.url}]);
+    expect(await exactDocumentReader(url + '#nodelane-fixture=12', new AbortController().signal)(project)).toBe('fixture');
+    expect(reads).toBe(2);
+    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url, active:false});
+    expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
 describe('opt-in search page transport', () => {
   const search = (signal = new AbortController().signal) => withSearchNetworkContext(target, signal, context => context.request(target));
   it('reuses any ready same-origin work page without navigating, opening, closing or using extension HTTP', async () => {

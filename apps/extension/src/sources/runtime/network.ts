@@ -6,7 +6,7 @@ import {validatePages} from '../core/pages';
 import {registerManifest} from './manifests';
 import type {PageManifest,PageSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 import {createSourceNetworkContext as networkContext} from './http';
-import {withPageNetworkContext} from './page-network';
+import {exactDocumentReader,withPageNetworkContext} from './page-network';
 import {importResponseLimits,rememberImportResponses,takeImportResponses,type ImportResponse} from './import-responses';
 
 /** Select each operation independently; failures never switch transports implicitly. */
@@ -15,7 +15,7 @@ export function networkOperation<K extends 'catalog'|'pages'>(url:string,operati
   if(!definition.capabilities.importable||!definition.capabilities[operation]||location.kind!==(operation==='catalog'?'catalog':'reader'))throw Error('SOURCE_OPERATION_UNSUPPORTED');
   return sourceNetworks[definition.id]?.[operation];
 }
-/** Resolve missing parent identity through the owning adapter, without opening a source tab. */
+/** Resolve missing parent identity through the owning adapter. */
 export async function resolveNetworkCatalog(url:string,signal?:AbortSignal):Promise<string|undefined>{
   const {definition,location}=resolveSource(url,definitions);
   if(!definition.capabilities.importable||!definition.capabilities.catalog||location.kind!=='reader')return;
@@ -26,7 +26,7 @@ export async function resolveNetworkCatalog(url:string,signal?:AbortSignal):Prom
   signal.throwIfAborted();
   const context=networkContext(signal),responses:ImportResponse[]=[];
   let retained=0;
-  const target=await resolve(url,{...context,async request(target,options){
+  const target=await resolve(url,{...context,readDocument:exactDocumentReader(url,signal),async request(target,options){
     const body=await context.request(target,options);
     if(options?.form===undefined&&options?.json===undefined){
       retained+=body.length*2;
@@ -59,7 +59,7 @@ export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal
   }:undefined;
   const value=sourceNetworks[definition.id]?.pageTransport?.includes('catalog')
     ?await withPageNetworkContext(url,signal,context=>read(url,{...context,previous,onCatalogProgress}))
-    :await read(url,{...networkContext(signal),previous,onCatalogProgress});
+    :await read(url,{...networkContext(signal),readDocument:exactDocumentReader(url,signal),previous,onCatalogProgress});
   const snapshot=validateCatalog(value,definitions);
   if(snapshot.id!==location.catalog!.key||!snapshot.complete||!snapshot.groups.every(group=>group.complete))throw Error('SOURCE_CATALOG_CHANGED');
   signal?.throwIfAborted();
@@ -71,7 +71,7 @@ export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<P
   if(!read)throw Error('SOURCE_COLLECTION_UNSUPPORTED');
   const value=sourceNetworks[definition.id]?.pageTransport?.includes('pages')
     ?await withPageNetworkContext(url,readSignal,context=>read(url,context))
-    :await read(url,networkContext(readSignal,await takeImportResponses(location,readSignal)));
+    :await read(url,{...networkContext(readSignal,await takeImportResponses(location,readSignal)),readDocument:exactDocumentReader(url,readSignal)});
   const snapshot=validatePages(value,location);
   readSignal.throwIfAborted();
   const manifest:PageSnapshot={adapter:snapshot.adapter,url:snapshot.url,title:snapshot.title,direction:snapshot.direction,
