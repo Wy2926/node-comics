@@ -27,7 +27,6 @@ function input(baseUrl='http://127.0.0.1:8000',password='fixture-password'):Chan
 function result(value:ChannelConnectionInput):ChannelConnectionResult{
   return {settings:{baseUrl:value.settings.baseUrl,username:value.settings.username},secrets:{token:'private-token-'+value.secrets.password,password:value.secrets.password}};
 }
-function deferred<T>(){let resolve!:(value:T)=>void;const promise=new Promise<T>(done=>{resolve=done;});return {promise,resolve};}
 
 beforeEach(()=>{
   vi.resetModules();protocol.connect.mockReset().mockImplementation(async(value:ChannelConnectionInput)=>result(value));protocol.open.mockReset();protocol.builtinEnabled=false;
@@ -188,7 +187,7 @@ describe('channel configuration and connection',()=>{
     installLocks(enabled);
     const {connectChannel}=await import('../src/translation/channels');
     const {readChannelCredentials,updateChannelSettings,writeChannelSecrets}=await import('../src/translation/channels/configuration');
-    const profile=await connectChannel('fixture','Local',input()),entered=deferred<void>(),release=deferred<void>();
+    const profile=await connectChannel('fixture','Local',input()),entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
     const updated={...profile,settings:{...profile.settings,baseUrl:'http://127.0.0.1:9000'}};
     const updatedSecrets={password:'other-password',token:'other-token'};
     const mutation=updateChannelSettings(async value=>{
@@ -233,7 +232,7 @@ describe('channel configuration and connection',()=>{
     const {connectChannel,selectChannel,removeChannel,listChannels}=await import('../src/translation/channels');
     const {readChannelSecrets}=await import('../src/translation/channels/configuration');
     const profile=await connectChannel('fixture','Local',input());await selectChannel(profile.id);
-    const pending=deferred<ChannelConnectionResult>();protocol.connect.mockImplementationOnce(()=>pending.promise);
+    const pending=Promise.withResolvers<ChannelConnectionResult>();protocol.connect.mockImplementationOnce(()=>pending.promise);
     const reconnect=connectChannel('fixture','Late',input(undefined,'late-password'),profile.id);
     await vi.waitFor(()=>expect(protocol.connect).toHaveBeenCalledTimes(2));await removeChannel(profile.id);
     pending.resolve(result(input(undefined,'late-password')));await expect(reconnect).rejects.toThrow('已移除');

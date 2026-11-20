@@ -24,11 +24,6 @@ afterEach(async () => {
   for (const remove of unregister.splice(0)) remove();
 });
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
-  return {promise, resolve};
-}
 function context(provider = 'fixture-files', connectionId = `${provider}:reader`, itemId = 'same-file', version = 'v1', marker = 7): OpenFileSourceContext {
   return {
     connection: {id: connectionId, provider, displayName: 'Fixture files', status: 'connected', generation: 1, createdAt: 1, updatedAt: 1},
@@ -92,7 +87,7 @@ describe('pluggable file-source runtime', () => {
   it('disposes late provider opens invalidated by either the connection or its stable item', async () => {
     const fixture = fixtureDriver();
     for (const itemId of [undefined, 'same-file']) {
-      const pending = deferred<RandomAccessSource>();
+      const pending = Promise.withResolvers<RandomAccessSource>();
       const late = {snapshot: {identity: 'late', version: 'v1', size: 32, local: false}, readAt: vi.fn(), validate: vi.fn(), close: vi.fn(async () => {})};
       fixture.open.mockReturnValueOnce(pending.promise);
       const opening = openFileSource(context());
@@ -139,7 +134,7 @@ describe('pluggable file-source runtime', () => {
     const fixture = fixtureDriver();
     const first = await open(), sibling = await open(context('fixture-files', undefined, 'another-file'));
     const anotherAccount = await open(context('fixture-files', 'fixture-files:another-reader'));
-    const pending = deferred<Uint8Array>(); fixture.sources[0].readAt.mockReturnValueOnce(pending.promise);
+    const pending = Promise.withResolvers<Uint8Array>(); fixture.sources[0].readAt.mockReturnValueOnce(pending.promise);
     const reading = first.readAt(0, 2);
     await vi.waitFor(() => expect(fixture.sources[0].readAt).toHaveBeenCalledTimes(1));
     await closeSourceAccess({connectionId: context().connection.id, itemId: 'same-file'});
@@ -159,7 +154,7 @@ describe('pluggable file-source runtime', () => {
   it('discards late uncached/local reads and validations after explicit close', async () => {
     for (const options of [{id: 'uncached-files', cacheRanges: false}, {id: 'local-files', local: true}]) {
       const fixture = fixtureDriver(options), source = await open(context(options.id));
-      const bytes = deferred<Uint8Array>(), status = deferred<'unchanged'>();
+      const bytes = Promise.withResolvers<Uint8Array>(), status = Promise.withResolvers<'unchanged'>();
       fixture.sources[0].readAt.mockReturnValueOnce(bytes.promise); fixture.sources[0].validate.mockReturnValueOnce(status.promise);
       const reading = source.readAt(0, 2), validating = source.validate();
       await source.close();
@@ -171,7 +166,7 @@ describe('pluggable file-source runtime', () => {
   });
 
   it('rejects late cache hits after connection closure without reopening the remote source', async () => {
-    const fixture = fixtureDriver(), source = await open(), lookup = deferred<Blob>();
+    const fixture = fixtureDriver(), source = await open(), lookup = Promise.withResolvers<Blob>();
     cache.get.mockReturnValueOnce(lookup.promise);
     const reading = source.readAt(0, 2);
     await closeSourceAccess({connectionId: context().connection.id});
@@ -194,7 +189,7 @@ describe('pluggable file-source runtime', () => {
   });
 
   it('disposes a source when opening is cancelled, and validates byte boundaries before cache or provider reads', async () => {
-    const fixture = fixtureDriver(), pending = deferred<RandomAccessSource>(), controller = new AbortController();
+    const fixture = fixtureDriver(), pending = Promise.withResolvers<RandomAccessSource>(), controller = new AbortController();
     const late = {snapshot: {identity: 'late', version: 'v1', size: 32, local: false}, readAt: vi.fn(), validate: vi.fn(), close: vi.fn(async () => {})};
     fixture.open.mockReturnValueOnce(pending.promise);
     const opening = openFileSource({...context(), signal: controller.signal}); controller.abort();

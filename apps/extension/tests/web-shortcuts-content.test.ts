@@ -8,13 +8,12 @@ type Listener=(message:any,sender:chrome.runtime.MessageSender,respond:(value:un
 const background={id:'extension',url:'chrome-extension://extension/background.js'};
 const flush=async()=>{for(let count=0;count<10;count++)await Promise.resolve();};
 let listeners:Set<Listener>,hidden:boolean;
-let initial:{promise:Promise<any>;resolve:(value:any)=>void};
-function deferred(){let resolve!:(value:any)=>void;return {promise:new Promise<any>(done=>{resolve=done;}),resolve};}
+let initial:PromiseWithResolvers<unknown>;
 function broadcast(message:any,sender:chrome.runtime.MessageSender=background){for(const listener of listeners)listener(message,sender,()=>{});}
 const binding=()=>vi.mocked(bindShortcuts).mock.calls.at(-1)!;
 const key=(trusted=true)=>({isTrusted:trusted}) as KeyboardEvent;
 beforeEach(()=>{
-  vi.clearAllMocks();listeners=new Set();hidden=false;initial=deferred();
+  vi.clearAllMocks();listeners=new Set();hidden=false;initial=Promise.withResolvers<unknown>();
   vi.stubGlobal('window',{});vi.stubGlobal('document',{get hidden(){return hidden;}});
   vi.stubGlobal('location',{href:'https://source.test/chapter'});
   vi.stubGlobal('chrome',{runtime:{id:'extension',getURL:()=> 'chrome-extension://extension/',

@@ -7,7 +7,6 @@ import type {ComicSearchDependencies} from '../src/comics/application/search/typ
 import type {SourceSearchResult,SourceSearchResults,SourceSearchSite} from '../src/sources/contracts/search';
 
 const flush=async()=>{for(let index=0;index<12;index++)await Promise.resolve();};
-const deferred=<T>()=>{let resolve!:(value:T)=>void,reject!:(reason?:unknown)=>void;const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const site=(id:string,primaryLanguages=['en']):SourceSearchSite=>({id,name:id,url:`https://${id}.example/`,icon:'',primaryLanguages,adaptedOn:'2026-09-23',contentTags:['manga'],pricing:'unknown',isRaw:false,adapterId:id,key:id+':'+id,search: true});
 const hit=(id:string,name=id):SourceSearchResult=>({sourceId:id,siteId:id,key:JSON.stringify([id,name]),catalogId:name,catalogUrl:`https://${id}.example/comic/${name}`,title:name});
 const page=(id:string,name=id):SourceSearchResults=>({items:[hit(id,name)]});
@@ -68,7 +67,7 @@ describe('comic search session',()=>{
     expect(vi.mocked(deps.search).mock.calls.map(([id])=>id)).toEqual(['a','b']);
   });
   it('snapshots the filtered scope before resolving a translated title',async()=>{
-    const name=deferred<{name:string;target_language:string}>();
+    const name=Promise.withResolvers<{name:string;target_language:string}>();
     const {session,deps}=setup({translateTitle:()=>name.promise});
     const scope=['a:a'];const pending=session.searchWithTranslatedTitle(scope);
     scope.splice(0,1,'b:b');session.setSelection({'a:a':false});
@@ -76,7 +75,7 @@ describe('comic search session',()=>{
     expect(vi.mocked(deps.search).mock.calls.map(([id])=>id)).toEqual(['a']);
   });
   it('rejects an empty filtered scope without requests or interrupting the active round',async()=>{
-    const pending=deferred<SourceSearchResults>();
+    const pending=Promise.withResolvers<SourceSearchResults>();
     const {session,deps}=setup({search:vi.fn().mockReturnValue(pending.promise)},[site('a')]);
     session.searchManual('first');
     const before=session.getSnapshot(),signal=vi.mocked(deps.search).mock.calls[0][2].signal;
@@ -89,7 +88,7 @@ describe('comic search session',()=>{
   });
   it('preserves the search origin through name translation and deferred site completion',async()=>{
     let now=1700000000000;
-    const name=deferred<{name:string;target_language:string}>(),results=deferred<SourceSearchResults>();
+    const name=Promise.withResolvers<{name:string;target_language:string}>(),results=Promise.withResolvers<SourceSearchResults>();
     const {session}=setup({now:()=>now,translateTitle:()=>name.promise,search:()=>results.promise},[site('a')]);
     const request=session.searchWithTranslatedTitle();
     now+=10000;name.resolve({name:'private-name',target_language:'en'});await request;
@@ -106,7 +105,7 @@ describe('comic search session',()=>{
     expect(JSON.stringify(analytics.track.mock.calls)).not.toContain('private-');
   });
   it('records translated-name misses and explicit cancellation as separate search outcomes',async()=>{
-    const pending=deferred<SourceSearchResults>();
+    const pending=Promise.withResolvers<SourceSearchResults>();
     const {session}=setup({translateTitle:async()=>({name:null,target_language:null}),search:()=>pending.promise});
     await session.searchWithTranslatedTitle();session.searchManual('private-query');session.stop();pending.resolve(page('private'));await flush();
     expect(analytics.track.mock.calls.filter(([name])=>name==='search_result').map(([,params])=>params.outcome)).toEqual(['empty','cancelled']);
@@ -133,7 +132,7 @@ describe('comic search session',()=>{
     expect(deps.search).not.toHaveBeenCalled();
   });
   it('keeps this round, pagination and retries intact when the scope changes, then uses the new scope on submit',async()=>{
-    const slow=deferred<SourceSearchResults>();let bCalls=0;
+    const slow=Promise.withResolvers<SourceSearchResults>();let bCalls=0;
     const search=vi.fn<ComicSearchDependencies['search']>((id,request)=>id==='b'&&++bCalls===1?slow.promise:Promise.resolve(id==='a'?{items:[hit('a',request.cursor?'second':'first')],nextCursor:request.cursor?undefined:'next'}:page(id)));
     const {session,deps}=setup({search},[site('a'),site('b'),site('c')],{'c:c':false});
     session.searchManual('first query');await flush();
@@ -150,7 +149,7 @@ describe('comic search session',()=>{
     expect(session.getSnapshot().sites.map(state=>state.status)).toEqual(['idle','idle','ready']);
   });
   it('uses the submitted scope even when choices change while the title is being resolved',async()=>{
-    const name=deferred<{name:string;target_language:string}>();
+    const name=Promise.withResolvers<{name:string;target_language:string}>();
     const search=vi.fn<ComicSearchDependencies['search']>(async id=>page(id));
     const {session}=setup({translateTitle:()=>name.promise,search},[site('a'),site('b')],{'b:b':false});
     const pending=session.searchWithTranslatedTitle();session.setSelection({'a:a':false,'b:b':true});
@@ -159,8 +158,8 @@ describe('comic search session',()=>{
     await session.searchWithTranslatedTitle();await flush();expect(search.mock.calls.map(call=>call[0])).toEqual(['a','b']);
   });
   it('streams first results with no more than three concurrent sites and preserves same-name cross-site candidates',async()=>{
-    const pending=new Map<string,ReturnType<typeof deferred<SourceSearchResults>>>();let running=0,max=0;
-    const {session}=setup({search:vi.fn((id)=>{running++;max=Math.max(max,running);const request=deferred<SourceSearchResults>();pending.set(id,request);return request.promise.finally(()=>running--);})},['a','b','c','d','e'].map(id=>site(id)));
+    const pending=new Map<string,PromiseWithResolvers<SourceSearchResults>>();let running=0,max=0;
+    const {session}=setup({search:vi.fn((id)=>{running++;max=Math.max(max,running);const request=Promise.withResolvers<SourceSearchResults>();pending.set(id,request);return request.promise.finally(()=>running--);})},['a','b','c','d','e'].map(id=>site(id)));
     session.searchManual('共同名称');await flush();expect([...pending.keys()]).toEqual(['a','b','c']);
     pending.get('b')!.resolve(page('b','same'));await flush();
     expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['b']);expect(pending.has('d')).toBe(true);
@@ -169,7 +168,7 @@ describe('comic search session',()=>{
     expect(max).toBe(3);expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['b','a','e','d','c']);expect(session.getSnapshot().phase).toBe('settled');
   });
   it('interleaves uneven site batches and later pages without duplicating hits or changing each site order',async()=>{
-    const pending=new Map(['a','b','c'].map(id=>[id,deferred<SourceSearchResults>()]));
+    const pending=new Map(['a','b','c'].map(id=>[id,Promise.withResolvers<SourceSearchResults>()]));
     const {session}=setup({search:vi.fn((id,request)=>request.cursor?Promise.resolve({items:[hit('b','b1'),hit('b','b3')]}):pending.get(id)!.promise)},[site('a'),site('b'),site('c')]);
     const order=()=>session.getSnapshot().results.map(result=>result.catalogId);
     session.searchManual('same');pending.get('a')!.resolve({items:['a1','a2','a3'].map(name=>hit('a',name))});await flush();expect(order()).toEqual(['a1','a2','a3']);
@@ -217,7 +216,7 @@ describe('comic search session',()=>{
     await vi.advanceTimersByTimeAsync(30_001);await session.searchWithTranslatedTitle();expect(translate).toHaveBeenCalledTimes(2);
   });
   it('retries only a failed site and appends cursor pages without resolving names again',async()=>{
-    const slow=deferred<SourceSearchResults>();let a=0;
+    const slow=Promise.withResolvers<SourceSearchResults>();let a=0;
     const search=vi.fn((id:string,request:{cursor?:string})=>id==='b'?slow.promise:++a===1?Promise.reject(new Error('temporary')):Promise.resolve(request.cursor?{items:[{...hit('a'),authors:['Updated']},hit('a','second')]}:{...page('a'),nextCursor:'bound-cursor'}));
     const {session,deps}=setup({search});await session.searchWithTranslatedTitle();await flush();
     expect(session.getSnapshot().sites[0].status).toBe('error');session.retrySite('a:a');await flush();
@@ -227,7 +226,7 @@ describe('comic search session',()=>{
     slow.resolve(page('b'));await flush();expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['a','b','a']);
   });
   it('retains the first mirror destination and tracks each site hit independently while enriching optional fields',async()=>{
-    const mirror={...site('mirror'),adapterId:'a'},slow=deferred<SourceSearchResults>();
+    const mirror={...site('mirror'),adapterId:'a'},slow=Promise.withResolvers<SourceSearchResults>();
     const {session}=setup({search:vi.fn((_id,request)=>request.siteId==='mirror'?slow.promise:Promise.resolve(page('a')))},[site('a'),mirror]);
     session.searchManual('same');await flush();const first=session.getSnapshot().results[0];
     slow.resolve({items:[{...hit('a'),siteId:'mirror',catalogUrl:'https://mirror.example/comic/a',authors:['Known author'],cover:{url:'https://mirror.example/cover.jpg'},contentLanguages:['ja']}]});await flush();
@@ -257,12 +256,12 @@ describe('comic search session',()=>{
     expect(session.getSnapshot().results).toHaveLength(2);
   });
   it('cancels late name/site responses, preserves arrived results on stop, and clears old results on language change',async()=>{
-    const slow=deferred<SourceSearchResults>();let b=0;
+    const slow=Promise.withResolvers<SourceSearchResults>();let b=0;
     const {session}=setup({search:vi.fn(id=>id==='b'&&++b===1?slow.promise:Promise.resolve(page(id)))});
     session.searchManual('one');await flush();session.stop();expect(session.getSnapshot().results.map(result=>result.sourceId)).toEqual(['a']);
     slow.resolve(page('b','late'));await flush();expect(session.getSnapshot().results).toHaveLength(1);
     session.setTargetLanguage('en');expect(session.getSnapshot().results).toHaveLength(0);expect(session.getSnapshot().query).toBe('');
-    const name=deferred<{name:string;target_language:string}>();const other=setup({translateTitle:()=>name.promise}).session;
+    const name=Promise.withResolvers<{name:string;target_language:string}>();const other=setup({translateTitle:()=>name.promise}).session;
     const request=other.searchWithTranslatedTitle();other.setSourceTitle('new');name.resolve({name:'stale',target_language:'en'});await request;expect(other.getSnapshot().query).toBe('');expect(other.getSnapshot().sourceTitle).toBe('new');
   });
   it('surfaces browser-revoked access as an error without authorization work and retries only the failed site',async()=>{

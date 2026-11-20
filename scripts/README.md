@@ -9,11 +9,12 @@
 | `verify_reader_*.mjs` | 阅读器夹具、位置与图片窗口 |
 | `verify_translation_*.mjs` | 渠道、字体、语言与结果 |
 | `verify_*source*.mjs`、`verify_comic_search.mjs` | 来源与搜索 |
+| `verify_discovery.mjs`、`verify_extension_mobile.mjs` | 作品关联、评论与移动布局 |
 | `prepare_*translation_fonts.py` | 按本地固定清单生成字体描述和预览 |
 | `prepare_*screenshots.mjs` | 商店图片排版；先在本目录 `npm ci` |
 
 浏览器脚本使用 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright，`TEST_CHROMIUM` 或 `CHROMIUM_PATH` 指定浏览器。MV3 测试先构建插件，网页夹具先启动对应 Vite 配置。
 
-插件 `tests/epub-reader-fixture.html?fixed` 提供五页固定版式样本；`tests/epub-reader.browser.mjs` 的 `desktop EPUB double` 验证双栏、固定双页、0／50／100 中缝、RTL 与重开恢复。`tests/reader-pagination.browser.mjs` 验证图片中缝、尺寸和 URL 稳定、窄屏与保存恢复；均使用本地合成样本。
+EPUB 与图片分页的浏览器测试在插件的 [`tests/`](../apps/extension/tests/) 目录。
 
 `verify_overlay_tiles.mjs` 需要 `COMICS_COMPUTE_ROOT` 和安装了 NumPy、Pillow 的 `PYTHON`，用于真实节点编码联调。其他服务端工具在 `node-comics-backend/scripts/`。

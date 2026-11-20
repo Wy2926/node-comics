@@ -13,7 +13,6 @@ const renewable=()=>testSession({credential:{kind:'oidc',refreshToken:'refresh-o
 const renewed=()=>Response.json({access_token:'new-access',refresh_token:'refresh-two',token_type:'Bearer',expires_in:3600});
 const unauthorized=()=>Response.json({error:{code:'TOKEN_INVALID',message:'Expired'}},{status:401});
 const bound=()=>new Api(API_BASE,'test-token',undefined,undefined,sessionAuthorization('test-session'));
-function deferred<T>(){let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return {promise,resolve};}
 let entries:Map<string,string>;
 let request:ReturnType<typeof vi.fn>;
 beforeEach(()=>{
@@ -106,7 +105,7 @@ describe('shared renewable sessions',()=>{
   });
   it.each(['logout','switch'] as const)('cannot resurrect a session after %s during refresh',async action=>{
     await saveSession({...renewable(),refreshAt:Date.now()-1});
-    const started=deferred<void>(),response=deferred<Response>();request.mockImplementationOnce(()=>{started.resolve();return response.promise;});
+    const started=Promise.withResolvers<void>(),response=Promise.withResolvers<Response>();request.mockImplementationOnce(()=>{started.resolve();return response.promise;});
     const pending=sessionAuthorization('test-session').token();const failed=expect(pending).rejects.toThrow();
     await started.promise;
     if(action==='logout')await signOut('test-session');else await saveSession(testSession({id:'new-login',token:'other-token',user:{id:'other',name:'Other',role:'reader'}}));
@@ -176,7 +175,7 @@ describe('authenticated API boundaries',()=>{
     expect((await readAuth()).session?.token).toBe('new-access');
   });
   it('does not clear the new account when an old account request returns 401',async()=>{
-    await saveSession(renewable());const started=deferred<void>(),response=deferred<Response>();
+    await saveSession(renewable());const started=Promise.withResolvers<void>(),response=Promise.withResolvers<Response>();
     request.mockImplementationOnce(()=>{started.resolve();return response.promise;});
     const pending=bound().entitlements(),failed=expect(pending).rejects.toThrow('账户或服务已切换');await started.promise;
     await saveSession(testSession({id:'other-login',token:'other-token'}));response.resolve(unauthorized());await failed;

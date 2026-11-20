@@ -25,11 +25,6 @@ function partial(source:SourceCatalogSnapshot,length=1):SourceCatalogSnapshot {
   return {...source,observedAt:source.observedAt-1,complete:false,note:'Loading directory',entries,
     groups:[{...source.groups[0],complete:false,entryIds:entries.map(entry=>entry.id)}]};
 }
-function deferred<T>() {
-  let resolve!:(value:T)=>void;
-  const promise=new Promise<T>(done=>{resolve=done;});
-  return {promise,resolve};
-}
 beforeEach(()=>{
   fixture.read.mockReset();
   vi.stubGlobal('chrome',{runtime:{id:'test'},permissions:{contains:vi.fn(async()=>true)}});
@@ -41,7 +36,7 @@ afterEach(async()=>{
 
 describe('progressive website directory import',()=>{
   it('opens a saved partial directory before completion and preserves content and position when it completes',async()=>{
-    const source=snapshot(),finish=deferred<SourceCatalogSnapshot>(),seen=deferred<void>(),onReady=vi.fn((_result:{comic:Comic;entry:Entry})=>{seen.resolve();});
+    const source=snapshot(),finish=Promise.withResolvers<SourceCatalogSnapshot>(),seen=Promise.withResolvers<void>(),onReady=vi.fn((_result:{comic:Comic;entry:Entry})=>{seen.resolve();});
     fixture.read.mockImplementation(async(_url:string,_signal:AbortSignal|undefined,options:{onCatalogProgress:(source:SourceCatalogSnapshot)=>Promise<void>})=>{
       await options.onCatalogProgress(partial(source));return finish.promise;
     });
@@ -90,7 +85,7 @@ describe('progressive website directory import',()=>{
   });
 
   it('never recreates a removed book when a later complete batch arrives',async()=>{
-    const source=snapshot(),finish=deferred<SourceCatalogSnapshot>(),seen=deferred<void>();
+    const source=snapshot(),finish=Promise.withResolvers<SourceCatalogSnapshot>(),seen=Promise.withResolvers<void>();
     fixture.read.mockImplementation(async(_url:string,_signal:AbortSignal|undefined,options:{onCatalogProgress:(source:SourceCatalogSnapshot)=>Promise<void>})=>{
       await options.onCatalogProgress(partial(source));return finish.promise;
     });
@@ -104,7 +99,7 @@ describe('progressive website directory import',()=>{
   });
 
   it('binds an existing book before reading so deletion before the first batch cannot recreate it',async()=>{
-    const source=snapshot(),comic=await importCatalog(source),finish=deferred<SourceCatalogSnapshot>(),started=deferred<void>();
+    const source=snapshot(),comic=await importCatalog(source),finish=Promise.withResolvers<SourceCatalogSnapshot>(),started=Promise.withResolvers<void>();
     fixture.read.mockImplementation(async()=>{started.resolve();return finish.promise;});
     const importing=importWebsiteLink(source.url),rejected=expect(importing).rejects.toThrow('已移除');
     await started.promise;await catalog.deleteComic(comic.id);finish.resolve({...source,observedAt:source.observedAt+1});await rejected;
@@ -112,7 +107,7 @@ describe('progressive website directory import',()=>{
   });
 
   it('rejects the final batch when the accepted book has changed its source generation',async()=>{
-    const source=snapshot(),finish=deferred<SourceCatalogSnapshot>(),seen=deferred<void>();
+    const source=snapshot(),finish=Promise.withResolvers<SourceCatalogSnapshot>(),seen=Promise.withResolvers<void>();
     fixture.read.mockImplementation(async(_url:string,_signal:AbortSignal|undefined,options:{onCatalogProgress:(source:SourceCatalogSnapshot)=>Promise<void>})=>{
       await options.onCatalogProgress(partial(source));return finish.promise;
     });
@@ -136,7 +131,7 @@ describe('progressive website directory import',()=>{
   });
 
   it('waits for the explicit requested chapter instead of opening a different partial chapter',async()=>{
-    const source=snapshot(),finish=deferred<SourceCatalogSnapshot>(),observed=deferred<void>(),onReady=vi.fn();
+    const source=snapshot(),finish=Promise.withResolvers<SourceCatalogSnapshot>(),observed=Promise.withResolvers<void>(),onReady=vi.fn();
     fixture.read.mockImplementation(async(_url:string,_signal:AbortSignal|undefined,options:{onCatalogProgress:(source:SourceCatalogSnapshot)=>Promise<void>})=>{
       await options.onCatalogProgress(partial(source));observed.resolve();return finish.promise;
     });
@@ -148,7 +143,7 @@ describe('progressive website directory import',()=>{
   });
 
   it('cancels after the early opening without accepting a late final directory',async()=>{
-    const source=snapshot(),controller=new AbortController(),finish=deferred<SourceCatalogSnapshot>(),seen=deferred<void>();
+    const source=snapshot(),controller=new AbortController(),finish=Promise.withResolvers<SourceCatalogSnapshot>(),seen=Promise.withResolvers<void>();
     fixture.read.mockImplementation(async(_url:string,_signal:AbortSignal|undefined,options:{onCatalogProgress:(source:SourceCatalogSnapshot)=>Promise<void>})=>{
       await options.onCatalogProgress(partial(source));seen.resolve();return finish.promise;
     });

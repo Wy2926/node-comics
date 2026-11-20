@@ -4,11 +4,6 @@ import {TextTranslationSession} from '../session';
 import type {TextTranslationAdapter} from '../contracts';
 
 const signal = () => new AbortController().signal;
-const deferred = () => {
-  let resolve!: (text: string) => void;
-  const promise = new Promise<string>(done => {resolve = done;});
-  return {resolve, promise};
-};
 const tick = async () => {for (let i = 0; i < 10; i++) await Promise.resolve();};
 
 describe('Anonymous Google text adapter', () => {
@@ -79,7 +74,7 @@ describe('Anonymous Google text adapter', () => {
 
 describe('Bounded text translation session', () => {
   it('uses two slots, shares exact input and cancels only after the last consumer leaves', async () => {
-    const pending = Array.from({length: 3}, deferred);
+    const pending = Array.from({length: 3}, () => Promise.withResolvers<string>());
     const translate = vi.fn<TextTranslationAdapter['translate']>().mockReturnValueOnce(pending[0].promise)
       .mockReturnValueOnce(pending[1].promise).mockReturnValueOnce(pending[2].promise);
     const session = new TextTranslationSession({id: 'fixture', name: 'Fixture', translate});
@@ -98,7 +93,7 @@ describe('Bounded text translation session', () => {
     session.dispose();
   });
   it('drops waiting jobs, prevents stale cache writes, and isolates languages', async () => {
-    const pending = [deferred(), deferred()];
+    const pending = [Promise.withResolvers<string>(), Promise.withResolvers<string>()];
     const translate = vi.fn<TextTranslationAdapter['translate']>().mockReturnValueOnce(pending[0].promise)
       .mockReturnValueOnce(pending[1].promise).mockResolvedValue('New');
     const session = new TextTranslationSession({id: 'fixture', name: 'Fixture', translate});

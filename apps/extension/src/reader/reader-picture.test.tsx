@@ -59,10 +59,9 @@ function previewCanvas(node:ReactNode):{ref:{current:unknown};style:{display?:st
 }
 function cleanup() {for (const effect of hooks.effects) effect?.cleanup?.(); hooks.effects = [];}
 type Lease={blob:Blob;release():void};
-function deferred<T>(){let resolve!:(value:T)=>void,reject!:(reason:Error)=>void;const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};}
 function controlledReads(){
   const reads:{key:string;signal:AbortSignal;release:ReturnType<typeof vi.fn>;resolve:()=>void;reject:(error:Error)=>void}[]=[];
-  const acquire=vi.fn<ReaderPictureProps['acquire']>((key,signal)=>{const pending=deferred<Lease>(),release=vi.fn();reads.push({key,signal,release,resolve:()=>pending.resolve({blob:new Blob([key]),release}),reject:pending.reject});return pending.promise;});
+  const acquire=vi.fn<ReaderPictureProps['acquire']>((key,signal)=>{const pending=Promise.withResolvers<Lease>(),release=vi.fn();reads.push({key,signal,release,resolve:()=>pending.resolve({blob:new Blob([key]),release}),reject:pending.reject});return pending.promise;});
   return {acquire,reads};
 }
 const translatedJob={id:'translated-job'} as NonNullable<ReaderPictureProps['job']>;
@@ -118,7 +117,7 @@ describe('shared reader pixel presentation', () => {
     expect(images(tree)).toHaveLength(0);expect(prepareReaderImage).not.toHaveBeenCalled();unpublish();releaseReaderImageURL(url);
   });
   it('shares an in-flight preview URL so its next owner does not start a second decode',async()=>{
-    const decode=deferred<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(decode.promise);
+    const decode=Promise.withResolvers<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(decode.promise);
     render({shareForTurn:true});await flush();expect(images(tree)).toHaveLength(0);
     const borrowed=borrowReaderImageURL(JSON.stringify(['slot-1','original',undefined]))!;expect(borrowed).toBe('blob:reader-test-1');
     cleanup();expect(URL.revokeObjectURL).not.toHaveBeenCalled();decode.resolve();await Promise.resolve();
@@ -142,7 +141,7 @@ describe('shared reader pixel presentation', () => {
     render({scope:'next',blobKey:'next'});preview.draw(frame);render();expect(drawImage).toHaveBeenCalledTimes(2);expect(acquire).toHaveBeenCalledTimes(2);
   });
   it('promotes a queued neighbor without reacquiring bytes or restarting preparation',async()=>{
-    const pending=deferred<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(pending.promise);
+    const pending=Promise.withResolvers<void>();vi.mocked(prepareReaderImage).mockReturnValueOnce(pending.promise);
     render({priority:'prefetch'});await flush();
     expect(prepareReaderImage).toHaveBeenCalledExactlyOnceWith('blob:reader-test-1',expect.any(AbortSignal),'prefetch');
     render({priority:'current'});
@@ -327,7 +326,7 @@ describe('shared reader pixel presentation', () => {
     expect(images(tree)[0]['data-result-job']).toBe('original');
   });
   it('does not restart or abort original decoding when the selected result changes',async()=>{
-    const decoding=deferred<void>(),{acquire,reads}=controlledReads();let decodeSignal!:AbortSignal;
+    const decoding=Promise.withResolvers<void>(),{acquire,reads}=controlledReads();let decodeSignal!:AbortSignal;
     vi.mocked(prepareReaderImage).mockImplementationOnce((_url,signal)=>{decodeSignal=signal;return decoding.promise;});
     render({acquire,originalKey:'original'});reads[0].resolve();await flush();
     render({blobKey:'translated',job:translatedJob});
@@ -376,7 +375,7 @@ describe('shared reader pixel presentation', () => {
     expect(images(tree)[0].src).toBe(enhanced);expect(acquire).toHaveBeenCalledTimes(2);
   });
   it('does not cancel an original decode when an enhanced result arrives',async()=>{
-    const originalDecode=deferred<void>(),enhancedDecode=deferred<void>(),{acquire,reads}=controlledReads();let originalSignal!:AbortSignal;
+    const originalDecode=Promise.withResolvers<void>(),enhancedDecode=Promise.withResolvers<void>(),{acquire,reads}=controlledReads();let originalSignal!:AbortSignal;
     vi.mocked(prepareReaderImage).mockImplementationOnce((_url,signal)=>{originalSignal=signal;return originalDecode.promise;}).mockImplementationOnce(()=>enhancedDecode.promise);
     render({acquire,originalKey:'original'});reads[0].resolve();await flush();
     render({enhancement:{identity:'enhanced-original',blob:new Blob(['enhanced']),state:{phase:'ready'},retry:vi.fn()}});await flush();
@@ -480,7 +479,7 @@ describe('shared reader pixel presentation', () => {
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
   it('releases all prepared URLs and leases when unmounted with three concurrent candidates',async()=>{
-    const {acquire,reads}=controlledReads(),decoding=deferred<void>();
+    const {acquire,reads}=controlledReads(),decoding=Promise.withResolvers<void>();
     vi.mocked(prepareReaderImage).mockImplementation(()=>decoding.promise);
     render({acquire,originalKey:'original',blobKey:'translated',job:translatedJob});
     reads[0].resolve();reads[1].resolve();await flush();

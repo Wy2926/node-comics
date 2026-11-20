@@ -71,13 +71,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   for (const stop of stops.splice(0)) stop();
 });
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
 function fixture(kind: RemoteReadingPlan['kind'] = 'pages') {
   const providerId = 'fixture-' + crypto.randomUUID(),
     connectionId = crypto.randomUUID(),
@@ -375,7 +368,7 @@ describe('remote library capability integration', () => {
 
   it('cancels one caller without cancelling another subscriber', async () => {
     const f = fixture(),
-      gate = deferred<void>();
+      gate = Promise.withResolvers<void>();
     await f.connect();
     const original = f.index.getMockImplementation()!;
     f.index.mockImplementation(async () => {
@@ -424,8 +417,8 @@ describe('remote library capability integration', () => {
 
   it('rejects a late index after disconnect and leaves no empty comic', async () => {
     const f = fixture(),
-      gate = deferred<void>(),
-      started = deferred<void>();
+      gate = Promise.withResolvers<void>(),
+      started = Promise.withResolvers<void>();
     await f.connect();
     const original = f.index.getMockImplementation()!;
     f.index.mockImplementation(async () => {
@@ -443,8 +436,8 @@ describe('remote library capability integration', () => {
 
   it('rejects cross-tab preparation begun before deletion but permits a new explicit open', async () => {
     const f = fixture(),
-      gate = deferred<void>(),
-      started = deferred<void>();
+      gate = Promise.withResolvers<void>(),
+      started = Promise.withResolvers<void>();
     await f.connect();
     const original = f.index.getMockImplementation()!;
     f.index.mockImplementation(async () => {
@@ -513,8 +506,8 @@ describe('remote library capability integration', () => {
   it('does not let a late reconnect override a newer disconnect', async () => {
     const f = fixture(),
       connection = await f.connect(),
-      started = deferred<void>(),
-      gate = deferred<void>();
+      started = Promise.withResolvers<void>(),
+      gate = Promise.withResolvers<void>();
     const connect = f.provider.connection!.connect!;
     f.provider.connection!.connect = async (...args) => {
       started.resolve();
@@ -644,8 +637,8 @@ describe('remote library capability integration', () => {
   it('rejects a provider thumbnail encoding completed after the source generation was reloaded', async () => {
     const f = fixture(),
       encode = thumbnailEncoder(),
-      started = deferred<void>(),
-      encoded = deferred<Blob>();
+      started = Promise.withResolvers<void>(),
+      encoded = Promise.withResolvers<Blob>();
     f.plan.publication.artwork = { id: 'unchanged-artwork', locator: { resourceId: 'same' } };
     f.provider.artwork = { read: async () => new Blob(['old source cover']) };
     encode.mockImplementationOnce(() => {
@@ -731,8 +724,8 @@ describe('remote library capability integration', () => {
       const opened = await openRemotePublication(f.connectionId, f.publicationId);
       if (opened.kind !== 'opened') throw Error('Expected a reading entry.');
       const before = (await catalog.get('entries', opened.entryId))!,
-        gate = deferred<void>(),
-        started = deferred<void>(),
+        gate = Promise.withResolvers<void>(),
+        started = Promise.withResolvers<void>(),
         controller = new AbortController(),
         index = f.index.getMockImplementation()!;
       f.resolve.mockResolvedValue({
@@ -1043,9 +1036,9 @@ describe('remote library capability integration', () => {
     const secondContentId = crypto.randomUUID();
     const first = await importContainer(input, undefined, undefined, firstContentId);
     const second = await importContainer(input, undefined, undefined, secondContentId);
-    const retaining = deferred<void>();
-    const proceed = deferred<void>();
-    const indexed = deferred<void>();
+    const retaining = Promise.withResolvers<void>();
+    const proceed = Promise.withResolvers<void>();
+    const indexed = Promise.withResolvers<void>();
     const retainContainer = containers.retainContainer;
     const indexFile = formats.indexFile;
     let indexes = 0;

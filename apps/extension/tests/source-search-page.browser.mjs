@@ -28,7 +28,6 @@ const context = await chromium.launchPersistentContext(path.join(out, 'profile')
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
 context.setDefaultTimeout(10_000);
 const origin = 'https://readcomicsonline.ru', requests = [], checks = [];
-const deferred = () => {let resolve; const promise = new Promise(done => {resolve = done;}); return {promise, resolve};};
 let hold, started, first, second;
 try {
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
@@ -77,7 +76,7 @@ try {
   assert.equal(await sourcePage.evaluate(() => scrollY), 440);
   checks.push('Existing verified page: first/next page succeed through MAIN context; no direct retry, navigation or scroll change');
 
-  hold = deferred(); started = deferred();
+  hold = Promise.withResolvers(); started = Promise.withResolvers();
   await probe.evaluate(() => {window.pending = window.probe.searchSource('readcomicsonline', {siteId: 'readcomicsonline', query: 'Test'}, {sessionId: 'cancel'}).catch(error => ({name: error.name, code: error.code}));});
   await started.promise;
   await probe.evaluate(() => window.probe.releaseSourceSearchSession('cancel'));
@@ -86,7 +85,7 @@ try {
   assert.equal((await search()).count, 60);
   checks.push('Cancellation aborts the pinned request, leaves the user tab open and permits a clean retry');
 
-  hold = deferred(); started = deferred();
+  hold = Promise.withResolvers(); started = Promise.withResolvers();
   const reloaded = search(); await started.promise;
   await sourcePage.reload();
   assert.equal((await reloaded).code, 'SOURCE_SEARCH_HTTP_ERROR');
@@ -95,7 +94,7 @@ try {
   checks.push('Same-URL reload rejects old-document results; the next search binds the new document');
 
   const otherPage = await context.newPage(); await otherPage.goto('https://second-source.test/');
-  hold = deferred(); first = deferred(); second = deferred();
+  hold = Promise.withResolvers(); first = Promise.withResolvers(); second = Promise.withResolvers();
   const parallel = probe.evaluate(async origin => Promise.all([origin, 'https://second-source.test'].map(host =>
     window.probe.withSearchNetworkContext(host + '/slow', AbortSignal.timeout(5000), context => context.request(host + '/slow')))), origin);
   await Promise.race([Promise.all([first.promise, second.promise]), new Promise((_, reject) => setTimeout(() => reject(Error('Independent origins were serialized')), 3000))]);

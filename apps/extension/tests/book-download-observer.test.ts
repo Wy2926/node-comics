@@ -137,13 +137,6 @@ const book = (status: BookDownloadView['status'], id = 'comic'): BookDownloadVie
   hasPendingTasks: false,
   status,
 });
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -264,8 +257,8 @@ describe('book download observer', () => {
     }
   });
   it('retains changes received during a pending read without starting overlapping reads', async () => {
-    const initial = deferred<BookDownloadView[]>(),
-      next = deferred<BookDownloadView[]>();
+    const initial = Promise.withResolvers<BookDownloadView[]>(),
+      next = Promise.withResolvers<BookDownloadView[]>();
     source.read.mockReturnValueOnce(initial.promise).mockReturnValueOnce(next.promise);
     render();
     change('tasks', 'download:entry');
@@ -308,7 +301,7 @@ describe('book download observer', () => {
     expect(render().activeCount).toBe(0);
   });
   it('unsubscribes and aborts the host on unmount, ignoring a late refresh result', async () => {
-    const pending = deferred<BookDownloadView[]>();
+    const pending = Promise.withResolvers<BookDownloadView[]>();
     source.read.mockReturnValueOnce(pending.promise);
     render();
     const signal = source.host.mock.calls[0][0];

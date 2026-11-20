@@ -58,11 +58,6 @@ class Node {
   }
 }
 const flush=async()=>{for(let count=0;count<16;count++)await Promise.resolve();};
-function deferred<T>(){
-  let resolve!:(value:T)=>void,reject!:(error:unknown)=>void;
-  const promise=new Promise<T>((done,fail)=>{resolve=done;reject=fail;});
-  return {promise,resolve,reject};
-}
 function fixture(){
   vi.useFakeTimers();
   vi.mocked(receiveImage).mockReset();vi.mocked(RegionDisplay).mockClear();
@@ -177,7 +172,7 @@ describe('region crop preview and explicit retries',()=>{
     expect(f.reads.map(request=>request.resultKey)).toEqual(['replacement']);f.stop();
   });
   it('keeps a source-preview failure separate from submission and the translated result, with an explicit read retry',async()=>{
-    const f=fixture(),submission=deferred<Partial<RegionResponse>>();let failSource=true;
+    const f=fixture(),submission=Promise.withResolvers<Partial<RegionResponse>>();let failSource=true;
     f.setReply(()=>submission.promise);
     f.setRead(async request=>{if(request.kind==='source'&&failSource){failSource=false;throw Error('source transfer interrupted');}return new Blob([request.kind]);});
     await f.select();expect(f.messages.filter(message=>message.type==='NC_REGION_SUBMIT')).toHaveLength(1);expect(f.reads).toHaveLength(0);
@@ -190,7 +185,7 @@ describe('region crop preview and explicit retries',()=>{
     expect(f.messages.filter(message=>message.type==='NC_REGION_SUBMIT')).toHaveLength(1);f.stop();
   });
   it.each(['close-preview','hide-tab','close-selection'])('cancels a pending original preview on %s and discards a late source',async action=>{
-    const f=fixture(),source=deferred<Blob>();let signal:AbortSignal|undefined;
+    const f=fixture(),source=Promise.withResolvers<Blob>();let signal:AbortSignal|undefined;
     f.setRead(async(request,value)=>{if(request.kind==='source'){signal=value;return source.promise;}return new Blob(['result']);});
     await f.select();f.button('恢复原图').onclick!();f.button('显示预览').onclick!();await flush();
     const before=f.create.mock.calls.length;
@@ -201,7 +196,7 @@ describe('region crop preview and explicit retries',()=>{
     expect(f.create).toHaveBeenCalledTimes(before);f.stop();
   });
   it('resumes only the open original preview and never lets its old hidden-tab response replace the new read',async()=>{
-    const f=fixture(),oldSource=deferred<Blob>(),newSource=deferred<Blob>();let sourceReads=0;
+    const f=fixture(),oldSource=Promise.withResolvers<Blob>(),newSource=Promise.withResolvers<Blob>();let sourceReads=0;
     f.setRead(async request=>request.kind==='source'?(sourceReads++===0?oldSource.promise:newSource.promise):new Blob(['result']));
     await f.select();f.button('恢复原图').onclick!();f.button('显示预览').onclick!();await flush();
     const before=f.create.mock.calls.length;
