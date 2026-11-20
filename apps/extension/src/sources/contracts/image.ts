@@ -1,5 +1,7 @@
 /** Image transport/decoding is independent of how a site discovers its directory or pages. */
 export interface SourceImageAdapter {
+  /** Replace expiring transport URLs with renewable chapter slots before a shelf manifest is registered. */
+  bindPages?(snapshot: import('./source').SourceSnapshot): import('./source').SourceSnapshot;
   /** Resolve an already registered stable page locator using ephemeral viewer data. Never persisted. */
   resolvePage?(url:string): {url:string; headers:Readonly<Record<string,string>>; processing?:string};
   /** Explicitly verified public images only: Safari native GET has no source cookies. */

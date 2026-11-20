@@ -14,6 +14,7 @@ import { pageRenderProfile, pageReference, type PageReference } from './identity
 import type { PageDescriptor, PageMaterialization } from '../domain';
 import {entryContentKind} from '../domain';
 import {PagePreview,type PagePreviewTarget} from './preview';
+import {isTemporaryEntry,temporaryPage} from './temporary';
 
 export interface PageRequest extends PageReference { signal?: AbortSignal; priority?: 'current'|'prefetch'|'background'; purpose?: 'reading'|'translation'|'export'|'download'|'thumbnail'; preview?:PagePreviewTarget; }
 export interface PageLease { blob: Blob; identity: PageMaterialization; release(): void; }
@@ -62,9 +63,16 @@ async function pageContext(request:PageReference){
   return {descriptor,doc,binding,connection,assertSourceCurrent};
 }
 /** Validates catalog identity and access without opening the source or reading image bytes. */
-export async function pageAccess(request:PageReference){return (await pageContext(request)).assertSourceCurrent;}
+export async function pageAccess(request:PageReference){return isTemporaryEntry(request.entryId)?temporaryPage(request).validate:(await pageContext(request)).assertSourceCurrent;}
 async function read(request:RasterRequest,signal:AbortSignal,preview:PagePreview):Promise<Value>{
   signal.throwIfAborted();
+  if(isTemporaryEntry(request.entryId)){
+    const page=temporaryPage(request),prepared=await prepareComicPage({name:request.pageId,blob:await page.read(signal)},signal);
+    signal.throwIfAborted();await page.validate();
+    const identity:PageMaterialization={id:materializationId(request),contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,
+      imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
+    publishMetadata(identity);return {blob:prepared.blob,identity,validate:page.validate};
+  }
   const {descriptor,doc,binding,connection,assertSourceCurrent}=await pageContext(request);
   const render=doc.format==='pdf'?request.render:undefined;
   const cachePages=render===undefined&&getSourceDriver(connection.provider)?.cachePages!==false;

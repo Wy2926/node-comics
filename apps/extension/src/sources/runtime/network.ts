@@ -1,4 +1,5 @@
 import {sourceNetworks} from '../registry/networks';
+import {sourceImages} from '../registry/images';
 import {definitions} from '../registry/definitions';
 import {resolveSource} from '../core/resolve';
 import {validateCatalog} from '../core/catalog';
@@ -65,7 +66,7 @@ export async function readNetworkCatalog(url:string,options:{signal?:AbortSignal
   signal?.throwIfAborted();
   return snapshot;
 }
-export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<PageManifest>{
+export async function readNetworkSnapshot(url:string,signal?:AbortSignal){
   const readSignal=AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(60_000)]);
   const {definition,location}=resolveSource(url,definitions),read=networkOperation(url,'pages');
   if(!read)throw Error('SOURCE_COLLECTION_UNSUPPORTED');
@@ -74,6 +75,11 @@ export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<P
     :await read(url,{...networkContext(readSignal,await takeImportResponses(location,readSignal)),readDocument:exactDocumentReader(url,readSignal)});
   const snapshot=validatePages(value,location);
   readSignal.throwIfAborted();
+  return snapshot;
+}
+export async function readNetworkPages(url:string,signal?:AbortSignal):Promise<PageManifest>{
+  const raw=await readNetworkSnapshot(url,signal),bind=sourceImages[raw.adapter]?.bindPages;
+  const snapshot=bind?validatePages(bind(raw),resolveSource(url,definitions).location):raw;
   const manifest:PageSnapshot={adapter:snapshot.adapter,url:snapshot.url,title:snapshot.title,direction:snapshot.direction,
     discoveryComplete:snapshot.discoveryComplete,knownTotal:snapshot.knownTotal,note:snapshot.note,
     items:snapshot.items.map(({resource,id,contentKey,width,height,order})=>{

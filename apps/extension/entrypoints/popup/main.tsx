@@ -36,11 +36,13 @@ function Popup({initialError=''}:{initialError?:string}){
  const bindings=useMemo(()=>activeBindings(shortcuts.overrides),[shortcuts.overrides]);
  const disabled=busy||opening||!!translating||saving;
  const resolved=source?.url?sourceFor(source.url):undefined;
- const adapted=!!resolved&&(resolved.definition.id!=='generic'||supportedOrigins.has(new URL(resolved.location.url).origin));
- const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other';
+ const [linkConfirmed,setLinkConfirmed]=useState(false);
+ const adapted=!!resolved&&!resolved.definition.linkMatch&&(resolved.definition.id!=='generic'||supportedOrigins.has(new URL(resolved.location.url).origin));
+ const importable=!!resolved?.definition.capabilities.importable&&resolved.location.kind!=='other'&&(!resolved.definition.linkMatch||linkConfirmed);
  async function readSource(){
   if(!source?.url||!importable||disabled||lock.current)return;lock.current=true;setBusy(true);setDiscoveryError('');
-  try{await requireHostAccess();
+   try{await requireHostAccess();
+    if(resolved?.definition.linkMatch){await sourceMessage({type:'NC_OPEN_LINK',tabId:source.id,url:source.url});window.close();return;}
    const discovered=await sourceMessage<Discovery>({type:'NC_DISCOVER_TAB',tabId:source.id});
    await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html?'+(discovered.kind==='file'?'sourceFile':discovered.kind==='catalog'?'catalog':'manifest')+'='+discovered.id)});window.close();
   }catch(e){setDiscoveryError((e as Error).message);}finally{lock.current=false;setBusy(false);}
@@ -55,9 +57,14 @@ function Popup({initialError=''}:{initialError?:string}){
  }
  useEffect(()=>{
   let active=true;void readBrowserShortcuts().then(value=>{if(active)setBrowserShortcuts(value);}).catch(()=>{});
-  void chrome.tabs.query({active:true,currentWindow:true}).then(([tab])=>{
+   void chrome.tabs.query({active:true,currentWindow:true}).then(async ([tab])=>{
    if(tab?.id==null||!tab.url||!['https:','http:'].includes(new URL(tab.url).protocol)){setSourceNotice(msg("请切换到普通漫画网页，再打开插件。"));return;}
-   setSource(tab);setSourceNotice('');
+    setSource(tab);setSourceNotice('');
+    const {definition,location}=sourceFor(tab.url);
+    if(definition.linkMatch){
+     const [probe]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:(url,selector)=>window.location.href===url&&!!document.querySelector(selector),args:[tab.url,definition.linkMatch(location)]});
+     if(active)setLinkConfirmed(probe?.result===true);
+    }
   }).catch(()=>setSourceNotice(msg("无法读取当前标签页，请重新打开插件。")));
   const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null)setPreferences(settings());};
   window.addEventListener('storage',changed);return()=>{active=false;window.removeEventListener('storage',changed);};
@@ -134,7 +141,7 @@ function Popup({initialError=''}:{initialError?:string}){
    </section>
    {importable&&<section className="nc-popup-import" aria-label={msg('漫画阅读')}>
     <h2>{msg('漫画阅读')}</h2><div className="nc-popup-reading-actions">
-    <button className="nc-popup-tool" disabled={disabled} onClick={()=>void readSource()}><Icon name="book" size={22}/><span>{busy?msg('正在打开漫画'):msg('开始阅读')}</span><Icon name="arrow" size={16}/></button>
+     <button className="nc-popup-tool" disabled={disabled} onClick={()=>void readSource()}><Icon name="book" size={22}/><span>{busy?msg('正在打开漫画'):resolved?.definition.linkMatch?resolved.location.kind==='catalog'?msg('添加到书架'):msg('临时阅读本章'):msg('开始阅读')}</span><Icon name="arrow" size={16}/></button>
     {resolved?.definition.capabilities.findAlternatives!==false&&<button className="nc-popup-tool" disabled={disabled} onClick={()=>void findComic()}><Icon name="translate" size={22}/><span>{msg('寻找其他语言')}</span></button>}
     </div>
     {discoveryError&&<div className="nc-popup-error" role="alert">{discoveryError}</div>}
@@ -146,7 +153,7 @@ function Popup({initialError=''}:{initialError?:string}){
      <button className="nc-popup-tool" disabled={disabled} onClick={()=>void openSettings()}><Icon name="settings" size={23}/><span>{msg('设置')}</span>{shortcutHint('app.settings')}</button>
      <button className="nc-popup-tool" disabled={disabled} onClick={()=>void openPage('settings/shortcuts')}><Icon name="keyboard" size={23}/><span>{msg('键盘快捷键')}</span>{shortcutHint('web.shortcuts')}</button>
     </div>
-    {source&&!adapted&&<p className="nc-popup-hint nc-popup-site-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
+     {source&&!adapted&&!linkConfirmed&&<p className="nc-popup-hint nc-popup-site-hint">{msg('此网站尚未专门适配，不能导入漫画。')}</p>}
     {adapted&&!importable&&resolved?.definition.capabilities.importable&&<p className="nc-popup-hint nc-popup-site-hint">{msg('进入漫画详情页或章节页后，可开始阅读。')}</p>}
    </section>
   </div>

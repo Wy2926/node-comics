@@ -3,13 +3,13 @@ import type {ReadingProgressStatus} from '../comics/application/reading-progress
 import './reading-progress.css';
 
 /** Shared by document and image readers; synchronization never interrupts the page. */
-export function ReadingProgressBadge({status='local'}:{status?:ReadingProgressStatus}) {
-  const label={local:msg('本地进度'),pending:msg('待同步'),syncing:msg('同步中'),synced:msg('已同步')}[status];
+export function ReadingProgressBadge({status='local'}:{status?:ReadingProgressStatus|'temporary'}) {
+  const label={temporary:msg('临时阅读本章'),local:msg('本地进度'),pending:msg('待同步'),syncing:msg('同步中'),synced:msg('已同步')}[status];
   return <span className="nc-reading-progress nc-reader-controls" data-sync={status} role="status" aria-live="off"
     title={status==='pending'?msg('阅读位置已保存在本地，等待同步。'):status==='local'?msg('阅读位置仅保存在此设备。'):label}>
     <span className="nc-reading-progress-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" focusable="false">
-        {status==='local'?<>
+        {status==='local'||status==='temporary'?<>
           <rect x="5" y="3" width="14" height="18" rx="2"/>
           <path d="M9 8h6M9 12h6M9 16h4"/>
         </>:status==='syncing'?<g className="nc-reading-progress-arrows">

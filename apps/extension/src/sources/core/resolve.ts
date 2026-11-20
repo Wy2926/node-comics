@@ -7,13 +7,17 @@ export function resolveSource(url: string, definitions: readonly SourceDefinitio
     throw Error('SOURCE_REGISTRY_CONFLICT');
   const parsed = new URL(safe),
     matches = definitions
-      .filter((d) => d.id !== 'generic')
+      .filter((d) => d.id !== 'generic' && !d.linkMatch)
       .flatMap((definition) => {
         const location = definition.identify(parsed);
         return location ? [{ definition, location }] : [];
       });
   if (matches.length > 1) throw Error('SOURCE_REGISTRY_CONFLICT');
   if (matches.length) return matches[0];
+  for (const definition of definitions) {
+    const location = definition.linkMatch && definition.identify(parsed);
+    if (location) return {definition, location};
+  }
   const definition = definitions.find((d) => d.id === 'generic'),
     location = definition?.identify(parsed);
   if (!definition || !location) throw Error('SOURCE_UNSUPPORTED');

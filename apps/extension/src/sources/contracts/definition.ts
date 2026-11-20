@@ -37,6 +37,8 @@ export interface SourceDefinition {
   name: string;
   sites?: readonly SourceSite[];
   identify(url: URL): SourceLocation | null;
+  /** Host-independent fallback: confirm this selector before offering explicit catalog import or temporary chapter reading. */
+  linkMatch?(location: SourceLocation): string;
   capabilities: { pages: boolean; inline: boolean; catalog: boolean; completePageList: boolean; importable?: boolean; file?: boolean; findAlternatives?: boolean };
   /** Use the shared floating import entry when the site has no stable inline anchor. */
   embeddedEntry?: 'floating';

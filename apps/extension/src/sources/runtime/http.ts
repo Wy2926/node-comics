@@ -115,7 +115,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
     // Chromium drops fetch's User-Agent; use the existing exact-request rules.
     return withImageHeaders(url, Object.keys(headers).length ? headers : undefined, lifetime, async () => {
       const binary = body instanceof Uint8Array;
-      return consume(await fetch(url, {credentials: 'include', headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
+      return consume(await fetch(url, {credentials: 'include', redirect:options?.redirect, headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
         ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),
         ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : options?.json !== undefined ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})}));

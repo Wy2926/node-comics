@@ -64,7 +64,7 @@ export function ReaderNavigation({backLabel, backText, title, notice, onBack, pr
   title: string;
   notice?: string;
   onBack(): void;
-  progressStatus?: ReadingProgressStatus;
+  progressStatus?: ReadingProgressStatus | 'temporary';
   directoryOpen: boolean;
   onDirectory(): void;
   children?: ReactNode;

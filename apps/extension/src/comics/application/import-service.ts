@@ -154,7 +154,7 @@ function requireWebsite(url:string,adapter?:string) {
 async function websiteComic(url:string,title:string,resourceKey?:string) {
   const {definition,location}=requireWebsite(url),resourceId=resourceKey??location.catalog?.key??location.pageKey,sourceKey=JSON.stringify(['website:'+definition.id,resourceId]);
   const [existing]=await catalog.list('comics',{index:'sourceKey',range:sourceKey,limit:1});if(existing)return existing;
-  const now=Date.now(),value:Comic={id:crypto.randomUUID(),sourceKey,title,sourceName:definition.name,sourceUrl:location.catalog?.url??url,source:{connectionId:'website:'+definition.id,providerItemId:resourceId,locator:{url:location.catalog?.url??url,catalogId:location.catalog?.key},generation:1,status:'active'},createdAt:now,updatedAt:now};
+  const now=Date.now(),value:Comic={id:crypto.randomUUID(),sourceKey,title,sourceName:definition.linkMatch?new URL(location.url).host:definition.name,sourceUrl:location.catalog?.url??url,source:{connectionId:'website:'+definition.id,providerItemId:resourceId,locator:{url:location.catalog?.url??url,catalogId:location.catalog?.key},generation:1,status:'active'},createdAt:now,updatedAt:now};
   await connection({id:value.source.connectionId,provider:'website',displayName:definition.name});
   await catalog.put('comics',value);return value;
 }

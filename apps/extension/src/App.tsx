@@ -21,12 +21,13 @@ import { settings as readSettings, saveSettings } from './comics/application/pre
 import { discoverEntryContent } from './comics/acquisition';
 import { chooseSourceFiles, sourceImportOptions } from './comics/application/source-service';
 import { onPageImageMetadata } from './comics/pages/service';
+import {isTemporaryEntry,openTemporaryChapter} from './comics/pages/temporary';
 import { initializeSources } from './comics/application/source-lifecycle';
 import { Reader } from './reader/Reader';
 import type {ChapterLoadOptions} from './reader/chapter-resources';
 import { readingViewKey } from './reader/view';
 import { API_BASE } from './service';
-import { inExtension, sourceFor, canFindAlternatives, consumeSearchSeed, consumeSourceFile, type SourceSearchResult, type PageManifest } from './sources';
+import { inExtension, sourceFor, sourceMessage, canFindAlternatives, consumeSearchSeed, consumeSourceFile, type SourceSearchResult, type PageManifest } from './sources';
 import {importWebsiteCatalog,importWebsiteLink,resumeWebsiteCatalog} from './comics/application/website-import';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import {useTranslationChannel} from './translation/channels/useChannel';
@@ -152,14 +153,33 @@ export function App(){
    for(;;){const language=settingsRef.current.language,scope=channelRef.current?.scope,result=await readerSequence(id,scope,language);if(language===settingsRef.current.language&&scope?.key===channelRef.current?.scope.key)return result;}
  },[]);
  const leaveReader=useCallback(()=>{readingOpen.current?.abort();void readingProgress.close();readingEpoch.current++;readingLoadEpoch.current++;currentRef.current=undefined;setCurrentId(undefined);setCopies([]);setDirectory(undefined);setReadingBusy(false);},[readingProgress]);
- const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));void saveReaderState(copy).catch(e=>setError(e.message));if(currentRef.current===copy.id)readingProgress.update(copy);},[readingProgress]);
+ const updateEntry=useCallback((copy:ReadingEntry)=>{setCopies(values=>values.map(c=>c.id===copy.id?copy:c));if(!copy.comicId)return;void saveReaderState(copy).catch(e=>setError(e.message));if(currentRef.current===copy.id)readingProgress.update(copy);},[readingProgress]);
+ async function openLinkedPage(url:string){
+   readingOpen.current?.abort();
+   const controller=new AbortController(),request=++readingEpoch.current;
+   readingOpen.current=controller;setReadingBusy(true);setError('');
+   window.addEventListener('pagehide',leaveReader,{once:true,signal:controller.signal});
+   try{
+     const {definition,location}=sourceFor(url);
+     if(!definition.linkMatch)throw Error(msg('来源目录无效。'));
+     if(location.kind==='catalog'){
+       const comic=await observeImport('website','website',()=>importWebsiteLink(location.url,{signal:controller.signal}));
+       controller.signal.throwIfAborted();await reloadLibrary();controller.signal.throwIfAborted();
+       nav('library');notify(`${comic.title} · ${msg('已在书架')}`);
+     }else{
+       const copy=await openTemporaryChapter(location.url,controller.signal);
+       controller.signal.throwIfAborted();setDirectory(undefined);setCopies([copy]);currentRef.current=copy.id;setCurrentId(copy.id);setNavigationKey(n=>n+1);
+     }
+   }catch(error){const cancelled=controller.signal.aborted;controller.abort();if(!cancelled)throw error;}
+   finally{if(request===readingEpoch.current)setReadingBusy(false);}
+ }
  const openEntry=useCallback(async(id:string,pageId?:string,rememberChoice=false,requestIsCurrent?:()=>boolean,bookmark?:BookmarkLocation)=>{
    const api=apiRef.current;
    readingOpen.current?.abort();const controller=new AbortController();readingOpen.current=controller;
    const request=++readingEpoch.current;readingLoadEpoch.current++;const isCurrent=()=>!controller.signal.aborted&&request===readingEpoch.current&&api.isCurrent()&&(requestIsCurrent?.()??true);setReadingBusy(true);setError('');
    try{
      if(!bookmark)await selectReadingEntry(id,rememberChoice);if(!isCurrent())return false;
-     try{await discoverEntryContent(id);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;
+      try{await discoverEntryContent(id,controller.signal);}catch(error){if(isCurrent())setError((error as Error).message);}if(!isCurrent())return;
      const result=await readSequence(id);if(!isCurrent())return;
      const selected=result.copies.find(copy=>copy.id===id);
      if(bookmark&&(!selected||!applyBookmark(selected,bookmark)))throw Error(msg('书签位置已不可用，请重新打开内容。'));
@@ -173,6 +193,7 @@ export function App(){
    void readSequence(id).then(result=>{if(request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){setCopies(result.copies);setDirectory(result.directory);}}).catch(e=>{if(request===readingEpoch.current&&api.isCurrent())setError(e.message);});
  }
  async function loadEntry(id:string,options:ChapterLoadOptions={}){
+   if(isTemporaryEntry(id))return;
    const request=readingLoadEpoch.current,target=copiesRef.current.find(copy=>copy.id===id);
    const matches=(copy:ReadingEntry)=>copy.id===id&&copy.contentId===target?.contentId&&copy.generation===target?.generation;
    const isCurrent=()=>!options.signal?.aborted&&request===readingLoadEpoch.current&&api.isCurrent()&&copiesRef.current.some(matches);
@@ -254,7 +275,10 @@ export function App(){
    if(result.results.length===1&&selected.files.length===1&&request===readingEpoch.current)await openEntry(result.results[0].id);else notify(msg('{0} 份已导入 · {1} 份需要处理',{'0':result.results.length,'1':result.failures.length}));
   }catch(e){setError((e as Error).message);}finally{sourceInProgress.current=false;setBusy('');}
  }
- async function reloadCurrent(entryId=currentId){if(!entryId||busy)return;const id=entryId;setBusy(msg('正在重新载入'));try{await prepareEntryContent(id,undefined,{reload:true});await openEntry(id);}catch(e){setError((e as Error).message);}finally{setBusy('');}}
+ async function reloadCurrent(entryId=currentId){if(!entryId||busy)return;const id=entryId;setBusy(msg('正在重新载入'));try{
+   if(isTemporaryEntry(id)&&current?.sourceUrl){const url=current.sourceUrl;leaveReader();await openLinkedPage(url);}
+   else{await prepareEntryContent(id,undefined,{reload:true});await openEntry(id);}
+ }catch(e){setError((e as Error).message);}finally{setBusy('');}}
  useEffect(()=>{localImport.activate();void initializeSources().then(reloadLibrary).catch(e=>setError(e.message));return()=>localImport.dispose();},[localImport]);
  useEffect(()=>{void reloadLibrary().catch(e=>setError(e.message));},[reloadLibrary]);
  useEffect(()=>{
@@ -269,6 +293,7 @@ export function App(){
      }).catch(()=>{});
    }
    const id=currentRef.current;
+   if(isTemporaryEntry(id))return;
    if((change.table==='catalogs'||change.table==='metadata')&&id){
      const request=readingEpoch.current,refresh=++sequenceRefreshEpoch.current;
      void readSequence(id).then(result=>{if(refresh===sequenceRefreshEpoch.current&&request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
@@ -283,7 +308,7 @@ export function App(){
   return()=>{live=false;unsubscribe();};
  },[reloadLibrary,api,leaveReader,translationScope?.key]);
  useEffect(()=>{
-   const id=currentRef.current;if(!id)return;const request=readingEpoch.current,refresh=++sequenceRefreshEpoch.current;let active=true;
+    const id=currentRef.current;if(!id||isTemporaryEntry(id))return;const request=readingEpoch.current,refresh=++sequenceRefreshEpoch.current;let active=true;
    void readSequence(id).then(result=>{if(active&&refresh===sequenceRefreshEpoch.current&&request===readingEpoch.current&&currentRef.current===id&&api.isCurrent()){
      setDirectory(result.directory);setCopies(previous=>result.copies.map(copy=>previous.find(old=>old.id===copy.id&&old.contentId===copy.contentId)??copy));
    }}).catch(error=>{if(active&&request===readingEpoch.current)setError(error.message);});
@@ -292,7 +317,7 @@ export function App(){
  useEffect(()=>{
    if(!channel)return;
    let stopped=false;
-   void Promise.all(copiesRef.current.filter(copy=>copy.pages.length&&!copy.document).map(copy=>readEntry(copy.id,channel.scope))).then(loaded=>{
+    void Promise.all(copiesRef.current.filter(copy=>copy.comicId&&copy.pages.length&&!copy.document).map(copy=>readEntry(copy.id,channel.scope))).then(loaded=>{
      if(stopped||!channel.isCurrent())return;
      setCopies(values=>values.map(copy=>{const next=loaded.find(item=>item.id===copy.id&&item.contentId===copy.contentId);return next?{...next,pageId:copy.pageId,relativeOffset:copy.relativeOffset,lastReadAt:copy.lastReadAt}:copy;}));
    }).catch(()=>{});
@@ -309,7 +334,13 @@ export function App(){
  useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);setCapsError('');setCapsLoading(true);void(async()=>{try{const value=await api.capabilities();if(live){setCaps(value);setUsage(value.entitlements??undefined);}}catch(error){if(live&&error instanceof Error)setCapsError(error.message);}finally{if(live)setCapsLoading(false);}})();return()=>{live=false;};},[api]);
  useEffect(()=>{
   if(sourceQueryHandled.current||typeof chrome==='undefined'||!chrome.storage?.local)return;
-  const query=new URLSearchParams(location.search),manifestId=query.get('manifest'),catalogId=query.get('catalog'),fileId=query.get('sourceFile');if(!manifestId&&!catalogId&&!fileId)return;
+   const query=new URLSearchParams(location.search),manifestId=query.get('manifest'),catalogId=query.get('catalog'),fileId=query.get('sourceFile');
+   if(query.has('sourceLink')){
+     sourceQueryHandled.current=true;setReadingBusy(true);history.replaceState(null,'',location.pathname+location.hash);
+     const epoch=readingEpoch.current;
+     void sourceMessage<string>({type:'NC_TAKE_LINK'}).then(url=>{if(epoch===readingEpoch.current)return openLinkedPage(url);}).catch(e=>{setError(e.message);if(epoch===readingEpoch.current)setReadingBusy(false);});return;
+   }
+   if(!manifestId&&!catalogId&&!fileId)return;
   sourceQueryHandled.current=true;const request=readingEpoch.current,openingMessage=msg('正在打开漫画');let sourceImportComicId:string|undefined;
   const releaseBusy=()=>setBusy(value=>value===openingMessage?'':value);setBusy(openingMessage);
   void (async()=>{
@@ -349,9 +380,9 @@ export function App(){
  },[]);
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
  const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag&&!shortcutScope
-   &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
+    &&!['manifest','catalog','sourceLink','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  const releaseNotesActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag&&!shortcutScope
-   &&!['manifest','catalog','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
+    &&!['manifest','catalog','sourceLink','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
  function nav(value:View){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);location.hash=value;setError('');}
  useShortcuts({
    'app.shortcuts':()=>setShortcutScope(current?'reader':'global'),
@@ -367,7 +398,8 @@ export function App(){
  const rights=usage??caps?.entitlements;
  const readerBackLabel=view==='remote-library'?msg('返回远程书库'):view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画');
  const searchPanelProps={api,defaultLanguage:readSearchLanguage(settings.language),onLanguageChange:saveSearchLanguage,onLogin:()=>login.setOpen(true),existingSourceKeys:existingSearchKeys};
- async function importWebsiteUrl(url:string){
+  async function importWebsiteUrl(url:string){
+    if(sourceFor(url).definition.linkMatch){await openLinkedPage(url);return;}
    const request=readingEpoch.current,intent=searchIntent.current;let opened=false,importedId:string|undefined;
    const active=()=>request===readingEpoch.current&&intent===searchIntent.current&&api.isCurrent();
    try{

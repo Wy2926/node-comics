@@ -18,6 +18,7 @@ export {listSearchSites, searchSource, readSearchCover, releaseSourceSearchSessi
 export { pollSourceDiscovery } from './core/discovery';
 export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
 export {prepareCatalogImport,readImportCatalog} from './runtime/import';
+export {readLinkedChapter} from './runtime/link-reader';
 export {listSupportedSites, sortSupportedSites, matchesSiteFilters, type SiteFilters} from './registry/sites';
 export {readSourceImage,readInlineSourceImage,readSourceCover} from './runtime/source-image';
 export { sourceImage } from './runtime/image-fetch';

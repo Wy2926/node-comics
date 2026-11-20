@@ -36,8 +36,9 @@ describe('exact source document projections', () => {
     let reads = 0;
     inject.mockImplementation(async options => [{frameId:0, documentId:'document-1',
       result:options.func === project ? (++reads === 1 ? null : 'fixture') : tab.url}]);
-    expect(await exactDocumentReader(url + '#nodelane-fixture=12', new AbortController().signal)(project)).toBe('fixture');
+    expect(await exactDocumentReader(url + '#nodelane-fixture=12', new AbortController().signal)(project,{work:12})).toBe('fixture');
     expect(reads).toBe(2);
+    expect(inject.mock.calls.filter(([input])=>input.func===project).map(([input])=>input.args[0].params)).toEqual([{work:12},{work:12}]);
     expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url, active:false});
     expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(7);
     expect(fetch).not.toHaveBeenCalled();

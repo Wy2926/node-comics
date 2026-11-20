@@ -1,4 +1,5 @@
 {
+  "临时阅读本章": "Read chapter without saving",
   "默认并发": "Default concurrency",
   "{0} 的缓存并发": "Cache concurrency for {0}",
   "跟随默认 · {0} 张并发": "Use default · {0} parallel images",

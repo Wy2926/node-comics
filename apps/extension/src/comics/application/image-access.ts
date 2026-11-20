@@ -1,5 +1,6 @@
 import { acquirePage, acquireDisplayPage, acquireOriginalPdfImage, pageAccess, promotePage, type PageLease } from '../pages/service';
 import { PDF_RENDER_PROFILE, parsePageReference } from '../pages/identity';
+import {isTemporaryEntry} from '../pages/temporary';
 import { resultInMemory,readMaterializedResult,validateMaterializedResult } from '../../storage/translations/results';
 import type {ProcessingInput} from '../../image-processing/contracts';
 import { translationCache } from '../../storage/translations';
@@ -50,6 +51,10 @@ export async function readImage(key:string,signal?:AbortSignal):Promise<Blob|und
 export async function readThumbnail(key:string,signal?:AbortSignal):Promise<Blob>{
   signal?.throwIfAborted();
   const reference=parsePageReference(key);
+  if(reference&&isTemporaryEntry(reference.entryId))return thumbnails.run(async()=>{
+    const lease=await acquirePage({...reference,signal,priority:'background',purpose:'thumbnail'});
+    try{return lease.blob;}finally{lease.release();}
+  });
   const source=await openSourceCover(key);
   const owner=source?.owner??reference?.entryId;
   const token=await thumbnailCache.token(owner).catch(()=>undefined);

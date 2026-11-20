@@ -15,6 +15,7 @@ import {BlobPicture,type ShownImage} from './Images';
 import {useProcessingSettings, useEnhancementVisible, useProcessingWindow} from '../image-processing/react';
 import {activeProcessingProfile} from '../image-processing/settings';
 import {processingInput} from '../comics/application/image-access';
+import {isTemporaryEntry} from '../comics/pages/temporary';
 import {canRetryPage,displayTranslationState,imagePrefetchReady,pageTranslation,readingImage,type ImageLoadState} from './presentation';
 import {pageFrame} from './geometry';
 import {chapterGeometry,pageWindow,nextImagePages,type ChapterGeometry} from './virtual-window';
@@ -49,18 +50,19 @@ type Props={onBookmarkNavigate?:(location:BookmarkLocation)=>Promise<boolean>;pr
 type Panel='bookmarks'|'directory'|'translation'|'settings';
 export function Reader({onBookmarkNavigate,progressStatus,analyticsSession,analyticsSource='unknown',analyticsChannel,analyticsBlocked=false,backLabel=msg("返回我的漫画"),backText=msg("书架"),onFind,searchOpen=false,onOpenShortcuts,onSourceLanguageChange,viewKey,directory,checkingUpdates,onCheckUpdates,catalogLoading,onContinueCatalog,onReload,onMarkRead,sourceStatus:reportedSourceStatus,sequence,onActiveEntry,onLoadEntry,onNavigate,copy,settings:globalSettings,setSettings,update,onBack,onRetry,onUpgrade,onLogin,translationState,onImport,notify,onReadingWindow,caps,modelSelection,fontSelection,channelOptions,translationScope,busy}:Props&{analyticsSession?:ReaderAnalytics;analyticsSource?:AnalyticsFields['source_type'];analyticsChannel?:AnalyticsFields['channel'];analyticsBlocked?:boolean}){
 const motion=useRef(false),surface=useRef<HTMLDivElement>(null),spreadStack=useRef<HTMLDivElement>(null);
+const temporary=isTemporaryEntry(copy.id);
 const [moving,setMoving]=useState(false);
 const previewSurface=useRef<HTMLDivElement>(null);
 const [previewRequest,setPreviewRequest]=useState<{entryId:string;index:number|'last'}>();
 const [initialSizing]=useState(()=>({compact:isCompactReaderDevice(),readerZoom:normalizeReaderZoom(globalSettings.readerZoom)}));
 const [savedView,setView]=useState<ReadingView|undefined>(()=>{
  const page=copy.pages.find(page=>page.id===copy.pageId)??copy.pages[0];
- return readStoredReadingView(viewKey)??initialReadingView(page?.imageSha256||page?.imageDimensionsKnown?page:undefined,initialSizing.compact,initialSizing.readerZoom);
+ return (temporary?undefined:readStoredReadingView(viewKey))??initialReadingView(page?.imageSha256||page?.imageDimensionsKnown?page:undefined,initialSizing.compact,initialSizing.readerZoom);
 });
 const view=savedView??{...readingViewDefaults(),zoom:initialSizing.readerZoom};
 // Resolve once so streaming, prefetching, gestures and controls use the same comic layout.
 const settings={...globalSettings,layout:view.layout??globalSettings.layout,direction:view.direction??globalSettings.direction};
-const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,processingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead,notify});
+const {index,indexRef,anchor,viewport,cells,ends,stacks,geometry,stream,previous,next,nextOf,preserve,persist,restore,scroll,jump:jumpImmediately,navigationReason,pageShown,settleMotion,resources,resourceVersion,processingAhead}=useChapterStream({copy,sequence,layout:settings.layout,previewEntry:previewRequest?.entryId,motion,update,onActiveEntry,onLoadEntry,onMarkRead:temporary?async()=>{}:onMarkRead,notify});
 const sourceRemoved=directory?.entries.find(entry=>entry.id===copy.id)?.sourceRemoved;
 const sourceStatus=sourceRemoved?msg('源站已移除，缓存页面仍可阅读。'):reportedSourceStatus;
 const page=copy.pages[Math.min(index,copy.pages.length-1)];
@@ -75,7 +77,7 @@ const bookmarks=useReaderBookmarks({comicId:copy.comicId,current:bookmarkLocatio
   if(location.entryId===copy.id){const target=applyBookmark(copy,location);if(!target)return false;spreadZoom.reset();jumpImmediately(copy.pages.findIndex(page=>page.id===target.pageId),target.relativeOffset);return true;}
   return await onBookmarkNavigate?.(location)??false;
  },close:()=>{if(panel)closePanel();else reveal();}});
-const bookmarkTools=<BookmarkTools bookmarks={bookmarks} open={panel==='bookmarks'} onOpen={()=>{swipe.cancel();togglePanel('bookmarks');}}/>;
+const bookmarkTools=!temporary&&<BookmarkTools bookmarks={bookmarks} open={panel==='bookmarks'} onOpen={()=>{swipe.cancel();togglePanel('bookmarks');}}/>;
 const [viewportSize,setViewportSize]=useState({width:900,height:700});
 const preservePosition=useRef(preserve);preservePosition.current=preserve;
 const previousSearch=useRef(searchOpen);
@@ -104,7 +106,7 @@ useLayoutEffect(()=>{
  if(initialView){preserve();setView(previous=>previous??initialView);}
 },[savedView,page?.id,page?.imageSha256,page?.imageDimensionsKnown,page?.width,page?.height]);
 // Persist the opening zoom even if image loading fails before fit can be detected.
-useEffect(()=>{saveReadingView(viewKey,view);},[viewKey,savedView]);
+useEffect(()=>{if(!temporary)saveReadingView(viewKey,view);},[temporary,viewKey,savedView]);
 useEffect(()=>{
  if(!viewport.current)return;
  let measured=false;
@@ -282,9 +284,10 @@ const sourceActions=!sourceRemoved&&<>
  {onReload&&<button className="button secondary" disabled={busy} onClick={()=>reloadContent(copy)}><Icon name="refresh" size={16}/>{msg('重新载入')}</button>}
  {copy.sourceUrl&&<a className="button secondary" href={copy.sourceUrl} target="_blank" rel="noopener noreferrer">{msg('返回来源网页')}</a>}
 </>;
+const thumbnails=<ThumbnailDirectory pages={resources.ready(copy)?copy.pages:[]} index={index} mode="classic" language={settings.language} translationScope={translationScope} onJump={n=>{jump(n);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}/>;
 const readerPanel=panel&&<ReaderDrawer kind={panel} title={{bookmarks:msg('书签'),directory:msg('目录'),translation:msg('翻译设置'),settings:msg('阅读设置')}[panel]} label={{bookmarks:msg('书签'),directory:msg('漫画目录'),translation:msg('翻译选项'),settings:msg('阅读设置')}[panel]} onClose={closePanel}>
 {panel==='directory'&&sourceStatus&&<div className="nc-source-status" role="status"><span>{sourceStatus}</span>{sourceActions}</div>}
-{panel==='directory'||panel==='bookmarks'?<ComicDirectory checkingUpdates={checkingUpdates} onCheckUpdates={onCheckUpdates} bookmarks={<BookmarkList bookmarks={bookmarks}/>} bookmarkCount={bookmarks.count} showBookmarks={panel==='bookmarks'} onShowBookmarks={value=>setPanel(value?'bookmarks':'directory')} catalogLoading={catalogLoading} onContinueCatalog={onContinueCatalog} directory={directory??{title:copy.title,entries:[],groups:[],chapters:[]}} index={index} pageCount={copy.pages.length} onNavigate={(id,pageId,rememberChoice)=>{swipe.cancel();preserve();persist();onNavigate(id,pageId,rememberChoice);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}><ThumbnailDirectory pages={resources.ready(copy)?copy.pages:[]} index={index} mode='classic' language={settings.language} translationScope={translationScope} onJump={n=>{jump(n);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}/></ComicDirectory>:<div className="nc-drawer-content">
+{temporary&&panel==='directory'?<><div className="nc-comic-directory-heading"><h3>{copy.title}</h3></div>{thumbnails}</>:panel==='directory'||panel==='bookmarks'?<ComicDirectory checkingUpdates={checkingUpdates} onCheckUpdates={onCheckUpdates} bookmarks={<BookmarkList bookmarks={bookmarks}/>} bookmarkCount={bookmarks.count} showBookmarks={panel==='bookmarks'} onShowBookmarks={value=>setPanel(value?'bookmarks':'directory')} catalogLoading={catalogLoading} onContinueCatalog={onContinueCatalog} directory={directory??{title:copy.title,entries:[],groups:[],chapters:[]}} index={index} pageCount={copy.pages.length} onNavigate={(id,pageId,rememberChoice)=>{swipe.cancel();preserve();persist();onNavigate(id,pageId,rememberChoice);if(window.matchMedia(compactReaderQuery).matches)closePanel();}}>{thumbnails}</ComicDirectory>:<div className="nc-drawer-content">
 {panel==='translation'?<ReaderTranslationSettings settings={globalSettings} setSettings={setSettings} caps={caps} modelSelection={modelSelection} fontSelection={fontSelection} channelOptions={channelOptions} note={msg('选择译图后，随读预翻译后续页面；查看方式仅对此漫画生效。')}/>:<ReaderSettings settings={globalSettings} setSettings={setSettings} layout={view.layout} direction={settings.direction} onLayout={changeLayout} onDirection={changeDirection}
  animation={settings.layout!=='continuous'&&<Choice variant="cards" label={msg('翻页动画')} value={view.animation??'curl'} options={[{id:'curl',label:msg('仿真翻页')},{id:'slide',label:msg('左右滑动')},{id:'fade',label:msg('淡入淡出')},{id:'none',label:msg('无动画')}]} onChange={animation=>{swipe.cancel();updateView(view=>({...view,animation}));}}/>}
   sizing={settings.layout==='double'
@@ -300,7 +303,7 @@ const readerPanel=panel&&<ReaderDrawer kind={panel} title={{bookmarks:msg('书�
 </div>}
 </ReaderDrawer>;
 return <ReaderShell ref={root} background={settings.readerBackground} immersive={immersive} hidden={hidden} reveal={reveal}>
-<ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} notice={sourceStatus} onBack={leaveReader} bookmarks={bookmarkTools} progressStatus={progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}>
+<ReaderNavigation backLabel={backLabel} backText={backText} title={copy.title} notice={sourceStatus} onBack={leaveReader} bookmarks={bookmarkTools} progressStatus={temporary?'temporary':progressStatus} directoryOpen={panel==='directory'} onDirectory={()=>togglePanel('directory')}>
 {page&&<div className="nc-reader-navigation"><button aria-label={msg("上一页")} title={msg("上一页")} disabled={bookmarks.busy||!canTurn(-1)} onClick={()=>navigate(-1)}><Icon name="chevron" style={{transform:'rotate(-90deg)'}}/></button><ReaderPosition label={msg("第 {0} 页，共 {1} 页", {"0": index+1, "1": copy.pages.length})} value={index+1} total={copy.pages.length}/><ReaderProgress key={JSON.stringify([copy.id,copy.contentId,copy.generation])} valueText={value=>msg("第 {0} 页，共 {1} 页", {"0": value, "1": copy.pages.length})} min={1} max={copy.pages.length} value={index+1} disabled={copy.pages.length===1} onCommit={value=>jump(value-1)}/><button aria-label={msg("下一页")} title={msg("下一页")} disabled={bookmarks.busy||(spread?.end??index+1)>=copy.pages.length&&!next} onClick={()=>navigate(1)}><Icon name="chevron" style={{transform:'rotate(90deg)'}}/></button></div>}
 </ReaderNavigation>
 {page?<PageTranslationBar contentLanguageControl={contentLanguageControl} modes={caps?.modes.filter(m=>m.enabled).map(m=>m.id)} selectedView={preference==='original'?'original':mode} onView={selectView} onRetry={retryCurrentPage} canRetry={canRetry} translationLabel={msg("默认翻译 · {0} · {1}", {"0": modeLabels.classic, "1": language})} panel={panel} onPanel={togglePanel}/>: <ReaderTools label={msg("翻译与阅读工具")} above={Number(!!contentLanguageControl)} below={1}><div className="nc-reader-tool-group">{contentLanguageControl}</div><span className="nc-rail-divider" aria-hidden="true"/><div className="nc-reader-tool-group"><ReaderSettingsButton open={panel==='settings'} onClick={()=>togglePanel('settings')}/></div></ReaderTools>}

@@ -1,4 +1,4 @@
-import type { SourceDocumentProjection, SourceNetworkContext } from '../contracts/network';
+import type { SourceDocumentParams, SourceDocumentProjection, SourceNetworkContext } from '../contracts/network';
 import { resolveSource } from '../core/resolve';
 import { definitions } from '../registry/definitions';
 import { authorizeSourceRequest, createSourceNetworkContext, SourceHttpError, sourceRetryAfter, sourceVerificationError } from './http';
@@ -12,10 +12,10 @@ export function exactDocumentReader(url: string, signal: AbortSignal) {
   // Catalog bindings are extension metadata, not part of the site's SPA route.
   url = url.split('#nodelane-', 1)[0];
   const authorize = (lifetime: AbortSignal) => authorizeSourceRequest(url, undefined, lifetime);
-  return (project: SourceDocumentProjection) => withPageDocument({url, matches: target => target === url, authorize, exact: true},
+  return (project: SourceDocumentProjection, params?:SourceDocumentParams) => withPageDocument({url, matches: target => target === url, authorize, exact: true},
     AbortSignal.any([signal, AbortSignal.timeout(30_000)]), async page => {
       for (;;) {
-        const value = await page.request(project, {});
+        const value = await page.request(project, params ? {params} : {});
         if (value === null) {await discoveryDelay(250, page.signal); continue;}
         if (typeof value !== 'string' || value.length > 4 * 1024 * 1024) throw Error('INVALID_SOURCE_DOCUMENT');
         await authorize(page.signal);
@@ -71,7 +71,7 @@ function pageNetworkContext(page: PageDocument): SourceNetworkContext {
       // Page-context fetch is bound to its document origin, not an adapter host allowlist.
       if (new URL(target).origin !== origin || options?.referer && new URL(options.referer).origin !== origin || options?.desktop || options?.safariTransport)
         throw new SourceHttpError('request-denied', '网页上下文请求必须与来源页面同源。');
-      const result = await page.request(requestInSourcePage, { url: target, referer: options?.referer, body,
+      const result = await page.request(requestInSourcePage, { url: target, referer: options?.referer, redirect:options?.redirect, body,
         ...(options?.json !== undefined ? {json: true} : {}) });
       await authorizeSourceRequest(target, undefined, page.signal);
       if (!result || result.pageUrl !== page.url || typeof result.body !== 'string' || result.body.length > 8 * 1024 * 1024 ||

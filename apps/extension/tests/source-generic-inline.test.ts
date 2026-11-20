@@ -84,7 +84,7 @@ describe('generic recognition is independent of import classification', () => {
 
   for (const definition of definitions.filter(source => source.inlineRecognition === 'generic')) {
     it.each(['reader', 'catalog', 'other'] as const)(`${definition.id} scans %s pages without changing their identity`, async kind => {
-      const url = definition.sites![0].url, {document, good, querySelectorAll} = fixture(url);
+      const url = definition.sites?.[0]?.url ?? 'https://example.test/series/sample', {document, good, querySelectorAll} = fixture(url);
       const location = Object.freeze({sourceId: definition.id, pageKey: 'fixture', kind, url});
       const controller = new AbortController(), session = pageFactories[definition.id]({document, location, signal: controller.signal});
       const targets = session.inlineTargets();

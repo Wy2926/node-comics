@@ -26,8 +26,11 @@ import {registerDocumentManifest} from './manifests';
 import {readSourceCatalog} from './catalog-reader';
 import {openSearchFromTab} from './search-entry';
 import {registerSourceFile} from './file';
+import {openLinkedReader,takeLinkedReader,forgetLinkedReader} from './link-handoff';
 import type {DocumentSnapshot,SourceCatalogSnapshot} from '../contracts/source';
 const sourceMessageTypes = new Set([
+  'NC_OPEN_LINK',
+  'NC_TAKE_LINK',
   'NC_IMPORT_CURRENT',
   'NC_SEARCH_CURRENT',
   'NC_SEARCH_TAB',
@@ -53,6 +56,7 @@ async function discover(tabId: number,readCatalog:(url:string)=>Promise<SourceCa
   if (senderUrl && new URL(tab.url).origin !== new URL(senderUrl).origin)
     throw Error(msg('来源页面已变化，请重新发现。'));
   const { definition, location: loc } = sourceFor(tab.url);
+  if(definition.linkMatch)throw Error(msg('不支持的操作。'));
   if(!definition.capabilities.importable||loc.kind==='other')throw Error('此网站尚未专门适配，不能导入漫画。');
   if (definition.capabilities.file) {await inject(tabId); return registerSourceFile(tabId);}
   if(definition.capabilities.catalog&&sourceNetworks[definition.id]?.catalog){
@@ -102,6 +106,7 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
   registerInlineBackground();
   registerRegionBackground();
   registerSourceTabRecovery();
+  chrome.tabs.onRemoved?.addListener(forgetLinkedReader);
   void recoverImageHeaders().catch(()=>{});
   void chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   chrome.runtime.onInstalled.addListener(() => {
@@ -186,6 +191,8 @@ export function registerSourceBackground(readCatalog:(url:string)=>Promise<Sourc
     if (!trusted(sender)) return;
     (async () => {
       await localeReady();
+      if(message.type==='NC_OPEN_LINK'){await openLinkedReader(message.url,message.tabId);return true;}
+      if(message.type==='NC_TAKE_LINK')return takeLinkedReader(sender.frameId===0&&new URL(sender.url!).pathname==='/reader.html'?sender.tab?.id??-1:-1);
       if(message.type==='NC_SEARCH_TAB'){await openSearchFromTab(message.tabId,message.url);return true;}
       if (message?.type === 'NC_TRANSLATE_TAB' || message?.type === 'NC_TRANSLATE_REGION') {
         if (!Number.isInteger(message.tabId) || message.tabId < 0)
