@@ -103,6 +103,42 @@ it('paginates the observed series protocol, binds every row to its parent and ke
   expect(readDocument).not.toHaveBeenCalled();
 });
 
+it.each(['menu','numbered','counted'] as const)('verifies the %s directory before importing and reads only indexed images',async layout=>{
+  const menu=layout==='menu',numbered=layout==='numbered';
+  const book=new URL(menu?'/manga/paper':numbered?'/comic/paper.html':'/read-book/paper',work).href;
+  const part=(n:number)=>menu?`${book}/chapter-${n}`:numbered?`${book.slice(0,-5)}/chapter-${70+n}.html`:`${book}-chapter-${n}${n===2?'-the-end':''}-ch${70+n}`;
+  const newest=part(2),oldest=part(1),canonical=(url:string)=>`<link rel="canonical" href="${url}">`;
+  const catalogHtml=(prefix=false)=>{
+    const parts=prefix?[1]:[2,1],top=prefix?oldest:newest;
+    const rows=parts.map(n=>menu?`<li><a class="chapter-name" href="${part(n)}">Part ${n}</a></li>`:numbered?
+      `<li><a href="${part(n)}">第${n}話</a></li>`:`<a class="${part(n)===top?'is-latest':''}" data-name="Part ${n}" href="${part(n)}">Part ${n}</a>`).join('');
+    return canonical(book)+'<h1>Paper</h1><a href="/other">Related</a>'+(menu?
+      `<a id="btn-read-first" href="${top}"></a><a id="btn-read-last" href="${oldest}"></a><div id="chapterlist"><ul class="row-content-chapter">${rows}</ul></div>`:numbered?
+      `<a id="Subscribe_bak" href="${oldest}"></a><div id="list"><ul id="mh-chapter-list-ol-0">${rows}</ul></div>`:
+      `<section id="chapters"><h2><small>2 chapters</small></h2><div id="chapter-list">${rows}</div></section>`);
+  };
+  const chapterHtml=(url:string,skipFirst=false)=>{
+    const pages=(skipFirst?[2]:[1,2]).map(n=>menu?`<div class="page-break"><img class="p${n}" data-src="/asset/${n}"></div>`:numbered?
+      `<div class="img-wrap"><img data-index="${n-1}" data-src="/asset/${n}"></div>`:`<img data-page="${n}" src="/asset/${n}">`).join('');
+    return canonical(url)+'<h1>Part</h1><img src="/ad">'+(menu?
+      `<select class="navi-change-chapter">${[newest,oldest].map(u=>`<option data-c="${u}" ${u===url?'selected':''}></option>`).join('')}</select><div class="read-manga"><div class="read-content">${pages}</div></div>`:numbered?
+      `<a id="k_Pic_backArr" href="${book}"></a>${url===newest?`<a id="k_Pic_upArr" href="${oldest}"></a>`:`<a id="k_Pic_nextArr" href="${newest}"></a>`}<div id="currentCache"><div class="view-imgBox">${pages}</div></div>`:
+      `<div data-reader data-comic-url="${book}"><div data-pages>${pages}</div></div>`);
+  };
+  let landing=catalogHtml();
+  const request=vi.fn(async(url:string)=>url===book?landing:[newest,oldest].includes(url)?chapterHtml(url):Promise.reject(Error('unexpected request')));
+  const snap=validateSourceCatalog(await network.catalog!(book,{request}));
+  expect(snap.entries.map(e=>e.url)).toEqual([oldest,newest]);
+  expect(snap.defaultEntryId).toBe(snap.entries[0].id);
+  expect(request.mock.calls.map(([url])=>url)).toEqual(layout==='counted'?[book]:[book,newest]);
+  const pages=await network.pages!(newest,{request});
+  expect(pages.items.map(p=>p.resource)).toEqual([1,2].map(n=>({kind:'http',url:new URL('/asset/'+n,work).href})));
+  landing=catalogHtml(true);
+  await expect(network.catalog!(book,{request})).rejects.toThrow();
+  await expect(network.catalog!(book,{request:async()=>catalogHtml().replaceAll(oldest,oldest.replace(new URL(work).origin,new URL(other).origin))})).rejects.toThrow();
+  await expect(network.pages!(newest,{request:async()=>chapterHtml(newest,true)})).rejects.toThrow();
+});
+
 it('revokes temporary page access and only registers stable locators for shelf reads',async()=>{
   const controller=new AbortController(),copy=await openTemporaryChapter(chapter,controller.signal);
   expect(copy.pages).toHaveLength(1);expect(JSON.stringify(copy)).not.toContain('token=');

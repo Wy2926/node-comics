@@ -13,6 +13,7 @@ const profile=await mkdtemp(path.join(process.env.TEST_TMPDIR||tmpdir(),'linked-
 const pages=Array.from({length:32},(_,i)=>`<div data-reader-page><img data-reader-image data-fallback-index="0" loading="lazy" width="320" height="480" data-src="/image/${i+1}?token=fixture-secret"></div>`).join('');
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a2ioAAAAASUVORK5CYII=','base64');
 const requests=[],total=45,series='/series/paper',work='/comics/7';
+const menu='/manga/fold';
 const slice=(page,size)=>Array.from({length:Math.min(size,Math.max(0,total-(page-1)*size))},(_,i)=>total-(page-1)*size-i);
 const rows=ids=>ids.map(id=>`<a data-chapter-id="${id}" href="${work}/chapters/${id}"><span class="truncate">Part ${id}</span></a>`).join('');
 const site=createServer((request,response)=>{
@@ -22,6 +23,12 @@ const site=createServer((request,response)=>{
   if(p===work)body=`<h1>Paper library</h1><section id="chapters" data-chapter-sort-scope data-chapters-url="${work}/chapters" data-chapter-page-size="20" data-chapter-next-page="2"><h2>Parts</h2><span>Total: 45</span>${rows(slice(1,20))}</section>`;
   else if(p===work+'/chapters'){
     type='application/json';body=JSON.stringify({html:rows(slice(page,20)),total,current_page:page,last_page:3,next_page:page<3?page+1:null,has_more:page<3});
+  }else if(p===menu){
+    body=`<link rel="canonical" href="${p}"><h1>Paper folds</h1><a id="btn-read-first" href="${p}/chapter-2"></a><a id="btn-read-last" href="${p}/chapter-1"></a>
+      <div id="chapterlist"><ul class="row-content-chapter">${[2,1].map(n=>`<li><a class="chapter-name" href="${p}/chapter-${n}">Part ${n}</a></li>`).join('')}</ul></div>`;
+  }else if(p.startsWith(menu+'/chapter-')){
+    body=`<link rel="canonical" href="${p}"><h1>Fold</h1><select class="navi-change-chapter">${[2,1].map(n=>`<option data-c="chapter-${n}" ${p.endsWith('-'+n)?'selected':''}></option>`).join('')}</select>
+      <div class="read-manga"><div class="read-content"><div class="page-break"><img class="p1" src="/image/1?token=fixture-secret"></div></div></div>`;
   }else if(p===series){
     const data=JSON.stringify({series_id:9,series_type:'Comic',series:{id:9,series_slug:'paper',title:'Folded paper',meta:{chapters_count:total}}});
     body=`<h1>Folded paper</h1><div role="tabpanel" id="tab-content-chapters_list"></div><script type="application/json">${data}</script>
@@ -101,13 +108,15 @@ try{
   await card(r).locator('.nc-book-cover').click();await rendered(r);
   await r.getByRole('button',{name:'Next page',exact:true}).click();await r.locator('.nc-reader-position[data-value="2"]').waitFor();
   await r.locator('[data-reader-back-trigger]').click();await card(r).waitFor();
-  const saved=await readState(r);assert.equal(saved.positions.length,1);
+  await r.close();
+  const saved=await readState(shelf);assert.equal(saved.positions.length,1);
   assert(!JSON.stringify(saved).includes('fixture-secret'));
-  const durable=await r.evaluate(()=>chrome.storage.local.get(null));assert(!JSON.stringify(durable).includes('fixture-secret'));
+  const durable=await shelf.evaluate(()=>chrome.storage.local.get(null));assert(!JSON.stringify(durable).includes('fixture-secret'));
   const transient=await popupAction(origin+work+'/chapters/1',direct);await rendered(transient);
   await transient.locator('[data-reader-back-trigger]').click();await card(transient).waitFor();
   assert.deepEqual((await readState(transient)).positions,saved.positions);await transient.close();
 
+  r=shelf;
   const link=async url=>{await r.goto(base+'#sites');await r.locator('#nc-site-url').fill(url);await r.locator('.nc-site-link-import button').click();};
   await link(other+'/comics/8');await r.locator('.nc-site-link-import [role=alert]').waitFor();
   assert.equal((await readState(r)).comics.length,1);
@@ -119,7 +128,12 @@ try{
   state=await readState(folded);const snap=state.catalogs.find(s=>s.url===origin+series);
   assert(snap.complete);assert.equal(snap.entries.length,total);assert.equal(snap.entries.filter(e=>!e.readable).length,1);
   assert.deepEqual(state.positions,saved.positions);assert.equal(state.comics.length,3);
-  assert.deepEqual(errors,[]);console.log('PASS: popup and link entry points; both complete directories; locked rows; lazy images; invalid catalog; cross-origin and temporary progress isolation.');
+  await source.goto(origin+menu);requests.length=0;
+  const inShelf=await popupAction(origin+menu,add);
+  const folds=inShelf.locator('article.nc-book').filter({hasText:'Paper folds'});await folds.waitFor();
+  assert.deepEqual(requests.map(x=>x.p).filter(p=>p.startsWith(menu)||p.startsWith('/image/')),[menu,menu+'/chapter-2']);
+  await folds.locator('.nc-book-cover').click();await rendered(inShelf);
+  assert.deepEqual(errors,[]);console.log('PASS: popup and link entry points; complete directories; locked rows; lazy images; invalid catalog; cross-origin and temporary progress isolation.');
 }finally{
   await context?.close();await new Promise(resolve=>site.close(resolve));
   await rm(profile,{force:true,recursive:true,maxRetries:5,retryDelay:250});
