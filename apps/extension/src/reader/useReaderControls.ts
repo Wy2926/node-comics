@@ -37,6 +37,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, settin
   }
 
   function toggleControls() {
+    if (panel === 'comments') return;
     if (panel) {setPanel(undefined); return;}
     if (!immersive || blocked) return;
     if (hidden) reveal();
@@ -53,7 +54,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, settin
   function closePanel() {
     setPanel(undefined);
     const selector = panel === 'bookmarks' ? '[data-reader-bookmarks-trigger]' : panel === 'directory' ? '[data-reader-directory-trigger]'
-      : panel === 'translation' ? '.nc-translation-trigger' : '[data-reader-settings-trigger]';
+      : panel === 'comments' ? '[data-reader-comments-trigger]' : panel === 'translation' ? '.nc-translation-trigger' : '[data-reader-settings-trigger]';
     const trigger=root.current?.querySelector<HTMLButtonElement>(selector);
     (trigger?.getClientRects?.().length===0 ? [...(root.current?.querySelectorAll<HTMLButtonElement>(selector)??[])].find(button=>button.getClientRects().length) : trigger)?.focus({preventScroll:true});
   }
@@ -72,7 +73,7 @@ export function useReaderControls<Panel extends string>({blocked, notify, settin
     return () => clearTimeout(hideTimer.current);
   }, [immersive, panel, blocked]);
   useEffect(() => {
-    if (!panel) return;
+    if (!panel || panel === 'comments') return;
     if (panel !== 'translation') {
       root.current?.querySelector<HTMLButtonElement>('.nc-reader-drawer .nc-drawer-title button')?.focus({preventScroll: true});
       return;

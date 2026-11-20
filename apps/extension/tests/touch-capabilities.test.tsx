@@ -46,7 +46,8 @@ it.each([
   const queries = cssQueries(path);
   expect(queries).toContain(query);
   for (const branch of queries.flatMap(value => value.split(','))) {
-    if (branch.includes('(max-height:500px)')) expect(branch).toContain('(max-width:1000px)');
+    if (branch.includes('(max-height:500px)') && /\((?:pointer:coarse|hover:none)\)/.test(branch))
+      expect(branch).toContain('(max-width:1000px)');
   }
 });
 

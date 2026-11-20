@@ -25,11 +25,12 @@ npx wxt zip --browser firefox --mv3
 | `src/comics`、`src/storage` | 漫画、导入、字节缓存与进度 |
 | `src/reader` | 阅读窗口与交互 |
 | `src/sources` | 站点发现、目录与取图 |
+| `src/discovery` | [作品关联、资料站适配与公开评论](../../docs/WORK_LINKS.md) |
 | `src/translation` | 渠道、任务与结果 |
 | `src/ui`、`src/i18n` | 通用界面与字典 |
 | `../../shared` | 本仓库使用的图像协议、模型和字体数据 |
 
-测试在 `tests/` 和模块相邻的 `*.test.ts`。浏览器夹具使用各自的 `*.config.ts`；需要扩展权限的行为使用构建后的 MV3 验证。
+单元测试在 `tests/` 和源码模块旁。浏览器验证入口见[辅助脚本](../../scripts/README.md)；需要扩展权限的用例使用构建后的 MV3。
 
 官网站点清单更新：`node scripts/export-website-catalog.mjs <新输出目录>`，将产物替换后端仓库的 `contracts/extension/`。普通构建不访问其他仓库。
 

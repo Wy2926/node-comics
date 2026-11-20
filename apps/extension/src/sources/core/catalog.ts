@@ -104,12 +104,18 @@ export function validateCatalog(
     while (parent) {if (parents.has(parent) || parents.size >= 8) return invalid(); parents.add(parent); parent = groups.get(parent)?.parentId;}
   }
   if (c.defaultEntryId !== undefined && (!entries.has(c.defaultEntryId) || entries.get(c.defaultEntryId)?.related)) return invalid();
+  // Optional metadata must neither break reading nor carry arbitrary URLs or source credentials.
+  const refs = c.externalWorkIds;
+  const ids = refs && typeof refs === 'object' && !Array.isArray(refs)
+    ? Object.entries(refs).slice(0, 16).filter(([key, id]) => /^[a-z][a-z0-9-]{0,47}$/.test(key) &&
+      typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/.test(id)) : [];
   return {
     id: c.id,
     sourceId: c.sourceId,
     url: c.url,
     title: c.title,
     cover: c.cover ? {url: c.cover.url} : undefined,
+    ...(ids.length ? {externalWorkIds: Object.fromEntries(ids)} : {}),
     observedAt: c.observedAt,
     complete: c.complete,
     note: c.note,

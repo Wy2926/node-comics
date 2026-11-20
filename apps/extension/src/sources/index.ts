@@ -1,5 +1,4 @@
 import { msg } from '../i18n/runtime';
-import type { SourceDefinition } from './contracts/definition';
 import { validateCatalog } from './core/catalog';
 import { sameSource } from './core/identity';
 import { resolveSource } from './core/resolve';
@@ -19,6 +18,8 @@ export { pollSourceDiscovery } from './core/discovery';
 export { discoverCatalog, discoverEntry, discoverPage, inExtension, sourceMessage } from './runtime/client';
 export {prepareCatalogImport,readImportCatalog} from './runtime/import';
 export {readLinkedChapter} from './runtime/link-reader';
+export {chapterDiscussion} from './runtime/chapter-comments';
+export type {ChapterCommentPage} from './contracts/network';
 export {listSupportedSites, sortSupportedSites, matchesSiteFilters, type SiteFilters} from './registry/sites';
 export {readSourceImage,readInlineSourceImage,readSourceCover} from './runtime/source-image';
 export { sourceImage } from './runtime/image-fetch';
@@ -31,15 +32,7 @@ export { imageDataUrl } from './shared/bytes';
 export { comicSize } from './shared/dimensions';
 export { isPageImageUrl, safeImageUrl } from './shared/urls';
 export {isImageReferrerPolicy} from './shared/referrer';
-export function createSourceService(registry: readonly SourceDefinition[]) {
-  return {
-    resolve: (url: string) => resolveSource(url, registry),
-    validateCatalog: (input: unknown) => validateCatalog(input, registry),
-    samePage: (a: string, b: string) => sameSource(a, b, registry),
-  };
-}
-const service = createSourceService(definitions);
-export const sourceFor = service.resolve;
+export const sourceFor = (url: string) => resolveSource(url, definitions);
 /** Local files and existing sources keep their search entry unless a source opts out. */
 export const canFindAlternatives = (url?: string) => !url || sourceFor(url).definition.capabilities.findAlternatives !== false;
 /** Validate against the resolved source, never a caller-supplied adapter flag. */
@@ -58,9 +51,9 @@ export const sourceLocation = (url: string) => {
 };
 export const sourcePageIdentity = (url: string) => sourceLocation(url)?.pageKey ?? url;
 export const sourceCatalogReference = (url: string) => sourceLocation(url)?.catalog;
-export const sameSourcePage = service.samePage;
+export const sameSourcePage = (a: string, b: string) => sameSource(a, b, definitions);
 export const sourceName = (id: string) => definitions.find((d) => d.id === id)?.name || msg('网页图片');
 export const sourceInstallation = {
   autoContentMatches: [...new Set(definitions.flatMap((d) => d.installation.autoContentMatches))],
 };
-export const validateSourceCatalog = service.validateCatalog;
+export const validateSourceCatalog = (input: unknown) => validateCatalog(input, definitions);

@@ -88,7 +88,9 @@ export function parseCatalog(mangaValue: unknown, rawChapters: unknown[], aggreg
   });
   const volumes = [...new Set(chapters.map(chapter => chapter.volume))];
   const first = entries.find(entry => entry.readable);
+  const al = (attributes.links as JsonObject | null)?.al;
   return {id: catalogId, sourceId: 'mangadex', url: catalogUrl(mangaId), title, cover: cover(manga, mangaId), observedAt: Date.now(), complete: true,
+    ...(typeof al === 'string' && /^[1-9]\d{0,9}$/.test(al) && Number(al) <= 2147483647 ? {externalWorkIds: {anilist: al}} : {}),
     note: chapters.some(chapter => chapter.external || chapter.unavailable || !chapter.pages) ? '目录保留外链及暂不可用章节；打开时会说明源站状态。' : '',
     groups: volumes.map(volume => ({id: 'volume:' + (volume ?? 'none'), title: volume ? `Vol. ${volume}` : '未标注卷', complete: true,
       entryIds: entries.filter(entry => entry.groupIds.includes('volume:' + (volume ?? 'none'))).map(entry => entry.id)})),

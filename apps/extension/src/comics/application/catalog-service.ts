@@ -50,7 +50,7 @@ export async function reconcileCatalog(tx:CatalogMutation, current:Comic, source
   const defaultEntry = entries.find(entry => entry.sourceEntryId === source.defaultEntryId) ?? (entries.length === 1 ? entries[0] : undefined);
   const policy = catalogSyncPolicy(current), updates = current.catalogUpdates;
   const next:Comic = {...current, title:source.title, sourceUrl:source.url, startEntryId:defaultEntry?.id,
-    sourceCover:source.cover,
+    sourceCover:source.cover, externalWorkIds:source.externalWorkIds ?? (source.complete ? undefined : current.externalWorkIds),
     ...(added ? {updatedAt:now, catalogUpdates:{revision:(updates?.revision ?? 0) + 1,
       seenRevision:updates?.seenRevision ?? 0, count:(updates?.count ?? 0) + added}} : {}),
     // Claim the automatic check gate for an initial partial import too: its ongoing read already owns this work.

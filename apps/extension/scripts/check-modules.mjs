@@ -63,6 +63,8 @@ for (const filename of modules) {
         (/^src\/(?:App\.tsx|api\.ts|auth\/|comics\/|sources\/|ui\/|reader\/|translation\/|storage\/)/.test(relative(target)) || /\/node_modules\/(?:@types\/)?react(?:-dom)?\//.test(target)))
       importErrors.push(`Discovery boundary (metadata must not depend on UI, account, reading or source services): ${relative(filename)} -> ${relative(target)}`);
     const targetAdapter = channelAdapter(target), adapter = channelAdapter(filename);
+    if (relative(target).startsWith('src/discovery/providers/') && filename !== target)
+      importErrors.push(`Discovery boundary (use the provider registry): ${relative(filename)} -> ${relative(target)}`);
     const targetTextAdapter = textAdapter(target);
     if (targetTextAdapter && textAdapter(filename) !== targetTextAdapter && relative(filename) !== 'src/text-translation/registry.ts')
       importErrors.push(`Text translation boundary (concrete adapters require their owner or registry): ${relative(filename)} -> ${relative(target)}`);
@@ -92,7 +94,11 @@ for (const filename of modules) {
       const pattern = node.arguments[0];
       const kind = relative(filename).match(/^src\/sources\/registry\/(definitions|pages|networks|images)\.ts$/)?.[1];
       const file = {definitions:'definition',pages:'page',networks:'network',images:'image'}[kind];
-      if (!file || !pattern || !ts.isStringLiteral(pattern) || pattern.text !== `../sites/*/${file}.ts`) {
+      if (relative(filename) === 'src/discovery/registry.ts' && pattern && ts.isStringLiteral(pattern) && pattern.text === './providers/*.ts') {
+        for (const target of modules) if (/^src\/discovery\/providers\/[^/]+\.ts$/.test(relative(target))) {
+          dependencies.add(target); runtime.add(target);
+        }
+      } else if (!file || !pattern || !ts.isStringLiteral(pattern) || pattern.text !== `../sites/*/${file}.ts`) {
         importErrors.push(`Source boundary (only uniform registry discovery is allowed): ${relative(filename)}`);
       } else {
         for (const target of modules) if (new RegExp(`^src/sources/sites/[^/]+/${file}\\.ts$`).test(relative(target))) {

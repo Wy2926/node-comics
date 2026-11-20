@@ -2,12 +2,33 @@ import {describe, expect, it, vi} from 'vitest';
 import {definition, languages} from '../definition';
 import {network, parsePages} from '../network';
 import {parseSearch, searchUrl} from '../search';
-import {validateSourceCatalog, sourceFor} from '../../../index';
-import {catalogHtml, catalogUrl, episodePage, episodeUrl, image, readerHtml, searchHtml} from './fixtures';
+import {chapterDiscussion, validateSourceCatalog, sourceFor} from '../../../index';
+import {catalogHtml, catalogUrl, commentsPage, episodePage, episodeUrl, image, readerHtml, searchHtml} from './fixtures';
 
 const endpoint = 'https://m.webtoons.com/api/v1/canvas/7/episodes?pageSize=100';
 
 describe('WEBTOON international', () => {
+  it('reads public comments for exactly one release and keeps spoiler flags, source cursors and removed text separate', async () => {
+    const url = episodeUrl(3), {location} = sourceFor(url), scope = 'c_7_3';
+    expect(chapterDiscussion(url, location.pageKey, location.catalog!.key)?.key).toBe(location.pageKey);
+    expect(chapterDiscussion(episodeUrl(4), location.pageKey, location.catalog!.key)).toBeUndefined();
+    expect(chapterDiscussion(url, location.pageKey, 'webtoons:fr:canvas:7')).toBeUndefined();
+    const {read} = network.chapterComments, response = commentsPage(scope), last = response.result.posts[1];
+    const get = vi.fn(async (_url: string) => JSON.stringify(response));
+    expect(await read(url, undefined, get)).toMatchObject({items:[{spoiler:false},{body:last.body,spoiler:true}],next:last.id});
+    expect(new URL(get.mock.calls[0][0]).searchParams.get('pageId')).toBe(scope);
+    last.status = 'DELETE'; expect((await read(url, undefined, get)).items).toHaveLength(1);
+    const foreign = commentsPage('w_7_3');
+    await expect(read(url, foreign.result.posts[0].id, get)).rejects.toThrow();
+    expect(get).toHaveBeenCalledTimes(2);
+    await expect(read(url, undefined, async () => JSON.stringify(foreign))).rejects.toThrow();
+    const second = await read(url, last.id, async target => {
+      const params = new URL(target).searchParams;
+      expect(params.get('cursor')).toBe(last.id); expect(params.get('withCursor')).toBe('false');
+      return JSON.stringify(commentsPage(scope, true));
+    });
+    expect(second.items[0].body).toBe(`Comment ${scope}/b`); expect(second.next).toBeUndefined();
+  });
   it('isolates language, Originals and Canvas identities and rejects forged/ambiguous URLs', () => {
     for (const language of Object.keys(languages)) {
       for (const host of ['www', 'm']) {

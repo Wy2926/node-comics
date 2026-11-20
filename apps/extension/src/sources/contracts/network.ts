@@ -35,8 +35,17 @@ export interface SourceNetworkContext {
 }
 export type SourceDocumentParams = Readonly<Record<string,string|number>>;
 export type SourceDocumentProjection = (input: {pageUrl: string; documentToken: string; cancelEvent: string; params?:SourceDocumentParams}) => Promise<string | null>;
+export interface ChapterCommentPage {
+  items: {id:string; author:string; body:string; postedAt?:number; spoiler?:boolean}[];
+  next?:string;
+}
 /** Packaged parsers only; adapters never execute downloaded site scripts. */
 export interface SourceNetwork {
+  /** Public chapter discussion. Headers, cursor and episode identifiers belong to the adapter. */
+  chapterComments?: {
+    headers?: Readonly<Record<string,string>>;
+    read(url:string, cursor:string|undefined, get:(url:string)=>Promise<string>):Promise<ChapterCommentPage>;
+  };
   /** Operations that need a real source-page session; omitted operations retain direct HTTP. */
   pageTransport?: readonly ('catalog'|'pages')[];
   /** Reuse an already open same-origin page for search; never create or navigate a tab. */

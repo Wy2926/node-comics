@@ -24,7 +24,7 @@ export class DiscoverySession {
   };
   private listeners = new Set<() => void>();
   private pages = new Map<string, {value: DiscoveryPageResult; at: number}>();
-  private details = new Map<number, DiscoveryDetail>();
+  private details = new Map<string, DiscoveryDetail>();
   private listRequest?: AbortController;
   private detailRequest?: AbortController;
   private requestedPage = 1;

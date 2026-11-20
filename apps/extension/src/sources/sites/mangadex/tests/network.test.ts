@@ -56,6 +56,15 @@ describe('MangaDex API source', () => {
     expect(parseCatalog(manga(), unavailable, aggregate(unavailable), mangaId).defaultEntryId).toBeUndefined();
   });
 
+  it('uses only the source-published AniList manga ID without persisting other links', () => {
+    const value = manga();
+    const catalog = (al: unknown) => validateCatalog(parseCatalog({...value, data: {...value.data,
+      attributes: {...value.data.attributes, links: {al, raw: 'https://example.test/?token=private'}}}}, [], aggregate([]), mangaId), [definition]);
+    expect(catalog('30013').externalWorkIds).toEqual({anilist: '30013'});
+    expect(catalog('https://example.test/?token=private').externalWorkIds).toBeUndefined();
+    expect(catalog('2147483648').externalWorkIds).toBeUndefined();
+  });
+
   it('keeps unnumbered and unproven releases separate, preserves decimal/suffix labels, and never infers slots from titles', () => {
     const rows = [chapter(1, 'en', null), chapter(2, 'en', null), chapter(3, 'en', '1.5'), chapter(4, 'en', '1.25'), chapter(5, 'en', '1a'), chapter(6, 'en', '1')];
     const value = parseCatalog(manga(), rows, aggregate(rows), mangaId);

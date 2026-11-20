@@ -32,6 +32,7 @@ if (live) {
   context.on('requestfailed', request => {const url = describe(request); if (url) console.log('failed', url, request.failure()?.errorText);});
 }
 const errors = [], checks = []; let reader, imageBytes, failCatalog = false, addChapter = false, activeEntry;
+const commentRequests = []; let holdPage, failCommentPage = false;
 context.on('page', page => page.on('pageerror', error => {if (page.url().startsWith('chrome-extension:')) errors.push(error.message);}));
 // Block product API calls in the isolated reader without intercepting source traffic.
 await context.addInitScript(() => {
@@ -43,8 +44,17 @@ await context.addInitScript(() => {
 });
 if (!live) {
   await context.route('https://webtoon-phinf.pstatic.net/**', route => route.fulfill({contentType: 'image/png', body: imageBytes}));
-  await context.route('https://www.webtoons.com/**', route => {
+  await context.route('https://www.webtoons.com/**', async route => {
     const url = new URL(route.request().url()); let html;
+    if (url.pathname === '/p/api/community/v2/posts') {
+      const id = url.searchParams.get('pageId'), cursor = url.searchParams.get('cursor');
+      assert.equal(route.request().headers()['service-ticket-id'], 'epicom');
+      assert(!route.request().headers().cookie && !route.request().headers().referer);
+      commentRequests.push(id);
+      if (cursor && holdPage) await holdPage.promise;
+      if (cursor && failCommentPage) {failCommentPage = false; return route.fulfill({status:503,body:'Unavailable'});}
+      return route.fulfill({json:fixture.commentsPage(id, !!cursor)}).catch(() => {});
+    }
     if (url.pathname.includes('/search/')) html = fixture.searchHtml(url.pathname.split('/').at(-1), url.searchParams.get('keyword'));
     else if (url.pathname.endsWith('/viewer')) html = fixture.readerHtml(Number(url.searchParams.get('episode_no')));
     else html = fixture.catalogHtml();
@@ -90,7 +100,10 @@ try {
   }
   await reader.getByRole('navigation', {name: '主导航', exact: true}).getByRole('button', {name: '搜索漫画', exact: true}).click();
   const search = reader.locator('.nc-search-page');
-  for (const option of await search.locator('.nc-search-site-option').all()) await option.locator('input').setChecked((await option.innerText()).includes('WEBTOON · English'));
+  await search.locator('.nc-search-scope-expand').click();
+  await search.getByRole('button', {name:'反选',exact:true}).click();
+  await search.getByRole('checkbox', {name:'WEBTOON · English',exact:true}).check();
+  await search.locator('.nc-search-scope-expand').click();
   const input = search.getByPlaceholder('输入漫画名称或别名'); await input.fill(live ? liveTitle : 'fixture'); await input.press('Enter');
   const hit = search.locator('.nc-search-result').filter({has: reader.getByRole('heading', {name: live ? liveTitle : 'WEBTOON fixture', exact: true})});
   await hit.waitFor({timeout: 60000}); await reader.screenshot({path: path.join(out, 'search.png')});
@@ -102,6 +115,60 @@ try {
   await reader.waitForFunction(async entry => {const {catalog} = await import(chrome.runtime.getURL('probe.mjs')), e = await catalog.get('entries', entry);
     return (await catalog.get('positions', entry))?.pageId === (await catalog.listPages(e.contentId))[2]?.pageId;}, activeEntry);
   await reader.screenshot({path: path.join(out, 'reader.png')}); checks.push('Search -> full catalog -> real image decode -> page 3');
+  if (!live) {
+    assert.deepEqual(commentRequests, []);
+    const tools = reader.locator('.nc-reader-rail.right'), toggle = tools.getByRole('button',{name:'评论',exact:true});
+    await toggle.click();
+    const panel = reader.getByRole('complementary',{name:'评论'}), pages = reader.locator('.nc-reader-navigation');
+    await panel.getByText('Comment c_7_1/d',{exact:true}).waitFor();
+    assert.equal(await panel.getByText('Comment c_7_1/c',{exact:true}).count(),0);
+    await panel.getByRole('button',{name:'显示剧透'}).click();
+    await panel.getByText('Comment c_7_1/c',{exact:true}).waitFor();
+    const progress = reader.getByRole('slider',{name:'阅读进度',exact:true});
+    await panel.locator('.nc-comment-scroll').press('PageUp');
+    assert.equal(await progress.inputValue(),'3');
+    await reader.locator('.nc-reading-viewport').click();
+    await reader.keyboard.press('PageUp'); await waitImage(2);
+    await reader.keyboard.press('PageDown'); await waitImage(3);
+    assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+    assert.deepEqual(commentRequests,['c_7_1']);
+    holdPage = Promise.withResolvers();
+    const started = reader.waitForRequest(req => new URL(req.url()).searchParams.get('cursor')?.endsWith('c_7_1-c'));
+    await panel.getByRole('button',{name:'下一页'}).click(); await started;
+    await pages.getByRole('button',{name:'下一页'}).click();
+    await panel.getByText('Comment c_7_2/d',{exact:true}).waitFor();
+    holdPage.resolve(); holdPage = undefined;
+    assert.equal(await panel.getByText(/Comment c_7_1\//).count(),0);
+    failCommentPage = true;
+    await panel.getByRole('button',{name:'下一页'}).click();
+    await panel.getByText('WEBTOON 暂不可用，请稍后重试。').waitFor();
+    assert.equal(await panel.locator('.nc-comment').count(),0);
+    await panel.getByRole('button',{name:'重试'}).click();
+    await panel.getByText('Comment c_7_2/b',{exact:true}).waitFor();
+    await panel.getByRole('button',{name:'上一页'}).click();
+    await panel.getByText('Comment c_7_2/d',{exact:true}).waitFor();
+    await reader.setViewportSize({width:390,height:844});
+    await reader.waitForFunction(() => document.querySelector('.nc-reading-viewport img.nc-page-image')?.getBoundingClientRect().width <= innerWidth);
+    const sheet = await panel.boundingBox(), canvas = await reader.locator('.nc-reading-viewport').boundingBox();
+    assert(sheet.y < canvas.y + canvas.height && sheet.height < 844 / 2 && canvas.height > 844 / 2);
+    const imageBounds = () => reader.locator('.nc-reading-viewport img.nc-page-image').first().boundingBox();
+    const compactImage = await imageBounds();
+    await panel.getByRole('button',{name:'展开评论面板'}).click();
+    assert((await panel.boundingBox()).height > sheet.height + 100);
+    assert.deepEqual(await reader.locator('.nc-reading-viewport').boundingBox(),canvas);
+    assert.deepEqual(await imageBounds(),compactImage);
+    await panel.getByRole('button',{name:'恢复紧凑面板'}).click();
+    assert.equal(await reader.locator('dialog[open],.nc-drawer-scrim').count(),0);
+    await reader.screenshot({path:path.join(out,'mobile-chapter-comments.png')});
+    await pages.getByRole('button',{name:'上一页'}).click();
+    await panel.getByText('Comment c_7_1/d',{exact:true}).waitFor();
+    await reader.keyboard.press('Escape');
+    assert.equal(await toggle.getAttribute('aria-expanded'),'false');
+    assert.deepEqual(await reader.locator('.nc-reading-viewport').boundingBox(),canvas);
+    await reader.setViewportSize({width:1440,height:1000}); await waitImage(3);
+    assert.equal(await reader.getByRole('slider',{name:'阅读进度',exact:true}).inputValue(),'3');
+    checks.push('Chapter comments follow release changes, suppress stale pages and spoilers, and leave mobile reading controls usable');
+  }
   await reader.getByRole('button', {name: '打开目录', exact: true}).click();
   const directory = reader.getByRole('tab', {name: /^目录/}); if (await directory.isVisible()) await directory.click();
   await reader.getByRole('searchbox', {name: '搜索目录', exact: true}).waitFor(); await reader.screenshot({path: path.join(out, 'directory.png')});

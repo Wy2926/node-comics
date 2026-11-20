@@ -4,6 +4,7 @@ import {hasClass, inertHtml, tags} from '../../shared/html';
 import {languages} from './definition';
 import {block, imageUrl, meta, ownership, requireLocation, unavailable} from './html';
 import {search} from './search';
+import {chapterComments} from './comments';
 
 async function request(url: string, context: SourceNetworkContext, options?: SourceRequestOptions) {
   context.signal?.throwIfAborted();
@@ -25,7 +26,7 @@ export function parsePages(html: string, url: string): SourceSnapshot {
     discoveryComplete: true, knownTotal: items.length, note: '', items};
 }
 export const network = {
-  search,
+  search, chapterComments,
   async catalog(url, context) {
     const loc = requireLocation(url);
     if (loc.episode) throw unavailable();

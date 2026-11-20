@@ -13,8 +13,8 @@ export function DiscoveryCover({work}: {work: DiscoveryWork}) {
     {work.cover && work.cover !== failed ? <img src={work.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(work.cover)}/> : <Icon name="book" size={40}/>}
   </div>;
 }
-export function DiscoveryCard({work, onOpen, translator, language, translate}: {
-  work: DiscoveryWork; onOpen: () => void; translator: TextTranslationSession; language: string; translate: boolean;
+export function DiscoveryCard({work, provider, onOpen, translator, language, translate}: {
+  work: DiscoveryWork; provider: string; onOpen: () => void; translator: TextTranslationSession; language: string; translate: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null), [visible, setVisible] = useState(false), [original, setOriginal] = useState(false);
   useEffect(() => {
@@ -26,11 +26,12 @@ export function DiscoveryCard({work, onOpen, translator, language, translate}: {
   useEffect(() => setOriginal(false), [language]);
   const result = useTextTranslation(translator, work.title, language, translate && visible);
   const title = !original && translate && result.text ? result.text : work.title;
+  const scoreLabel = msg('{provider} 评分 {0}/100', {provider, '0': work.score});
   return <div ref={element} className="nc-discovery-card-entry"><button className="nc-discovery-card" onClick={onOpen} aria-label={title}>
     <div className="nc-discovery-poster">
       <DiscoveryCover work={work}/>
       <div className="nc-discovery-poster-top">
-        {work.score !== undefined && <span className="nc-discovery-score" aria-label={msg('AniList 评分 {0}/100', {'0': work.score})} title={msg('AniList 评分 {0}/100', {'0': work.score})}><Icon name="spark" size={13}/><b>{work.score}</b><small>/100</small></span>}
+        {work.score !== undefined && <span className="nc-discovery-score" aria-label={scoreLabel} title={scoreLabel}><Icon name="spark" size={13}/><b>{work.score}</b><small>/100</small></span>}
         {work.status && <span className="nc-discovery-status">{statusLabels()[work.status]}</span>}
       </div>
       <div className="nc-discovery-poster-bottom">

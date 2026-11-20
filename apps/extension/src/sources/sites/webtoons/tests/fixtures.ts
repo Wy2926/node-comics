@@ -14,3 +14,11 @@ export const mobileReaderHtml = (no = 1) => metadata(episodeUrl(no)) + `<header 
   <div id="_viewer"><div class="_imageWrap"><img class="_checkVisible" src="${image}" width="800" height="1200"></div></div>`;
 export const searchHtml = (section = 'canvas', query = 'fixture') => `<a href="/en/search/${section}?keyword=${query}" aria-current="page">${section}</a>` +
   (section === 'canvas' ? `<a class="_card_item" data-title-no="7" href="${catalogUrl}"><div><img src="${image}"></div><div class="info_text"><strong class="title">WEBTOON fixture</strong><div class="author">Author</div></div></a>` : '');
+export function commentsPage(pageId: string, more = false) {
+  const rows = (more ? ['b'] : ['d','c']).map(suffix => {
+    const id = `GW-epicom:0-${pageId}-${suffix}`;
+    return {id, rootId:id, pageId, status:'SERVICE', bodyFormat:{type:'PLAIN'}, createdBy:{name:`Reader ${suffix}`},
+      createdAt:1700000000000, body:`Comment ${pageId}/${suffix}`, settings:{spoilerFilter:suffix === 'c' ? 'ON' : 'OFF'}};
+  });
+  return {status:'success', result:{posts:rows, pagination:{next:more ? null : rows.at(-1)!.id}}};
+}

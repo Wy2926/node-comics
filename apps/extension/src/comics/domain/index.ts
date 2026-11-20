@@ -22,6 +22,9 @@ export interface Comic {
   sourceCover?: {url: string};
   /** Remote library artwork is separate from the legacy website cover reference. */
   sourceArtwork?:SourceArtwork;
+  /** Source observations may change; an explicit local choice (including unlink) wins. */
+  externalWorkIds?: Record<string, string>;
+  workLinks?: Record<string, string | null>;
   catalogSync?: { nextCheckAt: number; lastAttemptAt?: number; lastSuccessAt?: number; lease?: string };
   catalogUpdates?: { revision: number; seenRevision: number; count: number };
 }

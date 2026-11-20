@@ -70,7 +70,7 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
   return options?.form === undefined ? undefined : encodeForm(options.form);
 }
 /** Packaged adapters choose request hosts; the transport checks browser access and resource budgets. */
-export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportResponse[] = []): SourceNetworkContext {
+export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportResponse[] = [], publicHeaders?: Readonly<Record<string,string>>): SourceNetworkContext {
   async function read(url: string, options: Parameters<SourceNetworkContext['request']>[1], body?: string | Uint8Array<ArrayBuffer>, binaryResponse = false) {
     const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]);
     const consume=async(response:Response)=>{
@@ -115,7 +115,8 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
     // Chromium drops fetch's User-Agent; use the existing exact-request rules.
     return withImageHeaders(url, Object.keys(headers).length ? headers : undefined, lifetime, async () => {
       const binary = body instanceof Uint8Array;
-      return consume(await fetch(url, {credentials: 'include', redirect:options?.redirect, headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html',
+      return consume(await fetch(url, {credentials: publicHeaders ? 'omit' : 'include', redirect:publicHeaders ? 'error' : options?.redirect,
+        referrerPolicy:publicHeaders ? 'no-referrer' : undefined, headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html', ...publicHeaders,
         ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),
         ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : options?.json !== undefined ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})}));

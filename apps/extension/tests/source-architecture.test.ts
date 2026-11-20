@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createSourceService, listSearchSites, pollSourceDiscovery, sameSourcePage, sourceFor, sourceInstallation, sourcePageIdentity, validateSourceCatalog, type SourceCatalogSnapshot, type SourceDefinition, type SourceSnapshot, } from '../src/sources';
+  listSearchSites, pollSourceDiscovery, sameSourcePage, sourceFor, sourceInstallation, sourcePageIdentity, validateSourceCatalog, type SourceCatalogSnapshot, type SourceDefinition, type SourceSnapshot, } from '../src/sources';
 import { validateCatalog } from '../src/sources/core/catalog';
 import { SourceNavigation } from '../src/sources/core/navigation';
 import { validatePages } from '../src/sources/core/pages';
@@ -179,7 +179,7 @@ describe('source composition and identity', () => {
         definitions: registry,
         pages: { ...pageFactories, fixture: factory },
       });
-    expect(createSourceService(registry).validateCatalog(testCatalog)).toEqual(testCatalog);
+    expect(validateCatalog(testCatalog, registry)).toEqual(testCatalog);
     const page = navigation.get(snapshot.url);
     expect((await page.session.discoverPages()).status).toBe('ready');
     expect(validatePages(snapshot, page.location)).toBe(snapshot);

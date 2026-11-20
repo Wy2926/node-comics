@@ -63,3 +63,6 @@
 .nc-cover-retry{position:absolute;top:44px;right:10px;z-index:2}
 .nc-card-progress{height:5px;flex-shrink:0;background:var(--surface-soft);overflow:hidden}
 .nc-card-progress>span{display:block;height:100%;background:var(--accent)}
+.nc-library-card-body:has(.nc-shelf-comments){grid-template-columns:minmax(0,1fr) auto}
+.nc-library-card-body>.nc-shelf-comments{grid-area:1/2/3/3;align-self:center;min-width:44px;min-height:44px;color:var(--muted)}
+.nc-library-card-body>.nc-shelf-comments:is(:hover,:focus-visible){color:var(--accent);background:var(--accent-soft)}

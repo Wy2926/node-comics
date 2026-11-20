@@ -4,7 +4,7 @@ import {Icon} from '../icons';
 import {Thumbnail} from '../reader/Images';
 import {coverReference,hasCatalogUpdates,shelfReadingState,type Comic,type ShelfReadingState} from '../comics/application/library-service';
 type Selection={checked:boolean;disabled:boolean;onToggle:()=>void};
-export function ShelfCard({active,comic,now,onOpen,menu,selection}:{active:boolean;comic:Comic;now:number;onOpen:()=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
+export function ShelfCard({active,comic,now,onOpen,onComments,menu,selection}:{active:boolean;comic:Comic;now:number;onOpen:()=>void;onComments?:()=>void;menu:HTMLAttributes<HTMLElement>;selection?:Selection}){
  const action=selection?.onToggle??onOpen,selectLabel=msg('选择漫画 {0}',{'0':comic.title});
  const lastRead=comic.lastReadAt&&Number.isFinite(comic.lastReadAt)?comic.lastReadAt:undefined;
  const [reading,setReading]=useState<ShelfReadingState>({progress:0}),progressComic=useRef<Comic>(undefined);
@@ -37,6 +37,8 @@ export function ShelfCard({active,comic,now,onOpen,menu,selection}:{active:boole
    {hasCatalogUpdates(comic)&&<span className="nc-card-update" role="img" aria-label={msg('有更新')} title={msg('新增 {0} 个条目，目录已自动同步',{'0':comic.catalogUpdates?.count??0})}>
     <Icon name="new" size={92}/>
    </span>}
-  <div className="nc-library-card-body"><h2 className="nc-card-title"><button title={comic.title} disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><p className="nc-card-position" title={position}>{position}</p></div>
+  <div className="nc-library-card-body"><h2 className="nc-card-title"><button title={comic.title} disabled={selection?.disabled} onClick={action}>{comic.title}</button></h2><p className="nc-card-position" title={position}>{position}</p>
+    {!selection && onComments && <button className="nc-shelf-comments" title={msg('评论')} aria-label={`${comic.title} · ${msg('评论')}`} onClick={onComments}><Icon name="message" size={18}/></button>}
+  </div>
  </article>;
 }

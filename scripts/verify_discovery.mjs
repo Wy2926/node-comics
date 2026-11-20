@@ -34,10 +34,13 @@ await context.addInitScript(version => {
 const checks = [], errors = [], requests = [], sourceRequests = [];
 const textRequests = [];
 let textActive = 0, textPeak = 0, textFail = false, textDelay = 200;
-let descriptionGate, releaseDescription;
+let descriptionGate;
 const check = name => {checks.push(name); console.log('PASS ' + name);};
 context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
 const image = await readFile(path.join(root, 'samples/starlight-bookshop.png'));
+const reviewTitle = (id, page) => `星光书店 ${id}：${page === 1 ? '把夜色留在两格之间' : '从最后一页读回开头'}`;
+const reviewImages = [];
+const reviewArt = 'https://review-art.example.test';
 const longTitle = '穿越到星光书店之后与异世界伙伴一起寻找失落故事的漫长冒险';
 const media = id => ({id, title: {native: detailOnly ? longTitle + ` ${id}` : `星光书店 ${id}`, english: `Starlight Bookshop ${id}`, romaji: `Hoshi ${id}`}, genres: ['Fantasy', 'Drama'], status: 'RELEASING', format: id === 2 ? 'ONE_SHOT' : 'MANGA', averageScore: 88, startDate: {year: detailOnly && id === 2 ? null : 2026}, coverImage: {large: 'https://s4.anilist.co/fixture.png'}});
 let page2Fail = true, rateLimit = false, unavailable = false, detailFail = false, slowImport = false, sourceItem = 123, catalog = '', reader = '';
@@ -53,7 +56,7 @@ await context.route(/https?:\/\//, async route => {
     textRequests.push({kind, language});
     textPeak = Math.max(textPeak, ++textActive);
     try {
-      if (kind === 'description' && descriptionGate) await descriptionGate;
+      if (kind === 'description' && descriptionGate) await descriptionGate.promise;
       await pause(textDelay);
       if (textFail) return await route.fulfill({status: 429, headers: {'Retry-After': '1'}, body: ''}).catch(() => {});
       return await route.fulfill({json: [[[`译文 ${language} · ${text}`, text]], null, 'en']}).catch(() => {});
@@ -65,6 +68,28 @@ await context.route(/https?:\/\//, async route => {
     if (live) return route.continue();
     if (rateLimit) {rateLimit = false; return route.fulfill({status: 429, headers: {'Retry-After': '2'}, json: {errors: [{message: 'Fixture rate limit'}]}});}
     if (unavailable) return route.fulfill({status: 503, json: {errors: [{message: 'Fixture offline'}]}});
+    if (body.query.includes('query MangaReviews')) {
+      const {id, page} = body.variables;
+      return route.fulfill({json: {data: {Media: {...media(id), reviews: {pageInfo: {hasNextPage: page === 1},
+        nodes: [{id: id * 100 + page * 2, mediaId: id, private: false, summary: reviewTitle(id, page),
+          body:`<p>我最喜欢的是<strong>灯亮以前的那一格</strong>。画家让街角安静下来，下一页的对白才有了分量。</p>
+            <img src="${reviewArt}/window.png" alt="书店橱窗"><h2>翻页的节奏</h2><blockquote>留白也是对白的一部分。</blockquote>
+            <p>仔细看<em>窗框的影子</em>，它在读者察觉之前就交代了时间。<a href="/manga/${id}">作品资料</a></p>
+            <ul><li>远景让人物显得很小</li><li>近景让停顿显得很长</li></ul><img src="${reviewArt}/detail.png" alt="画格细节">
+            <p><span class="markdown_spoiler"><span>最后一格的秘密<img src="${reviewArt}/ending.png" alt="结尾插图"></span></span></p>`,
+          score:83,rating:65,ratingAmount:211,createdAt:1772366400,user:{name:'纸页之间'}},
+        {id:id * 100 + page * 2 + 1,mediaId:id,private:false,summary:'一场适合慢慢读的漫游',
+          body:'<p>有些故事靠<strong>停顿</strong>推进，这本正是如此。</p>',score:91,rating:18,ratingAmount:23,createdAt:1772280000,user:{name:'灯下客'}}]}}}}});
+    }
+    if (body.query.includes('query MatchManga')) {
+      const matches = [
+        {...media(19),title:{native:'星光书店',english:'The Starlight Bookshop'},synonyms:['Hoshi no Shoten','星の書店'],startDate:{year:2019}},
+        {...media(21),title:{native:'星光书店',english:'Starlight at the Station'},synonyms:['星の書店・海辺編'],startDate:{year:2021},
+          format:'ONE_SHOT',status:'FINISHED',coverImage:{large:'https://s4.anilist.co/station.webp'}},
+      ];
+      const rows = body.variables.id ? matches.filter(work => work.id === body.variables.id) : body.variables.search === 'no match' ? [] : matches;
+      return route.fulfill({json: {data: {Page: {media: rows}}}});
+    }
     if (body.variables.id) {
       if (detailFail) return route.fulfill({status: 503, body: 'Unavailable'});
       return route.fulfill({json: {data: {Media: {...media(body.variables.id), synonyms: detailOnly ? Array.from({length: 16}, (_, index) => `${longTitle} ${index}`) : ['星光书店'], description: 'A bookshop between worlds.\n'.repeat(detailOnly ? 60 : 15), staff: {edges: [{role: 'Story & Art', node: {name: {full: 'Fixture author'}}}]}}}}});
@@ -74,6 +99,13 @@ await context.route(/https?:\/\//, async route => {
     const rows = body.variables.search === 'nothing' ? [] : Array.from({length: 24}, (_, index) => media(index + (body.variables.page === 2 ? 24 : 1)));
     return route.fulfill({json: {data: {Page: {pageInfo: {hasNextPage: body.variables.page === 1}, media: rows}}}}).catch(() => {});
   }
+  if (url.origin === reviewArt) {
+    assert(!request.headers().referer && !request.headers().cookie);
+    reviewImages.push(url.pathname);
+    return route.fulfill({contentType:'image/png',headers:{'Access-Control-Allow-Origin':'*'},body:image});
+  }
+  if (!live && url.href === 'https://s4.anilist.co/station.webp')
+    return route.fulfill({path:path.join(root,'apps/extension/tests/fixtures/translation/journey-original.webp'),contentType:'image/webp'});
   if (/^(?:[a-z0-9-]+\.)?anilist\.co$/.test(url.hostname)) return live ? route.continue() : route.fulfill({contentType: 'image/png', body: image});
   if (url.hostname === 'www.guazimanhua.com') {
     sourceRequests.push(url.pathname);
@@ -94,6 +126,12 @@ async function label(key, target = page) {
   if (!dictionaries.has(language)) dictionaries.set(language, JSON.parse(await readFile(path.join(root, 'apps/extension/src/i18n/dictionaries', language + '.json'), 'utf8')));
   return dictionaries.get(language)[key] ?? key;
 }
+async function waitForTextPreference(target, enabled) {
+  await target.waitForFunction(value => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === value, enabled);
+  const saved = await target.evaluate(() => navigator.locks.request('nc-reader-settings', async () =>
+    (await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'].discoveryTextTranslation));
+  assert.equal(saved, enabled);
+}
 async function setTextEnabled(enabled) {
   // A second settings view exercises the real storage event while discovery remains active, including cancellation.
   if (!settingsPage) {
@@ -103,14 +141,30 @@ async function setTextEnabled(enabled) {
   await settingsPage.waitForFunction(language => document.documentElement.lang === language, await page.locator('html').getAttribute('lang'));
   const toggle = settingsPage.getByRole('switch', {name: await label('翻译书名与简介', settingsPage), exact: true});
   if (await toggle.getAttribute('aria-checked') !== String(enabled)) await toggle.click();
-  await settingsPage.waitForFunction(enabled => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === enabled, enabled);
-  await page.waitForFunction(enabled => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === enabled, enabled);
+  await waitForTextPreference(settingsPage, enabled);
   await page.bringToFront();
-  if (!enabled) await page.waitForFunction(() => !document.querySelector('.nc-discovery-card-entry .nc-discovery-text-status'));
+  await page.waitForFunction(value => !!document.querySelector('.nc-discovery-card-entry .nc-discovery-text-status') === value, enabled);
 }
 const settleUi = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+async function checkReviewGutter(owner) {
+  const list = owner.locator('.nc-comment-scroll');
+  const rail = page.locator(`.nc-scrollbar-y[aria-controls="${await list.getAttribute('id')}"]`);
+  await rail.waitFor();
+  const edge = (await rail.boundingBox()).x;
+  assert(await list.locator('.nc-comment-list').evaluate((node, x) => node.getBoundingClientRect().right <= x, edge),
+    'The entire scrollbar hit area must be outside the review cards');
+}
+const setFixtureSettings = patch => page.evaluate(async changes => {
+  const key = 'nc-reader-settings';
+  await navigator.locks.request(key, async () => {
+    const settings = {...(await chrome.storage.local.get(key))[key], ...changes}, next = JSON.stringify(settings);
+    await chrome.storage.local.set({[key]: settings});
+    localStorage.setItem('nc-settings', next);
+    window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));
+  });
+}, patch);
 const setTextScale = async scale => {
-  await page.evaluate(textScale => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), textScale}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, scale);
+  await setFixtureSettings({textScale: scale});
   await page.waitForFunction(scale => parseFloat(getComputedStyle(document.documentElement).fontSize) === 16 * scale, scale);
   await settleUi();
 };
@@ -138,7 +192,7 @@ async function checkDescriptionExpansion(dialog) {
   await tools.locator(':scope > button').click(); await settleUi(); fixedDescriptionTools(before, await descriptionLayout(dialog));
   return before;
 }
-async function checkInlineAction(dialog, action, area, prefix) {
+async function checkInlineAction(dialog, action) {
   await dialog.getByRole('button', {name: '关闭弹窗', exact: true}).focus(); await page.mouse.move(5, 5);
   const styles = () => action.evaluate(element => {
     const value = getComputedStyle(element), text = getComputedStyle(element.querySelector('span'));
@@ -148,18 +202,15 @@ async function checkInlineAction(dialog, action, area, prefix) {
   });
   const before = await styles(), box = await action.boundingBox();
   assert.equal(before.background, 'rgba(0, 0, 0, 0)'); assert(before.borders.every(width => width === '0px'));
-  await area.screenshot({path: path.join(out, prefix + '-default.png')});
   await action.hover();
   await settleUi();
   const hover = await styles();
   assert.notEqual(hover.color, before.color); assert(hover.decoration.includes('underline')); assert.notEqual(hover.decorationColor, 'rgba(0, 0, 0, 0)');
   assert.deepEqual(await action.boundingBox(), box, 'Hover must not move a text action');
-  await area.screenshot({path: path.join(out, prefix + '-hover.png')});
   await page.mouse.move(5, 5); await page.keyboard.press('Tab'); await action.focus(); await settleUi();
   const focus = await styles(); assert(focus.focus && focus.decoration.includes('underline'));
   assert.notEqual(focus.color, before.color); assert.notEqual(focus.decorationColor, 'rgba(0, 0, 0, 0)'); assert(parseFloat(focus.decorationThickness) >= 2);
   assert.deepEqual(await action.boundingBox(), box, 'Keyboard focus must not move a text action');
-  await area.screenshot({path: path.join(out, prefix + '-focus.png')});
 }
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
@@ -173,7 +224,7 @@ try {
   assert.equal(await initialTextToggle.locator('..').getByRole('combobox').count(), 0);
   await page.locator('.nc-preferences > .settings-card').first().screenshot({path: path.join(out, 'discovery-text-settings-default-on.png')});
   await initialTextToggle.click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('nc-settings')).discoveryTextTranslation === false);
+  await waitForTextPreference(page, false);
   await page.reload(); await page.locator('.nc-preferences').waitFor();
   assert.equal(await initialTextToggle.getAttribute('aria-checked'), 'false');
   await page.locator('.nc-preferences > .settings-card').first().screenshot({path: path.join(out, 'discovery-text-settings-persisted-off.png')});
@@ -202,7 +253,7 @@ try {
     await titleTools.getByText('文字翻译失败', {exact: true}).waitFor();
     assert.equal(textRequests.length, 1);
     for (const uiLanguage of ['fr', 'zh-CN']) {
-      await page.evaluate(uiLanguage => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, uiLanguage);
+      await setFixtureSettings({uiLanguage});
       await page.waitForFunction(language => document.documentElement.lang === language, uiLanguage);
     }
     assert.equal(textRequests.length, 1, 'Language changes with automatic translation off must not issue requests');
@@ -263,7 +314,7 @@ try {
     }
     check('Mobile 320–700px long titles keep scores top-right and actions beside the year; long descriptions/aliases grow naturally; desktop 1280/1560px retains its fixed footer at 125% text scale');
     for (const uiLanguage of ['de', 'ru']) {
-      await page.evaluate(uiLanguage => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, uiLanguage);
+      await setFixtureSettings({uiLanguage});
       await page.waitForFunction(language => document.documentElement.lang === language, uiLanguage);
       textFail = true; textDelay = 800;
       await titleTools.getByRole('button', {name: await label('翻译'), exact: true}).click();
@@ -285,20 +336,20 @@ try {
     assert.equal(await dialog.count(), 0);
     assert(await cards.first().evaluate(element => element === document.activeElement));
     await page.setViewportSize({width: 390, height: 740});
-    await page.evaluate(() => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage: 'zh-CN'}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));});
+    await setFixtureSettings({uiLanguage: 'zh-CN'});
     await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
     await cards.nth(1).click();
     await descriptionTools.getByRole('button', {name: '翻译', exact: true}).waitFor();
     assert.equal(await dialog.locator('time').count(), 0);
     assert.equal(await titleTools.getByRole('button', {name: '翻译', exact: true}).count(), 1, 'Missing year must not hide the title translation action');
-    descriptionGate = new Promise(resolve => {releaseDescription = resolve;});
+    descriptionGate = Promise.withResolvers();
     // Use a fresh target language so the description cannot hit the completed zh-CN cache.
-    await page.evaluate(() => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage: 'en'}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));});
+    await setFixtureSettings({uiLanguage: 'en'});
     await page.waitForFunction(() => document.documentElement.lang === 'en');
     await descriptionTools.getByRole('button', {name: await label('翻译'), exact: true}).click();
     await descriptionTools.getByText(await label('翻译中…'), {exact: true}).waitFor();
     await page.keyboard.press('Escape');
-    releaseDescription(); descriptionGate = undefined;
+    descriptionGate.resolve(); descriptionGate = undefined;
     await pause(300);
     const closedRequests = textRequests.length;
     await cards.nth(1).click();
@@ -330,7 +381,7 @@ try {
     await page.getByRole('button', {name: '搜索作品名称', exact: true}).click();
     await page.screenshot({path: path.join(out, 'live-discovery-search.png')});
     await page.getByRole('textbox', {name: '搜索作品名称', exact: true}).press('Escape');
-    await page.evaluate(() => {const value = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), appearance: 'dark'}); localStorage.setItem('nc-settings', value); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: value}));});
+    await setFixtureSettings({appearance: 'dark'});
     await page.waitForFunction(() => document.documentElement.dataset.appearance === 'dark');
     await page.screenshot({path: path.join(out, 'live-discovery-dark.png')});
     await cards.first().click();
@@ -352,8 +403,7 @@ try {
     });
     for (const width of [1560, 1280, 1024]) for (const textScale of [1, 1.25]) {
       await page.setViewportSize({width, height: 1120});
-      await page.evaluate(textScale => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), textScale}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, textScale);
-      await page.waitForFunction(textScale => parseFloat(getComputedStyle(document.documentElement).fontSize) === 16 * textScale, textScale);
+      await setTextScale(textScale);
       const before = await toolbarLayout();
       await page.getByRole('button', {name: '搜索作品名称', exact: true}).click();
       assert.deepEqual(await toolbarLayout(), before, `Search expansion shifted the layout at ${width}px / ${textScale}`);
@@ -365,11 +415,10 @@ try {
       assert.deepEqual(await toolbarLayout(), before, `Search blur shifted the layout at ${width}px / ${textScale}`);
     }
     await page.setViewportSize({width: 1560, height: 1120});
-    await page.evaluate(() => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), textScale: 1}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));});
-    await page.waitForFunction(() => parseFloat(getComputedStyle(document.documentElement).fontSize) === 16);
+    await setTextScale(1);
     check('Search expansion/collapse keeps rankings, count, tools and cards fixed across desktop widths and text sizes');
     const fixtures = await page.evaluate(async () => {const probe = await import(chrome.runtime.getURL('discovery-probe.js')); return {catalog: probe.catalogHtml(['11']), reader: probe.readerHtml()};});
-    catalog = fixtures.catalog; reader = fixtures.reader;
+    catalog = fixtures.catalog.replaceAll('Fixture comic', '星光书店'); reader = fixtures.reader;
     assert.equal(await page.getByRole('button', {name: '加载更多', exact: true}).count(), 0);
     await page.locator('.nc-discovery-pagination').scrollIntoViewIfNeeded();
     await page.getByText('AniList 暂不可用，请稍后重试。', {exact: false}).waitFor();
@@ -408,6 +457,7 @@ try {
     assert.equal(sourceRequests.length, 0);
     assert.equal(await dialog.getByRole('textbox', {name: '搜索名称', exact: true}).inputValue(), '星光书店 19');
     await dialog.getByRole('button', {name: '星光书店', exact: true}).click();
+    await dialog.getByText('所选阅读来源将关联到 AniList 的《星光书店 19》。', {exact:true}).waitFor();
     assert.equal(sourceRequests.length, 0);
     await dialog.locator('.nc-search-scope-trigger').click();
     await page.keyboard.press('Escape');
@@ -428,6 +478,66 @@ try {
     await dialog.getByRole('button', {name: '导入并阅读', exact: true}).click();
     await page.locator('.nc-reader').waitFor();
     assert.equal(await page.locator('dialog[open]').count(), 0);
+    const reviewIds = () => requests.filter(row => row.query.includes('query MangaReviews')).map(row => [row.variables.id, row.variables.page]);
+    assert.deepEqual(reviewIds(), []);
+    const tool = page.locator('.nc-reader-rail.right').getByRole('button', {name:'评论', exact:true});
+    const viewport = page.locator('.nc-reading-viewport');
+    await viewport.locator('img.nc-page-image').first().evaluate(img => img.decode());
+    const geometry = () => viewport.evaluate(v => [v.getBoundingClientRect().toJSON(),v.querySelector('img.nc-page-image').getBoundingClientRect().toJSON(),v.scrollTop,v.scrollLeft]);
+    const original = await geometry();
+    await tool.click();
+    const links = page.getByRole('complementary', {name: '评论', exact: true});
+    await links.getByText(reviewTitle(19,1), {exact:true}).waitFor();
+    const first = links.locator('.nc-review-card').first(), lead = first.locator('.nc-review-cover'), headline = first.getByRole('heading',{name:reviewTitle(19,1)});
+    await page.waitForFunction(() => document.querySelector('.nc-review-cover img')?.naturalWidth > 0);
+    assert.deepEqual(await geometry(),original);
+    assert.equal(await first.getByRole('meter',{name:'作者评分'}).getAttribute('aria-valuenow'),'83');
+    await first.getByText('211 位读者中有 65 位喜欢这篇书评',{exact:true}).waitFor();
+    assert.deepEqual(reviewImages,['/window.png']);
+    assert.equal(await first.locator('.nc-review-excerpt strong').first().innerText(),'灯亮以前的那一格');
+    assert.equal(await links.getByRole('button',{name:'本章评论'}).count(),0);
+    assert.equal(await page.locator('dialog[open],.nc-drawer-scrim').count(), 0);
+    const dock = await links.boundingBox();
+    assert(dock.width <= 352 && (await headline.boundingBox()).y > (await lead.boundingBox()).y);
+    await page.screenshot({path:path.join(out,'reader-review-rail.png')});
+    await links.getByRole('button',{name:'展开评论面板'}).click();
+    assert((await links.boundingBox()).width > dock.width + 100);
+    assert((await headline.boundingBox()).x >= (await lead.boundingBox()).x + (await lead.boundingBox()).width);
+    assert.deepEqual(await geometry(),original);
+    await page.screenshot({path:path.join(out,'reader-review-wide.png')});
+    await first.getByRole('button',{name:'展开全文'}).click();
+    const article = first.locator('> .nc-review-prose');
+    await article.getByRole('heading',{name:'翻页的节奏'}).waitFor();
+    await checkReviewGutter(links);
+    await article.getByRole('img',{name:'画格细节'}).scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector('.nc-review-prose img[alt="画格细节"]')?.naturalWidth > 0);
+    assert(!reviewImages.includes('/ending.png'));
+    await article.getByRole('button',{name:'显示剧透'}).click();
+    await article.getByText('最后一格的秘密',{exact:true}).waitFor();
+    await article.getByRole('button',{name:'隐藏剧透'}).click();
+    await first.getByRole('button',{name:'收起全文'}).click();
+    assert.deepEqual(await geometry(),original);
+    await links.getByRole('button',{name:'恢复紧凑面板'}).click();
+    await links.getByRole('button', {name: '下一页'}).click();
+    await links.getByText(reviewTitle(19,2), {exact: true}).waitFor();
+    await links.getByRole('button', {name: '上一页'}).click();
+    await links.getByText(reviewTitle(19,1), {exact: true}).waitFor();
+    assert.deepEqual(reviewIds(), [[19, 1], [19, 2]]);
+    await page.setViewportSize({width:390,height:844});
+    await page.waitForFunction(() => document.querySelector('.nc-reading-viewport img.nc-page-image').getBoundingClientRect().width <= innerWidth);
+    const phone = await geometry();
+    await links.getByRole('button',{name:'展开评论面板'}).click();
+    await first.getByRole('button',{name:'展开全文'}).click();
+    await article.getByRole('heading',{name:'翻页的节奏'}).waitFor();
+    assert(await article.evaluate(node => node.scrollWidth <= node.clientWidth + 1));
+    assert.deepEqual(await geometry(),phone);
+    await page.waitForFunction(() => document.querySelector('.nc-review-prose img[alt="书店橱窗"]')?.naturalWidth > 0);
+    await page.screenshot({path:path.join(out,'reader-review-phone-article.png')});
+    await links.getByRole('button', {name: '关闭面板'}).click();
+    assert(await tool.evaluate(button => button === document.activeElement));
+    assert.deepEqual(await geometry(),phone);
+    await page.setViewportSize({width:1560,height:1120});
+    check('Reviewer scores, vote tallies, safe illustrations and inline articles reflow across panel widths without moving the manga');
     await page.getByRole('button', {name: '返回发现', exact: true}).click();
     await dialog.getByRole('button', {name: '继续阅读', exact: true}).waitFor();
     await dialog.getByRole('button', {name: '返回作品详情', exact: true}).click();
@@ -442,6 +552,67 @@ try {
     assert(Math.abs(await page.evaluate(() => window.scrollY) - listScroll) < 3);
     check('Failed import retries in place; reader return restores source results, list scroll and card focus');
     await page.getByRole('navigation', {name: '主导航'}).getByRole('button', {name: '我的漫画', exact: true}).click();
+    await page.locator('.nc-shelf-grid .nc-book').first().getByRole('button', {name:/ · 评论$/}).click();
+    await links.getByText(reviewTitle(19,1), {exact: true}).waitFor();
+    const masthead = await page.locator('.nc-app-header').boundingBox();
+    assert((await links.boundingBox()).y >= masthead.y + masthead.height);
+    const changeLink = links.getByRole('button', {name:'更换关联'}), field = links.getByRole('searchbox');
+    const savedLink = () => page.evaluate(async () => (await (await import(chrome.runtime.getURL('discovery-probe.js'))).listShelfIndex()).comics[0].workLinks.anilist);
+    const searches = () => requests.filter(row => row.query.includes('query MatchManga')).length;
+    await changeLink.click();
+    assert(await field.evaluate(input => input === document.activeElement));
+    assert.equal(await field.inputValue(),'星光书店');
+    await field.fill('no match'); assert.equal(searches(),0);
+    await field.press('Enter'); await links.getByText('试试其他译名，或粘贴作品链接。').waitFor();
+    await links.getByRole('button',{name:'取消'}).click();
+    assert(await changeLink.evaluate(button => button === document.activeElement)); assert.equal(await savedLink(),'19');
+    await changeLink.click();
+    await field.press('Enter');
+    const candidates = links.locator('.nc-work-matches article');
+    await candidates.nth(1).waitFor();
+    await page.waitForFunction(() => [...document.querySelectorAll('.nc-match-cover img')].filter(img => img.naturalWidth > 0).length === 2);
+    assert.equal(await candidates.first().getAttribute('aria-current'),'true');
+    assert.equal(await candidates.nth(1).getByRole('link').getAttribute('href'),'https://anilist.co/manga/21');
+    const cardBoxes = () => candidates.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+    let [a,b] = await cardBoxes();
+    assert(b.y >= a.bottom && b.x === a.x);
+    await links.screenshot({path:path.join(out,'work-link-compact.png')});
+    await links.getByRole('button',{name:'展开评论面板'}).click();
+    [a,b] = await cardBoxes(); assert(b.x >= a.right && b.y === a.y);
+    await candidates.first().locator('summary').press('Enter');
+    await candidates.first().getByText('星の書店',{exact:true}).waitFor();
+    await links.screenshot({path:path.join(out,'work-link-wide.png')});
+    await candidates.first().locator('summary').press('Enter');
+    await page.setViewportSize({width:390,height:844});
+    await setFixtureSettings({appearance:'dark'});
+    await page.waitForFunction(() => document.documentElement.dataset.appearance === 'dark');
+    await links.getByRole('button',{name:'恢复紧凑面板'}).click();
+    await field.fill('Starlight'); await field.press('Enter'); await candidates.nth(1).waitFor();
+    assert(await links.locator('.nc-work-matches').evaluate(section => {
+      const bounds = section.parentElement.getBoundingClientRect(), heading = section.querySelector('h4').getBoundingClientRect();
+      const search = section.parentElement.querySelector('form').getBoundingClientRect();
+      return search.top >= bounds.top - 1 && heading.top >= search.bottom + 3 && heading.bottom + 40 < bounds.bottom;
+    }));
+    await links.getByRole('button',{name:'展开评论面板'}).click();
+    [a,b] = await cardBoxes(); assert(b.y >= a.bottom && b.x === a.x);
+    assert(await links.locator('.nc-link-editor').evaluate(node => node.scrollWidth <= node.clientWidth + 1));
+    await page.screenshot({path:path.join(out,'work-link-mobile.png')});
+    assert.equal(searches(),3); assert.equal(await savedLink(),'19');
+    assert.deepEqual(reviewIds(), [[19, 1], [19, 2]]);
+    await candidates.filter({hasText: '2021'}).getByRole('button', {name: '关联此作品'}).click();
+    await links.getByText(reviewTitle(21,1), {exact: true}).waitFor();
+    assert.equal(await links.getByText(reviewTitle(19,1), {exact: true}).count(), 0);
+    assert.equal(await savedLink(),'21');
+    await changeLink.click();
+    await links.getByRole('button', {name: '解除关联'}).click();
+    await links.getByText('尚未关联',{exact:true}).waitFor();
+    await field.fill('id:21'); await field.press('Enter');
+    await candidates.first().waitFor();
+    assert.equal(await candidates.count(),1); assert.equal(await savedLink(),null);
+    await links.getByRole('button', {name: '关闭面板'}).click();
+    await page.setViewportSize({width:1560,height:1120});
+    await setFixtureSettings({appearance:'light'});
+    check('Title matching keeps the shelf identity in view; keyboard lookup, namesake comparison, explicit replacement and unlink work in compact, wide and mobile layouts');
     await page.getByRole('navigation', {name: '主导航'}).getByRole('button', {name: '发现', exact: true}).click();
     assert.equal(await cards.count(), 47);
     assert(Math.abs(await page.evaluate(() => window.scrollY) - listScroll) < 3);
@@ -497,6 +668,44 @@ try {
     detailFail = false;
     await dialog.getByRole('button', {name: '重试', exact: true}).click();
     await dialog.getByRole('button', {name: '展开简介', exact: true}).waitFor();
+    await dialog.getByRole('button', {name: '展开简介', exact: true}).click();
+    const reviewButton = dialog.getByRole('button', {name:'作品评论', exact:true});
+    const reviews = dialog.getByRole('region', {name:'作品评论', exact:true});
+    for (const size of [{width:1560,height:1120},{width:1280,height:720},{width:390,height:740}]) {
+      await page.setViewportSize(size); await settleUi();
+      const detail = dialog.locator(size.width > 700 ? '.nc-discovery-detail-body' : '.nc-discovery-detail');
+      const top = await detail.evaluate(node => {node.scrollTop = 64; return node.scrollTop;});
+      assert(top > 0);
+      const bounds = await dialog.boundingBox(), cover = dialog.locator('.nc-discovery-detail-art');
+      await reviewButton.click();
+      await reviews.getByRole('heading', {name:reviewTitle(1,1)}).waitFor();
+      assert(await dialog.evaluate(node => node.matches(':modal')));
+      assert.equal(await page.locator('.nc-comments-panel').count(),0);
+      assert.deepEqual(await dialog.boundingBox(),bounds);
+      assert(await cover.isVisible() && await dialog.getByRole('heading',{name:'星光书店 1',exact:true}).isVisible());
+      const feed = await reviews.boundingBox(), art = await cover.boundingBox();
+      assert(size.width > 700 ? feed.x >= art.x + art.width && feed.height > bounds.height * .75 : feed.y >= art.y + art.height && feed.width > bounds.width * .85);
+      await page.waitForFunction(() => document.querySelector('.nc-discovery-reviews .nc-review-cover img')?.naturalWidth > 0);
+      await page.screenshot({path:path.join(out,`discovery-reviews-${size.width}.png`)});
+      if (size.width === 1280) {
+        for (const width of [844, 1440]) {
+          await page.setViewportSize({width,height:390}); await settleUi();
+          const sheet = await dialog.boundingBox(), pager = await reviews.getByRole('navigation').boundingBox(), art = await cover.boundingBox();
+          assert((await reviews.boundingBox()).x >= art.x + art.width - 1, 'A short desktop keeps reviews beside the cover');
+          assert(pager.y + pager.height <= sheet.y + sheet.height, 'Pagination must remain reachable in a short window');
+        }
+        await page.setViewportSize(size); await settleUi();
+      }
+      await reviews.getByRole('button',{name:'展开全文'}).click();
+      await checkReviewGutter(reviews);
+      await reviews.getByRole('button',{name:'下一页'}).click();
+      await reviews.getByRole('heading',{name:reviewTitle(1,2)}).waitFor();
+      await page.keyboard.press('Escape');
+      assert(await reviewButton.evaluate(button => button === document.activeElement));
+      assert.equal(await detail.evaluate(node => node.scrollTop),top);
+    }
+    await page.setViewportSize({width:1560,height:1120});
+    check('Reviews share the open work dialog, reserve their scrollbar gutter and restore details on desktop and phone');
     await page.keyboard.press('Escape');
     check('Detail failure can retry independently without clearing the discovery list');
     sourceItem = 456; slowImport = true;
@@ -533,7 +742,7 @@ try {
     await firstEntry.getByRole('button', {name: '查看译文', exact: true}).click();
     assert.equal(textRequests.length, beforeOriginal);
     await page.screenshot({path: path.join(out, 'discovery-translated-titles.png')});
-    descriptionGate = new Promise(resolve => {releaseDescription = resolve;});
+    descriptionGate = Promise.withResolvers();
     await cards.first().click();
     await dialog.locator('.nc-discovery-description').getByText('翻译中…', {exact: true}).waitFor();
     const pendingLayouts = new Map();
@@ -543,7 +752,7 @@ try {
       pendingLayouts.set(width + ':' + scale, await checkDescriptionExpansion(dialog));
       if (scale === 1.25) await page.screenshot({path: path.join(out, `discovery-description-pending-${width}.png`)});
     }
-    releaseDescription(); descriptionGate = undefined;
+    descriptionGate.resolve(); descriptionGate = undefined;
     await dialog.locator('.nc-discovery-description').getByRole('button', {name: '查看原文', exact: true}).waitFor();
     assert((await dialog.locator('.nc-discovery-description p').innerText()).startsWith('译文 zh-CN'));
     for (const width of [1560, 1280]) for (const scale of [1, 1.25]) {
@@ -557,8 +766,8 @@ try {
     }
     await page.setViewportSize({width: 1560, height: 1120}); await setTextScale(1);
     const descriptionControls = dialog.locator('.nc-discovery-description-controls');
-    await checkInlineAction(dialog, descriptionControls.getByRole('button', {name: '查看原文', exact: true}), descriptionControls, 'discovery-description-action');
-    await checkInlineAction(dialog, dialog.getByRole('link', {name: '在 AniList 查看', exact: true}), dialog.locator('.nc-discovery-detail-footer'), 'discovery-anilist-action');
+    await checkInlineAction(dialog, descriptionControls.getByRole('button', {name: '查看原文', exact: true}));
+    await checkInlineAction(dialog, dialog.getByRole('link', {name: '在 AniList 查看', exact: true}));
     const detailTextRequests = textRequests.length, translatedScroll = await dialog.locator('.nc-discovery-detail-body').evaluate(element => element.scrollTop);
     await dialog.locator('.nc-discovery-description').getByRole('button', {name: '查看原文', exact: true}).click();
     assert((await dialog.locator('.nc-discovery-description p').innerText()).startsWith('A bookshop'));
@@ -579,7 +788,7 @@ try {
     check('Description pending, translated and original controls share a fixed row above the paragraph at 1560/1280 widths and 100/125 percent text size');
     check('Original toggles and the AniList link are unboxed text actions with hover/keyboard feedback and stable geometry');
     textFail = true;
-    const setUiLanguage = preference => page.evaluate(uiLanguage => {const next = JSON.stringify({...JSON.parse(localStorage.getItem('nc-settings')), uiLanguage}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, preference);
+    const setUiLanguage = uiLanguage => setFixtureSettings({uiLanguage});
     await setUiLanguage('ja');
     await page.waitForFunction(() => document.documentElement.lang === 'ja');
     await page.getByText('テキストの翻訳に失敗しました', {exact: true}).first().waitFor();
@@ -643,8 +852,9 @@ try {
     await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
     check('Text follows UI/browser language; same-line failure retry and persistent settings-off cancel pending work and preserve originals');
     await setTextEnabled(true);
+    await settingsPage.close();
     for (const appearance of ['light', 'dark']) for (const accent of ['sky', 'rose', 'mint', 'iris', 'amber', 'slate']) {
-      await page.evaluate(({appearance, accent}) => {const saved = JSON.parse(localStorage.getItem('nc-settings')); const next = JSON.stringify({...saved, appearance, accentTheme: accent, textScale: 1.25}); localStorage.setItem('nc-settings', next); window.dispatchEvent(new StorageEvent('storage', {key: 'nc-settings', newValue: next}));}, {appearance, accent});
+      await setFixtureSettings({appearance, accentTheme: accent, textScale: 1.25});
       await page.waitForFunction(({appearance, accent}) => document.documentElement.dataset.appearance === appearance && document.documentElement.dataset.accent === accent, {appearance, accent});
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     }

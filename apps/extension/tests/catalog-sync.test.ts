@@ -6,6 +6,7 @@ import {acknowledgeCatalogUpdates, applyCatalogRefresh, catalogSyncPolicy} from 
 import {checkCatalogUpdates} from '../src/comics/application/catalog-sync';
 import {comicDirectory, continueEntry, loadEntry, readerSequence} from '../src/comics/application/library-service';
 import type {SourceCatalogSnapshot} from '../src/sources';
+import {linkedWorkId, setWorkLink} from '../src/comics/application/work-links';
 
 function snapshot():SourceCatalogSnapshot {
   const slug='sync-'+crypto.randomUUID(),id='mangacopy:'+slug;
@@ -19,6 +20,27 @@ function append(value:SourceCatalogSnapshot):SourceCatalogSnapshot {
 afterEach(async()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();for(const comic of await catalog.list('comics',{limit:10000}))await catalog.deleteComic(comic.id);});
 
 describe('automatic source directory reconciliation',()=>{
+  it('keeps a confirmed link or unlink across refresh and concurrent imports, scoped by book and provider',async()=>{
+    const source={...snapshot(),externalWorkIds:{first:'source-id',other:'opaque.42'}};
+    const comic=await importCatalog(source),sameTitle=await importCatalog(snapshot());
+    expect(linkedWorkId(comic,'first')).toBe('source-id');
+    // A discovery import must not overwrite conflicting evidence. An explicit correction can.
+    expect(await setWorkLink(comic.id,'first','different')).toBe(false);
+    expect(await setWorkLink(comic.id,'first','confirmed','source-id')).toBe(true);
+    const refreshed=(await applyCatalogRefresh(comic.id,1,{...source,title:'Renamed',observedAt:source.observedAt+1,externalWorkIds:{first:'new-id',other:'opaque.42'}}))!;
+    expect(linkedWorkId(refreshed,'first')).toBe('confirmed');
+    expect(linkedWorkId(refreshed,'other')).toBe('opaque.42');
+    expect(linkedWorkId(sameTitle,'first')).toBeUndefined();
+    expect(await setWorkLink(comic.id,'first',null,'confirmed')).toBe(true);
+    expect(await setWorkLink(comic.id,'first','confirmed')).toBe(false);
+    const saved=(await catalog.get('comics',comic.id))!;
+    expect(linkedWorkId(saved,'first')).toBeNull();
+    expect(saved.source).toEqual(comic.source);
+    expect(await setWorkLink(comic.id,'first','new-choice',null)).toBe(true);
+    await catalog.deleteComic(comic.id);
+    await expect(setWorkLink(comic.id,'first','late')).rejects.toThrow();
+    expect(await catalog.get('comics',comic.id)).toBeUndefined();
+  });
   it('establishes a quiet baseline, detects additions once, and keeps images and reading positions',async()=>{
     const first=snapshot(),comic=await importCatalog(first),entry=(await continueEntry(comic.id))!;
     expect(comic.catalogUpdates).toBeUndefined();expect(catalogSyncPolicy(comic)?.intervalMinutes).toBe(720);

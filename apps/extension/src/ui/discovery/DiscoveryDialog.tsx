@@ -1,6 +1,6 @@
 import {useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import type {SearchSeed} from '../../comics/application/search/types';
-import type {DiscoveryDetail, DiscoveryError, DiscoveryWork, PublicationStatus} from '../../discovery/types';
+import type {DiscoveryDetail, DiscoveryError, DiscoveryWork, PublicationStatus, WorkProvider, WorkRef} from '../../discovery/types';
 import {msg} from '../../i18n/runtime';
 import {Icon} from '../../icons';
 import {DiscoveryCover} from './DiscoveryCard';
@@ -11,14 +11,18 @@ import type {TextTranslationSession} from '../../text-translation';
 import {useTextTranslation} from './useTextTranslation';
 import {TextTranslationStatus} from './TextTranslationStatus';
 import {useDialogViewport} from '../visual-viewport';
+import {WorkReviews} from '../comments/WorkReviews';
+import {DialogSubject} from '../ConfirmationDialog';
 
 export interface DiscoverySearchContext {
   seed: SearchSeed;
+  workRef: WorkRef;
   open: boolean;
   isActive: () => boolean;
 }
 interface Props {
   active: boolean;
+  provider: WorkProvider;
   work: DiscoveryWork;
   detail?: DiscoveryDetail;
   loading: boolean;
@@ -30,30 +34,30 @@ interface Props {
   language: string;
   translate: boolean;
 }
-type Pane = 'details' | 'sources';
+type Pane = 'details' | 'reviews' | 'sources';
 const statusIcons: Record<PublicationStatus, string> = {releasing: 'bolt', finished: 'check', upcoming: 'clock', hiatus: 'stop', cancelled: 'close'};
 const ratingOutline = 'm14 14 37 2 6-10 20 8 80-5-3 25 15 8-10 20 2 56-35-2-11 13-16-12-87 6 4-39-10-10 10-13Z';
-/** Owns only the details/search presentation. The host supplies the source-search workflow. */
-export function DiscoveryDialog({active, work, detail, loading, error, onRetry, onClose, renderSearch, translator, language, translate}: Props) {
+/** The work stays open while browsing its details, reviews or reading sources. */
+export function DiscoveryDialog({active, provider, work, detail, loading, error, onRetry, onClose, renderSearch, translator, language, translate}: Props) {
   const dialog = useRef<HTMLDialogElement>(null), closeButton = useRef<HTMLButtonElement>(null);
+  const reviewTrigger = useRef<HTMLButtonElement>(null);
   const detailBody = useRef<HTMLDivElement>(null), detailScroll = useRef<HTMLDivElement>(null);
-  useDialogViewport(dialog, active);
   const [pane, setPane] = useState<Pane>('details');
   const [sourceSeed, setSourceSeed] = useState<SearchSeed>();
   const [expanded, setExpanded] = useState(false);
-  const searching = pane === 'sources';
+  useDialogViewport(dialog, active);
+  const searching = pane === 'sources', reviewing = pane === 'reviews';
   const [originalTitle, setOriginalTitle] = useState(false), [originalDescription, setOriginalDescription] = useState(false);
   useEffect(() => {setOriginalTitle(false); setOriginalDescription(false);}, [language]);
-  const translating = active && !searching;
-  const titleTranslation = useTextTranslation(translator, (detail ?? work).title, language, translating, translate);
-  const descriptionTranslation = useTextTranslation(translator, detail?.description ?? '', language, translating, translate);
+  const titleTranslation = useTextTranslation(translator, (detail ?? work).title, language, active && !searching, translate);
+  const descriptionTranslation = useTextTranslation(translator, detail?.description ?? '', language, active && pane === 'details', translate);
   const current = useRef({active, pane});
   current.current = {active, pane};
   const scroll = useRef({details: 0, sources: 0}), returnFocus = useRef<HTMLElement | null>(null);
-  const scrollArea = (key: Pane) => key === 'sources' ? dialog.current : detailScroll.current && getComputedStyle(detailScroll.current).overflowY === 'auto' ? detailScroll.current : detailBody.current;
+  const scrollArea = (key: 'details' | 'sources') => key === 'sources' ? dialog.current : detailScroll.current && getComputedStyle(detailScroll.current).overflowY === 'auto' ? detailScroll.current : detailBody.current;
   const rememberScroll = () => {
     const key = current.current.pane;
-    scroll.current[key] = scrollArea(key)?.scrollTop ?? 0;
+    if (key !== 'reviews') scroll.current[key] = scrollArea(key)?.scrollTop ?? 0;
   };
   useLayoutEffect(() => {
     const element = dialog.current;
@@ -71,8 +75,9 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
     };
   }, [active]);
   useLayoutEffect(() => {
-    const element = scrollArea(pane);
-    if (active && element) element.scrollTop = scroll.current[pane];
+    if (!active) return;
+    const element = pane === 'reviews' ? detailScroll.current : scrollArea(pane);
+    if (element) element.scrollTop = pane === 'reviews' ? 0 : scroll.current[pane];
   }, [active, pane]);
   const showPane = (next: Pane) => {
     rememberScroll();
@@ -86,16 +91,23 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
     queueMicrotask(() => { if (previous?.isConnected) previous.focus({preventScroll: true}); });
   };
   const startSearch = () => {
-    setSourceSeed(seed => seed ?? {title: work.title, titles: detail?.titles ?? work.titles, sourceName: 'AniList'});
+    setSourceSeed(seed => seed ?? {title: work.title, titles: detail?.titles ?? work.titles, sourceName: provider.label});
     showPane('sources');
   };
   const value = detail ?? work;
-  return <dialog ref={dialog} className={`nc-discovery-dialog${searching ? ' is-searching' : ''}`} aria-label={work.title} onCancel={event => {event.preventDefault(); close();}}>
+  return <dialog ref={dialog} className={`nc-discovery-dialog${searching ? ' is-searching' : ''}`} aria-label={work.title} onCancel={event => {
+    event.preventDefault();
+    if (reviewing) {showPane('details'); reviewTrigger.current?.focus({preventScroll:true});} else close();
+  }}>
     <header className="nc-discovery-dialog-header">
       {searching && <button className="button secondary small" onClick={() => showPane('details')}>{msg('返回作品详情')}</button>}
+      {!searching && provider.reviews && <div className="nc-discovery-sections" role="group" aria-label={work.title}>
+        <button type="button" aria-pressed={!reviewing} onClick={() => showPane('details')}><Icon name="book" size={18}/>{msg('作品详情')}</button>
+        <button ref={reviewTrigger} type="button" aria-pressed={reviewing} onClick={() => showPane('reviews')}><Icon name="message" size={18}/>{msg('作品评论')}</button>
+      </div>}
       <button ref={closeButton} className="icon-button" aria-label={msg('关闭弹窗')} onClick={close}><Icon name="close"/></button>
     </header>
-    <div ref={detailScroll} className="nc-discovery-detail" hidden={searching}>
+    <div ref={detailScroll} className={`nc-discovery-detail${reviewing ? ' is-reviewing' : ''}`} hidden={searching}>
       <aside className="nc-discovery-detail-art">
         <DiscoveryCover work={value}/>
       </aside>
@@ -116,7 +128,7 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
                 </div>
               </div>
             </div>
-            {value.score !== undefined && <div className="nc-discovery-detail-rating" aria-label={msg('AniList 评分 {0}/100', {'0': value.score})}>
+            {value.score !== undefined && <div className="nc-discovery-detail-rating" aria-label={msg('{provider} 评分 {0}/100', {provider: provider.label, '0': value.score})}>
               <svg className="nc-discovery-rating-paper" viewBox="0 0 180 136" preserveAspectRatio="none" aria-hidden="true" focusable="false">
                 <path className="nc-discovery-rating-shadow" d={ratingOutline} transform="translate(3 3)"/>
                 <path className="nc-discovery-rating-outline" d={ratingOutline} vectorEffect="non-scaling-stroke"/>
@@ -126,11 +138,11 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
               <b>{value.score}</b><small>/100</small>
             </div>}
           </header>
-          {value.genres.length > 0 && <div className="nc-discovery-detail-tags">{value.genres.map(genre => <DiscoveryGenreBadge genre={genre} key={genre}/>)}</div>}
-          {detail && detail.contributors.length > 0 && <dl className="nc-discovery-contributors">{detail.contributors.map((person, index) => <div key={index}><dt><Icon name="user" size={16}/>{person.role}</dt><dd>{person.name}</dd></div>)}</dl>}
-          <div ref={detailBody} className="nc-discovery-detail-body" data-scrollbar-mode="overlay" tabIndex={0}>
+          {!reviewing && value.genres.length > 0 && <div className="nc-discovery-detail-tags">{value.genres.map(genre => <DiscoveryGenreBadge genre={genre} key={genre}/>)}</div>}
+          {!reviewing && detail && detail.contributors.length > 0 && <dl className="nc-discovery-contributors">{detail.contributors.map((person, index) => <div key={index}><dt><Icon name="user" size={16}/>{person.role}</dt><dd>{person.name}</dd></div>)}</dl>}
+          <div ref={detailBody} className="nc-discovery-detail-body" data-scrollbar-mode="overlay" tabIndex={0} hidden={reviewing}>
             {loading && <p role="status">{msg('正在加载作品资料…')}</p>}
-            {error && <DiscoveryNotice error={error} onRetry={onRetry}/>}
+            {error && <DiscoveryNotice provider={provider.label} error={error} onRetry={onRetry}/>}
             {detail?.description && <div className="nc-discovery-description">
               <div className="nc-discovery-description-controls">
                 <TextTranslationStatus pending={descriptionTranslation.pending} error={descriptionTranslation.error} translated={!!descriptionTranslation.text} original={originalDescription} onOriginal={() => setOriginalDescription(value => !value)} onRetry={descriptionTranslation.retry} onTranslate={descriptionTranslation.retry}/>
@@ -140,13 +152,19 @@ export function DiscoveryDialog({active, work, detail, loading, error, onRetry, 
             </div>}
             {value.titles.length > 1 && <details className="nc-discovery-aliases"><summary>{msg('作品别名')}</summary><div>{value.titles.filter(title => title !== value.title).map(title => <DiscoveryBadge kind="alias" icon="message" key={title}>{title}</DiscoveryBadge>)}</div></details>}
           </div>
+          {active && reviewing && <section className="nc-discovery-reviews" aria-label={msg('作品评论')}>
+            <WorkReviews provider={provider} workId={work.id}/>
+          </section>}
           <footer className="nc-discovery-detail-footer">
             <button className="button primary nc-comic-action" onClick={startSearch}>{msg('查找阅读来源')}<Icon name="arrow" size={19}/></button>
-            <a className="nc-discovery-inline-action" href={work.url} target="_blank" rel="noopener noreferrer"><span>{msg('在 AniList 查看')}</span><Icon name="external" size={14}/></a>
-            <p>{msg('作品资料来自 AniList，阅读内容由所选网站提供。')}</p>
+            <a className="nc-discovery-inline-action" href={work.url} target="_blank" rel="noopener noreferrer"><span>{msg('在 {provider} 查看', {provider: provider.label})}</span><Icon name="external" size={14}/></a>
+            <p>{msg('作品资料来自 {provider}，阅读内容由所选网站提供。', {provider: provider.label})}</p>
           </footer>
       </article>
     </div>
-    {sourceSeed && renderSearch({seed: sourceSeed, open: active && searching, isActive: () => current.current.active && current.current.pane === 'sources'})}
+    {sourceSeed && <div className="nc-discovery-source-search" hidden={!searching}>
+      <DialogSubject icon="layers" title={msg('作品关联')} meta={msg('所选阅读来源将关联到 {provider} 的《{title}》。', {provider: provider.label, title: work.title})}/>
+      {renderSearch({seed: sourceSeed, workRef: {providerId: provider.id, workId: work.id}, open: active && searching, isActive: () => current.current.active && current.current.pane === 'sources'})}
+    </div>}
   </dialog>;
 }

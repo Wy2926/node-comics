@@ -71,6 +71,8 @@ export interface SourceCatalogSnapshot {
   title: string;
   /** Optional dedicated artwork supplied by this catalog, never a reading page. */
   cover?: {url: string};
+  /** Stable public work IDs explicitly published by the source, keyed by metadata provider. */
+  externalWorkIds?: Record<string, string>;
   observedAt: number;
   complete: boolean;
   note: string;

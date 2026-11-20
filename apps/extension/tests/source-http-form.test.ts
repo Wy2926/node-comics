@@ -19,6 +19,7 @@ vi.mock('../src/sources/runtime/import-responses', () => ({
 }));
 import {createSourceNetworkContext} from '../src/sources/runtime/http';
 import {resolveNetworkCatalog} from '../src/sources/runtime/network';
+import {chapterDiscussion} from '../src/sources/runtime/chapter-comments';
 
 const source = 'https://fixture.test/book/one', endpoint = 'https://fixture.test/ajax', options = {referer: source, form: {action: 'pages'}};
 let fetcher: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>;
@@ -31,6 +32,19 @@ beforeEach(() => {
   fixture.headers.mockClear(); fixture.remember.mockClear(); delete fixture.networks.fixture;
 });
 afterEach(() => {vi.unstubAllGlobals();});
+
+it('defers chapter comments until opened, omits credentials and cancels before publishing a late page', async () => {
+  const controller = new AbortController();
+  fixture.networks.fixture = {chapterComments:{headers:{'X-Public-Service':'public'},read:async (_url,_cursor,get) => {
+    await get(endpoint); controller.abort(); return {items:[]};
+  }}};
+  const comments = chapterDiscussion(source, '/book/one', 'fixture:book')!;
+  expect(fetcher).not.toHaveBeenCalled();
+  await expect(comments.read(undefined, controller.signal)).rejects.toMatchObject({name:'AbortError'});
+  expect(fetcher.mock.calls[0][1]).toMatchObject({credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',headers:{'X-Public-Service':'public'}});
+  await expect(comments.read(undefined, controller.signal)).rejects.toMatchObject({name:'AbortError'});
+  expect(fetcher).toHaveBeenCalledOnce();
+});
 
 describe('bounded source JSON POST', () => {
   it('posts nested JSON with credentials and Referer, without consuming GET replay', async () => {
