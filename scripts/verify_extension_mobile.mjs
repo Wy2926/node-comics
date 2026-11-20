@@ -60,13 +60,15 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
         if(name==='漫画网站'){
           const rows=await page.locator('.nc-site-card').evaluateAll(cards=>cards.map(card=>{
             const box=card.getBoundingClientRect(),icon=card.querySelector('.nc-site-monogram').getBoundingClientRect(),title=card.querySelector('h3').getBoundingClientRect();
-            const footer=card.querySelector('.nc-site-card-footer').getBoundingClientRect();
-            return {title:card.querySelector('h3').textContent,x:box.x,y:box.y,width:box.width,height:box.height,iconRight:icon.right,titleLeft:title.left,contentFits:card.scrollHeight<=card.clientHeight+1&&footer.bottom<=box.bottom};
+            const meta=card.querySelector('.nc-site-adapted').getBoundingClientRect(),link=card.querySelector('a').getBoundingClientRect(),favorite=card.querySelector('.nc-site-favorite').getBoundingClientRect();
+            return {title:card.querySelector('h3').textContent,y:box.y,width:box.width,height:box.height,iconRight:icon.right,titleLeft:title.left,
+              contentFits:card.scrollWidth<=card.clientWidth+1&&card.scrollHeight<=card.clientHeight+1&&meta.bottom<=box.bottom,
+              favoriteBeside:favorite.width>=44&&favorite.height>=44&&favorite.left>=link.right&&favorite.top<link.bottom&&favorite.bottom<=meta.top};
           }));
           assert(rows.length>2&&rows[1].y>=rows[0].y+rows[0].height,'Phone sites must be full-width horizontal rows, not a desktop card grid');
           // Long names, language badges and touch-sized actions may wrap. Check
           // readable, unclipped content instead of a fixed card height.
-          assert(rows.every(row=>row.iconRight<=row.titleLeft&&row.width>width*.8&&row.contentFits),`Phone site rows must keep icon beside readable metadata: ${JSON.stringify(rows.filter(row=>row.iconRight>row.titleLeft||row.width<=width*.8||!row.contentFits).slice(0,3))}`);
+          for(const row of rows)assert(row.iconRight<=row.titleLeft&&row.width>width*.8&&row.contentFits&&row.favoriteBeside,`Phone row must fit metadata and a separate touch-sized favorite: ${JSON.stringify(row)}`);
         }
         if(name==='搜索漫画'){
           const input=await page.getByRole('textbox',{name:'搜索名称',exact:true}).boundingBox(),submit=await page.getByRole('button',{name:'搜索网站',exact:true}).boundingBox();
@@ -451,7 +453,7 @@ for(const engine of (process.env.MOBILE_BROWSER||'chromium,firefox,webkit').spli
             await resizedNav.getByRole('button',{name,exact:true}).click();
             assert(await resizedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Desktop overflow: ${width}x${height}, touch=${hasTouch}, ${name}`);
             if(name==='漫画网站'){
-              assert.equal(await resizedPage.locator('.nc-site-card').first().evaluate(el=>getComputedStyle(el).flexDirection),'column',`Phone rows leaked into desktop ${width}x${height}, touch=${hasTouch}`);
+              assert(await resizedPage.locator('.nc-site-card').first().evaluate(el=>el.querySelector('.nc-site-favorite').getBoundingClientRect().top>=el.querySelector('a').getBoundingClientRect().bottom),`Phone rows leaked into desktop ${width}x${height}, touch=${hasTouch}`);
               if(width===420)assert.equal(await resizedPage.locator('.nc-sites-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);
             }
             if(name==='搜索漫画'){
