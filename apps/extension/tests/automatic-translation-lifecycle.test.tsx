@@ -117,6 +117,31 @@ async function fixture(){
 }
 
 describe('automatic translation result-reader lifecycle',()=>{
+  it.each(['offline','with overlapping chapter page IDs'])('opens a saved result from the shelf %s without resubmitting',async scenario=>{
+    const {channel,download,translate}=channelFixture(),frame=new Frame();
+    unmounts.push(()=>frame.unmount());
+    channel.requiresInternet=true;
+    vi.stubGlobal('navigator',{onLine:scenario!=='offline'});
+    const result=job(0,{status:'succeeded',target_language:'en'}),key=resultBlobKey(channel.scope,result);
+    await translationCache.put(key,new Blob(['saved translation']),{owner:channel.scope.key});
+    const page={...target(0).page,entryId:'active',contentId:'active-content',translationScope:channel.scope.key,jobs:[result]};
+    const active:ReadingEntry={id:page.entryId,contentId:page.contentId,source:'cbz',sourceKey:'fixture',title:'Active',generation:1,createdAt:0,updatedAt:0,pages:[page],pageId:page.id,relativeOffset:0,discoveryComplete:true};
+    const previous={...active,id:'previous',contentId:'previous-content',pages:[{...target(1).page,id:page.id,entryId:'previous',contentId:'previous-content'}]};
+    let copies:ReadingEntry[]=[];
+    const updateEntry=(changed:ReadingEntry)=>{copies=copies.map(copy=>copy.id===changed.id?changed:copy);};
+    const render=()=>frame.render(()=>useAutomaticTranslation({channel,copies,updateEntry,language:'en',currentId:copies.at(-1)?.id}));
+    render();frame.create();await nextTurn();
+    copies=scenario==='offline'?[active]:[previous,active];
+    const translation=render();
+    // Reader publishes its window before the parent's passive effects on entry.
+    translation.onReadingWindow([{entryId:active.id,page,mode:'classic'}],[page],true);
+    frame.cleanup();frame.create();await vi.advanceTimersByTimeAsync(0);
+    const selected=readingImage(copies.at(-1)!.pages[0],'classic',true,'en',channel.scope.key);
+    expect(selected).toMatchObject({key,job:{id:result.id}});
+    const lease=await acquireImage(key);try{expect(await lease.blob.text()).toBe('saved translation');}finally{lease.release();}
+    if(copies.length===2)expect(copies[0].pages[0].outputBlobs).toEqual({});
+    expect(download).not.toHaveBeenCalled();expect(translate).not.toHaveBeenCalled();
+  });
   it('rebinds a cached result after asynchronous same-scope storage hydration without a new request',async()=>{
     const f=await fixture();expect(f.copy.pages[0].outputBlobs[f.en.id]).toBe(f.key('en'));
     f.reloadStoredBindings();await f.settle();

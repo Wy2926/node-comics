@@ -55,7 +55,6 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
       changed=true;return {...page,outputBlobs:{...page.outputBlobs,[job.id]:key},translationError:undefined};
     });if(changed)commit({...copy,pages});}
   },[channel,commit]);
-  useEffect(()=>{stamp.current++;if(!currentId){windowRef.current.update([]);visible.current=[];wake.current();}},[currentId,language]);
   // Delivered results belong to the channel, not its language-specific runtime.
   useEffect(()=>{
     jobs.current=[];
@@ -70,9 +69,11 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     const live=()=>!stopped&&channel.isCurrent();
     const online=()=>!channel.requiresInternet||navigator.onLine!==false;
     const resultPrefetch=new TranslationResultPrefetch();
+    // A page ID (e.g. an archive filename) is only unique within its content.
+    const currentPage=(page:Page,entryId=page.entryId)=>copyRef.current.find(copy=>copy.id===entryId)?.pages.find(p=>p.id===page.id&&p.contentId===page.contentId)??page;
     function prefetchResults(){
       resultPrefetch.update(live()&&!document.hidden&&online()?windowRef.current.targets.flatMap(target=>{
-        const page=copyRef.current.find(copy=>copy.id===target.entryId)?.pages.find(page=>page.id===target.page.id)??target.page;
+        const page=currentPage(target.page,target.entryId);
         const job=pageTranslation(page,target.mode,language,channel!.scope.key).result;
         if(!job?.result||job.result_expired||job.result_available===false)return [];
         const key=resultBlobKey(channel!.scope,job);
@@ -84,9 +85,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     async function prepareResults(){
       prefetchResults();
       const generation=stamp.current,current=()=>live()&&generation===stamp.current;
-      const wanted=[...visible.current,...windowRef.current.targets.map(t=>t.page)];
-      const currentPages=copyRef.current.flatMap(copy=>copy.pages);
-      const pages=[...new Map(wanted.map(p=>[p.id,currentPages.find(v=>v.id===p.id)??p])).values()];
+      const pages=[...new Set([...visible.current.map(page=>currentPage(page)),...windowRef.current.targets.map(t=>currentPage(t.page,t.entryId))])];
       const needed=[...new Map(pages.flatMap(p=>p.translationScope===channel!.scope.key?latestResults(p.jobs).filter(j=>j.target_language===language&&j.result&&(!p.outputBlobs[j.id]||!resultReaders.current.has(resultBlobKey(channel!.scope,j)))):[]).map(j=>[j.id,j])).values()];
       const retained=new Set(pages.flatMap(p=>p.jobs.map(job=>resultBlobKey(channel!.scope,job))));
       const removed=new Set<string>();
@@ -110,7 +109,7 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
       try{
         const window=windowRef.current,now=performance.now();
         if(window.targets.length&&now<window.readyAt){schedule(window.readyAt-now);return;}
-        const targets=window.ready(now).map(t=>({...t,page:copyRef.current.find(c=>c.id===t.entryId)?.pages.find(p=>p.id===t.page.id)??t.page}));
+        const targets=window.ready(now).map(t=>({...t,page:currentPage(t.page,t.entryId)}));
         const caps=channel!.capabilities;
         // Use the selection clock: crossing the deadline here must not lose the tail tick.
         const delay=window.delay(now);if(delay>0)schedule(delay);
@@ -154,6 +153,8 @@ export function useAutomaticTranslation({channel,connectionError='',copies,updat
     const changed=windowRef.current.update(targets,performance.now(),immediate),imagesChanged=visibleImageSignature(visible.current)!==visibleImageSignature(visiblePages);
     visible.current=visiblePages;if(changed||imagesChanged){stamp.current++;render(n=>n+1);wake.current(changed);}
   },[]);
+  // On entry the child has already published the new window; only closing clears it here.
+  useEffect(()=>{if(!currentId)onReadingWindow([],[]);},[currentId,onReadingWindow]);
   const retry=useCallback(async(entryId:string,page:Page,mode:Mode)=>{
     if(!channel?.available||!runtime.current)throw Error(channel?.unavailable?.message??msg('正在连接翻译服务'));
     const latest=pageTranslation(page,mode,language,channel.scope.key);
