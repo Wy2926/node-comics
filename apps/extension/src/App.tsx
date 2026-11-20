@@ -379,10 +379,9 @@ export function App(){
   return()=>{live=false;};
  },[]);
  const translation=useAutomaticTranslation({channel,connectionError:channelError,copies,updateEntry,language:settings.language,currentId});
- const analyticsPromptActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag&&!shortcutScope
-    &&!['manifest','catalog','sourceLink','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
- const releaseNotesActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!drag&&!shortcutScope
-    &&!['manifest','catalog','sourceLink','search','code','state'].some(key=>new URLSearchParams(location.search).has(key));
+ const routeParams=new URLSearchParams(location.search);
+ const libraryPromptsActive=libraryActive&&!readingBusy&&!busy&&!searchOpen&&!login.open&&!drag&&!shortcutScope
+    &&!['manifest','catalog','sourceLink','search','code','state'].some(key=>routeParams.has(key));
  function nav(value:View){searchIntent.current++;leaveReader();setComicSearch(value=>value?{...value,open:false}:value);setView(value);location.hash=value;setError('');}
  useShortcuts({
    'app.shortcuts':()=>setShortcutScope(current?'reader':'global'),
@@ -428,7 +427,7 @@ export function App(){
    </nav>
    <div className="nc-header-actions">
     <HeaderUtilities page={view}>
-     <ReleaseNotes active={releaseNotesActive}/>
+     <ReleaseNotes active={libraryPromptsActive&&!feedbackOpen&&!exporting&&!importExpanded}/>
      <a className="icon-button" href="https://github.com/Wy2926/node-comics" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><Icon name="github" size={28}/></a>
      <button className="icon-button" aria-label={msg('插件反馈')} title={msg('插件反馈')} onClick={()=>setFeedbackOpen(true)}><Icon name="message" size={28}/></button>
     </HeaderUtilities>
@@ -450,7 +449,7 @@ export function App(){
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl} view={siteDirectoryView}/>}
   {view==='settings'&&<Preferences onAutomaticTranslationSaved={applySettings} onOpenShortcuts={()=>setShortcutScope('global')} settings={settings} setSettings={setSettings} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection} channelOptions={channel?.options}><StorageManagement onNotice={notify} onChanged={()=>{setCopies(values=>values.map(c=>({...c,pages:c.pages.map(p=>({...p,outputBlobs:{}}))})));}}/></Preferences>}
   {view==='account'&&<AccountPage api={api} account={account} rights={rights??undefined} rightsLoading={capsLoading} rightsError={capsError} testing={login.development} onEntitlements={updateEntitlements} onLogin={()=>login.setOpen(true)} onLogout={()=>{if(account)void signOut(account.id).catch(e=>setError(e.message));}}/>}</main>:null}
-  <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library loadingCatalogIds={loadingCatalogs} checkingCatalogId={catalogUpdates.checkingId} onCheckUpdates={id=>void catalogUpdates.check(id)} active={libraryActive} notice={<AnalyticsPrompt active={analyticsPromptActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
+  <main className="nc-main" hidden={!libraryActive}>{(libraryVisited||libraryActive)&&<Library loadingCatalogIds={loadingCatalogs} checkingCatalogId={catalogUpdates.checkingId} onCheckUpdates={id=>void catalogUpdates.check(id)} active={libraryActive} notice={<AnalyticsPrompt active={libraryPromptsActive}/>} downloads={downloads} onFind={findComic} library={library} onOpen={id=>void openComic(id).catch(e=>setError(e.message))} onImport={beginImport} onSource={id=>void chooseSource(id)} sourceActions={sourceActions} onChanged={reloadLibrary} notify={notify} onExport={setExporting} shelfView={shelfView}/>}</main>
   <main className="nc-main nc-search-main" hidden={!!current||view!=='search'}>{(searchPageVisited||view==='search')&&<ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}:page`} presentation="page" open={!current&&view==='search'} seed={directSearchSeed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='search')}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='discover'}>{(discoveryVisited||view==='discover')&&<DiscoveryPage active={!current&&view==='discover'} translate={settings.discoveryTextTranslation} onSearchSites={()=>nav('search')} renderSearch={({seed,open,isActive})=><ComicSearchPanel {...searchPanelProps} key={`${api.base}:${account?.id??'anonymous'}`} presentation="embedded" open={open} seed={seed} onImportHit={hit=>openSearchHit(hit,()=>viewRef.current==='discover'&&isActive())}/>}/>}</main>
   <main className="nc-main" hidden={!!current||view!=='remote-library'}>{(remoteVisited||view==='remote-library')&&<RemoteLibrary active={!current&&view==='remote-library'} onRead={async(id,isCurrent)=>{if(isCurrent())await openEntry(id,undefined,false,isCurrent);}} onDownload={downloads.promptFileDownload}/>}</main>

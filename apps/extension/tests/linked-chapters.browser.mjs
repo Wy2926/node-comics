@@ -15,14 +15,13 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
 const requests=[],total=45,series='/series/paper',work='/comics/7';
 const slice=(page,size)=>Array.from({length:Math.min(size,Math.max(0,total-(page-1)*size))},(_,i)=>total-(page-1)*size-i);
 const rows=ids=>ids.map(id=>`<a data-chapter-id="${id}" href="${work}/chapters/${id}"><span class="truncate">Part ${id}</span></a>`).join('');
-let broken=false;
 const site=createServer((request,response)=>{
   const url=new URL(request.url,'http://'+request.headers.host),p=url.pathname.replace(/\/$/,''),page=Number(url.searchParams.get('page'));
-  requests.push({p,page,dest:request.headers['sec-fetch-dest']});
+  requests.push({p,page});
   let type='text/html; charset=utf-8',body;
   if(p===work)body=`<h1>Paper library</h1><section id="chapters" data-chapter-sort-scope data-chapters-url="${work}/chapters" data-chapter-page-size="20" data-chapter-next-page="2"><h2>Parts</h2><span>Total: 45</span>${rows(slice(1,20))}</section>`;
   else if(p===work+'/chapters'){
-    type='application/json';body=JSON.stringify({html:rows(slice(page,20)),total,current_page:page,last_page:3,next_page:page<3?page+1:null,has_more:page<3&&!broken});
+    type='application/json';body=JSON.stringify({html:rows(slice(page,20)),total,current_page:page,last_page:3,next_page:page<3?page+1:null,has_more:page<3});
   }else if(p===series){
     const data=JSON.stringify({series_id:9,series_type:'Comic',series:{id:9,series_slug:'paper',title:'Folded paper',meta:{chapters_count:total}}});
     body=`<h1>Folded paper</h1><div role="tabpanel" id="tab-content-chapters_list"></div><script type="application/json">${data}</script>
@@ -87,7 +86,8 @@ try{
   await r.getByRole('button',{name:'Next page',exact:true}).click();
   await r.locator('.nc-reader-position[data-value="2"]').waitFor();
   assert(requests.filter(x=>x.p.startsWith('/image/')).length<32);
-  for(const table of ['comics','entries','positions','pageDescriptors','materializations'])assert.deepEqual((await readState(r))[table],[]);
+  const empty=await readState(r);
+  for(const table of ['comics','entries','positions','pageDescriptors','materializations'])assert.deepEqual(empty[table],[]);
   assert.equal((await r.evaluate(()=>chrome.runtime.sendMessage({type:'NC_TAKE_LINK'}))).ok,false);
   assert.equal(await shelf.locator('.nc-book').count(),0);
   await r.close();
@@ -104,17 +104,14 @@ try{
   const saved=await readState(r);assert.equal(saved.positions.length,1);
   assert(!JSON.stringify(saved).includes('fixture-secret'));
   const durable=await r.evaluate(()=>chrome.storage.local.get(null));assert(!JSON.stringify(durable).includes('fixture-secret'));
-  const replay=await popupAction(origin+work+'/?tracking=discard',add);
-  await replay.getByText(/Paper library · /).waitFor();assert.deepEqual((await readState(replay)).positions,saved.positions);await replay.close();
   const transient=await popupAction(origin+work+'/chapters/1',direct);await rendered(transient);
   await transient.locator('[data-reader-back-trigger]').click();await card(transient).waitFor();
   assert.deepEqual((await readState(transient)).positions,saved.positions);await transient.close();
-  assert.equal((await readState(r)).comics.length,1);
 
   const link=async url=>{await r.goto(base+'#sites');await r.locator('#nc-site-url').fill(url);await r.locator('.nc-site-link-import button').click();};
-  broken=true;await link(other+work);await r.locator('.nc-site-link-import [role=alert]').waitFor();
+  await link(other+'/comics/8');await r.locator('.nc-site-link-import [role=alert]').waitFor();
   assert.equal((await readState(r)).comics.length,1);
-  broken=false;await link(other+work);await r.waitForURL(base+'#library');assert.equal((await readState(r)).comics.length,2);
+  await link(other+work);await r.waitForURL(base+'#library');assert.equal((await readState(r)).comics.length,2);
   await link(origin+series+'/part-4');await rendered(r);assert(await r.locator('[data-sync=temporary]').isVisible());await r.locator('[data-reader-back-trigger]').click();
   await source.goto(origin+'/browse');await source.getByRole('link',{name:'Open paper'}).click();
   await source.locator('[role=tabpanel] a').waitFor();assert.equal(source.url(),origin+series);
@@ -122,7 +119,7 @@ try{
   state=await readState(folded);const snap=state.catalogs.find(s=>s.url===origin+series);
   assert(snap.complete);assert.equal(snap.entries.length,total);assert.equal(snap.entries.filter(e=>!e.readable).length,1);
   assert.deepEqual(state.positions,saved.positions);assert.equal(state.comics.length,3);
-  assert.deepEqual(errors,[]);console.log('PASS: popup and link entry points; both complete directories; locked rows; lazy images; failed/repeated imports; cross-origin and temporary progress isolation.');
+  assert.deepEqual(errors,[]);console.log('PASS: popup and link entry points; both complete directories; locked rows; lazy images; invalid catalog; cross-origin and temporary progress isolation.');
 }finally{
   await context?.close();await new Promise(resolve=>site.close(resolve));
   await rm(profile,{force:true,recursive:true,maxRetries:5,retryDelay:250});

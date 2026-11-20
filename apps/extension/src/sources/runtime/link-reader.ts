@@ -14,14 +14,10 @@ export async function readLinkedChapter(url:string, signal:AbortSignal) {
   await requireHostAccess();
   const snapshot=await readNetworkSnapshot(location.url,signal);
   if (!snapshot.discoveryComplete || !snapshot.items.length) throw Error(msg('来源图片清单不可用。'));
-  const assets=new Map(snapshot.items.map(item=>{
-    if(item.resource.kind!=='http')throw Error(msg('来源图片清单不可用。'));
-    return [item.id,item.resource.url];
+  const pages=new Map(snapshot.items.map(({id,width,height,resource})=>{
+    if(resource.kind!=='http')throw Error(msg('来源图片清单不可用。'));
+    return [id,{width,height,read:async(request:AbortSignal)=>
+      (await fetchSourceImage(resource.url,AbortSignal.any([request,signal]),undefined,{pageUrl:location.url})).blob}];
   }));
-  return {url:location.url,title:snapshot.title,pages:snapshot.items.map(({id,width,height})=>({id,width,height})),
-    async read(id:string, request:AbortSignal) {
-      const url=assets.get(id);
-      if (!url) throw Error(msg('图片不在来源清单内。'));
-      return (await fetchSourceImage(url,AbortSignal.any([request,signal]),undefined,{pageUrl:location.url})).blob;
-    }};
+  return {url:location.url,title:snapshot.title,pages};
 }

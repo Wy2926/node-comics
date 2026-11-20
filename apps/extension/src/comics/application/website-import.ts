@@ -81,10 +81,7 @@ async function readAndImportWebsite(sourceUrl:string,options:WebsiteImportOption
 
 export async function importWebsiteLink(url:string,options:WebsiteImportOptions={}) {
   options.signal?.throwIfAborted();
-  const sourceUrl=await prepareCatalogImport(url);
-  const {definition,location}=sourceFor(sourceUrl);
-  if(definition.linkMatch&&location.kind!=='catalog')throw Error('请使用作品目录链接添加到书架。');
-  return readAndImportWebsite(sourceUrl,options);
+  return readAndImportWebsite(await prepareCatalogImport(url),options);
 }
 
 /** Continue a saved partial directory without creating another book or resetting its reading selection. */

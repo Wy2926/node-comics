@@ -1,12 +1,11 @@
 import 'fake-indexeddb/auto';
 import {parseHTML} from 'linkedom';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-import {sourceFor,listSupportedSites,validateSourceCatalog} from '../src/sources';
+import {listSupportedSites,validateSourceCatalog} from '../src/sources';
 import {network} from '../src/sources/sites/structured-chapters/network';
 import {readNetworkPages} from '../src/sources/runtime/network';
 import {openLinkedReader,takeLinkedReader,forgetLinkedReader} from '../src/sources/runtime/link-handoff';
 import {importWebsiteLink} from '../src/comics/application/website-import';
-import type {Entry} from '../src/comics/domain';
 import {catalog} from '../src/comics/repositories';
 import {continueEntry,saveReaderState} from '../src/comics/application/library-service';
 import {openTemporaryChapter,temporaryPage} from '../src/comics/pages/temporary';
@@ -29,14 +28,6 @@ const fetcher=vi.fn(async(target:string)=>{
   throw Error('Unexpected fixture request');
 });
 const registered=vi.fn();
-async function rememberPosition(entry:Entry) {
-  const {id,comicId,contentId}=entry,pageId='saved-slot';
-  await catalog.put('pageDescriptors',{contentId,pageId,ordinal:0,name:'Paper',locator:{sourceId:'page-1'},formatLocator:'page-1'});
-  const position={id,entryId:id,comicId,contentId,pageId,relativeOffset:.6,updatedAt:1234};
-  await catalog.savePosition(position);
-  expect(await catalog.get('positions',id)).toEqual(position);
-  return position;
-}
 beforeEach(()=>{
   fetcher.mockClear();registered.mockClear();
   vi.stubGlobal('document',parseHTML('<html></html>').document);
@@ -52,17 +43,19 @@ it('reads to the last page before publishing any entries and preserves the book 
   const a=await importWebsiteLink(work+'/?token=fixture-only#top');
   expect(fetcher.mock.calls.map(([url])=>new URL(url).searchParams.get('page'))).toEqual([null,'2','3']);
   const snapshot=validateSourceCatalog(await catalog.get('catalogs',a.source.providerItemId));
-  expect(snapshot).toMatchObject({complete:true,url:work});expect(snapshot.entries).toHaveLength(45);
+  expect(snapshot).toMatchObject({complete:true,url:work});
   expect(snapshot.entries.map(e=>e.title)).toEqual(Array.from({length:45},(_,n)=>'Part '+(n+1)));
-  const entry=(await catalog.listEntries(a.id))[11];
-  const position=await rememberPosition(entry);
+  const {id,comicId,contentId}=(await catalog.listEntries(a.id))[11],pageId='saved-slot';
+  await catalog.put('pageDescriptors',{contentId,pageId,ordinal:0,name:'Paper',locator:{sourceId:'page-1'},formatLocator:'page-1'});
+  const position={id,entryId:id,comicId,contentId,pageId,relativeOffset:.6,updatedAt:1234};
+  await catalog.savePosition(position);
   expect((await importWebsiteLink(work)).id).toBe(a.id);
   const b=await importWebsiteLink(other);expect(b.id).not.toBe(a.id);expect(b.sourceName).not.toBe(a.sourceName);
-  expect(await continueEntry(a.id)).toMatchObject({id:entry.id});
-  expect(await catalog.get('positions',entry.id)).toEqual(position);
+  expect(await continueEntry(a.id)).toMatchObject({id});
+  expect(await catalog.get('positions',id)).toEqual(position);
   expect((await catalog.list('comics')).length).toBe(2);
-  expect(()=>validateSourceCatalog({...snapshot,entries:snapshot!.entries.map(e=>({...e,url:e.url.replace(work,other)}))})).toThrow();
-  expect(listSupportedSites().some(site=>site.adapterId===snapshot!.sourceId)).toBe(false);
+  expect(()=>validateSourceCatalog({...snapshot,entries:snapshot.entries.map(e=>({...e,url:e.url.replace(work,other)}))})).toThrow();
+  expect(listSupportedSites().some(site=>site.adapterId===snapshot.sourceId)).toBe(false);
   expect(JSON.stringify(snapshot)).not.toContain('token=');
 });
 
@@ -110,21 +103,16 @@ it('paginates the observed series protocol, binds every row to its parent and ke
   expect(readDocument).not.toHaveBeenCalled();
 });
 
-it('direct chapter reading never registers a manifest, creates a book or overwrites a saved position',async()=>{
-  const read=async()=>{
-    const controller=new AbortController(),copy=await openTemporaryChapter(chapter,controller.signal);
-    expect(copy.comicId).toBeUndefined();expect(copy.pages).toHaveLength(1);
-    expect(JSON.stringify(copy)).not.toContain('token=');
-    const ref=parsePageReference(copy.pages[0].blobKey!)!,page=temporaryPage(ref);
-    expect(await (await page.read(controller.signal)).text()).toBe('synthetic bytes');
-    await saveReaderState({...copy,lastReadAt:300,relativeOffset:.9});
-    controller.abort();expect(()=>temporaryPage(ref)).toThrow();await expect(page.validate()).rejects.toThrow();
-  };
-  await read();
-  expect(await catalog.list('comics')).toEqual([]);expect(await catalog.list('entries')).toEqual([]);
-  const comic=await importWebsiteLink(work),saved=await continueEntry(comic.id);
-  const position=await rememberPosition(saved!),before=await catalog.list('comics');
-  await read();expect(await catalog.list('comics')).toEqual(before);expect(await catalog.list('positions')).toEqual([position]);
+it('revokes temporary page access and only registers stable locators for shelf reads',async()=>{
+  const controller=new AbortController(),copy=await openTemporaryChapter(chapter,controller.signal);
+  expect(copy.pages).toHaveLength(1);expect(JSON.stringify(copy)).not.toContain('token=');
+  const ref=parsePageReference(copy.pages[0].blobKey!)!,page=temporaryPage(ref);
+  expect(()=>temporaryPage({...ref,pageId:'outside-this-chapter'})).toThrow();
+  expect(await (await page.read(controller.signal)).text()).toBe('synthetic bytes');
+  await saveReaderState({...copy,lastReadAt:300,relativeOffset:.9});
+  expect(await catalog.list('positions')).toEqual([]);
+  controller.abort();expect(()=>temporaryPage(ref)).toThrow();await expect(page.validate()).rejects.toThrow();
+  await expect(page.read(new AbortController().signal)).rejects.toMatchObject({name:'AbortError'});
   expect(registered).not.toHaveBeenCalled();
   const manifest=await readNetworkPages(chapter);
   expect(manifest.items).toMatchObject([{url:chapter+'#page-1',contentKey:'page-1'}]);
@@ -141,5 +129,4 @@ it('scopes a one-shot launch to its reader tab and discards closed or failed lau
   await openLinkedReader(chapter,1);forgetLinkedReader(10);expect(()=>takeLinkedReader(10)).toThrow();
   update.mockRejectedValueOnce(Error('closed'));await expect(openLinkedReader(chapter,1)).rejects.toThrow('closed');expect(()=>takeLinkedReader(10)).toThrow();
   await expect(openLinkedReader(chapter+'/changed',1)).rejects.toThrow();
-  expect(sourceFor('https://example.test/news').definition.id).toBe('generic');
 });

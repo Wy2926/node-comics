@@ -66,18 +66,22 @@ async function pageContext(request:PageReference){
 export async function pageAccess(request:PageReference){return isTemporaryEntry(request.entryId)?temporaryPage(request).validate:(await pageContext(request)).assertSourceCurrent;}
 async function read(request:RasterRequest,signal:AbortSignal,preview:PagePreview):Promise<Value>{
   signal.throwIfAborted();
+  const id=materializationId(request);
+  const identityFor=({blob,imageSha256,width,height}:Awaited<ReturnType<typeof prepareComicPage>>):PageMaterialization=>({
+    id,contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,
+    imageSha256,width,height,byteSize:blob.size,mime:blob.type,updatedAt:Date.now(),
+  });
   if(isTemporaryEntry(request.entryId)){
     const page=temporaryPage(request),prepared=await prepareComicPage({name:request.pageId,blob:await page.read(signal)},signal);
     signal.throwIfAborted();await page.validate();
-    const identity:PageMaterialization={id:materializationId(request),contentId:request.contentId,pageId:request.pageId,renderProfileId:request.renderProfileId,
-      imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
+    const identity=identityFor(prepared);
     publishMetadata(identity);return {blob:prepared.blob,identity,validate:page.validate};
   }
   const {descriptor,doc,binding,connection,assertSourceCurrent}=await pageContext(request);
   const render=doc.format==='pdf'?request.render:undefined;
   const cachePages=render===undefined&&getSourceDriver(connection.provider)?.cachePages!==false;
   const cacheToken=cachePages&&request.purpose!=='download'?await sourcePageCache.token(doc.id).catch(cacheUnavailable):undefined;
-  const id=materializationId(request),known=render===undefined?await catalog.get('materializations',id):undefined;
+  const known=render===undefined?await catalog.get('materializations',id):undefined;
   let blob=render===undefined?await downloadStore.get(downloadKey(request.contentId,request.pageId,request.renderProfileId)).catch(cacheUnavailable):undefined;
   if(!blob&&cachePages)blob=await sourcePageCache.get(pageReference(request)).catch(cacheUnavailable);
   // These repositories contain already-normalized output from this service, keyed by current content identity/profile.
@@ -133,7 +137,7 @@ async function read(request:RasterRequest,signal:AbortSignal,preview:PagePreview
   const prepared=trustedCache&&known&&known.byteSize===blob.size&&known.mime===blob.type&&known.width>0&&known.height>0
     ? {blob,width:known.width,height:known.height,imageSha256:known.imageSha256}
     : await prepareComicPage({name:descriptor.name,blob},signal);
-  const identity:PageMaterialization={id,pageId:request.pageId,contentId:request.contentId,renderProfileId:request.renderProfileId,imageSha256:prepared.imageSha256,width:prepared.width,height:prepared.height,byteSize:prepared.blob.size,mime:prepared.blob.type,updatedAt:Date.now()};
+  const identity=identityFor(prepared);
   // PDF rasters are derived bytes, not document identity. Frozen translation inputs are checked by their task.
   if(doc.format!=='pdf'&&known&&known.imageSha256!==identity.imageSha256)throw Error('来源内容与已保存的页面身份不同，请重新载入当前内容。');
   signal.throwIfAborted();

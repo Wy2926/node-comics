@@ -43,6 +43,7 @@ export async function readImportCatalog(url:string,readCatalog:(url:string,optio
 export async function prepareCatalogImport(url:string) {
   const {definition,location}=resolveSource(url,definitions);
   if(!definition.capabilities.importable||!definition.capabilities.catalog||location.kind==='other')throw Error('请粘贴已适配网站的漫画详情页或章节链接。');
+  if(definition.linkMatch&&location.kind==='reader')throw Error('请使用作品目录链接添加到书架。');
   await requireHostAccess();
   return location.url;
 }
