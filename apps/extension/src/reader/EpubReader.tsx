@@ -53,6 +53,7 @@ interface Props {
   onRetry(page: Page, mode: Mode): void | Promise<void>;
   onLogin(): void;
   onUpgrade(): void;
+  onManageResources?(): void;
   progressStatus?: ReadingProgressStatus;
 }
 
@@ -96,6 +97,7 @@ export function EpubReader({
   onRetry,
   onLogin,
   onUpgrade,
+  onManageResources,
   progressStatus,
 }: Props) {
   const [view, setView] = useState(() => readReadingView(viewKey));
@@ -477,7 +479,7 @@ export function EpubReader({
       {error && <div className="nc-epub-status" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>{msg('重试')}</button></div>}
       {!disabled && view.preference === 'translation' && (images.page || images.error) &&
         <ImageTranslationStatus state={images.error ? {kind: 'error', message: images.error} : translationState(copy.id, images.page!, view.mode)}
-          onLogin={onLogin} onUpgrade={onUpgrade} onRetry={() => images.error ? images.retry() : onRetry(images.page!, view.mode)}/>}
+          onLogin={onLogin} onUpgrade={onUpgrade} onManageResources={onManageResources} onRetry={() => images.error ? images.retry() : onRetry(images.page!, view.mode)}/>}
       {!disabled && <EnhancementStatus state={images.enhancement} onRetry={images.retryEnhancement}/>}
     </main>
     {panel && <ReaderDrawer kind={panel} title={{bookmarks:msg('书签'),directory: msg('目录'), settings: msg('阅读设置'), translation: msg('翻译设置')}[panel]}

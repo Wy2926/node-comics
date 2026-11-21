@@ -16,14 +16,14 @@ export function translationState({page,mode,language,modelId,fontId,userId,origi
   if(operation?.state==='blocked'){
     const code=operation.errorCode??'';
     if(quotaErrors.has(code))return upgradeState(code==='TRANSLATION_MODEL_NOT_ALLOWED'?'not_allowed':'quota_exhausted');
-    return {kind:'error',message:operation.error??msg("此页暂不能翻译"),retryable:!['IDEMPOTENCY_CONFLICT','TRANSLATION_UNAVAILABLE','TRANSLATION_MODE_UNAVAILABLE','SOURCE_CHANGED','OUTCOME_UNKNOWN'].includes(code)};
+    return {kind:'error',message:operation.error||msg("此页暂不能翻译"),code,retryable:!['IDEMPOTENCY_CONFLICT','TRANSLATION_UNAVAILABLE','TRANSLATION_MODE_UNAVAILABLE','SOURCE_CHANGED','OUTCOME_UNKNOWN'].includes(code)};
   }
   if(operation?.state==='uncertain')return {kind:'translating',message:msg("正在恢复翻译请求")};
   if(t.pending)return {kind:t.pending.status==='queued'?'waiting':'translating',message:t.pending.status==='outcome_unknown'?msg("结果核实中"):taskText(t.pending)};
   if(t.latest?.status==='unknown_released')return {kind:'error',message:msg("原请求结果待核实"),retryable:false};
   if(active&&error&&!t.ready)return {kind:'error',message:error};
   if(operation?.state==='local'||operation?.state==='deferred')return {kind:'waiting',message:operation.state==='local'?msg('准备翻译…'):msg('等待翻译')};
-  if(t.latest?.status==='failed')return {kind:'error',message:t.latest.error?.message??msg("翻译失败"),retryable:t.latest.error?.code!=='TRANSLATION_UNAVAILABLE'};
+  if(t.latest?.status==='failed')return {kind:'error',message:t.latest.error?.message||msg("翻译失败"),code:t.latest.error?.code,retryable:t.latest.error?.code!=='TRANSLATION_UNAVAILABLE'};
   if(t.ready)return;
   if(t.result?.result&&!t.expired)return {kind:page.translationError?'error':'translating',message:page.translationError??msg("正在读取译图"),retryLabel:msg("点击重新加载")};
   if(t.latest?.status==='no_text')return;

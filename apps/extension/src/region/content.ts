@@ -52,6 +52,7 @@ export function installRegion(){
     loadError=undefined;
     state={kind:'translating',message:msg('重试中…')};paint();void progress('NC_REGION_RETRY');
   });
+  const resources=button(()=>{void send('NC_REGION_OPEN',{view:'resources'}).catch(()=>{});});
   const toggleOriginal=()=>{if(!resultUrl)return false;original=!original;paint();};
   const originals=button(toggleOriginal);
   const previews=button(()=>{
@@ -122,9 +123,10 @@ export function installRegion(){
     const loadingResult=!!resultLoad;
     const currentState=loadingResult?{kind:'translating' as const,message:msg('正在读取译图')}:loadError??state;
     const message=currentState?translationNotice(currentState):undefined;
-    status.textContent=message?.message??(resultKey?msg('翻译完成'):'');status.title=message?.detail??'';status.dataset.kind=currentState?.kind??'';
+    status.textContent=message?.detail??(resultKey?msg('翻译完成'):'');status.title=message?.detail??'';status.dataset.kind=currentState?.kind??'';
     const actionable=!!currentState&&(currentState.kind==='login'||currentState.kind==='upgrade'||currentState.kind==='error'&&currentState.retryable!==false);
     retry.hidden=!actionable;retry.textContent=message?.label??'';retry.title=message?.detail??'';retry.disabled=!!running||loadingResult||document.hidden;
+    resources.hidden=!message?.resourceAction;resources.textContent=message?.resourceAction??'';
     originals.hidden=!resultUrl;originals.textContent=original?msg('显示译图'):msg('恢复原图');
     previews.hidden=phase!=='ready';previews.textContent=previewOpen?msg('关闭预览'):msg('显示预览');
     reselect.textContent=msg('重新框选');reselect.hidden=phase==='selecting';settings.textContent=msg('设置');close.textContent=msg('关闭');

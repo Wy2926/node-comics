@@ -15,10 +15,12 @@ import {modelAssets,resourceEvents} from './resources';
 import {ENGINE_REVISION,type ShinobuConfig} from './config';
 import {TEXT_PROTOCOL_REVISION} from './text/protocol';
 import {errorMessage} from './errors';
+import {knownLocalCode,localFailureCode} from './failure-code';
 import {supportsLocalLanguage} from './languages';
 import {executionLock,launchLock,operationLock} from './locks';
 import {readOperation,saveOperation,readCheckpoint,saveCheckpoint,releaseInput,type LocalOperation} from './operations';
 const digest=(value:unknown)=>new Sha256().update(new TextEncoder().encode(JSON.stringify(value))).digest();
+const localError=(code:string)=>({kind:'error' as const,code,message:errorMessage(code),manageResources:['ASSET_MISSING','ASSET_CORRUPT','FONT_UNAVAILABLE'].includes(code)});
 export class ShinobuRuntime implements ChannelRuntime{
   private admissionError?:string;private resources?:BroadcastChannel;
   private records=new Map<string,LocalOperation>();private targets:ReadingTarget[]=[];private stopped=false;private pumping=false;private check:(target:ReadingTarget)=>boolean=()=>true;
@@ -87,7 +89,7 @@ export class ShinobuRuntime implements ChannelRuntime{
         const existing=await readOperation(this.id(target));if(existing){await this.adopt(existing);return;}
         await this.begin(target,undefined,()=>this.current()&&this.check(target));
       });
-    }catch{this.changed();}finally{this.pumping=false;}
+    }catch(error){this.admissionError=localFailureCode(error);this.changed();}finally{this.pumping=false;}
   }
   // Manual requests follow channel lifetime; automatic requests also follow their reading window.
   private async begin(target:ReadingTarget,previous?:LocalOperation,requestCurrent=this.current){
@@ -121,9 +123,10 @@ export class ShinobuRuntime implements ChannelRuntime{
         if(target.page.blobKey)await this.options.onInputConsumed?.(target.page.blobKey).catch(()=>{});
       }catch(error){
         // A missing ACK cannot overwrite work already accepted by the independent host.
-        if(dispatched)return;
-        const code=error instanceof Error?error.message:'INTERRUPTED';record={...record,job:{...record.job,status:'failed',phase:'failed',error:{code,message:errorMessage(code)}}};
-        await saveOperation(record,true);await releaseInput(record.job.id);await this.adopt(record);
+        const code=localFailureCode(error);
+        if(dispatched&&!['LOCAL_HOST_EXTENSION_REQUIRED','LOCAL_HOST_UNAVAILABLE','LOCAL_BUSY'].includes(code))return;
+        record={...record,job:{...record.job,status:'failed',phase:'failed',error:{code,message:errorMessage(code)}}};
+        await saveOperation(record,!dispatched);await releaseInput(record.job.id);await this.adopt(record);
       }finally{lease?.release();}
     });
   }
@@ -131,7 +134,7 @@ export class ShinobuRuntime implements ChannelRuntime{
     if(!supportsLocalLanguage(this.options.language))throw Error(errorMessage('TEXT_LANGUAGE_UNSUPPORTED'));
     this.admissionError=undefined;
     await navigator.locks.request('nc-shinobu-admission',async()=>{
-      if((await navigator.locks.query()).held?.some(l=>l.name===executionLock))throw Error(errorMessage('INTERRUPTED'));
+      if((await navigator.locks.query()).held?.some(l=>l.name===executionLock))throw Error(errorMessage('LOCAL_BUSY'));
       const previous=await readOperation(this.id(target));await this.begin(target,previous);
     });
   }
@@ -149,10 +152,13 @@ export class ShinobuRuntime implements ChannelRuntime{
     if(!supportsLocalLanguage(this.options.language))return active?{kind:'error',message:errorMessage('TEXT_LANGUAGE_UNSUPPORTED'),retryable:false}:undefined;
     const record=this.records.get(this.id(target)),displayed=pageTranslation(target.page,target.mode,this.options.language,this.scope.key);
     if(record?.job.status==='running')return {kind:'translating',message:msgTranslate()};
-    if(record?.job.status==='failed')return {kind:'error',message:errorMessage(record.job.error?.code??'PIPELINE_FAILED'),retryable:true,retryAction:'translate'};
+    if(record?.job.status==='failed'){
+      const code=knownLocalCode(record.job.error?.code);
+      return {...localError(code),retryable:true,retryAction:'translate'};
+    }
     if(error||target.page.translationError||displayed.expired)return {kind:'error',message:error||target.page.translationError||errorMessage('RESULT_NOT_CACHED'),retryable:true,retryAction:'translate'};
     if(displayed.ready||record?.job.status==='no_text'||this.delivered.get(this.id(target))?.status==='no_text')return;
-    if(this.admissionError)return {kind:'error',message:errorMessage(this.admissionError),retryable:false};
+    if(this.admissionError)return {...localError(this.admissionError),retryable:this.admissionError!=='ASSET_MISSING'};
     return active?{kind:'waiting',message:msgWait()}:undefined;
   }
   dispose(){this.stopped=true;this.resources?.close();this.targets=[];this.delivered.clear();}

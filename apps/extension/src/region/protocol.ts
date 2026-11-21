@@ -12,7 +12,7 @@ export interface RegionIdentity {
 export interface RegionRequest {
   type:'NC_REGION_CAPTURE'|'NC_REGION_SUBMIT'|'NC_REGION_TICK'|'NC_REGION_WAIT'|'NC_REGION_RETRY'|'NC_REGION_CLOSE'|'NC_REGION_PAUSE'|'NC_REGION_OPEN';
   navigationId:string;generation:number;selectionId?:string;rect?:RegionRect;viewport?:RegionViewport;
-  view?:'settings'|'account';
+  view?:'settings'|'account'|'resources';
 }
 export interface RegionResponse {
   selectionId:string;width:number;height:number;rect:RegionRect;

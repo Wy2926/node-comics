@@ -96,6 +96,11 @@ beforeEach(async()=>{
 afterEach(()=>{vi.unstubAllGlobals();});
 
 describe('region background capture and admission',()=>{
+  it('opens the resource manager without submitting the selected region',async()=>{
+    expect(await send({...message('NC_REGION_OPEN'),view:'resources'})).toMatchObject({ok:true});
+    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url:'chrome-extension://test/reader.html#settings/resources'});
+    expect(core.manual).not.toHaveBeenCalled();expect(core.submit).not.toHaveBeenCalled();
+  });
   it('initializes and freezes the browser target on a background-first region translation',async()=>{
     Object.assign(navigator,{languages:['ja-JP'],language:'ja-JP'});
     const saved:Record<string,unknown>={},listeners:Array<(changes:Record<string,unknown>,area:string)=>void>=[];

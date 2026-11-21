@@ -761,6 +761,19 @@ try {
   await button('关闭'); await page.locator('[data-nc-region]').waitFor({state: 'detached'});
   check('Real MTU cache loss after host/worker restart waits for explicit retranslation and reuses the same frozen input without recapture');
 
+  await worker.evaluate(() => chrome.storage.local.set({'nc-translation-channels': {activeId: 'shinobu', profiles: [
+    {id: 'shinobu', adapterId: 'shinobu', name: 'Local', revision: 1, settings: {textServiceId: 'google', textServices: '[]'}}]}}));
+  await activate(); await select(selected); await button('管理模型与字体', false);
+  const [crop] = await regionRecords(), traffic = translationTraffic(), opened = browser.waitForEvent('page');
+  await button('管理模型与字体');
+  const settingsTab = await opened; await settingsTab.waitForURL(`chrome-extension://${extensionId}/reader.html#settings/resources`);
+  const manager = settingsTab.getByRole('dialog', {name: '模型与字体'});
+  await manager.locator('.nc-resource-card').first().waitFor(); assert(await manager.getByRole('button', {name: '下载缺少的必需资源'}).isEnabled());
+  await settingsTab.close(); await page.bringToFront(); await button('管理模型与字体', false);
+  assert.deepEqual(await regionRecords(), [crop]); assert.deepEqual(translationTraffic(), traffic);
+  await button('关闭');
+  check('The missing-resource action opens the download dialog and returns to the same selected crop without retranslating');
+
   assert.equal(await worker.evaluate(() => fixturePermissionRequests), 0);
   assert.deepEqual(await worker.evaluate(() => fixtureExternalRequests), []);
   assert.deepEqual(externalPageRequests, []);

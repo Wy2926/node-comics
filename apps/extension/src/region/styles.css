@@ -118,6 +118,8 @@ button:disabled {
 }
 .status[data-kind=error] {
   color: var(--danger);
+  max-height: min(8em, 25vh);
+  overflow: auto;
 }
 .status[data-kind=login],
 .status[data-kind=translating] {

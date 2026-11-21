@@ -8,6 +8,7 @@ import {modelAssets,resourceAssets,resourceEvents} from './resources';
 import {readOperation,readInput,releaseInput,saveOperation,clearCheckpoint,expireCheckpoints} from './operations';
 import {runImage,disposeEngine} from './engine';
 import {errorMessage} from './errors';
+import {localFailureCode} from './failure-code';
 import {executionLock,operationLock} from './locks';
 export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLocalHost>{
   let active:AbortController|undefined,downloader:Worker|undefined,downloads:LocalAsset[]=[],currentDownload:string|undefined;
@@ -43,7 +44,7 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
                 if(job.status==='succeeded')await saveResultBlob({scope:{key:record.scope},job,blob:output.image,cacheToken:record.cacheToken,isCurrent:()=>!controller.signal.aborted});
                 record={...record,job};await saveOperation(record);await clearCheckpoint(record.job.id);
               }catch(error){
-                const code=error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'PIPELINE_FAILED';
+                 const code=localFailureCode(error);
                 await saveOperation({...record,job:{...record.job,status:'failed',phase:'failed',updated_at:new Date().toISOString(),error:{code,message:errorMessage(code)}}}).catch(()=>{});
               }finally{await releaseInput(record.job.id);active=undefined;notify();}
             });

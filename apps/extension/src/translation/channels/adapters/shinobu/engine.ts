@@ -64,7 +64,7 @@ export async function runImage(operation:LocalOperation,source:Blob,signal:Abort
           textError=error instanceof Error&&/^(TEXT_|FONT_)/.test(error.message)?error.message:'TEXT_OUTCOME_UNKNOWN';if(context===current)worker.postMessage({type:'text-error',code:textError});
         });
         else if(data.type==='result')finish({status:data.status,image:data.image});
-        else if(data.type==='error')finish(undefined,Error(textError??(data.code&&/^(FONT_|ASSET_)[A-Z_]+$/.test(data.code)?data.code:'PIPELINE_FAILED')));
+        else if(data.type==='error')finish(undefined,Error(textError??data.code??'PIPELINE_FAILED'));
       };
       worker.postMessage(start);
     });

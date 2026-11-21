@@ -14,6 +14,22 @@ export function registerLocalHost(close:()=>Promise<void>){
       void Promise.allSettled([...hosts.values()].map(async pending=>(await pending).dispose())).then(async()=>{hosts.clear();await close();}).finally(()=>{closing=false;});
     },60_000);
   };
+  const dispatch=async(adapterId:string,message:unknown)=>{
+    if(closing)throw Error('LOCAL_HOST_UNAVAILABLE');
+    pendingRequests++;clearTimeout(timer);
+    try{
+      const {channelDefinition}=await import('./registry');
+      const definition=channelDefinition(adapterId);
+      if(!definition.startLocalHost)throw Error('UNSUPPORTED_HOST');
+      let pending=hosts.get(definition.id);
+      if(!pending){
+        pending=definition.startLocalHost(busy=>{busy?active.add(definition.id):active.delete(definition.id);idle();});
+        hosts.set(definition.id,pending);
+        void pending.catch(()=>hosts.delete(definition.id));
+      }
+      const host=await pending;return await host.dispatch(message);
+    }finally{pendingRequests--;idle();}
+  };
   chrome.runtime.onMessage.addListener((request,sender,reply)=>{
     if(request?.type!==LOCAL_HOST_MESSAGE||sender.id!==chrome.runtime.id||(sender.url?!sender.url.startsWith(chrome.runtime.getURL('/')):sender.tab!==undefined))return;
     if(request.action==='ping'){reply({ready:!closing});idle();return;}
@@ -25,22 +41,9 @@ export function registerLocalHost(close:()=>Promise<void>){
       return true;
     }
     if(request.action!=='dispatch'||typeof request.adapterId!=='string')return;
-    if(closing){reply({ok:false,error:'LOCAL_HOST_UNAVAILABLE'});return;}
-    pendingRequests++;
-    clearTimeout(timer);
-    void (async()=>{
-      const {channelDefinition}=await import('./registry');
-      const definition=channelDefinition(request.adapterId);
-      if(!definition.startLocalHost)throw Error('UNSUPPORTED_HOST');
-      let pending=hosts.get(definition.id);
-      if(!pending){
-        pending=definition.startLocalHost(busy=>{busy?active.add(definition.id):active.delete(definition.id);idle();});
-        hosts.set(definition.id,pending);
-        void pending.catch(()=>hosts.delete(definition.id));
-      }
-      const host=await pending;return host.dispatch(request.message);
-    })().then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'LOCAL_HOST_UNAVAILABLE'})).finally(()=>{pendingRequests--;idle();});
+    void dispatch(request.adapterId,request.message).then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'LOCAL_HOST_UNAVAILABLE'}));
     return true;
   });
   idle();
+  return dispatch;
 }

@@ -31,6 +31,8 @@ import { inExtension, sourceFor, sourceMessage, canFindAlternatives, consumeSear
 import {importWebsiteCatalog,importWebsiteLink,resumeWebsiteCatalog} from './comics/application/website-import';
 import { useAutomaticTranslation } from './translation/useAutomaticTranslation';
 import {useTranslationChannel} from './translation/channels/useChannel';
+import {resourceSettingsHash} from './translation/navigation';
+import {ChannelResourcesDialog} from './ui/ChannelResources';
 import { type Capabilities, type Entitlements, type ReadingEntry, type Settings } from './types';
 import { AccountPage } from './ui/Account';
 import { useAppearance } from './ui/Appearance';
@@ -95,6 +97,7 @@ export function App(){
  const [exporting,setExporting]=useState<Entry>();
  const [feedbackOpen,setFeedbackOpen]=useState(false);
  const [shortcutScope,setShortcutScope]=useState<ShortcutScope|undefined>(()=>location.hash==='#settings/shortcuts'?'web':undefined);
+ const [resourcesOpen,setResourcesOpen]=useState(()=>location.hash===resourceSettingsHash);
  const [comicSearch,setComicSearch]=useState<{seed:SearchSeed;key:string;open:boolean}>();
  const comicSearchRef=useRef(comicSearch);comicSearchRef.current=comicSearch;
  const pendingSearchSeed=useRef<{id:string;result:Promise<SearchSeed>}|undefined>(undefined),searchIntent=useRef(0),searchOpen=!!comicSearch?.open;
@@ -146,6 +149,10 @@ export function App(){
  const downloads=useBookDownloads(notify,()=>nav('downloads'));
  const activeDownloads=downloads.activeCount;
  const {channel,error:channelError}=useTranslationChannel();
+ const resourceManager=channel?.options?.resources;
+ const openResources=resourceManager?()=>setResourcesOpen(true):undefined;
+ const readerBlocked=login.open||!!shortcutScope||!!(resourcesOpen&&resourceManager);
+ useEffect(()=>{if(resourcesOpen&&!resourceManager&&(channel||channelError))closeResources();},[resourcesOpen,resourceManager,channel,channelError]);
  const channelRef=useRef(channel);channelRef.current=channel;
  const translationScope=channel?.scope;
  useAppearance(settings);
@@ -336,7 +343,7 @@ export function App(){
  }:p)}:c))),[]);
  // Initialization and other surfaces already persisted their values; only user changes write back.
  useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key==='nc-settings'||event.key===null){const next=readSettings();settingsRef.current=next;applySettings(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
- useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setShortcutScope(location.hash==='#settings/shortcuts'?'web':undefined);leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
+  useEffect(()=>{const changed=()=>{searchIntent.current++;setComicSearch(value=>value?{...value,open:false}:value);setView(viewFromHash());setShortcutScope(location.hash==='#settings/shortcuts'?'web':undefined);setResourcesOpen(location.hash===resourceSettingsHash);leaveReader();};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[leaveReader]);
  useEffect(()=>()=>{readingEpoch.current++;readingLoadEpoch.current++;libraryEpoch.current++;for(const controller of catalogRequests.current.keys())controller.abort();},[]);
  useEffect(()=>{let live=true;setUsage(undefined);setCaps(undefined);setCapsError('');setCapsLoading(true);void(async()=>{try{const value=await api.capabilities();if(live){setCaps(value);setUsage(value.entitlements??undefined);}}catch(error){if(live&&error instanceof Error)setCapsError(error.message);}finally{if(live)setCapsLoading(false);}})();return()=>{live=false;};},[api]);
  useEffect(()=>{
@@ -401,6 +408,7 @@ export function App(){
    'app.import':()=>{if(current)return false;beginImport();},
  },{enabled:!searchOpen&&!login.open&&!feedbackOpen&&!exporting&&!importExpanded&&!shortcutScope&&!busy&&!readingBusy&&!drag});
  function closeShortcuts(){setShortcutScope(undefined);if(location.hash==='#settings/shortcuts')history.replaceState(null,'',location.pathname+location.search+'#settings');}
+ function closeResources(){setResourcesOpen(false);if(location.hash===resourceSettingsHash)history.replaceState(null,'',location.pathname+location.search+'#settings');}
  const rights=usage??caps?.entitlements;
  const readerBackLabel=view==='remote-library'?msg('返回远程书库'):view==='downloads'?msg('返回离线中心'):view==='discover'?msg('返回发现'):view==='search'?msg('返回搜索'):msg('返回我的漫画');
  const searchPanelProps={api,defaultLanguage:readSearchLanguage(settings.language),onLanguageChange:saveSearchLanguage,onLogin:()=>login.setOpen(true),existingSourceKeys:existingSearchKeys};
@@ -447,13 +455,13 @@ export function App(){
   <div id="nc-workspace" className="nc-workspace">
   {current?.document?<Suspense fallback={<div role="status">{msg('正在打开漫画')}</div>}><EpubReader progressStatus={progressStatus} key={`${current.id}:${current.contentId}:${navigationKey}`} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} backLabel={readerBackLabel}
     backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')}
-    viewKey={readingViewKey(current.comicId??current.id)} controlsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')}
+    viewKey={readingViewKey(current.comicId??current.id)} controlsBlocked={readerBlocked} onOpenShortcuts={()=>setShortcutScope('reader')} onManageResources={openResources}
     notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection} channelOptions={channel?.options} translationScope={channel?.scope.key}
     translationState={translation.stateFor} onRetry={(page,mode)=>translation.retry(current.id,page,mode)} onLogin={()=>login.setOpen(true)}
     onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});openPricing();}}/></Suspense>:current?<Reader
-    comments={readingComic&&readingSource==='website'?<ComicComments key={readingComic.id} comic={readingComic} chapter={current}/>:undefined}
+    onManageResources={openResources} comments={readingComic&&readingSource==='website'?<ComicComments key={readingComic.id} comic={readingComic} chapter={current}/>:undefined}
     onBookmarkNavigate={async location=>await openEntry(location.entryId,undefined,false,undefined,location)??false} progressStatus={progressStatus}
-    analyticsBlocked={login.open||!!shortcutScope} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={readerBackLabel} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onCheckUpdates={canCheckUpdates?()=>void catalogUpdates.check(current.comicId!):undefined} checkingUpdates={catalogUpdates.checkingId===current.comicId} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={entryId=>void reloadCurrent(entryId)} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});openPricing();}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection} channelOptions={channel?.options} translationScope={channel?.scope.key}/>:
+     analyticsBlocked={readerBlocked} onOpenShortcuts={()=>setShortcutScope('reader')} analyticsSession={readerAnalytics} analyticsSource={readingSource} analyticsChannel={channel?.analyticsCategory} backText={view==='remote-library'?msg('远程书库'):view==='downloads'?msg('离线中心'):view==='discover'?msg('发现'):view==='search'?msg('搜索'):msg('书架')} backLabel={readerBackLabel} key={`${current.comicId}:${navigationKey}`} viewKey={readingViewKey(current.comicId??current.id)} directory={directory} onCheckUpdates={canCheckUpdates?()=>void catalogUpdates.check(current.comicId!):undefined} checkingUpdates={catalogUpdates.checkingId===current.comicId} catalogLoading={!!current.comicId&&loadingCatalogs.includes(current.comicId)} onContinueCatalog={current.comicId?()=>void continueCatalog(current.comicId!):undefined} searchOpen={searchOpen} onFind={canFindAlternatives(current.sourceUrl)?()=>{const comic=library.comics.find(comic=>comic.id===current.comicId);if(comic)findComic(comic);}:undefined} onSourceLanguageChange={language=>{if(current.comicId)void setSourceLanguagePreference(current.comicId,language).catch(e=>setError(e.message));}} onReload={entryId=>void reloadCurrent(entryId)} sourceStatus={directory?.entries.find(e=>e.id===current.id)?.error} onMarkRead={markRead} sequence={copies} onActiveEntry={activateEntry} onLoadEntry={loadEntry} onNavigate={(id,pageId,rememberChoice)=>void openEntry(id,pageId,rememberChoice)} busy={!!busy||readingBusy} copy={current} settings={settings} setSettings={setSettings} update={updateEntry} onBack={leaveReader} onRetry={(page,mode,id)=>translation.retry(id??current.id,page,mode)} onUpgrade={()=>{track('upgrade_click',{surface:'reader',entry_point:'other'});openPricing();}} onLogin={()=>login.setOpen(true)} translationState={translation.stateFor} onImport={beginImport} notify={notify} onReadingWindow={translation.onReadingWindow} caps={channel?.capabilities} modelSelection={channel?.modelSelection} fontSelection={channel?.fontSelection} channelOptions={channel?.options} translationScope={channel?.scope.key}/>:
   view!=='search'&&view!=='discover'&&view!=='library'&&view!=='remote-library'?<main className="nc-main">
   {view==='downloads'&&<BookDownloads controller={downloads} onRead={id=>void openComic(id).catch(e=>setError(e.message))} onManageStorage={()=>nav('settings')}/>}
   {view==='sites'&&<ComicSites onImport={importWebsiteUrl} view={siteDirectoryView}/>}
@@ -477,6 +485,7 @@ export function App(){
   {workComic&&<CommentSidebar key={workComic.id} subject={workComic.title} onClose={()=>setWorkComicId(undefined)}><ComicComments comic={workComic}/></CommentSidebar>}
   {feedbackOpen&&<Modal title={msg('插件反馈')} subtitle={msg('使用中遇到问题或有建议？无需登录，欢迎告诉我们。')} onClose={()=>setFeedbackOpen(false)}><SupportRequestForm kind="plugin"/></Modal>}
   {shortcutScope&&<ShortcutPanel initialScope={shortcutScope} onClose={closeShortcuts}/>}
+  {resourcesOpen&&resourceManager&&<ChannelResourcesDialog manager={resourceManager} language={settings.language} onClose={closeResources}/>}
   <Login login={login}/><LocalImport reading={!!current} queue={localImport} expanded={importExpanded} onExpand={()=>setImportExpanded(true)} onCollapse={()=>setImportExpanded(false)} onOpen={id=>void openEntry(id)}/>
 
  </div>;

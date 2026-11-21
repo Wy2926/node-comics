@@ -287,6 +287,7 @@
   "登录服务返回的数据格式无效，请检查服务地址及版本。": "Dịch vụ đăng nhập trả về phản hồi không hợp lệ. Hãy kiểm tra địa chỉ và phiên bản dịch vụ.",
   "登录授权被拒绝，请确认账号有权访问后重新登录。": "Yêu cầu cấp quyền bị từ chối. Hãy kiểm tra quyền truy cập của tài khoản rồi đăng nhập lại.",
   "无法打开登录页，请检查网络和浏览器的网站访问权限。": "Không mở được trang đăng nhập. Hãy kiểm tra kết nối mạng và quyền truy cập trang web của trình duyệt.",
+  "请在已安装的浏览器插件中使用本机翻译。": "Hãy mở tiện ích trình duyệt đã cài đặt để dịch trên thiết bị này.",
   "身份服务未返回授权码。": "Dịch vụ nhận dạng không trả lại mã ủy quyền.",
   "登录来源未获身份服务允许，请管理员在 Logto 应用的 Allowed CORS origins 中登记当前网页或插件来源。": "Nguồn đăng nhập không được dịch vụ nhận dạng cho phép. Vui lòng cho phép quản trị viên đăng ký nguồn của trang web hiện tại hoặc plug-in trong Nguồn gốc CORS được phép của ứng dụng Logto.",
   "登录授权码已失效或校验失败，请重新登录。": "Mã ủy quyền đăng nhập đã hết hạn hoặc xác minh không thành công, vui lòng đăng nhập lại.",

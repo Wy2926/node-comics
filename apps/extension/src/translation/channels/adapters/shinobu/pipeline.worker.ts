@@ -6,6 +6,7 @@ import {Sha256} from '../../../../importers/hash';
 import type {ShinobuConfig} from './config';
 import type {TextRegion} from './text/protocol';
 import {localLanguage} from './languages';
+import {localFailureCode} from './failure-code';
 export interface PipelineStart {type:'run';source:Blob;config:ShinobuConfig;language:string;modelUrls:Record<string,string>;manifestUrl:string;fontUrl:string;fontWeight:number;fontCoverage:number[][];workerUrl:string;ortPath:string;}
 let pipeline:ImagePipeline|undefined;
 let runtime:ReturnType<typeof createBrowserModelRuntime>|undefined;
@@ -30,5 +31,5 @@ onmessage=({data}:{data:PipelineStart|{type:'text';result:Record<string,string>}
   if(data.type==='text'){respond?.(data.result);respond=undefined;rejectText=undefined;return;}
   if(data.type==='text-error'){rejectText?.(Error(data.code));respond=undefined;rejectText=undefined;return;}
   if(data.type==='stop'){rejectText?.(Error('INTERRUPTED'));void (async()=>{await pipeline?.dispose();await runtime?.dispose();postMessage({type:'disposed'});})();return;}
-  void run(data).catch(error=>postMessage({type:'error',code:(error instanceof Error&&/^(FONT_|ASSET_)[A-Z_]+$/.test(error.message)?error.message:'PIPELINE_FAILED')}));
+  void run(data).catch(error=>postMessage({type:'error',code:localFailureCode(error)}));
 };

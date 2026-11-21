@@ -220,17 +220,12 @@ export function installInline() {
       if (entry.signature === contentSignature) continue;
       entry.signature = contentSignature;
       const focused = badge.contains(shadow.activeElement);
+      const showDetail = !actionable || notice.detail !== notice.message, detailId = 'detail-' + item.id;
       badge.replaceChildren();
-      badge.removeAttribute('aria-description');
       if (actionable) {
         const b = document.createElement('button');
         b.type = 'button';
         b.textContent = notice.label;
-        const detail = document.createElement('span');
-        detail.className = 'sr-only';
-        detail.id = 'detail-' + item.id;
-        detail.textContent = notice.detail;
-        b.setAttribute('aria-describedby', detail.id);
         b.onclick = () => {
           if (state.kind === 'login' || state.kind === 'upgrade') {
             void send('NC_INLINE_OPEN', { view: 'account' });
@@ -250,13 +245,26 @@ export function installInline() {
           schedule(0);
           paint();
         };
-        badge.append(b, detail);
+        if (showDetail) b.setAttribute('aria-describedby', detailId);
+        badge.append(b);
         if (focused) b.focus({ preventScroll: true });
-      } else {
-        badge.textContent = notice.message;
-        badge.setAttribute('aria-description', notice.detail);
-        if (focused) badge.focus({ preventScroll: true });
       }
+      if (showDetail) {
+        const detail = document.createElement('span');
+        detail.id = detailId;
+        detail.textContent = notice.detail;
+        if (actionable || notice.resourceAction) detail.className = 'status-detail';
+        badge.append(detail);
+      }
+      if (notice.resourceAction) {
+        const manage = document.createElement('button');
+        manage.type = 'button';
+        manage.textContent = notice.resourceAction;
+        if (showDetail) manage.setAttribute('aria-describedby', detailId);
+        manage.onclick = () => {void send('NC_INLINE_OPEN', {view:'resources'});};
+        badge.append(manage);
+        if (focused && !actionable) manage.focus({preventScroll:true});
+      } else if (focused && !actionable) badge.focus({preventScroll:true});
     }
     for (const id of visibleBadges.keys()) if (!visible.has(id)) removeBadge(id);
   }

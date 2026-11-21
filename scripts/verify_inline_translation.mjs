@@ -405,6 +405,9 @@ try{
     await button('关闭');
   }
   if(selectedSite==='feedback') {
+    // The install-time reader also loads capabilities; count only this inline activation.
+    for(const tab of browser.pages())if(tab!==page)await tab.close();
+    const policyReads=()=>requests.filter(request=>request.path==='/v1/capabilities').length;
     const notice=async text=>(await cdp.send('Accessibility.getFullAXTree')).nodes.some(node=>node.role?.value==='StaticText'&&node.name?.value===text);
     const waitNotice=async(text,visible=true)=>{
       const until=Date.now()+10000;
@@ -432,15 +435,16 @@ try{
     assert.equal(translations.size,0);
     check('pause and original view hide preparation feedback; resuming restores it without bypassing pending preparation');
     policyGate=new Promise(resolve=>{releasePolicy=resolve;});
+    const initialPolicyReads=policyReads();
     finishPreparation();
     const policyUntil=Date.now()+10000;
-    while(!requests.some(request=>request.path==='/v1/capabilities')&&Date.now()<policyUntil)await page.waitForTimeout(25);
-    assert(requests.some(request=>request.path==='/v1/capabilities'),'policy refresh starts after source preparation');
+    while(policyReads()===initialPolicyReads&&Date.now()<policyUntil)await page.waitForTimeout(25);
+    assert(policyReads()>initialPolicyReads,'policy refresh starts after source preparation');
     await page.waitForTimeout(300);await waitNotice('准备翻译…');
     const states=await worker.evaluate(()=>fixtureStates);
     assert(states.length>0,'observed actual background state pushes');
     assert(states.every(state=>state.kind==='waiting'&&state.message==='准备翻译…'),JSON.stringify(states));
-    assert.equal(requests.filter(request=>request.path==='/v1/capabilities').length,1,'preparation shares one policy read');
+    assert.equal(policyReads()-initialPolicyReads,1,'preparation shares one policy read');
     assert.equal(translations.size,0);assert.deepEqual(await geometry(),before);
     await page.screenshot({path:path.join(out,'preparing-selected-model.png')});
     check('a saved explicit model stays in preparation after source reads while policy is delayed, with no quota, permission or error flash and no submitted jobs');
@@ -454,6 +458,7 @@ try{
     await page.locator('#second').scrollIntoViewIfNeeded();await page.waitForTimeout(200);
     assert.equal(await notice('准备翻译…'),false);
     await page.locator('#third').scrollIntoViewIfNeeded();await waitNotice('翻译失败 · 重试');
+    await waitNotice('示例翻译失败 (FIXTURE_FAILED)');
     await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await page.waitForTimeout(200);
     assert.equal(await notice('准备翻译…'),false);assert.equal(await notice('翻译失败 · 重试'),true);
     await page.screenshot({path:path.join(out,'preparation-replaced-by-error.png')});
@@ -472,6 +477,19 @@ try{
     await button('关闭');await waitNotice('准备翻译…',false);finishPreparation();
     await page.waitForTimeout(500);assert.equal(await notice('准备翻译…'),false);assert.equal(createdJobs,1);
     check('closing during preparation removes feedback and ignores the late response without submitting another job');
+    await worker.evaluate(async()=>{
+      const saved=(await chrome.storage.local.get('nc-reader-settings'))['nc-reader-settings'];
+      await chrome.storage.local.set({'nc-reader-settings':{...saved,language:'ja',uiLanguage:'zh-CN'},
+        'nc-translation-channels':{activeId:'shinobu',profiles:[{id:'shinobu',adapterId:'shinobu',name:'Local',revision:1,settings:{textServiceId:'google',textServices:'[]'}}]}});
+    });
+    await activate();await waitNotice('管理模型与字体');
+    const sourcePosition=await geometry(),opened=browser.waitForEvent('page');await button('管理模型与字体');
+    const settingsTab=await opened;await settingsTab.waitForURL(`chrome-extension://${extensionId}/reader.html#settings/resources`);
+    const manager=settingsTab.getByRole('dialog',{name:'模型与字体'});await manager.locator('.nc-resource-card').first().waitFor();
+    assert(await manager.getByRole('button',{name:'下载缺少的必需资源'}).isEnabled());
+    await manager.getByRole('button',{name:/^翻译字体/}).click();assert.equal(await manager.getByRole('combobox',{name:'字体语言'}).getAttribute('data-value'),'ja');
+    await settingsTab.close();await page.bringToFront();assert.deepEqual(await geometry(),sourcePosition);assert.equal(createdJobs,1);await button('关闭');
+    check('a missing local model opens the download manager directly from the website and keeps the source page in place');
   }
   if(selectedSite==='prefetch'){
     complete=false;await page.goto(site+'/rolling?long');await page.locator('#rolling-1').evaluate(i=>i.decode());await activate();

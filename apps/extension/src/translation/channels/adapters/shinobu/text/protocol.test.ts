@@ -4,6 +4,9 @@ import {parseConfig,needsInternet} from '../config';
 import {llmTranslate} from './openai-compatible';
 import {googleTranslate} from './google';
 import {anthropicRequest} from './anthropic';
+import {localFailureCode} from '../failure-code';
+import {errorMessage} from '../errors';
+import {translationNotice} from '../../../../notice';
 const config=parseConfig({provider:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'organization/a-long-model-name:Q4_K_M'});
 describe('Shinobu text boundary',()=>{
   it('supports basic Chat Completions with reasoning off and optional fields omitted',()=>{
@@ -59,10 +62,20 @@ describe('Shinobu text boundary',()=>{
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('reports Google network or access restrictions without replaying or asking for an LLM token',async()=>{
-    for(const outcome of [()=>Promise.reject(new TypeError('Failed to fetch')),()=>Promise.resolve(new Response(null,{status:403}))]){
+    for(const [outcome,code] of [[()=>Promise.reject(new TypeError('Failed to fetch')),'TEXT_GOOGLE_UNAVAILABLE'],[()=>Promise.resolve(new Response(null,{status:403})),'TEXT_GOOGLE_HTTP_403']] as const){
       const fetcher=vi.fn(outcome);
-      await expect(googleTranslate({a:'hello'},'zh-Hans',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_GOOGLE_UNAVAILABLE');
+      await expect(googleTranslate({a:'hello'},'zh-Hans',new AbortController().signal,fetcher)).rejects.toThrow(code);
       expect(fetcher).toHaveBeenCalledTimes(1);
     }
+  });
+  it('keeps the HTTP status through local error handling without echoing provider text',async()=>{
+    const fetcher=vi.fn(async()=>new Response('private OCR and token',{status:404}));
+    const code=await llmTranslate(config,{a:'hello'},'zh-Hans','private-token',new AbortController().signal,fetcher).then(()=>'',localFailureCode);
+    expect(translationNotice({kind:'error',message:errorMessage(code),code}).detail).toBe('请检查正文服务地址、模型与参数，然后保存设置。 (HTTP 404)');
+  });
+  it('carries the failed OCR stage but no worker diagnostics or private text',()=>{
+    const code=localFailureCode(Object.assign(Error('private OCR'),{failure:{stage:'ocr',diagnostics:'private text'}}));
+    expect(localFailureCode(Error(code))).toBe('PIPELINE_OCR');expect(errorMessage(code)).toContain('文字识别');
+    expect(localFailureCode(Error('PRIVATE_TOKEN'))).toBe('PIPELINE_FAILED');
   });
 });

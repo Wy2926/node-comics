@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {Sha256} from '../../importers/hash';
+import {openSourceDatabase} from '../database';
 import {assetLock,assetRecord,downloadAsset,readAsset,removeAsset,type LocalAsset} from './store';
 const held=new Set<string>();
 beforeEach(()=>{held.clear();vi.stubGlobal('navigator',{storage:{estimate:async()=>({quota:1,usage:0})},locks:{request:async(name:string,options:unknown,callback?:(value:unknown)=>Promise<unknown>)=>{
@@ -23,6 +24,22 @@ describe('streamed local asset storage',()=>{
     const bytes=new Uint8Array([1,2,3]),asset=descriptor(bytes);
     await expect(downloadAsset(asset,new AbortController().signal,()=>{},vi.fn().mockResolvedValue(new Response(new Uint8Array([4,5,6]))))).rejects.toThrow('ASSET_CORRUPT');
     expect(await assetRecord(asset)).toMatchObject({state:'error',offset:0});await expect(readAsset(asset)).rejects.toThrow('ASSET_MISSING');
+  });
+  it('makes a damaged installed resource downloadable again in one click',async()=>{
+    const bytes=new Uint8Array([8,4,2]),asset=descriptor(bytes),signal=new AbortController().signal;
+    const fetcher=vi.fn(async()=>new Response(bytes));
+    await downloadAsset(asset,signal,()=>{},fetcher);
+    const db=await openSourceDatabase('local-assets',{chunks:{keyPath:['id','offset']}},()=>{});
+    try{
+      await new Promise<void>((resolve,reject)=>{
+        const tx=db.transaction('chunks','readwrite');tx.objectStore('chunks').put({id:asset.sha256,offset:0,bytes:new Uint8Array([1,1,1])});
+        tx.oncomplete=()=>resolve();tx.onabort=tx.onerror=()=>reject(tx.error);
+      });
+    }finally{db.close();}
+    await expect(readAsset(asset)).rejects.toThrow('ASSET_CORRUPT');
+    expect(await assetRecord(asset)).toMatchObject({state:'error',error:'ASSET_CORRUPT'});
+    await downloadAsset(asset,signal,()=>{},fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(2);expect(new Uint8Array(await (await readAsset(asset)).arrayBuffer())).toEqual(bytes);
   });
   it('does not remove resources leased by an inference session',async()=>{
     const asset=descriptor(new Uint8Array([9]));held.add(assetLock(asset));await expect(removeAsset(asset)).rejects.toThrow('ASSET_BUSY');

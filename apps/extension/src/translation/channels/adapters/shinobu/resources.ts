@@ -8,7 +8,8 @@ import {translationFontName} from '../../../../../../../shared/translation-fonts
 import {fallbackLanguages} from '../../../../types';
 import {effectiveTranslationFont} from '../../../fonts';
 import {localLanguages,supportsLocalLanguage} from './languages';
-const resourceError=(code:string)=>code==='ASSET_BUSY'?msg('资源正在使用，请停止任务或稍后再试。'):code==='ASSET_STORAGE_FULL'?msg('空间不足'):code==='ASSET_CORRUPT'?msg('资源校验失败，请重新下载。'):msg('资源操作失败；请检查空间、网络或正在运行的任务。');
+import {errorMessage} from './errors';
+const resourceError=(code:string)=>code==='LOCAL_HOST_EXTENSION_REQUIRED'||code==='LOCAL_HOST_UNAVAILABLE'?errorMessage(code):code==='ASSET_BUSY'?msg('资源正在使用，请停止任务或稍后再试。'):code==='ASSET_STORAGE_FULL'?msg('空间不足'):code==='ASSET_CORRUPT'?msg('资源校验失败，请重新下载。'):msg('资源操作失败；请检查空间、网络或正在运行的任务。');
 const source='https://github.com/DonutShinobu/ShinobuTranslator/releases/download/models-v0.8.3/';
 const modelLicenses:Record<string,string>={detector:'GPL-3.0',inpaint:'GPL-3.0',bubble:'Apache-2.0 / AGPL-3.0','paddleocr-v6-medium':'Apache-2.0','paddleocr-v6-dictionary':'Apache-2.0'};
 export const modelAssets:LocalAsset[]=manifest.assets.map(asset=>({id:asset.id,label:asset.path,url:source+asset.path,bytes:asset.size,sha256:asset.sha256,

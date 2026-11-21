@@ -1,7 +1,8 @@
 import {msg,messageSource} from '../i18n/runtime';
+import {errorDetail} from '../error-detail';
 import type {TranslationState} from './automatic';
 
-/** In-image notices stay short; diagnostic details are available on hover. */
+/** Keep the action short and the cause separate so reading it never triggers a retry. */
 export function translationNotice(state:TranslationState){
   let message=state.message;
   if(state.kind==='error'){
@@ -15,5 +16,6 @@ export function translationNotice(state:TranslationState){
       :state.retryable===false?msg("暂不可用"):msg("翻译失败");
   }else if(state.kind==='login')message=messageSource(state.message).startsWith('登录已过期')?msg('重新登录'):msg("登录后翻译");
   const action=state.kind==='error'&&state.retryable!==false?(state.retryAction==='translate'?msg('重新翻译'):msg("重试")):state.kind==='upgrade'?msg("升级"):undefined;
-  return {message,action,label:action?`${message} · ${action}`:message,detail:state.message};
+  const resourceAction=state.kind==='error'&&state.manageResources?msg('管理模型与字体'):undefined;
+  return {message,action,resourceAction,label:action?`${message} · ${action}`:message,detail:errorDetail(state.message,state.code)};
 }

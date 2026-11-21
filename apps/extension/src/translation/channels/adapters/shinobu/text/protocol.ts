@@ -14,7 +14,7 @@ export function translationInput(regions:readonly TextRegion[]):RegionTexts{
   return input;
 }
 export async function boundedJson(response:Response){
-  if(!response.ok){await response.body?.cancel();throw new TextError(response.status===401||response.status===403?'TEXT_AUTH':response.status===429?'TEXT_RATE_LIMIT':'TEXT_HTTP');}
+  if(!response.ok){await response.body?.cancel();throw new TextError('TEXT_HTTP_'+response.status);}
   if(!response.body)throw new TextError('TEXT_OUTPUT_INVALID');
   const reader=response.body.getReader(),decoder=new TextDecoder();let text='',bytes=0;
   try{for(;;){const value=await reader.read();if(value.done)break;bytes+=value.value.length;if(bytes>1024*1024)throw new TextError('TEXT_OUTPUT_LIMIT');text+=decoder.decode(value.value,{stream:true});}text+=decoder.decode();return JSON.parse(text) as unknown;}

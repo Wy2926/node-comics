@@ -287,6 +287,7 @@
   "登录服务返回的数据格式无效，请检查服务地址及版本。": "Usługa logowania zwróciła nieprawidłową odpowiedź. Sprawdź jej adres i wersję.",
   "登录授权被拒绝，请确认账号有权访问后重新登录。": "Odmówiono autoryzacji. Sprawdź uprawnienia konta i zaloguj się ponownie.",
   "无法打开登录页，请检查网络和浏览器的网站访问权限。": "Nie można otworzyć strony logowania. Sprawdź połączenie oraz uprawnienia witryny w przeglądarce.",
+  "请在已安装的浏览器插件中使用本机翻译。": "Aby tłumaczyć na tym urządzeniu, otwórz zainstalowane rozszerzenie przeglądarki.",
   "身份服务未返回授权码。": "Usługa tożsamości nie zwróciła kodu autoryzacyjnego.",
   "登录来源未获身份服务允许，请管理员在 Logto 应用的 Allowed CORS origins 中登记当前网页或插件来源。": "Źródło logowania nie jest dozwolone przez usługę tożsamości. Zezwól administratorowi na zarejestrowanie źródła bieżącej strony internetowej lub wtyczki w obszarze Dozwolone źródła CORS aplikacji Logto.",
   "登录授权码已失效或校验失败，请重新登录。": "Kod autoryzacyjny do logowania wygasł lub weryfikacja nie powiodła się. Zaloguj się ponownie.",

@@ -41,9 +41,14 @@ async function verifyAsset(asset:LocalAsset,consume?:(bytes:Uint8Array<ArrayBuff
 }
 /** Caller holds a shared asset lease until all sessions and Blob URLs are released. */
 export async function readAsset(asset:LocalAsset):Promise<Blob>{
-  if((await assetRecord(asset))?.state!=='ready')throw Error('ASSET_MISSING');
+  const record=await assetRecord(asset);if(record?.state!=='ready')throw Error('ASSET_MISSING');
   const parts:BlobPart[]=[];
-  await verifyAsset(asset,bytes=>parts.push(new Blob([bytes])));
+  try{await verifyAsset(asset,bytes=>parts.push(new Blob([bytes])));}
+  catch(error){
+    if(error instanceof Error&&['ASSET_MISSING','ASSET_CORRUPT'].includes(error.message))
+      await save({...record,state:'error',error:'ASSET_CORRUPT',updatedAt:Date.now()});
+    throw error;
+  }
   return new Blob(parts);
 }
 export async function removeAsset(asset:LocalAsset){
@@ -72,6 +77,8 @@ export async function downloadAsset(asset:LocalAsset,signal:AbortSignal,changed:
     const notify=()=>{record.updatedAt=Date.now();changed();};
     if(record.state==='ready')return;
     try{
+      // Replace known-bad chunks under the download's exclusive lease.
+      if(record.error==='ASSET_CORRUPT'&&record.offset){await reset(asset);record.offset=0;}
       if(record.offset===asset.bytes){
         await verifyAsset(asset);record.state='ready';await save(record);notify();return;
       }

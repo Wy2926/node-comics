@@ -8,6 +8,7 @@ import { pageTranslation } from '../reader/presentation';
 import { safeImageUrl, readInlineSourceImage, ImagePermissionsRequired, isImageReferrerPolicy, inlineImageSize } from '../sources';
 import {MAX_COMIC_IMAGES} from '../sources/shared/geometry';
 import type {ReadingTarget} from '../translation/automatic';
+import {openTranslationPage} from '../translation/navigation';
 import {MAX_READING_TARGETS} from '../reading-window';
 import { matchesPage } from '../translation/sync';
 import { type Job, type Page, type Settings } from '../types';
@@ -465,7 +466,7 @@ export function registerInlineBackground(){
       if(message.type==='NC_INLINE_INVALIDATE'){
         const ctx=contexts.get(tabId);if(ctx){ctx.waiting?.abort();cancelSources(ctx,Array.isArray(message.keepIds)?message.keepIds.filter((id:unknown)=>typeof id==='string').slice(0,1500):[]);}return;
       }
-      if(message.type==='NC_INLINE_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
+      if(message.type==='NC_INLINE_OPEN'){await openTranslationPage(message.view);return;}
       // Use the current, activation-checked tab URL; sender.url can lag behind SPA navigation.
       const currentSender={...sender,tab};
       return step(message,currentSender,activity);

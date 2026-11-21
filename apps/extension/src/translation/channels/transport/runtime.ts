@@ -252,7 +252,7 @@ export class DirectImageRuntime implements ChannelRuntime {
     const displayed = pageTranslation(target.page, target.mode, this.options.language, this.scope.key);
     const record = this.records.get(this.id(target));
     if (record?.job.status === 'running') return {kind: 'translating', message: msg('翻译中')};
-    if (record?.job.status === 'failed') return {kind: 'error', message: record.job.error?.message ?? msg('翻译失败'), retryable: true, retryAction: 'translate'};
+    if (record?.job.status === 'failed') return {kind: 'error', message: record.job.error?.message || msg('翻译失败'), code: record.job.error?.code, retryable: true, retryAction: 'translate'};
     const failure = error || target.page.translationError || this.runtimeError;
     if (failure) return {kind: 'error', message: failure, retryable: true, retryAction: 'translate'};
     if (displayed.ready) return;

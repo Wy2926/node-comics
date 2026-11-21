@@ -287,6 +287,7 @@
   "登录服务返回的数据格式无效，请检查服务地址及版本。": "Le service de connexion a renvoyé une réponse invalide. Vérifiez son adresse et sa version.",
   "登录授权被拒绝，请确认账号有权访问后重新登录。": "L’autorisation a été refusée. Vérifiez que votre compte dispose des droits d’accès, puis reconnectez-vous.",
   "无法打开登录页，请检查网络和浏览器的网站访问权限。": "Impossible d’ouvrir la page de connexion. Vérifiez votre connexion et les autorisations du site dans le navigateur.",
+  "请在已安装的浏览器插件中使用本机翻译。": "Ouvrez l’extension installée dans votre navigateur pour traduire sur cet appareil.",
   "身份服务未返回授权码。": "Le service d'identité n'a pas renvoyé de code d'autorisation.",
   "登录来源未获身份服务允许，请管理员在 Logto 应用的 Allowed CORS origins 中登记当前网页或插件来源。": "La source de connexion n'est pas autorisée par le service d'identité. Veuillez autoriser l'administrateur à enregistrer la source de la page Web ou du plug-in actuel dans les origines CORS autorisées de l'application Logto.",
   "登录授权码已失效或校验失败，请重新登录。": "Le code d'autorisation de connexion a expiré ou la vérification a échoué, veuillez vous reconnecter.",

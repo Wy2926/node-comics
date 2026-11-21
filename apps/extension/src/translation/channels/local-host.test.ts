@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {registerLocalHostBackground} from './host-background';
 import {registerLocalHost} from './local-host';
-import {LOCAL_HOST_MESSAGE,LOCAL_HOST_PATH,localHostRequest} from './host-client';
+import {LOCAL_HOST_MESSAGE,LOCAL_HOST_PATH,localHostRequest,setBackgroundHostRequest} from './host-client';
 import type {ChannelLocalHost} from './contracts';
 
 const registry=vi.hoisted(()=>({start:vi.fn()}));
@@ -20,7 +20,7 @@ beforeEach(()=>{
   vi.stubGlobal('navigator',{locks:{request:(_name:string,run:()=>Promise<unknown>)=>{const next=pending.then(run,run);pending=next.catch(()=>{});return next;}}});
   vi.stubGlobal('chrome',{runtime:{id:'fixture',getURL:(path:string)=>extensionUrl+path,onMessage:{addListener:(listener:Listener)=>listeners.push(listener)},sendMessage}});
 });
-afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
+afterEach(()=>{setBackgroundHostRequest(undefined);vi.useRealTimers();vi.unstubAllGlobals();});
 
 function offscreen(){
   let contexts:chrome.runtime.ExtensionContext[]=[];
@@ -52,6 +52,20 @@ it('ignores host lifecycle requests from website content scripts',async()=>{
   const f=offscreen();expect(f.send('ensure',{...sender,url:'https://example.com',tab:{id:1} as chrome.tabs.Tab})).toBeUndefined();
   expect(f.createDocument).not.toHaveBeenCalled();
 });
+it('dispatches a background translation to the offscreen host without sending ensure to itself',async()=>{
+  const f=offscreen(),message={action:'start',id:'page'};
+  sendMessage.mockResolvedValue({ok:true,value:'started'});
+  await expect(localHostRequest('fixture',message)).resolves.toBe('started');
+  expect(f.createDocument).toHaveBeenCalledOnce();
+  expect(sendMessage).toHaveBeenCalledExactlyOnceWith({type:LOCAL_HOST_MESSAGE,action:'dispatch',adapterId:'fixture',message});
+});
+it('dispatches in the background document when that document is also the local host',async()=>{
+  vi.useFakeTimers();vi.stubGlobal('document',{});
+  const dispatch=vi.fn(async()=>'started'),message={action:'start',id:'page'};
+  registry.start.mockResolvedValue({dispatch,dispose:vi.fn()});registerLocalHostBackground();
+  await expect(localHostRequest('fixture',message)).resolves.toBe('started');
+  expect(dispatch).toHaveBeenCalledExactlyOnceWith(message);expect(sendMessage).not.toHaveBeenCalled();
+});
 it('does not replay dispatch when acknowledgement is lost',async()=>{
   sendMessage.mockResolvedValueOnce({ok:true}).mockRejectedValueOnce(Error('Lost acknowledgement'));
   await expect(localHostRequest('fixture',{action:'start',id:'page'})).rejects.toThrow('Lost acknowledgement');
@@ -78,6 +92,6 @@ it('keeps pending dispatch alive and rejects new work while disposing',async()=>
   await vi.advanceTimersByTimeAsync(120_000);expect(close).not.toHaveBeenCalled();
   accepted();await work;await vi.advanceTimersByTimeAsync(60_000);
   const reply=vi.fn();listeners[0]({type:LOCAL_HOST_MESSAGE,action:'ping'},sender,reply);expect(reply).toHaveBeenCalledWith({ready:false});
-  listeners[0]({type:LOCAL_HOST_MESSAGE,action:'dispatch',adapterId:'fixture'},sender,reply);expect(reply).toHaveBeenLastCalledWith({ok:false,error:'LOCAL_HOST_UNAVAILABLE'});
+  await expect(request(listeners[0],'dispatch',sender,{adapterId:'fixture'})).resolves.toEqual({ok:false,error:'LOCAL_HOST_UNAVAILABLE'});
   disposed();await vi.waitFor(()=>expect(close).toHaveBeenCalledOnce());
 });

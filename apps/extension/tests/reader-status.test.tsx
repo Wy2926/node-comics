@@ -123,11 +123,12 @@ describe('in-image retry status',()=>{
   const html=statusMarkup(page);
   expect(html).toContain('加载失败 · 重试');expect(html).not.toContain('点击重新生成');
  });
- it('keeps long diagnostic text out of the visible label',()=>{
+  it('shows the cause and code without hovering or activating the retry button',()=>{
   const detail='暂时连接不到服务。请检查网络连接，原图仍可继续阅读。';
   expect(translationNotice({kind:'error',message:detail})).toEqual({message:'连接失败',action:'重试',label:'连接失败 · 重试',detail});
-  const html=renderToStaticMarkup(<ImageTranslationStatus state={{kind:'error',message:detail}} onRetry={noop} onUpgrade={noop} onLogin={noop}/>);
-  expect(html).toContain(`title="${detail}"`);expect(html.replace(/<[^>]*>/g,'')).toBe('连接失败重试');
+   const html=renderToStaticMarkup(<ImageTranslationStatus state={{kind:'error',message:detail,code:'NETWORK_ERROR'}} onRetry={noop} onUpgrade={noop} onLogin={noop}/>);
+   expect(html.replace(/<[^>]*>/g,'')).toBe(`连接失败重试${detail} (NETWORK_ERROR)`);
+   expect(html).toContain('aria-describedby=');expect(html).toContain('aria-label="连接失败 · 重试"');
  });
  it('shows a connection failure instead of silently waiting on a local retry plan',()=>{
   const operation:LocalOperation={id:'retry',requestId:'retry',scope:'reader',entryId:'copy',pageId:'page',state:'local',createdAt:0,mode:'classic',language:'zh-Hans',image:{sha256:'a'.repeat(64),byte_size:1,content_type:'image/png'},request:{retry_of:'previous'}};

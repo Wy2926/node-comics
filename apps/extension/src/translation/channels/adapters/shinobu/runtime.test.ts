@@ -41,6 +41,34 @@ it('does not read images, create operations or dispatch automatic/manual work fo
   }
   expect(getBlob).not.toHaveBeenCalled();expect(onJobs).not.toHaveBeenCalled();expect(localHostRequest).not.toHaveBeenCalled();
 });
+it('offers resource management before admission, and alongside manual retry for a saved font failure',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[]}),request:async(_name:string,run:()=>unknown)=>run()}});
+  const getBlob=vi.fn(async()=>png());
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'ja',getBlob,onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'klee-one');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('page.png',900,1200),blobKey:'original'}};
+  try{
+    await runtime.submit([target]);
+    await vi.waitFor(()=>expect(runtime.stateFor(target,true)).toMatchObject({manageResources:true,retryable:false,code:'ASSET_MISSING'}));
+    expect(getBlob).not.toHaveBeenCalled();expect(localHostRequest).not.toHaveBeenCalled();
+    await runtime.manual(target);
+    const [record]=await entryOperations(target.entryId);
+    await saveOperation({...record,job:{...record.job,status:'failed',error:{code:'FONT_UNAVAILABLE',message:'font'}}});
+    await runtime.restore([target]);
+    expect(runtime.stateFor(target,true)).toMatchObject({manageResources:true,retryAction:'translate',code:'FONT_UNAVAILABLE'});
+  }finally{runtime.dispose();}
+});
+it('reports a definite host startup failure while leaving a lost acknowledgement for recovery',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[]}),request:async(_name:string,run:()=>unknown)=>run()}});
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob:async()=>png(),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
+  const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('test.png',900,1200),blobKey:'test'}};
+  try{
+    vi.mocked(localHostRequest).mockRejectedValueOnce(Error('LOCAL_HOST_UNAVAILABLE')).mockRejectedValueOnce(Error('Lost acknowledgement'));
+    await runtime.manual(target);
+    expect(runtime.stateFor(target,true)).toMatchObject({kind:'error',code:'LOCAL_HOST_UNAVAILABLE',message:'翻译执行页面无法打开，请重新尝试。'});
+    await runtime.manual(target);
+    expect(runtime.stateFor(target,true)?.kind).toBe('translating');expect(localHostRequest).toHaveBeenCalledTimes(2);
+  }finally{runtime.dispose();}
+});
 it('retries a failed text request after the previous automatic window was cancelled, without reopening the runtime',async()=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
   const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language:'zh-Hans',getBlob:async()=>png(),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');

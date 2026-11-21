@@ -160,6 +160,9 @@
   .nc-app .nc-reader .nc-source-action { top: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px)); }
   .nc-app .nc-reader .nc-empty { margin: auto 16px; padding-block: calc(var(--reader-mobile-header) + env(safe-area-inset-top, 0px)) calc(var(--reader-mobile-footer) + env(safe-area-inset-bottom, 0px)); }
   .nc-app .nc-reader .nc-image-translation-action { min-height: 44px; }
+  .nc-app .nc-reader.is-immersive:not(.controls-hidden) .nc-image-translation {
+    top: calc(var(--reader-mobile-header) + 10px);
+  }
   .nc-app .nc-reader .nc-image-translation-dismiss,
   .nc-app .nc-reader .nc-image-translation.is-collapsed,
   .nc-app .nc-reader .nc-image-failure.over-image > .nc-image-failure-dismiss,

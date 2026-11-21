@@ -11,6 +11,7 @@ import {safeImageUrl} from '../sources';
 import {openActiveChannel,subscribeChannels,type ChannelConnection,type ChannelRuntime} from '../translation/channels';
 import {prepareTranslationInput,type PreparedInput} from '../translation/input/prepare';
 import {matchesPage} from '../translation/sync';
+import {openTranslationPage} from '../translation/navigation';
 import {supportsLanguage,type Capabilities} from '../types';
 import {captureRegion} from './capture';
 import {sameViewport,validViewport} from './geometry';
@@ -282,7 +283,7 @@ export function registerRegionBackground() {
     void(async()=>{
       if(['NC_REGION_OPEN','NC_REGION_PAUSE','NC_REGION_CLOSE'].includes(message.type)){
         const {tabId}=await checked(sender,message,message.type==='NC_REGION_OPEN');
-        if(message.type==='NC_REGION_OPEN'){await chrome.tabs.create({url:chrome.runtime.getURL('/reader.html#'+(message.view==='settings'?'settings':'account'))});return;}
+        if(message.type==='NC_REGION_OPEN'){await openTranslationPage(message.view);return;}
         if(message.type==='NC_REGION_PAUSE'){const ctx=contexts.get(tabId);if(ctx&&ctx.record.id===message.selectionId)ctx.waiting?.abort();return;}
         await abandon(tabId,message.selectionId,message.generation);return;
       }

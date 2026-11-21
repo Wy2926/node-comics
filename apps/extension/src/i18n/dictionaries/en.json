@@ -317,6 +317,7 @@
   "登录服务返回的数据格式无效，请检查服务地址及版本。": "The sign-in service returned an invalid response. Check its address and version.",
   "登录授权被拒绝，请确认账号有权访问后重新登录。": "Authorization was denied. Check that your account has access, then sign in again.",
   "无法打开登录页，请检查网络和浏览器的网站访问权限。": "Could not open the sign-in page. Check your connection and the browser’s site permissions.",
+  "请在已安装的浏览器插件中使用本机翻译。": "Open the installed browser extension to translate on this device.",
   "身份服务未返回授权码。": "The identity service did not return an authorization code.",
   "登录来源未获身份服务允许，请管理员在 Logto 应用的 Allowed CORS origins 中登记当前网页或插件来源。": "The login source is not allowed by the identity service. Please allow the administrator to register the source of the current web page or plug-in in the Allowed CORS origins of the Logto application.",
   "登录授权码已失效或校验失败，请重新登录。": "The login authorization code has expired or failed verification, please log in again.",
