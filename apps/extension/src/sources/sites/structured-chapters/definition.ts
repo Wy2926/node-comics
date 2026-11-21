@@ -8,6 +8,7 @@ const shapes = [
   ['menu', /^(\/manga\/[\w-]+)(\/chapter-\d+(?:[.-]\d+)*)?$/, '#chapterlist > .row-content-chapter > li > a.chapter-name[href]', '.read-manga .read-content > .page-break > img'],
   ['numbered', /^(\/comic\/[\w-]+)(\/chapter-\d+)?\.html$/, '#list > ul[id^="mh-chapter-list-ol-"] > li > a[href]', '#currentCache .view-imgBox .img-wrap > img'],
   ['counted', /^(\/read-[a-z]+\/[\w-]+?)(-chapter-\d+(?:[.-]\w+)*-ch\d+)?$/, '#chapters #chapter-list > a[data-name][href]', '[data-reader][data-comic-url] > [data-pages] > img'],
+  ['kemono', /^(\/[a-z][\w-]{0,31}\/user\/[\w-]{1,128})(\/post\/[\w-]{1,128})?$/, '.user-header[data-service][data-id], .card-list__items .post-card[data-user]', '.post__files .post__thumbnail img, .post__content img[src*="/data/"]'],
 ] as const;
 
 export function matchLink(url: URL) {
@@ -17,6 +18,7 @@ export function matchLink(url: URL) {
   for (const [layout, pattern, catalog, reader] of shapes) {
     const route = pattern.exec(path);
     if (!route) continue;
+    if (layout==='kemono' && url.search && (route[2] || !/^\?o=\d+$/.test(url.search))) continue;
     const page = url.origin + path, work = url.origin + route[1] + (layout === 'numbered' ? '.html' : '');
     const location:SourceLocation = {sourceId:id, kind:route[2] ? 'reader' : 'catalog', url:page, pageKey:id + ':' + page, catalog:{url:work, key:id + ':' + work}};
     return {layout, location, selector:route[2] ? typeof reader === 'string' ? reader : reader(path) : catalog};

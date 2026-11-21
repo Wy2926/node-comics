@@ -5,6 +5,7 @@ import {chapterList} from './chapter-list';
 import {seriesList} from './series';
 import {documentList,validImageList} from './document-list';
 import {markup} from './catalog';
+import {creatorPosts, postPages} from './kemono';
 import {msg} from '../../../i18n/runtime';
 
 export const network: SourceNetwork = {
@@ -12,10 +13,12 @@ export const network: SourceNetwork = {
     const link=matchLink(new URL(url))!;
     if (link.layout==='series') return seriesList(link.location,ctx);
     if (link.layout==='list') return chapterList(link.location,ctx);
+    if (link.layout==='kemono') return creatorPosts(link.location,ctx);
     return documentList(link,ctx);
   },
   async pages(url, ctx) {
     const link=matchLink(new URL(url))!, doc=markup(await ctx.request(url,{redirect:'error'}));
+    if (link.layout==='kemono') return postPages(link.location,doc,ctx);
     const images = [...doc.querySelectorAll<HTMLImageElement>(link.selector)];
     const indexed=link.layout!=='series'&&link.layout!=='list';
     if (!images.length || images.length > 1500 || indexed&&!validImageList(link,doc,images))
