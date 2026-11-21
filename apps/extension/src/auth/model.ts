@@ -28,7 +28,8 @@ export class RefreshUnavailable extends ApiError {
   }
 }
 export function secureIdentityUrl(value:string){
-  const url=new URL(value);
+  let url:URL;
+  try{url=new URL(value);}catch{throw Error(msg('登录会话或服务地址无效。'));}
   if(url.username||url.password||url.protocol!=='https:'&&!(['127.0.0.1','localhost'].includes(url.hostname)&&url.protocol==='http:'))throw Error(msg("身份服务必须使用 HTTPS。"));
   return url;
 }

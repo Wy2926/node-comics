@@ -9,7 +9,7 @@ export async function requestSafariToken(endpoint: string, body: string): Promis
   try {
     const reply: unknown = await Promise.race([
       chrome.runtime.sendNativeMessage('net.nodelane.comics.safari.NodeLaneSafari', {type: 'oidc-token', endpoint, body}),
-      new Promise((_, reject) => {timer = setTimeout(() => reject(Error('Native token request timed out')), 25000);}),
+      new Promise((_, reject) => {timer = setTimeout(() => reject(new DOMException('', 'TimeoutError')), 25000);}),
     ]);
     if (!reply || typeof reply !== 'object' || !('status' in reply) || !('body' in reply) ||
         !Number.isInteger(reply.status) || (reply.status as number) < 200 || (reply.status as number) > 599 ||
@@ -17,7 +17,8 @@ export async function requestSafariToken(endpoint: string, body: string): Promis
       throw Error('Invalid native token response');
     const status = reply.status as number;
     return new Response([204, 205, 304].includes(status) ? null : reply.body, {status, headers: {'Content-Type': 'application/json'}});
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') throw error;
     // Never surface native diagnostics containing endpoint URLs or credentials.
     throw Error(msg('未收到登录结果，请重新登录。'));
   } finally {clearTimeout(timer);}

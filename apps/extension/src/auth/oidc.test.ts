@@ -161,18 +161,25 @@ describe('OIDC public-client boundaries', () => {
     request.mockResolvedValueOnce(Response.json({ access_token: TOKEN, token_type: 'Bearer', expires_in: 3600, refresh_token: 'test-refresh' }));
     request.mockResolvedValueOnce(Response.json({ error: { code: 'INVALID_TOKEN', message: 'Invalid token' } }, { status: 401 }));
     current = callback(pending);
-    await expect(finishOidc()).rejects.toThrow('Invalid token');
+    await expect(finishOidc()).rejects.toThrow('GET /v1/me · Invalid token (HTTP 401 · INVALID_TOKEN)');
     expect(entries.has(KEY)).toBe(false);
     expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it('does not exchange a callback reporting an authorization error', async () => {
+  it.each([['access_denied','登录授权被拒绝，请确认账号有权访问后重新登录。 (access_denied)'],
+    ['PRIVATE_SECRET','身份服务未完成登录，请重试。']])('explains %s without exposing callback details or exchanging a code', async (error,message) => {
     const pending = await begin();
     current = new URL(pending.redirect);
-    current.search = new URLSearchParams({ state: pending.state, error: 'access_denied' }).toString();
-    await expect(finishOidc()).rejects.toThrow('身份服务未完成登录');
+    current.search = new URLSearchParams({ state: pending.state, error, error_description:'private details'}).toString();
+    await expect(finishOidc()).rejects.toMatchObject({message});
     expect(entries.has(KEY)).toBe(false);
     expect(request).not.toHaveBeenCalled();
+  });
+  it('keeps the token exchange status and configuration error, not the private provider response',async()=>{
+    const pending=await begin();current=callback(pending);
+    request.mockResolvedValueOnce(Response.json({error:'invalid_client',error_description:'private-client-secret'},{status:401}));
+    await expect(finishOidc()).rejects.toMatchObject({message:'身份服务尚未配置完整，请稍后重试或联系运营方。 (HTTP 401 · invalid_client)'});
+    expect(request).toHaveBeenCalledOnce();
   });
 
   it('returns the API origin captured at login even if another tab changes service settings', async () => {

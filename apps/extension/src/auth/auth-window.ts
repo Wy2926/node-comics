@@ -1,6 +1,7 @@
 import {msg} from '../i18n/runtime';
 import {secureIdentityUrl} from './model';
 import {hostPermissionPattern} from '../host-permissions';
+import {errorDetail} from '../error-detail';
 
 /** Prefer browser-owned OAuth; browsers without identity use an owned tab. */
 export async function launchLoginWindow(url: string): Promise<string | undefined> {
@@ -36,6 +37,12 @@ export async function launchLoginWindow(url: string): Promise<string | undefined
   chrome.windows?.onCreated?.addListener(created);
   chrome.tabs?.onUpdated?.addListener(updated);
   try { return await chrome.identity.launchWebAuthFlow({url, interactive: true}); }
+  catch (error) {
+    if (error instanceof Error && /user did not approve|user (?:cancelled|canceled)|window (?:was )?closed/i.test(error.message))
+      throw Error(msg('登录窗口已关闭。'));
+    const code=error instanceof Error?error.message.match(/\bERR_(?:NAME_NOT_RESOLVED|CONNECTION_(?:REFUSED|TIMED_OUT|RESET)|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED|CERT_AUTHORITY_INVALID|BLOCKED_BY_CLIENT|INTERNET_DISCONNECTED)\b/)?.[0]:undefined;
+    throw Error(`${authorization.origin} · ${errorDetail(msg('无法打开登录页，请检查网络和浏览器的网站访问权限。'),code)}`);
+  }
   finally { cleanup(); }
 }
 

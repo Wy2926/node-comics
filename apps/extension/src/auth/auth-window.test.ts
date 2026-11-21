@@ -61,10 +61,16 @@ describe('browser-owned login popup', () => {
     f.get.mockImplementation(() => new Promise(resolve => {finish = resolve;}));
     const result = launchLoginWindow('https://identity.example/authorize?state=ours');
     f.created.emit({id: 3, type: 'popup'});
-    const rejected = expect(result).rejects.toThrow('closed'); f.reject(Error('closed')); await rejected;
+    const rejected = expect(result).rejects.toThrow('登录窗口已关闭'); f.reject(Error('The user did not approve access.')); await rejected;
     finish({tabs: [{windowId: 3, url: 'https://identity.example/login'} as chrome.tabs.Tab]});
     await Promise.resolve();
     expect(f.update).not.toHaveBeenCalled();
     expect(f.created.listeners.size + f.updated.listeners.size).toBe(0);
+  });
+  it('identifies the unreachable login page without echoing its authorization URL',async()=>{
+    const f=fixture(),url='https://identity.example/authorize?state=private-state';
+    const result=launchLoginWindow(url);
+    f.reject(Error(`net::ERR_PROXY_CONNECTION_FAILED: ${url}`));
+    await expect(result).rejects.toMatchObject({message:'https://identity.example · 无法打开登录页，请检查网络和浏览器的网站访问权限。 (ERR_PROXY_CONNECTION_FAILED)'});
   });
 });

@@ -15,7 +15,10 @@ export async function requestOidcToken(endpoint: string, body: URLSearchParams):
   const send = () => fetch(url.href, {
     method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer',
     signal: AbortSignal.timeout(15000), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body,
-  }).catch(()=>{throw new ApiError(msg('暂时连接不到登录服务，请检查网络后重试。'),'NETWORK_ERROR');});
+  }).catch(error=>{
+    if(error instanceof Error&&error.name==='TimeoutError')throw error;
+    throw new ApiError(msg('暂时连接不到登录服务，请检查网络后重试。'),'NETWORK_ERROR');
+  });
   const extensionUrl = typeof chrome !== 'undefined' ? chrome.runtime?.getURL?.('') : undefined;
   if (!extensionUrl?.startsWith('moz-extension://')) return send();
   if (!chrome.declarativeNetRequest?.updateSessionRules)

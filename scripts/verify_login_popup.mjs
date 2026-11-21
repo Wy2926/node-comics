@@ -95,7 +95,7 @@ try{
     if(action==='close')await reader.evaluate(id=>chrome.windows.remove(id),auth.id);
     else {const closed=popup.waitForEvent('close');await popup.getByRole('button',{name:action==='success'?'完成测试登录':'拒绝授权'}).click();await closed;}
     if(action==='success')await reader.getByText('隔离测试读者',{exact:true}).waitFor();
-    else await reader.getByRole('alert').filter({hasText:action==='close'?'登录窗口已关闭':'身份服务未完成登录'}).waitFor();
+    else await reader.getByRole('alert').filter({hasText:action==='close'?'登录窗口已关闭':'access_denied'}).waitFor();
     assert.equal(await reader.evaluate(()=>sessionStorage.getItem('nc-oidc-pending')),null);
     await reader.screenshot({path:path.join(run,'reader-'+action+'.png')});
     checks.push(action+': native identity popup is 600x760, adds no main-window tab and returns to the reader');

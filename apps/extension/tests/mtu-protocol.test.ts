@@ -48,7 +48,7 @@ it('rejects ambiguous service addresses and never shows server-provided credenti
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({success: false, message: 'PRIVATE_TOKEN PRIVATE_OCR'})));
   await expect(login('http://localhost/', 'user', 'password')).rejects.toThrow('用户名和密码');
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({detail: 'PRIVATE_TOKEN PRIVATE_OCR'}, {status: 403})));
-  await expect(login('http://localhost/', 'user', 'password')).rejects.toThrow(safeError('HTTP_403'));
+  await expect(login('http://localhost/', 'user', 'password')).rejects.toMatchObject({message:'POST auth/login · 登录授权被拒绝，请确认账号有权访问后重新登录。 (HTTP 403)'});
 });
 it('reports malformed successful login responses as protocol errors rather than credential failures', async () => {
   for (const result of [null, [], 'invalid', {}, {success: 'true', token: 'token'}, {success: true},
@@ -69,7 +69,11 @@ it('reports required initial password changes before checking the token, only af
 });
 it('reports login rate limiting without exposing server-provided details', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({detail: 'PRIVATE_TOKEN PRIVATE_OCR'}, {status: 429})));
-  await expect(login('http://localhost/', 'user', 'password')).rejects.toThrow(safeError('HTTP_429'));
+  await expect(login('http://localhost/', 'user', 'password')).rejects.toMatchObject({message:`POST auth/login · ${safeError('HTTP_429')} (HTTP 429)`});
+});
+it('keeps a cancelled connection attempt distinct from an unreachable service',async()=>{
+  const signal=AbortSignal.abort();vi.stubGlobal('fetch',vi.fn().mockRejectedValue(signal.reason));
+  await expect(login('http://localhost/', 'user', 'password',signal)).rejects.toBe(signal.reason);
 });
 it('opens an independent channel without any NodeLane login or rights', async () => {
   const connection = await definition.open({id: 'local', adapterId: definition.id, name: 'Local GPU', revision: 2, settings: {baseUrl: 'http://localhost:8000'}}, {token: 'fixture-token'}, () => true);

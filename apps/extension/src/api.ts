@@ -20,6 +20,13 @@ function retryDelay(body:unknown,header:string|null){
   const seconds=typeof body==='number'?body:header&&/^\d+(?:\.\d+)?$/.test(header)?Number(header):header?(Date.parse(header)-Date.now())/1000:NaN;
   return Number.isFinite(seconds)&&seconds>0?Math.ceil(seconds):undefined;
 }
+async function responseFailure(response:Response){
+  const raw=await response.json().catch(()=>null);
+  if(response.status===404&&raw?.detail==='Not Found')return new ApiError(msg("当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。"),'API_ROUTE_MISSING',404);
+  const error=raw?.error??raw?.detail??raw,message=typeof error==='string'?error:error?.message;
+  return new ApiError(typeof message==='string'&&message.trim()?message:msg("请求未完成（{0}）",{'0':response.status}),
+    typeof error?.code==='string'?error.code:'REQUEST_FAILED',response.status,error?.resets_at,retryDelay(error?.retry_after_seconds,response.headers.get('Retry-After')),error?.scope);
+}
 export class Api {
   private static snapshots=new Map<string,TranslationSnapshot>();
   private readonly controlPool = new RequestPool(2);
@@ -54,7 +61,7 @@ export class Api {
     assertCurrent(this.isCurrent);
     const headers=new Headers(init.headers);if(init.body&&!(init.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
     const response=await this.authorizedFetch(this.base+path,{...init,headers});
-    if (!response.ok) { const raw = await response.json().catch(() => ({})); if(response.status===404&&raw.detail==='Not Found')throw new ApiError(msg("当前 API 服务尚未包含此接口，请更新并重启 API 服务后重试。"),'API_ROUTE_MISSING',404); const error = raw.error ?? raw.detail ?? raw; throw new ApiError(typeof error === 'string' ? error : error.message ?? msg("请求未完成（{0}）", {"0": response.status}), error.code ?? 'REQUEST_FAILED', response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')),error.scope); }
+    if (!response.ok) throw await responseFailure(response);
     if (response.status === 204) return undefined as T;
     const result=await response.json();await this.assertAuthorized();return result;
   }
@@ -65,7 +72,7 @@ export class Api {
     if(previous&&(previous===value||Date.parse(previous.generated_at)>Date.parse(value.generated_at)))return previous;
     cacheValue(key,value);return value;
   }
-  authConfig() { return this.cached<AuthConfig>('/v1/auth/config'); }
+  authConfig(force=false) { return this.cached<AuthConfig>('/v1/auth/config',force); }
   login(username: string) { return this.request<{access_token: string; expires_in:number; user: User}>('/v1/auth/dev', { method: 'POST', body: JSON.stringify({username}) }); }
   async capabilities() {
     await this.assertAuthorized();
@@ -107,7 +114,7 @@ export class Api {
     const fetchSnapshot=async()=>{
       const response=await this.authorizedFetch(this.base+'/v1/translations?'+query,{signal,cache:'no-store',headers:options.etag?{'If-None-Match':options.etag}:{}});
       if(response.status===304)return {etag:response.headers.get('ETag')??options.etag,unchanged:true as const};
-      if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
+      if(!response.ok)throw await responseFailure(response);
       const batch=await response.json() as TranslationBatch;await this.assertAuthorized();for(const item of batch.items)this.remember(item);
       return {etag:response.headers.get('ETag')??undefined,unchanged:false as const,...batch};
     };
@@ -120,7 +127,7 @@ export class Api {
     try{
       response=await this.authorizedFetch(this.base+'/v1/translations/events?'+new URLSearchParams({ids:ids.join(',')}),{signal:deadline.signal,cache:'no-store',headers:{Accept:'text/event-stream'}});
       deadline.signal.throwIfAborted();
-      if(!response.ok){const raw=await response.json().catch(()=>({})),error=raw.error??raw.detail??{};throw new ApiError(error.message??msg('翻译服务暂不可用'),error.code??'REQUEST_FAILED',response.status,error.resets_at,retryDelay(error.retry_after_seconds,response.headers.get('Retry-After')));}
+      if(!response.ok)throw await responseFailure(response);
       if(!response.body||!response.headers.get('Content-Type')?.startsWith('text/event-stream')){await response.body?.cancel();throw new ApiError(msg('翻译服务暂不可用'),'INVALID_EVENT_STREAM');}
     }finally{deadline.clear();}
     let ended=false;

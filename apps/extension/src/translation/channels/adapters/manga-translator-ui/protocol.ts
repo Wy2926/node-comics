@@ -1,4 +1,5 @@
 import {msg} from '../../../../i18n/runtime';
+import {errorDetail} from '../../../../error-detail';
 import type {Mode} from '../../../../types';
 import {ImageTransferError, type ImageTransferRequest} from '../../../../image-transfer/types';
 
@@ -24,7 +25,7 @@ export function safeError(code: string): string {
   if (code === 'SOURCE_MISSING') return msg('本地原图尚未就绪，请重新采集。');
   if (code === 'SOURCE_CHANGED') return msg('原图内容已变化，请重新加载后翻译。');
   if (code === 'INVALID_IMAGE') return msg('翻译服务未返回可解码的图片。');
-  if (code === 'IMAGE_TOO_LARGE') return msg('图片超过翻译服务的大小限制。');
+  if (code === 'IMAGE_TOO_LARGE' || code === 'HTTP_413') return msg('图片超过翻译服务的大小限制。');
   if (code === 'RESULT_MISSING' || code === 'RESULT_NOT_CACHED') return msg('本地译图缓存已清理，请手动重新翻译。');
   if (code === 'HOST_UNAVAILABLE') return msg('翻译执行页面无法打开，请重新尝试。');
   if (code === 'INTERRUPTED') return msg('翻译连接已中断，服务可能仍在处理。确认后可手动重试。');
@@ -43,20 +44,30 @@ export function translationRequest(base: string, token: string, mode: Mode, lang
 
 export async function login(base: string, username: string, password: string, signal?: AbortSignal): Promise<string> {
   let response: Response;
+  const deadline=AbortSignal.timeout(20_000);
+  const interrupted=()=>{
+    signal?.throwIfAborted();
+    if(deadline.aborted)throw Error(msg('请求超时，请检查服务是否可访问后重试。'));
+  };
   try {
     response = await fetch(base + 'auth/login', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}),
       credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
+      signal: signal ? AbortSignal.any([signal,deadline]) : deadline,
     });
-  } catch {throw Error(msg('无法连接翻译服务，请检查地址、访问权限和服务状态。'));}
-  if (!response.ok) throw Error(safeError('HTTP_' + response.status));
+  } catch {interrupted();throw Error(msg('无法连接翻译服务，请检查地址、访问权限和服务状态。'));}
+  if (!response.ok) {
+    const status=response.status;
+    const message=status===401?msg('翻译服务登录失败，请检查用户名和密码。'):status===403?msg('登录授权被拒绝，请确认账号有权访问后重新登录。')
+      :status===400||status===422?msg('登录服务返回的数据格式无效，请检查服务地址及版本。'):safeError('HTTP_'+status);
+    throw Error(`POST auth/login · ${errorDetail(message,undefined,status)}`);
+  }
   let result: {success?: unknown; token?: unknown; must_change_password?: unknown};
   try {
     const text = await response.text();
     if (text.length > 65536) throw Error();
     result = JSON.parse(text);
-  } catch {throw Error(msg('翻译服务返回的登录响应无效。'));}
+  } catch {interrupted();throw Error(msg('翻译服务返回的登录响应无效。'));}
   if (!result || typeof result !== 'object' || Array.isArray(result) || typeof result.success !== 'boolean')
     throw Error(msg('翻译服务返回的登录响应无效。'));
   if (!result.success) throw Error(msg('翻译服务登录失败，请检查用户名和密码。'));

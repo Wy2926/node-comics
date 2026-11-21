@@ -5,6 +5,18 @@ import {entitlement} from './translation-fixture';
 const api=(base:string,session='account-a')=>new Api(base,'token',undefined,undefined,{cacheKey:session,current:async()=>{},token:async()=>'token',reject:async()=>{}});
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();vi.restoreAllMocks();});
 describe('session policy cache',()=>{
+  it('keeps HTTP failures diagnosable even if a gateway returns null or a batch uses detail',async()=>{
+    const a=api('https://invalid-response.example');
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(Response.json(null,{status:502})).mockResolvedValueOnce(Response.json({detail:{message:'Server busy',code:'CONTROL_LIMIT'}},{status:503,headers:{'Retry-After':'4'}})));
+    await expect(a.authConfig()).rejects.toMatchObject({status:502,code:'REQUEST_FAILED',message:'请求未完成（502）'});
+    await expect(a.translations(['page'])).rejects.toMatchObject({status:503,code:'CONTROL_LIMIT',message:'Server busy',retryAfterSeconds:4});
+  });
+  it('rereads an incomplete sign-in configuration on explicit reconnect',async()=>{
+    const a=api('https://login-config.example');
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(Response.json({mode:'oidc'})).mockResolvedValueOnce(Response.json({mode:'oidc',client_id:'repaired'})));
+    expect((await a.authConfig()).client_id).toBeUndefined();
+    expect((await a.authConfig(true)).client_id).toBe('repaired');
+  });
   it('merges concurrent readers and reuses capabilities entitlements across API instances',async()=>{
     const base='https://'+crypto.randomUUID()+'.example',rights=entitlement(),caps={result_protocol:'overlay-v1',modes:[{id:'classic',label:'Classic',enabled:true}],entitlements:rights};
     const fetch=vi.fn(async()=>Response.json(caps));vi.stubGlobal('fetch',fetch);

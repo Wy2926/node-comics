@@ -54,7 +54,7 @@ function LoginDialog({login}:{login:ReturnType<typeof useLogin>}){
               :unavailable?<div role="alert"><Icon name="info"/><div><strong>{msg("登录服务暂不可用")}</strong><p>{configError||msg("身份服务尚未配置完整，请稍后重试或联系运营方。")}</p></div></div>
               :<div><Icon name="shield"/><div><strong>{development?msg("开发环境 · 测试登录"):msg("你的下一页，已准备好")}</strong><p>{development?msg("此入口仅用于本地开发验证。"):msg("前往安全登录页面，完成后回到这里。")}</p></div></div>}
           </div>
-          {unavailable&&!pending?<button type="button" className="button primary full nc-login-submit nc-comic-action" onClick={()=>void reloadConfig()}>{msg("重新连接登录服务")}<Icon name="refresh" size={18}/></button>
+          {unavailable&&!pending?<button type="button" className="button primary full nc-login-submit nc-comic-action" onClick={()=>void reloadConfig(true)}>{msg("重新连接登录服务")}<Icon name="refresh" size={18}/></button>
             :<button type="submit" className="button primary full nc-login-submit nc-comic-action" disabled={pending||configLoading||!configured||development&&!username.trim()}>{pending?<><span className="spinner"/>{msg("等待登录完成")}</>:configLoading?msg("准备登录中…"):<>{state.kind==='error'?msg("重新登录"):development?msg("连接测试账户"):msg("登录，开启漫译")}<Icon name="arrow" size={18}/></>}</button>}
           <button type="button" className="button quiet full nc-login-later" onClick={()=>setOpen(false)}>{pending?msg("收起进度，继续阅读"):msg("先阅读原图")}</button>
         </form>

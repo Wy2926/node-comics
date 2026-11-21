@@ -1,10 +1,12 @@
 import {msg} from '../i18n/runtime';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Api,ApiError} from '../api';
+import {Api} from '../api';
 import {API_BASE,API_ORIGIN} from '../service';
+import {requireHostAccess} from '../host-permissions';
 import {finishOidc,isOidcCallback,startOidc,type AuthConfig} from './oidc';
 import {tokenLifetime,type Session} from './model';
 import {saveSession} from './storage';
+import {loginError} from './errors';
 
 export type LoginState={kind:'idle'}|{kind:'pending';message:string}|{kind:'error';message:string};
 
@@ -17,11 +19,15 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
   const [configError,setConfigError]=useState('');
   const pending=useRef(false),configPending=useRef(false),callbackStarted=useRef(false);
   const development=Boolean(config?.dev_auth);
-  const reloadConfig=useCallback(async()=>{
+  const reloadConfig=useCallback(async(force=false)=>{
     if(configPending.current)return;
     configPending.current=true;setConfigLoading(true);setConfigError('');
-    try{setConfig(await new Api(API_BASE).authConfig());}
-    catch(error){setConfig(undefined);setConfigError(error instanceof ApiError?loginError(error):msg('无法读取身份服务配置，请重试。'));}
+    if(force&&!pending.current)setState({kind:'idle'});
+    try{
+      await requireHostAccess([API_ORIGIN]);
+      setConfig(await new Api(API_BASE).authConfig(force));
+    }
+    catch(error){setConfig(undefined);setConfigError(`GET /v1/auth/config · ${loginError(error)}`);}
     finally{configPending.current=false;setConfigLoading(false);}
   },[]);
   useEffect(()=>{void reloadConfig();},[reloadConfig]);
@@ -49,7 +55,7 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
     try{
       let value:Session;
       if(development){
-        const issuedAt=Date.now(),result=await new Api(API_BASE).login(username.trim());
+        const issuedAt=Date.now(),result=await new Api(API_BASE).login(username.trim()).catch(error=>{throw Error(`POST /v1/auth/dev · ${loginError(error)}`);});
         value={id:crypto.randomUUID(),token:result.access_token,...tokenLifetime(result.expires_in,issuedAt),user:result.user,apiOrigin:API_ORIGIN,credential:{kind:'development'}};
       }else{
         if(!config)throw Error(msg("无法读取身份服务配置，请重试。"));
@@ -68,10 +74,4 @@ export function useLogin(currentId:string|undefined,restoreCopy:(id:string)=>voi
     finally{pending.current=false;}
   }
   return {open,setOpen,username,setUsername,state,config,configLoading,configError,development,reloadConfig,authenticate};
-}
-
-function loginError(error:unknown){
-  if(error instanceof ApiError&&error.code==='NETWORK_ERROR')return msg("暂时连接不到登录服务，请检查网络后重试。");
-  if(error instanceof TypeError||error instanceof SyntaxError)return msg('登录未完成，请重试。');
-  return error instanceof Error?error.message:msg("登录未完成，请重试。");
 }
