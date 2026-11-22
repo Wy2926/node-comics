@@ -47,7 +47,7 @@ describe('Shinobu text boundary',()=>{
     expect(await googleTranslate({a:'hello'},'zh-Hant',new AbortController().signal,fetcher)).toEqual({a:'你好'});
     expect(fetcher.mock.calls[0][0]).not.toContain('hello');expect(fetcher.mock.calls[0][1].body.get('q')).toBe('hello');expect(fetcher.mock.calls[0][1].body.get('tl')).toBe('zh-TW');
   });
-  it.each([['ja','Japanese'],['ko','Korean']])('translates to %s consistently across Google and both LLM protocols',async(language,name)=>{
+  it.each([['ja','Japanese'],['ko','Korean'],['en','English'],['es','Spanish']])('translates to %s consistently across Google and both LLM protocols',async(language,name)=>{
     const fetcher=vi.fn(async()=>new Response(JSON.stringify([[['translated','original']]])));
     await googleTranslate({a:'你好'},language,new AbortController().signal,fetcher);
     const request=fetcher.mock.calls[0] as unknown as [string,{body:URLSearchParams}];
@@ -57,8 +57,8 @@ describe('Shinobu text boundary',()=>{
   });
   it('never sends unsupported targets to a text service or substitutes Chinese',async()=>{
     const fetcher=vi.fn();
-    await expect(googleTranslate({a:'hello'},'en',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
-    await expect(llmTranslate(config,{a:'hello'},'en','',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
+    await expect(googleTranslate({a:'hello'},'fr',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
+    await expect(llmTranslate(config,{a:'hello'},'fr','',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_LANGUAGE_UNSUPPORTED');
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('reports Google network or access restrictions without replaying or asking for an LLM token',async()=>{

@@ -15,6 +15,7 @@ import {drawTypeset} from '../../../../../third_party/shinobu/packages/image-pip
 import {bitmapPng,type PngPatch} from '../../../../../../../shared/translation-images/png';
 import type {TextRegion as TextInput} from './text/protocol';
 import {pageBands,reconcileOverlap,textId,type DetectedBand} from './page-bands';
+import {drawLatinTypeset} from './latin-typeset';
 import type {LocalStage} from './failure-code';
 
 const ocrProvider='paddleocr_v6_medium';
@@ -107,19 +108,19 @@ export async function processPage(source:Blob,platform:PlatformProvider,runtime:
         region.translatedText=translated[region.id];
       }
       const input=canvas(rect);
+      let result=input;
       try{
         await drawBlob(input,clean);
-        const {canvas:result}=await drawTypeset(input,regions,language,undefined,platform);
-        try{
-          if(bands.length===1){stage('finalize');return await png(result);}
-          // Overlapping strips must only paint their changes; an unchanged margin could erase its neighbour's text.
-          const ctx=input.getContext('2d')!,out=result.getContext('2d')!;
-          ctx.globalCompositeOperation='copy';ctx.drawImage(base,rect.x,rect.y,rect.width,rect.height,0,0,rect.width,rect.height);
-          const orig=ctx.getImageData(0,0,rect.width,rect.height).data,delta=out.getImageData(0,0,rect.width,rect.height);
-          for(let i=0;i<orig.length;i+=4)delta.data[i+3]=orig[i]!==delta.data[i]||orig[i+1]!==delta.data[i+1]||orig[i+2]!==delta.data[i+2]?255:0;
-          out.putImageData(delta,0,0);patches.push({...rect,blob:await png(result)});
-        }finally{result.dispose?.();}
-      }finally{input.dispose?.();}
+        if(language==='en'||language==='es')drawLatinTypeset(input,regions);
+        else result=(await drawTypeset(input,regions,language,undefined,platform)).canvas;
+        if(bands.length===1){stage('finalize');return await png(result);}
+        // Snapshot the ink before reusing the input surface; overlap margins must not erase neighbouring dialogue.
+        const out=result.getContext('2d')!,delta=out.getImageData(0,0,rect.width,rect.height),ctx=input.getContext('2d')!;
+        ctx.globalCompositeOperation='copy';ctx.drawImage(base,rect.x,rect.y,rect.width,rect.height,0,0,rect.width,rect.height);
+        const orig=ctx.getImageData(0,0,rect.width,rect.height).data;
+        for(let i=0;i<orig.length;i+=4)delta.data[i+3]=orig[i]!==delta.data[i]||orig[i+1]!==delta.data[i+1]||orig[i+2]!==delta.data[i+2]?255:0;
+        out.putImageData(delta,0,0);patches.push({...rect,blob:await png(result)});
+      }finally{if(result!==input)result.dispose?.();input.dispose?.();}
     }
     stage('finalize');
     return await bitmapPng(base,patches);

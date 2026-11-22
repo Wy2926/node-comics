@@ -11,23 +11,25 @@ import {uiLanguages} from '../../../../i18n/locales';
 import {getDictionary,getLocale,installDictionary,type Dictionary} from '../../../../i18n/runtime';
 
 afterEach(()=>vi.restoreAllMocks());
-it('keeps the complete language list while exposing only four executable local targets',async()=>{
+it('keeps the complete language list while exposing the executable local targets and their fonts',async()=>{
   vi.spyOn(configuration,'readChannelSettings').mockResolvedValue({activeId:'local',profiles:[]});
   const connection=await definition.open({id:'local',adapterId:'shinobu',name:'Local',revision:1,settings:definition.defaultSettings!},{},()=>true);
   expect(connection.capabilities.languages).toEqual(fallbackLanguages);
+  const executable=['zh-Hans','zh-Hant','ja','ko','en','es'];
   for(const language of fallbackLanguages){
-    const supported=['zh-Hans','zh-Hant','ja','ko'].includes(language.id);
+    const supported=executable.includes(language.id);
     expect(supportsLanguage(connection.capabilities,'classic',language.id)).toBe(supported);
     const html=renderToStaticMarkup(<TargetLanguage value={language.id} caps={connection.capabilities} onChange={()=>{}}/>);
     expect(html).toContain(`>${language.label}</span>`);
-    expect(html.match(/nc-select-status/g)).toHaveLength(fallbackLanguages.length-4+(supported?0:1));
+    expect(html.match(/nc-select-status/g)).toHaveLength(fallbackLanguages.length-executable.length+(supported?0:1));
     expect(html.match(/role="option"/g)).toHaveLength(fallbackLanguages.length);
     // Pending options remain selectable; execution belongs to the adapter's admission policy.
     expect(html).not.toContain('aria-disabled="true"');
     const fonts=renderToStaticMarkup(<TranslationFontPicker language={language.id} selection={connection.fontSelection}/>);
     expect(!!fonts).toBe(supported);
   }
-  expect(localLanguage('ja').pipeline).toBe('ja');expect(localLanguage('ko').pipeline).toBe('ko');
+  for(const id of ['ja','ko','en','es'])expect(localLanguage(id).pipeline).toBe(id);
+  for(const id of ['en','es'])expect(connection.fontSelection!.value(id)).toBe('comic-relief');
   connection.dispose();
 });
 it('preserves a named current selection when switching from a broader channel',()=>{

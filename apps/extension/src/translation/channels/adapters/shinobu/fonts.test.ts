@@ -7,12 +7,12 @@ import coverage from '../../../font-coverage.json';
 import catalog from '../../../../../../../shared/translation-fonts.json';
 
 it('has full-font coverage for every advertised language and localized specimen',()=>{
-  expect(localFonts).toHaveLength(10);
+  expect(localFonts).toHaveLength(16);
   for(const font of localFonts){
     const ranges=(coverage as Record<string,number[][]>)[font.id];
     configureTypesetFont(font.id,400,ranges);
     for(const language of font.languages){
-      const text=catalog.samples[language as keyof typeof catalog.samples]+font.names[language];
+      const text=catalog.samples[language as keyof typeof catalog.samples]+font.names[language]+(language==='es'?'¿¡ÁÉÍÓÚÜÑáéíóúüñ!?':'');
       expect(supportedTypesetText(text),font.id+' · '+language).toBe(text);
     }
   }

@@ -4,6 +4,8 @@ const targets={
   'zh-Hant':{google:'zh-TW',pipeline:'zh-CHT',prompt:'Traditional Chinese'},
   ja:{google:'ja',pipeline:'ja',prompt:'Japanese'},
   ko:{google:'ko',pipeline:'ko',prompt:'Korean'},
+  en:{google:'en',pipeline:'en',prompt:'English'},
+  es:{google:'es',pipeline:'es',prompt:'Spanish'},
 } as const;
 export const localLanguages=Object.keys(targets);
 export const supportsLocalLanguage=(language:string)=>Object.hasOwn(targets,language);

@@ -19,7 +19,7 @@ def digest(path):
 def prepare(source):
     assets = json.loads((ROOT / 'shared/font-assets.json').read_text())['fonts']
     catalog = json.loads((ROOT / 'shared/translation-fonts.json').read_text())['fonts']
-    languages = {'zh-Hans', 'zh-Hant', 'ja', 'ko'}
+    languages = {'zh-Hans', 'zh-Hant', 'ja', 'ko', 'en', 'es'}
     ids = {font['id'] for font in catalog if languages.intersection(font['languages'])}
     resources, coverage = [], {}
     for asset in assets:

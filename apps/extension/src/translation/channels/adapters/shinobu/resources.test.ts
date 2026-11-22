@@ -13,8 +13,8 @@ describe('local font download capability',()=>{
     const manager=resourceManager({ja:'klee-one',ko:'gaegu'}),resources=await manager.read();
     const fonts=resources.filter(item=>item.category?.id==='fonts');
     expect(new Set(fonts.map(font=>font.id)).size).toBe(fonts.length);
-    expect(fonts[0].category?.languages?.filter(language=>language.supported).map(language=>language.id)).toEqual(['zh-Hans','zh-Hant','ja','ko']);
-    expect(fonts[0].category?.languages?.find(language=>language.id==='en')?.supported).toBe(false);
+    expect(fonts[0].category?.languages?.filter(language=>language.supported).map(language=>language.id)).toEqual(['zh-Hans','zh-Hant','en','ja','ko','es']);
+    expect(fonts.find(font=>font.id==='font:comic-relief')?.languages).toMatchObject({en:{selected:true},es:{selected:true}});
     expect(fonts.find(font=>font.id==='font:klee-one')?.languages).toEqual({ja:{label:'クレー ワン',selected:true}});
     expect(fonts.find(font=>font.id==='font:gaegu')?.languages).toEqual({ko:{label:'개구체',selected:true}});
     const shared=fonts.find(font=>font.id==='font:noto-sans-cjk')!;
@@ -24,7 +24,9 @@ describe('local font download capability',()=>{
     expect(localHostRequest).toHaveBeenCalledWith('shinobu',{action:'download',id:undefined,fontIds:['noto-sans-cjk','klee-one','gaegu']});
     await resourceManager({'zh-Hans':'lxgw-wenkai'}).act('download',undefined,'ko');
     expect(localHostRequest).toHaveBeenLastCalledWith('shinobu',{action:'download',id:undefined,fontIds:['lxgw-wenkai','noto-sans-cjk']});
-    expect((await resourceManager().read('en')).filter(item=>item.required).map(item=>item.id)).not.toContain('font:noto-sans-cjk');
+    expect((await resourceManager().read('en')).filter(item=>item.required&&item.id.startsWith('font:')).map(item=>item.id)).toEqual(['font:comic-relief']);
+    await resourceManager({en:'comic-relief'}).act('download',undefined,'es');
+    expect(localHostRequest).toHaveBeenLastCalledWith('shinobu',{action:'download',id:undefined,fontIds:['comic-relief']});
   });
   it('offers every model for download in ordinary builds',async()=>{
     const manager=resourceManager(),models=(await manager.read()).filter(item=>item.category?.id!=='fonts');

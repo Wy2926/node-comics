@@ -10,6 +10,7 @@ import {localHostRequest} from '../../host-client';
 import {getDictionary,getLocale,installDictionary} from '../../../../i18n/runtime';
 import french from '../../../../i18n/dictionaries/fr.json';
 import * as assets from '../../../../storage/local-assets/store';
+import {defaultTranslationFont} from '../../../../../../../shared/translation-fonts';
 vi.mock('../../host-client',()=>({localHostRequest:vi.fn(async()=>{})}));
 
 function png(width=900,height=1200){
@@ -18,9 +19,9 @@ function png(width=900,height=1200){
   return new Blob([header],{type:'image/png'});
 }
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();vi.clearAllMocks();});
-it.each(['zh-Hans','zh-Hant','ja','ko'])('admits %s without persisting the task token',async language=>{
+it.each(['zh-Hans','zh-Hant','ja','ko','en','es'])('admits %s without persisting the task token',async language=>{
   vi.stubGlobal('navigator',{locks:{query:async()=>({held:[],pending:[]}),request:async(_name:string,options:unknown,callback?:(lock:unknown)=>Promise<unknown>)=>typeof options==='function'?options():callback!({})}});
-  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob:async()=>png(1000,13000),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk','task-fixture-token');
+  const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob:async()=>png(1000,13000),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},parseConfig({}),defaultTranslationFont(language)!.id,'task-fixture-token');
   const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('long.png',1000,13000),blobKey:'fixture-long-image'}};
   await runtime.manual(target);
   const [record]=await entryOperations(target.entryId);
@@ -30,7 +31,7 @@ it.each(['zh-Hans','zh-Hant','ja','ko'])('admits %s without persisting the task 
 });
 it('does not read images, create operations or dispatch automatic/manual work for pending languages',async()=>{
   const getBlob=vi.fn(async()=>undefined),onJobs=vi.fn(async()=>{});
-  for(const language of ['en','fr','ar','unknown']){
+  for(const language of ['fr','ar','unknown']){
     const runtime=new ShinobuRuntime({key:crypto.randomUUID()},{language,getBlob,onJobs,onChange:()=>{},isCurrent:()=>true},parseConfig({}),'noto-sans-cjk');
     const target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('fixture.png',900,1200),blobKey:'must-not-read'}};
     await runtime.submit([target]);await runtime.refresh();
