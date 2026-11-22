@@ -4,10 +4,10 @@ import {version} from '../../../package.json';
 export const releaseNotes = {
   version,
   highlights: [
-    {icon: 'book', title: 'releaseNotes.epubImport.title', description: 'releaseNotes.epubImport.description'},
-    {icon: 'split', title: 'releaseNotes.doublePage.title', description: 'releaseNotes.doublePage.description'},
-    {icon: 'coin', title: 'releaseNotes.modelQuota.title', description: 'releaseNotes.modelQuota.description'},
-    {icon: 'globe', title: 'releaseNotes.siteSupport.title', description: 'releaseNotes.siteSupport.description'},
+    {icon: 'translate', title: 'releaseNotes.dialogue.title', description: 'releaseNotes.dialogue.description'},
+    {icon: 'image', title: 'releaseNotes.longPages.title', description: 'releaseNotes.longPages.description'},
+    {icon: 'globe', title: 'releaseNotes.linkReading.title', description: 'releaseNotes.linkReading.description'},
+    {icon: 'message', title: 'releaseNotes.reviews.title', description: 'releaseNotes.reviews.description'},
   ],
 } as const;
 

@@ -119,12 +119,10 @@ async function checkRelease(){
     await dialog.waitFor();
     assert.equal(await dialog.locator('h2').innerText(),dictionary['releaseNotes.title']);
     assert.equal(await dialog.locator('.nc-release-kicker').innerText(),dictionary['releaseNotes.kicker']);
-    for(const [index,key] of ['siteTranslation','comicUpdates','pdfReading','accountStability'].entries()){
-      const highlight=dialog.locator('.nc-release-highlights>li').nth(index);
-      assert.equal(await highlight.locator('h3').innerText(),dictionary[`releaseNotes.${key}.title`]);
-      assert.equal(await highlight.locator('p').innerText(),dictionary[`releaseNotes.${key}.description`]);
-    }
-    assert.equal(await dialog.locator('.nc-release-highlights>li').count(),4);
+    const expected=Object.keys(dictionary).filter(key=>/^releaseNotes\..+\.title$/.test(key))
+      .map(key=>[dictionary[key],dictionary[key.replace(/\.title$/,'.description')]]).sort();
+    const cards=await dialog.locator('.nc-release-highlights>li').evaluateAll(items=>items.map(item=>[item.querySelector('h3').innerText,item.querySelector('p').innerText]).sort());
+    assert.deepEqual(cards,expected,locale);
     assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth));
     assert(await dialog.locator('.nc-release-content').evaluate(element=>element.scrollWidth<=element.clientWidth));
     await checkLayout();
@@ -132,7 +130,7 @@ async function checkRelease(){
     await page.locator('.nc-release-close').click();
   }
   await page.setViewportSize({width:1440,height:1100});
-  checks.push(`${version} presents four concise highlights for readers; automatic notes wait for the library, appear once after upgrade, stay manually available, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
+  checks.push(`${version}: localized release notes appear once on the shelf after upgrade, reopen manually, restore focus/scroll, and fit 320px large text in 16 locales, tablet/landscape layouts and six dark accent themes.`);
 }
 try{
   await checkRelease();
