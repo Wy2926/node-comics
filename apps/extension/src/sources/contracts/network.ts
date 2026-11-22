@@ -9,6 +9,8 @@ export class SourceProtocolError extends Error {
 
 export interface SourceRequestOptions {
   referer?:string;
+  /** Single Accept media type for Fetch-based text requests. */
+  accept?:string;
   /** A redirected response would no longer prove ownership of this work or chapter. */
   redirect?:'error';
   acceptStatuses?:readonly number[];

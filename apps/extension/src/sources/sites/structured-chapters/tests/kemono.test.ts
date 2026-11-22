@@ -1,6 +1,7 @@
 import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {validateSourceCatalog} from '../../../index';
+import {createSourceNetworkContext} from '../../../runtime/http';
 import {definition} from '../definition';
 import {image} from '../image';
 import {network} from '../network';
@@ -11,6 +12,26 @@ const row = (id:number) => ({id:String(id),title:`Post ${id}`,service:'patreon',
 const profile = {id:'42',service:'patreon',name:'Artist'};
 beforeEach(() => vi.stubGlobal('document',parseHTML('<html></html>').document));
 afterEach(() => vi.unstubAllGlobals());
+
+it('negotiates JSON served as CSS on v1 requests without changing the post HTML request', async () => {
+  const base = host + '/api/v1' + path;
+  const payloads = new Map<string,unknown>([
+    [base+'/profile',profile], [base+'/posts',Array.from({length:50},(_,i)=>row(i+1))],
+    [base+'/posts?o=50',[]], [base+'/post/9',{post:row(9)}],
+  ]);
+  const fetcher = vi.fn(async (url:string, init:RequestInit) => {
+    const accept = new Headers(init.headers).get('Accept');
+    if (url === reader && accept === 'application/json, text/html') return new Response('<main id="app"></main>');
+    if (payloads.has(url) && accept === 'text/css')
+      return new Response(JSON.stringify(payloads.get(url)),{headers:{'Content-Type':'text/css; charset=utf-8'}});
+    return new Response(null,{status:403});
+  });
+  vi.stubGlobal('fetch',fetcher);
+  const ctx = createSourceNetworkContext();
+  expect((await network.catalog!(work,ctx)).entries).toHaveLength(50);
+  expect((await network.pages!(reader,ctx)).knownTotal).toBe(1);
+  expect(fetcher).toHaveBeenCalledTimes(5);
+});
 
 it('imports the v1 creator directory across origins, without fetching individual posts or images', async () => {
   for (const origin of [host,'https://second.example.test']) {

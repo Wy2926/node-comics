@@ -63,6 +63,8 @@ export async function authorizeSourceRequest(url: string, options: Parameters<So
   }
   if (options?.referer !== undefined && safeImageUrl(options.referer, options.referer) !== options.referer)
     throw new SourceHttpError('request-denied', '来源请求 Referer 地址无效。');
+  if (options?.accept !== undefined && (typeof options.accept !== 'string' || !/^[\w.+-]{1,64}\/[\w.+-]{1,64}$/.test(options.accept)))
+    throw new SourceHttpError('request-denied', '来源请求的媒体类型无效。');
   if (options?.json !== undefined) {
     if (options.form !== undefined) throw new SourceHttpError('request-denied', '来源请求不能同时包含表单和 JSON。');
     return encodeJson(options.json);
@@ -106,7 +108,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
       return bytes;
     };
     if(options?.safariTransport==='public-native'&&isSafariExtension()){
-      if(body!==undefined||binaryResponse)throw new SourceHttpError('request-denied','来源请求地址无效。');
+      if(body!==undefined||binaryResponse||options.accept!==undefined)throw new SourceHttpError('request-denied','来源请求地址无效。');
       // Public GET only. A redirect is returned as an HTTP error, never followed natively.
       return withSafariPublicResponse(url,options.referer?{referer:options.referer}:{},lifetime,consume,'text');
     }
@@ -116,7 +118,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
     return withImageHeaders(url, Object.keys(headers).length ? headers : undefined, lifetime, async () => {
       const binary = body instanceof Uint8Array;
       return consume(await fetch(url, {credentials: publicHeaders ? 'omit' : 'include', redirect:publicHeaders ? 'error' : options?.redirect,
-        referrerPolicy:publicHeaders ? 'no-referrer' : undefined, headers: {Accept: binaryResponse ? 'application/octet-stream' : 'application/json, text/html', ...publicHeaders,
+        referrerPolicy:publicHeaders ? 'no-referrer' : undefined, headers: {Accept: binaryResponse ? 'application/octet-stream' : options?.accept ?? 'application/json, text/html', ...publicHeaders,
         ...(options?.desktop&&isSafariExtension()?{'User-Agent':desktopAgent}:{}),
         ...(body === undefined ? {} : {'Content-Type': binary ? 'application/octet-stream' : options?.json !== undefined ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8'})}, signal: lifetime,
         ...(body === undefined ? {} : {method: 'POST', body})}));
@@ -124,7 +126,7 @@ export function createSourceNetworkContext(signal?: AbortSignal, replay: ImportR
   }
   return {signal, async request(url, options) {
     const body = await authorizeSourceRequest(url,options,signal);
-    const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer) : -1;
+    const cached = body === undefined ? replay.findIndex(response => response.url === url && response.referer === options?.referer && response.accept === options?.accept) : -1;
     if (cached >= 0) return replay.splice(cached, 1)[0].body;
     return new TextDecoder().decode(await read(url, options, body));
   }, async requestBytes(url, options) {

@@ -2,6 +2,7 @@ import type { PageRequestInput } from './page-document';
 export interface PageNetworkRequest extends PageRequestInput {
   url: string;
   referer?: string;
+  accept?: string;
   redirect?: 'error';
   body?: string;
   json?: boolean;
@@ -27,7 +28,7 @@ export async function requestInSourcePage(input: PageNetworkRequest): Promise<Pa
   try {
     const response = await fetch(input.url, {
       credentials: 'include', signal: controller.signal, redirect:input.redirect,
-      headers: { Accept: 'application/json, text/html', ...(input.body === undefined ? {} : { 'Content-Type': input.json ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8' }) },
+      headers: { Accept: input.accept ?? 'application/json, text/html', ...(input.body === undefined ? {} : { 'Content-Type': input.json ? 'application/json' : 'application/x-www-form-urlencoded;charset=UTF-8' }) },
       ...(input.body === undefined ? {} : { method: 'POST', body: input.body }),
       ...(input.referer ? { referrer: input.referer, referrerPolicy: 'unsafe-url' as ReferrerPolicy } : {})
     });

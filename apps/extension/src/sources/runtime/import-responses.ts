@@ -1,7 +1,7 @@
 import type {SourceLocation} from '../contracts/definition';
 import {hostPermissionPattern} from '../../host-permissions';
 
-export interface ImportResponse {url:string; referer?:string; body:string}
+export interface ImportResponse {url:string; referer?:string; accept?:string; body:string}
 interface Handoff {sourceId:string; pageKey:string; catalogKey:string; expiresAt:number; responses:ImportResponse[]}
 export const importResponseLimits={bytes:2*1024*1024,count:8} as const;
 const key='nc-import-responses', lifetime=30_000, budget=4*1024*1024;

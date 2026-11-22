@@ -46,6 +46,21 @@ it('defers chapter comments until opened, omits credentials and cancels before p
   expect(fetcher).toHaveBeenCalledOnce();
 });
 
+it('only replays a GET handoff for the requested media type', async () => {
+  fixture.networks.fixture = {resolveCatalog: async (_url, context) => {
+    await context.request(endpoint, {accept: 'application/json'});
+    return 'https://fixture.test/book';
+  }};
+  await resolveNetworkCatalog('https://fixture.test/unbound');
+  const replay = fixture.remember.mock.calls[0][2] as ImportResponse[];
+  fetcher.mockResolvedValueOnce(new Response('HTML response'));
+  const context = createSourceNetworkContext(undefined, replay);
+  expect(await context.request(endpoint)).toBe('HTML response');
+  expect(await context.request(endpoint, {accept: 'application/json'})).toBe('source response');
+  await expect(context.request(endpoint, {accept: 'text/css\r\nAnother: value'})).rejects.toMatchObject({kind: 'request-denied'});
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
 describe('bounded source JSON POST', () => {
   it('posts nested JSON with credentials and Referer, without consuming GET replay', async () => {
     const replay = [{url: endpoint, referer: source, body: 'GET replay'}], json = {query: '회차', variables: {offset: 8, ids: ['1']}};

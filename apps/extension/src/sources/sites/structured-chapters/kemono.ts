@@ -11,7 +11,8 @@ const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 function badPages(): never {throw Error(msg('来源图片清单不可用。'));}
 async function api(origin: string, path: string, ctx: SourceNetworkContext) {
   ctx.signal?.throwIfAborted();
-  const raw = await ctx.request(origin + '/api/v1' + path, {redirect:'error'});
+  // Some v1 instances explicitly serve their JSON representation as text/css.
+  const raw = await ctx.request(origin + '/api/v1' + path, {redirect:'error', accept:'text/css'});
   ctx.signal?.throwIfAborted();
   return catalogData(raw);
 }
