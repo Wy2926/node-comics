@@ -121,15 +121,19 @@ it('publishes only status changes and polls through the caller wait, without its
   for(let i=0;i<5;i++)await runtime.restore([target]);
   expect(onJobs).toHaveBeenCalledTimes(1);expect(onChange).toHaveBeenCalledTimes(1);expect(getBlob).toHaveBeenCalledTimes(1);
   const [record]=await entryOperations(target.entryId);
-  await saveOperation({...record,job:{...record.job,status:'running'}},true);
+  await saveOperation({...record,job:{...record.job,status:'running',phase:'detecting_ocr'}},true);
   await runtime.submit([target]);expect(runtime.hasPending).toBe(true);
+  expect(runtime.stateFor(target,true)?.message).toBe('识别漫画文字');
+  await saveOperation({...record,job:{...record.job,status:'running',phase:'translating_text'}});
+  await runtime.refresh();
+  expect(runtime.stateFor(target,true)?.message).toBe('翻译对白');
   vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
   await saveOperation({...record,job:{...record.job,status:'no_text',updated_at:new Date().toISOString()}});
   await vi.advanceTimersByTimeAsync(2000);
-  expect(runtime.hasPending).toBe(true);expect(onJobs).toHaveBeenCalledTimes(2);
+  expect(runtime.hasPending).toBe(true);expect(onJobs).toHaveBeenCalledTimes(3);
   const waiting=runtime.wait(new AbortController().signal);
   await vi.advanceTimersByTimeAsync(750);expect(await waiting).toBe(false);
-  expect(onJobs).toHaveBeenCalledTimes(3);expect(getBlob).toHaveBeenCalledTimes(1);
+  expect(onJobs).toHaveBeenCalledTimes(4);expect(getBlob).toHaveBeenCalledTimes(1);
   runtime.dispose();
 });
 it('restores a shared image binding before admission while the reader still holds another channel',async()=>{

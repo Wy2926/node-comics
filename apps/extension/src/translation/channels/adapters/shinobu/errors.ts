@@ -1,4 +1,9 @@
 import {msg} from '../../../../i18n/runtime';
+export function localStageLabel(stage:string){
+  return stage==='ocr'?msg('文字识别'):stage==='detect'?msg('文字位置检测'):stage==='preload'?msg('模型与字体'):stage==='load'?msg('准备原图')
+    :stage==='bubble'?msg('对话气泡识别'):stage==='ocr_postfilter'?msg('文字识别过滤'):stage==='merge'||stage==='order'?msg('整理文字顺序')
+    :stage==='inpaint'||stage==='mask_refine'?msg('原文清除与背景修复'):stage==='typeset'?msg('清理原文并排版'):stage==='finalize'?msg('生成译图'):undefined;
+}
 export function errorMessage(code:string):string{
   if(code==='ASSET_CORRUPT')return msg('资源校验失败，请重新下载。');
   if(code==='TEXT_STORAGE_FULL')return msg('空间不足');
@@ -19,8 +24,7 @@ export function errorMessage(code:string):string{
   if(code.startsWith('FONT_'))return msg('本地模型或字体尚未就绪，请在资源管理中下载或修复。');
   if(code==='SOURCE_MISSING'||code==='SOURCE_CHANGED')return msg('原图不可用，请恢复所属来源或本地原图缓存。');
   if(code==='RESULT_NOT_CACHED')return msg('本地译图缓存已清理，请手动重新翻译。');
-  const stage=code==='PIPELINE_OCR'?msg('文字识别'):code==='PIPELINE_DETECT'?msg('文字位置检测'):code==='PIPELINE_PRELOAD'?msg('模型与字体')
-    :code==='PIPELINE_BUBBLE'?msg('对话气泡识别'):code==='PIPELINE_INPAINT'?msg('原文清除与背景修复'):code==='PIPELINE_TYPESET'?msg('清理原文并排版'):undefined;
-  const message=msg('本机推理失败，请检查设备与模型资源后手动重试。');
+  const stage=localStageLabel(code.replace(/^PIPELINE_/,'').replace(/_TIMEOUT$/,'').toLowerCase());
+  const message=code.endsWith('_TIMEOUT')?msg('本机处理长时间无响应，请手动重试。'):msg('本机推理失败，请检查设备与模型资源后手动重试。');
   return stage?`${stage} · ${message}`:message;
 }

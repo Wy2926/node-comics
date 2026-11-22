@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Sắp xếp văn bản theo thứ tự đọc",
+  "生成译图": "Đang tạo ảnh đã dịch",
   "临时阅读本章": "Đọc chương mà không lưu",
   "默认并发": "Số tải đồng thời mặc định",
   "{0} 的缓存并发": "Số tải đồng thời của {0}",
@@ -1245,6 +1247,7 @@
   "平衡": "Cân bằng",
   "最大输出 Token": "Số token đầu ra tối đa",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Mô hình hoặc phông chữ cục bộ chưa sẵn sàng. Hãy tải xuống hoặc sửa trong trình quản lý tài nguyên.",
+  "本机处理长时间无响应，请手动重试。": "Quá trình xử lý trên thiết bị đã lâu không phản hồi. Vui lòng thử lại thủ công.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Suy luận cục bộ thất bại. Hãy kiểm tra thiết bị và tài nguyên mô hình rồi thử lại thủ công.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Nhận dạng và chèn chữ trên thiết bị; dịch văn bản bằng Google hoặc LLM tương thích. Cần tải mô hình thủ công.",
   "来源与许可": "Nguồn và giấy phép",

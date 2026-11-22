@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Mise en ordre du texte pour la lecture",
+  "生成译图": "Génération de l’image traduite",
   "临时阅读本章": "Lire le chapitre sans l’enregistrer",
   "默认并发": "Parallélisme par défaut",
   "{0} 的缓存并发": "Téléchargements simultanés pour {0}",
@@ -1245,6 +1247,7 @@
   "平衡": "Équilibré",
   "最大输出 Token": "Nombre maximal de jetons de sortie",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Un modèle ou une police locale n’est pas prêt. Téléchargez ou réparez les ressources dans le gestionnaire.",
+  "本机处理长时间无响应，请手动重试。": "Le traitement local ne répond plus. Réessayez manuellement.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Échec de l’inférence locale. Vérifiez l’appareil et les modèles, puis réessayez manuellement.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Reconnaissance et lettrage sur l’appareil ; traduction du texte via Google ou un LLM compatible. Les modèles se téléchargent manuellement.",
   "来源与许可": "Source et licence",

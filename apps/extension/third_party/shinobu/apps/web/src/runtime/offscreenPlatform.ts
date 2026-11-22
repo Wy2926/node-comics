@@ -4,9 +4,9 @@ import type {
   PipelineImageData,
   PipelineRenderingContext,
   PlatformProvider,
-} from '../../../../packages/image-pipeline/src/index';
+} from '../../../../packages/image-pipeline/src/runtime/platform';
 
-class BitmapPipelineImage implements PipelineImage {
+export class BitmapPipelineImage implements PipelineImage {
   readonly src: string;
   readonly naturalWidth: number;
   readonly naturalHeight: number;
@@ -172,32 +172,4 @@ export function createOffscreenPlatform(): PlatformProvider {
       // Android Chromium 的 Worker FontFaceSet.ready 可能永远不结束。
     },
   };
-}
-
-export async function createNormalizedWorkingFile(
-  source: File,
-  dimensions: { width: number; height: number },
-): Promise<File> {
-  const bitmap = await createImageBitmap(source, {
-    imageOrientation: 'from-image',
-  });
-  const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
-  try {
-    const context = canvas.getContext('2d', { alpha: false });
-    if (!context) throw new Error('当前 Worker 不支持 Canvas 2D');
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, dimensions.width, dimensions.height);
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    context.drawImage(bitmap, 0, 0, dimensions.width, dimensions.height);
-    const blob = await canvas.convertToBlob({ type: 'image/png' });
-    return new File([blob], `${source.name.replace(/\.[^.]+$/u, '') || 'source'}.png`, {
-      type: 'image/png',
-      lastModified: source.lastModified,
-    });
-  } finally {
-    bitmap.close();
-    canvas.width = 0;
-    canvas.height = 0;
-  }
 }

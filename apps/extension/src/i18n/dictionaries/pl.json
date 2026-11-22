@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Układanie tekstu w kolejności czytania",
+  "生成译图": "Tworzenie przetłumaczonego obrazu",
   "临时阅读本章": "Czytaj rozdział bez zapisywania",
   "默认并发": "Domyślna równoległość",
   "{0} 的缓存并发": "Równoległe pobieranie dla {0}",
@@ -1245,6 +1247,7 @@
   "平衡": "Zrównoważony",
   "最大输出 Token": "Maksymalna liczba tokenów wyjścia",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Lokalny model lub czcionka nie są gotowe. Pobierz lub napraw zasoby w menedżerze.",
+  "本机处理长时间无响应，请手动重试。": "Przetwarzanie lokalne nie odpowiada. Spróbuj ponownie ręcznie.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Lokalne uruchomienie modelu nie powiodło się. Sprawdź urządzenie i zasoby modeli, a następnie spróbuj ponownie ręcznie.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Rozpoznawanie i nanoszenie tekstu na urządzeniu; tłumaczenie przez Google lub zgodny LLM. Modele trzeba pobrać ręcznie.",
   "来源与许可": "Źródło i licencja",

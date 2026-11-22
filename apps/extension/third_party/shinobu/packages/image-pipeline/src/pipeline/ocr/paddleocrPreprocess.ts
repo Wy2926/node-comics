@@ -26,7 +26,7 @@ export function buildPaddleOcrInput(
   channelOrder: PaddleOcrChannelOrder = 'rgb',
 ): PaddleOcrInputData {
   // 使用 getTransformedRegion 处理透视变换和竖排旋转
-  const source = getTransformedRegion(image, region, direction, inputHeight, platform);
+  const source = getTransformedRegion(image, region, direction, inputHeight, platform, maxInputWidth);
   const srcWidth = Math.max(1, source.width);
   const srcHeight = Math.max(1, source.height);
 
@@ -35,11 +35,13 @@ export function buildPaddleOcrInput(
   const resizedWidth = Math.max(1, Math.min(maxInputWidth, Math.round(ratio * inputHeight)));
 
   const resizeCanvas = platform.createCanvas(resizedWidth, inputHeight);
-  const resizeCtx = resizeCanvas.getContext('2d')!;
+  const resizeCtx = resizeCanvas.getContext('2d', { willReadFrequently: true })!;
   resizeCtx.drawImage(source, 0, 0, srcWidth, srcHeight, 0, 0, resizedWidth, inputHeight);
 
   // 提取像素并归一化
   const imageData = resizeCtx.getImageData(0, 0, resizedWidth, inputHeight);
+  source.dispose?.();
+  resizeCanvas.dispose?.();
   const pixels = imageData.data;
   const pixelCount = resizedWidth * inputHeight;
 

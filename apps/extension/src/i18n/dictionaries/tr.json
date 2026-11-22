@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Metin okuma sırasına göre düzenleniyor",
+  "生成译图": "Çevrilmiş görsel oluşturuluyor",
   "临时阅读本章": "Bölümü kaydetmeden oku",
   "默认并发": "Varsayılan eşzamanlılık",
   "{0} 的缓存并发": "{0} için eşzamanlı indirme",
@@ -1245,6 +1247,7 @@
   "平衡": "Dengeli",
   "最大输出 Token": "En fazla çıktı tokenı",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Yerel model veya yazı tipi hazır değil. Kaynak yöneticisinden indirin veya onarın.",
+  "本机处理长时间无响应，请手动重试。": "Yerel işlem uzun süredir yanıt vermiyor. Lütfen elle yeniden deneyin.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Yerel çıkarım başarısız oldu. Cihazı ve model kaynaklarını kontrol edip elle yeniden deneyin.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Tanıma ve yazı yerleştirme cihazda, metin çevirisi Google veya uyumlu bir LLM ile yapılır. Modeller elle indirilmelidir.",
   "来源与许可": "Kaynak ve lisans",

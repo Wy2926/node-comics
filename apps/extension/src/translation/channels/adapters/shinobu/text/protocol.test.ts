@@ -68,14 +68,30 @@ describe('Shinobu text boundary',()=>{
       expect(fetcher).toHaveBeenCalledTimes(1);
     }
   });
+  it('ends a stalled Google response body without starting the next region or replaying the page',async()=>{
+    const deadline=new AbortController(),caller=new AbortController(),reading=Promise.withResolvers<void>();
+    const timeout=vi.spyOn(AbortSignal,'timeout').mockReturnValue(deadline.signal);
+    const fetcher=vi.fn<typeof fetch>(async(_url,options)=>new Response(new ReadableStream({
+      start(stream){const signal=options!.signal!;signal.addEventListener('abort',()=>stream.error(signal.reason),{once:true});},
+      pull(){reading.resolve();},
+    })));
+    try{
+      const result=googleTranslate({a:'hello',b:'world'},'zh-Hans',caller.signal,fetcher);
+      await reading.promise;
+      expect(timeout).toHaveBeenCalledWith(15_000);
+      deadline.abort(new DOMException('Timed out','TimeoutError'));
+      await expect(result).rejects.toThrow('TEXT_GOOGLE_UNAVAILABLE');
+      expect(fetcher).toHaveBeenCalledOnce();expect(caller.signal.aborted).toBe(false);
+    }finally{timeout.mockRestore();}
+  });
   it('keeps the HTTP status through local error handling without echoing provider text',async()=>{
     const fetcher=vi.fn(async()=>new Response('private OCR and token',{status:404}));
     const code=await llmTranslate(config,{a:'hello'},'zh-Hans','private-token',new AbortController().signal,fetcher).then(()=>'',localFailureCode);
     expect(translationNotice({kind:'error',message:errorMessage(code),code}).detail).toBe('请检查正文服务地址、模型与参数，然后保存设置。 (HTTP 404)');
   });
-  it('carries the failed OCR stage but no worker diagnostics or private text',()=>{
-    const code=localFailureCode(Object.assign(Error('private OCR'),{failure:{stage:'ocr',diagnostics:'private text'}}));
-    expect(localFailureCode(Error(code))).toBe('PIPELINE_OCR');expect(errorMessage(code)).toContain('文字识别');
+  it('accepts only owned error codes, never private exception details',()=>{
+    const code=localFailureCode(Error('PIPELINE_OCR_TIMEOUT'));
+    expect(code).toBe('PIPELINE_OCR_TIMEOUT');expect(errorMessage(code)).toContain('文字识别');
     expect(localFailureCode(Error('PRIVATE_TOKEN'))).toBe('PIPELINE_FAILED');
   });
 });

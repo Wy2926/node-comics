@@ -1,7 +1,7 @@
 import {hashFile,Sha256} from '../../../../importers/hash';
 import {PDF_RENDER_PROFILE,parsePageReference} from '../../../../comics/pages/identity';
 import {readImageTranslationBinding} from '../../../../comics/repositories/translation-bindings';
-import type {Job} from '../../../../types';
+import {phaseLabels,type Job} from '../../../../types';
 import {probeImageMetadata} from '../../../../comics/pages/image-metadata';
 import {pageTranslation} from '../../../../reader/presentation';
 import {translationCache} from '../../../../storage/translations';
@@ -14,7 +14,7 @@ import {assetRecord} from '../../../../storage/local-assets/store';
 import {modelAssets,resourceEvents} from './resources';
 import {ENGINE_REVISION,type ShinobuConfig} from './config';
 import {TEXT_PROTOCOL_REVISION} from './text/protocol';
-import {errorMessage} from './errors';
+import {errorMessage,localStageLabel} from './errors';
 import {knownLocalCode,localFailureCode} from './failure-code';
 import {supportsLocalLanguage} from './languages';
 import {executionLock,launchLock,operationLock} from './locks';
@@ -36,7 +36,7 @@ export class ShinobuRuntime implements ChannelRuntime{
   async init(){if(!this.resources){this.resources=new BroadcastChannel(resourceEvents);this.resources.onmessage=()=>{this.admissionError=undefined;void this.pump();};}}
   private async adopt(record:LocalOperation){
     const previous=this.records.get(record.id);this.records.set(record.id,record);
-    if(previous?.job.id===record.job.id&&previous.job.status===record.job.status&&previous.job.updated_at===record.job.updated_at&&previous.previousResult?.id===record.previousResult?.id)return;
+    if(previous?.job.id===record.job.id&&previous.job.status===record.job.status&&previous.job.phase===record.job.phase&&previous.job.updated_at===record.job.updated_at&&previous.previousResult?.id===record.previousResult?.id)return;
     if(this.current())await this.options.onJobs([...(record.previousResult?[record.previousResult]:[]),record.job]);this.changed();
   }
   private async recover(record:LocalOperation){
@@ -100,7 +100,7 @@ export class ShinobuRuntime implements ChannelRuntime{
       let lease:{blob:Blob;release:()=>void}|undefined;
       const now=new Date().toISOString();
       let record:LocalOperation={id,scope:this.scope.key,entryId:target.entryId,pageId:target.page.id,config:this.config,fontId:this.fontId,fingerprint,cacheToken:await translationCache.token(this.scope.key),previousResult:previous?.job.status==='succeeded'?previous.job:previous?.previousResult??this.delivered.get(id),
-        job:{id:crypto.randomUUID(),mode:target.mode,target_language:this.options.language,font_id:this.fontId,status:'running',phase:'detecting',created_at:now,updated_at:now,version:1,quota_pages:0,cache_hit:false}};
+        job:{id:crypto.randomUUID(),mode:target.mode,target_language:this.options.language,font_id:this.fontId,status:'running',phase:'preload',created_at:now,updated_at:now,version:1,quota_pages:0,cache_hit:false}};
       try{
         const reference=target.page.blobKey?parsePageReference(target.page.blobKey):undefined;
         if(reference)lease=await this.options.readOriginal?.(reference);
@@ -151,7 +151,7 @@ export class ShinobuRuntime implements ChannelRuntime{
   stateFor(target:ReadingTarget,active:boolean,error?:string):TranslationState|undefined{
     if(!supportsLocalLanguage(this.options.language))return active?{kind:'error',message:errorMessage('TEXT_LANGUAGE_UNSUPPORTED'),retryable:false}:undefined;
     const record=this.records.get(this.id(target)),displayed=pageTranslation(target.page,target.mode,this.options.language,this.scope.key);
-    if(record?.job.status==='running')return {kind:'translating',message:msgTranslate()};
+    if(record?.job.status==='running')return {kind:'translating',message:localStageLabel(record.job.phase)??phaseLabels[record.job.phase]??msgTranslate()};
     if(record?.job.status==='failed'){
       const code=knownLocalCode(record.job.error?.code);
       return {...localError(code),retryable:true,retryAction:'translate'};

@@ -1,7 +1,7 @@
 import type {ChannelField} from '../../contracts';
 import {msg} from '../../../../i18n/runtime';
 import {llmProviders,providerPreset,thinkingCapability,thinkingValues,type LlmProvider,type LlmProtocol,type Thinking,type ThinkingFormat} from './providers';
-export const ENGINE_REVISION='shinobu-c4239a2-node2';
+export const ENGINE_REVISION='shinobu-c4239a2-node3';
 export interface ShinobuConfig {provider:'google'|'llm';llmProvider:LlmProvider;protocol:LlmProtocol;thinking:Thinking;thinkingFormat:ThinkingFormat;baseUrl:string;model:string;maxTokens?:number;tokenField:'max_tokens'|'max_completion_tokens';responseFormat:'text'|'json_object'|'json_schema';temperature?:number;backend:'auto'|'cpu';ocrFilter:'balanced'|'off';}
 export function parseConfig(values:Record<string,string>):ShinobuConfig{
   const provider=values.provider||'google';

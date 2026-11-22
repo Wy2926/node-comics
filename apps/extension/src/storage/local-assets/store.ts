@@ -40,11 +40,12 @@ async function verifyAsset(asset:LocalAsset,consume?:(bytes:Uint8Array<ArrayBuff
   if(hash.digest()!==asset.sha256)throw Error('ASSET_CORRUPT');
 }
 /** Caller holds a shared asset lease until all sessions and Blob URLs are released. */
-export async function readAsset(asset:LocalAsset):Promise<Blob>{
+export async function readAsset(asset:LocalAsset,signal?:AbortSignal):Promise<Blob>{
   const record=await assetRecord(asset);if(record?.state!=='ready')throw Error('ASSET_MISSING');
   const parts:BlobPart[]=[];
-  try{await verifyAsset(asset,bytes=>parts.push(new Blob([bytes])));}
+  try{signal?.throwIfAborted();await verifyAsset(asset,bytes=>{signal?.throwIfAborted();parts.push(new Blob([bytes]));});}
   catch(error){
+    signal?.throwIfAborted();
     if(error instanceof Error&&['ASSET_MISSING','ASSET_CORRUPT'].includes(error.message))
       await save({...record,state:'error',error:'ASSET_CORRUPT',updatedAt:Date.now()});
     throw error;

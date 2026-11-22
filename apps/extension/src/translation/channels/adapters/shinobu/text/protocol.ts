@@ -1,7 +1,7 @@
 import type {ShinobuConfig} from '../config';
 import {thinkingParameters} from '../providers';
 import {localLanguage} from '../languages';
-export interface TextRegion {id:string;sourceText:string;translatedText:string;}
+export interface TextRegion {id:string;sourceText:string;}
 export type RegionTexts=Record<string,string>;
 export const TEXT_PROTOCOL_REVISION='regions-json-v4';
 export class TextError extends Error {constructor(readonly code:string){super(code);}}

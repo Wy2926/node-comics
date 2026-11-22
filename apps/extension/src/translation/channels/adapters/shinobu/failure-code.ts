@@ -1,6 +1,11 @@
-const stages=['load','preload','detect','bubble','ocr','merge','order','ocr_postfilter','llm_ocr_filter','translate','mask_refine','inpaint','parallel','typeset'];
+export const stageModels={load:null,preload:null,detect:'detector',bubble:'bubble',ocr:'paddleocr_v6_medium_rec',merge:null,
+  ocr_postfilter:'paddleocr_v6_medium_rec',order:null,mask_refine:null,inpaint:'inpaint',typeset:null,finalize:null} as const;
+export type LocalStage=keyof typeof stageModels;
+export type LocalModel=NonNullable<(typeof stageModels)[LocalStage]>;
+export const isLocalStage=(stage:unknown):stage is LocalStage=>typeof stage==='string'&&Object.hasOwn(stageModels,stage);
 const knownCodes=new Set([
-  ...stages.map(stage=>'PIPELINE_'+stage.toUpperCase()),
+  ...Object.keys(stageModels).flatMap(stage=>{const code='PIPELINE_'+stage.toUpperCase();return [code,code+'_TIMEOUT'];}),
+  'PIPELINE_LLM_OCR_FILTER','PIPELINE_TRANSLATE','PIPELINE_PARALLEL', // Older saved jobs.
   'TEXT_GOOGLE_UNAVAILABLE','TEXT_HTTP','TEXT_AUTH','TEXT_RATE_LIMIT','TEXT_CONFIG_INVALID','TEXT_CONFIG_CHANGED',
   'TEXT_LANGUAGE_UNSUPPORTED','TEXT_THINKING_INVALID','TEXT_THINKING_BUDGET','TEXT_THINKING_REQUIRED',
   'TEXT_INPUT_INVALID','TEXT_OUTPUT_INVALID','TEXT_OUTPUT_LIMIT','TEXT_CHECKPOINT_MISMATCH','TEXT_OUTCOME_UNKNOWN','TEXT_STORAGE_FULL',
@@ -14,7 +19,5 @@ export function knownLocalCode(code:unknown){
 /** Pipeline exceptions may carry OCR text or artifacts; only owned codes cross the worker/storage boundary. */
 export function localFailureCode(error:unknown){
   if(error instanceof Error&&error.name==='QuotaExceededError')return 'TEXT_STORAGE_FULL';
-  const stage=error&&typeof error==='object'&&'failure' in error?(error.failure as {stage?:unknown}|null)?.stage:undefined;
-  if(typeof stage==='string'&&stages.includes(stage))return 'PIPELINE_'+stage.toUpperCase();
   return knownLocalCode(error instanceof Error?error.message:undefined);
 }

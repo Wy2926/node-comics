@@ -19,6 +19,9 @@ describe('streamed local asset storage',()=>{
     await downloadAsset(asset,new AbortController().signal,()=>{},fetcher);
     expect(fetcher.mock.calls[0][1].headers).toEqual({Range:'bytes=1048576-','If-Range':'"one"'});
     expect((await assetRecord(asset))?.state).toBe('ready');expect(new Uint8Array(await (await readAsset(asset)).arrayBuffer())).toEqual(bytes);
+    const signal=AbortSignal.abort(new DOMException('Stopped','AbortError'));
+    await expect(readAsset(asset,signal)).rejects.toBe(signal.reason);
+    expect((await assetRecord(asset))?.state).toBe('ready');
   });
   it('rejects corrupt bytes and never publishes them as installed',async()=>{
     const bytes=new Uint8Array([1,2,3]),asset=descriptor(bytes);

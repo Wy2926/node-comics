@@ -438,6 +438,7 @@ export function getTransformedRegion(
   direction: Direction,
   textHeight: number,
   platform: PlatformProvider,
+  maxWidth = Infinity,
 ): PipelineCanvas {
   const quad = sortQuadPoints(getRegionQuad(region));
   const imW = image.naturalWidth;
@@ -450,7 +451,7 @@ export function getTransformedRegion(
   const cropH = Math.max(1, maxY - minY);
 
   const source = platform.createCanvas(cropW, cropH);
-  const sctx = source.getContext("2d");
+  const sctx = source.getContext("2d", { willReadFrequently: true });
   if (!sctx) {
     throw new Error("OCR 透视裁切阶段无法创建画布上下文");
   }
@@ -482,12 +483,15 @@ export function getTransformedRegion(
     outH = Math.max(2, Math.round(textHeight * ratio));
   }
 
-  const warped = warpPerspectiveRegion(source, localQuad, outW, outH, platform);
+  const warped = warpPerspectiveRegion(source, localQuad, Math.min(outW, maxWidth), Math.min(outH, maxWidth), platform);
   if (!warped) {
     return source;
   }
+  source.dispose?.();
   if (direction === "v") {
-    return rotate90CounterClockwise(warped, platform);
+    const rotated = rotate90CounterClockwise(warped, platform);
+    if (rotated !== warped) warped.dispose?.();
+    return rotated;
   }
   return warped;
 }

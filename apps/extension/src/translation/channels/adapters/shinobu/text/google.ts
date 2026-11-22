@@ -7,11 +7,17 @@ export async function googleTranslate(input:RegionTexts,language:string,signal:A
   for(const [id,text] of Object.entries(input)){
     if(!text.trim()){result[id]='';continue;}
     const body=new URLSearchParams({client:'gtx',sl:'auto',tl:target.google,dt:'t',q:text});
-    let response:Response;
-    try{response=await fetcher('https://translate.googleapis.com/translate_a/single',{method:'POST',body,signal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});}
-    catch{signal.throwIfAborted();throw new TextError('TEXT_GOOGLE_UNAVAILABLE');}
-    if(response.status===401||response.status===403){await response.body?.cancel();throw new TextError('TEXT_GOOGLE_HTTP_'+response.status);}
-    const json=await boundedJson(response);
+    const requestSignal=AbortSignal.any([signal,AbortSignal.timeout(15_000)]);
+    let json:unknown;
+    try{
+      const response=await fetcher('https://translate.googleapis.com/translate_a/single',{method:'POST',body,signal:requestSignal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});
+      if(response.status===401||response.status===403){await response.body?.cancel();throw new TextError('TEXT_GOOGLE_HTTP_'+response.status);}
+      json=await boundedJson(response);
+    }catch(error){
+      signal.throwIfAborted();
+      if(!requestSignal.aborted&&error instanceof TextError)throw error;
+      throw new TextError('TEXT_GOOGLE_UNAVAILABLE');
+    }
     if(!Array.isArray(json)||!Array.isArray(json[0])||!json[0].length)throw new TextError('TEXT_OUTPUT_INVALID');
     result[id]=json[0].map((part:unknown)=>{if(!Array.isArray(part)||typeof part[0]!=='string')throw new TextError('TEXT_OUTPUT_INVALID');return part[0];}).join('');
   }

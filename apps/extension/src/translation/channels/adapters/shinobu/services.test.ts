@@ -45,7 +45,7 @@ describe('browser local text providers',()=>{
       // A task already accepted under A keeps A's endpoint/token after switching or editing providers.
       await saved.selection.select(id===idA?idB:idA);
       await (await f.current()).selection.save(provider('Extra','http://192.168.1.8:1234/v1','other-token'));
-      await translateText(operation,[{id:'r0',sourceText:'test',translatedText:''}],new AbortController().signal,taskToken);
+      await translateText(operation,[{id:'r0',sourceText:'test'}],new AbortController().signal,taskToken);
       expect(fetcher).toHaveBeenLastCalledWith(url+'/chat/completions',expect.objectContaining({headers:expect.objectContaining({Authorization:'Bearer '+token})}));
     }
     expect(JSON.stringify(metadata)).not.toMatch(/secret-a|secret-b/);

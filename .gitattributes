@@ -8,3 +8,7 @@ apps/extension/public/licenses/flag-icons.txt text eol=lf
 # Preserve checksum-pinned upstream font notices verbatim, including whitespace.
 apps/extension/public/fonts/translation/*-OFL.txt -text -whitespace
 apps/extension/public/fonts/translation/*-LICENSE -text -whitespace
+# Keep the vendored notice and manifest bytes consistent with their recorded SHA-256.
+apps/extension/third_party/shinobu/LICENSE text eol=lf
+apps/extension/third_party/shinobu/THIRD_PARTY_NOTICES.md text eol=lf
+apps/extension/third_party/shinobu/**/*.json text eol=lf

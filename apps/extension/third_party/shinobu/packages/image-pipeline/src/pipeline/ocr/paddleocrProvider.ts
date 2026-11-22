@@ -670,9 +670,10 @@ function createPaddleOcrProvider(name: string, modelName: PaddleOcrModelName): O
             groups.set(bucketWidth, [item]);
           }
         }
-        debugInfo.chunkBatchSize = Math.max(1, ...Array.from(groups.values(), (group) => group.length));
+        const maxBatch = 4; // Bound logits and activation memory even when all lines share one width.
+        debugInfo.chunkBatchSize = Math.min(maxBatch, Math.max(1, ...Array.from(groups.values(), (group) => group.length)));
         for (const [bucketWidth, group] of groups) {
-          await runPreparedGroup(group, bucketWidth, true);
+          for (let i = 0; i < group.length; i += maxBatch) await runPreparedGroup(group.slice(i, i + maxBatch), bucketWidth, true);
         }
       } else {
         warmedPaddleSessionIds.add(sessionHandle.sessionId);

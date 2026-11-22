@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Arranging text in reading order",
+  "生成译图": "Generating translated image",
   "临时阅读本章": "Read chapter without saving",
   "默认并发": "Default concurrency",
   "{0} 的缓存并发": "Cache concurrency for {0}",
@@ -1245,6 +1247,7 @@
   "平衡": "Balanced",
   "最大输出 Token": "Maximum output tokens",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Local models or fonts are not ready. Download or repair them in resource management.",
+  "本机处理长时间无响应，请手动重试。": "Local processing stopped responding. Please retry manually.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Local inference failed. Check the device and model resources, then retry manually.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Recognize and render locally; translate text with Google or a compatible LLM. Download models manually.",
   "来源与许可": "Source and license",

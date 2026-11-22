@@ -1,6 +1,5 @@
 import type { RuntimeProvider, WebNnDeviceType } from "./onnxTypes";
 import type { OnnxSessionOptions } from "./onnxSessionOptions";
-import type { RuntimeSelfCheckReport } from "./selfCheck";
 
 // ---------------------------------------------------------------------------
 // Tensor transport — plain-data representation of ort.Tensor for comlink boundary.
@@ -48,26 +47,6 @@ export type GpuDetectResult = {
   unpaddedHeight: number;
 };
 
-export type PaddleGraphCaptureProbeOptions = {
-  modelUrl: string;
-  inputWidth?: number;
-  batchSize?: number;
-  classCount?: number;
-  runs?: number;
-};
-
-export type PaddleGraphCaptureProbeResult = {
-  ok: boolean;
-  modelUrl: string;
-  inputDims: number[];
-  outputDims: number[];
-  inputBytes: number;
-  outputBytes: number;
-  createSessionMs?: number;
-  runMs: number[];
-  error?: string;
-};
-
 // ---------------------------------------------------------------------------
 // Worker API — the comlink-exposed interface
 // ---------------------------------------------------------------------------
@@ -84,10 +63,6 @@ export interface OnnxWorkerApi {
     sessionId: string,
     feeds: Record<string, TensorTransport>
   ): Promise<InferenceResult>;
-  probeRuntime(modelUrl: string): Promise<RuntimeSelfCheckReport>;
-  probePaddleGraphCapture(
-    options: PaddleGraphCaptureProbeOptions
-  ): Promise<PaddleGraphCaptureProbeResult>;
   runDetectWithGpuPreprocess(
     sessionId: string,
     imageSource: ImageBitmap

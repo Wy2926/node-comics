@@ -16,7 +16,7 @@ import {
   runInference,
   type WorkerBootstrapPolicy,
 } from './runtime/onnxWorkerBridge';
-import type { DiagnosticLogObserver } from '../../diagnostics/src/index';
+import type { DiagnosticLogObserver } from '../../diagnostics/src/diagnosticLog';
 import type { ModelRuntimePerformanceObserver } from './contracts';
 import { configureModelRuntimePerformanceObserver } from './runtime/performanceObserver';
 

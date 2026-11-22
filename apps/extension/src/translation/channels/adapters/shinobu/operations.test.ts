@@ -8,7 +8,7 @@ beforeEach(()=>vi.restoreAllMocks());
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 describe('private local receipts',()=>{
   it('sends a whole page once and reuses its text after a render failure',async()=>{
-    const record=operation(),input=Array.from({length:300},(_,i)=>({id:'r'+i,sourceText:i?'こんにちは':'文'.repeat(8001),translatedText:''}));
+    const record=operation(),input=Array.from({length:300},(_,i)=>({id:'r'+i,sourceText:i?'こんにちは':'文'.repeat(8001)}));
     const result=Object.fromEntries(input.map(region=>[region.id,'你好']));
     const fetcher=vi.fn(async(_url:string,_options:RequestInit)=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(result)}}]})));vi.stubGlobal('fetch',fetcher);
     expect(await translateText(record,input,new AbortController().signal,'fixture-token')).toEqual(result);
@@ -24,7 +24,7 @@ describe('private local receipts',()=>{
     const controller=new AbortController(),fetcher=vi.fn((_url:string,options:RequestInit)=>new Promise<Response>((_resolve,reject)=>{
       options.signal!.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true});started();
     }));vi.stubGlobal('fetch',fetcher);
-    const task=translateText(operation(),[{id:'r0',sourceText:'test',translatedText:''}],controller.signal,'fixture-token');
+    const task=translateText(operation(),[{id:'r0',sourceText:'test'}],controller.signal,'fixture-token');
     await ready;await vi.advanceTimersByTimeAsync(180_000);
     expect(fetcher.mock.calls[0][1].signal?.aborted).toBe(false);
     const stopped=expect(task).rejects.toThrow('Aborted');controller.abort();await stopped;
@@ -32,7 +32,7 @@ describe('private local receipts',()=>{
   });
   it('does not replay an unknown paid request on refresh',async()=>{
     const record=operation(),fetcher=vi.fn().mockRejectedValue(Error('Connection lost'));vi.stubGlobal('fetch',fetcher);
-    const input=[{id:'r0',sourceText:'こんにちは',translatedText:''}];
+    const input=[{id:'r0',sourceText:'こんにちは'}];
     await expect(translateText(record,input,new AbortController().signal,'fixture-token')).rejects.toThrow();
     await expect(translateText(record,input,new AbortController().signal,'fixture-token')).rejects.toThrow('TEXT_OUTCOME_UNKNOWN');
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -40,7 +40,7 @@ describe('private local receipts',()=>{
   it('rejects changed OCR input instead of assigning cached text by a new region order',async()=>{
     const record=operation();await saveCheckpoint({id:record.job.id,entryId:record.entryId,fingerprint:record.fingerprint,input:{r0:'before'},state:'succeeded',result:{r0:'之前'},updatedAt:Date.now(),bytes:0});
     const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
-    await expect(translateText(record,[{id:'r0',sourceText:'after',translatedText:''}],new AbortController().signal,'fixture-token')).rejects.toThrow('TEXT_CHECKPOINT_MISMATCH');expect(fetcher).not.toHaveBeenCalled();
+    await expect(translateText(record,[{id:'r0',sourceText:'after'}],new AbortController().signal,'fixture-token')).rejects.toThrow('TEXT_CHECKPOINT_MISMATCH');expect(fetcher).not.toHaveBeenCalled();
   });
   it('fences late attempts and deleted entries in the same storage transaction',async()=>{
     const original=operation();await saveOperation(original,true);

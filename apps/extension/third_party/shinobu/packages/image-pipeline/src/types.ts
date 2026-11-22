@@ -1,30 +1,7 @@
-import type { PipelineCanvas, PipelineImage } from "./runtime/platform";
-import type { EditableLayerCanvases, RegionMaskOwnership } from './editor/types';
-import type {
-  LlmAuthMode,
-  LlmProvider,
-  LlmThinkingLevel,
-  TranslationReferenceContext,
-  TranslationDebugInfo,
-} from '../../text-translation/src/index';
-import type {
-  PipelineConfig,
-  PipelineProgress as ImagePipelineProgress,
-  QuadPoint,
-  Rect,
-  TextDirection,
-} from "./index";
-
-export type {
-  LlmAuthMode,
-  LlmProvider,
-  LlmThinkingLevel,
-  PipelineConfig,
-  QuadPoint,
-  Rect,
-  TextDirection,
-  TranslationReferenceContext,
-};
+import type { PipelineCanvas } from './runtime/platform';
+import type { RegionMaskOwnership } from './editor/types';
+import type { QuadPoint, Rect, TextDirection } from './index';
+export type { QuadPoint, Rect, TextDirection };
 
 export type SourceTextLineGeometry = {
   text: string;
@@ -51,12 +28,6 @@ export type BubbleMask = {
   height: number;
   data: Uint8Array;
 };
-
-export type ImageEngine = 'local' | 'gemini_app';
-
-export type GeminiAppAuthMode = 'browser_session' | 'cookies_permission';
-
-export type GeminiAppModel = 'nano_banana_2' | 'nano_banana_pro';
 
 export type TextRegion = {
   id: string;
@@ -198,8 +169,6 @@ export type PipelineTypesetDebugLog = {
   generatedAt: string;
   regions: TypesetDebugRegionLog[];
 };
-
-export type { TranslationDebugInfo } from '../../text-translation/src/index';
 
 export type OcrRunDebugStep = {
   step: number;
@@ -381,37 +350,3 @@ export type RefineTextMaskResult = {
   debugLayers?: MaskDebugLayers;
   regionOwnership?: RegionMaskOwnership;
 };
-
-export type PipelineStageRegions = {
-  detected: TextRegion[];
-  ocr: TextRegion[];
-  merged: TextRegion[];
-  ordered: TextRegion[];
-};
-
-export type PipelineArtifacts = {
-  original: PipelineImage;
-  detectedRegions: TextRegion[];
-  stageRegions: PipelineStageRegions;
-  detectionCanvas: PipelineCanvas;
-  ocrCanvas: PipelineCanvas;
-  segmentationCanvas: PipelineCanvas | null;
-  cleanedCanvas: PipelineCanvas;
-  resultCanvas: PipelineCanvas;
-  debugOriginalCanvas: PipelineCanvas | null;
-  typesetDebugLog: PipelineTypesetDebugLog | null;
-  translationDebug: TranslationDebugInfo | null;
-  ocrDebug: OcrRunDebugInfo | null;
-  ocrPostFilterDebug: OcrPostFilterDebugInfo | null;
-  runtimeStages: RuntimeStageStatus[];
-  stageTimings: StageTiming[];
-  editableLayers?: EditableLayerCanvases;
-};
-
-export type StageTiming = {
-  stage: string;
-  label: string;
-  durationMs: number;
-};
-
-export type PipelineProgress = ImagePipelineProgress;

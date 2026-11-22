@@ -1,4 +1,6 @@
 {
+  "整理文字顺序": "Menyusun teks sesuai urutan baca",
+  "生成译图": "Membuat gambar terjemahan",
   "临时阅读本章": "Baca bab tanpa menyimpan",
   "默认并发": "Paralel default",
   "{0} 的缓存并发": "Unduhan paralel untuk {0}",
@@ -1245,6 +1247,7 @@
   "平衡": "Seimbang",
   "最大输出 Token": "Token keluaran maksimum",
   "本地模型或字体尚未就绪，请在资源管理中下载或修复。": "Model atau font lokal belum siap. Unduh atau perbaiki sumber daya di pengelola.",
+  "本机处理长时间无响应，请手动重试。": "Pemrosesan lokal tidak merespons. Silakan coba lagi secara manual.",
   "本机推理失败，请检查设备与模型资源后手动重试。": "Inferensi lokal gagal. Periksa perangkat dan sumber daya model lalu coba lagi secara manual.",
   "本机识别与嵌字，正文使用 Google 或兼容 LLM；模型需手动下载。": "Pengenalan dan penempatan teks di perangkat; terjemahan teks melalui Google atau LLM yang kompatibel. Model perlu diunduh manual.",
   "来源与许可": "Sumber dan lisensi",

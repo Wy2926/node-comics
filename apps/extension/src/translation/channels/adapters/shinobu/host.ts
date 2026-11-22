@@ -35,14 +35,16 @@ export async function createHost(changed:(busy:boolean)=>void):Promise<ChannelLo
           void navigator.locks.request(executionLock,{ifAvailable:true},async lock=>{
             if(!lock)throw Error('LOCAL_BUSY');
             await navigator.locks.request(operationLock(id),async()=>{
-              let record=await readOperation(id);if(!record||record.job.status!=='running')throw Error('OPERATION_STALE');
+              const record=await readOperation(id);if(!record||record.job.status!=='running')throw Error('OPERATION_STALE');
               const controller=new AbortController();active=controller;notify();accepted=true;resolve();
               try{
                 const source=await readInput(record.job.id);if(!source)throw Error('SOURCE_MISSING');
-                const output=await runImage(record,source,controller.signal,token??'');
-                const now=new Date().toISOString(),job={...record.job,status:output.status==='no-translatable-text'?'no_text' as const:'succeeded' as const,phase:'succeeded',updated_at:now,completed_at:now,result_available:output.status!=='no-translatable-text',...(output.status==='no-translatable-text'?{}:{result:{key:record.job.id,recoverable:false}})};
-                if(job.status==='succeeded')await saveResultBlob({scope:{key:record.scope},job,blob:output.image,cacheToken:record.cacheToken,isCurrent:()=>!controller.signal.aborted});
-                record={...record,job};await saveOperation(record);await clearCheckpoint(record.job.id);
+                const image=await runImage(record,source,controller.signal,token??'',phase=>{
+                  void saveOperation({...record,job:{...record.job,phase,updated_at:new Date().toISOString()}}).catch(()=>{});
+                });
+                const now=new Date().toISOString(),job={...record.job,status:image?'succeeded' as const:'no_text' as const,phase:'succeeded',updated_at:now,completed_at:now,result_available:!!image,result:image?{key:record.job.id,recoverable:false}:undefined};
+                if(image)await saveResultBlob({scope:{key:record.scope},job,blob:image,cacheToken:record.cacheToken,isCurrent:()=>!controller.signal.aborted});
+                await saveOperation({...record,job});await clearCheckpoint(record.job.id);
               }catch(error){
                  const code=localFailureCode(error);
                 await saveOperation({...record,job:{...record.job,status:'failed',phase:'failed',updated_at:new Date().toISOString(),error:{code,message:errorMessage(code)}}}).catch(()=>{});

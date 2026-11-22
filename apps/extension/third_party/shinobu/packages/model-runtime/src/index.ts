@@ -22,8 +22,5 @@ export type {
   InferenceResult,
   GpuDetectResult,
   OnnxWorkerApi,
-  PaddleGraphCaptureProbeOptions,
-  PaddleGraphCaptureProbeResult,
 } from './runtime/onnxWorkerTypes';
-export type { RuntimeSelfCheckReport } from './runtime/selfCheck';
 export type { ModelName } from './runtime/modelRegistry';

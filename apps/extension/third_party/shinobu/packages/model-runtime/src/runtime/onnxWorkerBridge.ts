@@ -7,10 +7,7 @@ import type {
   InferenceResult,
   OnnxWorkerApi,
   GpuDetectResult,
-  PaddleGraphCaptureProbeOptions,
-  PaddleGraphCaptureProbeResult,
 } from "./onnxWorkerTypes";
-import type { RuntimeSelfCheckReport } from "./selfCheck";
 import {
   recordModelRuntimeEvent as recordPerfRuntimeEvent,
   recordModelRuntimeWorkerCall as recordPerfWorkerCall,
@@ -349,40 +346,6 @@ export async function runInference(
       startedAt,
       durationMs: performance.now() - startedAt,
       error: failure instanceof Error ? failure.message : failure === null ? undefined : String(failure),
-    });
-  }
-}
-
-export async function probeRuntime(modelUrl: string): Promise<RuntimeSelfCheckReport> {
-  const startedAt = performance.now();
-  try {
-    return await (await getProxy()).probeRuntime(modelUrl);
-  } finally {
-    recordPerfWorkerCall({
-      kind: "probeRuntime",
-      model: modelUrl,
-      startedAt,
-      durationMs: performance.now() - startedAt,
-    });
-  }
-}
-
-export async function probePaddleGraphCapture(
-  options: PaddleGraphCaptureProbeOptions
-): Promise<PaddleGraphCaptureProbeResult> {
-  const startedAt = performance.now();
-  let result: PaddleGraphCaptureProbeResult | null = null;
-  try {
-    result = await (await getProxy()).probePaddleGraphCapture(options);
-    return result;
-  } finally {
-    recordPerfWorkerCall({
-      kind: "probePaddleGraphCapture",
-      model: options.modelUrl,
-      inputBytes: result?.inputBytes,
-      outputBytes: result?.outputBytes,
-      startedAt,
-      durationMs: performance.now() - startedAt,
     });
   }
 }

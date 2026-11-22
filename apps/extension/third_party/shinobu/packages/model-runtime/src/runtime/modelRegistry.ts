@@ -1,4 +1,4 @@
-import type { DiagnosticLogObserver } from '../../../diagnostics/src/index';
+import type { DiagnosticLogObserver } from '../../../diagnostics/src/diagnosticLog';
 import type { ModelRuntimePerformanceObserver } from '../contracts';
 import type { OnnxSessionOptions } from './onnxSessionOptions';
 import { serializeOnnxSessionOptions } from './onnxSessionOptions';
