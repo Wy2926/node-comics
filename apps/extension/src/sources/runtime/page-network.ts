@@ -26,9 +26,10 @@ export function exactDocumentReader(url: string, signal: AbortSignal) {
 /** One bounded source-page session per origin across extension pages; no HTTP-failure fallback. */
 export async function withPageNetworkContext<T>(url: string, signal: AbortSignal, read: (context: SourceNetworkContext) => Promise<T>): Promise<T> {
   await authorizeSourceRequest(url, undefined, signal);
-  const source = resolveSource(url, definitions).location, origin = new URL(url).origin;
-  // Open the work landing page, not the chapter reader with its eager image downloads.
+  const source = resolveSource(url, definitions).location;
+  // 从适配器选定的目录页建立同源会话；粘贴的裸域可能会重定向，也无需加载整章图片。
   const pageSource = source.catalog?.url ?? url;
+  const origin = new URL(pageSource).origin;
   const matches = (target: string | undefined) => {
     if (!target)
       return false;

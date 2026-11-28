@@ -1,7 +1,7 @@
 import type {SourceNetwork, SourceNetworkContext} from '../../contracts/network';
 import type {SourceCatalogSnapshot, SourceSnapshot} from '../../contracts/source';
 import {attributes, hasClass, inertHtml, tags, textContent} from '../../shared/html';
-import {catalogKey, catalogUrl, chapterKey, chapterUrl, origin} from './definition';
+import {catalogKey, catalogUrl, chapterKey, chapterUrl, matchesBaoPage} from './definition';
 import {blocks, changed, coverUrl, imageUrl, label, location, one, ownership, text} from './html';
 import {search} from './search';
 
@@ -16,18 +16,18 @@ export function parseCatalog(raw: string, url: string): SourceCatalogSnapshot {
   if (first.length) list = first[0] + (remaining[0] ?? '');
   else {
     if (remaining.length || buttons.length) throw changed();
-    // At most 24 chapters: the source renders only its complete, newest-first list.
+    // 不超过 24 章时只有倒序的「最新章节」列表；新模板用 h2 标记同一标题。
     const box = one(blocks(html, 'div', 'class', 'l-box').filter(body => tags(body, 'a').some(a => hasClass(a, 'comics-chapters__item'))));
-    if (textContent(one(blocks(box, 'div', 'class', 'section-title'))) !== '最新章节') throw changed();
+    if (!/^最新章[节節]$/.test(label(box, 'section-title', 'div', 'h2'))) throw changed();
     list = one(blocks(box, 'div', 'class', 'pure-g'));
   }
   const links = [...list.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi)];
-  const total = buttons.length ? /^查看全部(\d+)章节$/.exec(textContent(buttons[0]))?.[1] : String(links.length);
+  const total = buttons.length ? /^查看全部(\d+)章[节節]$/.exec(textContent(buttons[0]))?.[1] : String(links.length);
   if (!total || !links.length || Number(total) !== links.length || links.length > 10000 || !buttons.length && links.length > 24 || tags(list, 'a').length !== links.length) throw changed();
   if (!first.length) links.reverse();
   const id = catalogKey(loc.comic), seen = new Set<string>();
   const entries = links.map((match, order) => {
-    const attrs = attributes(' ' + match[1]), target = location(new URL(text(attrs.href), origin).href);
+    const attrs = attributes(' ' + match[1]), target = location(new URL(text(attrs.href), url).href);
     const entryId = chapterKey(target);
     if (!hasClass(attrs, 'comics-chapters__item') || target.chapter === undefined || target.comic !== loc.comic || target.part !== 1 || seen.has(entryId)) throw changed();
     seen.add(entryId);
@@ -35,10 +35,10 @@ export function parseCatalog(raw: string, url: string): SourceCatalogSnapshot {
       title: text(textContent(match[2])), groupIds: ['chapters'], rawTypes: [], order, related: false,
       sequenceId: `${id}:section:${target.section}`};
   });
-  const title = label(html, 'h1', 'comics-detail__title');
+  const title = label(html, 'comics-detail__title', 'h1');
   const info = one(blocks(html, 'div', 'class', 'de-info__box'));
   const cover = coverUrl(tags(info, 'amp-img')[0]?.src);
-  return {id, sourceId: 'baozimh', url: catalogUrl(loc.comic), title, cover,
+  return {id, sourceId: 'baozimh', url: catalogUrl(loc), title, cover,
     observedAt: Date.now(), complete: true, note: '', entries,
     groups: [{id: 'chapters', title: '章节目录', entryIds: entries.map(e => e.id), complete: true}], defaultEntryId: entries[0]?.id};
 }
@@ -46,7 +46,7 @@ export function parsePart(raw: string, url: string) {
   const html = inertHtml(raw), loc = ownership(html, url);
   if (loc.chapter === undefined) throw changed();
   const header = one(blocks(html, 'div', 'class', 'header'));
-  const title = label(header, 'span', 'title'), pagination = /\((\d+)\/(\d+)\)$/.exec(title);
+  const title = label(header, 'title', 'span', 'h1'), pagination = /\((\d+)\/(\d+)\)$/.exec(title);
   const total = pagination ? Number(pagination[2]) : 1;
   if (total < loc.part || total > 30 || pagination && Number(pagination[1]) !== loc.part || !pagination && loc.part !== 1) throw changed();
   const body = one(blocks(html, 'ul', 'class', 'comic-contain'));
@@ -63,8 +63,7 @@ export function parsePart(raw: string, url: string) {
   let next: string | undefined;
   if (loc.part < total) {
     next = text(one(nextLinks).href);
-    const target = location(next);
-    if (chapterKey(target) !== chapterKey(loc) || target.part !== loc.part + 1 || next !== chapterUrl(loc, target.part)) throw changed();
+    if (!matchesBaoPage(next, chapterUrl(loc, loc.part + 1))) throw changed();
   } else {
     if (nextLinks.length > 1) throw changed();
     if (nextLinks.length) {
@@ -86,7 +85,7 @@ export const network = {
   async catalog(url, context) {
     const loc = location(url);
     if (loc.chapter !== undefined) throw changed();
-    const target = catalogUrl(loc.comic);
+    const target = catalogUrl(loc);
     return parseCatalog(await request(context, target), target);
   },
   async pages(url, context): Promise<SourceSnapshot> {

@@ -40,4 +40,20 @@ describe('Baozi page sessions', () => {
     expect(session.describeWork?.()).toMatchObject({status: 'ready', value: {title: 'Work - with hyphen', catalogUrl: url}});
     canonical = reader.replace('0_0', '0_1'); expect(session.describeWork?.().status).toBe('not-ready'); navigation.dispose();
   });
+  it('recognizes a www continuation with a tw canonical and a labeled return link', () => {
+    const current = reader.replace('cn.', 'www.').replace('.html', '_2.html');
+    let canonical = current.replace('www.', 'tw.'), parent = url.replace('cn.', 'tw.');
+    const doc = {title: '', querySelector: (selector: string) => {
+      if (selector.startsWith('link')) return {getAttribute: () => canonical};
+      if (selector === '.header a.goto') return {getAttribute: () => parent};
+      if (selector.startsWith('.header a.back')) return {getAttribute: (key: string) => key === 'title' ? '返回《作品 - 外傳》目錄' : parent};
+      if (selector === '.header .title') return {textContent: '作品 - 外傳 - 第1話(2/2)'};
+      return null;
+    }} as unknown as Document;
+    const navigation = createSourceNavigation(doc), session = navigation.get(current).session;
+    expect(session.describeWork?.()).toMatchObject({status: 'ready', value: {title: '作品 - 外傳', catalogUrl: url.replace('cn.', 'www.')}});
+    canonical = canonical.replace('_2.html', '.html'); expect(session.describeWork?.().status).toBe('not-ready');
+    canonical = current; parent = parent.replace('.com', '.com.evil.test'); expect(session.describeWork?.().status).toBe('not-ready');
+    navigation.dispose();
+  });
 });

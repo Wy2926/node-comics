@@ -22,15 +22,22 @@ describe('Baozi complete HTTP adapter', () => {
     expect(request).toHaveBeenCalledWith(url);
     expect(direct).not.toHaveBeenCalled();
   });
-  it('unifies catalog entry, redirected chapter and continuation identities without claiming other hosts', () => {
+  it.each(['cn.', '', 'www.', 'tw.'])('shares book and chapter IDs across the %j catalog and reader aliases', prefix => {
+    const site = `https://${prefix}baozimh.com`, chapters = `https://${prefix}twbzmg.com`;
+    const catalog = {key: catalogKey(loc.comic), url: url.replace('cn.', prefix || 'www.')};
+    expect(sourceFor(`${site}/comic/${loc.comic}`).location).toMatchObject({kind: 'catalog', pageKey: catalog.key, catalog});
+    for (const address of [`${site}/user/page_direct?chapter_slot=0&section_slot=0&comic_id=${loc.comic}`,
+      `${site}/comic/chapter/${loc.comic}/0_0.html`, `${chapters}/comic/chapter/${loc.comic}/0_0_2.html`])
+      expect(sourceFor(address).location).toMatchObject({kind: 'reader', pageKey: chapterKey(loc), catalog});
+    expect(definition.installation.optionalContentMatches).toEqual(expect.arrayContaining([site + '/*', chapters + '/comic/chapter/*']));
+  });
+  it('rejects foreign origins and does not import malformed routes', () => {
     const direct = `https://cn.baozimh.com/user/page_direct?chapter_slot=0&section_slot=0&comic_id=${loc.comic}`;
-    for (const address of [reader, chapterUrl(loc, 2), direct]) {
-      expect(sourceFor(address).location).toMatchObject({kind: 'reader', pageKey: chapterKey(loc), catalog: {key: catalogKey(loc.comic), url}});
-    }
-    expect(sourceFor(url).location.kind).toBe('catalog');
-    for (const address of [url.replace('https:', 'http:'), url.replace('.com', '.com.evil.test'), url.replace('cn.', 'user:pass@cn.'), url.replace('.com', '.com:444'), url.replace('cn.', 'www.')])
+    for (const address of [url.replace('https:', 'http:'), url.replace('.com', '.com.evil.test'), url.replace('cn.', 'user:pass@www.'),
+      url.replace('.com', '.com:444'), url.replace('cn.', 'static-tw.'), url.replace('cn.', 'not'), reader.replace('.com', '.com.evil.test')])
       expect(definition.identify(new URL(address))).toBeNull();
-    for (const address of [direct + '&chapter_slot=1', reader.replace('0_0.html', '0_0_1.html'), reader.replace('0_0.html', '00_0.html'), url.replace('/comic/', '/other/')])
+    for (const address of [direct + '&chapter_slot=1', reader.replace('0_0.html', '0_0_1.html'), reader.replace('0_0.html', '00_0.html'),
+      url.replace('/comic/', '/other/'), url.replace('baozimh', 'twbzmg')])
       expect(definition.identify(new URL(address))?.kind).toBe('other');
     expect(definition.catalogSync?.intervalMinutes).toBe(720);
   });
@@ -77,10 +84,28 @@ describe('Baozi complete HTTP adapter', () => {
     expect(new Set(result.items.map(p => p.id)).size).toBe(6);
     expect(result.items.map(p => p.order)).toEqual([0, 1, 2, 3, 4, 5]);
   });
-  it.each(['missing-next', 'foreign-next', 'loop', 'part-count', 'parent', 'canonical', 'foreign-image', 'duplicate-slot', 'no-body', 'early-end'])('rejects %s reader without a partial success', async mode => {
+  it('reads a traditional catalog and follows a verified next part on another alias', async () => {
+    const book = url.replace('cn.', 'tw.'), first = reader.replace('cn.', 'tw.');
+    const second = chapterUrl(loc, 2).replace('cn.twbzmg.com', 'www.baozimh.com');
+    const content = (part: number) => readerHtml(part).replaceAll('cn.', 'www.')
+      .replace('<span class="title">第1话', '<h1 class="title">作品 - 第1話').replace('</span>', '</h1>');
+    const request = vi.fn().mockResolvedValueOnce(catalogHtml().replace(url, url.replace('cn.', 'www.')).replace('27章节', '27章節'))
+      .mockResolvedValueOnce(content(1).replace(chapterUrl(loc, 2).replace('cn.', 'www.'), second))
+      .mockResolvedValueOnce(content(2));
+    const value = validateSourceCatalog(await network.catalog(book, {request}));
+    expect(value).toMatchObject({id: catalogKey(loc.comic), url: book});
+    expect(value.entries).toHaveLength(27);
+    expect(value.entries[0]).toMatchObject({id: chapterKey(loc), url: first});
+    const snapshot = await network.pages(value.entries[0].url, {request});
+    expect(snapshot).toMatchObject({discoveryComplete: true, knownTotal: 6, title: '作品 - 第1話'});
+    expect(request.mock.calls).toEqual([[book], [first], [second]]);
+  });
+  it.each(['missing-next', 'foreign-next', 'foreign-host', 'next-query', 'loop', 'part-count', 'parent', 'canonical', 'foreign-image', 'duplicate-slot', 'no-body', 'early-end'])('rejects %s reader without a partial success', async mode => {
     let html = readerHtml();
     if (mode === 'missing-next') html = html.replace('id="next-chapter"', 'id="missing"');
     if (mode === 'foreign-next') html = html.replace('0_0_2.html', '0_1_2.html');
+    if (mode === 'foreign-host') html = html.replace(chapterUrl(loc, 2), chapterUrl(loc, 2).replace('.com', '.com.evil.test'));
+    if (mode === 'next-query') html = html.replace('0_0_2.html', '0_0_2.html?other=1');
     if (mode === 'loop') html = html.replace('0_0_2.html', '0_0.html');
     if (mode === 'part-count') html = html.replace('(1/2)', '(2/2)');
     if (mode === 'parent') html = html.replace('href="' + url, 'href="' + url + '-wrong');

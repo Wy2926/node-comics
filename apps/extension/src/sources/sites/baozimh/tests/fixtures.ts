@@ -1,8 +1,8 @@
 import {catalogUrl, chapterUrl, type BaoLocation} from '../definition';
 
-export const comic = 'example-author', url = catalogUrl(comic);
-export const loc: BaoLocation = {comic, section: '0', chapter: '0', part: 1};
-export const reader = chapterUrl(loc);
+export const comic = 'example-author';
+export const loc: BaoLocation = {edition: 'cn', comic, section: '0', chapter: '0', part: 1};
+export const url = catalogUrl(loc), reader = chapterUrl(loc);
 export const image = 'https://s1.bzcdn.net/scomic/example-author/0/0-abcd/1.jpg';
 export const cover = 'https://static-tw.baozimh.com/cover/example-author.jpg';
 export const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');

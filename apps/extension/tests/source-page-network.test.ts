@@ -4,6 +4,7 @@ import { requestInSourcePage, type PageNetworkResponse } from '../src/sources/ru
 import { readSourceCatalog } from '../src/sources/runtime/catalog-reader';
 import { readNetworkPages } from '../src/sources/runtime/network';
 import {fixtureSource, protocolAssetPath, protocolHtml} from '../src/sources/sites/comix/tests/protocol-fixture';
+import {catalogHtml as baoCatalog} from '../src/sources/sites/baozimh/tests/fixtures';
 const url = 'https://comix.to/title/fixture-book', target = 'https://comix.to/api/v1/manga/fixture';
 const event = () => ({ addListener: vi.fn(), removeListener: vi.fn() });
 let records: Record<string, unknown>, tab: {
@@ -95,6 +96,15 @@ describe('opt-in search page transport', () => {
   });
 });
 describe('opt-in source-page catalog transport', () => {
+  it('opens the adapter-selected www catalog for a bare domain and fetches in that same origin', async () => {
+    const bare = 'https://baozimh.com/comic/example-author';
+    tab.url = bare.replace('://', '://www.');
+    response = {...response, pageUrl: tab.url, body: baoCatalog(1).replace('<div class="section-title">最新章节</div>', '<h2 class="section-title">最新章節</h2>')};
+    const snapshot = await readSourceCatalog(bare);
+    expect(snapshot).toMatchObject({url: tab.url, id: 'baozimh:example-author', entries: [{url: 'https://www.twbzmg.com/comic/chapter/example-author/0_0.html'}]});
+    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({url: tab.url, active: false});
+    expect(inject.mock.calls[1][0].args[0]).toMatchObject({pageUrl: tab.url, url: tab.url});
+  });
   it('passes authorized JSON encoding through the source-page request', async () => {
     expect(await withPageNetworkContext(url, new AbortController().signal, context => context.request(target, {json: {book_id: '1'}, accept:'application/json'}))).toBe('source');
     expect(inject.mock.calls[1][0].args[0]).toMatchObject({body: '{"book_id":"1"}', json: true, accept:'application/json'});

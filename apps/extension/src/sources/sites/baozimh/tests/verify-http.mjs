@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {mkdir, mkdtemp, writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
+import installation from '../installation.json' with {type: 'json'};
 const root = process.cwd(), base = path.join(root, 'artifacts/baozimh/http');
 await mkdir(base, {recursive: true}); const out = await mkdtemp(path.join(base, 'run-'));
 const {build} = createRequire(path.join(root, 'apps/extension/package.json'))('vite');
@@ -11,8 +12,9 @@ await build({configFile: false, root: path.join(root, 'apps/extension'), logLeve
   lib: {entry: path.join(root, 'apps/extension/src/sources/sites/baozimh/network.ts'), formats: ['es'], fileName: () => 'network.mjs'}}});
 const {network} = await import(pathToFileURL(path.join(out, 'network.mjs')).href);
 let browser, page, requests = 0;
+const origins = new Set(installation.optionalContentMatches.map(pattern => new URL(pattern).origin));
 async function request(url) {
-  assert(['cn.baozimh.com', 'cn.twbzmg.com'].includes(new URL(url).hostname)); requests++;
+  assert(origins.has(new URL(url).origin)); requests++;
   const response = page ? await page.context().request.get(url) : await fetch(url, {signal: AbortSignal.timeout(30000)});
   assert(page ? response.ok() : response.ok, `Source HTTP ${page ? response.status() : response.status}`);
   return response.text();

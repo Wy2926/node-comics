@@ -1,4 +1,7 @@
 {
   "autoContentMatches": [],
-  "optionalContentMatches": ["https://cn.baozimh.com/*", "https://cn.twbzmg.com/comic/chapter/*"]
+  "optionalContentMatches": [
+    "https://cn.baozimh.com/*", "https://baozimh.com/*", "https://www.baozimh.com/*", "https://tw.baozimh.com/*",
+    "https://cn.twbzmg.com/comic/chapter/*", "https://twbzmg.com/comic/chapter/*", "https://www.twbzmg.com/comic/chapter/*", "https://tw.twbzmg.com/comic/chapter/*"
+  ]
 }

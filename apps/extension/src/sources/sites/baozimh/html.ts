@@ -28,7 +28,8 @@ export function blocks(html: string, tag: string, attribute: 'id' | 'class', val
     throw changed();
   });
 }
-export const label = (html: string, tag: string, name: string) => text(textContent(one(blocks(html, tag, 'class', name))));
+export const label = (html: string, name: string, ...tagNames: string[]) =>
+  text(textContent(one(tagNames.flatMap(tag => blocks(html, tag, 'class', name)))));
 export function ownership(html: string, url: string) {
   const expected = location(url), canonical = one(tags(html, 'link').filter(a => a.rel === 'canonical'));
   const actual = location(text(canonical.href));

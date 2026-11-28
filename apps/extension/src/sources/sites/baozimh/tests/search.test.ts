@@ -10,6 +10,11 @@ describe('Baozi source search', () => {
     expect(result.items[0].latestLabel).toBeUndefined(); expect(result.items[0].contentLanguages).toBeUndefined();
     expect((await parseSearch(searchHtml('fixture', 0), query)).items).toEqual([]);
   });
+  it('keeps the regional catalog link and the same work ID in traditional results', async () => {
+    const html = searchHtml().replace('相近搜索结果', '相近搜尋結果').replaceAll('href="/comic/', 'href="https://tw.baozimh.com/comic/');
+    expect((await parseSearch(html, query)).items[0]).toMatchObject({
+      catalogId: 'baozimh:example-author', catalogUrl: 'https://tw.baozimh.com/comic/example-author'});
+  });
   it('paginates the complete result and expires the cursor if source ordering or query changes', async () => {
     const html = searchHtml('fixture', 90), first = await parseSearch(html, query);
     expect(first.items).toHaveLength(50);

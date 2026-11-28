@@ -13,7 +13,7 @@ export async function parseSearch(raw: string, query: SourceSearchRequest): Prom
   const html = inertHtml(raw);
   if (one(tags(html, 'input').filter(a => a.name === 'q')).value !== query.query) throw invalid();
   const hint = textContent(one(blocks(html, 'div', 'class', 'keyword-hinter')));
-  const count = /相近搜索结果\((\d+)\)$/.exec(hint)?.[1];
+  const count = /相近(?:搜索结果|搜尋結果)\((\d+)\)$/.exec(hint)?.[1];
   const list = one(blocks(html, 'div', 'class', 'classify-items'));
   const cards = blocks(list, 'div', 'class', 'comics-card');
   if (count === undefined || Number(count) !== cards.length || cards.length > 5000) throw invalid();
@@ -26,7 +26,7 @@ export async function parseSearch(raw: string, query: SourceSearchRequest): Prom
     const author = blocks(info[2], 'small', 'class', 'tags').map(textContent).filter(Boolean);
     const poster = one(blocks(card, 'a', 'class', 'comics-card__poster'));
     const cover = coverUrl(tags(poster, 'amp-img')[0]?.src);
-    return {catalogId: catalogKey(loc.comic), catalogUrl: catalogUrl(loc.comic), title: label(info[2], 'h3', 'text-truncate'),
+    return {catalogId: catalogKey(loc.comic), catalogUrl: catalogUrl(loc), title: label(info[2], 'text-truncate', 'h3'),
       ...(cover ? {cover} : {}), ...(author.length ? {authors: author} : {})};
   });
   // One server response contains every match; bounded pages remain tied to that exact result.
