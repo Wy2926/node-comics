@@ -13,7 +13,7 @@ export interface ChannelProfile {
   revision: number;
   settings: Record<string, string>;
 }
-export interface ChannelField {key:string;label:string;type:'text'|'url'|'password'|'number'|'select';required?:boolean;placeholder?:string;defaultValue?:string;options?:readonly {value:string;label:string}[];help?:string;advanced?:boolean;}
+export interface ChannelField {key:string;label:string;type:'text'|'textarea'|'url'|'password'|'number'|'select';required?:boolean;placeholder?:string;maxLength?:number;defaultValue?:string;options?:readonly {value:string;label:string}[];help?:string;advanced?:boolean;}
 export interface ChannelResource {id:string;label:string;description?:string;category?:{id:string;label:string;description:string;languages?:readonly {id:string;label:string;supported:boolean}[]};languages?:Readonly<Record<string,{label:string;selected?:boolean}>>;required?:boolean;selected?:boolean;bytes:number;downloaded:number;state:'missing'|'downloading'|'paused'|'verifying'|'ready'|'error';detail?:string;license:string;source:string;}
 export interface ChannelResources {
   read(language?:string):Promise<ChannelResource[]>;
@@ -29,7 +29,10 @@ export interface ChannelOptions {
   resources?:ChannelResources;
   services?:ChannelServiceSelection;
 }
-/** Adapter-owned named text services; the UI never reads or stores their credentials. */
+/** 仅配置弹窗按需接收脱敏的 HTTP 正文预览，不随任务、配置或日志保存。 */
+export interface ServiceResponse {status:number;body:string;truncated:boolean}
+export type InspectResponse=(response:ServiceResponse)=>void;
+/** Adapter-owned named text services; the UI never reads or stores their saved credentials. */
 export interface ChannelServiceSelection {
   label:string;
   description:string;
@@ -39,9 +42,15 @@ export interface ChannelServiceSelection {
   initialValues:Record<string,string>;
   fields(values:Record<string,string>):readonly ChannelField[];
   changeValues(previous:Record<string,string>,next:Record<string,string>):Record<string,string>;
+  listModels(values:Record<string,string>,id:string|undefined,signal:AbortSignal,inspect?:InspectResponse):Promise<string[]>;
+  test(values:Record<string,string>,id:string|undefined,language:string,signal:AbortSignal,inspect?:InspectResponse):Promise<string>;
   select(id:string):Promise<void>;
   save(values:Record<string,string>,id?:string):Promise<void>;
   remove(id:string):Promise<void>;
+}
+/** 表单可按字段定位错误，协议和诊断文案仍由适配器负责。 */
+export class ChannelServiceError extends Error {
+  constructor(message:string,readonly field?:string){super(message);}
 }
 export interface ChannelLocalHost {dispatch(message:unknown):Promise<unknown>;dispose():Promise<void>;}
 export interface ChannelConnectionInput {settings:Record<string,string>;secrets:Record<string,string>;signal?:AbortSignal;}

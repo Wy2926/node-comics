@@ -3,7 +3,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {emptyPage} from '../../../../reader/model';
 import {ShinobuRuntime} from './runtime';
 import {parseConfig} from './config';
-import {entryOperations,saveOperation} from './operations';
+import {entryOperations,readCheckpoint,saveCheckpoint,saveOperation} from './operations';
 import {openTranslationBindings} from '../../../../comics/repositories/translation-bindings';
 import type {Job} from '../../../../types';
 import {localHostRequest} from '../../host-client';
@@ -88,6 +88,20 @@ it('retries a failed text request after the previous automatic window was cancel
     expect(retried.job.status).toBe('running');
     expect(localHostRequest).toHaveBeenCalledTimes(2);
   }finally{runtime.dispose();}
+});
+it('reuses translated text after a render failure only if the prompt still matches',async()=>{
+  vi.stubGlobal('navigator',{locks:{query:async()=>({held:[]}),request:async(_name:string,run:()=>unknown)=>run()}});
+  const scope={key:crypto.randomUUID()},target={entryId:crypto.randomUUID(),mode:'classic' as const,page:{...emptyPage('page.png',900,1200),blobKey:'original'}};
+  const retry=async(customPrompt:string)=>{
+    const config=parseConfig({provider:'llm',baseUrl:'http://model.home/v1',model:'fixture',customPrompt});
+    const runtime=new ShinobuRuntime(scope,{language:'en',getBlob:async()=>png(),onJobs:async()=>{},onChange:()=>{},isCurrent:()=>true},config,'comic-relief');
+    try{await runtime.manual(target);return (await entryOperations(target.entryId))[0];}finally{runtime.dispose();}
+  };
+  const first=await retry('Formal tone.'),result={a:'Good morning.'};
+  await saveCheckpoint({id:first.job.id,entryId:first.entryId,fingerprint:first.fingerprint,input:{a:'早上好'},state:'succeeded',result,updatedAt:Date.now(),bytes:0});
+  await saveOperation({...first,job:{...first.job,status:'failed',phase:'failed'}});
+  expect(await readCheckpoint((await retry('Formal tone.')).job.id)).toMatchObject({result});
+  expect(await readCheckpoint((await retry('Casual tone.')).job.id)).toBeUndefined();
 });
 it.each(['automatic','manual'] as const)('cancels %s preparation when its own lifetime ends',async kind=>{
   const admission=Promise.withResolvers<void>();

@@ -6,6 +6,7 @@ export const releaseNotes = {
   highlights: [
     {icon: 'translate', title: 'releaseNotes.dialogue.title', description: 'releaseNotes.dialogue.description'},
     {icon: 'image', title: 'releaseNotes.longPages.title', description: 'releaseNotes.longPages.description'},
+    {icon: 'settings', title: 'releaseNotes.prompt.title', description: 'releaseNotes.prompt.description'},
     {icon: 'globe', title: 'releaseNotes.linkReading.title', description: 'releaseNotes.linkReading.description'},
     {icon: 'message', title: 'releaseNotes.reviews.title', description: 'releaseNotes.reviews.description'},
   ],

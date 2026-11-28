@@ -10,7 +10,7 @@ import {fontPreferenceKey,serviceScope,serviceToken,serviceSelection,saveCommonS
 import {resourceManager,fontDownloads} from './resources';
 import {localFonts} from '../../../font-resources';
 import {effectiveTranslationFont} from '../../../fonts';
-import {ShinobuRuntime} from './runtime';
+import {digest,ShinobuRuntime} from './runtime';
 import {entryOperations,blockEntry,removeEntry} from './operations';
 import {errorMessage} from './errors';
 import {localLanguages} from './languages';
@@ -22,9 +22,10 @@ export const definition:ChannelDefinition={
   fields:[],get defaultSettings(){return localSettings({});},
   async open(profile,secrets,isCurrent){
     const config=profileConfig(profile),scope={key:serviceScope(profile)},preferences=await readChannelSettings(),fontKey=fontPreferenceKey(profile),fonts=preferences.fontPreferences?.[fontKey]??{};
+    const key=JSON.stringify([scope.key,{...config,customPrompt:config.customPrompt&&digest(config.customPrompt)},fonts]);
     let disposed=false;const current=()=>!disposed&&isCurrent();
     return {
-      key:JSON.stringify([scope.key,config,fonts]),scope,get label(){return definition.label;},capabilities:capabilities(),available:true,requiresInternet:needsInternet(config),analyticsCategory:'local',isCurrent:current,
+      key,scope,get label(){return definition.label;},capabilities:capabilities(),available:true,requiresInternet:needsInternet(config),analyticsCategory:'local',isCurrent:current,
       fontSelection:{fonts:localFonts,downloads:fontDownloads,get description(){return msg('此字体用于本地译图嵌字，需先下载完整字库。更换后，新翻译或手动重译的页面使用新字体。');},value:language=>effectiveTranslationFont(localFonts,language,fonts[language]),async select(language,value){
         assertCurrent(current);const selected=effectiveTranslationFont(localFonts,language,value);
         if(!selected||value&&value!==selected)throw Error(errorMessage('FONT_UNAVAILABLE'));

@@ -2,7 +2,8 @@
 .nc-channel-options form,.nc-service-form,.nc-config-fields {display:grid;gap:var(--settings-field-gap);min-width:0;}
 .nc-config-row {display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,1.65fr);gap:var(--settings-field-gap);align-items:center;min-width:0;margin:0;}
 .nc-config-row>:is(span,label) {font-size:var(--settings-label-size);font-weight:550;line-height:1.5;overflow-wrap:anywhere;}
-.nc-config-row :is(input,button.nc-select) {width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:44px;font-size:var(--text-body);}
+.nc-config-row :is(input,textarea,button.nc-select) {width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:44px;font-size:var(--text-body);}
+.nc-config-row textarea {grid-column:1/-1;}
 .nc-config-help {font-size:var(--settings-description-size);line-height:1.6;margin:var(--settings-description-gap) 0 0;}
 .nc-config-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .nc-config-advanced {border-block:1px solid var(--line);padding:var(--settings-field-gap) 0;min-width:0;}

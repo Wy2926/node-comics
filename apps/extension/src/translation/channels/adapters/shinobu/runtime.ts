@@ -19,7 +19,7 @@ import {knownLocalCode,localFailureCode} from './failure-code';
 import {supportsLocalLanguage} from './languages';
 import {executionLock,launchLock,operationLock} from './locks';
 import {readOperation,saveOperation,readCheckpoint,saveCheckpoint,releaseInput,type LocalOperation} from './operations';
-const digest=(value:unknown)=>new Sha256().update(new TextEncoder().encode(JSON.stringify(value))).digest();
+export const digest=(value:unknown)=>new Sha256().update(new TextEncoder().encode(JSON.stringify(value))).digest();
 const localError=(code:string)=>({kind:'error' as const,code,message:errorMessage(code),manageResources:['ASSET_MISSING','ASSET_CORRUPT','FONT_UNAVAILABLE'].includes(code)});
 export class ShinobuRuntime implements ChannelRuntime{
   private admissionError?:string;private resources?:BroadcastChannel;

@@ -26,7 +26,7 @@ export function ChannelOptionsPanel({options,language}:{options?:ChannelOptions;
     {error&&<p className="error" role="alert">{error}</p>}
   </form>;
   return <section className="nc-channel-options">
-    {options.services&&<ChannelServices services={options.services}/>}
+    {options.services&&<ChannelServices services={options.services} language={language??'zh-Hans'}/>}
     {options.fields.length>0&&(options.settingsLabel?<details className="nc-config-advanced" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}><summary>{options.settingsLabel}</summary>{form}</details>:form)}
     {options.resources&&<ChannelResources manager={options.resources} language={language}/>}
   </section>;

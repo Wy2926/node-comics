@@ -1,6 +1,6 @@
 import {Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode} from 'react';
 import {Icon} from '../icons';
-import {menuPosition, visibleViewport} from './visual-viewport';
+import {useSelectPopover} from './useSelectPopover';
 import './select.css';
 
 /** Value-only change contract; this is deliberately not a native select event. */
@@ -93,44 +93,7 @@ export function Select({value, onChange, onOpenChange, children, trigger, placem
     }
   }
 
-  useLayoutEffect(() => {
-    const button = buttonRef.current, list = listRef.current;
-    if (!button || !list || !expanded) return;
-    // Keeping the popover in the DOM subtree preserves dialog interactivity and theme tokens.
-    // The browser's top layer escapes ancestor overflow without a body portal.
-    const nativePopover = typeof list.showPopover === 'function';
-    if (nativePopover) list.showPopover();
-    function position() {
-      if (!button || !list) return;
-      const bounds = visibleViewport(), rect = button.getBoundingClientRect();
-      // Set width before measuring wrapped labels, then keep the list above the soft keyboard.
-      list.style.width = `${Math.max(0, Math.min(Math.max(rect.width, menuWidth), bounds.width - 16))}px`;
-      const position = menuPosition(rect, bounds, menuWidth, list.scrollHeight + 4, placement);
-      for (const [key, value] of Object.entries(position)) list.style[key as 'left' | 'top' | 'width' | 'maxHeight'] = `${value}px`;
-    }
-    position();
-    const resize = new ResizeObserver(position);
-    resize.observe(button);
-    resize.observe(list);
-    // Styled labels can reflow after their font loads, even when the list is height-constrained.
-    list.querySelectorAll('.nc-select-label[style]').forEach(label => resize.observe(label));
-    const scroll = (event: Event) => { if (event.target !== list) position(); };
-    const dismiss = (event: PointerEvent) => { if (!list.contains(event.target as Node) && !button.contains(event.target as Node)) close(); };
-    window.addEventListener('resize', position);
-    window.visualViewport?.addEventListener('resize', position);
-    window.visualViewport?.addEventListener('scroll', position);
-    document.addEventListener('scroll', scroll, true);
-    if (!nativePopover) document.addEventListener('pointerdown', dismiss);
-    return () => {
-      resize.disconnect();
-      window.removeEventListener('resize', position);
-      window.visualViewport?.removeEventListener('resize', position);
-      window.visualViewport?.removeEventListener('scroll', position);
-      document.removeEventListener('scroll', scroll, true);
-      document.removeEventListener('pointerdown', dismiss);
-      if (nativePopover && list.matches(':popover-open')) list.hidePopover();
-    };
-  }, [expanded, placement, menuWidth]);
+  useSelectPopover(buttonRef,listRef,expanded,close,placement,menuWidth);
 
   useLayoutEffect(() => {
     const list = listRef.current, option = list?.querySelectorAll<HTMLElement>('.nc-select-option')[activeIndex];

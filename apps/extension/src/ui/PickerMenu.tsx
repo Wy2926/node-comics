@@ -5,9 +5,9 @@ import './select.css';
 import './picker-menu.css';
 
 /** An anchored picker with real buttons/forms, rather than interactive children inside listbox options. */
-export function PickerMenu({id:providedId,label,descriptionId,open,onOpenChange,trigger,children,viewKey='',busy=false,width=380,className=''}:{
+export function PickerMenu({id:providedId,label,descriptionId,open,onOpenChange,trigger,children,busy=false,width=380,className=''}:{
   id?:string;label:string;descriptionId?:string;open:boolean;onOpenChange:(open:boolean)=>void;
-  trigger:ReactNode;children:ReactNode;viewKey?:string;busy?:boolean;width?:number;className?:string;
+  trigger:ReactNode;children:ReactNode;busy?:boolean;width?:number;className?:string;
 }){
   const generatedId=useId(),id=providedId??generatedId,button=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
   const latest=useRef(onOpenChange);latest.current=onOpenChange;
@@ -43,7 +43,7 @@ export function PickerMenu({id:providedId,label,descriptionId,open,onOpenChange,
       node.scrollTop=0;
       (node.querySelector<HTMLElement>('input:not(:disabled)')??node.querySelector<HTMLElement>('[aria-pressed=true]:not(:disabled)')??node.querySelector<HTMLElement>('button:not(:disabled)'))?.focus({preventScroll:true});
     }
-  },[open,viewKey]);
+  },[open]);
   function navigate(event:KeyboardEvent<HTMLDivElement>){
     // Nested selects retain their own navigation; editable fields retain cursor movement.
     if(event.defaultPrevented||event.nativeEvent.isComposing)return;

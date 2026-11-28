@@ -9,10 +9,10 @@ import {errorMessage} from '../errors';
 import {translationNotice} from '../../../../notice';
 const config=parseConfig({provider:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'organization/a-long-model-name:Q4_K_M'});
 describe('Shinobu text boundary',()=>{
-  it('supports basic Chat Completions with reasoning off and optional fields omitted',()=>{
+  it('supports basic Chat Completions without overriding the service defaults',()=>{
     const request=llmRequest(config,{a:'こんにちは'},'zh-Hans');
     expect(request).toMatchObject({model:config.model,stream:false});
-    expect(request).toHaveProperty('reasoning_effort','none');
+    expect(request).not.toHaveProperty('reasoning_effort');
     expect(request).not.toHaveProperty('max_tokens');expect(request).not.toHaveProperty('response_format');expect(request).not.toHaveProperty('temperature');expect(request).not.toHaveProperty('max_completion_tokens');
     expect(needsInternet(config)).toBe(false);expect(needsInternet(parseConfig({}))).toBe(true);
   });
@@ -20,6 +20,18 @@ describe('Shinobu text boundary',()=>{
     const request=llmRequest({...config,maxTokens:32768,tokenField:'max_completion_tokens',responseFormat:'json_schema'},{a:'はい'},'zh-Hant');
     expect(request).toHaveProperty('max_completion_tokens',32768);expect(request).not.toHaveProperty('max_tokens');
     expect(request.response_format).toMatchObject({type:'json_schema',json_schema:{schema:{required:['a'],additionalProperties:false}}});
+  });
+  it('adds multiline preferences to both system prompts while keeping the language, output rules and dialogue intact',()=>{
+    const input={a:'「ソラ！」',b:'Wait!'},customPrompt='Keep “Sora” as a name.\nUse informal speech.';
+    const defaults=llmRequest(config,input,'es').messages;
+    const chat=llmRequest({...config,customPrompt},input,'es').messages;
+    const native=anthropicRequest({...config,protocol:'anthropic',maxTokens:1024,customPrompt},input,'es');
+    expect(chat[0].role).toBe('system');
+    expect(chat[0].content).toContain(defaults[0].content);
+    expect(chat[0].content).toContain(customPrompt);
+    expect(native.system).toBe(chat[0].content);
+    expect(chat.slice(1)).toEqual([{role:'user',content:JSON.stringify(input)}]);
+    expect(native.messages).toEqual(chat.slice(1));
   });
   it('accepts HTTP services while rejecting credential URLs and full method URLs',()=>{
     for(const baseUrl of ['https://key:secret@example.com/v1','https://example.com/v1?token=x','https://example.com/v1/chat/completions'])expect(()=>parseConfig({provider:'llm',baseUrl,model:'test'})).toThrow();
@@ -40,7 +52,7 @@ describe('Shinobu text boundary',()=>{
     expect(fetcher.mock.calls[0][0]).toBe('http://127.0.0.1:1234/v1/chat/completions');
     expect(fetcher.mock.calls[0][1]).toMatchObject({method:'POST',redirect:'error',credentials:'omit',headers:{Authorization:'Bearer test-gateway-token'}});
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({choices:[{finish_reason:'length',message:{content:'{"a":"你好"}'}}]})));
-    await expect(llmTranslate(config,{a:'hello'},'zh-Hans','',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_OUTPUT_INVALID');expect(fetcher).toHaveBeenCalledTimes(2);
+    await expect(llmTranslate(config,{a:'hello'},'zh-Hans','',new AbortController().signal,fetcher)).rejects.toThrow('TEXT_OUTPUT_TRUNCATED');expect(fetcher).toHaveBeenCalledTimes(2);
   });
   it('uses Google POST bodies and preserves each region boundary',async()=>{
     const fetcher=vi.fn().mockResolvedValue(new Response(JSON.stringify([[['你好','hello']]])));
@@ -53,7 +65,7 @@ describe('Shinobu text boundary',()=>{
     const request=fetcher.mock.calls[0] as unknown as [string,{body:URLSearchParams}];
     expect(request[1].body.get('tl')).toBe(language);expect(request[1].body.get('sl')).toBe('auto');
     expect(llmRequest(config,{a:'你好'},language).messages[0].content).toContain('into '+name);
-    expect(anthropicRequest({...config,llmProvider:'claude',protocol:'anthropic',model:'claude-sonnet-4-6',maxTokens:16384},{a:'你好'},language).system).toContain('into '+name);
+    expect(anthropicRequest({...config,llmProvider:'claude',protocol:'anthropic',maxTokens:16384},{a:'你好'},language).system).toContain('into '+name);
   });
   it('never sends unsupported targets to a text service or substitutes Chinese',async()=>{
     const fetcher=vi.fn();
@@ -87,7 +99,7 @@ describe('Shinobu text boundary',()=>{
   it('keeps the HTTP status through local error handling without echoing provider text',async()=>{
     const fetcher=vi.fn(async()=>new Response('private OCR and token',{status:404}));
     const code=await llmTranslate(config,{a:'hello'},'zh-Hans','private-token',new AbortController().signal,fetcher).then(()=>'',localFailureCode);
-    expect(translationNotice({kind:'error',message:errorMessage(code),code}).detail).toBe('请检查正文服务地址、模型与参数，然后保存设置。 (HTTP 404)');
+    expect(translationNotice({kind:'error',message:errorMessage(code),code}).detail).toBe('未找到接口或模型，请核对服务地址和模型 ID。 (HTTP 404)');
   });
   it('accepts only owned error codes, never private exception details',()=>{
     const code=localFailureCode(Error('PIPELINE_OCR_TIMEOUT'));

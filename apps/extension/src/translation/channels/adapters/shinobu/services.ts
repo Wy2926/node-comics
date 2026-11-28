@@ -2,17 +2,21 @@ import {assertCurrent} from '../../../../concurrency';
 import {requireHostAccess} from '../../../../host-permissions';
 import {msg} from '../../../../i18n/runtime';
 import {readChannelCredentials,updateChannelSettings,writeChannelSecrets} from '../../configuration';
-import type {ChannelProfile,ChannelServiceSelection} from '../../contracts';
-import {configValues,parseConfig,serviceFields,changeServiceValues} from './config';
-import {providerPreset,thinkingParameters} from './providers';
-import {errorMessage} from './errors';
+import {ChannelServiceError,type ChannelProfile,type ChannelServiceSelection} from '../../contracts';
+import {configValues,parseConfig,draftConfig,serviceEndpoint,serviceFields,changeServiceValues,type ShinobuConfig} from './config';
+import {providerPreset} from './providers';
+import {errorMessage,serviceError} from './errors';
+import {listModels} from './text/models';
+import {llmTranslate} from './text/openai-compatible';
+import {anthropicTranslate} from './text/anthropic';
+import {redactProbeText} from './text/llm-http';
 
 interface TextService {id:string;name:string;scope:string;values:Record<string,string>}
 interface Services {selectedId:string;items:TextService[]}
 const secretKey=(id:string)=>'text-service:'+id;
 export const fontPreferenceKey=(profile:ChannelProfile)=>'local-fonts:'+profile.id;
-const textValues=(values:Record<string,string>)=>{
-  const {backend:_backend,ocrFilter:_filter,...text}=configValues(parseConfig({...values,provider:'llm'}));
+const textValues=(config:ShinobuConfig)=>{
+  const {backend:_backend,ocrFilter:_filter,...text}=configValues(config);
   return text;
 };
 export function readServices(profile:ChannelProfile):Services{
@@ -21,7 +25,7 @@ export function readServices(profile:ChannelProfile):Services{
       if(!Array.isArray(items)||new Set(items.map(item=>item.id)).size!==items.length)throw Error();
       for(const item of items){
         if(!item||!/^[-\w]{1,64}$/.test(item.id)||item.id==='google'||!item.name||item.name.length>80||typeof item.scope!=='string'||!item.values)throw Error();
-        item.values=textValues(item.values);
+        item.values=textValues(parseConfig({...item.values,provider:'llm'}));
       }
       const selectedId=profile.settings.textServiceId;
       if(selectedId!=='google'&&!items.some(item=>item.id===selectedId))throw Error();
@@ -69,29 +73,53 @@ export async function saveCommonSettings(profile:ChannelProfile,values:Record<st
 }
 export function serviceSelection(profile:ChannelProfile,secrets:Record<string,string>,isCurrent:()=>boolean):ChannelServiceSelection{
   const state=readServices(profile),stored=providerSecrets(secrets);
+  function existing(id?:string){
+    const item=state.items.find(item=>item.id===id);
+    if(id&&!item)throw Error(errorMessage('TEXT_CONFIG_CHANGED'));
+    return item;
+  }
+  async function probe<T>(values:Record<string,string>,id:string|undefined,signal:AbortSignal,baseUrl:string,models:boolean,send:(token:string,signal:AbortSignal)=>Promise<T>){
+    assertCurrent(isCurrent);signal.throwIfAborted();
+    const item=existing(id);
+    await requireHostAccess([baseUrl]);
+    // 包含端口和路径，不能只按域名复用凭据；试译和列模型均不创建任务或写入草稿。
+    const token=values.token?.trim()||(item?.values.baseUrl===baseUrl?stored[secretKey(item.id)]:'')||'';
+    assertCurrent(isCurrent);signal.throwIfAborted();
+    const deadline=AbortSignal.timeout(models?15_000:60_000),combined=AbortSignal.any([signal,deadline]);
+    let result:T;
+    try{result=await send(token,combined);combined.throwIfAborted();}
+    catch(error){signal.throwIfAborted();throw serviceError(deadline.aborted?Error('TEXT_TIMEOUT'):error,models);}
+    assertCurrent(isCurrent);return result;
+  }
   return {
     get label(){return msg('正文翻译服务');},get description(){return msg('识别和绘图在浏览器内完成，仅文字发送至所选服务。');},get addLabel(){return msg('添加 LLM 供应商');},selectedId:state.selectedId,initialValues:providerPreset('deepseek'),fields:serviceFields,changeValues:changeServiceValues,
     items:[{id:'google',get label(){return msg('谷歌翻译');},get description(){return msg('无需配置，使用 Google Translate 翻译正文。');}},...state.items.map(item=>({id:item.id,label:item.name,description:item.values.model+' · '+new URL(item.values.baseUrl).host,values:{...item.values,name:item.name},savedSecrets:stored[secretKey(item.id)]?['token']:[]}))],
+    async listModels(values,id,signal,inspect){
+      let endpoint:ReturnType<typeof serviceEndpoint>;
+      try{endpoint=serviceEndpoint(values);}catch(error){throw serviceError(error);}
+      return probe(values,id,signal,endpoint.baseUrl,true,(token,signal)=>listModels(endpoint,token,signal,inspect));
+    },
+    async test(values,id,language,signal,inspect){
+      const config=draftConfig(values),translate=config.protocol==='anthropic'?anthropicTranslate:llmTranslate;
+      return probe(values,id,signal,config.baseUrl,false,async(token,signal)=>{
+        const {sample}=await translate(config,{sample:language==='ja'?'Hello!':'こんにちは！'},language,token,signal,fetch,inspect);
+        return redactProbeText(sample,token);
+      });
+    },
     async select(id){
       if(id===state.selectedId)return;
       if(id!=='google'&&!state.items.some(item=>item.id===id))throw Error(errorMessage('TEXT_CONFIG_INVALID'));
       await mutate(profile,isCurrent,next=>{next.selectedId=id;});
     },
     async save(values,id){
-      const name=values.name?.trim();
-      if(!name||name.length>80)throw Error(msg('请填写不超过 80 个字的供应商名称。'));
-      let config:Record<string,string>;
-      try{
-        config=textValues(values);const parsed=parseConfig(config);thinkingParameters(parsed,parsed.maxTokens);
-        if(parsed.protocol==='anthropic'&&(parsed.maxTokens===undefined||parsed.responseFormat==='json_object'))throw Error('TEXT_CONFIG_INVALID');
-      }catch(error){throw Error(errorMessage(error instanceof Error?error.message:'TEXT_CONFIG_INVALID'));}
-      const previous=id?state.items.find(item=>item.id===id):undefined;
-      if(id&&!previous)throw Error(errorMessage('TEXT_CONFIG_CHANGED'));
-      await requireHostAccess([new URL(config.baseUrl).origin+'/*']);
+      const config=textValues(draftConfig(values)),previous=existing(id);
+      const name=values.name?.trim()||config.model.slice(0,80),token=values.token?.trim();
+      if(name.length>80)throw new ChannelServiceError(msg('请填写不超过 80 个字的供应商名称。'),'name');
+      await requireHostAccess([config.baseUrl]);
       await mutate(profile,isCurrent,(next,credentials)=>{
-        const key=id??crypto.randomUUID(),changed=previous?.values.baseUrl!==config.baseUrl||previous?.values.protocol!==config.protocol||!!values.token;
+        const key=id??crypto.randomUUID(),changed=previous?.values.baseUrl!==config.baseUrl||previous?.values.protocol!==config.protocol||!!token;
         const item:TextService={id:key,name,values:config,scope:previous&&!changed?previous.scope:JSON.stringify([profile.id,'llm',key,crypto.randomUUID()])};
-        if(values.token)credentials[secretKey(key)]=values.token;
+        if(token)credentials[secretKey(key)]=token;
         else if(previous?.values.baseUrl!==config.baseUrl)delete credentials[secretKey(key)];
         next.items=[...next.items.filter(item=>item.id!==key),item];next.selectedId=key;
       });
